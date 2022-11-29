@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import DanceDiffusionPipeline
 from scipy.io.wavfile import write
+
+from ppdiffusers import DanceDiffusionPipeline
 
 # 加载模型和scheduler
 pipe = DanceDiffusionPipeline.from_pretrained("harmonai/maestro-150k")
@@ -23,5 +24,4 @@ audios = pipe(audio_length_in_s=4.0).audios
 
 # 保存音频到本地
 for i, audio in enumerate(audios):
-    write(f"dance_maestro_test_{i}.wav", pipe.unet.sample_rate,
-          audio.transpose())
+    write(f"dance_maestro_test_{i}.wav", pipe.unet.sample_rate, audio.transpose())

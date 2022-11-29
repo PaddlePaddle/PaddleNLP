@@ -12,16 +12,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import numpy as np
-
 import PIL
-from PIL import Image
 
-from ...utils import BaseOutput, is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ...utils import (
+    BaseOutput,
+    is_onnx_available,
+    is_paddle_available,
+    is_paddlenlp_available,
+)
 
 
 @dataclass
@@ -44,21 +48,33 @@ class StableDiffusionPipelineOutput(BaseOutput):
 
 if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_cycle_diffusion import CycleDiffusionPipeline
-    from .pipeline_stable_diffusion_all_in_one import StableDiffusionPipelineAllinOne
     from .pipeline_stable_diffusion import StableDiffusionPipeline
+    from .pipeline_stable_diffusion_all_in_one import StableDiffusionPipelineAllinOne
     from .pipeline_stable_diffusion_img2img import StableDiffusionImg2ImgPipeline
     from .pipeline_stable_diffusion_inpaint import StableDiffusionInpaintPipeline
-    from .pipeline_stable_diffusion_inpaint_legacy import StableDiffusionInpaintPipelineLegacy
+    from .pipeline_stable_diffusion_inpaint_legacy import (
+        StableDiffusionInpaintPipelineLegacy,
+    )
     from .pipeline_stable_diffusion_upscale import StableDiffusionUpscalePipeline
     from .safety_checker import StableDiffusionSafetyChecker
 
 if is_paddlenlp_available() and is_paddle_available():
-    from .pipeline_stable_diffusion_image_variation import StableDiffusionImageVariationPipeline
+    from .pipeline_stable_diffusion_image_variation import (
+        StableDiffusionImageVariationPipeline,
+    )
 else:
-    from ...utils.dummy_paddle_and_paddlenlp_objects import StableDiffusionImageVariationPipeline
+    from ...utils.dummy_paddle_and_paddlenlp_objects import (
+        StableDiffusionImageVariationPipeline,
+    )
 
 if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion import OnnxStableDiffusionPipeline
-    from .pipeline_onnx_stable_diffusion_img2img import OnnxStableDiffusionImg2ImgPipeline
-    from .pipeline_onnx_stable_diffusion_inpaint import OnnxStableDiffusionInpaintPipeline
-    from .pipeline_onnx_stable_diffusion_inpaint_legacy import OnnxStableDiffusionInpaintPipelineLegacy
+    from .pipeline_onnx_stable_diffusion_img2img import (
+        OnnxStableDiffusionImg2ImgPipeline,
+    )
+    from .pipeline_onnx_stable_diffusion_inpaint import (
+        OnnxStableDiffusionInpaintPipeline,
+    )
+    from .pipeline_onnx_stable_diffusion_inpaint_legacy import (
+        OnnxStableDiffusionInpaintPipelineLegacy,
+    )

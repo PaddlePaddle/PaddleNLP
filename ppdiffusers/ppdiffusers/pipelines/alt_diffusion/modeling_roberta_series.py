@@ -19,26 +19,25 @@ from typing import Optional, Tuple
 import paddle
 from paddle import nn
 
-from paddlenlp.transformers import RobertaPretrainedModel, RobertaConfig as XLMRobertaConfig, RobertaModel as XLMRobertaModel
+from paddlenlp.transformers import RobertaConfig as XLMRobertaConfig
+from paddlenlp.transformers import RobertaModel as XLMRobertaModel
+from paddlenlp.transformers import RobertaPretrainedModel
 from paddlenlp.transformers.model_outputs import ModelOutput
 
 
-def create_position_ids_from_input_ids(input_ids,
-                                       padding_idx,
-                                       past_key_values_length=0):
+def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length=0):
     """
     Replace non-padding symbols with their position numbers. Position numbers begin at padding_idx+1. Padding symbols
     are ignored. This is modified from fairseq's `utils.make_positions`.
-    
+
     Args:
         x: paddle.Tensor x:
     Returns: paddle.Tensor
-    
+
     """
     # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
     mask = (input_ids != padding_idx).cast("int64")
-    incremental_indices = (paddle.cumsum(mask, axis=1) +
-                           past_key_values_length) * mask
+    incremental_indices = (paddle.cumsum(mask, axis=1) + past_key_values_length) * mask
     return incremental_indices + padding_idx
 
 
@@ -82,10 +81,7 @@ class RobertaSeriesConfig(XLMRobertaConfig):
         use_attention_mask=True,
         **kwargs,
     ):
-        super().__init__(pad_token_id=pad_token_id,
-                         bos_token_id=bos_token_id,
-                         eos_token_id=eos_token_id,
-                         **kwargs)
+        super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
         self.project_dim = project_dim
         self.pooler_fn = pooler_fn
         self.learn_encoder = learn_encoder
@@ -94,9 +90,7 @@ class RobertaSeriesConfig(XLMRobertaConfig):
 
 class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
     _keys_to_ignore_on_load_unexpected = [r"pooler"]
-    _keys_to_ignore_on_load_missing = [
-        r"position_ids", r"predictions.decoder.bias"
-    ]
+    _keys_to_ignore_on_load_missing = [r"position_ids", r"predictions.decoder.bias"]
     base_model_prefix = "roberta"
     config_class = RobertaSeriesConfig
 
@@ -119,8 +113,7 @@ class RobertaSeriesModelWithTransformation(RobertaPretrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         if position_ids is None:
-            position_ids = create_position_ids_from_input_ids(
-                input_ids, self.config.pad_token_id)
+            position_ids = create_position_ids_from_input_ids(input_ids, self.config.pad_token_id)
         outputs = self.base_model(
             input_ids=input_ids,
             attention_mask=attention_mask,

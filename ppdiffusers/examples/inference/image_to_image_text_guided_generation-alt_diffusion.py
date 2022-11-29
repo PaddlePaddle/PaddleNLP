@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import paddle
+
 from ppdiffusers import AltDiffusionImg2ImgPipeline
 from ppdiffusers.utils import load_image
 
@@ -25,9 +26,6 @@ init_image = load_image(url).resize((768, 512))
 prompt = "奇幻的景观，以一种艺术的形式。"
 # 使用fp16加快生成速度
 with paddle.amp.auto_cast(True):
-    image = pipe(prompt=prompt,
-                 init_image=init_image,
-                 strength=0.75,
-                 guidance_scale=7.5).images[0]
+    image = pipe(prompt=prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
 
 image.save("alt_diffusion_fantasy_landscape.png")

@@ -50,9 +50,7 @@ def get_constant_schedule(learning_rate: float, last_epoch: int = -1):
     return LambdaDecay(learning_rate, lambda _: 1, last_epoch=last_epoch)
 
 
-def get_constant_schedule_with_warmup(learning_rate: float,
-                                      num_warmup_steps: int,
-                                      last_epoch: int = -1):
+def get_constant_schedule_with_warmup(learning_rate: float, num_warmup_steps: int, last_epoch: int = -1):
     """
     Create a schedule with a constant learning rate preceded by a warmup period during which the learning rate
     increases linearly between 0 and the initial lr set in the optimizer.
@@ -77,10 +75,9 @@ def get_constant_schedule_with_warmup(learning_rate: float,
     return LambdaDecay(learning_rate, lr_lambda, last_epoch=last_epoch)
 
 
-def get_linear_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps: int,
-                                    num_training_steps: int,
-                                    last_epoch: int = -1):
+def get_linear_schedule_with_warmup(
+    learning_rate: float, num_warmup_steps: int, num_training_steps: int, last_epoch: int = -1
+):
     """
     Create a schedule with a learning rate that decreases linearly from the initial lr set in the optimizer to 0, after
     a warmup period during which it increases linearly from 0 to the initial lr set in the optimizer.
@@ -103,18 +100,15 @@ def get_linear_schedule_with_warmup(learning_rate: float,
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         return max(
-            0.0,
-            float(num_training_steps - current_step) /
-            float(max(1, num_training_steps - num_warmup_steps)))
+            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
+        )
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
-def get_cosine_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps: int,
-                                    num_training_steps: int,
-                                    num_cycles: float = 0.5,
-                                    last_epoch: int = -1):
+def get_cosine_schedule_with_warmup(
+    learning_rate: float, num_warmup_steps: int, num_training_steps: int, num_cycles: float = 0.5, last_epoch: int = -1
+):
     """
     Create a schedule with a learning rate that decreases following the values of the cosine function between the
     initial lr set in the optimizer to 0, after a warmup period during which it increases linearly between 0 and the
@@ -140,20 +134,15 @@ def get_cosine_schedule_with_warmup(learning_rate: float,
     def lr_lambda(current_step):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
-        progress = float(current_step - num_warmup_steps) / float(
-            max(1, num_training_steps - num_warmup_steps))
-        return max(
-            0.0, 0.5 *
-            (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+        progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
-def get_cosine_with_hard_restarts_schedule_with_warmup(learning_rate: float,
-                                                       num_warmup_steps: int,
-                                                       num_training_steps: int,
-                                                       num_cycles: int = 1,
-                                                       last_epoch: int = -1):
+def get_cosine_with_hard_restarts_schedule_with_warmup(
+    learning_rate: float, num_warmup_steps: int, num_training_steps: int, num_cycles: int = 1, last_epoch: int = -1
+):
     """
     Create a schedule with a learning rate that decreases following the values of the cosine function between the
     initial lr set in the optimizer to 0, with several hard restarts, after a warmup period during which it increases
@@ -178,23 +167,22 @@ def get_cosine_with_hard_restarts_schedule_with_warmup(learning_rate: float,
     def lr_lambda(current_step):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
-        progress = float(current_step - num_warmup_steps) / float(
-            max(1, num_training_steps - num_warmup_steps))
+        progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
         if progress >= 1.0:
             return 0.0
-        return max(
-            0.0, 0.5 * (1.0 + math.cos(math.pi *
-                                       ((float(num_cycles) * progress) % 1.0))))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * ((float(num_cycles) * progress) % 1.0))))
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
-def get_polynomial_decay_schedule_with_warmup(learning_rate: float,
-                                              num_warmup_steps: int,
-                                              num_training_steps: int,
-                                              lr_end: float = 1e-7,
-                                              power: float = 1.0,
-                                              last_epoch: int = -1):
+def get_polynomial_decay_schedule_with_warmup(
+    learning_rate: float,
+    num_warmup_steps: int,
+    num_training_steps: int,
+    lr_end: float = 1e-7,
+    power: float = 1.0,
+    last_epoch: int = -1,
+):
     """
     Create a schedule with a learning rate that decreases as a polynomial decay from the initial lr set in the
     optimizer to end lr defined by *lr_end*, after a warmup period during which it increases linearly from 0 to the
@@ -225,8 +213,7 @@ def get_polynomial_decay_schedule_with_warmup(learning_rate: float,
 
     lr_init = learning_rate
     if not (lr_init > lr_end):
-        raise ValueError(
-            f"lr_end ({lr_end}) must be be smaller than initial lr ({lr_init})")
+        raise ValueError(f"lr_end ({lr_end}) must be be smaller than initial lr ({lr_init})")
 
     def lr_lambda(current_step: int):
         if current_step < num_warmup_steps:
@@ -246,8 +233,7 @@ def get_polynomial_decay_schedule_with_warmup(learning_rate: float,
 TYPE_TO_SCHEDULER_FUNCTION = {
     SchedulerType.LINEAR: get_linear_schedule_with_warmup,
     SchedulerType.COSINE: get_cosine_schedule_with_warmup,
-    SchedulerType.COSINE_WITH_RESTARTS:
-    get_cosine_with_hard_restarts_schedule_with_warmup,
+    SchedulerType.COSINE_WITH_RESTARTS: get_cosine_with_hard_restarts_schedule_with_warmup,
     SchedulerType.POLYNOMIAL: get_polynomial_decay_schedule_with_warmup,
     SchedulerType.CONSTANT: get_constant_schedule,
     SchedulerType.CONSTANT_WITH_WARMUP: get_constant_schedule_with_warmup,
@@ -282,20 +268,15 @@ def get_scheduler(
 
     # All other schedulers require `num_warmup_steps`
     if num_warmup_steps is None:
-        raise ValueError(
-            f"{name} requires `num_warmup_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_warmup_steps`, please provide that argument.")
 
     if name == SchedulerType.CONSTANT_WITH_WARMUP:
-        return schedule_func(learning_rate=learning_rate,
-                             num_warmup_steps=num_warmup_steps)
+        return schedule_func(learning_rate=learning_rate, num_warmup_steps=num_warmup_steps)
 
     # All other schedulers require `num_training_steps`
     if num_training_steps is None:
-        raise ValueError(
-            f"{name} requires `num_training_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_training_steps`, please provide that argument.")
 
-    return schedule_func(learning_rate=learning_rate,
-                         num_warmup_steps=num_warmup_steps,
-                         num_training_steps=num_training_steps)
+    return schedule_func(
+        learning_rate=learning_rate, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps
+    )

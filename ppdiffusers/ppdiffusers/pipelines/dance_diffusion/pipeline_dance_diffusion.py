@@ -74,26 +74,25 @@ class DanceDiffusionPipeline(DiffusionPipeline):
 
         sample_size = audio_length_in_s * self.unet.sample_rate
 
-        down_scale_factor = 2**len(self.unet.up_blocks)
+        down_scale_factor = 2 ** len(self.unet.up_blocks)
         if sample_size < 3 * down_scale_factor:
             raise ValueError(
                 f"{audio_length_in_s} is too small. Make sure it's bigger or equal to"
-                f" {3 * down_scale_factor / self.unet.sample_rate}.")
+                f" {3 * down_scale_factor / self.unet.sample_rate}."
+            )
 
         original_sample_size = int(sample_size)
         if sample_size % down_scale_factor != 0:
-            sample_size = ((audio_length_in_s * self.unet.sample_rate) //
-                           down_scale_factor + 1) * down_scale_factor
+            sample_size = ((audio_length_in_s * self.unet.sample_rate) // down_scale_factor + 1) * down_scale_factor
             logger.info(
                 f"{audio_length_in_s} is increased to {sample_size / self.unet.sample_rate} so that it can be handled"
                 f" by the model. It will be cut to {original_sample_size / self.unet.sample_rate} after the denoising"
-                " process.")
+                " process."
+            )
         sample_size = int(sample_size)
 
         dtype = self.unet.dtype
-        audio = paddle.randn((batch_size, self.unet.in_channels, sample_size),
-                             generator=generator,
-                             dtype=dtype)
+        audio = paddle.randn((batch_size, self.unet.in_channels, sample_size), generator=generator, dtype=dtype)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)
@@ -111,6 +110,6 @@ class DanceDiffusionPipeline(DiffusionPipeline):
         audio = audio[:, :, :original_sample_size]
 
         if not return_dict:
-            return (audio, )
+            return (audio,)
 
         return AudioPipelineOutput(audios=audio)

@@ -26,13 +26,11 @@ from pathlib import Path
 from typing import Union
 
 import numpy as np
-
 import PIL.Image
 import PIL.ImageOps
 import requests
-from packaging import version
 
-from .import_utils import is_paddle_available, is_onnx_available
+from .import_utils import is_onnx_available, is_paddle_available
 
 if is_paddle_available():
     import paddle
@@ -119,16 +117,14 @@ def require_paddle(test_case):
     """
     Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
     """
-    return unittest.skipUnless(is_paddle_available(),
-                               "test requires Paddle")(test_case)
+    return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
 
 
 def require_onnxruntime(test_case):
     """
     Decorator marking a test that requires onnxruntime. These tests are skipped when onnxruntime isn't installed.
     """
-    return unittest.skipUnless(is_onnx_available(),
-                               "test requires onnxruntime")(test_case)
+    return unittest.skipUnless(is_onnx_available(), "test requires onnxruntime")(test_case)
 
 
 def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:
@@ -148,7 +144,8 @@ def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:
     else:
         raise ValueError(
             "Incorrect format used for numpy ndarray. Should be an url linking to an image, a local path, or a"
-            " ndarray.")
+            " ndarray."
+        )
 
     return arry
 
@@ -185,8 +182,8 @@ def load_image(image: Union[str, PIL.Image.Image]) -> PIL.Image.Image:
 def load_hf_numpy(path) -> np.ndarray:
     if not path.startswith("http://") or path.startswith("https://"):
         path = os.path.join(
-            "https://huggingface.co/datasets/fusing/diffusers-testing/resolve/main",
-            urllib.parse.quote(path))
+            "https://huggingface.co/datasets/fusing/diffusers-testing/resolve/main", urllib.parse.quote(path)
+        )
 
     return load_numpy(path)
 
@@ -194,8 +191,8 @@ def load_hf_numpy(path) -> np.ndarray:
 def load_ppnlp_numpy(path) -> np.ndarray:
     if not path.startswith("http://") or path.startswith("https://"):
         path = os.path.join(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/diffusers-testing",
-            urllib.parse.quote(path))
+            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/diffusers-testing", urllib.parse.quote(path)
+        )
     return load_numpy(path)
 
 
@@ -219,8 +216,7 @@ def pytest_addoption_shared(parser):
             option,
             action="store",
             default=False,
-            help=
-            "generate report files. The value of this option is used as a prefix to report names",
+            help="generate report files. The value of this option is used as a prefix to report names",
         )
         pytest_opt_registered[option] = 1
 
@@ -287,9 +283,7 @@ def pytest_terminal_summary_main(tr, id):
             f.write("slowest durations\n")
             for i, rep in enumerate(dlist):
                 if rep.duration < durations_min:
-                    f.write(
-                        f"{len(dlist)-i} durations < {durations_min} secs were omitted"
-                    )
+                    f.write(f"{len(dlist)-i} durations < {durations_min} secs were omitted")
                     break
                 f.write(f"{rep.duration:02.2f}s {rep.when:<8} {rep.nodeid}\n")
 
@@ -303,8 +297,7 @@ def pytest_terminal_summary_main(tr, id):
             msg = tr._getfailureheadline(rep)
             tr.write_sep("_", msg, red=True, bold=True)
             # chop off the optional leading extra frames, leaving only the last one
-            longrepr = re.sub(r".*_ _ _ (_ ){10,}_ _ ", "", rep.longreprtext, 0,
-                              re.M | re.S)
+            longrepr = re.sub(r".*_ _ _ (_ ){10,}_ _ ", "", rep.longreprtext, 0, re.M | re.S)
             tr._tw.line(longrepr)
             # note: not printing out any rep.sections to keep the report short
 

@@ -12,12 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from dataclasses import dataclass
 from typing import List, Optional, Union
 
 import numpy as np
-
 import PIL
 
 from ...utils import BaseOutput, is_paddle_available, is_paddlenlp_available

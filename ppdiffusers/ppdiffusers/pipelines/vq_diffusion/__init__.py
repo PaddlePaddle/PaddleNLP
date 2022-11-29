@@ -12,8 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from ...utils import is_paddle_available, is_paddlenlp_available
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipeline_vq_diffusion import LearnedClassifierFreeSamplingEmbeddings, VQDiffusionPipeline
+    from .pipeline_vq_diffusion import (
+        LearnedClassifierFreeSamplingEmbeddings,
+        VQDiffusionPipeline,
+    )

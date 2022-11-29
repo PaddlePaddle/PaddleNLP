@@ -22,7 +22,6 @@ import sys
 from collections import OrderedDict
 from typing import Union
 
-from packaging import version
 from packaging.version import Version, parse
 
 from . import logging
@@ -40,14 +39,7 @@ ENV_VARS_TRUE_AND_AUTO_VALUES = ENV_VARS_TRUE_VALUES.union({"AUTO"})
 
 USE_PADDLE = os.environ.get("USE_PADDLE", "AUTO").upper()
 
-STR_OPERATION_TO_FUNC = {
-    ">": op.gt,
-    ">=": op.ge,
-    "==": op.eq,
-    "!=": op.ne,
-    "<=": op.le,
-    "<": op.lt
-}
+STR_OPERATION_TO_FUNC = {">": op.gt, ">=": op.ge, "==": op.eq, "!=": op.ne, "<=": op.le, "<": op.lt}
 
 _paddle_version = "N/A"
 if USE_PADDLE in ENV_VARS_TRUE_AND_AUTO_VALUES:
@@ -55,6 +47,7 @@ if USE_PADDLE in ENV_VARS_TRUE_AND_AUTO_VALUES:
     if _paddle_available:
         try:
             import paddle
+
             _paddle_version = paddle.__version__
             logger.info(f"Paddle version {_paddle_version} available.")
         except importlib_metadata.PackageNotFoundError:
@@ -66,8 +59,7 @@ else:
 _paddlenlp_available = importlib.util.find_spec("paddlenlp") is not None
 try:
     _paddlenlp_version = importlib_metadata.version("paddlenlp")
-    logger.debug(
-        f"Successfully imported paddlenlp version {_paddlenlp_version}")
+    logger.debug(f"Successfully imported paddlenlp version {_paddlenlp_version}")
 except importlib_metadata.PackageNotFoundError:
     _paddlenlp_available = False
 
@@ -81,24 +73,21 @@ except importlib_metadata.PackageNotFoundError:
 _unidecode_available = importlib.util.find_spec("unidecode") is not None
 try:
     _unidecode_version = importlib_metadata.version("unidecode")
-    logger.debug(
-        f"Successfully imported unidecode version {_unidecode_version}")
+    logger.debug(f"Successfully imported unidecode version {_unidecode_version}")
 except importlib_metadata.PackageNotFoundError:
     _unidecode_available = False
 
 _modelcards_available = importlib.util.find_spec("modelcards") is not None
 try:
     _modelcards_version = importlib_metadata.version("modelcards")
-    logger.debug(
-        f"Successfully imported modelcards version {_modelcards_version}")
+    logger.debug(f"Successfully imported modelcards version {_modelcards_version}")
 except importlib_metadata.PackageNotFoundError:
     _modelcards_available = False
 
 _onnxruntime_version = "N/A"
 _onnx_available = importlib.util.find_spec("onnxruntime") is not None
 if _onnx_available:
-    candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml",
-                  "onnxruntime-openvino")
+    candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml", "onnxruntime-openvino")
     _onnxruntime_version = None
     # For the metadata, we have to look for both onnxruntime and onnxruntime-gpu
     for pkg in candidates:
@@ -109,8 +98,7 @@ if _onnx_available:
             pass
     _onnx_available = _onnxruntime_version is not None
     if _onnx_available:
-        logger.debug(
-            f"Successfully imported onnxruntime version {_onnxruntime_version}")
+        logger.debug(f"Successfully imported onnxruntime version {_onnxruntime_version}")
 
 _scipy_available = importlib.util.find_spec("scipy") is not None
 try:
@@ -184,14 +172,16 @@ UNIDECODE_IMPORT_ERROR = """
 Unidecode`
 """
 
-BACKENDS_MAPPING = OrderedDict([
-    ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
-    ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
-    ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
-    ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
-    ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
-    ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
-])
+BACKENDS_MAPPING = OrderedDict(
+    [
+        ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
+        ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
+        ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
+        ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
+        ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
+        ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
+    ]
+)
 
 
 def requires_backends(obj, backends):
@@ -218,8 +208,7 @@ class DummyObject(type):
 
 
 # This function was copied from: https://github.com/huggingface/accelerate/blob/874c4967d94badd24f893064cc3bef45f57cadf7/src/accelerate/utils/versions.py#L319
-def compare_versions(library_or_version: Union[str, Version], operation: str,
-                     requirement_version: str):
+def compare_versions(library_or_version: Union[str, Version], operation: str, requirement_version: str):
     """
     Args:
     Compares a library version to some requirement using a given operation.
@@ -231,13 +220,10 @@ def compare_versions(library_or_version: Union[str, Version], operation: str,
             The version to compare the library version against
     """
     if operation not in STR_OPERATION_TO_FUNC.keys():
-        raise ValueError(
-            f"`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}, received {operation}"
-        )
+        raise ValueError(f"`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}, received {operation}")
     operation = STR_OPERATION_TO_FUNC[operation]
     if isinstance(library_or_version, str):
-        library_or_version = parse(
-            importlib_metadata.version(library_or_version))
+        library_or_version = parse(importlib_metadata.version(library_or_version))
     return operation(library_or_version, parse(requirement_version))
 
 

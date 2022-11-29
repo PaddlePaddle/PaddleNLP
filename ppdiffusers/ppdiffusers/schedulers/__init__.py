@@ -12,8 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
-from ..utils import is_scipy_available, is_paddle_available
+from ..utils import is_paddle_available, is_scipy_available
 
 if is_paddle_available():
     from .scheduling_ddim import DDIMScheduler

@@ -18,7 +18,6 @@ from typing import Optional, Tuple, Union
 import paddle
 
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
-from ...utils import deprecate
 
 
 class DDIMPipeline(DiffusionPipeline):
@@ -76,11 +75,9 @@ class DDIMPipeline(DiffusionPipeline):
         """
         # Sample gaussian noise to begin loop
         if isinstance(self.unet.sample_size, int):
-            image_shape = (batch_size, self.unet.in_channels,
-                           self.unet.sample_size, self.unet.sample_size)
+            image_shape = (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size)
         else:
-            image_shape = (batch_size, self.unet.in_channels,
-                           *self.unet.sample_size)
+            image_shape = (batch_size, self.unet.in_channels, *self.unet.sample_size)
 
         image = paddle.randn(image_shape, generator=generator)
 
@@ -95,12 +92,8 @@ class DDIMPipeline(DiffusionPipeline):
             # eta corresponds to η in paper and should be between [0, 1]
             # do x_t -> x_t-1
             image = self.scheduler.step(
-                model_output,
-                t,
-                image,
-                eta=eta,
-                use_clipped_model_output=use_clipped_model_output,
-                generator=generator).prev_sample
+                model_output, t, image, eta=eta, use_clipped_model_output=use_clipped_model_output, generator=generator
+            ).prev_sample
 
         image = (image / 2 + 0.5).clip(0, 1)
         image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
@@ -108,6 +101,6 @@ class DDIMPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

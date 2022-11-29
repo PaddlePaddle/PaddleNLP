@@ -16,18 +16,29 @@ import inspect
 from typing import Callable, List, Optional, Union
 
 import paddle
-
 import PIL.Image
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModelWithProjection, CLIPTokenizer, CLIPVisionModelWithProjection
+
+from paddlenlp.transformers import (
+    CLIPFeatureExtractor,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    CLIPVisionModelWithProjection,
+)
 
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import logging
 from .modeling_text_unet import UNetFlatConditionModel
-from .pipeline_versatile_diffusion_dual_guided import VersatileDiffusionDualGuidedPipeline
-from .pipeline_versatile_diffusion_image_variation import VersatileDiffusionImageVariationPipeline
-from .pipeline_versatile_diffusion_text_to_image import VersatileDiffusionTextToImagePipeline
+from .pipeline_versatile_diffusion_dual_guided import (
+    VersatileDiffusionDualGuidedPipeline,
+)
+from .pipeline_versatile_diffusion_image_variation import (
+    VersatileDiffusionImageVariationPipeline,
+)
+from .pipeline_versatile_diffusion_text_to_image import (
+    VersatileDiffusionTextToImagePipeline,
+)
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -94,11 +105,9 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
             vae=vae,
             scheduler=scheduler,
         )
-        self.vae_scale_factor = 2**(len(self.vae.config.block_out_channels) - 1)
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -222,14 +231,8 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        expected_components = inspect.signature(
-            VersatileDiffusionImageVariationPipeline.__init__).parameters.keys(
-            )
-        components = {
-            name: component
-            for name, component in self.components.items()
-            if name in expected_components
-        }
+        expected_components = inspect.signature(VersatileDiffusionImageVariationPipeline.__init__).parameters.keys()
+        components = {name: component for name, component in self.components.items() if name in expected_components}
         return VersatileDiffusionImageVariationPipeline(**components)(
             image=image,
             height=height,
@@ -334,13 +337,8 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
             list of `bool`s denoting whether the corresponding generated image likely represents "not-safe-for-work"
             (nsfw) content, according to the `safety_checker`.
         """
-        expected_components = inspect.signature(
-            VersatileDiffusionTextToImagePipeline.__init__).parameters.keys()
-        components = {
-            name: component
-            for name, component in self.components.items()
-            if name in expected_components
-        }
+        expected_components = inspect.signature(VersatileDiffusionTextToImagePipeline.__init__).parameters.keys()
+        components = {name: component for name, component in self.components.items() if name in expected_components}
         temp_pipeline = VersatileDiffusionTextToImagePipeline(**components)
         output = temp_pipeline(
             prompt=prompt,
@@ -464,13 +462,8 @@ class VersatileDiffusionPipeline(DiffusionPipeline):
             returning a tuple, the first element is a list with the generated images.
         """
 
-        expected_components = inspect.signature(
-            VersatileDiffusionDualGuidedPipeline.__init__).parameters.keys()
-        components = {
-            name: component
-            for name, component in self.components.items()
-            if name in expected_components
-        }
+        expected_components = inspect.signature(VersatileDiffusionDualGuidedPipeline.__init__).parameters.keys()
+        components = {name: component for name, component in self.components.items() if name in expected_components}
         temp_pipeline = VersatileDiffusionDualGuidedPipeline(**components)
         output = temp_pipeline(
             prompt=prompt,

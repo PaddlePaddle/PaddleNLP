@@ -16,11 +16,10 @@
 import unittest
 
 import paddle
+from test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet1DModel
 from ppdiffusers.utils import floats_tensor, slow
-
-from test_modeling_common import ModelTesterMixin
 
 
 class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
@@ -69,37 +68,25 @@ class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
     def prepare_init_args_and_inputs_for_common(self):
         init_dict = {
             "block_out_channels": (32, 64, 128, 256),
-            "in_channels":
-            14,
-            "out_channels":
-            14,
-            "time_embedding_type":
-            "positional",
-            "use_timestep_embedding":
-            True,
-            "flip_sin_to_cos":
-            False,
-            "freq_shift":
-            1.0,
-            "out_block_type":
-            "OutConv1DBlock",
-            "mid_block_type":
-            "MidResTemporalBlock1D",
-            "down_block_types": ("DownResnetBlock1D", "DownResnetBlock1D",
-                                 "DownResnetBlock1D", "DownResnetBlock1D"),
-            "up_block_types":
-            ("UpResnetBlock1D", "UpResnetBlock1D", "UpResnetBlock1D"),
-            "act_fn":
-            "mish",
+            "in_channels": 14,
+            "out_channels": 14,
+            "time_embedding_type": "positional",
+            "use_timestep_embedding": True,
+            "flip_sin_to_cos": False,
+            "freq_shift": 1.0,
+            "out_block_type": "OutConv1DBlock",
+            "mid_block_type": "MidResTemporalBlock1D",
+            "down_block_types": ("DownResnetBlock1D", "DownResnetBlock1D", "DownResnetBlock1D", "DownResnetBlock1D"),
+            "up_block_types": ("UpResnetBlock1D", "UpResnetBlock1D", "UpResnetBlock1D"),
+            "act_fn": "mish",
         }
         inputs_dict = self.dummy_input
         return init_dict, inputs_dict
 
     def test_from_pretrained_hub(self):
         model, loading_info = UNet1DModel.from_pretrained(
-            "bglick13/hopper-medium-v2-value-function-hor32",
-            output_loading_info=True,
-            subfolder="unet")
+            "bglick13/hopper-medium-v2-value-function-hor32", output_loading_info=True, subfolder="unet"
+        )
         self.assertIsNotNone(model)
         self.assertEqual(len(loading_info["missing_keys"]), 0)
 
@@ -108,29 +95,36 @@ class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
         assert image is not None, "Make sure output is not None"
 
     def test_output_pretrained(self):
-        model = UNet1DModel.from_pretrained(
-            "bglick13/hopper-medium-v2-value-function-hor32", subfolder="unet")
+        model = UNet1DModel.from_pretrained("bglick13/hopper-medium-v2-value-function-hor32", subfolder="unet")
         paddle.seed(0)
 
         num_features = model.in_channels
         seq_len = 16
         noise = paddle.randn((1, seq_len, num_features)).transpose(
-            [0, 2, 1])  # match original, we can update values and remove
-        time_step = paddle.full((num_features, ), 0)
+            [0, 2, 1]
+        )  # match original, we can update values and remove
+        time_step = paddle.full((num_features,), 0)
 
         with paddle.no_grad():
             output = model(noise, time_step).sample.transpose([0, 2, 1])
 
         output_slice = output[0, -3:, -3:].flatten()
-        # fmt: off
-        expected_output_slice = paddle.to_tensor([
-            -0.28575825691223145, -0.9908179044723511, 0.2976352870464325,
-            -0.8677193522453308, -0.2177833616733551, 0.08095616102218628,
-            -0.587175726890564, 0.32997289299964905, -0.1742163598537445
-        ])
-        # fmt: on
-        self.assertTrue(
-            paddle.allclose(output_slice, expected_output_slice, rtol=1e-3))
+
+        expected_output_slice = paddle.to_tensor(
+            [
+                -0.28575825691223145,
+                -0.9908179044723511,
+                0.2976352870464325,
+                -0.8677193522453308,
+                -0.2177833616733551,
+                0.08095616102218628,
+                -0.587175726890564,
+                0.32997289299964905,
+                -0.1742163598537445,
+            ]
+        )
+
+        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, rtol=1e-3))
 
     def test_forward_with_norm_groups(self):
         # Not implemented yet for this UNet
@@ -142,9 +136,7 @@ class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
         model = UNet1DModel.from_pretrained(model_id, subfolder="unet")
 
         sample_size = 65536
-        noise = paddle.sin(
-            paddle.arange(sample_size)[None,
-                                       None, :].cast("float32").tile([1, 2, 1]))
+        noise = paddle.sin(paddle.arange(sample_size)[None, None, :].cast("float32").tile([1, 2, 1]))
         timestep = paddle.to_tensor([1])
 
         with paddle.no_grad():
@@ -205,8 +197,7 @@ class UNetRLModelTests(ModelTesterMixin, unittest.TestCase):
 
         self.assertIsNotNone(output)
         expected_shape = list((inputs_dict["sample"].shape[0], 1))
-        self.assertEqual(output.shape, expected_shape,
-                         "Input and output shapes do not match")
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
 
     def test_ema_training(self):
         pass
@@ -216,43 +207,28 @@ class UNetRLModelTests(ModelTesterMixin, unittest.TestCase):
 
     def prepare_init_args_and_inputs_for_common(self):
         init_dict = {
-            "in_channels":
-            14,
-            "out_channels":
-            14,
-            "down_block_types": [
-                "DownResnetBlock1D", "DownResnetBlock1D", "DownResnetBlock1D",
-                "DownResnetBlock1D"
-            ],
+            "in_channels": 14,
+            "out_channels": 14,
+            "down_block_types": ["DownResnetBlock1D", "DownResnetBlock1D", "DownResnetBlock1D", "DownResnetBlock1D"],
             "up_block_types": [],
-            "out_block_type":
-            "ValueFunction",
-            "mid_block_type":
-            "ValueFunctionMidBlock1D",
+            "out_block_type": "ValueFunction",
+            "mid_block_type": "ValueFunctionMidBlock1D",
             "block_out_channels": [32, 64, 128, 256],
-            "layers_per_block":
-            1,
-            "downsample_each_block":
-            True,
-            "use_timestep_embedding":
-            True,
-            "freq_shift":
-            1.0,
-            "flip_sin_to_cos":
-            False,
-            "time_embedding_type":
-            "positional",
-            "act_fn":
-            "mish",
+            "layers_per_block": 1,
+            "downsample_each_block": True,
+            "use_timestep_embedding": True,
+            "freq_shift": 1.0,
+            "flip_sin_to_cos": False,
+            "time_embedding_type": "positional",
+            "act_fn": "mish",
         }
         inputs_dict = self.dummy_input
         return init_dict, inputs_dict
 
     def test_from_pretrained_hub(self):
         value_function, vf_loading_info = UNet1DModel.from_pretrained(
-            "bglick13/hopper-medium-v2-value-function-hor32",
-            output_loading_info=True,
-            subfolder="value_function")
+            "bglick13/hopper-medium-v2-value-function-hor32", output_loading_info=True, subfolder="value_function"
+        )
         self.assertIsNotNone(value_function)
         self.assertEqual(len(vf_loading_info["missing_keys"]), 0)
 
@@ -262,25 +238,22 @@ class UNetRLModelTests(ModelTesterMixin, unittest.TestCase):
 
     def test_output_pretrained(self):
         value_function, vf_loading_info = UNet1DModel.from_pretrained(
-            "bglick13/hopper-medium-v2-value-function-hor32",
-            output_loading_info=True,
-            subfolder="value_function")
+            "bglick13/hopper-medium-v2-value-function-hor32", output_loading_info=True, subfolder="value_function"
+        )
         paddle.seed(0)
 
         num_features = value_function.in_channels
         seq_len = 14
         noise = paddle.randn((1, seq_len, num_features)).transpose(
-            [0, 2, 1])  # match original, we can update values and remove
-        time_step = paddle.full((num_features, ), 0)
+            [0, 2, 1]
+        )  # match original, we can update values and remove
+        time_step = paddle.full((num_features,), 0)
 
         with paddle.no_grad():
             output = value_function(noise, time_step).sample
 
-        # fmt: off
         expected_output_slice = paddle.to_tensor([291.51135254] * seq_len)
-        # fmt: on
-        self.assertTrue(
-            paddle.allclose(output.flatten(), expected_output_slice, rtol=1e-3))
+        self.assertTrue(paddle.allclose(output.flatten(), expected_output_slice, rtol=1e-3))
 
     def test_forward_with_norm_groups(self):
         # Not implemented yet for this UNet

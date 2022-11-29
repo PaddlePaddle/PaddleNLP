@@ -17,6 +17,7 @@ from typing import Optional, Tuple, Union
 import numpy as np
 import paddle
 import paddle.nn as nn
+from paddle.distributed.fleet.utils import recompute
 
 from ...configuration_utils import ConfigMixin, register_to_config
 from ...modeling_utils import ModelMixin
@@ -24,7 +25,6 @@ from ...models.attention import DualTransformer2DModel, Transformer2DModel
 from ...models.embeddings import TimestepEmbedding, Timesteps
 from ...models.unet_2d_condition import UNet2DConditionOutput
 from ...utils import logging
-from paddle.distributed.fleet.utils import recompute
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -46,8 +46,7 @@ def get_down_block(
     use_linear_projection=False,
     only_cross_attention=False,
 ):
-    down_block_type = down_block_type[7:] if down_block_type.startswith(
-        "UNetRes") else down_block_type
+    down_block_type = down_block_type[7:] if down_block_type.startswith("UNetRes") else down_block_type
     if down_block_type == "DownBlockFlat":
         return DownBlockFlat(
             num_layers=num_layers,
@@ -62,9 +61,7 @@ def get_down_block(
         )
     elif down_block_type == "CrossAttnDownBlockFlat":
         if cross_attention_dim is None:
-            raise ValueError(
-                "cross_attention_dim must be specified for CrossAttnDownBlockFlat"
-            )
+            raise ValueError("cross_attention_dim must be specified for CrossAttnDownBlockFlat")
         return CrossAttnDownBlockFlat(
             num_layers=num_layers,
             in_channels=in_channels,
@@ -101,8 +98,7 @@ def get_up_block(
     use_linear_projection=False,
     only_cross_attention=False,
 ):
-    up_block_type = up_block_type[7:] if up_block_type.startswith(
-        "UNetRes") else up_block_type
+    up_block_type = up_block_type[7:] if up_block_type.startswith("UNetRes") else up_block_type
     if up_block_type == "UpBlockFlat":
         return UpBlockFlat(
             num_layers=num_layers,
@@ -117,9 +113,7 @@ def get_up_block(
         )
     elif up_block_type == "CrossAttnUpBlockFlat":
         if cross_attention_dim is None:
-            raise ValueError(
-                "cross_attention_dim must be specified for CrossAttnUpBlockFlat"
-            )
+            raise ValueError("cross_attention_dim must be specified for CrossAttnUpBlockFlat")
         return CrossAttnUpBlockFlat(
             num_layers=num_layers,
             in_channels=in_channels,
@@ -216,34 +210,27 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
         time_embed_dim = block_out_channels[0] * 4
 
         # input
-        self.conv_in = LinearMultiDim(in_channels,
-                                      block_out_channels[0],
-                                      kernel_size=3,
-                                      padding=(1, 1))
+        self.conv_in = LinearMultiDim(in_channels, block_out_channels[0], kernel_size=3, padding=(1, 1))
 
         # time
-        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos,
-                                   freq_shift)
+        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift)
         timestep_input_dim = block_out_channels[0]
 
-        self.time_embedding = TimestepEmbedding(timestep_input_dim,
-                                                time_embed_dim)
+        self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim)
 
         # class embedding
         if num_class_embeds is not None:
-            self.class_embedding = nn.Embedding(num_class_embeds,
-                                                time_embed_dim)
+            self.class_embedding = nn.Embedding(num_class_embeds, time_embed_dim)
 
         self.down_blocks = nn.LayerList([])
         self.mid_block = None
         self.up_blocks = nn.LayerList([])
 
         if isinstance(only_cross_attention, bool):
-            only_cross_attention = [only_cross_attention
-                                    ] * len(down_block_types)
+            only_cross_attention = [only_cross_attention] * len(down_block_types)
 
         if isinstance(attention_head_dim, int):
-            attention_head_dim = (attention_head_dim, ) * len(down_block_types)
+            attention_head_dim = (attention_head_dim,) * len(down_block_types)
 
         # down
         output_channel = block_out_channels[0]
@@ -301,9 +288,7 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
 
             prev_output_channel = output_channel
             output_channel = reversed_block_out_channels[i]
-            input_channel = reversed_block_out_channels[min(
-                i + 1,
-                len(block_out_channels) - 1)]
+            input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
 
             # add upsample block for all BUT final layer
             if not is_final_block:
@@ -333,23 +318,20 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
             prev_output_channel = output_channel
 
         # out
-        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[0],
-                                          num_groups=norm_num_groups,
-                                          epsilon=norm_eps)
+        self.conv_norm_out = nn.GroupNorm(
+            num_channels=block_out_channels[0], num_groups=norm_num_groups, epsilon=norm_eps
+        )
         self.conv_act = nn.Silu()
-        self.conv_out = LinearMultiDim(block_out_channels[0],
-                                       out_channels,
-                                       kernel_size=3,
-                                       padding=1)
+        self.conv_out = LinearMultiDim(block_out_channels[0], out_channels, kernel_size=3, padding=1)
 
     def set_attention_slice(self, slice_size):
         head_dims = self.config.attention_head_dim
         head_dims = [head_dims] if isinstance(head_dims, int) else head_dims
-        if slice_size is not None and any(dim % slice_size != 0
-                                          for dim in head_dims):
+        if slice_size is not None and any(dim % slice_size != 0 for dim in head_dims):
             raise ValueError(
                 f"Make sure slice_size {slice_size} is a common divisor of "
-                f"the number of heads used in cross_attention: {head_dims}")
+                f"the number of heads used in cross_attention: {head_dims}"
+            )
         if slice_size is not None and slice_size > min(head_dims):
             raise ValueError(
                 f"slice_size {slice_size} has to be smaller or equal to "
@@ -367,8 +349,7 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
                 block.set_attention_slice(slice_size)
 
     def _set_gradient_checkpointing(self, module, value=False):
-        if isinstance(module, (CrossAttnDownBlockFlat, DownBlockFlat,
-                               CrossAttnUpBlockFlat, UpBlockFlat)):
+        if isinstance(module, (CrossAttnDownBlockFlat, DownBlockFlat, CrossAttnUpBlockFlat, UpBlockFlat)):
             module.gradient_checkpointing = value
 
     def forward(
@@ -403,8 +384,7 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
         upsample_size = None
 
         if any(s % default_overall_up_factor != 0 for s in sample.shape[-2:]):
-            logger.info(
-                "Forward upsample size to force interpolation output size.")
+            logger.info("Forward upsample size to force interpolation output size.")
             forward_upsample_size = True
 
         # 0. center input if necessary
@@ -420,9 +400,11 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
             timesteps = timesteps[None]
 
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
-        timesteps = timesteps.expand([
-            sample.shape[0],
-        ])
+        timesteps = timesteps.expand(
+            [
+                sample.shape[0],
+            ]
+        )
 
         t_emb = self.time_proj(timesteps)
 
@@ -434,8 +416,7 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
 
         if self.config.num_class_embeds is not None:
             if class_labels is None:
-                raise ValueError(
-                    "class_labels should be provided when num_class_embeds > 0")
+                raise ValueError("class_labels should be provided when num_class_embeds > 0")
             class_emb = self.class_embedding(class_labels).cast(self.dtype)
             emb = emb + class_emb
 
@@ -443,42 +424,35 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
         sample = self.conv_in(sample)
 
         # 3. down
-        down_block_res_samples = (sample, )
+        down_block_res_samples = (sample,)
         for downsample_block in self.down_blocks:
-            if hasattr(
-                    downsample_block,
-                    "attentions") and downsample_block.attentions is not None:
+            if hasattr(downsample_block, "attentions") and downsample_block.attentions is not None:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
                     temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample,
-                                                       temb=emb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
-        sample = self.mid_block(sample,
-                                emb,
-                                encoder_hidden_states=encoder_hidden_states)
+        sample = self.mid_block(sample, emb, encoder_hidden_states=encoder_hidden_states)
 
         # 5. up
         for i, upsample_block in enumerate(self.up_blocks):
             is_final_block = i == len(self.up_blocks) - 1
 
-            res_samples = down_block_res_samples[-len(upsample_block.resnets):]
-            down_block_res_samples = down_block_res_samples[:-len(upsample_block
-                                                                  .resnets)]
+            res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
+            down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
             # if we have not reached the final block and need to forward the
             # upsample size, we do it here
             if not is_final_block and forward_upsample_size:
                 upsample_size = down_block_res_samples[-1].shape[2:]
 
-            if hasattr(upsample_block,
-                       "attentions") and upsample_block.attentions is not None:
+            if hasattr(upsample_block, "attentions") and upsample_block.attentions is not None:
                 sample = upsample_block(
                     hidden_states=sample,
                     temb=emb,
@@ -487,54 +461,40 @@ class UNetFlatConditionModel(ModelMixin, ConfigMixin):
                     upsample_size=upsample_size,
                 )
             else:
-                sample = upsample_block(hidden_states=sample,
-                                        temb=emb,
-                                        res_hidden_states_tuple=res_samples,
-                                        upsample_size=upsample_size)
+                sample = upsample_block(
+                    hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples, upsample_size=upsample_size
+                )
         # 6. post-process
         sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)
         sample = self.conv_out(sample)
 
         if not return_dict:
-            return (sample, )
+            return (sample,)
 
         return UNet2DConditionOutput(sample=sample)
 
 
 class LinearMultiDim(nn.Linear):
-
-    def __init__(self,
-                 in_features,
-                 out_features=None,
-                 second_dim=4,
-                 *args,
-                 **kwargs):
-        in_features = [in_features, second_dim, 1] if isinstance(
-            in_features, int) else list(in_features)
+    def __init__(self, in_features, out_features=None, second_dim=4, *args, **kwargs):
+        in_features = [in_features, second_dim, 1] if isinstance(in_features, int) else list(in_features)
         if out_features is None:
             out_features = in_features
-        out_features = [out_features, second_dim, 1] if isinstance(
-            out_features, int) else list(out_features)
+        out_features = [out_features, second_dim, 1] if isinstance(out_features, int) else list(out_features)
         self.in_features_multidim = in_features
         self.out_features_multidim = out_features
-        super().__init__(
-            np.array(in_features).prod(),
-            np.array(out_features).prod())
+        super().__init__(np.array(in_features).prod(), np.array(out_features).prod())
 
     def forward(self, input_tensor, *args, **kwargs):
         shape = input_tensor.shape
         n_dim = len(self.in_features_multidim)
-        input_tensor = input_tensor.reshape(
-            [*shape[0:-n_dim], self.in_features])
+        input_tensor = input_tensor.reshape([*shape[0:-n_dim], self.in_features])
         output_tensor = super().forward(input_tensor)
-        output_tensor = output_tensor.reshape(
-            [*shape[0:-n_dim], *self.out_features_multidim])
+        output_tensor = output_tensor.reshape([*shape[0:-n_dim], *self.out_features_multidim])
         return output_tensor
 
 
 class ResnetBlockFlat(nn.Layer):
-
     def __init__(
         self,
         *,
@@ -555,14 +515,12 @@ class ResnetBlockFlat(nn.Layer):
         self.pre_norm = pre_norm
         self.pre_norm = True
 
-        in_channels = [in_channels, second_dim, 1] if isinstance(
-            in_channels, int) else list(in_channels)
+        in_channels = [in_channels, second_dim, 1] if isinstance(in_channels, int) else list(in_channels)
         self.in_channels_prod = np.array(in_channels).prod()
         self.channels_multidim = in_channels
 
         if out_channels is not None:
-            out_channels = [out_channels, second_dim, 1] if isinstance(
-                out_channels, int) else list(out_channels)
+            out_channels = [out_channels, second_dim, 1] if isinstance(out_channels, int) else list(out_channels)
             out_channels_prod = np.array(out_channels).prod()
             self.out_channels_multidim = out_channels
         else:
@@ -573,46 +531,34 @@ class ResnetBlockFlat(nn.Layer):
         if groups_out is None:
             groups_out = groups
 
-        self.norm1 = nn.GroupNorm(num_groups=groups,
-                                  num_channels=self.in_channels_prod,
-                                  epsilon=eps)
-        self.conv1 = nn.Conv2D(self.in_channels_prod,
-                               out_channels_prod,
-                               kernel_size=1,
-                               padding=0)
+        self.norm1 = nn.GroupNorm(num_groups=groups, num_channels=self.in_channels_prod, epsilon=eps)
+        self.conv1 = nn.Conv2D(self.in_channels_prod, out_channels_prod, kernel_size=1, padding=0)
 
         if temb_channels is not None:
             self.time_emb_proj = nn.Linear(temb_channels, out_channels_prod)
         else:
             self.time_emb_proj = None
 
-        self.norm2 = nn.GroupNorm(num_groups=groups_out,
-                                  num_channels=out_channels_prod,
-                                  epsilon=eps)
+        self.norm2 = nn.GroupNorm(num_groups=groups_out, num_channels=out_channels_prod, epsilon=eps)
         self.dropout = nn.Dropout(dropout)
-        self.conv2 = nn.Conv2D(out_channels_prod,
-                               out_channels_prod,
-                               kernel_size=1,
-                               padding=0)
+        self.conv2 = nn.Conv2D(out_channels_prod, out_channels_prod, kernel_size=1, padding=0)
 
         self.nonlinearity = nn.Silu()
 
-        self.use_in_shortcut = (self.in_channels_prod != out_channels_prod
-                                if use_in_shortcut is None else use_in_shortcut)
+        self.use_in_shortcut = (
+            self.in_channels_prod != out_channels_prod if use_in_shortcut is None else use_in_shortcut
+        )
 
         self.conv_shortcut = None
         if self.use_in_shortcut:
-            self.conv_shortcut = nn.Conv2D(self.in_channels_prod,
-                                           out_channels_prod,
-                                           kernel_size=1,
-                                           stride=1,
-                                           padding=0)
+            self.conv_shortcut = nn.Conv2D(
+                self.in_channels_prod, out_channels_prod, kernel_size=1, stride=1, padding=0
+            )
 
     def forward(self, input_tensor, temb):
         shape = input_tensor.shape
         n_dim = len(self.channels_multidim)
-        input_tensor = input_tensor.reshape(
-            [*shape[0:-n_dim], self.in_channels_prod, 1, 1])
+        input_tensor = input_tensor.reshape([*shape[0:-n_dim], self.in_channels_prod, 1, 1])
         input_tensor = input_tensor.reshape([-1, self.in_channels_prod, 1, 1])
 
         hidden_states = input_tensor
@@ -637,15 +583,13 @@ class ResnetBlockFlat(nn.Layer):
         output_tensor = input_tensor + hidden_states
 
         output_tensor = output_tensor.reshape([*shape[0:-n_dim], -1])
-        output_tensor = output_tensor.reshape(
-            [*shape[0:-n_dim], *self.out_channels_multidim])
+        output_tensor = output_tensor.reshape([*shape[0:-n_dim], *self.out_channels_multidim])
 
         return output_tensor
 
 
 # Copied from diffusers.models.unet_2d_blocks.DownBlock2D with DownBlock2D->DownBlockFlat, ResnetBlock2D->ResnetBlockFlat, Downsample2D->LinearMultiDim
 class DownBlockFlat(nn.Layer):
-
     def __init__(
         self,
         in_channels: int,
@@ -679,18 +623,19 @@ class DownBlockFlat(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
-                ))
+                )
+            )
 
         self.resnets = nn.LayerList(resnets)
 
         if add_downsample:
-            self.downsamplers = nn.LayerList([
-                LinearMultiDim(out_channels,
-                               use_conv=True,
-                               out_channels=out_channels,
-                               padding=downsample_padding,
-                               name="op")
-            ])
+            self.downsamplers = nn.LayerList(
+                [
+                    LinearMultiDim(
+                        out_channels, use_conv=True, out_channels=out_channels, padding=downsample_padding, name="op"
+                    )
+                ]
+            )
         else:
             self.downsamplers = None
 
@@ -703,31 +648,28 @@ class DownBlockFlat(nn.Layer):
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
-
                     def custom_forward(*inputs):
                         return module(*inputs)
 
                     return custom_forward
 
-                hidden_states = recompute(create_custom_forward(resnet),
-                                          hidden_states, temb)
+                hidden_states = recompute(create_custom_forward(resnet), hidden_states, temb)
             else:
                 hidden_states = resnet(hidden_states, temb)
 
-            output_states += (hidden_states, )
+            output_states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
 
-            output_states += (hidden_states, )
+            output_states += (hidden_states,)
 
         return hidden_states, output_states
 
 
 # Copied from diffusers.models.unet_2d_blocks.CrossAttnDownBlock2D with CrossAttnDownBlock2D->CrossAttnDownBlockFlat, ResnetBlock2D->ResnetBlockFlat, Downsample2D->LinearMultiDim
 class CrossAttnDownBlockFlat(nn.Layer):
-
     def __init__(
         self,
         in_channels: int,
@@ -771,7 +713,8 @@ class CrossAttnDownBlockFlat(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
-                ))
+                )
+            )
             if not dual_cross_attention:
                 attentions.append(
                     Transformer2DModel(
@@ -783,7 +726,8 @@ class CrossAttnDownBlockFlat(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
             else:
                 attentions.append(
                     DualTransformer2DModel(
@@ -795,18 +739,19 @@ class CrossAttnDownBlockFlat(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
         self.attentions = nn.LayerList(attentions)
         self.resnets = nn.LayerList(resnets)
 
         if add_downsample:
-            self.downsamplers = nn.LayerList([
-                LinearMultiDim(out_channels,
-                               use_conv=True,
-                               out_channels=out_channels,
-                               padding=downsample_padding,
-                               name="op")
-            ])
+            self.downsamplers = nn.LayerList(
+                [
+                    LinearMultiDim(
+                        out_channels, use_conv=True, out_channels=out_channels, padding=downsample_padding, name="op"
+                    )
+                ]
+            )
         else:
             self.downsamplers = None
 
@@ -815,11 +760,11 @@ class CrossAttnDownBlockFlat(nn.Layer):
     def set_attention_slice(self, slice_size):
         head_dims = self.attn_num_head_channels
         head_dims = [head_dims] if isinstance(head_dims, int) else head_dims
-        if slice_size is not None and any(dim % slice_size != 0
-                                          for dim in head_dims):
+        if slice_size is not None and any(dim % slice_size != 0 for dim in head_dims):
             raise ValueError(
                 f"Make sure slice_size {slice_size} is a common divisor of "
-                f"the number of heads used in cross_attention: {head_dims}")
+                f"the number of heads used in cross_attention: {head_dims}"
+            )
         if slice_size is not None and slice_size > min(head_dims):
             raise ValueError(
                 f"slice_size {slice_size} has to be smaller or equal to "
@@ -836,41 +781,35 @@ class CrossAttnDownBlockFlat(nn.Layer):
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
-
                     def custom_forward(*inputs):
                         if return_dict is not None:
-                            return module(
-                                *inputs, return_dict=return_dict)[0]  # move [0]
+                            return module(*inputs, return_dict=return_dict)[0]  # move [0]
                         else:
                             return module(*inputs)
 
                     return custom_forward
 
-                hidden_states = recompute(create_custom_forward(resnet),
-                                          hidden_states, temb)
+                hidden_states = recompute(create_custom_forward(resnet), hidden_states, temb)
                 hidden_states = recompute(
-                    create_custom_forward(attn, return_dict=False),
-                    hidden_states, encoder_hidden_states)  #[0]
+                    create_custom_forward(attn, return_dict=False), hidden_states, encoder_hidden_states
+                )  # [0]
             else:
                 hidden_states = resnet(hidden_states, temb)
-                hidden_states = attn(
-                    hidden_states,
-                    encoder_hidden_states=encoder_hidden_states).sample
+                hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states).sample
 
-            output_states += (hidden_states, )
+            output_states += (hidden_states,)
 
         if self.downsamplers is not None:
             for downsampler in self.downsamplers:
                 hidden_states = downsampler(hidden_states)
 
-            output_states += (hidden_states, )
+            output_states += (hidden_states,)
 
         return hidden_states, output_states
 
 
 # Copied from diffusers.models.unet_2d_blocks.UpBlock2D with UpBlock2D->UpBlockFlat, ResnetBlock2D->ResnetBlockFlat, Upsample2D->LinearMultiDim
 class UpBlockFlat(nn.Layer):
-
     def __init__(
         self,
         in_channels: int,
@@ -891,8 +830,7 @@ class UpBlockFlat(nn.Layer):
         resnets = []
 
         for i in range(num_layers):
-            res_skip_channels = in_channels if (i == num_layers -
-                                                1) else out_channels
+            res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
 
             resnets.append(
@@ -907,44 +845,34 @@ class UpBlockFlat(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
-                ))
+                )
+            )
 
         self.resnets = nn.LayerList(resnets)
 
         if add_upsample:
-            self.upsamplers = nn.LayerList([
-                LinearMultiDim(out_channels,
-                               use_conv=True,
-                               out_channels=out_channels)
-            ])
+            self.upsamplers = nn.LayerList([LinearMultiDim(out_channels, use_conv=True, out_channels=out_channels)])
         else:
             self.upsamplers = None
 
         self.gradient_checkpointing = False
 
-    def forward(self,
-                hidden_states,
-                res_hidden_states_tuple,
-                temb=None,
-                upsample_size=None):
+    def forward(self, hidden_states, res_hidden_states_tuple, temb=None, upsample_size=None):
         for resnet in self.resnets:
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
-            hidden_states = paddle.concat([hidden_states, res_hidden_states],
-                                          axis=1)
+            hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
 
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module):
-
                     def custom_forward(*inputs):
                         return module(*inputs)
 
                     return custom_forward
 
-                hidden_states = recompute(create_custom_forward(resnet),
-                                          hidden_states, temb)
+                hidden_states = recompute(create_custom_forward(resnet), hidden_states, temb)
             else:
                 hidden_states = resnet(hidden_states, temb)
 
@@ -957,7 +885,6 @@ class UpBlockFlat(nn.Layer):
 
 # Copied from diffusers.models.unet_2d_blocks.CrossAttnUpBlock2D with CrossAttnUpBlock2D->CrossAttnUpBlockFlat, ResnetBlock2D->ResnetBlockFlat, Upsample2D->LinearMultiDim
 class CrossAttnUpBlockFlat(nn.Layer):
-
     def __init__(
         self,
         in_channels: int,
@@ -988,8 +915,7 @@ class CrossAttnUpBlockFlat(nn.Layer):
         self.attn_num_head_channels = attn_num_head_channels
 
         for i in range(num_layers):
-            res_skip_channels = in_channels if (i == num_layers -
-                                                1) else out_channels
+            res_skip_channels = in_channels if (i == num_layers - 1) else out_channels
             resnet_in_channels = prev_output_channel if i == 0 else out_channels
 
             resnets.append(
@@ -1004,7 +930,8 @@ class CrossAttnUpBlockFlat(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
-                ))
+                )
+            )
             if not dual_cross_attention:
                 attentions.append(
                     Transformer2DModel(
@@ -1016,7 +943,8 @@ class CrossAttnUpBlockFlat(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
             else:
                 attentions.append(
                     DualTransformer2DModel(
@@ -1028,16 +956,13 @@ class CrossAttnUpBlockFlat(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
         self.attentions = nn.LayerList(attentions)
         self.resnets = nn.LayerList(resnets)
 
         if add_upsample:
-            self.upsamplers = nn.LayerList([
-                LinearMultiDim(out_channels,
-                               use_conv=True,
-                               out_channels=out_channels)
-            ])
+            self.upsamplers = nn.LayerList([LinearMultiDim(out_channels, use_conv=True, out_channels=out_channels)])
         else:
             self.upsamplers = None
 
@@ -1046,11 +971,11 @@ class CrossAttnUpBlockFlat(nn.Layer):
     def set_attention_slice(self, slice_size):
         head_dims = self.attn_num_head_channels
         head_dims = [head_dims] if isinstance(head_dims, int) else head_dims
-        if slice_size is not None and any(dim % slice_size != 0
-                                          for dim in head_dims):
+        if slice_size is not None and any(dim % slice_size != 0 for dim in head_dims):
             raise ValueError(
                 f"Make sure slice_size {slice_size} is a common divisor of "
-                f"the number of heads used in cross_attention: {head_dims}")
+                f"the number of heads used in cross_attention: {head_dims}"
+            )
         if slice_size is not None and slice_size > min(head_dims):
             raise ValueError(
                 f"slice_size {slice_size} has to be smaller or equal to "
@@ -1074,32 +999,26 @@ class CrossAttnUpBlockFlat(nn.Layer):
             # pop res hidden states
             res_hidden_states = res_hidden_states_tuple[-1]
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
-            hidden_states = paddle.concat([hidden_states, res_hidden_states],
-                                          axis=1)
+            hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
 
             if self.training and self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
-
                     def custom_forward(*inputs):
                         if return_dict is not None:
-                            return module(
-                                *inputs, return_dict=return_dict)[0]  # move [0]
+                            return module(*inputs, return_dict=return_dict)[0]  # move [0]
                         else:
                             return module(*inputs)
 
                     return custom_forward
 
-                hidden_states = recompute(create_custom_forward(resnet),
-                                          hidden_states, temb)
+                hidden_states = recompute(create_custom_forward(resnet), hidden_states, temb)
                 hidden_states = recompute(
-                    create_custom_forward(attn, return_dict=False),
-                    hidden_states, encoder_hidden_states)  #[0]
+                    create_custom_forward(attn, return_dict=False), hidden_states, encoder_hidden_states
+                )  # [0]
             else:
                 hidden_states = resnet(hidden_states, temb)
-                hidden_states = attn(
-                    hidden_states,
-                    encoder_hidden_states=encoder_hidden_states).sample
+                hidden_states = attn(hidden_states, encoder_hidden_states=encoder_hidden_states).sample
 
         if self.upsamplers is not None:
             for upsampler in self.upsamplers:
@@ -1110,7 +1029,6 @@ class CrossAttnUpBlockFlat(nn.Layer):
 
 # Copied from diffusers.models.unet_2d_blocks.UNetMidBlock2DCrossAttn with UNetMidBlock2DCrossAttn->UNetMidBlockFlatCrossAttn, ResnetBlock2D->ResnetBlockFlat
 class UNetMidBlockFlatCrossAttn(nn.Layer):
-
     def __init__(
         self,
         in_channels: int,
@@ -1134,8 +1052,7 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
 
         self.attention_type = attention_type
         self.attn_num_head_channels = attn_num_head_channels
-        resnet_groups = resnet_groups if resnet_groups is not None else min(
-            in_channels // 4, 32)
+        resnet_groups = resnet_groups if resnet_groups is not None else min(in_channels // 4, 32)
 
         # there is always at least one resnet
         resnets = [
@@ -1166,7 +1083,8 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
             else:
                 attentions.append(
                     DualTransformer2DModel(
@@ -1178,7 +1096,8 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
                         norm_num_groups=resnet_groups,
                         use_linear_projection=use_linear_projection,
                         only_cross_attention=only_cross_attention,
-                    ))
+                    )
+                )
             resnets.append(
                 ResnetBlockFlat(
                     in_channels=in_channels,
@@ -1191,7 +1110,8 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
                     non_linearity=resnet_act_fn,
                     output_scale_factor=output_scale_factor,
                     pre_norm=resnet_pre_norm,
-                ))
+                )
+            )
 
         self.attentions = nn.LayerList(attentions)
         self.resnets = nn.LayerList(resnets)
@@ -1199,11 +1119,11 @@ class UNetMidBlockFlatCrossAttn(nn.Layer):
     def set_attention_slice(self, slice_size):
         head_dims = self.attn_num_head_channels
         head_dims = [head_dims] if isinstance(head_dims, int) else head_dims
-        if slice_size is not None and any(dim % slice_size != 0
-                                          for dim in head_dims):
+        if slice_size is not None and any(dim % slice_size != 0 for dim in head_dims):
             raise ValueError(
                 f"Make sure slice_size {slice_size} is a common divisor of "
-                f"the number of heads used in cross_attention: {head_dims}")
+                f"the number of heads used in cross_attention: {head_dims}"
+            )
         if slice_size is not None and slice_size > min(head_dims):
             raise ValueError(
                 f"slice_size {slice_size} has to be smaller or equal to "

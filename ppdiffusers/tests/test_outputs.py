@@ -17,8 +17,8 @@ from dataclasses import dataclass
 from typing import List, Union
 
 import numpy as np
-
 import PIL.Image
+
 from ppdiffusers.utils.outputs import BaseOutput
 
 
@@ -28,7 +28,6 @@ class CustomOutput(BaseOutput):
 
 
 class ConfigTester(unittest.TestCase):
-
     def test_outputs_single_attribute(self):
         outputs = CustomOutput(images=np.random.rand(1, 3, 4, 4))
 

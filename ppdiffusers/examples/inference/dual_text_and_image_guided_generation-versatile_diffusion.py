@@ -19,12 +19,9 @@ url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
 image = load_image(url)
 text = "a red car in the sun"
 
-pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained(
-    "shi-labs/versatile-diffusion")
+pipe = VersatileDiffusionDualGuidedPipeline.from_pretrained("shi-labs/versatile-diffusion")
 pipe.remove_unused_weights()
 
 text_to_image_strength = 0.75
-image = pipe(prompt=text,
-             image=image,
-             text_to_image_strength=text_to_image_strength).images[0]
+image = pipe(prompt=text, image=image, text_to_image_strength=text_to_image_strength).images[0]
 image.save("versatile-diffusion-red_car.png")

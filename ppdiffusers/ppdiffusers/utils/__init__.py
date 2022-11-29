@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 import os
 
@@ -24,10 +25,10 @@ from .import_utils import (
     is_inflect_available,
     is_modelcards_available,
     is_onnx_available,
-    is_scipy_available,
     is_paddle_available,
     is_paddle_version,
     is_paddlenlp_available,
+    is_scipy_available,
     is_unidecode_available,
     requires_backends,
 )
@@ -41,17 +42,17 @@ if is_paddle_available():
         load_hf_numpy,
         load_image,
         load_numpy,
+        paddle_all_close,
         parse_flag_from_env,
         slow,
-        paddle_all_close,
     )
 
 logger = get_logger(__name__)
 
-from paddlenlp.utils.env import _get_sub_home, _get_ppnlp_home
+from paddlenlp.utils.env import _get_ppnlp_home, _get_sub_home
 
 ppnlp_cache_home = _get_ppnlp_home()
-default_cache_path = _get_sub_home('models')
+default_cache_path = _get_sub_home("models")
 
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"

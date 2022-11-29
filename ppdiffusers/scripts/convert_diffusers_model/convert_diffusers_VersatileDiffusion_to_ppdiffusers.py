@@ -11,17 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import paddle
+import argparse
 import tempfile
+from collections import OrderedDict
+
+import paddle
+import torch
+from diffusers import VersatileDiffusionPipeline as DiffusersVersatileDiffusionPipeline
+
+from paddlenlp.transformers import (
+    CLIPFeatureExtractor,
+    CLIPTextModelWithProjection,
+    CLIPTokenizer,
+    CLIPVisionModelWithProjection,
+)
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    UNet2DConditionModel,
+)
+from ppdiffusers import (
+    VersatileDiffusionPipeline as PPDiffusersVersatileDiffusionPipeline,
+)
+from ppdiffusers.pipelines.versatile_diffusion import UNetFlatConditionModel
 
 paddle.set_device("cpu")
-import argparse
-import torch
-from collections import OrderedDict
-from diffusers import VersatileDiffusionPipeline as DiffusersVersatileDiffusionPipeline
-from ppdiffusers import VersatileDiffusionPipeline as PPDiffusersVersatileDiffusionPipeline, AutoencoderKL, UNet2DConditionModel, PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler
-from paddlenlp.transformers import CLIPTokenizer, CLIPFeatureExtractor, CLIPVisionModelWithProjection, CLIPTextModelWithProjection
-from ppdiffusers.pipelines.versatile_diffusion import UNetFlatConditionModel
 
 
 def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
@@ -38,10 +54,7 @@ def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
     return new_vae_or_unet
 
 
-def convert_hf_clip_to_ppnlp_clip(clip,
-                                  dtype="float32",
-                                  is_text_encoder=True,
-                                  need_prefix=False):
+def convert_hf_clip_to_ppnlp_clip(clip, dtype="float32", is_text_encoder=True, need_prefix=False):
     new_model_state = {}
     transformers2ppnlp = {
         ".encoder.": ".transformer.",
@@ -57,12 +70,10 @@ def convert_hf_clip_to_ppnlp_clip(clip,
         "text_projection.weight": "text_projection",
         ".pre_layrnorm.": ".ln_pre.",
         ".post_layernorm.": ".ln_post.",
-        ".vision_model.": "."
+        ".vision_model.": ".",
     }
     ignore_value = ["position_ids"]
-    donot_transpose = [
-        "embeddings", "norm", "concept_embeds", "special_care_embeds"
-    ]
+    donot_transpose = ["embeddings", "norm", "concept_embeds", "special_care_embeds"]
 
     for name, value in clip.state_dict().items():
         # step1: ignore position_ids
@@ -75,55 +86,48 @@ def convert_hf_clip_to_ppnlp_clip(clip,
         for hf_name, ppnlp_name in transformers2ppnlp.items():
             name = name.replace(hf_name, ppnlp_name)
         # step4: 0d tensor -> 1d tensor
-        if name == "logit_scale": value = value.reshape((1, ))
+        if name == "logit_scale":
+            value = value.reshape((1,))
         # step5: safety_checker need prefix "clip."
-        if "vision_model" in name and need_prefix: name = "clip." + name
+        if "vision_model" in name and need_prefix:
+            name = "clip." + name
         new_model_state[name] = value.cpu().numpy().astype(dtype)
 
     if is_text_encoder:
         new_config = {
-            'max_text_length': clip.config.max_position_embeddings,
-            'vocab_size': clip.config.vocab_size,
-            'text_embed_dim': clip.config.hidden_size,
-            'text_heads': clip.config.num_attention_heads,
-            'text_layers': clip.config.num_hidden_layers,
-            'text_hidden_act': clip.config.hidden_act,
-            'projection_dim': clip.config.projection_dim,
-            'initializer_range': clip.config.initializer_range,
-            'initializer_factor': clip.config.initializer_factor,
+            "max_text_length": clip.config.max_position_embeddings,
+            "vocab_size": clip.config.vocab_size,
+            "text_embed_dim": clip.config.hidden_size,
+            "text_heads": clip.config.num_attention_heads,
+            "text_layers": clip.config.num_hidden_layers,
+            "text_hidden_act": clip.config.hidden_act,
+            "projection_dim": clip.config.projection_dim,
+            "initializer_range": clip.config.initializer_range,
+            "initializer_factor": clip.config.initializer_factor,
         }
     else:
         if need_prefix:
             new_config = {
-                'image_resolution':
-                clip.config.vision_config.image_size,
-                'vision_layers':
-                clip.config.vision_config.num_hidden_layers,
-                'vision_heads':
-                clip.config.vision_config.num_attention_heads,
-                'vision_embed_dim':
-                clip.config.vision_config.hidden_size,
-                'vision_patch_size':
-                clip.config.vision_config.patch_size,
-                'vision_mlp_ratio':
-                clip.config.vision_config.intermediate_size //
-                clip.config.vision_config.hidden_size,
-                'vision_hidden_act':
-                clip.config.vision_config.hidden_act,
-                'projection_dim':
-                clip.config.projection_dim,
+                "image_resolution": clip.config.vision_config.image_size,
+                "vision_layers": clip.config.vision_config.num_hidden_layers,
+                "vision_heads": clip.config.vision_config.num_attention_heads,
+                "vision_embed_dim": clip.config.vision_config.hidden_size,
+                "vision_patch_size": clip.config.vision_config.patch_size,
+                "vision_mlp_ratio": clip.config.vision_config.intermediate_size
+                // clip.config.vision_config.hidden_size,
+                "vision_hidden_act": clip.config.vision_config.hidden_act,
+                "projection_dim": clip.config.projection_dim,
             }
         else:
             new_config = {
-                'image_resolution': clip.config.image_size,
-                'vision_layers': clip.config.num_hidden_layers,
-                'vision_heads': clip.config.num_attention_heads,
-                'vision_embed_dim': clip.config.hidden_size,
-                'vision_patch_size': clip.config.patch_size,
-                'vision_mlp_ratio':
-                clip.config.intermediate_size // clip.config.hidden_size,
-                'vision_hidden_act': clip.config.hidden_act,
-                'projection_dim': clip.config.projection_dim,
+                "image_resolution": clip.config.image_size,
+                "vision_layers": clip.config.num_hidden_layers,
+                "vision_heads": clip.config.num_attention_heads,
+                "vision_embed_dim": clip.config.hidden_size,
+                "vision_patch_size": clip.config.patch_size,
+                "vision_mlp_ratio": clip.config.intermediate_size // clip.config.hidden_size,
+                "vision_hidden_act": clip.config.hidden_act,
+                "projection_dim": clip.config.projection_dim,
             }
     return new_model_state, new_config
 
@@ -145,20 +149,22 @@ def check_keys(model, state_dict):
         print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
 
 
-def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path,
-                                     output_path=None):
+def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path, output_path=None):
     # 0. load diffusers pipe and convert to ppdiffusers weights format
     diffusers_pipe = DiffusersVersatileDiffusionPipeline.from_pretrained(
-        pretrained_model_name_or_path, use_auth_token=True)
+        pretrained_model_name_or_path, use_auth_token=True
+    )
     vae_state_dict = convert_to_ppdiffusers(diffusers_pipe.vae)
     image_unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.image_unet)
     text_unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.text_unet)
 
     text_encoder_state_dict, text_config = convert_hf_clip_to_ppnlp_clip(
-        diffusers_pipe.text_encoder, is_text_encoder=True, need_prefix=False)
+        diffusers_pipe.text_encoder, is_text_encoder=True, need_prefix=False
+    )
 
     image_encoder_state_dict, vision_config = convert_hf_clip_to_ppnlp_clip(
-        diffusers_pipe.image_encoder, is_text_encoder=False, need_prefix=False)
+        diffusers_pipe.image_encoder, is_text_encoder=False, need_prefix=False
+    )
 
     # 1. vae
     pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
@@ -202,9 +208,7 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path,
             skip_prk_steps=True,
         )
     elif "lms" in scheduler_type:
-        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start,
-                                            beta_end=beta_end,
-                                            beta_schedule="scaled_linear")
+        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start, beta_end=beta_end, beta_schedule="scaled_linear")
     elif "ddim" in scheduler_type:
         pp_scheduler = DDIMScheduler(
             beta_start=beta_start,
@@ -221,8 +225,7 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path,
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(
-            "CompVis/stable-diffusion-v1-4/feature_extractor")
+        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained("CompVis/stable-diffusion-v1-4/feature_extractor")
         # 7. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)
         pp_tokenizer = CLIPTokenizer.from_pretrained(tmpdirname)
@@ -235,21 +238,20 @@ def convert_diffusers_to_ppdiffusers(pretrained_model_name_or_path,
             image_unet=pp_image_unet,
             text_unet=pp_text_unet,
             vae=pp_vae,
-            scheduler=pp_scheduler)
+            scheduler=pp_scheduler,
+        )
         # 9. save_pretrained
         paddle_pipe.save_pretrained(output_path)
     return paddle_pipe
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Pytorch model weights to Paddle model weights.")
+    parser = argparse.ArgumentParser(description="Pytorch model weights to Paddle model weights.")
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
         default="shi-labs/versatile-diffusion",
-        help=
-        "Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
         "--output_path",
@@ -258,5 +260,4 @@ if __name__ == "__main__":
         help="The model output path.",
     )
     args = parser.parse_args()
-    ppdiffusers_pipe = convert_diffusers_to_ppdiffusers(
-        args.pretrained_model_name_or_path, args.output_path)
+    ppdiffusers_pipe = convert_diffusers_to_ppdiffusers(args.pretrained_model_name_or_path, args.output_path)

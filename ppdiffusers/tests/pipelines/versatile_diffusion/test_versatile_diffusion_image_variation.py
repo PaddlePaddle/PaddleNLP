@@ -17,30 +17,23 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import VersatileDiffusionImageVariationPipeline
 from ppdiffusers.utils.testing_utils import load_image, slow
 
-from test_pipelines_common import PipelineTesterMixin
 
-
-class VersatileDiffusionImageVariationPipelineFastTests(PipelineTesterMixin,
-                                                        unittest.TestCase):
+class VersatileDiffusionImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     pass
 
 
 @slow
-class VersatileDiffusionImageVariationPipelineIntegrationTests(
-        unittest.TestCase):
-
+class VersatileDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
     def test_inference_image_variations(self):
-        pipe = VersatileDiffusionImageVariationPipeline.from_pretrained(
-            "shi-labs/versatile-diffusion")
+        pipe = VersatileDiffusionImageVariationPipeline.from_pretrained("shi-labs/versatile-diffusion")
         pipe.set_progress_bar_config(disable=None)
 
-        image_prompt = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg"
-        )
+        image_prompt = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/benz.jpg")
         generator = paddle.Generator().manual_seed(0)
         image = pipe(
             image=image_prompt,
@@ -53,10 +46,18 @@ class VersatileDiffusionImageVariationPipelineIntegrationTests(
         image_slice = image[0, 253:256, 253:256, -1]
 
         assert image.shape == (1, 512, 512, 3)
-        expected_slice = np.array([
-            0.011769682168960571, 0.22415882349014282, 0.40258049964904785,
-            0.08735564351081848, 0.08671644330024719, 0.27234160900115967,
-            0.26517266035079956, 0.0, 0.10928627848625183
-        ])
+        expected_slice = np.array(
+            [
+                0.011769682168960571,
+                0.22415882349014282,
+                0.40258049964904785,
+                0.08735564351081848,
+                0.08671644330024719,
+                0.27234160900115967,
+                0.26517266035079956,
+                0.0,
+                0.10928627848625183,
+            ]
+        )
         print(image_slice.flatten().tolist())
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

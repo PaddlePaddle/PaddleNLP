@@ -24,12 +24,9 @@ from ppdiffusers.utils.testing_utils import slow
 
 
 class TrainingTests(unittest.TestCase):
-
     def get_model_optimizer(self, resolution=32):
         set_seed(0)
-        model = UNet2DModel(sample_size=resolution,
-                            in_channels=3,
-                            out_channels=3)
+        model = UNet2DModel(sample_size=resolution, in_channels=3, out_channels=3)
         optimizer = SGD(parameters=model.parameters(), learning_rate=0.0001)
         return model, optimizer
 
@@ -54,19 +51,16 @@ class TrainingTests(unittest.TestCase):
 
         # shared batches for DDPM and DDIM
         set_seed(0)
-        clean_images = [
-            paddle.randn((4, 3, 32, 32)).clip(-1, 1) for _ in range(4)
-        ]
+        clean_images = [paddle.randn((4, 3, 32, 32)).clip(-1, 1) for _ in range(4)]
         noise = [paddle.randn((4, 3, 32, 32)) for _ in range(4)]
-        timesteps = [paddle.randint(0, 1000, (4, )) for _ in range(4)]
+        timesteps = [paddle.randint(0, 1000, (4,)) for _ in range(4)]
 
         # train with a DDPM scheduler
         model, optimizer = self.get_model_optimizer(resolution=32)
         model.train()
         for i in range(4):
             optimizer.clear_grad()
-            ddpm_noisy_images = ddpm_scheduler.add_noise(
-                clean_images[i], noise[i], timesteps[i])
+            ddpm_noisy_images = ddpm_scheduler.add_noise(clean_images[i], noise[i], timesteps[i])
             ddpm_noise_pred = model(ddpm_noisy_images, timesteps[i]).sample
             loss = paddle.nn.functional.mse_loss(ddpm_noise_pred, noise[i])
             loss.backward()
@@ -78,15 +72,12 @@ class TrainingTests(unittest.TestCase):
         model.train()
         for i in range(4):
             optimizer.clear_grad()
-            ddim_noisy_images = ddim_scheduler.add_noise(
-                clean_images[i], noise[i], timesteps[i])
+            ddim_noisy_images = ddim_scheduler.add_noise(clean_images[i], noise[i], timesteps[i])
             ddim_noise_pred = model(ddim_noisy_images, timesteps[i]).sample
             loss = paddle.nn.functional.mse_loss(ddim_noise_pred, noise[i])
             loss.backward()
             optimizer.step()
         del model, optimizer
 
-        self.assertTrue(
-            paddle.allclose(ddpm_noisy_images, ddim_noisy_images, atol=1e-5))
-        self.assertTrue(
-            paddle.allclose(ddpm_noise_pred, ddim_noise_pred, atol=1e-4))
+        self.assertTrue(paddle.allclose(ddpm_noisy_images, ddim_noisy_images, atol=1e-5))
+        self.assertTrue(paddle.allclose(ddpm_noise_pred, ddim_noise_pred, atol=1e-4))

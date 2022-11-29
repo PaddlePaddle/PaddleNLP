@@ -24,7 +24,6 @@ from ppdiffusers.utils import slow
 
 
 class PipelineFastTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -45,10 +44,8 @@ class PipelineFastTests(unittest.TestCase):
             use_timestep_embedding=False,
             time_embedding_type="fourier",
             mid_block_type="UNetMidBlock1D",
-            down_block_types=["DownBlock1DNoSkip"] + ["DownBlock1D"] +
-            ["AttnDownBlock1D"],
-            up_block_types=["AttnUpBlock1D"] + ["UpBlock1D"] +
-            ["UpBlock1DNoSkip"],
+            down_block_types=["DownBlock1DNoSkip"] + ["DownBlock1D"] + ["AttnDownBlock1D"],
+            up_block_types=["AttnUpBlock1D"] + ["UpBlock1D"] + ["UpBlock1DNoSkip"],
         )
         return model
 
@@ -63,27 +60,20 @@ class PipelineFastTests(unittest.TestCase):
         audio = output.audios
 
         generator = paddle.Generator().manual_seed(0)
-        output = pipe(generator=generator,
-                      num_inference_steps=4,
-                      return_dict=False)
+        output = pipe(generator=generator, num_inference_steps=4, return_dict=False)
         audio_from_tuple = output[0]
 
         audio_slice = audio[0, -3:, -3:]
         audio_from_tuple_slice = audio_from_tuple[0, -3:, -3:]
 
         assert audio.shape == (1, 2, self.dummy_unet.sample_size)
-        expected_slice = np.array([
-            0.3497878611087799, -0.10828632861375809, -1.0, -1.0, -1.0,
-            0.1466890275478363
-        ])
+        expected_slice = np.array([0.3497878611087799, -0.10828632861375809, -1.0, -1.0, -1.0, 0.1466890275478363])
         assert np.abs(audio_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(audio_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-2
+        assert np.abs(audio_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow
 class PipelineIntegrationTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -96,14 +86,11 @@ class PipelineIntegrationTests(unittest.TestCase):
         pipe.set_progress_bar_config(disable=None)
 
         generator = paddle.Generator().manual_seed(0)
-        output = pipe(generator=generator,
-                      num_inference_steps=100,
-                      audio_length_in_s=4.096)
+        output = pipe(generator=generator, num_inference_steps=100, audio_length_in_s=4.096)
         audio = output.audios
 
         audio_slice = audio[0, -3:, -3:]
 
         assert audio.shape == (1, 2, pipe.unet.sample_size)
-        expected_slice = np.array(
-            [-0.1576, -0.1526, -0.127, -0.2699, -0.2762, -0.2487])
+        expected_slice = np.array([-0.1576, -0.1526, -0.127, -0.2699, -0.2762, -0.2487])
         assert np.abs(audio_slice.flatten() - expected_slice).max() < 1e-2

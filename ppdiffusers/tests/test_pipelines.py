@@ -20,12 +20,14 @@ import random
 import shutil
 import tempfile
 import unittest
-from functools import partial
 
 import numpy as np
 import paddle
-
 import PIL
+from parameterized import parameterized
+from PIL import Image
+
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMPipeline,
@@ -47,9 +49,6 @@ from ppdiffusers import (
 from ppdiffusers.pipeline_utils import DiffusionPipeline
 from ppdiffusers.utils import floats_tensor, slow
 from ppdiffusers.utils.testing_utils import CaptureLogger
-from PIL import Image
-from parameterized import parameterized
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
 
 def test_progress_bar(capsys):
@@ -76,63 +75,44 @@ def test_progress_bar(capsys):
 
 
 class DownloadTests(unittest.TestCase):
-
     def test_download_no_safety_checker(self):
         prompt = "hello"
         pipe = StableDiffusionPipeline.from_pretrained(
-            "hf-internal-testing/tiny-stable-diffusion-torch",
-            safety_checker=None)
+            "hf-internal-testing/tiny-stable-diffusion-torch", safety_checker=None
+        )
         generator = paddle.Generator().manual_seed(0)
-        out = pipe(prompt,
-                   num_inference_steps=2,
-                   generator=generator,
-                   output_type="numpy").images
+        out = pipe(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
-        pipe_2 = StableDiffusionPipeline.from_pretrained(
-            "hf-internal-testing/tiny-stable-diffusion-torch")
+        pipe_2 = StableDiffusionPipeline.from_pretrained("hf-internal-testing/tiny-stable-diffusion-torch")
         generator = paddle.Generator().manual_seed(0)
-        out_2 = pipe_2(prompt,
-                       num_inference_steps=2,
-                       generator=generator,
-                       output_type="numpy").images
+        out_2 = pipe_2(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
         assert np.max(np.abs(out - out_2)) < 1e-3
 
     def test_load_no_safety_checker_explicit_locally(self):
         prompt = "hello"
         pipe = StableDiffusionPipeline.from_pretrained(
-            "hf-internal-testing/tiny-stable-diffusion-torch",
-            safety_checker=None)
+            "hf-internal-testing/tiny-stable-diffusion-torch", safety_checker=None
+        )
         generator = paddle.Generator().manual_seed(0)
-        out = pipe(prompt,
-                   num_inference_steps=2,
-                   generator=generator,
-                   output_type="numpy").images
+        out = pipe(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             pipe.save_pretrained(tmpdirname)
-            pipe_2 = StableDiffusionPipeline.from_pretrained(
-                tmpdirname, safety_checker=None)
+            pipe_2 = StableDiffusionPipeline.from_pretrained(tmpdirname, safety_checker=None)
             pipe_2 = pipe_2
 
             generator = paddle.Generator().manual_seed(0)
 
-            out_2 = pipe_2(prompt,
-                           num_inference_steps=2,
-                           generator=generator,
-                           output_type="numpy").images
+            out_2 = pipe_2(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
         assert np.max(np.abs(out - out_2)) < 1e-3
 
     def test_load_no_safety_checker_default_locally(self):
         prompt = "hello"
-        pipe = StableDiffusionPipeline.from_pretrained(
-            "hf-internal-testing/tiny-stable-diffusion-torch")
+        pipe = StableDiffusionPipeline.from_pretrained("hf-internal-testing/tiny-stable-diffusion-torch")
         generator = paddle.Generator().manual_seed(0)
-        out = pipe(prompt,
-                   num_inference_steps=2,
-                   generator=generator,
-                   output_type="numpy").images
+        out = pipe(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             pipe.save_pretrained(tmpdirname)
@@ -140,23 +120,18 @@ class DownloadTests(unittest.TestCase):
 
             generator = paddle.Generator().manual_seed(0)
 
-            out_2 = pipe_2(prompt,
-                           num_inference_steps=2,
-                           generator=generator,
-                           output_type="numpy").images
+            out_2 = pipe_2(prompt, num_inference_steps=2, generator=generator, output_type="numpy").images
 
         assert np.max(np.abs(out - out_2)) < 1e-3
 
 
 class PipelineFastTests(unittest.TestCase):
-
     def dummy_image(self):
         batch_size = 1
         num_channels = 3
         sizes = (32, 32)
 
-        image = floats_tensor((batch_size, num_channels) + sizes,
-                              rng=random.Random(0))
+        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
     def dummy_uncond_unet(self, sample_size=64):
@@ -214,11 +189,8 @@ class PipelineFastTests(unittest.TestCase):
 
     @property
     def dummy_extractor(self):
-
         def extract(*args, **kwargs):
-
             class Out:
-
                 def __init__(self):
                     self.pixel_values = paddle.ones([0])
 
@@ -229,16 +201,15 @@ class PipelineFastTests(unittest.TestCase):
 
         return extract
 
-    @parameterized.expand([
-        [DDIMScheduler, DDIMPipeline, 32],
-        [DDPMScheduler, DDPMPipeline, 32],
-        [DDIMScheduler, DDIMPipeline, (32, 64)],
-        [DDPMScheduler, DDPMPipeline, (64, 32)],
-    ])
-    def test_uncond_unet_components(self,
-                                    scheduler_fn=DDPMScheduler,
-                                    pipeline_fn=DDPMPipeline,
-                                    sample_size=32):
+    @parameterized.expand(
+        [
+            [DDIMScheduler, DDIMPipeline, 32],
+            [DDPMScheduler, DDPMPipeline, 32],
+            [DDIMScheduler, DDIMPipeline, (32, 64)],
+            [DDPMScheduler, DDPMPipeline, (64, 32)],
+        ]
+    )
+    def test_uncond_unet_components(self, scheduler_fn=DDPMScheduler, pipeline_fn=DDPMPipeline, sample_size=32):
         unet = self.dummy_uncond_unet(sample_size)
         scheduler = scheduler_fn()
         pipeline = pipeline_fn(unet, scheduler)
@@ -251,8 +222,7 @@ class PipelineFastTests(unittest.TestCase):
             num_inference_steps=2,
             output_type="np",
         ).images
-        sample_size = (sample_size, sample_size) if isinstance(
-            sample_size, int) else sample_size
+        sample_size = (sample_size, sample_size) if isinstance(sample_size, int) else sample_size
         assert out_image.shape == (1, *sample_size, 3)
 
     def test_components(self):
@@ -261,13 +231,11 @@ class PipelineFastTests(unittest.TestCase):
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         image = self.dummy_image().cpu().transpose([0, 2, 3, 1])[0]
         init_image = Image.fromarray(np.uint8(image)).convert("RGB")
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize(
-            (32, 32))
+        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((32, 32))
 
         # make sure here that pndm scheduler skips prk
         inpaint = StableDiffusionInpaintPipelineLegacy(
@@ -317,8 +285,7 @@ class PipelineFastTests(unittest.TestCase):
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         sd = StableDiffusionPipeline(
             unet=unet,
@@ -340,25 +307,18 @@ class PipelineFastTests(unittest.TestCase):
         assert isinstance(sd.scheduler, LMSDiscreteScheduler)
         sd.scheduler = EulerDiscreteScheduler.from_config(sd.scheduler.config)
         assert isinstance(sd.scheduler, EulerDiscreteScheduler)
-        sd.scheduler = EulerAncestralDiscreteScheduler.from_config(
-            sd.scheduler.config)
+        sd.scheduler = EulerAncestralDiscreteScheduler.from_config(sd.scheduler.config)
         assert isinstance(sd.scheduler, EulerAncestralDiscreteScheduler)
-        sd.scheduler = DPMSolverMultistepScheduler.from_config(
-            sd.scheduler.config)
+        sd.scheduler = DPMSolverMultistepScheduler.from_config(sd.scheduler.config)
         assert isinstance(sd.scheduler, DPMSolverMultistepScheduler)
 
     def test_set_scheduler_consistency(self):
         unet = self.dummy_cond_unet()
-        pndm = PNDMScheduler.from_config(
-            "hf-internal-testing/tiny-stable-diffusion-torch",
-            subfolder="scheduler")
-        ddim = DDIMScheduler.from_config(
-            "hf-internal-testing/tiny-stable-diffusion-torch",
-            subfolder="scheduler")
+        pndm = PNDMScheduler.from_config("hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler")
+        ddim = DDIMScheduler.from_config("hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler")
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         sd = StableDiffusionPipeline(
             unet=unet,
@@ -374,10 +334,7 @@ class PipelineFastTests(unittest.TestCase):
         sd.scheduler = DDPMScheduler.from_config(pndm_config)
         sd.scheduler = PNDMScheduler.from_config(sd.scheduler.config)
         pndm_config_2 = sd.scheduler.config
-        pndm_config_2 = {
-            k: v
-            for k, v in pndm_config_2.items() if k in pndm_config
-        }
+        pndm_config_2 = {k: v for k, v in pndm_config_2.items() if k in pndm_config}
 
         assert dict(pndm_config) == dict(pndm_config_2)
 
@@ -395,22 +352,16 @@ class PipelineFastTests(unittest.TestCase):
         sd.scheduler = LMSDiscreteScheduler.from_config(ddim_config)
         sd.scheduler = DDIMScheduler.from_config(sd.scheduler.config)
         ddim_config_2 = sd.scheduler.config
-        ddim_config_2 = {
-            k: v
-            for k, v in ddim_config_2.items() if k in ddim_config
-        }
+        ddim_config_2 = {k: v for k, v in ddim_config_2.items() if k in ddim_config}
 
         assert dict(ddim_config) == dict(ddim_config_2)
 
     def test_optional_components(self):
         unet = self.dummy_cond_unet()
-        pndm = PNDMScheduler.from_config(
-            "hf-internal-testing/tiny-stable-diffusion-torch",
-            subfolder="scheduler")
+        pndm = PNDMScheduler.from_config("hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler")
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         orig_sd = StableDiffusionPipeline(
             unet=unet,
@@ -430,10 +381,8 @@ class PipelineFastTests(unittest.TestCase):
 
             # Test that passing None works
             sd = StableDiffusionPipeline.from_pretrained(
-                tmpdirname,
-                feature_extractor=None,
-                safety_checker=None,
-                requires_safety_checker=False)
+                tmpdirname, feature_extractor=None, safety_checker=None, requires_safety_checker=False
+            )
 
             assert sd.config.requires_safety_checker is False
             assert sd.config.safety_checker == (None, None)
@@ -458,8 +407,7 @@ class PipelineFastTests(unittest.TestCase):
             with open(os.path.join(tmpdirname, sd.config_name), "w") as f:
                 json.dump(config, f)
 
-            sd = StableDiffusionPipeline.from_pretrained(
-                tmpdirname, requires_safety_checker=False)
+            sd = StableDiffusionPipeline.from_pretrained(tmpdirname, requires_safety_checker=False)
             sd.save_pretrained(tmpdirname)
             sd = StableDiffusionPipeline.from_pretrained(tmpdirname)
 
@@ -484,8 +432,7 @@ class PipelineFastTests(unittest.TestCase):
             sd.save_pretrained(tmpdirname)
 
             # Test that partially loading works
-            sd = StableDiffusionPipeline.from_pretrained(
-                tmpdirname, feature_extractor=self.dummy_extractor)
+            sd = StableDiffusionPipeline.from_pretrained(tmpdirname, feature_extractor=self.dummy_extractor)
 
             assert sd.config.requires_safety_checker is False
             assert sd.config.safety_checker == (None, None)
@@ -504,8 +451,7 @@ class PipelineFastTests(unittest.TestCase):
             assert sd.config.feature_extractor != (None, None)
 
             sd.save_pretrained(tmpdirname)
-            sd = StableDiffusionPipeline.from_pretrained(
-                tmpdirname, feature_extractor=self.dummy_extractor)
+            sd = StableDiffusionPipeline.from_pretrained(tmpdirname, feature_extractor=self.dummy_extractor)
 
             assert sd.config.requires_safety_checker == [True, True]
             assert sd.config.safety_checker != (None, None)
@@ -514,7 +460,6 @@ class PipelineFastTests(unittest.TestCase):
 
 @slow
 class PipelineSlowTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -532,7 +477,10 @@ class PipelineSlowTests(unittest.TestCase):
                     cache_dir=tmpdirname,
                 )
 
-        assert cap_logger.out == "Keyword arguments {'not_used': True} are not expected by DDPMPipeline and will be ignored.\n"
+        assert (
+            cap_logger.out
+            == "Keyword arguments {'not_used': True} are not expected by DDPMPipeline and will be ignored.\n"
+        )
 
     def test_from_pretrained_save_pretrained(self):
         # 1. Load models
@@ -560,8 +508,7 @@ class PipelineSlowTests(unittest.TestCase):
         generator = paddle.Generator().manual_seed(0)
         new_image = new_ddpm(generator=generator, output_type="numpy").images
 
-        assert np.abs(image - new_image).sum(
-        ) < 1e-5, "Models don't give the same forward pass"
+        assert np.abs(image - new_image).sum() < 1e-5, "Models don't give the same forward pass"
 
     def test_from_pretrained_hub(self):
         model_path = "google/ddpm-cifar10-32"
@@ -571,19 +518,16 @@ class PipelineSlowTests(unittest.TestCase):
         ddpm = DDPMPipeline.from_pretrained(model_path, scheduler=scheduler)
         ddpm.set_progress_bar_config(disable=None)
 
-        ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path,
-                                                          scheduler=scheduler)
+        ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path, scheduler=scheduler)
         ddpm_from_hub.set_progress_bar_config(disable=None)
 
         generator = paddle.Generator().manual_seed(0)
         image = ddpm(generator=generator, output_type="numpy").images
 
         generator = paddle.Generator().manual_seed(0)
-        new_image = ddpm_from_hub(generator=generator,
-                                  output_type="numpy").images
+        new_image = ddpm_from_hub(generator=generator, output_type="numpy").images
 
-        assert np.abs(image - new_image).sum(
-        ) < 1e-5, "Models don't give the same forward pass"
+        assert np.abs(image - new_image).sum() < 1e-5, "Models don't give the same forward pass"
 
     def test_from_pretrained_hub_pass_model(self):
         model_path = "google/ddpm-cifar10-32"
@@ -592,24 +536,19 @@ class PipelineSlowTests(unittest.TestCase):
 
         # pass unet into DiffusionPipeline
         unet = UNet2DModel.from_pretrained(model_path)
-        ddpm_from_hub_custom_model = DiffusionPipeline.from_pretrained(
-            model_path, unet=unet, scheduler=scheduler)
+        ddpm_from_hub_custom_model = DiffusionPipeline.from_pretrained(model_path, unet=unet, scheduler=scheduler)
         ddpm_from_hub_custom_model.set_progress_bar_config(disable=None)
 
-        ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path,
-                                                          scheduler=scheduler)
+        ddpm_from_hub = DiffusionPipeline.from_pretrained(model_path, scheduler=scheduler)
         ddpm_from_hub_custom_model.set_progress_bar_config(disable=None)
 
         generator = paddle.Generator().manual_seed(0)
-        image = ddpm_from_hub_custom_model(generator=generator,
-                                           output_type="numpy").images
+        image = ddpm_from_hub_custom_model(generator=generator, output_type="numpy").images
 
         generator = paddle.Generator().manual_seed(0)
-        new_image = ddpm_from_hub(generator=generator,
-                                  output_type="numpy").images
+        new_image = ddpm_from_hub(generator=generator, output_type="numpy").images
 
-        assert np.abs(image - new_image).sum(
-        ) < 1e-5, "Models don't give the same forward pass"
+        assert np.abs(image - new_image).sum() < 1e-5, "Models don't give the same forward pass"
 
     def test_output_format(self):
         model_path = "google/ddpm-cifar10-32"
@@ -623,9 +562,7 @@ class PipelineSlowTests(unittest.TestCase):
         assert images.shape == (1, 32, 32, 3)
         assert isinstance(images, np.ndarray)
 
-        images = pipe(generator=generator,
-                      output_type="pil",
-                      num_inference_steps=4).images
+        images = pipe(generator=generator, output_type="pil", num_inference_steps=4).images
         assert isinstance(images, list)
         assert len(images) == 1
         assert isinstance(images[0], PIL.Image.Image)
@@ -650,9 +587,7 @@ class PipelineSlowTests(unittest.TestCase):
         ddim.set_progress_bar_config(disable=None)
 
         generator = paddle.Generator().manual_seed(seed)
-        ddpm_images = ddpm(batch_size=2,
-                           generator=generator,
-                           output_type="numpy").images
+        ddpm_images = ddpm(batch_size=2, generator=generator, output_type="numpy").images
 
         generator = paddle.Generator().manual_seed(seed)
         ddim_images = ddim(

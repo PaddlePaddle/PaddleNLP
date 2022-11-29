@@ -12,47 +12,47 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import paddle
 import argparse
+import json
 
-paddle.set_device("cpu")
-from ppdiffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, LDMBertModel, LDMTextToImagePipeline
+import paddle
+
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LDMBertModel,
+    LDMTextToImagePipeline,
+    UNet2DConditionModel,
+)
+
+paddle.set_device("cpu")
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_file",
-                        type=str,
-                        default='./model_state.pdparams',
-                        help="path to pretrained model_state.pdparams")
-    parser.add_argument("--output_path",
-                        type=str,
-                        default='./ldm_pipelines',
-                        help="the output path of pipeline.")
-    parser.add_argument("--vae_name_or_path",
-                        type=str,
-                        default='CompVis/stable-diffusion-v1-4/vae',
-                        help="pretrained_vae_name_or_path.")
-    parser.add_argument("--text_encoder_config_file",
-                        type=str,
-                        default="./config/ldmbert.json",
-                        help="text_encoder_config_file.")
-    parser.add_argument("--unet_config_file",
-                        type=str,
-                        default="./config/unet.json",
-                        help="unet_config_file.")
+    parser.add_argument(
+        "--model_file", type=str, default="./model_state.pdparams", help="path to pretrained model_state.pdparams"
+    )
+    parser.add_argument("--output_path", type=str, default="./ldm_pipelines", help="the output path of pipeline.")
+    parser.add_argument(
+        "--vae_name_or_path",
+        type=str,
+        default="CompVis/stable-diffusion-v1-4/vae",
+        help="pretrained_vae_name_or_path.",
+    )
+    parser.add_argument(
+        "--text_encoder_config_file", type=str, default="./config/ldmbert.json", help="text_encoder_config_file."
+    )
+    parser.add_argument("--unet_config_file", type=str, default="./config/unet.json", help="unet_config_file.")
     parser.add_argument(
         "--tokenizer_name_or_path",
         type=str,
         default="bert-base-uncased",
-        help="Pretrained tokenizer name or path if not the same as model_name.")
-    parser.add_argument("--model_max_length",
-                        type=int,
-                        default=77,
-                        help="Pretrained tokenizer model_max_length.")
+        help="Pretrained tokenizer name or path if not the same as model_name.",
+    )
+    parser.add_argument("--model_max_length", type=int, default=77, help="Pretrained tokenizer model_max_length.")
 
     return parser.parse_args()
 
@@ -82,7 +82,7 @@ def extract_paramaters(model_file="model_state.pdparams", dtype="float32"):
 
 
 def read_json(file):
-    with open(file, 'r', encoding='utf-8') as f:
+    with open(file, "r", encoding="utf-8") as f:
         data = json.load(f)
     return data
 
@@ -104,17 +104,18 @@ def check_keys(model, state_dict):
         print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
 
 
-def build_pipelines(model_file,
-                    output_path,
-                    vae_name_or_path,
-                    unet_config_file,
-                    text_encoder_config_file,
-                    tokenizer_name_or_path="bert-base-uncased",
-                    model_max_length=77):
+def build_pipelines(
+    model_file,
+    output_path,
+    vae_name_or_path,
+    unet_config_file,
+    text_encoder_config_file,
+    tokenizer_name_or_path="bert-base-uncased",
+    model_max_length=77,
+):
     vae = AutoencoderKL.from_config(vae_name_or_path)
     unet = UNet2DConditionModel(**read_json(unet_config_file))
-    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path,
-                                              model_max_length=model_max_length)
+    tokenizer = AutoTokenizer.from_pretrained(tokenizer_name_or_path, model_max_length=model_max_length)
     text_encoder_config = read_json(text_encoder_config_file)
     vocab_size = text_encoder_config["vocab_size"]
     max_position_embeddings = text_encoder_config["max_position_embeddings"]
@@ -128,8 +129,7 @@ def build_pipelines(model_file,
         logger.info(
             f"The tokenizer's model_max_length {tokenizer.model_max_length}, while the text encoder's max_position_embeddings is {max_position_embeddings}, we will use {tokenizer.model_max_length} as max_position_embeddings!"
         )
-        text_encoder_config[
-            "max_position_embeddings"] = tokenizer.model_max_length
+        text_encoder_config["max_position_embeddings"] = tokenizer.model_max_length
     text_encoder = LDMBertModel(**text_encoder_config)
     scheduler = DDIMScheduler(
         beta_start=0.00085,
@@ -149,20 +149,18 @@ def build_pipelines(model_file,
     unet.load_dict(unet_dict)
     vae.load_dict(vae_dict)
     text_encoder.load_dict(text_encoder_dict)
-    pipe = LDMTextToImagePipeline(bert=text_encoder,
-                                  tokenizer=tokenizer,
-                                  scheduler=scheduler,
-                                  vqvae=vae,
-                                  unet=unet)
+    pipe = LDMTextToImagePipeline(bert=text_encoder, tokenizer=tokenizer, scheduler=scheduler, vqvae=vae, unet=unet)
     pipe.save_pretrained(output_path)
 
 
 if __name__ == "__main__":
     args = parse_args()
-    build_pipelines(model_file=args.model_file,
-                    output_path=args.output_path,
-                    vae_name_or_path=args.vae_name_or_path,
-                    unet_config_file=args.unet_config_file,
-                    text_encoder_config_file=args.text_encoder_config_file,
-                    tokenizer_name_or_path=args.tokenizer_name_or_path,
-                    model_max_length=args.model_max_length)
+    build_pipelines(
+        model_file=args.model_file,
+        output_path=args.output_path,
+        vae_name_or_path=args.vae_name_or_path,
+        unet_config_file=args.unet_config_file,
+        text_encoder_config_file=args.text_encoder_config_file,
+        tokenizer_name_or_path=args.tokenizer_name_or_path,
+        model_max_length=args.model_max_length,
+    )

@@ -11,15 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from ...utils import is_paddle_available, is_paddlenlp_available
 
 if is_paddlenlp_available() and is_paddle_available():
     from .modeling_text_unet import UNetFlatConditionModel
     from .pipeline_versatile_diffusion import VersatileDiffusionPipeline
-    from .pipeline_versatile_diffusion_dual_guided import VersatileDiffusionDualGuidedPipeline
-    from .pipeline_versatile_diffusion_image_variation import VersatileDiffusionImageVariationPipeline
-    from .pipeline_versatile_diffusion_text_to_image import VersatileDiffusionTextToImagePipeline
+    from .pipeline_versatile_diffusion_dual_guided import (
+        VersatileDiffusionDualGuidedPipeline,
+    )
+    from .pipeline_versatile_diffusion_image_variation import (
+        VersatileDiffusionImageVariationPipeline,
+    )
+    from .pipeline_versatile_diffusion_text_to_image import (
+        VersatileDiffusionTextToImagePipeline,
+    )
 else:
     from ...utils.dummy_paddle_and_paddlenlp_objects import (
         VersatileDiffusionDualGuidedPipeline,

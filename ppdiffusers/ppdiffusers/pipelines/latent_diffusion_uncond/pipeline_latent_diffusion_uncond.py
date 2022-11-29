@@ -36,8 +36,7 @@ class LDMPipeline(DiffusionPipeline):
             [`DDIMScheduler`] is to be used in combination with `unet` to denoise the encoded image latents.
     """
 
-    def __init__(self, vqvae: VQModel, unet: UNet2DModel,
-                 scheduler: DDIMScheduler):
+    def __init__(self, vqvae: VQModel, unet: UNet2DModel, scheduler: DDIMScheduler):
         super().__init__()
         self.register_modules(vqvae=vqvae, unet=unet, scheduler=scheduler)
 
@@ -74,8 +73,7 @@ class LDMPipeline(DiffusionPipeline):
         """
 
         latents = paddle.randn(
-            (batch_size, self.unet.in_channels, self.unet.sample_size,
-             self.unet.sample_size),
+            (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
             generator=generator,
         )
 
@@ -85,8 +83,7 @@ class LDMPipeline(DiffusionPipeline):
         self.scheduler.set_timesteps(num_inference_steps)
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
 
         extra_kwargs = {}
         if accepts_eta:
@@ -97,8 +94,7 @@ class LDMPipeline(DiffusionPipeline):
             # predict the noise residual
             noise_prediction = self.unet(latent_model_input, t).sample
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_prediction, t, latents,
-                                          **extra_kwargs).prev_sample
+            latents = self.scheduler.step(noise_prediction, t, latents, **extra_kwargs).prev_sample
 
         # decode the image latents with the VAE
         image = self.vqvae.decode(latents).sample
@@ -109,6 +105,6 @@ class LDMPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

@@ -14,20 +14,20 @@
 # limitations under the License.
 
 import inspect
-from typing import Callable, List, Optional, Union
-from packaging import version
-
+import os
 import random
+import re
+import time
+from typing import Callable, List, Optional, Union
+
+import numpy as np
 import paddle
 import PIL
 import PIL.Image
-import numpy as np
-import re
-import inspect
-import os
-import time
+from packaging import version
 
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+
 from ...configuration_utils import FrozenDict
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline
@@ -40,9 +40,9 @@ from ...schedulers import (
     PNDMScheduler,
 )
 from ...utils import PIL_INTERPOLATION, deprecate, logging
+from ...utils.testing_utils import load_image
 from . import StableDiffusionPipelineOutput
 from .safety_checker import StableDiffusionSafetyChecker
-from ...utils.testing_utils import load_image
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -64,12 +64,12 @@ def save_all(images, FORMAT="jpg", OUTDIR="./outputs/"):
         INFERENCE_STEPS = argument["num_inference_steps"]
         GUIDANCE_SCALE = argument["guidance_scale"]
 
-        filename = f'{str(epoch_time)}_scale_{GUIDANCE_SCALE}_steps_{INFERENCE_STEPS}_seed_{SEED}.{FORMAT}'
-        filedir = f'{OUTDIR}/{filename}'
+        filename = f"{str(epoch_time)}_scale_{GUIDANCE_SCALE}_steps_{INFERENCE_STEPS}_seed_{SEED}.{FORMAT}"
+        filedir = f"{OUTDIR}/{filename}"
         image.save(filedir)
-        with open(f'{OUTDIR}/{epoch_time}_prompt.txt', 'w') as file:
+        with open(f"{OUTDIR}/{epoch_time}_prompt.txt", "w") as file:
             file.write(
-                f'PROMPT: {PROMPT}\nNEG_PROMPT: {NEGPROMPT}\n\nINFERENCE_STEPS: {INFERENCE_STEPS}\nHeight: {HEIGHT}\nWidth: {WIDTH}\nSeed: {SEED}\n\nPrecision: {PRECISION}\nSTRENGTH: {STRENGTH}\nGUIDANCE_SCALE: {GUIDANCE_SCALE}'
+                f"PROMPT: {PROMPT}\nNEG_PROMPT: {NEGPROMPT}\n\nINFERENCE_STEPS: {INFERENCE_STEPS}\nHeight: {HEIGHT}\nWidth: {WIDTH}\nSeed: {SEED}\n\nPrecision: {PRECISION}\nSTRENGTH: {STRENGTH}\nGUIDANCE_SCALE: {GUIDANCE_SCALE}"
             )
 
 
@@ -88,7 +88,9 @@ re_attention = re.compile(
 ]|
 [^\\()\[\]:]+|
 :
-""", re.X)
+""",
+    re.X,
+)
 
 
 def parse_prompt_attention(text):
@@ -141,17 +143,17 @@ def parse_prompt_attention(text):
         text = m.group(0)
         weight = m.group(1)
 
-        if text.startswith('\\'):
+        if text.startswith("\\"):
             res.append([text[1:], 1.0])
-        elif text == '(':
+        elif text == "(":
             round_brackets.append(len(res))
-        elif text == '[':
+        elif text == "[":
             square_brackets.append(len(res))
         elif weight is not None and len(round_brackets) > 0:
             multiply_range(round_brackets.pop(), float(weight))
-        elif text == ')' and len(round_brackets) > 0:
+        elif text == ")" and len(round_brackets) > 0:
             multiply_range(round_brackets.pop(), round_bracket_multiplier)
-        elif text == ']' and len(square_brackets) > 0:
+        elif text == "]" and len(square_brackets) > 0:
             multiply_range(square_brackets.pop(), square_bracket_multiplier)
         else:
             res.append([text, 1.0])
@@ -177,8 +179,7 @@ def parse_prompt_attention(text):
     return res
 
 
-def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str],
-                             max_length: int):
+def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str], max_length: int):
     r"""
     Tokenize a list of prompts and return its tokens with weights of each token.
 
@@ -212,48 +213,34 @@ def get_prompts_with_weights(pipe: DiffusionPipeline, prompt: List[str],
     return tokens, weights
 
 
-def pad_tokens_and_weights(tokens,
-                           weights,
-                           max_length,
-                           bos,
-                           eos,
-                           pad,
-                           no_boseos_middle=True,
-                           chunk_length=77):
+def pad_tokens_and_weights(tokens, weights, max_length, bos, eos, pad, no_boseos_middle=True, chunk_length=77):
     r"""
     Pad the tokens (with starting and ending tokens) and weights (with 1.0) to max_length.
     """
     max_embeddings_multiples = (max_length - 2) // (chunk_length - 2)
     weights_length = max_length if no_boseos_middle else max_embeddings_multiples * chunk_length
     for i in range(len(tokens)):
-        tokens[i] = [bos] + tokens[i] + [
-            eos
-        ] + [pad] * (max_length - 2 - len(tokens[i]))
+        tokens[i] = [bos] + tokens[i] + [eos] + [pad] * (max_length - 2 - len(tokens[i]))
         if no_boseos_middle:
-            weights[i] = [
-                1.
-            ] + weights[i] + [1.] * (max_length - 1 - len(weights[i]))
+            weights[i] = [1.0] + weights[i] + [1.0] * (max_length - 1 - len(weights[i]))
         else:
             w = []
             if len(weights[i]) == 0:
-                w = [1.] * weights_length
+                w = [1.0] * weights_length
             else:
                 for j in range((len(weights[i]) - 1) // chunk_length + 1):
-                    w.append(1.)  # weight for starting token in this chunk
-                    w += weights[i][j *
-                                    chunk_length:min(len(weights[i]), (j + 1) *
-                                                     chunk_length)]
-                    w.append(1.)  # weight for ending token in this chunk
-                w += [1.] * (weights_length - len(w))
+                    w.append(1.0)  # weight for starting token in this chunk
+                    w += weights[i][j * chunk_length : min(len(weights[i]), (j + 1) * chunk_length)]
+                    w.append(1.0)  # weight for ending token in this chunk
+                w += [1.0] * (weights_length - len(w))
             weights[i] = w[:]
 
     return tokens, weights
 
 
-def get_unweighted_text_embeddings(pipe: DiffusionPipeline,
-                                   text_input: paddle.Tensor,
-                                   chunk_length: int,
-                                   no_boseos_middle: Optional[bool] = True):
+def get_unweighted_text_embeddings(
+    pipe: DiffusionPipeline, text_input: paddle.Tensor, chunk_length: int, no_boseos_middle: Optional[bool] = True
+):
     """
     When the length of tokens is a multiple of the capacity of the text encoder,
     it should be split into chunks and sent to the text encoder individually.
@@ -263,16 +250,14 @@ def get_unweighted_text_embeddings(pipe: DiffusionPipeline,
         text_embeddings = []
         for i in range(max_embeddings_multiples):
             # extract the i-th chunk
-            text_input_chunk = text_input[:, i * (chunk_length - 2):(i + 1) *
-                                          (chunk_length - 2) + 2].clone()
+            text_input_chunk = text_input[:, i * (chunk_length - 2) : (i + 1) * (chunk_length - 2) + 2].clone()
 
             # cover the head and the tail by the starting and the ending tokens
             text_input_chunk[:, 0] = text_input[0, 0]
             text_input_chunk[:, -1] = text_input[0, -1]
 
             attention_mask = paddle.ones_like(text_input_chunk)
-            text_embedding = pipe.text_encoder(text_input_chunk,
-                                               attention_mask=attention_mask)[0]
+            text_embedding = pipe.text_encoder(text_input_chunk, attention_mask=attention_mask)[0]
 
             if no_boseos_middle:
                 if i == 0:
@@ -289,25 +274,25 @@ def get_unweighted_text_embeddings(pipe: DiffusionPipeline,
         text_embeddings = paddle.concat(text_embeddings, axis=1)
     else:
         attention_mask = paddle.ones_like(text_input)
-        text_embeddings = pipe.text_encoder(text_input,
-                                            attention_mask=attention_mask)[0]
+        text_embeddings = pipe.text_encoder(text_input, attention_mask=attention_mask)[0]
     return text_embeddings
 
 
 def get_weighted_text_embeddings(
-        pipe: DiffusionPipeline,
-        prompt: Union[str, List[str]],
-        uncond_prompt: Optional[Union[str, List[str]]] = None,
-        max_embeddings_multiples: Optional[int] = 1,
-        no_boseos_middle: Optional[bool] = False,
-        skip_parsing: Optional[bool] = False,
-        skip_weighting: Optional[bool] = False,
-        **kwargs):
+    pipe: DiffusionPipeline,
+    prompt: Union[str, List[str]],
+    uncond_prompt: Optional[Union[str, List[str]]] = None,
+    max_embeddings_multiples: Optional[int] = 1,
+    no_boseos_middle: Optional[bool] = False,
+    skip_parsing: Optional[bool] = False,
+    skip_weighting: Optional[bool] = False,
+    **kwargs
+):
     r"""
-    Prompts can be assigned with local weights using brackets. For example, 
+    Prompts can be assigned with local weights using brackets. For example,
     prompt 'A (very beautiful) masterpiece' highlights the words 'very beautiful',
     and the embedding tokens corresponding to the words get multiplied by a constant, 1.1.
-    
+
     Also, to regularize of the embedding, the weighted embedding would be scaled to preserve the original mean.
 
     Args:
@@ -321,54 +306,47 @@ def get_weighted_text_embeddings(
         max_embeddings_multiples (`int`, *optional*, defaults to `1`):
             The max multiple length of prompt embeddings compared to the max output length of text encoder.
         no_boseos_middle (`bool`, *optional*, defaults to `False`):
-            If the length of text token is multiples of the capacity of text encoder, whether reserve the starting and 
+            If the length of text token is multiples of the capacity of text encoder, whether reserve the starting and
             ending token in each of the chunk in the middle.
         skip_parsing (`bool`, *optional*, defaults to `False`):
             Skip the parsing of brackets.
         skip_weighting (`bool`, *optional*, defaults to `False`):
             Skip the weighting. When the parsing is skipped, it is forced True.
     """
-    max_length = (pipe.tokenizer.model_max_length -
-                  2) * max_embeddings_multiples + 2
+    max_length = (pipe.tokenizer.model_max_length - 2) * max_embeddings_multiples + 2
     if isinstance(prompt, str):
         prompt = [prompt]
 
     if not skip_parsing:
-        prompt_tokens, prompt_weights = get_prompts_with_weights(
-            pipe, prompt, max_length - 2)
+        prompt_tokens, prompt_weights = get_prompts_with_weights(pipe, prompt, max_length - 2)
         if uncond_prompt is not None:
             if isinstance(uncond_prompt, str):
                 uncond_prompt = [uncond_prompt]
-            uncond_tokens, uncond_weights = get_prompts_with_weights(
-                pipe, uncond_prompt, max_length - 2)
+            uncond_tokens, uncond_weights = get_prompts_with_weights(pipe, uncond_prompt, max_length - 2)
     else:
         prompt_tokens = [
-            token[1:-1] for token in pipe.tokenizer(
-                prompt, max_length=max_length, truncation=True).input_ids
+            token[1:-1] for token in pipe.tokenizer(prompt, max_length=max_length, truncation=True).input_ids
         ]
-        prompt_weights = [[1.] * len(token) for token in prompt_tokens]
+        prompt_weights = [[1.0] * len(token) for token in prompt_tokens]
         if uncond_prompt is not None:
             if isinstance(uncond_prompt, str):
                 uncond_prompt = [uncond_prompt]
             uncond_tokens = [
                 token[1:-1]
-                for token in pipe.tokenizer(uncond_prompt,
-                                            max_length=max_length,
-                                            truncation=True).input_ids
+                for token in pipe.tokenizer(uncond_prompt, max_length=max_length, truncation=True).input_ids
             ]
-            uncond_weights = [[1.] * len(token) for token in uncond_tokens]
+            uncond_weights = [[1.0] * len(token) for token in uncond_tokens]
 
     # round up the longest length of tokens to a multiple of (model_max_length - 2)
     max_length = max([len(token) for token in prompt_tokens])
     if uncond_prompt is not None:
-        max_length = max(max_length,
-                         max([len(token) for token in uncond_tokens]))
+        max_length = max(max_length, max([len(token) for token in uncond_tokens]))
 
-    max_embeddings_multiples = min(max_embeddings_multiples, (max_length - 1) //
-                                   (pipe.tokenizer.model_max_length - 2) + 1)
+    max_embeddings_multiples = min(
+        max_embeddings_multiples, (max_length - 1) // (pipe.tokenizer.model_max_length - 2) + 1
+    )
     max_embeddings_multiples = max(1, max_embeddings_multiples)
-    max_length = (pipe.tokenizer.model_max_length -
-                  2) * max_embeddings_multiples + 2
+    max_length = (pipe.tokenizer.model_max_length - 2) * max_embeddings_multiples + 2
 
     # pad the length of tokens and weights
     # support bert tokenizer
@@ -383,7 +361,8 @@ def get_weighted_text_embeddings(
         eos,
         pad,
         no_boseos_middle=no_boseos_middle,
-        chunk_length=pipe.tokenizer.model_max_length)
+        chunk_length=pipe.tokenizer.model_max_length,
+    )
     prompt_tokens = paddle.to_tensor(prompt_tokens)
     if uncond_prompt is not None:
         uncond_tokens, uncond_weights = pad_tokens_and_weights(
@@ -394,25 +373,20 @@ def get_weighted_text_embeddings(
             eos,
             pad,
             no_boseos_middle=no_boseos_middle,
-            chunk_length=pipe.tokenizer.model_max_length)
+            chunk_length=pipe.tokenizer.model_max_length,
+        )
         uncond_tokens = paddle.to_tensor(uncond_tokens)
 
     # get the embeddings
     text_embeddings = get_unweighted_text_embeddings(
-        pipe,
-        prompt_tokens,
-        pipe.tokenizer.model_max_length,
-        no_boseos_middle=no_boseos_middle)
-    prompt_weights = paddle.to_tensor(prompt_weights,
-                                      dtype=text_embeddings.dtype)
+        pipe, prompt_tokens, pipe.tokenizer.model_max_length, no_boseos_middle=no_boseos_middle
+    )
+    prompt_weights = paddle.to_tensor(prompt_weights, dtype=text_embeddings.dtype)
     if uncond_prompt is not None:
         uncond_embeddings = get_unweighted_text_embeddings(
-            pipe,
-            uncond_tokens,
-            pipe.tokenizer.model_max_length,
-            no_boseos_middle=no_boseos_middle)
-        uncond_weights = paddle.to_tensor(uncond_weights,
-                                          dtype=uncond_embeddings.dtype)
+            pipe, uncond_tokens, pipe.tokenizer.model_max_length, no_boseos_middle=no_boseos_middle
+        )
+        uncond_weights = paddle.to_tensor(uncond_weights, dtype=uncond_embeddings.dtype)
 
     # assign weights to the prompts and normalize in the sense of mean
     # TODO: should we normalize by chunk or in a whole (current implementation)?
@@ -423,8 +397,7 @@ def get_weighted_text_embeddings(
         if uncond_prompt is not None:
             previous_mean = uncond_embeddings.mean(axis=[-2, -1])
             uncond_embeddings *= uncond_weights.unsqueeze(-1)
-            uncond_embeddings *= previous_mean / uncond_embeddings.mean(
-                axis=[-2, -1])
+            uncond_embeddings *= previous_mean / uncond_embeddings.mean(axis=[-2, -1])
 
     # For classifier free guidance, we need to do two forward passes.
     # Here we concatenate the unconditional and text embeddings into a single batch
@@ -478,7 +451,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`]
             or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
@@ -494,33 +467,33 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-                         EulerDiscreteScheduler,
-                         EulerAncestralDiscreteScheduler,
-                         DPMSolverMultistepScheduler],
+        scheduler: Union[
+            DDIMScheduler,
+            PNDMScheduler,
+            LMSDiscreteScheduler,
+            EulerDiscreteScheduler,
+            EulerAncestralDiscreteScheduler,
+            DPMSolverMultistepScheduler,
+        ],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
         requires_safety_checker: bool = False,
     ):
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
 
-        if hasattr(scheduler.config,
-                   "clip_sample") and scheduler.config.clip_sample is True:
+        if hasattr(scheduler.config, "clip_sample") and scheduler.config.clip_sample is True:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} has not set the configuration `clip_sample`."
                 " `clip_sample` should be set to False in the configuration file. Please make sure to update the"
@@ -528,10 +501,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                 " future versions. If you have downloaded this checkpoint from the Hugging Face Hub, it would be very"
                 " nice if you could open a Pull request for the `scheduler/scheduler_config.json` file"
             )
-            deprecate("clip_sample not set",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+            deprecate("clip_sample not set", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["clip_sample"] = False
             scheduler._internal_dict = FrozenDict(new_config)
@@ -550,12 +520,10 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                 "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
                 " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
             )
-        is_unet_version_less_0_9_0 = hasattr(
-            unet.config, "_ppdiffusers_version") and version.parse(
-                version.parse(unet.config._ppdiffusers_version).base_version
-            ) < version.parse("0.9.0.dev0")
-        is_unet_sample_size_less_64 = hasattr(
-            unet.config, "sample_size") and unet.config.sample_size < 64
+        is_unet_version_less_0_9_0 = hasattr(unet.config, "_ppdiffusers_version") and version.parse(
+            version.parse(unet.config._ppdiffusers_version).base_version
+        ) < version.parse("0.9.0.dev0")
+        is_unet_sample_size_less_64 = hasattr(unet.config, "sample_size") and unet.config.sample_size < 64
         if is_unet_version_less_0_9_0 and is_unet_sample_size_less_64:
             deprecation_message = (
                 "The configuration file of the unet has set the default `sample_size` to smaller than"
@@ -566,11 +534,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
                 " configuration file. Please make sure to update the config accordingly as leaving `sample_size=32`"
                 " in the config might lead to incorrect results in future versions. If you have downloaded this"
                 " checkpoint from the Hugging Face Hub, it would be very nice if you could open a Pull request for"
-                " the `unet/config.json` file")
-            deprecate("sample_size<64",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " the `unet/config.json` file"
+            )
+            deprecate("sample_size<64", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(unet.config)
             new_config["sample_size"] = 64
             unet._internal_dict = FrozenDict(new_config)
@@ -586,9 +552,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         )
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -625,28 +589,34 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
     def text2img(self, *args, **kwargs):
         return self.text2image(*args, **kwargs)
 
-    def _encode_prompt(self, prompt, negative_prompt, max_embeddings_multiples,
-                       no_boseos_middle, skip_parsing, skip_weighting,
-                       do_classifier_free_guidance, num_images_per_prompt):
+    def _encode_prompt(
+        self,
+        prompt,
+        negative_prompt,
+        max_embeddings_multiples,
+        no_boseos_middle,
+        skip_parsing,
+        skip_weighting,
+        do_classifier_free_guidance,
+        num_images_per_prompt,
+    ):
         if do_classifier_free_guidance and negative_prompt is None:
             negative_prompt = ""
         text_embeddings = get_weighted_text_embeddings(
-            self, prompt, negative_prompt, max_embeddings_multiples,
-            no_boseos_middle, skip_parsing, skip_weighting)
+            self, prompt, negative_prompt, max_embeddings_multiples, no_boseos_middle, skip_parsing, skip_weighting
+        )
 
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape(
-            [bs_embed * num_images_per_prompt, seq_len, -1])
+        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
         return text_embeddings
 
     def run_safety_checker(self, image, dtype):
         if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="pd")
+            safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
             image, has_nsfw_concept = self.safety_checker(
-                images=image,
-                clip_input=safety_checker_input.pixel_values.cast(dtype))
+                images=image, clip_input=safety_checker_input.pixel_values.cast(dtype)
+            )
         else:
             has_nsfw_concept = None
         return image, has_nsfw_concept
@@ -665,8 +635,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
 
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
@@ -675,61 +644,47 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
     def check_inputs_text2img(self, prompt, height, width, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-            )
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
     def check_inputs_img2img_inpaint(self, prompt, strength, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if strength < 0 or strength > 1:
-            raise ValueError(
-                f"The value of strength should in [1.0, 1.0] but is {strength}")
+            raise ValueError(f"The value of strength should in [1.0, 1.0] but is {strength}")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
-    def prepare_latents_text2img(self,
-                                 batch_size,
-                                 num_channels_latents,
-                                 height,
-                                 width,
-                                 dtype,
-                                 latents=None):
+    def prepare_latents_text2img(self, batch_size, num_channels_latents, height, width, dtype, latents=None):
         shape = [batch_size, num_channels_latents, height // 8, width // 8]
         if latents is None:
             latents = paddle.randn(shape, dtype=dtype)
         else:
             if latents.shape != shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {shape}"
-                )
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
-    def prepare_latents_img2img(self, init_image, timestep,
-                                num_images_per_prompt, dtype):
+    def prepare_latents_img2img(self, init_image, timestep, num_images_per_prompt, dtype):
         init_image = init_image.cast(dtype=dtype)
         init_latent_dist = self.vae.encode(init_image).latent_dist
         init_latents = init_latent_dist.sample()
@@ -737,8 +692,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         b, c, h, w = init_latents.shape
         init_latents = init_latents.tile([1, num_images_per_prompt, 1, 1])
-        init_latents = init_latents.reshape(
-            [b * num_images_per_prompt, c, h, w])
+        init_latents = init_latents.reshape([b * num_images_per_prompt, c, h, w])
 
         # add noise to latents using the timesteps
         noise = paddle.randn(init_latents.shape, dtype=dtype)
@@ -760,8 +714,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         return timesteps
 
-    def prepare_latents_inpaint(self, init_image, timestep,
-                                num_images_per_prompt, dtype):
+    def prepare_latents_inpaint(self, init_image, timestep, num_images_per_prompt, dtype):
         init_image = init_image.cast(dtype)
         init_latent_dist = self.vae.encode(init_image).latent_dist
         init_latents = init_latent_dist.sample()
@@ -769,8 +722,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         b, c, h, w = init_latents.shape
         init_latents = init_latents.tile([1, num_images_per_prompt, 1, 1])
-        init_latents = init_latents.reshape(
-            [b * num_images_per_prompt, c, h, w])
+        init_latents = init_latents.reshape([b * num_images_per_prompt, c, h, w])
 
         init_latents_orig = init_latents
 
@@ -858,21 +810,23 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         seed = random.randint(0, 2**32) if seed is None else seed
-        argument = dict(prompt=prompt,
-                        negative_prompt=negative_prompt,
-                        height=height,
-                        width=width,
-                        num_inference_steps=num_inference_steps,
-                        guidance_scale=guidance_scale,
-                        num_images_per_prompt=num_images_per_prompt,
-                        eta=eta,
-                        seed=seed,
-                        latents=latents,
-                        max_embeddings_multiples=max_embeddings_multiples,
-                        no_boseos_middle=no_boseos_middle,
-                        skip_parsing=skip_parsing,
-                        skip_weighting=skip_weighting,
-                        epoch_time=time.time())
+        argument = dict(
+            prompt=prompt,
+            negative_prompt=negative_prompt,
+            height=height,
+            width=width,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            num_images_per_prompt=num_images_per_prompt,
+            eta=eta,
+            seed=seed,
+            latents=latents,
+            max_embeddings_multiples=max_embeddings_multiples,
+            no_boseos_middle=no_boseos_middle,
+            skip_parsing=skip_parsing,
+            skip_weighting=skip_weighting,
+            epoch_time=time.time(),
+        )
         paddle.seed(seed)
         # 1. Check inputs. Raise error if not correct
         self.check_inputs_text2img(prompt, height, width, callback_steps)
@@ -885,12 +839,16 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_prompt(prompt, negative_prompt,
-                                              max_embeddings_multiples,
-                                              no_boseos_middle, skip_parsing,
-                                              skip_weighting,
-                                              do_classifier_free_guidance,
-                                              num_images_per_prompt)
+        text_embeddings = self._encode_prompt(
+            prompt,
+            negative_prompt,
+            max_embeddings_multiples,
+            no_boseos_middle,
+            skip_parsing,
+            skip_weighting,
+            do_classifier_free_guidance,
+            num_images_per_prompt,
+        )
 
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -913,25 +871,19 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 7. Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.unet(latent_model_input,
-                                   t,
-                                   encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
@@ -941,8 +893,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         image = self.decode_latents(latents)
 
         # 9. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, text_embeddings.dtype)
+        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
         # 10. Convert to PIL
         if output_type == "pil":
@@ -951,8 +902,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
 
     @paddle.no_grad()
     def img2img(
@@ -1049,22 +999,24 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             height = height
             width = width
 
-        argument = dict(prompt=prompt,
-                        init_image=init_image_str,
-                        negative_prompt=negative_prompt,
-                        height=height,
-                        width=width,
-                        strength=strength,
-                        num_inference_steps=num_inference_steps,
-                        guidance_scale=guidance_scale,
-                        num_images_per_prompt=num_images_per_prompt,
-                        eta=eta,
-                        seed=seed,
-                        max_embeddings_multiples=max_embeddings_multiples,
-                        no_boseos_middle=no_boseos_middle,
-                        skip_parsing=skip_parsing,
-                        skip_weighting=skip_weighting,
-                        epoch_time=time.time())
+        argument = dict(
+            prompt=prompt,
+            init_image=init_image_str,
+            negative_prompt=negative_prompt,
+            height=height,
+            width=width,
+            strength=strength,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            num_images_per_prompt=num_images_per_prompt,
+            eta=eta,
+            seed=seed,
+            max_embeddings_multiples=max_embeddings_multiples,
+            no_boseos_middle=no_boseos_middle,
+            skip_parsing=skip_parsing,
+            skip_weighting=skip_weighting,
+            epoch_time=time.time(),
+        )
         paddle.seed(seed)
 
         # 1. Check inputs
@@ -1078,12 +1030,16 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_prompt(prompt, negative_prompt,
-                                              max_embeddings_multiples,
-                                              no_boseos_middle, skip_parsing,
-                                              skip_weighting,
-                                              do_classifier_free_guidance,
-                                              num_images_per_prompt)
+        text_embeddings = self._encode_prompt(
+            prompt,
+            negative_prompt,
+            max_embeddings_multiples,
+            no_boseos_middle,
+            skip_parsing,
+            skip_weighting,
+            do_classifier_free_guidance,
+            num_images_per_prompt,
+        )
 
         # 4. Preprocess image
         if isinstance(init_image, PIL.Image.Image):
@@ -1093,13 +1049,12 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.get_timesteps(num_inference_steps, strength)
-        latent_timestep = timesteps[:1].tile(
-            [batch_size * num_images_per_prompt])
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
-        latents = self.prepare_latents_img2img(init_image, latent_timestep,
-                                               num_images_per_prompt,
-                                               text_embeddings.dtype)
+        latents = self.prepare_latents_img2img(
+            init_image, latent_timestep, num_images_per_prompt, text_embeddings.dtype
+        )
 
         # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
@@ -1107,25 +1062,19 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 8. Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.unet(latent_model_input,
-                                   t,
-                                   encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
@@ -1135,8 +1084,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         image = self.decode_latents(latents)
 
         # 10. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, text_embeddings.dtype)
+        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
         # 11. Convert to PIL
         if output_type == "pil":
@@ -1145,8 +1093,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
 
     @paddle.no_grad()
     def inpaint(
@@ -1252,23 +1199,25 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             height = height
             width = width
 
-        argument = dict(prompt=prompt,
-                        init_image=init_image_str,
-                        mask_image=mask_image_str,
-                        negative_prompt=negative_prompt,
-                        height=height,
-                        width=width,
-                        strength=strength,
-                        num_inference_steps=num_inference_steps,
-                        guidance_scale=guidance_scale,
-                        num_images_per_prompt=num_images_per_prompt,
-                        eta=eta,
-                        seed=seed,
-                        max_embeddings_multiples=max_embeddings_multiples,
-                        no_boseos_middle=no_boseos_middle,
-                        skip_parsing=skip_parsing,
-                        skip_weighting=skip_weighting,
-                        epoch_time=time.time())
+        argument = dict(
+            prompt=prompt,
+            init_image=init_image_str,
+            mask_image=mask_image_str,
+            negative_prompt=negative_prompt,
+            height=height,
+            width=width,
+            strength=strength,
+            num_inference_steps=num_inference_steps,
+            guidance_scale=guidance_scale,
+            num_images_per_prompt=num_images_per_prompt,
+            eta=eta,
+            seed=seed,
+            max_embeddings_multiples=max_embeddings_multiples,
+            no_boseos_middle=no_boseos_middle,
+            skip_parsing=skip_parsing,
+            skip_weighting=skip_weighting,
+            epoch_time=time.time(),
+        )
         paddle.seed(seed)
 
         # 1. Check inputs
@@ -1282,12 +1231,16 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_prompt(prompt, negative_prompt,
-                                              max_embeddings_multiples,
-                                              no_boseos_middle, skip_parsing,
-                                              skip_weighting,
-                                              do_classifier_free_guidance,
-                                              num_images_per_prompt)
+        text_embeddings = self._encode_prompt(
+            prompt,
+            negative_prompt,
+            max_embeddings_multiples,
+            no_boseos_middle,
+            skip_parsing,
+            skip_weighting,
+            do_classifier_free_guidance,
+            num_images_per_prompt,
+        )
 
         if not isinstance(init_image, paddle.Tensor):
             init_image = init_image.resize((width, height))
@@ -1300,14 +1253,13 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps = self.get_timesteps(num_inference_steps, strength)
-        latent_timestep = timesteps[:1].tile(
-            [batch_size * num_images_per_prompt])
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
         latents, init_latents_orig, noise = self.prepare_latents_inpaint(
-            init_image, latent_timestep, num_images_per_prompt,
-            text_embeddings.dtype)
+            init_image, latent_timestep, num_images_per_prompt, text_embeddings.dtype
+        )
 
         # 7. Prepare mask latent
         mask = mask_image.cast(latents.dtype)
@@ -1319,28 +1271,21 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 9. Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.unet(latent_model_input,
-                                   t,
-                                   encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
             # masking
-            init_latents_proper = self.scheduler.add_noise(
-                init_latents_orig, noise, t)
+            init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
 
             latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
@@ -1352,8 +1297,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         image = self.decode_latents(latents)
 
         # 11. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, text_embeddings.dtype)
+        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
         # 12. Convert to PIL
         if output_type == "pil":
@@ -1362,8 +1306,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
 
     @staticmethod
     def numpy_to_pil(images, **kwargs):

@@ -37,21 +37,17 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
     UNDER CONSTRUCTION
 
     """
+
     order = 1
 
     @register_to_config
-    def __init__(self,
-                 num_train_timesteps=2000,
-                 beta_min=0.1,
-                 beta_max=20,
-                 sampling_eps=1e-3):
+    def __init__(self, num_train_timesteps=2000, beta_min=0.1, beta_max=20, sampling_eps=1e-3):
         self.sigmas = None
         self.discrete_sigmas = None
         self.timesteps = None
 
     def set_timesteps(self, num_inference_steps):
-        self.timesteps = paddle.linspace(1, self.config.sampling_eps,
-                                         num_inference_steps)
+        self.timesteps = paddle.linspace(1, self.config.sampling_eps, num_inference_steps)
 
     def step_pred(self, score, x, t, generator=None):
         if self.timesteps is None:
@@ -61,9 +57,9 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
 
         # TODO(Patrick) better comments + non-Paddle
         # postprocess model score
-        log_mean_coeff = (-0.25 * t**2 *
-                          (self.config.beta_max - self.config.beta_min) -
-                          0.5 * t * self.config.beta_min)
+        log_mean_coeff = (
+            -0.25 * t**2 * (self.config.beta_max - self.config.beta_min) - 0.5 * t * self.config.beta_min
+        )
         std = paddle.sqrt(1.0 - paddle.exp(2.0 * log_mean_coeff))
         std = std.flatten()
         while len(std.shape) < len(score.shape):
@@ -73,8 +69,7 @@ class ScoreSdeVpScheduler(SchedulerMixin, ConfigMixin):
         # compute
         dt = -1.0 / len(self.timesteps)
 
-        beta_t = self.config.beta_min + t * (self.config.beta_max -
-                                             self.config.beta_min)
+        beta_t = self.config.beta_min + t * (self.config.beta_max - self.config.beta_min)
         beta_t = beta_t.flatten()
         while len(beta_t.shape) < len(x.shape):
             beta_t = beta_t.unsqueeze(-1)

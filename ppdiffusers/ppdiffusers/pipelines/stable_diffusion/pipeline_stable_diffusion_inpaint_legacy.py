@@ -18,8 +18,8 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 import paddle
-
 import PIL
+
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
@@ -54,8 +54,7 @@ def preprocess_mask(mask, scale_factor=8):
     mask = mask.convert("L")
     w, h = mask.size
     w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
-    mask = mask.resize((w // scale_factor, h // scale_factor),
-                       resample=PIL_INTERPOLATION["nearest"])
+    mask = mask.resize((w // scale_factor, h // scale_factor), resample=PIL_INTERPOLATION["nearest"])
     mask = np.array(mask).astype(np.float32) / 255.0
     mask = np.tile(mask, (4, 1, 1))
     mask = mask[None].transpose(0, 1, 2, 3)  # what does this step do?
@@ -84,7 +83,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         unet ([`UNet2DConditionModel`]): Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
-            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`] 
+            [`DDIMScheduler`], [`LMSDiscreteScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`], [`EulerAncestralDiscreteScheduler`]
             or [`DPMSolverMultistepScheduler`].
         safety_checker ([`StableDiffusionSafetyChecker`]):
             Classification module that estimates whether generated images could be considered offensive or harmful.
@@ -101,35 +100,35 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         text_encoder: CLIPTextModel,
         tokenizer: CLIPTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-                         EulerDiscreteScheduler,
-                         EulerAncestralDiscreteScheduler,
-                         DPMSolverMultistepScheduler],
+        scheduler: Union[
+            DDIMScheduler,
+            PNDMScheduler,
+            LMSDiscreteScheduler,
+            EulerDiscreteScheduler,
+            EulerAncestralDiscreteScheduler,
+            DPMSolverMultistepScheduler,
+        ],
         safety_checker: StableDiffusionSafetyChecker,
         feature_extractor: CLIPFeatureExtractor,
         requires_safety_checker: bool = True,
     ):
         super().__init__()
 
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
 
-        if hasattr(scheduler.config,
-                   "clip_sample") and scheduler.config.clip_sample is True:
+        if hasattr(scheduler.config, "clip_sample") and scheduler.config.clip_sample is True:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} has not set the configuration `clip_sample`."
                 " `clip_sample` should be set to False in the configuration file. Please make sure to update the"
@@ -137,10 +136,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 " future versions. If you have downloaded this checkpoint from the Hugging Face Hub, it would be very"
                 " nice if you could open a Pull request for the `scheduler/scheduler_config.json` file"
             )
-            deprecate("clip_sample not set",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+            deprecate("clip_sample not set", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["clip_sample"] = False
             scheduler._internal_dict = FrozenDict(new_config)
@@ -169,13 +165,11 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
             safety_checker=safety_checker,
             feature_extractor=feature_extractor,
         )
-        self.vae_scale_factor = 2**(len(self.vae.config.block_out_channels) - 1)
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
         self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -208,8 +202,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         self.enable_attention_slicing(None)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline._encode_prompt
-    def _encode_prompt(self, prompt, num_images_per_prompt,
-                       do_classifier_free_guidance, negative_prompt):
+    def _encode_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
         r"""
         Encodes the prompt into text encoder hidden states.
 
@@ -234,22 +227,21 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
             return_tensors="pd",
         )
         text_input_ids = text_inputs.input_ids
-        untruncated_ids = self.tokenizer(prompt,
-                                         padding="max_length",
-                                         return_tensors="pd").input_ids
+        untruncated_ids = self.tokenizer(prompt, padding="max_length", return_tensors="pd").input_ids
 
         if not paddle.equal_all(text_input_ids, untruncated_ids):
-            removed_text = self.tokenizer.batch_decode(
-                untruncated_ids[:, self.tokenizer.model_max_length - 1:-1])
+            removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+            )
 
-        config = self.text_encoder.config if isinstance(
-            self.text_encoder.config,
-            dict) else self.text_encoder.config.to_dict()
-        if config.get("use_attention_mask",
-                      None) is not None and config["use_attention_mask"]:
+        config = (
+            self.text_encoder.config
+            if isinstance(self.text_encoder.config, dict)
+            else self.text_encoder.config.to_dict()
+        )
+        if config.get("use_attention_mask", None) is not None and config["use_attention_mask"]:
             attention_mask = text_inputs.attention_mask
         else:
             attention_mask = None
@@ -263,8 +255,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape(
-            [bs_embed * num_images_per_prompt, seq_len, -1])
+        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance:
@@ -274,14 +265,16 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}.")
+                    f" {type(prompt)}."
+                )
             elif isinstance(negative_prompt, str):
                 uncond_tokens = [negative_prompt]
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`.")
+                    " the batch size of `prompt`."
+                )
             else:
                 uncond_tokens = negative_prompt
 
@@ -294,8 +287,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 return_tensors="pd",
             )
 
-            if config.get("use_attention_mask",
-                          None) is not None and config["use_attention_mask"]:
+            if config.get("use_attention_mask", None) is not None and config["use_attention_mask"]:
                 attention_mask = uncond_input.attention_mask
             else:
                 attention_mask = None
@@ -308,27 +300,23 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile(
-                [1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape(
-                [batch_size * num_images_per_prompt, seq_len, -1])
+            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            text_embeddings = paddle.concat(
-                [uncond_embeddings, text_embeddings])
+            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
 
         return text_embeddings
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.run_safety_checker
     def run_safety_checker(self, image, dtype):
         if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="pd")
+            safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
             image, has_nsfw_concept = self.safety_checker(
-                images=image,
-                clip_input=safety_checker_input.pixel_values.cast(dtype))
+                images=image, clip_input=safety_checker_input.pixel_values.cast(dtype)
+            )
         else:
             has_nsfw_concept = None
         return image, has_nsfw_concept
@@ -349,15 +337,13 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
 
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         # check if the scheduler accepts generator
-        accepts_generator = "generator" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
@@ -365,20 +351,18 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.StableDiffusionImg2ImgPipeline.check_inputs
     def check_inputs(self, prompt, strength, callback_steps):
         if not isinstance(prompt, str) and not isinstance(prompt, list):
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if strength < 0 or strength > 1:
-            raise ValueError(
-                f"The value of strength should in [1.0, 1.0] but is {strength}")
+            raise ValueError(f"The value of strength should in [1.0, 1.0] but is {strength}")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.StableDiffusionImg2ImgPipeline.get_timesteps
     def get_timesteps(self, num_inference_steps, strength):
@@ -392,23 +376,18 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
         return timesteps, num_inference_steps - t_start
 
-    def prepare_latents(self, init_image, timestep, batch_size,
-                        num_images_per_prompt, dtype, generator):
+    def prepare_latents(self, init_image, timestep, batch_size, num_images_per_prompt, dtype, generator):
         init_image = init_image.cast(dtype)
         init_latent_dist = self.vae.encode(init_image).latent_dist
         init_latents = init_latent_dist.sample(generator=generator)
         init_latents = 0.18215 * init_latents
 
         # Expand init_latents for batch_size and num_images_per_prompt
-        init_latents = paddle.concat([init_latents] * batch_size *
-                                     num_images_per_prompt,
-                                     axis=0)
+        init_latents = paddle.concat([init_latents] * batch_size * num_images_per_prompt, axis=0)
         init_latents_orig = init_latents
 
         # add noise to latents using the timesteps
-        noise = paddle.randn(init_latents.shape,
-                             generator=generator,
-                             dtype=dtype)
+        noise = paddle.randn(init_latents.shape, generator=generator, dtype=dtype)
         init_latents = self.scheduler.add_noise(init_latents, noise, timestep)
         latents = init_latents
         return latents, init_latents_orig, noise
@@ -501,9 +480,9 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         do_classifier_free_guidance = guidance_scale > 1.0
 
         # 3. Encode input prompt
-        text_embeddings = self._encode_prompt(prompt, num_images_per_prompt,
-                                              do_classifier_free_guidance,
-                                              negative_prompt)
+        text_embeddings = self._encode_prompt(
+            prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
+        )
 
         # 4. Preprocess image and mask
         if not isinstance(init_image, paddle.Tensor):
@@ -514,16 +493,14 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
-        timesteps, num_inference_steps = self.get_timesteps(
-            num_inference_steps, strength)
-        latent_timestep = timesteps[:1].tile(
-            [batch_size * num_images_per_prompt])
+        timesteps, num_inference_steps = self.get_timesteps(num_inference_steps, strength)
+        latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
         latents, init_latents_orig, noise = self.prepare_latents(
-            init_image, latent_timestep, batch_size, num_images_per_prompt,
-            text_embeddings.dtype, generator)
+            init_image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator
+        )
 
         # 7. Prepare mask latent
         mask = mask_image.cast(latents.dtype)
@@ -533,40 +510,30 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
 
         # 9. Denoising loop
-        num_warmup_steps = len(
-            timesteps) - num_inference_steps * self.scheduler.order
+        num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
-                latent_model_input = paddle.concat(
-                    [latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(
-                    latent_model_input, t)
+                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
-                noise_pred = self.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=text_embeddings).sample
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
                 # perform guidance
                 if do_classifier_free_guidance:
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + guidance_scale * (
-                        noise_pred_text - noise_pred_uncond)
+                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                latents = self.scheduler.step(noise_pred, t, latents,
-                                              **extra_step_kwargs).prev_sample
+                latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
                 # masking
-                init_latents_proper = self.scheduler.add_noise(
-                    init_latents_orig, noise, t)
+                init_latents_proper = self.scheduler.add_noise(init_latents_orig, noise, t)
 
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (
-                        i + 1) % self.scheduler.order == 0:
+                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)
@@ -575,8 +542,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         image = self.decode_latents(latents)
 
         # 11. Run safety checker
-        image, has_nsfw_concept = self.run_safety_checker(
-            image, text_embeddings.dtype)
+        image, has_nsfw_concept = self.run_safety_checker(image, text_embeddings.dtype)
 
         # 12. Convert to PIL
         if output_type == "pil":
@@ -585,5 +551,4 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)

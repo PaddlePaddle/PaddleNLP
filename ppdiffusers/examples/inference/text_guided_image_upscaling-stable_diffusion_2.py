@@ -15,8 +15,7 @@
 from ppdiffusers import StableDiffusionUpscalePipeline
 from ppdiffusers.utils import load_image
 
-pipe = StableDiffusionUpscalePipeline.from_pretrained(
-    "stabilityai/stable-diffusion-x4-upscaler")
+pipe = StableDiffusionUpscalePipeline.from_pretrained("stabilityai/stable-diffusion-x4-upscaler")
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/low_res_cat.png"
 low_res_img = load_image(url).resize((128, 128))

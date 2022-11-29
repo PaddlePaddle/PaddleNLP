@@ -37,6 +37,7 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
     """
+
     order = 1
 
     @register_to_config
@@ -67,11 +68,10 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
         steps = paddle.linspace(1, 0, num_inference_steps + 1)[:-1]
         steps = paddle.concat([steps, paddle.to_tensor([0.0])])
 
-        self.betas = paddle.sin(steps * math.pi / 2)**2
-        self.alphas = (1.0 - self.betas**2)**0.5
+        self.betas = paddle.sin(steps * math.pi / 2) ** 2
+        self.alphas = (1.0 - self.betas**2) ** 0.5
 
-        self.timesteps = (paddle.atan2(self.betas, self.alphas) / math.pi *
-                          2)[:-1]
+        self.timesteps = (paddle.atan2(self.betas, self.alphas) / math.pi * 2)[:-1]
 
         self.ets = []
 
@@ -106,8 +106,7 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
         timestep_index = (self.timesteps == timestep).nonzero().item()
         prev_timestep_index = timestep_index + 1
 
-        ets = sample * self.betas[timestep_index] + model_output * self.alphas[
-            timestep_index]
+        ets = sample * self.betas[timestep_index] + model_output * self.alphas[timestep_index]
         self.ets.append(ets)
 
         if len(self.ets) == 1:
@@ -115,22 +114,18 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
         elif len(self.ets) == 2:
             ets = (3 * self.ets[-1] - self.ets[-2]) / 2
         elif len(self.ets) == 3:
-            ets = (23 * self.ets[-1] - 16 * self.ets[-2] +
-                   5 * self.ets[-3]) / 12
+            ets = (23 * self.ets[-1] - 16 * self.ets[-2] + 5 * self.ets[-3]) / 12
         else:
-            ets = (1 / 24) * (55 * self.ets[-1] - 59 * self.ets[-2] +
-                              37 * self.ets[-3] - 9 * self.ets[-4])
+            ets = (1 / 24) * (55 * self.ets[-1] - 59 * self.ets[-2] + 37 * self.ets[-3] - 9 * self.ets[-4])
 
-        prev_sample = self._get_prev_sample(sample, timestep_index,
-                                            prev_timestep_index, ets)
+        prev_sample = self._get_prev_sample(sample, timestep_index, prev_timestep_index, ets)
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
 
-    def scale_model_input(self, sample: paddle.Tensor, *args,
-                          **kwargs) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, *args, **kwargs) -> paddle.Tensor:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
@@ -143,8 +138,7 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
         """
         return sample
 
-    def _get_prev_sample(self, sample, timestep_index, prev_timestep_index,
-                         ets):
+    def _get_prev_sample(self, sample, timestep_index, prev_timestep_index, ets):
         alpha = self.alphas[timestep_index]
         sigma = self.betas[timestep_index]
 

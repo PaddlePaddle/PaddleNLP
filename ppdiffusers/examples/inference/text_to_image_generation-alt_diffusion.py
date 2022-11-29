@@ -14,10 +14,8 @@
 
 from ppdiffusers import AltDiffusionPipeline, DPMSolverMultistepScheduler
 
-scheduler = DPMSolverMultistepScheduler.from_pretrained("BAAI/AltDiffusion",
-                                                        subfolder="scheduler")
-pipe = AltDiffusionPipeline.from_pretrained("BAAI/AltDiffusion",
-                                            scheduler=scheduler)
+scheduler = DPMSolverMultistepScheduler.from_pretrained("BAAI/AltDiffusion", subfolder="scheduler")
+pipe = AltDiffusionPipeline.from_pretrained("BAAI/AltDiffusion", scheduler=scheduler)
 
 prompt = "黑暗精灵公主，非常详细，幻想，非常详细，数字绘画，概念艺术，敏锐的焦点，插图"
 # or in English:

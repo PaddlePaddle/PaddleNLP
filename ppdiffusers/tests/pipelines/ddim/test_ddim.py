@@ -17,15 +17,13 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DDIMPipeline, DDIMScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import slow
 
-from test_pipelines_common import PipelineTesterMixin
-
 
 class DDIMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-
     @property
     def dummy_uncond_unet(self):
         paddle.seed(0)
@@ -48,32 +46,22 @@ class DDIMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         ddpm.set_progress_bar_config(disable=None)
 
         generator = paddle.Generator().manual_seed(0)
-        image = ddpm(generator=generator,
-                     num_inference_steps=2,
-                     output_type="numpy").images
+        image = ddpm(generator=generator, num_inference_steps=2, output_type="numpy").images
 
         generator = paddle.Generator().manual_seed(0)
-        image_from_tuple = ddpm(generator=generator,
-                                num_inference_steps=2,
-                                output_type="numpy",
-                                return_dict=False)[0]
+        image_from_tuple = ddpm(generator=generator, num_inference_steps=2, output_type="numpy", return_dict=False)[0]
 
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0., 0.00152004, 0., 0., 0.00860906, 0.00182715, 0.00189051, 1.,
-            0.668702
-        ])
+        expected_slice = np.array([0.0, 0.00152004, 0.0, 0.0, 0.00860906, 0.00182715, 0.00189051, 1.0, 0.668702])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-2
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow
 class DDIMPipelineIntegrationTests(unittest.TestCase):
-
     def test_inference_ema_bedroom(self):
         model_id = "google/ddpm-ema-bedroom-256"
 
@@ -89,10 +77,7 @@ class DDIMPipelineIntegrationTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
 
         assert image.shape == (1, 256, 256, 3)
-        expected_slice = np.array([
-            0.1546, 0.1561, 0.1595, 0.1564, 0.1569, 0.1585, 0.1554, 0.1550,
-            0.1575
-        ])
+        expected_slice = np.array([0.1546, 0.1561, 0.1595, 0.1564, 0.1569, 0.1585, 0.1554, 0.1550, 0.1575])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
     def test_inference_cifar10(self):
@@ -110,8 +95,5 @@ class DDIMPipelineIntegrationTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.2060, 0.2042, 0.2022, 0.2193, 0.2146, 0.2110, 0.2471, 0.2446,
-            0.2388
-        ])
+        expected_slice = np.array([0.2060, 0.2042, 0.2022, 0.2193, 0.2146, 0.2110, 0.2471, 0.2446, 0.2388])
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

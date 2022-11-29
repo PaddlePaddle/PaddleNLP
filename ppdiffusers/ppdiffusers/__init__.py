@@ -12,15 +12,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from .ppnlp_patch_utils import *
-
 from .utils import (
     is_inflect_available,
     is_onnx_available,
-    is_scipy_available,
     is_paddle_available,
     is_paddlenlp_available,
+    is_scipy_available,
     is_unidecode_available,
 )
 from .version import VERSION
@@ -34,7 +34,14 @@ from .utils import logging
 if is_paddle_available():
     from .initializer import *
     from .modeling_utils import ModelMixin
-    from .models import AutoencoderKL, Transformer2DModel, UNet1DModel, UNet2DConditionModel, UNet2DModel, VQModel
+    from .models import (
+        AutoencoderKL,
+        Transformer2DModel,
+        UNet1DModel,
+        UNet2DConditionModel,
+        UNet2DModel,
+        VQModel,
+    )
     from .optimization import (
         get_constant_schedule,
         get_constant_schedule_with_warmup,
@@ -106,9 +113,11 @@ else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
-    from .pipelines import (OnnxStableDiffusionImg2ImgPipeline,
-                            OnnxStableDiffusionInpaintPipeline,
-                            OnnxStableDiffusionInpaintPipelineLegacy,
-                            OnnxStableDiffusionPipeline)
+    from .pipelines import (
+        OnnxStableDiffusionImg2ImgPipeline,
+        OnnxStableDiffusionInpaintPipeline,
+        OnnxStableDiffusionInpaintPipelineLegacy,
+        OnnxStableDiffusionPipeline,
+    )
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403

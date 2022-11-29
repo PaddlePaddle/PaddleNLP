@@ -15,22 +15,20 @@
 
 import gc
 import math
-import tracemalloc
 import unittest
 
 import paddle
+from parameterized import parameterized
+from test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import UNet2DConditionModel, UNet2DModel
 from ppdiffusers.utils import (
     floats_tensor,
-    load_hf_numpy,
+    load_ppnlp_numpy,
     logging,
-    slow,
     paddle_all_close,
+    slow,
 )
-from parameterized import parameterized
-
-from test_modeling_common import ModelTesterMixin
 
 logger = logging.get_logger(__name__)
 
@@ -109,8 +107,7 @@ class UNetLDMModelTests(ModelTesterMixin, unittest.TestCase):
         return init_dict, inputs_dict
 
     def test_from_pretrained_hub(self):
-        model, loading_info = UNet2DModel.from_pretrained(
-            "fusing/unet-ldm-dummy-update", output_loading_info=True)
+        model, loading_info = UNet2DModel.from_pretrained("fusing/unet-ldm-dummy-update", output_loading_info=True)
 
         self.assertIsNotNone(model)
         self.assertEqual(len(loading_info["missing_keys"]), 0)
@@ -124,10 +121,7 @@ class UNetLDMModelTests(ModelTesterMixin, unittest.TestCase):
         model.eval()
 
         noise = paddle.randn(
-            [
-                1, model.config.in_channels, model.config.sample_size,
-                model.config.sample_size
-            ],
+            [1, model.config.in_channels, model.config.sample_size, model.config.sample_size],
             generator=paddle.Generator().manual_seed(0),
         )
         time_step = paddle.to_tensor([10] * noise.shape[0])
@@ -136,15 +130,22 @@ class UNetLDMModelTests(ModelTesterMixin, unittest.TestCase):
             output = model(noise, time_step).sample
 
         output_slice = output[0, -1, -3:, -3:].flatten()
-        # fmt: off
-        expected_output_slice = paddle.to_tensor([
-            0.43856096267700195, -10.29347038269043, -9.609537124633789,
-            -8.39902114868164, -16.292064666748047, -13.075122833251953,
-            -9.303834915161133, -13.698592185974121, -10.529990196228027
-        ])
-        # fmt: on
-        self.assertTrue(
-            paddle_all_close(output_slice, expected_output_slice, rtol=1e-3))
+
+        expected_output_slice = paddle.to_tensor(
+            [
+                0.43856096267700195,
+                -10.29347038269043,
+                -9.609537124633789,
+                -8.39902114868164,
+                -16.292064666748047,
+                -13.075122833251953,
+                -9.303834915161133,
+                -13.698592185974121,
+                -10.529990196228027,
+            ]
+        )
+
+        self.assertTrue(paddle_all_close(output_slice, expected_output_slice, rtol=1e-3))
 
 
 class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
@@ -160,11 +161,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         time_step = paddle.to_tensor([10])
         encoder_hidden_states = floats_tensor((batch_size, 4, 32))
 
-        return {
-            "sample": noise,
-            "timestep": time_step,
-            "encoder_hidden_states": encoder_hidden_states
-        }
+        return {"sample": noise, "timestep": time_step, "encoder_hidden_states": encoder_hidden_states}
 
     @property
     def input_shape(self):
@@ -227,10 +224,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
         named_params_2 = dict(model_2.named_parameters())
         with paddle.no_grad():
             for name, param in named_params.items():
-                self.assertTrue(
-                    paddle_all_close(param.grad,
-                                     named_params_2[name].grad,
-                                     atol=5e-5))
+                self.assertTrue(paddle_all_close(param.grad, named_params_2[name].grad, atol=5e-5))
 
     def test_model_with_attention_head_dim_tuple(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
@@ -248,8 +242,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
 
         self.assertIsNotNone(output)
         expected_shape = inputs_dict["sample"].shape
-        self.assertEqual(output.shape, expected_shape,
-                         "Input and output shapes do not match")
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
 
     def test_model_with_use_linear_projection(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
@@ -267,8 +260,7 @@ class UNet2DConditionModelTests(ModelTesterMixin, unittest.TestCase):
 
         self.assertIsNotNone(output)
         expected_shape = inputs_dict["sample"].shape
-        self.assertEqual(output.shape, expected_shape,
-                         "Input and output shapes do not match")
+        self.assertEqual(output.shape, expected_shape, "Input and output shapes do not match")
 
 
 class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
@@ -295,20 +287,13 @@ class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
     def prepare_init_args_and_inputs_for_common(self):
         init_dict = {
             "block_out_channels": [32, 64, 64, 64],
-            "in_channels":
-            3,
-            "layers_per_block":
-            1,
-            "out_channels":
-            3,
-            "time_embedding_type":
-            "fourier",
-            "norm_eps":
-            1e-6,
-            "mid_block_scale_factor":
-            math.sqrt(2.0),
-            "norm_num_groups":
-            None,
+            "in_channels": 3,
+            "layers_per_block": 1,
+            "out_channels": 3,
+            "time_embedding_type": "fourier",
+            "norm_eps": 1e-6,
+            "mid_block_scale_factor": math.sqrt(2.0),
+            "norm_num_groups": None,
             "down_block_types": [
                 "SkipDownBlock2D",
                 "AttnSkipDownBlock2D",
@@ -327,8 +312,7 @@ class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_from_pretrained_hub(self):
-        model, loading_info = UNet2DModel.from_pretrained(
-            "google/ncsnpp-celebahq-256", output_loading_info=True)
+        model, loading_info = UNet2DModel.from_pretrained("google/ncsnpp-celebahq-256", output_loading_info=True)
         self.assertIsNotNone(model)
         self.assertEqual(len(loading_info["missing_keys"]), 0)
 
@@ -356,19 +340,15 @@ class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
             output = model(noise, time_step).sample
 
         output_slice = output[0, -3:, -3:, -1].flatten()
-        # fmt: off
-        expected_output_slice = paddle.to_tensor([
-            -4836.2231, -6487.1387, -3816.7969, -7964.9253, -10966.2842,
-            -20043.6016, 8137.0571, 2340.3499, 544.6114
-        ])
-        # fmt: on
 
-        self.assertTrue(
-            paddle_all_close(output_slice, expected_output_slice, rtol=1e-2))
+        expected_output_slice = paddle.to_tensor(
+            [-4836.2231, -6487.1387, -3816.7969, -7964.9253, -10966.2842, -20043.6016, 8137.0571, 2340.3499, 544.6114]
+        )
+
+        self.assertTrue(paddle_all_close(output_slice, expected_output_slice, rtol=1e-2))
 
     def test_output_pretrained_ve_large(self):
-        model = UNet2DModel.from_pretrained(
-            "fusing/ncsnpp-ffhq-ve-dummy-update")
+        model = UNet2DModel.from_pretrained("fusing/ncsnpp-ffhq-ve-dummy-update")
 
         paddle.seed(0)
 
@@ -383,15 +363,12 @@ class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
             output = model(noise, time_step).sample
 
         output_slice = output[0, -3:, -3:, -1].flatten()
-        # fmt: off
-        expected_output_slice = paddle.to_tensor([
-            -0.0325, -0.0900, -0.0869, -0.0332, -0.0725, -0.0270, -0.0101,
-            0.0227, 0.0256
-        ])
-        # fmt: on
 
-        self.assertTrue(
-            paddle_all_close(output_slice, expected_output_slice, rtol=1e-2))
+        expected_output_slice = paddle.to_tensor(
+            [-0.0325, -0.0900, -0.0869, -0.0332, -0.0725, -0.0270, -0.0101, 0.0227, 0.0256]
+        )
+
+        self.assertTrue(paddle_all_close(output_slice, expected_output_slice, rtol=1e-2))
 
     def test_forward_with_norm_groups(self):
         # not required for this model
@@ -400,7 +377,6 @@ class NCSNppModelTests(ModelTesterMixin, unittest.TestCase):
 
 @slow
 class UNet2DConditionModelIntegrationTests(unittest.TestCase):
-
     def get_file_format(self, seed, shape):
         return f"gaussian_noise_s={seed}_shape={'_'.join([str(s) for s in shape])}.npy"
 
@@ -411,8 +387,7 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         paddle.device.cuda.empty_cache()
 
     def get_latents(self, seed=0, shape=(4, 4, 64, 64)):
-        image = paddle.to_tensor(
-            load_hf_numpy(self.get_file_format(seed, shape)))
+        image = paddle.to_tensor(load_ppnlp_numpy(self.get_file_format(seed, shape)))
         return image
 
     def get_unet_model(self, model_id="CompVis/stable-diffusion-v1-4"):
@@ -422,51 +397,24 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
         return model
 
     def get_encoder_hidden_states(self, seed=0, shape=(4, 77, 768)):
-        hidden_states = paddle.to_tensor(
-            load_hf_numpy(self.get_file_format(seed, shape)))
+        hidden_states = paddle.to_tensor(load_ppnlp_numpy(self.get_file_format(seed, shape)))
         return hidden_states
 
-    @parameterized.expand([
-        # fmt: off
+    @parameterized.expand(
         [
-            33, 4,
-            [
-                -0.4424, 0.1510, -0.1937, 0.2118, 0.3746, -0.3957, 0.0160,
-                -0.0435
-            ]
-        ],
-        [
-            47, 0.55,
-            [
-                -0.1508, 0.0379, -0.3075, 0.2540, 0.3633, -0.0821, 0.1719,
-                -0.0207
-            ]
-        ],
-        [
-            21, 0.89,
-            [
-                -0.6479, 0.6364, -0.3464, 0.8697, 0.4443, -0.6289, -0.0091,
-                0.1778
-            ]
-        ],
-        [
-            9, 1000,
-            [
-                0.8888, -0.5659, 0.5834, -0.7469, 1.1912, -0.3923, 1.1241,
-                -0.4424
-            ]
-        ],
-        # fmt: on
-    ])
+            [33, 4, [-0.4424, 0.1510, -0.1937, 0.2118, 0.3746, -0.3957, 0.0160, -0.0435]],
+            [47, 0.55, [-0.1508, 0.0379, -0.3075, 0.2540, 0.3633, -0.0821, 0.1719, -0.0207]],
+            [21, 0.89, [-0.6479, 0.6364, -0.3464, 0.8697, 0.4443, -0.6289, -0.0091, 0.1778]],
+            [9, 1000, [0.8888, -0.5659, 0.5834, -0.7469, 1.1912, -0.3923, 1.1241, -0.4424]],
+        ]
+    )
     def test_compvis_sd_v1_4(self, seed, timestep, expected_slice):
         model = self.get_unet_model(model_id="CompVis/stable-diffusion-v1-4")
         latents = self.get_latents(seed)
         encoder_hidden_states = self.get_encoder_hidden_states(seed)
 
         with paddle.no_grad():
-            sample = model(latents,
-                           timestep=timestep,
-                           encoder_hidden_states=encoder_hidden_states).sample
+            sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
 
         assert sample.shape == latents.shape
 
@@ -475,44 +423,21 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
 
         assert paddle_all_close(output_slice, expected_output_slice, atol=1e-3)
 
-    @parameterized.expand([
-        # fmt: off
+    @parameterized.expand(
         [
-            33, 4,
-            [
-                -0.4430, 0.1570, -0.1867, 0.2376, 0.3205, -0.3681, 0.0525,
-                -0.0722
-            ]
-        ],
-        [
-            47, 0.55,
-            [
-                -0.1415, 0.0129, -0.3136, 0.2257, 0.3430, -0.0536, 0.2114,
-                -0.0436
-            ]
-        ],
-        [
-            21, 0.89,
-            [-0.7091, 0.6664, -0.3643, 0.9032, 0.4499, -0.6541, 0.0139, 0.1750]
-        ],
-        [
-            9, 1000,
-            [
-                0.8878, -0.5659, 0.5844, -0.7442, 1.1883, -0.3927, 1.1192,
-                -0.4423
-            ]
-        ],
-        # fmt: on
-    ])
+            [33, 4, [-0.4430, 0.1570, -0.1867, 0.2376, 0.3205, -0.3681, 0.0525, -0.0722]],
+            [47, 0.55, [-0.1415, 0.0129, -0.3136, 0.2257, 0.3430, -0.0536, 0.2114, -0.0436]],
+            [21, 0.89, [-0.7091, 0.6664, -0.3643, 0.9032, 0.4499, -0.6541, 0.0139, 0.1750]],
+            [9, 1000, [0.8878, -0.5659, 0.5844, -0.7442, 1.1883, -0.3927, 1.1192, -0.4423]],
+        ]
+    )
     def test_compvis_sd_v1_5(self, seed, timestep, expected_slice):
         model = self.get_unet_model(model_id="runwayml/stable-diffusion-v1-5")
         latents = self.get_latents(seed)
         encoder_hidden_states = self.get_encoder_hidden_states(seed)
 
         with paddle.no_grad():
-            sample = model(latents,
-                           timestep=timestep,
-                           encoder_hidden_states=encoder_hidden_states).sample
+            sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
 
         assert sample.shape == latents.shape
 
@@ -521,45 +446,21 @@ class UNet2DConditionModelIntegrationTests(unittest.TestCase):
 
         assert paddle_all_close(output_slice, expected_output_slice, atol=1e-3)
 
-    @parameterized.expand([
-        # fmt: off
+    @parameterized.expand(
         [
-            33, 4,
-            [
-                -0.7639, 0.0106, -0.1615, -0.3487, -0.0423, -0.7972, 0.0085,
-                -0.4858
-            ]
-        ],
-        [
-            47, 0.55,
-            [-0.6564, 0.0795, -1.9026, -0.6258, 1.8235, 1.2056, 1.2169, 0.9073]
-        ],
-        [
-            21, 0.89,
-            [
-                0.0327, 0.4399, -0.6358, 0.3417, 0.4120, -0.5621, -0.0397,
-                -1.0430
-            ]
-        ],
-        [
-            9, 1000,
-            [
-                0.1600, 0.7303, -1.0556, -0.3515, -0.7440, -1.2037, -1.8149,
-                -1.8931
-            ]
-        ],
-        # fmt: on
-    ])
+            [33, 4, [-0.7639, 0.0106, -0.1615, -0.3487, -0.0423, -0.7972, 0.0085, -0.4858]],
+            [47, 0.55, [-0.6564, 0.0795, -1.9026, -0.6258, 1.8235, 1.2056, 1.2169, 0.9073]],
+            [21, 0.89, [0.0327, 0.4399, -0.6358, 0.3417, 0.4120, -0.5621, -0.0397, -1.0430]],
+            [9, 1000, [0.1600, 0.7303, -1.0556, -0.3515, -0.7440, -1.2037, -1.8149, -1.8931]],
+        ]
+    )
     def test_compvis_sd_inpaint(self, seed, timestep, expected_slice):
-        model = self.get_unet_model(
-            model_id="runwayml/stable-diffusion-inpainting")
+        model = self.get_unet_model(model_id="runwayml/stable-diffusion-inpainting")
         latents = self.get_latents(seed, shape=(4, 9, 64, 64))
         encoder_hidden_states = self.get_encoder_hidden_states(seed)
 
         with paddle.no_grad():
-            sample = model(latents,
-                           timestep=timestep,
-                           encoder_hidden_states=encoder_hidden_states).sample
+            sample = model(latents, timestep=timestep, encoder_hidden_states=encoder_hidden_states).sample
 
         assert sample.shape == [4, 4, 64, 64]
 

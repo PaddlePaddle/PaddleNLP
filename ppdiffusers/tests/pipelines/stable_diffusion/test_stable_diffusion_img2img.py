@@ -19,7 +19,9 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -31,14 +33,9 @@ from ppdiffusers import (
     VQModel,
 )
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
-
-from test_pipelines_common import PipelineTesterMixin
 
 
-class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
-                                              unittest.TestCase):
-
+class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -51,8 +48,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         num_channels = 3
         sizes = (32, 32)
 
-        image = floats_tensor((batch_size, num_channels) + sizes,
-                              rng=random.Random(0))
+        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
     @property
@@ -140,11 +136,8 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
 
     @property
     def dummy_extractor(self):
-
         def extract(*args, **kwargs):
-
             class Out:
-
                 def __init__(self):
                     self.pixel_values = paddle.ones([0])
 
@@ -160,8 +153,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         init_image = self.dummy_image
 
@@ -205,22 +197,28 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.6048411726951599, 0.3327171504497528, 0.45369353890419006,
-            0.23096901178359985, 0.176530659198761, 0.34747564792633057,
-            0.5890616178512573, 0.4539860188961029, 0.4980889558792114
-        ])
+        expected_slice = np.array(
+            [
+                0.6048411726951599,
+                0.3327171504497528,
+                0.45369353890419006,
+                0.23096901178359985,
+                0.176530659198761,
+                0.34747564792633057,
+                0.5890616178512573,
+                0.4539860188961029,
+                0.4980889558792114,
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-3
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-3
 
     def test_stable_diffusion_img2img_negative_prompt(self):
         unet = self.dummy_cond_unet
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         init_image = self.dummy_image
 
@@ -252,11 +250,19 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         image_slice = image[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.7819368839263916, 0.3929930031299591, 0.5836042761802673,
-            0.35738763213157654, 0.20820677280426025, 0.42706334590911865,
-            0.6419423222541809, 0.5077139139175415, 0.5988240242004395
-        ])
+        expected_slice = np.array(
+            [
+                0.7819368839263916,
+                0.3929930031299591,
+                0.5836042761802673,
+                0.35738763213157654,
+                0.20820677280426025,
+                0.42706334590911865,
+                0.6419423222541809,
+                0.5077139139175415,
+                0.5988240242004395,
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
 
     def test_stable_diffusion_img2img_multiple_init_images(self):
@@ -264,8 +270,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         init_image = self.dummy_image.tile([2, 1, 1, 1])
 
@@ -297,23 +302,28 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         image_slice = image[-1, -3:, -3:, -1]
 
         assert image.shape == (2, 32, 32, 3)
-        expected_slice = np.array([
-            0.6568188071250916, 0.4330902099609375, 0.611574113368988,
-            0.7987673282623291, 0.44095534086227417, 0.37207627296447754,
-            0.8799230456352234, 0.5347668528556824, 0.5321215391159058
-        ])
+        expected_slice = np.array(
+            [
+                0.6568188071250916,
+                0.4330902099609375,
+                0.611574113368988,
+                0.7987673282623291,
+                0.44095534086227417,
+                0.37207627296447754,
+                0.8799230456352234,
+                0.5347668528556824,
+                0.5321215391159058,
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
 
     def test_stable_diffusion_img2img_k_lms(self):
         unet = self.dummy_cond_unet
-        scheduler = LMSDiscreteScheduler(beta_start=0.00085,
-                                         beta_end=0.012,
-                                         beta_schedule="scaled_linear")
+        scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
 
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         init_image = self.dummy_image
 
@@ -357,22 +367,28 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.10766351222991943, 0.7343618869781494, 0.6679852604866028,
-            0.15485835075378418, 0.8575892448425293, 0.481354683637619,
-            0.3960404098033905, 0.6154966950416565, 0.4504551291465759
-        ])
+        expected_slice = np.array(
+            [
+                0.10766351222991943,
+                0.7343618869781494,
+                0.6679852604866028,
+                0.15485835075378418,
+                0.8575892448425293,
+                0.481354683637619,
+                0.3960404098033905,
+                0.6154966950416565,
+                0.4504551291465759,
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-3
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-3
 
     def test_stable_diffusion_img2img_num_images_per_prompt(self):
         unet = self.dummy_cond_unet
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         init_image = self.dummy_image
 
@@ -438,7 +454,6 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
 
 @slow
 class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -489,8 +504,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         )
 
         model_id = "CompVis/stable-diffusion-v1-4"
-        lms = LMSDiscreteScheduler.from_pretrained(model_id,
-                                                   subfolder="scheduler")
+        lms = LMSDiscreteScheduler.from_pretrained(model_id, subfolder="scheduler")
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
             model_id,
             scheduler=lms,
@@ -553,8 +567,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
     def test_stable_diffusion_img2img_intermediate_state(self):
         number_of_steps = 0
 
-        def test_callback_fn(step: int, timestep: int,
-                             latents: paddle.Tensor) -> None:
+        def test_callback_fn(step: int, timestep: int, latents: paddle.Tensor) -> None:
             test_callback_fn.has_been_called = True
             nonlocal number_of_steps
             number_of_steps += 1
@@ -562,25 +575,38 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
                 latents = latents.detach().cpu().numpy()
                 assert latents.shape == (1, 4, 64, 96)
                 latents_slice = latents[0, -3:, -3:, -1]
-                expected_slice = np.array([
-                    0.9075717329978943, -0.017079180106520653,
-                    0.48078930377960205, 0.2827966809272766, 0.5796141624450684,
-                    1.4848742485046387, 0.5332279205322266, 1.9802331924438477,
-                    0.05084720626473427
-                ])
-                assert np.abs(latents_slice.flatten() -
-                              expected_slice).max() < 1e-3
+                expected_slice = np.array(
+                    [
+                        0.9075717329978943,
+                        -0.017079180106520653,
+                        0.48078930377960205,
+                        0.2827966809272766,
+                        0.5796141624450684,
+                        1.4848742485046387,
+                        0.5332279205322266,
+                        1.9802331924438477,
+                        0.05084720626473427,
+                    ]
+                )
+                assert np.abs(latents_slice.flatten() - expected_slice).max() < 1e-3
             elif step == 37:
                 latents = latents.detach().cpu().numpy()
                 assert latents.shape == (1, 4, 64, 96)
                 latents_slice = latents[0, -3:, -3:, -1]
-                expected_slice = np.array([
-                    0.7074431777000427, 0.784945011138916, 0.8420439958572388,
-                    1.8224966526031494, 1.792901873588562, 1.9434930086135864,
-                    1.3401929140090942, 1.656121850013733, 1.2673498392105103
-                ])
-                assert np.abs(latents_slice.flatten() -
-                              expected_slice).max() < 1e-2
+                expected_slice = np.array(
+                    [
+                        0.7074431777000427,
+                        0.784945011138916,
+                        0.8420439958572388,
+                        1.8224966526031494,
+                        1.792901873588562,
+                        1.9434930086135864,
+                        1.3401929140090942,
+                        1.656121850013733,
+                        1.2673498392105103,
+                    ]
+                )
+                assert np.abs(latents_slice.flatten() - expected_slice).max() < 1e-2
 
         test_callback_fn.has_been_called = False
 
@@ -590,7 +616,8 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         init_image = init_image.resize((768, 512))
 
         pipe = StableDiffusionImg2ImgPipeline.from_pretrained(
-            "CompVis/stable-diffusion-v1-4", )
+            "CompVis/stable-diffusion-v1-4",
+        )
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
 

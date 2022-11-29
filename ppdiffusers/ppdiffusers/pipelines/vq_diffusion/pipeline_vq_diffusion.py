@@ -18,13 +18,13 @@ from typing import Callable, List, Optional, Tuple, Union
 import paddle
 import paddle.nn as nn
 
-from ...models import Transformer2DModel, VQModel
-from ...schedulers import VQDiffusionScheduler
 from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
 
 from ...configuration_utils import ConfigMixin, register_to_config
 from ...modeling_utils import ModelMixin
+from ...models import Transformer2DModel, VQModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
+from ...schedulers import VQDiffusionScheduler
 from ...utils import logging
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
@@ -43,10 +43,7 @@ class LearnedClassifierFreeSamplingEmbeddings(ModelMixin, ConfigMixin):
     """
 
     @register_to_config
-    def __init__(self,
-                 learnable: bool,
-                 hidden_size: Optional[int] = None,
-                 length: Optional[int] = None):
+    def __init__(self, learnable: bool, hidden_size: Optional[int] = None, length: Optional[int] = None):
         super().__init__()
 
         self.learnable = learnable
@@ -57,8 +54,8 @@ class LearnedClassifierFreeSamplingEmbeddings(ModelMixin, ConfigMixin):
 
             embeddings = paddle.zeros([length, hidden_size])
             self.embeddings = self.create_parameter(
-                embeddings.shape,
-                default_initializer=nn.initializer.Assign(embeddings))
+                embeddings.shape, default_initializer=nn.initializer.Assign(embeddings)
+            )
         else:
             self.embeddings = None
 
@@ -101,8 +98,7 @@ class VQDiffusionPipeline(DiffusionPipeline):
         tokenizer: CLIPTokenizer,
         transformer: Transformer2DModel,
         scheduler: VQDiffusionScheduler,
-        learned_classifier_free_sampling_embeddings:
-        LearnedClassifierFreeSamplingEmbeddings,
+        learned_classifier_free_sampling_embeddings: LearnedClassifierFreeSamplingEmbeddings,
     ):
         super().__init__()
 
@@ -112,12 +108,10 @@ class VQDiffusionPipeline(DiffusionPipeline):
             text_encoder=text_encoder,
             tokenizer=tokenizer,
             scheduler=scheduler,
-            learned_classifier_free_sampling_embeddings=
-            learned_classifier_free_sampling_embeddings,
+            learned_classifier_free_sampling_embeddings=learned_classifier_free_sampling_embeddings,
         )
 
-    def _encode_prompt(self, prompt, num_images_per_prompt,
-                       do_classifier_free_guidance):
+    def _encode_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance):
         batch_size = len(prompt) if isinstance(prompt, list) else 1
 
         # get prompt text embeddings
@@ -130,12 +124,12 @@ class VQDiffusionPipeline(DiffusionPipeline):
         text_input_ids = text_inputs.input_ids
 
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-            removed_text = self.tokenizer.batch_decode(
-                text_input_ids[:, self.tokenizer.model_max_length:])
+            removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
-            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+            )
+            text_input_ids = text_input_ids[:, : self.tokenizer.model_max_length]
         text_embeddings = self.text_encoder(text_input_ids)[0]
 
         # NOTE: This additional step of normalizing the text embeddings is from VQ-Diffusion.
@@ -144,20 +138,17 @@ class VQDiffusionPipeline(DiffusionPipeline):
         #
         # CLIP normalizing the pooled output.
         # https://github.com/huggingface/transformers/blob/d92e22d1f28324f513f3080e5c47c071a3916721/src/transformers/models/clip/modeling_clip.py#L1052-L1053
-        text_embeddings = text_embeddings / text_embeddings.norm(axis=-1,
-                                                                 keepdim=True)
+        text_embeddings = text_embeddings / text_embeddings.norm(axis=-1, keepdim=True)
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape(
-            [bs_embed * num_images_per_prompt, seq_len, -1])
+        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         if do_classifier_free_guidance:
             if self.learned_classifier_free_sampling_embeddings.learnable:
                 uncond_embeddings = self.learned_classifier_free_sampling_embeddings.embeddings
-                uncond_embeddings = uncond_embeddings.unsqueeze(0).tile(
-                    [batch_size, 1, 1])
+                uncond_embeddings = uncond_embeddings.unsqueeze(0).tile([batch_size, 1, 1])
             else:
                 uncond_tokens = [""] * batch_size
 
@@ -171,21 +162,17 @@ class VQDiffusionPipeline(DiffusionPipeline):
                 )
                 uncond_embeddings = self.text_encoder(uncond_input.input_ids)[0]
                 # See comment for normalizing text embeddings
-                uncond_embeddings = uncond_embeddings / uncond_embeddings.norm(
-                    axis=-1, keepdim=True)
+                uncond_embeddings = uncond_embeddings / uncond_embeddings.norm(axis=-1, keepdim=True)
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile(
-                [1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape(
-                [batch_size * num_images_per_prompt, seq_len, -1])
+            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            text_embeddings = paddle.concat(
-                [uncond_embeddings, text_embeddings])
+            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
 
         return text_embeddings
 
@@ -253,23 +240,21 @@ class VQDiffusionPipeline(DiffusionPipeline):
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         batch_size = batch_size * num_images_per_prompt
 
         do_classifier_free_guidance = guidance_scale > 1.0
 
-        text_embeddings = self._encode_prompt(prompt, num_images_per_prompt,
-                                              do_classifier_free_guidance)
+        text_embeddings = self._encode_prompt(prompt, num_images_per_prompt, do_classifier_free_guidance)
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
         # get the initial completely masked latents unless the user supplied it
 
@@ -279,14 +264,12 @@ class VQDiffusionPipeline(DiffusionPipeline):
             latents = paddle.full(latents_shape, mask_class, dtype="int64")
         else:
             if latents.shape != latents_shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}"
-                )
-            if (latents < 0).any() or (
-                    latents >= self.transformer.num_vector_embeds).any():
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
+            if (latents < 0).any() or (latents >= self.transformer.num_vector_embeds).any():
                 raise ValueError(
                     "Unexpected latents value(s). All latents be valid embedding indices i.e. in the range 0,"
-                    f" {self.transformer.num_vector_embeds - 1} (inclusive).")
+                    f" {self.transformer.num_vector_embeds - 1} (inclusive)."
+                )
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -297,20 +280,17 @@ class VQDiffusionPipeline(DiffusionPipeline):
 
         for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the sample if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [sample] * 2) if do_classifier_free_guidance else sample
+            latent_model_input = paddle.concat([sample] * 2) if do_classifier_free_guidance else sample
 
             # predict the un-noised image
             # model_output == `log_p_x_0`
             model_output = self.transformer(
-                latent_model_input,
-                encoder_hidden_states=text_embeddings,
-                timestep=t).sample
+                latent_model_input, encoder_hidden_states=text_embeddings, timestep=t
+            ).sample
 
             if do_classifier_free_guidance:
                 model_output_uncond, model_output_text = model_output.chunk(2)
-                model_output = model_output_uncond + guidance_scale * (
-                    model_output_text - model_output_uncond)
+                model_output = model_output_uncond + guidance_scale * (model_output_text - model_output_uncond)
                 model_output -= logsumexp(model_output, axis=1, keepdim=True)
 
             model_output = self.truncate(model_output, truncation_rate)
@@ -319,20 +299,15 @@ class VQDiffusionPipeline(DiffusionPipeline):
             model_output = model_output.clip(-70)
 
             # compute the previous noisy sample x_t -> x_t-1
-            sample = self.scheduler.step(model_output,
-                                         timestep=t,
-                                         sample=sample,
-                                         generator=generator).prev_sample
+            sample = self.scheduler.step(model_output, timestep=t, sample=sample, generator=generator).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
                 callback(i, t, sample)
 
         embedding_channels = self.vqvae.config.vq_embed_dim
-        embeddings_shape = (batch_size, self.transformer.height,
-                            self.transformer.width, embedding_channels)
-        embeddings = self.vqvae.quantize.get_codebook_entry(
-            sample, shape=embeddings_shape)
+        embeddings_shape = (batch_size, self.transformer.height, self.transformer.width, embedding_channels)
+        embeddings = self.vqvae.quantize.get_codebook_entry(sample, shape=embeddings_shape)
         image = self.vqvae.decode(embeddings, force_not_quantize=True).sample
 
         image = (image / 2 + 0.5).clip(0, 1)
@@ -342,35 +317,30 @@ class VQDiffusionPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)
 
-    def truncate(self, log_p_x_0: paddle.Tensor,
-                 truncation_rate: float) -> paddle.Tensor:
+    def truncate(self, log_p_x_0: paddle.Tensor, truncation_rate: float) -> paddle.Tensor:
         """
         Truncates log_p_x_0 such that for each column vector, the total cumulative probability is `truncation_rate` The
         lowest probabilities that would increase the cumulative probability above `truncation_rate` are set to zero.
         """
-        sorted_log_p_x_0, indices = paddle.topk(log_p_x_0,
-                                                k=log_p_x_0.shape[1],
-                                                axis=1)
+        sorted_log_p_x_0, indices = paddle.topk(log_p_x_0, k=log_p_x_0.shape[1], axis=1)
         sorted_p_x_0 = paddle.exp(sorted_log_p_x_0)
-        keep_mask = (sorted_p_x_0.cumsum(axis=1) <
-                     truncation_rate).cast("int64")
+        keep_mask = (sorted_p_x_0.cumsum(axis=1) < truncation_rate).cast("int64")
 
         # Ensure that at least the largest probability is not zeroed out
         all_true = paddle.full_like(keep_mask[:, 0:1, :], 1)
         keep_mask = paddle.concat((all_true, keep_mask), axis=1)
         keep_mask = keep_mask[:, :-1, :]
 
-        keep_mask = paddle.take_along_axis(
-            keep_mask, indices.argsort(1),
-            axis=1).cast("bool")  # keep_mask.gather(indices.argsort(1), axis=1)
+        keep_mask = paddle.take_along_axis(keep_mask, indices.argsort(1), axis=1).cast(
+            "bool"
+        )  # keep_mask.gather(indices.argsort(1), axis=1)
 
         rv = log_p_x_0.clone()
         # rv[~keep_mask] = -INF  # -inf = log(0)
-        rv = paddle.where(keep_mask, rv, paddle.to_tensor(-INF,
-                                                          dtype="float32"))
+        rv = paddle.where(keep_mask, rv, paddle.to_tensor(-INF, dtype="float32"))
 
         return rv

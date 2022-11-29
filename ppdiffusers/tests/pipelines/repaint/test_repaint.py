@@ -24,14 +24,9 @@ from ppdiffusers.utils.testing_utils import load_image, slow
 
 @slow
 class RepaintPipelineIntegrationTests(unittest.TestCase):
-
     def test_celebahq(self):
-        original_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/celeba_hq_256.png"
-        )
-        mask_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_256.png"
-        )
+        original_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/celeba_hq_256.png")
+        mask_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_256.png")
         expected_image = load_image(
             "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/celeba_hq_256_result.png"
         )

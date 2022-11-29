@@ -25,8 +25,8 @@ from ppdiffusers import (
     PNDMScheduler,
     logging,
 )
-from ppdiffusers.utils import deprecate
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
+from ppdiffusers.utils import deprecate
 from ppdiffusers.utils.testing_utils import CaptureLogger
 
 
@@ -35,12 +35,12 @@ class SampleObject(ConfigMixin):
 
     @register_to_config
     def __init__(
-            self,
-            a=2,
-            b=5,
-            c=(2, 5),
-            d="for diffusion",
-            e=[1, 3],
+        self,
+        a=2,
+        b=5,
+        c=(2, 5),
+        d="for diffusion",
+        e=[1, 3],
     ):
         pass
 
@@ -50,12 +50,12 @@ class SampleObject2(ConfigMixin):
 
     @register_to_config
     def __init__(
-            self,
-            a=2,
-            b=5,
-            c=(2, 5),
-            d="for diffusion",
-            f=[1, 3],
+        self,
+        a=2,
+        b=5,
+        c=(2, 5),
+        d="for diffusion",
+        f=[1, 3],
     ):
         pass
 
@@ -65,19 +65,18 @@ class SampleObject3(ConfigMixin):
 
     @register_to_config
     def __init__(
-            self,
-            a=2,
-            b=5,
-            c=(2, 5),
-            d="for diffusion",
-            e=[1, 3],
-            f=[1, 3],
+        self,
+        a=2,
+        b=5,
+        c=(2, 5),
+        d="for diffusion",
+        e=[1, 3],
+        f=[1, 3],
     ):
         pass
 
 
 class ConfigTester(unittest.TestCase):
-
     def test_load_not_from_mixin(self):
         with self.assertRaises(ValueError):
             ConfigMixin.load_config("dummy_path")
@@ -130,8 +129,7 @@ class ConfigTester(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdirname:
             obj.save_config(tmpdirname)
-            new_obj = SampleObject.from_config(
-                SampleObject.load_config(tmpdirname))
+            new_obj = SampleObject.from_config(SampleObject.load_config(tmpdirname))
             new_config = new_obj.config
 
         # unfreeze configs
@@ -139,9 +137,7 @@ class ConfigTester(unittest.TestCase):
         new_config = dict(new_config)
 
         assert config.pop("c") == (2, 5)  # instantiated as tuple
-        assert new_config.pop("c") == [
-            2, 5
-        ]  # saved & loaded as list because of json
+        assert new_config.pop("c") == [2, 5]  # saved & loaded as list because of json
         assert config == new_config
 
     def test_load_ddim_from_pndm(self):
@@ -149,8 +145,8 @@ class ConfigTester(unittest.TestCase):
 
         with CaptureLogger(logger) as cap_logger:
             ddim = DDIMScheduler.from_pretrained(
-                "hf-internal-testing/tiny-stable-diffusion-torch",
-                subfolder="scheduler")
+                "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
+            )
 
         assert ddim.__class__ == DDIMScheduler
         # no warning should be thrown
@@ -161,8 +157,8 @@ class ConfigTester(unittest.TestCase):
 
         with CaptureLogger(logger) as cap_logger:
             euler = EulerDiscreteScheduler.from_pretrained(
-                "hf-internal-testing/tiny-stable-diffusion-torch",
-                subfolder="scheduler")
+                "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
+            )
 
         assert euler.__class__ == EulerDiscreteScheduler
         # no warning should be thrown
@@ -173,8 +169,8 @@ class ConfigTester(unittest.TestCase):
 
         with CaptureLogger(logger) as cap_logger:
             euler = EulerAncestralDiscreteScheduler.from_pretrained(
-                "hf-internal-testing/tiny-stable-diffusion-torch",
-                subfolder="scheduler")
+                "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
+            )
 
         assert euler.__class__ == EulerAncestralDiscreteScheduler
         # no warning should be thrown
@@ -185,8 +181,8 @@ class ConfigTester(unittest.TestCase):
 
         with CaptureLogger(logger) as cap_logger:
             pndm = PNDMScheduler.from_pretrained(
-                "hf-internal-testing/tiny-stable-diffusion-torch",
-                subfolder="scheduler")
+                "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
+            )
 
         assert pndm.__class__ == PNDMScheduler
         # no warning should be thrown
@@ -204,9 +200,7 @@ class ConfigTester(unittest.TestCase):
             )
 
         with CaptureLogger(logger) as cap_logger_2:
-            ddpm_2 = DDPMScheduler.from_pretrained("google/ddpm-celebahq-256",
-                                                   beta_start=88,
-                                                   subfolder="scheduler")
+            ddpm_2 = DDPMScheduler.from_pretrained("google/ddpm-celebahq-256", beta_start=88, subfolder="scheduler")
 
         with CaptureLogger(logger) as cap_logger:
             deprecate("remove this case", "0.10.0", "remove")
@@ -232,8 +226,8 @@ class ConfigTester(unittest.TestCase):
 
         with CaptureLogger(logger) as cap_logger:
             dpm = DPMSolverMultistepScheduler.from_pretrained(
-                "hf-internal-testing/tiny-stable-diffusion-torch",
-                subfolder="scheduler")
+                "hf-internal-testing/tiny-stable-diffusion-torch", subfolder="scheduler"
+            )
 
         assert dpm.__class__ == DPMSolverMultistepScheduler
         # no warning should be thrown

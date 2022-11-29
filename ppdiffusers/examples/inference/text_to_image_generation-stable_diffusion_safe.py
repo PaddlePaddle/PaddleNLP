@@ -15,8 +15,7 @@
 from ppdiffusers import StableDiffusionPipelineSafe
 from ppdiffusers.pipelines.stable_diffusion_safe import SafetyConfig
 
-pipe = StableDiffusionPipelineSafe.from_pretrained(
-    "AIML-TUDA/stable-diffusion-safe")
+pipe = StableDiffusionPipelineSafe.from_pretrained("AIML-TUDA/stable-diffusion-safe")
 print(pipe.safety_concept)
 prompt = "the four horsewomen of the apocalypse, painting by tom of finland, gaston bussiere, craig mullins, j. c. leyendecker"
 out = pipe(prompt=prompt, **SafetyConfig.MAX)

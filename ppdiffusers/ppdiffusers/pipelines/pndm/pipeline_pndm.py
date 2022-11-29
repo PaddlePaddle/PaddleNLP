@@ -73,8 +73,7 @@ class PNDMPipeline(DiffusionPipeline):
 
         # Sample gaussian noise to begin loop
         image = paddle.randn(
-            (batch_size, self.unet.in_channels, self.unet.sample_size,
-             self.unet.sample_size),
+            (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
             generator=generator,
         )
 
@@ -90,6 +89,6 @@ class PNDMPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

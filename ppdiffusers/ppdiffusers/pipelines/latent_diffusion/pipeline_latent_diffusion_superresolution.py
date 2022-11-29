@@ -15,9 +15,11 @@
 
 import inspect
 from typing import Optional, Tuple, Union
+
 import numpy as np
-import PIL
 import paddle
+import PIL
+
 from ...models import UNet2DModel, VQModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import (
@@ -62,10 +64,14 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
         self,
         vqvae: VQModel,
         unet: UNet2DModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler,
-                         EulerDiscreteScheduler,
-                         EulerAncestralDiscreteScheduler,
-                         DPMSolverMultistepScheduler, ],
+        scheduler: Union[
+            DDIMScheduler,
+            PNDMScheduler,
+            LMSDiscreteScheduler,
+            EulerDiscreteScheduler,
+            EulerAncestralDiscreteScheduler,
+            DPMSolverMultistepScheduler,
+        ],
     ):
         super().__init__()
         self.register_modules(vqvae=vqvae, unet=unet, scheduler=scheduler)
@@ -127,9 +133,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
         latents_shape = (batch_size, self.unet.in_channels // 2, height, width)
         latents_dtype = next(self.unet.named_parameters())[1].dtype
 
-        latents = paddle.randn(latents_shape,
-                               generator=generator,
-                               dtype=latents_dtype)
+        latents = paddle.randn(latents_shape, generator=generator, dtype=latents_dtype)
 
         init_image = init_image.cast(latents_dtype)
 
@@ -143,8 +147,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_kwargs = {}
         if accepts_eta:
             extra_kwargs["eta"] = eta
@@ -156,8 +159,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
             # predict the noise residual
             noise_pred = self.unet(latents_input, t).sample
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_kwargs).prev_sample
 
         # decode the image latents with the VQVAE
         image = self.vqvae.decode(latents).sample
@@ -169,6 +171,6 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

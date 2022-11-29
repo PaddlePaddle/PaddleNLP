@@ -17,15 +17,13 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import PNDMPipeline, PNDMScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import slow
 
-from test_pipelines_common import PipelineTesterMixin
-
 
 class PNDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-
     @property
     def dummy_uncond_unet(self):
         paddle.seed(0)
@@ -49,29 +47,22 @@ class PNDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         generator = paddle.Generator().manual_seed(0)
 
-        image = pndm(generator=generator,
-                     num_inference_steps=20,
-                     output_type="numpy").images
+        image = pndm(generator=generator, num_inference_steps=20, output_type="numpy").images
 
         generator = paddle.Generator().manual_seed(0)
 
-        image_from_tuple = pndm(generator=generator,
-                                num_inference_steps=20,
-                                output_type="numpy",
-                                return_dict=False)[0]
+        image_from_tuple = pndm(generator=generator, num_inference_steps=20, output_type="numpy", return_dict=False)[0]
 
         image_slice = image[0, -3:, -3:, -1]
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
         expected_slice = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0])
         assert image.shape == (1, 32, 32, 3)
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-2
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow
 class PNDMPipelineIntegrationTests(unittest.TestCase):
-
     def test_inference_cifar10(self):
         model_id = "google/ddpm-cifar10-32"
 
@@ -87,9 +78,19 @@ class PNDMPipelineIntegrationTests(unittest.TestCase):
         image_slice = image[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([[
-            0.1594947874546051, 0.17172452807426453, 0.17315751314163208,
-            0.18366274237632751, 0.18239542841911316, 0.17990189790725708,
-            0.21776077151298523, 0.22992536425590515, 0.216785728931427
-        ]])
+        expected_slice = np.array(
+            [
+                [
+                    0.1594947874546051,
+                    0.17172452807426453,
+                    0.17315751314163208,
+                    0.18366274237632751,
+                    0.18239542841911316,
+                    0.17990189790725708,
+                    0.21776077151298523,
+                    0.22992536425590515,
+                    0.216785728931427,
+                ]
+            ]
+        )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

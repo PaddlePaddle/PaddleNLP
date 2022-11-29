@@ -17,7 +17,6 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import paddle
-
 import PIL
 
 from ...models import UNet2DModel
@@ -107,8 +106,7 @@ class RePaintPipeline(DiffusionPipeline):
         )
 
         # set step values
-        self.scheduler.set_timesteps(num_inference_steps, jump_length,
-                                     jump_n_sample)
+        self.scheduler.set_timesteps(num_inference_steps, jump_length, jump_n_sample)
         self.scheduler.eta = eta
 
         t_last = self.scheduler.timesteps[0] + 1
@@ -117,9 +115,7 @@ class RePaintPipeline(DiffusionPipeline):
                 # predict the noise residual
                 model_output = self.unet(image, t).sample
                 # compute previous image: x_t -> x_t-1
-                image = self.scheduler.step(model_output, t, image,
-                                            original_image, mask_image,
-                                            generator).prev_sample
+                image = self.scheduler.step(model_output, t, image, original_image, mask_image, generator).prev_sample
 
             else:
                 # compute the reverse: x_t-1 -> x_t
@@ -132,6 +128,6 @@ class RePaintPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

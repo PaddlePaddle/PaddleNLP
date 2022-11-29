@@ -22,7 +22,6 @@ from .resnet import Downsample1D, ResidualTemporalBlock1D, Upsample1D, rearrange
 
 
 class DownResnetBlock1D(nn.Layer):
-
     def __init__(
         self,
         in_channels,
@@ -50,17 +49,10 @@ class DownResnetBlock1D(nn.Layer):
             groups_out = groups
 
         # there will always be at least one resnet
-        resnets = [
-            ResidualTemporalBlock1D(in_channels,
-                                    out_channels,
-                                    embed_dim=temb_channels)
-        ]
+        resnets = [ResidualTemporalBlock1D(in_channels, out_channels, embed_dim=temb_channels)]
 
         for _ in range(num_layers):
-            resnets.append(
-                ResidualTemporalBlock1D(out_channels,
-                                        out_channels,
-                                        embed_dim=temb_channels))
+            resnets.append(ResidualTemporalBlock1D(out_channels, out_channels, embed_dim=temb_channels))
 
         self.resnets = nn.LayerList(resnets)
 
@@ -75,9 +67,7 @@ class DownResnetBlock1D(nn.Layer):
 
         self.downsample = None
         if add_downsample:
-            self.downsample = Downsample1D(out_channels,
-                                           use_conv=True,
-                                           padding=1)
+            self.downsample = Downsample1D(out_channels, use_conv=True, padding=1)
 
     def forward(self, hidden_states, temb=None):
         output_states = ()
@@ -86,7 +76,7 @@ class DownResnetBlock1D(nn.Layer):
         for resnet in self.resnets[1:]:
             hidden_states = resnet(hidden_states, temb)
 
-        output_states += (hidden_states, )
+        output_states += (hidden_states,)
 
         if self.nonlinearity is not None:
             hidden_states = self.nonlinearity(hidden_states)
@@ -98,7 +88,6 @@ class DownResnetBlock1D(nn.Layer):
 
 
 class UpResnetBlock1D(nn.Layer):
-
     def __init__(
         self,
         in_channels,
@@ -124,17 +113,10 @@ class UpResnetBlock1D(nn.Layer):
             groups_out = groups
 
         # there will always be at least one resnet
-        resnets = [
-            ResidualTemporalBlock1D(2 * in_channels,
-                                    out_channels,
-                                    embed_dim=temb_channels)
-        ]
+        resnets = [ResidualTemporalBlock1D(2 * in_channels, out_channels, embed_dim=temb_channels)]
 
         for _ in range(num_layers):
-            resnets.append(
-                ResidualTemporalBlock1D(out_channels,
-                                        out_channels,
-                                        embed_dim=temb_channels))
+            resnets.append(ResidualTemporalBlock1D(out_channels, out_channels, embed_dim=temb_channels))
 
         self.resnets = nn.LayerList(resnets)
 
@@ -154,8 +136,7 @@ class UpResnetBlock1D(nn.Layer):
     def forward(self, hidden_states, res_hidden_states_tuple=None, temb=None):
         if res_hidden_states_tuple is not None:
             res_hidden_states = res_hidden_states_tuple[-1]
-            hidden_states = paddle.concat((hidden_states, res_hidden_states),
-                                          axis=1)
+            hidden_states = paddle.concat((hidden_states, res_hidden_states), axis=1)
 
         hidden_states = self.resnets[0](hidden_states, temb)
         for resnet in self.resnets[1:]:
@@ -171,20 +152,15 @@ class UpResnetBlock1D(nn.Layer):
 
 
 class ValueFunctionMidBlock1D(nn.Layer):
-
     def __init__(self, in_channels, out_channels, embed_dim):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.embed_dim = embed_dim
 
-        self.res1 = ResidualTemporalBlock1D(in_channels,
-                                            in_channels // 2,
-                                            embed_dim=embed_dim)
+        self.res1 = ResidualTemporalBlock1D(in_channels, in_channels // 2, embed_dim=embed_dim)
         self.down1 = Downsample1D(out_channels // 2, use_conv=True)
-        self.res2 = ResidualTemporalBlock1D(in_channels // 2,
-                                            in_channels // 4,
-                                            embed_dim=embed_dim)
+        self.res2 = ResidualTemporalBlock1D(in_channels // 2, in_channels // 4, embed_dim=embed_dim)
         self.down2 = Downsample1D(out_channels // 4, use_conv=True)
 
     def forward(self, x, temb=None):
@@ -196,7 +172,6 @@ class ValueFunctionMidBlock1D(nn.Layer):
 
 
 class MidResTemporalBlock1D(nn.Layer):
-
     def __init__(
         self,
         in_channels,
@@ -213,17 +188,10 @@ class MidResTemporalBlock1D(nn.Layer):
         self.add_downsample = add_downsample
 
         # there will always be at least one resnet
-        resnets = [
-            ResidualTemporalBlock1D(in_channels,
-                                    out_channels,
-                                    embed_dim=embed_dim)
-        ]
+        resnets = [ResidualTemporalBlock1D(in_channels, out_channels, embed_dim=embed_dim)]
 
         for _ in range(num_layers):
-            resnets.append(
-                ResidualTemporalBlock1D(out_channels,
-                                        out_channels,
-                                        embed_dim=embed_dim))
+            resnets.append(ResidualTemporalBlock1D(out_channels, out_channels, embed_dim=embed_dim))
 
         self.resnets = nn.LayerList(resnets)
 
@@ -261,7 +229,6 @@ class MidResTemporalBlock1D(nn.Layer):
 
 
 class OutConv1DBlock(nn.Layer):
-
     def __init__(self, num_groups_out, out_channels, embed_dim, act_fn):
         super().__init__()
         self.final_conv1d_1 = nn.Conv1D(embed_dim, embed_dim, 5, padding=2)
@@ -283,14 +250,15 @@ class OutConv1DBlock(nn.Layer):
 
 
 class OutValueFunctionBlock(nn.Layer):
-
     def __init__(self, fc_dim, embed_dim):
         super().__init__()
-        self.final_block = nn.LayerList([
-            nn.Linear(fc_dim + embed_dim, fc_dim // 2),
-            nn.Mish(),
-            nn.Linear(fc_dim // 2, 1),
-        ])
+        self.final_block = nn.LayerList(
+            [
+                nn.Linear(fc_dim + embed_dim, fc_dim // 2),
+                nn.Mish(),
+                nn.Linear(fc_dim // 2, 1),
+            ]
+        )
 
     def forward(self, hidden_states, temb):
         hidden_states = hidden_states.reshape([hidden_states.shape[0], -1])
@@ -303,10 +271,7 @@ class OutValueFunctionBlock(nn.Layer):
 
 _kernels = {
     "linear": [1 / 8, 3 / 8, 3 / 8, 1 / 8],
-    "cubic": [
-        -0.01171875, -0.03515625, 0.11328125, 0.43359375, 0.43359375,
-        0.11328125, -0.03515625, -0.01171875
-    ],
+    "cubic": [-0.01171875, -0.03515625, 0.11328125, 0.43359375, 0.43359375, 0.11328125, -0.03515625, -0.01171875],
     "lanczos3": [
         0.003689131001010537,
         0.015056144446134567,
@@ -325,7 +290,6 @@ _kernels = {
 
 
 class Downsample1d(nn.Layer):
-
     def __init__(self, kernel="linear", pad_mode="reflect"):
         super().__init__()
         self.pad_mode = pad_mode
@@ -334,19 +298,14 @@ class Downsample1d(nn.Layer):
         self.register_buffer("kernel", kernel_1d)
 
     def forward(self, hidden_states):
-        hidden_states = F.pad(hidden_states, (self.pad, ) * 2,
-                              self.pad_mode,
-                              data_format="NCL")
-        weight = paddle.zeros([
-            hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]
-        ])
+        hidden_states = F.pad(hidden_states, (self.pad,) * 2, self.pad_mode, data_format="NCL")
+        weight = paddle.zeros([hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]])
         indices = paddle.arange(hidden_states.shape[1])
         weight[indices, indices] = self.kernel.cast(weight.dtype)
         return F.conv1d(hidden_states, weight, stride=2)
 
 
 class Upsample1d(nn.Layer):
-
     def __init__(self, kernel="linear", pad_mode="reflect"):
         super().__init__()
         self.pad_mode = pad_mode
@@ -355,22 +314,14 @@ class Upsample1d(nn.Layer):
         self.register_buffer("kernel", kernel_1d)
 
     def forward(self, hidden_states, temb=None):
-        hidden_states = F.pad(hidden_states, ((self.pad + 1) // 2, ) * 2,
-                              self.pad_mode,
-                              data_format="NCL")
-        weight = paddle.zeros([
-            hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]
-        ])
+        hidden_states = F.pad(hidden_states, ((self.pad + 1) // 2,) * 2, self.pad_mode, data_format="NCL")
+        weight = paddle.zeros([hidden_states.shape[1], hidden_states.shape[1], self.kernel.shape[0]])
         indices = paddle.arange(hidden_states.shape[1])
         weight[indices, indices] = self.kernel.cast(weight.dtype)
-        return F.conv1d_transpose(hidden_states,
-                                  weight,
-                                  stride=2,
-                                  padding=self.pad * 2 + 1)
+        return F.conv1d_transpose(hidden_states, weight, stride=2, padding=self.pad * 2 + 1)
 
 
 class SelfAttention1d(nn.Layer):
-
     def __init__(self, in_channels, n_head=1, dropout_rate=0.0):
         super().__init__()
         self.channels = in_channels
@@ -388,8 +339,7 @@ class SelfAttention1d(nn.Layer):
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
         # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose(
-            [0, 2, 1, 3])
+        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
         return new_projection
 
     def forward(self, hidden_states):
@@ -408,9 +358,7 @@ class SelfAttention1d(nn.Layer):
 
         scale = 1 / math.sqrt(math.sqrt(key_states.shape[-1]))
 
-        attention_scores = paddle.matmul(query_states * scale,
-                                         key_states * scale,
-                                         transpose_y=True)
+        attention_scores = paddle.matmul(query_states * scale, key_states * scale, transpose_y=True)
         attention_probs = F.softmax(attention_scores, axis=-1)
 
         # compute attention output
@@ -432,17 +380,13 @@ class SelfAttention1d(nn.Layer):
 
 
 class ResConvBlock(nn.Layer):
-
     def __init__(self, in_channels, mid_channels, out_channels, is_last=False):
         super().__init__()
         self.is_last = is_last
         self.has_conv_skip = in_channels != out_channels
 
         if self.has_conv_skip:
-            self.conv_skip = nn.Conv1D(in_channels,
-                                       out_channels,
-                                       1,
-                                       bias_attr=False)
+            self.conv_skip = nn.Conv1D(in_channels, out_channels, 1, bias_attr=False)
 
         self.conv_1 = nn.Conv1D(in_channels, mid_channels, 5, padding=2)
         self.group_norm_1 = nn.GroupNorm(1, mid_channels)
@@ -454,8 +398,7 @@ class ResConvBlock(nn.Layer):
             self.gelu_2 = nn.GELU()
 
     def forward(self, hidden_states):
-        residual = self.conv_skip(
-            hidden_states) if self.has_conv_skip else hidden_states
+        residual = self.conv_skip(hidden_states) if self.has_conv_skip else hidden_states
 
         hidden_states = self.conv_1(hidden_states)
         hidden_states = self.group_norm_1(hidden_states)
@@ -471,7 +414,6 @@ class ResConvBlock(nn.Layer):
 
 
 class UNetMidBlock1D(nn.Layer):
-
     def __init__(self, mid_channels, in_channels, out_channels=None):
         super().__init__()
 
@@ -512,7 +454,6 @@ class UNetMidBlock1D(nn.Layer):
 
 
 class AttnDownBlock1D(nn.Layer):
-
     def __init__(self, out_channels, in_channels, mid_channels=None):
         super().__init__()
         mid_channels = out_channels if mid_channels is None else mid_channels
@@ -539,11 +480,10 @@ class AttnDownBlock1D(nn.Layer):
             hidden_states = resnet(hidden_states)
             hidden_states = attn(hidden_states)
 
-        return hidden_states, (hidden_states, )
+        return hidden_states, (hidden_states,)
 
 
 class DownBlock1D(nn.Layer):
-
     def __init__(self, out_channels, in_channels, mid_channels=None):
         super().__init__()
         mid_channels = out_channels if mid_channels is None else mid_channels
@@ -563,11 +503,10 @@ class DownBlock1D(nn.Layer):
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 
-        return hidden_states, (hidden_states, )
+        return hidden_states, (hidden_states,)
 
 
 class DownBlock1DNoSkip(nn.Layer):
-
     def __init__(self, out_channels, in_channels, mid_channels=None):
         super().__init__()
         mid_channels = out_channels if mid_channels is None else mid_channels
@@ -585,11 +524,10 @@ class DownBlock1DNoSkip(nn.Layer):
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 
-        return hidden_states, (hidden_states, )
+        return hidden_states, (hidden_states,)
 
 
 class AttnUpBlock1D(nn.Layer):
-
     def __init__(self, in_channels, out_channels, mid_channels=None):
         super().__init__()
         mid_channels = out_channels if mid_channels is None else mid_channels
@@ -611,8 +549,7 @@ class AttnUpBlock1D(nn.Layer):
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None):
         res_hidden_states = res_hidden_states_tuple[-1]
-        hidden_states = paddle.concat([hidden_states, res_hidden_states],
-                                      axis=1)
+        hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
 
         for resnet, attn in zip(self.resnets, self.attentions):
             hidden_states = resnet(hidden_states)
@@ -624,7 +561,6 @@ class AttnUpBlock1D(nn.Layer):
 
 
 class UpBlock1D(nn.Layer):
-
     def __init__(self, in_channels, out_channels, mid_channels=None):
         super().__init__()
         mid_channels = in_channels if mid_channels is None else mid_channels
@@ -640,8 +576,7 @@ class UpBlock1D(nn.Layer):
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None):
         res_hidden_states = res_hidden_states_tuple[-1]
-        hidden_states = paddle.concat([hidden_states, res_hidden_states],
-                                      axis=1)
+        hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 
@@ -651,7 +586,6 @@ class UpBlock1D(nn.Layer):
 
 
 class UpBlock1DNoSkip(nn.Layer):
-
     def __init__(self, in_channels, out_channels, mid_channels=None):
         super().__init__()
         mid_channels = in_channels if mid_channels is None else mid_channels
@@ -659,24 +593,21 @@ class UpBlock1DNoSkip(nn.Layer):
         resnets = [
             ResConvBlock(2 * in_channels, mid_channels, mid_channels),
             ResConvBlock(mid_channels, mid_channels, mid_channels),
-            ResConvBlock(mid_channels, mid_channels, out_channels,
-                         is_last=True),
+            ResConvBlock(mid_channels, mid_channels, out_channels, is_last=True),
         ]
 
         self.resnets = nn.LayerList(resnets)
 
     def forward(self, hidden_states, res_hidden_states_tuple, temb=None):
         res_hidden_states = res_hidden_states_tuple[-1]
-        hidden_states = paddle.concat([hidden_states, res_hidden_states],
-                                      axis=1)
+        hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
         for resnet in self.resnets:
             hidden_states = resnet(hidden_states)
 
         return hidden_states
 
 
-def get_down_block(down_block_type, num_layers, in_channels, out_channels,
-                   temb_channels, add_downsample):
+def get_down_block(down_block_type, num_layers, in_channels, out_channels, temb_channels, add_downsample):
     if down_block_type == "DownResnetBlock1D":
         return DownResnetBlock1D(
             in_channels=in_channels,
@@ -688,16 +619,13 @@ def get_down_block(down_block_type, num_layers, in_channels, out_channels,
     elif down_block_type == "DownBlock1D":
         return DownBlock1D(out_channels=out_channels, in_channels=in_channels)
     elif down_block_type == "AttnDownBlock1D":
-        return AttnDownBlock1D(out_channels=out_channels,
-                               in_channels=in_channels)
+        return AttnDownBlock1D(out_channels=out_channels, in_channels=in_channels)
     elif down_block_type == "DownBlock1DNoSkip":
-        return DownBlock1DNoSkip(out_channels=out_channels,
-                                 in_channels=in_channels)
+        return DownBlock1DNoSkip(out_channels=out_channels, in_channels=in_channels)
     raise ValueError(f"{down_block_type} does not exist.")
 
 
-def get_up_block(up_block_type, num_layers, in_channels, out_channels,
-                 temb_channels, add_upsample):
+def get_up_block(up_block_type, num_layers, in_channels, out_channels, temb_channels, add_upsample):
     if up_block_type == "UpResnetBlock1D":
         return UpResnetBlock1D(
             in_channels=in_channels,
@@ -711,13 +639,11 @@ def get_up_block(up_block_type, num_layers, in_channels, out_channels,
     elif up_block_type == "AttnUpBlock1D":
         return AttnUpBlock1D(in_channels=in_channels, out_channels=out_channels)
     elif up_block_type == "UpBlock1DNoSkip":
-        return UpBlock1DNoSkip(in_channels=in_channels,
-                               out_channels=out_channels)
+        return UpBlock1DNoSkip(in_channels=in_channels, out_channels=out_channels)
     raise ValueError(f"{up_block_type} does not exist.")
 
 
-def get_mid_block(mid_block_type, num_layers, in_channels, mid_channels,
-                  out_channels, embed_dim, add_downsample):
+def get_mid_block(mid_block_type, num_layers, in_channels, mid_channels, out_channels, embed_dim, add_downsample):
     if mid_block_type == "MidResTemporalBlock1D":
         return MidResTemporalBlock1D(
             num_layers=num_layers,
@@ -727,18 +653,13 @@ def get_mid_block(mid_block_type, num_layers, in_channels, mid_channels,
             add_downsample=add_downsample,
         )
     elif mid_block_type == "ValueFunctionMidBlock1D":
-        return ValueFunctionMidBlock1D(in_channels=in_channels,
-                                       out_channels=out_channels,
-                                       embed_dim=embed_dim)
+        return ValueFunctionMidBlock1D(in_channels=in_channels, out_channels=out_channels, embed_dim=embed_dim)
     elif mid_block_type == "UNetMidBlock1D":
-        return UNetMidBlock1D(in_channels=in_channels,
-                              mid_channels=mid_channels,
-                              out_channels=out_channels)
+        return UNetMidBlock1D(in_channels=in_channels, mid_channels=mid_channels, out_channels=out_channels)
     raise ValueError(f"{mid_block_type} does not exist.")
 
 
-def get_out_block(*, out_block_type, num_groups_out, embed_dim, out_channels,
-                  act_fn, fc_dim):
+def get_out_block(*, out_block_type, num_groups_out, embed_dim, out_channels, act_fn, fc_dim):
     if out_block_type == "OutConv1DBlock":
         return OutConv1DBlock(num_groups_out, out_channels, embed_dim, act_fn)
     elif out_block_type == "ValueFunction":

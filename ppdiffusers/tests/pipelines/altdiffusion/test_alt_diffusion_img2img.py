@@ -19,21 +19,23 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
-from ppdiffusers import AltDiffusionImg2ImgPipeline, AutoencoderKL, PNDMScheduler, UNet2DConditionModel
+from paddlenlp.transformers import XLMRobertaTokenizer
+from ppdiffusers import (
+    AltDiffusionImg2ImgPipeline,
+    AutoencoderKL,
+    PNDMScheduler,
+    UNet2DConditionModel,
+)
 from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
     RobertaSeriesConfig,
     RobertaSeriesModelWithTransformation,
 )
 from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
-from paddlenlp.transformers import XLMRobertaTokenizer
-
-from test_pipelines_common import PipelineTesterMixin
 
 
-class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
-                                           unittest.TestCase):
-
+class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -46,8 +48,7 @@ class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         num_channels = 3
         sizes = (32, 32)
 
-        image = floats_tensor((batch_size, num_channels) + sizes,
-                              rng=random.Random(0))
+        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
     @property
@@ -81,26 +82,25 @@ class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
     @property
     def dummy_text_encoder(self):
         paddle.seed(0)
-        config = RobertaSeriesConfig(hidden_size=32,
-                                     project_dim=32,
-                                     intermediate_size=37,
-                                     layer_norm_eps=1e-05,
-                                     num_attention_heads=4,
-                                     num_hidden_layers=5,
-                                     pad_token_id=1,
-                                     vocab_size=5006,
-                                     return_dict=True)
+        config = RobertaSeriesConfig(
+            hidden_size=32,
+            project_dim=32,
+            intermediate_size=37,
+            layer_norm_eps=1e-05,
+            num_attention_heads=4,
+            num_hidden_layers=5,
+            pad_token_id=1,
+            vocab_size=5006,
+            return_dict=True,
+        )
         model = RobertaSeriesModelWithTransformation(config)
         model.eval()
         return model
 
     @property
     def dummy_extractor(self):
-
         def extract(*args, **kwargs):
-
             class Out:
-
                 def __init__(self):
                     self.pixel_values = paddle.ones([0])
 
@@ -117,8 +117,7 @@ class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = XLMRobertaTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-xlm-roberta")
+        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta")
         tokenizer.model_max_length = 77
 
         init_image = self.dummy_image
@@ -163,20 +162,26 @@ class AltDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin,
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.9207020998001099, 0.5348924398422241, 0.5613200068473816,
-            0.47631514072418213, 0.18416807055473328, 0.47090208530426025,
-            0.5388783812522888, 0.43293866515159607, 0.6159629225730896
-        ])
+        expected_slice = np.array(
+            [
+                0.9207020998001099,
+                0.5348924398422241,
+                0.5613200068473816,
+                0.47631514072418213,
+                0.18416807055473328,
+                0.47090208530426025,
+                0.5388783812522888,
+                0.43293866515159607,
+                0.6159629225730896,
+            ]
+        )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1.5e-3
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1.5e-3
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1.5e-3
 
 
 @slow
 class AltDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()

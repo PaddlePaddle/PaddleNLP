@@ -19,16 +19,21 @@ import unittest
 
 import numpy as np
 import paddle
-
-from ppdiffusers import AutoencoderKL, CycleDiffusionPipeline, DDIMScheduler, UNet2DConditionModel, UNet2DModel, VQModel
-from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
-
 from test_pipelines_common import PipelineTesterMixin
+
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from ppdiffusers import (
+    AutoencoderKL,
+    CycleDiffusionPipeline,
+    DDIMScheduler,
+    UNet2DConditionModel,
+    UNet2DModel,
+    VQModel,
+)
+from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 
 
 class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -41,8 +46,7 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         num_channels = 3
         sizes = (32, 32)
 
-        image = floats_tensor((batch_size, num_channels) + sizes,
-                              rng=random.Random(0))
+        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
     @property
@@ -130,11 +134,8 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
     @property
     def dummy_extractor(self):
-
         def extract(*args, **kwargs):
-
             class Out:
-
                 def __init__(self):
                     self.pixel_values = paddle.ones([0])
 
@@ -157,8 +158,7 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         )
         vae = self.dummy_vae
         bert = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         # make sure here that pndm scheduler skips prk
         sd_pipe = CycleDiffusionPipeline(
@@ -194,11 +194,19 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         image_slice = images[0, -3:, -3:, -1]
 
         assert images.shape == (1, 32, 32, 3)
-        expected_slice = np.array([
-            0.054250508546829224, 0.7774901390075684, 0.7094265222549438,
-            0.1572849154472351, 0.978983461856842, 0.49742749333381653,
-            0.362673282623291, 0.6486804485321045, 0.45295289158821106
-        ])
+        expected_slice = np.array(
+            [
+                0.054250508546829224,
+                0.7774901390075684,
+                0.7094265222549438,
+                0.1572849154472351,
+                0.978983461856842,
+                0.49742749333381653,
+                0.362673282623291,
+                0.6486804485321045,
+                0.45295289158821106,
+            ]
+        )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
 
@@ -206,7 +214,6 @@ class CycleDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 # TODO junnyu
 @slow
 class CycleDiffusionPipelineIntegrationTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -214,20 +221,15 @@ class CycleDiffusionPipelineIntegrationTests(unittest.TestCase):
         paddle.device.cuda.empty_cache()
 
     def test_cycle_diffusion_pipeline(self):
-        init_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/black_colored_car.png"
-        )
+        init_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/black_colored_car.png")
         expected_image = load_numpy(
             "https://huggingface.co/datasets/hf-internal-testing/diffusers-images/resolve/main/cycle-diffusion/blue_colored_car.npy"
         )
         init_image = init_image.resize((512, 512))
 
         model_id = "CompVis/stable-diffusion-v1-4"
-        scheduler = DDIMScheduler.from_pretrained(model_id,
-                                                  subfolder="scheduler")
-        pipe = CycleDiffusionPipeline.from_pretrained(model_id,
-                                                      scheduler=scheduler,
-                                                      safety_checker=None)
+        scheduler = DDIMScheduler.from_pretrained(model_id, subfolder="scheduler")
+        pipe = CycleDiffusionPipeline.from_pretrained(model_id, scheduler=scheduler, safety_checker=None)
 
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()

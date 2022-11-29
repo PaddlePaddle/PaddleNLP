@@ -70,27 +70,22 @@ class ScoreSdeVePipeline(DiffusionPipeline):
 
         model = self.unet
 
-        sample = paddle.randn(
-            shape, generator=generator) * self.scheduler.init_noise_sigma
+        sample = paddle.randn(shape, generator=generator) * self.scheduler.init_noise_sigma
 
         self.scheduler.set_timesteps(num_inference_steps)
         self.scheduler.set_sigmas(num_inference_steps)
 
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
-            sigma_t = self.scheduler.sigmas[i] * paddle.ones((shape[0], ))
+            sigma_t = self.scheduler.sigmas[i] * paddle.ones((shape[0],))
 
             # correction step
             for _ in range(self.scheduler.config.correct_steps):
                 model_output = self.unet(sample, sigma_t).sample
-                sample = self.scheduler.step_correct(
-                    model_output, sample, generator=generator).prev_sample
+                sample = self.scheduler.step_correct(model_output, sample, generator=generator).prev_sample
 
             # prediction step
             model_output = model(sample, sigma_t).sample
-            output = self.scheduler.step_pred(model_output,
-                                              t,
-                                              sample,
-                                              generator=generator)
+            output = self.scheduler.step_pred(model_output, t, sample, generator=generator)
 
             sample, sample_mean = output.prev_sample, output.prev_sample_mean
 
@@ -100,6 +95,6 @@ class ScoreSdeVePipeline(DiffusionPipeline):
             sample = self.numpy_to_pil(sample)
 
         if not return_dict:
-            return (sample, )
+            return (sample,)
 
         return ImagePipelineOutput(images=sample)

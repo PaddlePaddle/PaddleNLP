@@ -69,8 +69,7 @@ def index_to_log_onehot(x: paddle.Tensor, num_classes: int) -> paddle.Tensor:
     return log_x
 
 
-def gumbel_noised(logits: paddle.Tensor,
-                  generator: Optional[paddle.Generator]) -> paddle.Tensor:
+def gumbel_noised(logits: paddle.Tensor, generator: Optional[paddle.Generator]) -> paddle.Tensor:
     """
     Apply gumbel noise to `logits`
     """
@@ -80,34 +79,32 @@ def gumbel_noised(logits: paddle.Tensor,
     return noised
 
 
-def alpha_schedules(num_diffusion_timesteps: int,
-                    alpha_cum_start=0.99999,
-                    alpha_cum_end=0.000009):
+def alpha_schedules(num_diffusion_timesteps: int, alpha_cum_start=0.99999, alpha_cum_end=0.000009):
     """
     Cumulative and non-cumulative alpha schedules.
 
     See section 4.1.
     """
-    att = (np.arange(0, num_diffusion_timesteps) /
-           (num_diffusion_timesteps - 1) * (alpha_cum_end - alpha_cum_start) +
-           alpha_cum_start)
+    att = (
+        np.arange(0, num_diffusion_timesteps) / (num_diffusion_timesteps - 1) * (alpha_cum_end - alpha_cum_start)
+        + alpha_cum_start
+    )
     att = np.concatenate(([1], att))
     at = att[1:] / att[:-1]
     att = np.concatenate((att[1:], [1]))
     return at, att
 
 
-def gamma_schedules(num_diffusion_timesteps: int,
-                    gamma_cum_start=0.000009,
-                    gamma_cum_end=0.99999):
+def gamma_schedules(num_diffusion_timesteps: int, gamma_cum_start=0.000009, gamma_cum_end=0.99999):
     """
     Cumulative and non-cumulative gamma schedules.
 
     See section 4.1.
     """
-    ctt = (np.arange(0, num_diffusion_timesteps) /
-           (num_diffusion_timesteps - 1) * (gamma_cum_end - gamma_cum_start) +
-           gamma_cum_start)
+    ctt = (
+        np.arange(0, num_diffusion_timesteps) / (num_diffusion_timesteps - 1) * (gamma_cum_end - gamma_cum_start)
+        + gamma_cum_start
+    )
     ctt = np.concatenate(([0], ctt))
     one_minus_ctt = 1 - ctt
     one_minus_ct = one_minus_ctt[1:] / one_minus_ctt[:-1]
@@ -150,6 +147,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         gamma_cum_end (`float`):
             The ending cumulative gamma value.
     """
+
     order = 1
 
     @register_to_config
@@ -167,12 +165,8 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         # By convention, the index for the mask class is the last class index
         self.mask_class = self.num_embed - 1
 
-        at, att = alpha_schedules(num_train_timesteps,
-                                  alpha_cum_start=alpha_cum_start,
-                                  alpha_cum_end=alpha_cum_end)
-        ct, ctt = gamma_schedules(num_train_timesteps,
-                                  gamma_cum_start=gamma_cum_start,
-                                  gamma_cum_end=gamma_cum_end)
+        at, att = alpha_schedules(num_train_timesteps, alpha_cum_start=alpha_cum_start, alpha_cum_end=alpha_cum_end)
+        ct, ctt = gamma_schedules(num_train_timesteps, gamma_cum_start=gamma_cum_start, gamma_cum_end=gamma_cum_end)
 
         num_non_mask_classes = self.num_embed - 1
         bt = (1 - at - ct) / num_non_mask_classes
@@ -201,8 +195,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self.timesteps = paddle.to_tensor(
-            np.arange(0, num_train_timesteps)[::-1].copy())
+        self.timesteps = paddle.to_tensor(np.arange(0, num_train_timesteps)[::-1].copy())
 
     def set_timesteps(self, num_inference_steps: int):
         """
@@ -260,7 +253,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         x_t_min_1 = log_p_x_t_min_1.argmax(axis=1)
 
         if not return_dict:
-            return (x_t_min_1, )
+            return (x_t_min_1,)
 
         return VQDiffusionSchedulerOutput(prev_sample=x_t_min_1)
 
@@ -296,10 +289,12 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         log_onehot_x_t = index_to_log_onehot(x_t, self.num_embed)
 
         log_q_x_t_given_x_0 = self.log_Q_t_transitioning_to_known_class(
-            t=t, x_t=x_t, log_onehot_x_t=log_onehot_x_t, cumulative=True)
+            t=t, x_t=x_t, log_onehot_x_t=log_onehot_x_t, cumulative=True
+        )
 
         log_q_t_given_x_t_min_1 = self.log_Q_t_transitioning_to_known_class(
-            t=t, x_t=x_t, log_onehot_x_t=log_onehot_x_t, cumulative=False)
+            t=t, x_t=x_t, log_onehot_x_t=log_onehot_x_t, cumulative=False
+        )
 
         # p_0(x_0=C_0 | x_t) / q(x_t | x_0=C_0)          ...      p_n(x_0=C_0 | x_t) / q(x_t | x_0=C_0)
         #               .                    .                                   .
@@ -381,10 +376,9 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         # The last row is trivially verified. The other rows can be verified by directly expanding equation (11) stated in terms of forward probabilities.
         return log_p_x_t_min_1
 
-    def log_Q_t_transitioning_to_known_class(self, *, t: paddle.Tensor,
-                                             x_t: paddle.Tensor,
-                                             log_onehot_x_t: paddle.Tensor,
-                                             cumulative: bool):
+    def log_Q_t_transitioning_to_known_class(
+        self, *, t: paddle.Tensor, x_t: paddle.Tensor, log_onehot_x_t: paddle.Tensor, cumulative: bool
+    ):
         """
         Returns the log probabilities of the rows from the (cumulative or non-cumulative) transition matrix for each
         latent pixel in `x_t`.
@@ -457,9 +451,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
             #
             # `P(x_t=mask|x_{t-1=mask}) = 1` and 1 will be the value of the last row of the onehot vector
             # if x_t is masked
-            log_onehot_x_t_transitioning_from_masked = log_onehot_x_t[:,
-                                                                      -1, :].unsqueeze(
-                                                                          1)
+            log_onehot_x_t_transitioning_from_masked = log_onehot_x_t[:, -1, :].unsqueeze(1)
 
         # `index_to_log_onehot` will add onehot vectors for masked pixels,
         # so the default one hot matrix has one too many rows. See the doc string
@@ -481,13 +473,11 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
 
         # The whole column of each masked pixel is `c`
         mask_class_mask = x_t == self.mask_class
-        mask_class_mask = mask_class_mask.unsqueeze(1).expand(
-            [-1, self.num_embed - 1, -1])
+        mask_class_mask = mask_class_mask.unsqueeze(1).expand([-1, self.num_embed - 1, -1])
         log_Q_t[mask_class_mask] = c
 
         if not cumulative:
-            log_Q_t = paddle.concat(
-                (log_Q_t, log_onehot_x_t_transitioning_from_masked), axis=1)
+            log_Q_t = paddle.concat((log_Q_t, log_onehot_x_t_transitioning_from_masked), axis=1)
 
         return log_Q_t
 

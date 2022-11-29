@@ -12,17 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools, builtins, copy, contextlib, time
-from .utils import is_paddle_available, is_paddlenlp_available
+import builtins
+import contextlib
+import copy
+import functools
+import time
 from types import FunctionType, MethodType
 from typing import Any, Dict, List, Optional, Tuple
+
+from .utils import is_paddle_available, is_paddlenlp_available
 
 
 def copy_func(f):
     "Copy a non-builtin function (NB `copy.copy` does not work for this)"
-    if not isinstance(f, FunctionType): return copy.copy(f)
-    fn = FunctionType(f.__code__, f.__globals__, f.__name__, f.__defaults__,
-                      f.__closure__)
+    if not isinstance(f, FunctionType):
+        return copy.copy(f)
+    fn = FunctionType(f.__code__, f.__globals__, f.__name__, f.__defaults__, f.__closure__)
     fn.__kwdefaults__ = f.__kwdefaults__
     fn.__dict__.update(f.__dict__)
     fn.__annotations__.update(f.__annotations__)
@@ -33,7 +38,8 @@ def copy_func(f):
 # copied from https://github.com/fastai/fastcore/blob/c9b4c088d3706569c076e7c197c724730be190ab/fastcore/basics.py#L938-L954
 def patch_to(cls, as_prop=False, cls_method=False):
     "Decorator: add `f` to `cls`"
-    if not isinstance(cls, (tuple, list)): cls = (cls, )
+    if not isinstance(cls, (tuple, list)):
+        cls = (cls,)
 
     def _inner(f):
         for c_ in cls:
@@ -56,7 +62,6 @@ def patch_to(cls, as_prop=False, cls_method=False):
 if is_paddle_available():
     import paddle
     import paddle.nn as nn
-
     from paddle.fluid import framework
 
     @contextlib.contextmanager
@@ -75,7 +80,6 @@ if is_paddle_available():
     paddle.device_scope = device_scope
 
     class RNGStatesTracker:
-
         def __init__(self):
             self.states_ = {}
 
@@ -90,8 +94,7 @@ if is_paddle_available():
             if generator_name is None:
                 generator_name = str(time.time())
             if generator_name in self.states_:
-                raise ValueError(
-                    'state {} already exists'.format(generator_name))
+                raise ValueError("state {} already exists".format(generator_name))
             orig_rng_state = paddle.get_cuda_rng_state()
             paddle.seed(seed)
             self.states_[generator_name] = paddle.get_cuda_rng_state()
@@ -102,8 +105,7 @@ if is_paddle_available():
         def rng_state(self, generator_name=None):
             if generator_name is not None:
                 if generator_name not in self.states_:
-                    raise ValueError(
-                        'state {} does not exist'.format(generator_name))
+                    raise ValueError("state {} does not exist".format(generator_name))
                 orig_cuda_rng_state = paddle.get_cuda_rng_state()
                 paddle.set_cuda_rng_state(self.states_[generator_name])
                 try:
@@ -148,21 +150,20 @@ if is_paddle_available():
 
         for item in atoms:
             if not hasattr(mod, item):
-                raise AttributeError(mod.__class__.__name__ + " has no "
-                                     "attribute `" + item + "`")
+                raise AttributeError(mod.__class__.__name__ + " has no " "attribute `" + item + "`")
 
             mod = getattr(mod, item)
 
             if not isinstance(mod, nn.Layer):
-                raise AttributeError("`" + item + "` is not "
-                                     "an nn.Layer")
+                raise AttributeError("`" + item + "` is not " "an nn.Layer")
         return mod
 
 
 if is_paddle_available() and is_paddlenlp_available():
     import paddle
-    from paddlenlp.transformers import PretrainedModel
+
     import paddlenlp.transformers
+    from paddlenlp.transformers import PretrainedModel
 
     @patch_to(PretrainedModel, as_prop=True)
     def dtype(self):
@@ -179,12 +180,21 @@ if is_paddle_available() and is_paddlenlp_available():
             return paddle.get_device()
 
     try:
-        from paddlenlp.transformers import CLIPTextModelWithProjection, CLIPVisionModelWithProjection
-    except:
+        from paddlenlp.transformers import (
+            CLIPTextModelWithProjection,
+            CLIPVisionModelWithProjection,
+        )
+    except ImportError:
         # patch model
-        from paddlenlp.transformers import CLIPPretrainedModel, register_base_model, VisionTransformer, TextTransformer
-        from paddlenlp.transformers.model_outputs import ModelOutput
         from dataclasses import dataclass
+
+        from paddlenlp.transformers import (
+            CLIPPretrainedModel,
+            TextTransformer,
+            VisionTransformer,
+            register_base_model,
+        )
+        from paddlenlp.transformers.model_outputs import ModelOutput
 
         @dataclass
         class CLIPVisionModelOutput(ModelOutput):
@@ -204,17 +214,19 @@ if is_paddle_available() and is_paddlenlp_available():
         class CLIPTextModelWithProjection(CLIPPretrainedModel):
             base_model_class = None
 
-            def __init__(self,
-                         max_text_length=77,
-                         text_embed_dim=512,
-                         text_heads=8,
-                         text_layers=12,
-                         vocab_size=49408,
-                         text_hidden_act="quick_gelu",
-                         initializer_range=0.02,
-                         initializer_factor=1.0,
-                         projection_dim=512,
-                         **kwargs):
+            def __init__(
+                self,
+                max_text_length=77,
+                text_embed_dim=512,
+                text_heads=8,
+                text_layers=12,
+                vocab_size=49408,
+                text_hidden_act="quick_gelu",
+                initializer_range=0.02,
+                initializer_factor=1.0,
+                projection_dim=512,
+                **kwargs
+            ):
                 super().__init__()
                 self.initializer_range = initializer_range
                 self.initializer_factor = initializer_factor
@@ -227,10 +239,11 @@ if is_paddle_available() and is_paddlenlp_available():
                     transformer_layers=text_layers,
                     vocab_size=vocab_size,
                     activation=text_hidden_act,
-                    normalize_before=True)
+                    normalize_before=True,
+                )
                 self.text_projection = paddle.create_parameter(
-                    (text_embed_dim, projection_dim),
-                    paddle.get_default_dtype())
+                    (text_embed_dim, projection_dim), paddle.get_default_dtype()
+                )
                 self.apply(self._init_weights)
 
             def get_input_embeddings(self) -> nn.Layer:
@@ -254,14 +267,14 @@ if is_paddle_available() and is_paddlenlp_available():
                     attention_mask=attention_mask,
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
-                    return_dict=return_dict)
+                    return_dict=return_dict,
+                )
                 pooled_output = text_outputs[1]
                 text_embeds = paddle.matmul(pooled_output, self.text_projection)
 
                 if not return_dict:
                     outputs = (text_embeds, text_outputs[0]) + text_outputs[2:]
-                    return tuple(output for output in outputs
-                                 if output is not None)
+                    return tuple(output for output in outputs if output is not None)
 
                 return CLIPTextModelOutput(
                     text_embeds=text_embeds,
@@ -274,18 +287,20 @@ if is_paddle_available() and is_paddlenlp_available():
         class CLIPVisionModelWithProjection(CLIPPretrainedModel):
             base_model_class = None
 
-            def __init__(self,
-                         image_resolution=224,
-                         vision_patch_size=32,
-                         vision_embed_dim=768,
-                         vision_layers=12,
-                         vision_heads=12,
-                         vision_hidden_act="quick_gelu",
-                         vision_mlp_ratio=4,
-                         initializer_range=0.02,
-                         initializer_factor=1.0,
-                         projection_dim=512,
-                         **kwargs):
+            def __init__(
+                self,
+                image_resolution=224,
+                vision_patch_size=32,
+                vision_embed_dim=768,
+                vision_layers=12,
+                vision_heads=12,
+                vision_hidden_act="quick_gelu",
+                vision_mlp_ratio=4,
+                initializer_range=0.02,
+                initializer_factor=1.0,
+                projection_dim=512,
+                **kwargs
+            ):
                 super().__init__()
                 self.initializer_range = initializer_range
                 self.initializer_factor = initializer_factor
@@ -302,10 +317,11 @@ if is_paddle_available() and is_paddlenlp_available():
                     heads=vision_heads,
                     activation=vision_hidden_act,
                     mlp_ratio=vision_mlp_ratio,
-                    normalize_before=True)
+                    normalize_before=True,
+                )
                 self.vision_projection = paddle.create_parameter(
-                    (vision_embed_dim, projection_dim),
-                    paddle.get_default_dtype())
+                    (vision_embed_dim, projection_dim), paddle.get_default_dtype()
+                )
                 self.apply(self._init_weights)
 
             def get_input_embeddings(self) -> nn.Layer:
@@ -322,15 +338,13 @@ if is_paddle_available() and is_paddlenlp_available():
                     pixel_values,
                     output_attentions=output_attentions,
                     output_hidden_states=output_hidden_states,
-                    return_dict=return_dict)
+                    return_dict=return_dict,
+                )
                 pooled_output = vision_outputs[1]  # pooled_output
-                image_embeds = paddle.matmul(pooled_output,
-                                             self.vision_projection)
+                image_embeds = paddle.matmul(pooled_output, self.vision_projection)
                 if not return_dict:
-                    outputs = (image_embeds,
-                               vision_outputs[0]) + vision_outputs[2:]
-                    return tuple(output for output in outputs
-                                 if output is not None)
+                    outputs = (image_embeds, vision_outputs[0]) + vision_outputs[2:]
+                    return tuple(output for output in outputs if output is not None)
 
                 return CLIPVisionModelOutput(
                     image_embeds=image_embeds,
@@ -347,15 +361,18 @@ if is_paddle_available() and is_paddlenlp_available():
 
     try:
         from paddlenlp.transformers import XLMRobertaTokenizer
-    except:
+    except ImportError:
         # patch xlm-roberta tokenizer
-        """ Tokenization classes for XLM-RoBERTa model."""
+        """Tokenization classes for XLM-RoBERTa model."""
         import os
         from shutil import copyfile
 
         import sentencepiece as spm
 
-        from paddlenlp.transformers.tokenizer_utils import AddedToken, PretrainedTokenizer
+        from paddlenlp.transformers.tokenizer_utils import (
+            AddedToken,
+            PretrainedTokenizer,
+        )
         from paddlenlp.utils.log import logger
 
         SPIECE_UNDERLINE = "▁"
@@ -375,21 +392,23 @@ if is_paddle_available() and is_paddlenlp_available():
             }
             model_input_names = ["input_ids", "attention_mask"]
 
-            def __init__(self,
-                         vocab_file,
-                         bos_token="<s>",
-                         eos_token="</s>",
-                         sep_token="</s>",
-                         cls_token="<s>",
-                         unk_token="<unk>",
-                         pad_token="<pad>",
-                         mask_token="<mask>",
-                         sp_model_kwargs: Optional[Dict[str, Any]] = None,
-                         **kwargs) -> None:
+            def __init__(
+                self,
+                vocab_file,
+                bos_token="<s>",
+                eos_token="</s>",
+                sep_token="</s>",
+                cls_token="<s>",
+                unk_token="<unk>",
+                pad_token="<pad>",
+                mask_token="<mask>",
+                sp_model_kwargs: Optional[Dict[str, Any]] = None,
+                **kwargs
+            ) -> None:
                 # Mask token behave like a normal word, i.e. include the space before it
-                mask_token = AddedToken(mask_token, lstrip=True,
-                                        rstrip=False) if isinstance(
-                                            mask_token, str) else mask_token
+                mask_token = (
+                    AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
+                )
 
                 self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
 
@@ -405,8 +424,7 @@ if is_paddle_available() and is_paddlenlp_available():
                     **kwargs,
                 )
 
-                self.sp_model = spm.SentencePieceProcessor(
-                    **self.sp_model_kwargs)
+                self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
                 self.sp_model.Load(str(vocab_file))
                 self.vocab_file = vocab_file
 
@@ -417,22 +435,13 @@ if is_paddle_available() and is_paddlenlp_available():
                 # spm      | '<unk>' | '<s>'   | '</s>' | ','     | '.' | '▁' | 's' | '▁de' | '-'   | '▁a'
 
                 # Mimic fairseq token-to-id alignment for the first 4 token
-                self.fairseq_tokens_to_ids = {
-                    "<s>": 0,
-                    "<pad>": 1,
-                    "</s>": 2,
-                    "<unk>": 3
-                }
+                self.fairseq_tokens_to_ids = {"<s>": 0, "<pad>": 1, "</s>": 2, "<unk>": 3}
 
                 # The first "real" token "," has position 4 in the original fairseq vocab and position 3 in the spm vocab
                 self.fairseq_offset = 1
 
-                self.fairseq_tokens_to_ids["<mask>"] = len(
-                    self.sp_model) + self.fairseq_offset
-                self.fairseq_ids_to_tokens = {
-                    v: k
-                    for k, v in self.fairseq_tokens_to_ids.items()
-                }
+                self.fairseq_tokens_to_ids["<mask>"] = len(self.sp_model) + self.fairseq_offset
+                self.fairseq_ids_to_tokens = {v: k for k, v in self.fairseq_tokens_to_ids.items()}
 
             def __getstate__(self):
                 state = self.__dict__.copy()
@@ -447,14 +456,12 @@ if is_paddle_available() and is_paddlenlp_available():
                 if not hasattr(self, "sp_model_kwargs"):
                     self.sp_model_kwargs = {}
 
-                self.sp_model = spm.SentencePieceProcessor(
-                    **self.sp_model_kwargs)
+                self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
                 self.sp_model.LoadFromSerializedProto(self.sp_model_proto)
 
             def build_inputs_with_special_tokens(
-                    self,
-                    token_ids_0: List[int],
-                    token_ids_1: Optional[List[int]] = None) -> List[int]:
+                self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+            ) -> List[int]:
                 """
                 Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
                 adding special tokens. An XLM-RoBERTa sequence has the following format:
@@ -470,17 +477,17 @@ if is_paddle_available() and is_paddlenlp_available():
                 """
 
                 if token_ids_1 is None:
-                    return [self.cls_token_id
-                            ] + token_ids_0 + [self.sep_token_id]
+                    return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
                 cls = [self.cls_token_id]
                 sep = [self.sep_token_id]
                 return cls + token_ids_0 + sep + sep + token_ids_1 + sep
 
             def get_special_tokens_mask(
-                    self,
-                    token_ids_0: List[int],
-                    token_ids_1: Optional[List[int]] = None,
-                    already_has_special_tokens: bool = False) -> List[int]:
+                self,
+                token_ids_0: List[int],
+                token_ids_1: Optional[List[int]] = None,
+                already_has_special_tokens: bool = False,
+            ) -> List[int]:
                 """
                 Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
                 special tokens using the tokenizer `prepare_for_model` method.
@@ -497,19 +504,16 @@ if is_paddle_available() and is_paddlenlp_available():
 
                 if already_has_special_tokens:
                     return super().get_special_tokens_mask(
-                        token_ids_0=token_ids_0,
-                        token_ids_1=token_ids_1,
-                        already_has_special_tokens=True)
+                        token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+                    )
 
                 if token_ids_1 is None:
                     return [1] + ([0] * len(token_ids_0)) + [1]
-                return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-                    [0] * len(token_ids_1)) + [1]
+                return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
             def create_token_type_ids_from_sequences(
-                    self,
-                    token_ids_0: List[int],
-                    token_ids_1: Optional[List[int]] = None) -> List[int]:
+                self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+            ) -> List[int]:
                 """
                 Create a mask from the two sequences passed to be used in a sequence-pair classification task. XLM-RoBERTa does
                 not make use of token type ids, therefore a list of zeros is returned.
@@ -527,19 +531,14 @@ if is_paddle_available() and is_paddlenlp_available():
 
                 if token_ids_1 is None:
                     return len(cls + token_ids_0 + sep) * [0]
-                return len(cls + token_ids_0 + sep + sep + token_ids_1 +
-                           sep) * [0]
+                return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
             @property
             def vocab_size(self):
-                return len(self.sp_model
-                           ) + self.fairseq_offset + 1  # Add the <mask> token
+                return len(self.sp_model) + self.fairseq_offset + 1  # Add the <mask> token
 
             def get_vocab(self):
-                vocab = {
-                    self.convert_ids_to_tokens(i): i
-                    for i in range(self.vocab_size)
-                }
+                vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
                 vocab.update(self.added_tokens_encoder)
                 return vocab
 
@@ -563,34 +562,28 @@ if is_paddle_available() and is_paddlenlp_available():
 
             def convert_tokens_to_string(self, tokens):
                 """Converts a sequence of tokens (strings for sub-words) in a single string."""
-                out_string = "".join(tokens).replace(SPIECE_UNDERLINE,
-                                                     " ").strip()
+                out_string = "".join(tokens).replace(SPIECE_UNDERLINE, " ").strip()
                 return out_string
 
-            def save_vocabulary(
-                    self,
-                    save_directory: str,
-                    filename_prefix: Optional[str] = None) -> Tuple[str]:
+            def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
                 if not os.path.isdir(save_directory):
-                    logger.error(
-                        f"Vocabulary path ({save_directory}) should be a directory"
-                    )
+                    logger.error(f"Vocabulary path ({save_directory}) should be a directory")
                     return
                 out_vocab_file = os.path.join(
                     save_directory,
-                    (filename_prefix + "-" if filename_prefix else "") +
-                    self.resource_files_names["vocab_file"])
+                    (filename_prefix + "-" if filename_prefix else "") + self.resource_files_names["vocab_file"],
+                )
 
-                if os.path.abspath(self.vocab_file) != os.path.abspath(
-                        out_vocab_file) and os.path.isfile(self.vocab_file):
+                if os.path.abspath(self.vocab_file) != os.path.abspath(out_vocab_file) and os.path.isfile(
+                    self.vocab_file
+                ):
                     copyfile(self.vocab_file, out_vocab_file)
                 elif not os.path.isfile(self.vocab_file):
                     with open(out_vocab_file, "wb") as fi:
-                        content_spiece_model = self.sp_model.serialized_model_proto(
-                        )
+                        content_spiece_model = self.sp_model.serialized_model_proto()
                         fi.write(content_spiece_model)
 
-                return (out_vocab_file, )
+                return (out_vocab_file,)
 
         paddlenlp.transformers.XLMRobertaTokenizer = XLMRobertaTokenizer
 
@@ -600,18 +593,29 @@ if is_paddle_available() and is_paddlenlp_available():
     raw_forward = BertModel.forward
 
     @patch_to(BertModel)
-    def forward(self,
-                input_ids: paddle.Tensor,
-                token_type_ids: Optional[paddle.Tensor] = None,
-                position_ids: Optional[paddle.Tensor] = None,
-                attention_mask: Optional[paddle.Tensor] = None,
-                past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None,
-                use_cache: Optional[bool] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids: paddle.Tensor,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None,
+        use_cache: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         if attention_mask is None:
             attention_mask = paddle.ones_like(input_ids)
-        return raw_forward(self, input_ids, token_type_ids, position_ids,
-                           attention_mask, past_key_values, use_cache,
-                           output_hidden_states, output_attentions, return_dict)
+        return raw_forward(
+            self,
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            past_key_values,
+            use_cache,
+            output_hidden_states,
+            output_attentions,
+            return_dict,
+        )

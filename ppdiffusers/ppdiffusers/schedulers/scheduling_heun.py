@@ -59,19 +59,12 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start,
-                                         beta_end,
-                                         num_train_timesteps,
-                                         dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = (paddle.linspace(beta_start**0.5,
-                                          beta_end**0.5,
-                                          num_train_timesteps,
-                                          dtype="float32")**2)
+            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
         else:
-            raise NotImplementedError(
-                f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
@@ -94,7 +87,7 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
     ) -> paddle.Tensor:
         """
         Args:
-        
+
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
             sample (`paddle.Tensor`): input sample timestep (`int`, optional): current timestep
@@ -105,7 +98,7 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
         step_index = self.index_for_timestep(timestep)
 
         sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1)**0.5)
+        sample = sample / ((sigma**2 + 1) ** 0.5)
         return sample
 
     def set_timesteps(
@@ -125,25 +118,19 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         num_train_timesteps = num_train_timesteps or self.config.num_train_timesteps
 
-        timesteps = np.linspace(0,
-                                num_train_timesteps - 1,
-                                num_inference_steps,
-                                dtype=float)[::-1].copy()
+        timesteps = np.linspace(0, num_train_timesteps - 1, num_inference_steps, dtype=float)[::-1].copy()
 
-        sigmas = np.array(
-            ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
+        sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
         sigmas = paddle.to_tensor(sigmas)
-        self.sigmas = paddle.concat(
-            [sigmas[:1], sigmas[1:-1].repeat_interleave(2), sigmas[-1:]])
+        self.sigmas = paddle.concat([sigmas[:1], sigmas[1:-1].repeat_interleave(2), sigmas[-1:]])
 
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = self.sigmas.max()
 
         timesteps = paddle.to_tensor(timesteps)
-        timesteps = paddle.concat(
-            [timesteps[:1], timesteps[1:].repeat_interleave(2), timesteps[-1:]])
+        timesteps = paddle.concat([timesteps[:1], timesteps[1:].repeat_interleave(2), timesteps[-1:]])
 
         self.timesteps = timesteps
 
@@ -224,7 +211,7 @@ class HeunDiscreteScheduler(SchedulerMixin, ConfigMixin):
         prev_sample = sample + derivative * dt
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
 

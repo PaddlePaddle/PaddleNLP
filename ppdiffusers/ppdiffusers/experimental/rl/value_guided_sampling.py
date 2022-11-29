@@ -16,15 +16,12 @@
 import numpy as np
 import paddle
 
-import tqdm
-
 from ...models.unet_1d import UNet1DModel
 from ...pipeline_utils import DiffusionPipeline
 from ...utils.dummy_paddle_objects import DDPMScheduler
 
 
 class ValueGuidedRLPipeline(DiffusionPipeline):
-
     def __init__(
         self,
         value_function: UNet1DModel,
@@ -42,13 +39,13 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         for key in self.data.keys():
             try:
                 self.means[key] = self.data[key].mean()
-            except:
+            except Exception:
                 pass
         self.stds = dict()
         for key in self.data.keys():
             try:
                 self.stds[key] = self.data[key].std()
-            except:
+            except Exception:
                 pass
         self.state_dim = env.observation_space.shape[0]
         self.action_dim = env.action_space.shape[0]
@@ -76,12 +73,11 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         y = None
         for i in self.progress_bar(self.scheduler.timesteps):
             # create batch of timesteps to pass into model
-            timesteps = paddle.full((batch_size, ), i, dtype="int64")
+            timesteps = paddle.full((batch_size,), i, dtype="int64")
             for _ in range(n_guide_steps):
                 with paddle.set_grad_enabled(True):
                     x.stop_gradient = False
-                    y = self.value_function(x.transpose([0, 2, 1]),
-                                            timesteps).sample
+                    y = self.value_function(x.transpose([0, 2, 1]), timesteps).sample
                     grad = paddle.autograd.grad([y.sum()], [x])[0]
 
                     posterior_variance = self.scheduler._get_variance(i)
@@ -91,23 +87,16 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
                 x = x.detach()
                 x = x + scale * grad
                 x = self.reset_x0(x, conditions, self.action_dim)
-            prev_x = self.unet(x.transpose([0, 2, 1]),
-                               timesteps).sample.transpose([0, 2, 1])
+            prev_x = self.unet(x.transpose([0, 2, 1]), timesteps).sample.transpose([0, 2, 1])
             # TODO: set prediction_type when instantiating the model
-            x = self.scheduler.step(prev_x, i, x,
-                                    predict_epsilon=False)["prev_sample"]
+            x = self.scheduler.step(prev_x, i, x, predict_epsilon=False)["prev_sample"]
 
             # apply conditions to the trajectory
             x = self.reset_x0(x, conditions, self.action_dim)
             x = self.to_paddle(x)
         return x, y
 
-    def __call__(self,
-                 obs,
-                 batch_size=64,
-                 planning_horizon=32,
-                 n_guide_steps=2,
-                 scale=0.1):
+    def __call__(self, obs, batch_size=64, planning_horizon=32, n_guide_steps=2, scale=0.1):
         # normalize the observations and create  batch dimension
         obs = self.normalize(obs, "observations")
         obs = obs[None].repeat(batch_size, axis=0)
@@ -126,7 +115,7 @@ class ValueGuidedRLPipeline(DiffusionPipeline):
         # sort output trajectories by value
         sorted_idx = paddle.argsort(y, 0, descending=True).squeeze()
         sorted_values = x[sorted_idx]
-        actions = sorted_values[:, :, :self.action_dim]
+        actions = sorted_values[:, :, : self.action_dim]
         actions = actions.detach().numpy()
         denorm_actions = self.de_normalize(actions, key="actions")
 

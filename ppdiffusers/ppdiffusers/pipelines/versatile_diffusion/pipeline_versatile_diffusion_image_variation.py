@@ -17,8 +17,8 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 import paddle
-
 import PIL
+
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPVisionModelWithProjection
 
 from ...models import AutoencoderKL, UNet2DConditionModel
@@ -72,12 +72,10 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
             vae=vae,
             scheduler=scheduler,
         )
-        self.vae_scale_factor = 2**(len(self.vae.config.block_out_channels) - 1)
+        self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.enable_attention_slicing with unet->image_unet
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -109,8 +107,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         # set slice_size = `None` to disable `attention slicing`
         self.enable_attention_slicing(None)
 
-    def _encode_image_prompt(self, prompt, num_images_per_prompt,
-                             do_classifier_free_guidance, negative_prompt):
+    def _encode_image_prompt(self, prompt, num_images_per_prompt, do_classifier_free_guidance, negative_prompt):
         r"""
         Encodes the prompt into image encoder hidden states.
 
@@ -127,8 +124,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         """
 
         def normalize_embeddings(encoder_output):
-            embeds = self.image_encoder.vision_model.ln_post(
-                encoder_output.last_hidden_state)
+            embeds = self.image_encoder.vision_model.ln_post(encoder_output.last_hidden_state)
             embeds = paddle.matmul(embeds, self.image_encoder.vision_projection)
             embeds_pooled = embeds[:, 0:1]
             embeds = embeds / paddle.norm(embeds_pooled, axis=-1, keepdim=True)
@@ -137,8 +133,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         batch_size = len(prompt) if isinstance(prompt, list) else 1
 
         # get prompt text embeddings
-        image_input = self.image_feature_extractor(images=prompt,
-                                                   return_tensors="pd")
+        image_input = self.image_feature_extractor(images=prompt, return_tensors="pd")
         pixel_values = image_input.pixel_values.cast(self.image_encoder.dtype)
         image_embeddings = self.image_encoder(pixel_values, return_dict=True)
         image_embeddings = normalize_embeddings(image_embeddings)
@@ -146,8 +141,7 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         # duplicate image embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = image_embeddings.shape
         image_embeddings = image_embeddings.tile([1, num_images_per_prompt, 1])
-        image_embeddings = image_embeddings.reshape(
-            [bs_embed * num_images_per_prompt, seq_len, -1])
+        image_embeddings = image_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         # get unconditional embeddings for classifier free guidance
         if do_classifier_free_guidance:
@@ -157,37 +151,33 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}.")
+                    f" {type(prompt)}."
+                )
             elif isinstance(negative_prompt, PIL.Image.Image):
                 uncond_images = [negative_prompt]
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`.")
+                    " the batch size of `prompt`."
+                )
             else:
                 uncond_images = negative_prompt
 
-            uncond_images = self.image_feature_extractor(images=uncond_images,
-                                                         return_tensors="pd")
-            pixel_values = uncond_images.pixel_values.cast(
-                self.image_encoder.dtype)
-            uncond_embeddings = self.image_encoder(pixel_values,
-                                                   return_dict=True)
+            uncond_images = self.image_feature_extractor(images=uncond_images, return_tensors="pd")
+            pixel_values = uncond_images.pixel_values.cast(self.image_encoder.dtype)
+            uncond_embeddings = self.image_encoder(pixel_values, return_dict=True)
             uncond_embeddings = normalize_embeddings(uncond_embeddings)
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile(
-                [1, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape(
-                [batch_size * num_images_per_prompt, seq_len, -1])
+            uncond_embeddings = uncond_embeddings.tile([1, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and conditional embeddings into a single batch
             # to avoid doing two forward passes
-            image_embeddings = paddle.concat(
-                [uncond_embeddings, image_embeddings])
+            image_embeddings = paddle.concat([uncond_embeddings, image_embeddings])
 
         return image_embeddings
 
@@ -207,58 +197,40 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
 
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         # check if the scheduler accepts generator
-        accepts_generator = "generator" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_generator = "generator" in set(inspect.signature(self.scheduler.step).parameters.keys())
         if accepts_generator:
             extra_step_kwargs["generator"] = generator
         return extra_step_kwargs
 
     def check_inputs(self, image, height, width, callback_steps):
-        if not isinstance(image, PIL.Image.Image) and not isinstance(
-                image, paddle.Tensor):
-            raise ValueError(
-                f"`image` has to be of type `PIL.Image.Image` or `paddle.Tensor` but is {type(image)}"
-            )
+        if not isinstance(image, PIL.Image.Image) and not isinstance(image, paddle.Tensor):
+            raise ValueError(f"`image` has to be of type `PIL.Image.Image` or `paddle.Tensor` but is {type(image)}")
 
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-            )
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
     # Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion.StableDiffusionPipeline.prepare_latents
-    def prepare_latents(self,
-                        batch_size,
-                        num_channels_latents,
-                        height,
-                        width,
-                        dtype,
-                        generator,
-                        latents=None):
-        shape = [
-            batch_size, num_channels_latents, height // self.vae_scale_factor,
-            width // self.vae_scale_factor
-        ]
+    def prepare_latents(self, batch_size, num_channels_latents, height, width, dtype, generator, latents=None):
+        shape = [batch_size, num_channels_latents, height // self.vae_scale_factor, width // self.vae_scale_factor]
         if latents is None:
             latents = paddle.randn(shape, generator=generator, dtype=dtype)
         else:
             if latents.shape != shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {shape}"
-                )
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {shape}")
 
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
@@ -377,8 +349,8 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
 
         # 3. Encode input prompt
         image_embeddings = self._encode_image_prompt(
-            image, num_images_per_prompt, do_classifier_free_guidance,
-            negative_prompt)
+            image, num_images_per_prompt, do_classifier_free_guidance, negative_prompt
+        )
 
         # 4. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -402,25 +374,19 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
         # 7. Denoising loop
         for i, t in enumerate(self.progress_bar(timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.image_unet(
-                latent_model_input, t,
-                encoder_hidden_states=image_embeddings).sample
+            noise_pred = self.image_unet(latent_model_input, t, encoder_hidden_states=image_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
@@ -434,6 +400,6 @@ class VersatileDiffusionImageVariationPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

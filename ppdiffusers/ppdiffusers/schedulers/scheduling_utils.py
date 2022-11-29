@@ -89,12 +89,9 @@ class SchedulerMixin:
             return_unused_kwargs=True,
             **kwargs,
         )
-        return cls.from_config(config,
-                               return_unused_kwargs=return_unused_kwargs,
-                               **kwargs)
+        return cls.from_config(config, return_unused_kwargs=return_unused_kwargs, **kwargs)
 
-    def save_pretrained(self, save_directory: Union[str, os.PathLike],
-                        **kwargs):
+    def save_pretrained(self, save_directory: Union[str, os.PathLike], **kwargs):
         """
         Save a scheduler configuration object to the directory `save_directory`, so that it can be re-loaded using the
         [`~SchedulerMixin.from_pretrained`] class method.
@@ -120,7 +117,6 @@ class SchedulerMixin:
         compatible_classes_str = list(set([cls.__name__] + cls._compatibles))
         diffusers_library = importlib.import_module(__name__.split(".")[0])
         compatible_classes = [
-            getattr(diffusers_library, c) for c in compatible_classes_str
-            if hasattr(diffusers_library, c)
+            getattr(diffusers_library, c) for c in compatible_classes_str if hasattr(diffusers_library, c)
         ]
         return compatible_classes

@@ -16,8 +16,7 @@ from ppdiffusers import KarrasVePipeline, KarrasVeScheduler
 
 scheduler = KarrasVeScheduler()
 # 加载模型和scheduler
-pipe = KarrasVePipeline.from_pretrained("google/ncsnpp-celebahq-256",
-                                        scheduler=scheduler)
+pipe = KarrasVePipeline.from_pretrained("google/ncsnpp-celebahq-256", scheduler=scheduler)
 
 # 执行pipeline进行推理
 image = pipe().images

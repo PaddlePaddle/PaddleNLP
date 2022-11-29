@@ -16,20 +16,23 @@
 import gc
 import random
 import unittest
-import paddle
+
 import numpy as np
-
-from ppdiffusers import AutoencoderKL, PNDMScheduler, StableDiffusionInpaintPipeline, UNet2DConditionModel
-from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
+import paddle
 from PIL import Image
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
-
 from test_pipelines_common import PipelineTesterMixin
 
+from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from ppdiffusers import (
+    AutoencoderKL,
+    PNDMScheduler,
+    StableDiffusionInpaintPipeline,
+    UNet2DConditionModel,
+)
+from ppdiffusers.utils import floats_tensor, load_image, load_numpy, slow
 
-class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
-                                              unittest.TestCase):
 
+class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -42,8 +45,7 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         num_channels = 3
         sizes = (32, 32)
 
-        image = floats_tensor((batch_size, num_channels) + sizes,
-                              rng=random.Random(0))
+        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
         return image
 
     @property
@@ -95,11 +97,8 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
 
     @property
     def dummy_extractor(self):
-
         def extract(*args, **kwargs):
-
             class Out:
-
                 def __init__(self):
                     self.pixel_values = paddle.ones([0])
 
@@ -115,14 +114,11 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
         text_encoder = self.dummy_text_encoder
-        tokenizer = CLIPTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-clip")
+        tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
         image = self.dummy_image.transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize(
-            (64, 64))
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize(
-            (64, 64))
+        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize((64, 64))
+        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((64, 64))
 
         # make sure here that pndm scheduler skips prk
         sd_pipe = StableDiffusionInpaintPipeline(
@@ -166,20 +162,26 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin,
         image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 64, 64, 3)
-        expected_slice = np.array([
-            0.46581971645355225, 0.4502384066581726, 0.2711679935455322,
-            0.39340725541114807, 0.4130115509033203, 0.47139889001846313,
-            0.35663333535194397, 0.33137619495391846, 0.39559948444366455
-        ])
+        expected_slice = np.array(
+            [
+                0.46581971645355225,
+                0.4502384066581726,
+                0.2711679935455322,
+                0.39340725541114807,
+                0.4130115509033203,
+                0.47139889001846313,
+                0.35663333535194397,
+                0.33137619495391846,
+                0.39559948444366455,
+            ]
+        )
 
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() -
-                      expected_slice).max() < 1e-2
+        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow
 class StableDiffusionInpaintPipelineIntegrationTests(unittest.TestCase):
-
     def tearDown(self):
         # clean up the VRAM after each test
         super().tearDown()
@@ -187,19 +189,14 @@ class StableDiffusionInpaintPipelineIntegrationTests(unittest.TestCase):
         paddle.device.cuda.empty_cache()
 
     def test_stable_diffusion_inpaint_pipeline(self):
-        init_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/init_image_sd2.png"
-        )
-        mask_image = load_image(
-            "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_sd2.png"
-        )
+        init_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/init_image_sd2.png")
+        mask_image = load_image("https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/mask_sd2.png")
         expected_image = load_numpy(
             "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/yellow_cat_sitting_on_a_park_bench_sd2.npy"
         )
 
         model_id = "stabilityai/stable-diffusion-2-inpainting"
-        pipe = StableDiffusionInpaintPipeline.from_pretrained(
-            model_id, safety_checker=None)
+        pipe = StableDiffusionInpaintPipeline.from_pretrained(model_id, safety_checker=None)
         pipe.set_progress_bar_config(disable=None)
         pipe.enable_attention_slicing()
 

@@ -14,8 +14,7 @@
 
 from ppdiffusers import VersatileDiffusionTextToImagePipeline
 
-pipe = VersatileDiffusionTextToImagePipeline.from_pretrained(
-    "shi-labs/versatile-diffusion")
+pipe = VersatileDiffusionTextToImagePipeline.from_pretrained("shi-labs/versatile-diffusion")
 pipe.remove_unused_weights()
 
 image = pipe("an astronaut riding on a horse on mars").images[0]

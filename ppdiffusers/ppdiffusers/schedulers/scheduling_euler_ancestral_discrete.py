@@ -82,25 +82,17 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start,
-                                         beta_end,
-                                         num_train_timesteps,
-                                         dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = (paddle.linspace(beta_start**0.5,
-                                          beta_end**0.5,
-                                          num_train_timesteps,
-                                          dtype="float32")**2)
+            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
         else:
-            raise NotImplementedError(
-                f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
 
-        sigmas = np.array(
-            ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
+        sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.concatenate([sigmas[::-1], [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
 
@@ -109,16 +101,11 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        timesteps = np.linspace(0,
-                                num_train_timesteps - 1,
-                                num_train_timesteps,
-                                dtype=float)[::-1].copy()
+        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps)
         self.is_scale_input_called = False
 
-    def scale_model_input(
-            self, sample: paddle.Tensor,
-            timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
         """
         Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the Euler algorithm.
 
@@ -131,7 +118,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1)**0.5)
+        sample = sample / ((sigma**2 + 1) ** 0.5)
         self.is_scale_input_called = True
         return sample
 
@@ -145,12 +132,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         self.num_inference_steps = num_inference_steps
 
-        timesteps = np.linspace(0,
-                                self.config.num_train_timesteps - 1,
-                                num_inference_steps,
-                                dtype=float)[::-1].copy()
-        sigmas = np.array(
-            ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
+        timesteps = np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps, dtype=float)[::-1].copy()
+        sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
@@ -185,7 +168,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if not self.is_scale_input_called:
             logger.warning(
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
-                "See `StableDiffusionPipeline` for a usage example.")
+                "See `StableDiffusionPipeline` for a usage example."
+            )
         step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
 
@@ -193,9 +177,8 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         pred_original_sample = sample - sigma * model_output
         sigma_from = self.sigmas[step_index]
         sigma_to = self.sigmas[step_index + 1]
-        sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) /
-                    sigma_from**2)**0.5
-        sigma_down = (sigma_to**2 - sigma_up**2)**0.5
+        sigma_up = (sigma_to**2 * (sigma_from**2 - sigma_to**2) / sigma_from**2) ** 0.5
+        sigma_down = (sigma_to**2 - sigma_up**2) ** 0.5
 
         # 2. Convert to an ODE derivative
         derivative = (sample - pred_original_sample) / sigma
@@ -204,17 +187,16 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         prev_sample = sample + derivative * dt
 
-        noise = paddle.randn(model_output.shape,
-                             dtype=model_output.dtype,
-                             generator=generator)
+        noise = paddle.randn(model_output.shape, dtype=model_output.dtype, generator=generator)
 
         prev_sample = prev_sample + noise * sigma_up
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return EulerAncestralDiscreteSchedulerOutput(
-            prev_sample=prev_sample, pred_original_sample=pred_original_sample)
+            prev_sample=prev_sample, pred_original_sample=pred_original_sample
+        )
 
     def add_noise(
         self,
@@ -226,8 +208,7 @@ class EulerAncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         self.sigmas = self.sigmas.cast(original_samples.dtype)
 
         schedule_timesteps = self.timesteps
-        step_indices = [(schedule_timesteps == t).nonzero().item()
-                        for t in timesteps]
+        step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
 
         sigma = self.sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):

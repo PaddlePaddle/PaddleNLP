@@ -14,19 +14,20 @@
 # limitations under the License.
 
 import os
-from paddlenlp.utils.downloader import get_path_from_url, download_check
-from .utils import PPDIFFUSERS_CACHE, DOWNLOAD_SERVER
+
+from paddlenlp.utils.downloader import get_path_from_url
+
+from .utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE
 
 
-def ppdiffusers_bos_download(pretrained_model_name_or_path,
-                             filename=None,
-                             subfolder=None,
-                             cache_dir=None):
+def ppdiffusers_bos_download(pretrained_model_name_or_path, filename=None, subfolder=None, cache_dir=None):
     if cache_dir is None:
         cache_dir = PPDIFFUSERS_CACHE
-    cache_dir = pretrained_model_name_or_path if os.path.isdir(
-        pretrained_model_name_or_path) else os.path.join(
-            cache_dir, pretrained_model_name_or_path)
+    cache_dir = (
+        pretrained_model_name_or_path
+        if os.path.isdir(pretrained_model_name_or_path)
+        else os.path.join(cache_dir, pretrained_model_name_or_path)
+    )
     url = DOWNLOAD_SERVER + "/" + pretrained_model_name_or_path
     if subfolder is not None:
         url = url + "/" + subfolder

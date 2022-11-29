@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
 
@@ -29,8 +30,16 @@ else:
     from ..utils.dummy_paddle_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .alt_diffusion import AltDiffusionImg2ImgPipeline, AltDiffusionPipeline, RobertaSeriesModelWithTransformation
-    from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
+    from .alt_diffusion import (
+        AltDiffusionImg2ImgPipeline,
+        AltDiffusionPipeline,
+        RobertaSeriesModelWithTransformation,
+    )
+    from .latent_diffusion import (
+        LDMBertModel,
+        LDMSuperResolutionPipeline,
+        LDMTextToImagePipeline,
+    )
     from .stable_diffusion import (
         CycleDiffusionPipeline,
         StableDiffusionImageVariationPipeline,
@@ -38,8 +47,8 @@ if is_paddle_available() and is_paddlenlp_available():
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
         StableDiffusionPipeline,
-        StableDiffusionUpscalePipeline,
         StableDiffusionPipelineAllinOne,
+        StableDiffusionUpscalePipeline,
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
     from .versatile_diffusion import (

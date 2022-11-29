@@ -16,11 +16,10 @@
 import unittest
 
 import paddle
+from test_modeling_common import ModelTesterMixin
 
 from ppdiffusers import VQModel
 from ppdiffusers.utils import floats_tensor
-
-from test_modeling_common import ModelTesterMixin
 
 
 class VQModelTests(ModelTesterMixin, unittest.TestCase):
@@ -62,8 +61,7 @@ class VQModelTests(ModelTesterMixin, unittest.TestCase):
         pass
 
     def test_from_pretrained_hub(self):
-        model, loading_info = VQModel.from_pretrained("fusing/vqgan-dummy",
-                                                      output_loading_info=True)
+        model, loading_info = VQModel.from_pretrained("fusing/vqgan-dummy", output_loading_info=True)
         self.assertIsNotNone(model)
         self.assertEqual(len(loading_info["missing_keys"]), 0)
 
@@ -77,19 +75,23 @@ class VQModelTests(ModelTesterMixin, unittest.TestCase):
 
         paddle.seed(0)
 
-        image = paddle.randn([
-            1, model.config.in_channels, model.config.sample_size,
-            model.config.sample_size
-        ])
+        image = paddle.randn([1, model.config.in_channels, model.config.sample_size, model.config.sample_size])
         with paddle.no_grad():
             output = model(image).sample
 
         output_slice = output[0, -1, -3:, -3:].flatten()
-        # fmt: off
-        expected_output_slice = paddle.to_tensor([
-            -0.02714749, -0.41129789, -0.17730837, -0.52454376, -0.24236129,
-            -0.39570868, -0.16461502, -0.06902058, -0.01736599
-        ])
-        # fmt: on
-        self.assertTrue(
-            paddle.allclose(output_slice, expected_output_slice, atol=1e-3))
+        expected_output_slice = paddle.to_tensor(
+            [
+                -0.02714749,
+                -0.41129789,
+                -0.17730837,
+                -0.52454376,
+                -0.24236129,
+                -0.39570868,
+                -0.16461502,
+                -0.06902058,
+                -0.01736599,
+            ]
+        )
+
+        self.assertTrue(paddle.allclose(output_slice, expected_output_slice, atol=1e-3))

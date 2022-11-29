@@ -120,17 +120,11 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         if self.is_input_continuous:
             self.in_channels = in_channels
 
-            self.norm = nn.GroupNorm(num_groups=norm_num_groups,
-                                     num_channels=in_channels,
-                                     epsilon=1e-6)
+            self.norm = nn.GroupNorm(num_groups=norm_num_groups, num_channels=in_channels, epsilon=1e-6)
             if use_linear_projection:
                 self.proj_in = nn.Linear(in_channels, inner_dim)
             else:
-                self.proj_in = nn.Conv2D(in_channels,
-                                         inner_dim,
-                                         kernel_size=1,
-                                         stride=1,
-                                         padding=0)
+                self.proj_in = nn.Conv2D(in_channels, inner_dim, kernel_size=1, stride=1, padding=0)
         elif self.is_input_vectorized:
             assert sample_size is not None, "Transformer2DModel over discrete input must provide sample_size"
             assert num_vector_embeds is not None, "Transformer2DModel over discrete input must provide num_embed"
@@ -141,36 +135,33 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
             self.num_latent_pixels = self.height * self.width
 
             self.latent_image_embedding = ImagePositionalEmbeddings(
-                num_embed=num_vector_embeds,
-                embed_dim=inner_dim,
-                height=self.height,
-                width=self.width)
+                num_embed=num_vector_embeds, embed_dim=inner_dim, height=self.height, width=self.width
+            )
 
         # 3. Define transformers blocks
-        self.transformer_blocks = nn.LayerList([
-            BasicTransformerBlock(
-                inner_dim,
-                num_attention_heads,
-                attention_head_dim,
-                dropout=dropout,
-                cross_attention_dim=cross_attention_dim,
-                activation_fn=activation_fn,
-                num_embeds_ada_norm=num_embeds_ada_norm,
-                attention_bias=attention_bias,
-                only_cross_attention=only_cross_attention,
-            ) for d in range(num_layers)
-        ])
+        self.transformer_blocks = nn.LayerList(
+            [
+                BasicTransformerBlock(
+                    inner_dim,
+                    num_attention_heads,
+                    attention_head_dim,
+                    dropout=dropout,
+                    cross_attention_dim=cross_attention_dim,
+                    activation_fn=activation_fn,
+                    num_embeds_ada_norm=num_embeds_ada_norm,
+                    attention_bias=attention_bias,
+                    only_cross_attention=only_cross_attention,
+                )
+                for d in range(num_layers)
+            ]
+        )
 
         # 4. Define output layers
         if self.is_input_continuous:
             if use_linear_projection:
                 self.proj_out = nn.Linear(in_channels, inner_dim)
             else:
-                self.proj_out = nn.Conv2D(inner_dim,
-                                          in_channels,
-                                          kernel_size=1,
-                                          stride=1,
-                                          padding=0)
+                self.proj_out = nn.Conv2D(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
         elif self.is_input_vectorized:
             self.norm_out = nn.LayerNorm(inner_dim)
             self.out = nn.Linear(inner_dim, self.num_vector_embeds - 1)
@@ -179,11 +170,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         for block in self.transformer_blocks:
             block._set_attention_slice(slice_size)
 
-    def forward(self,
-                hidden_states,
-                encoder_hidden_states=None,
-                timestep=None,
-                return_dict: bool = True):
+    def forward(self, hidden_states, encoder_hidden_states=None, timestep=None, return_dict: bool = True):
         """
         Args:
             hidden_states ( When discrete, `paddle.Tensor` of shape `(batch size, num latent pixels)`.
@@ -210,27 +197,22 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
             if not self.use_linear_projection:
                 hidden_states = self.proj_in(hidden_states)
             inner_dim = hidden_states.shape[1]
-            hidden_states = hidden_states.transpose([0, 2, 3, 1]).reshape(
-                [batch, height * weight, inner_dim])
+            hidden_states = hidden_states.transpose([0, 2, 3, 1]).reshape([batch, height * weight, inner_dim])
             if self.use_linear_projection:
                 hidden_states = self.proj_in(hidden_states)
 
         elif self.is_input_vectorized:
-            hidden_states = self.latent_image_embedding(
-                hidden_states.cast("int64"))
+            hidden_states = self.latent_image_embedding(hidden_states.cast("int64"))
 
         # 2. Blocks
         for block in self.transformer_blocks:
-            hidden_states = block(hidden_states,
-                                  context=encoder_hidden_states,
-                                  timestep=timestep)
+            hidden_states = block(hidden_states, context=encoder_hidden_states, timestep=timestep)
 
         # 3. Output
         if self.is_input_continuous:
             if self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
-            hidden_states = hidden_states.reshape(
-                [batch, height, weight, inner_dim]).transpose([0, 3, 1, 2])
+            hidden_states = hidden_states.reshape([batch, height, weight, inner_dim]).transpose([0, 3, 1, 2])
             if not self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
             output = hidden_states + residual
@@ -241,11 +223,10 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
             logits = logits.transpose([0, 2, 1])
 
             # log(p(x_0))
-            output = F.log_softmax(logits.cast("float64"),
-                                   axis=1).cast("float32")
+            output = F.log_softmax(logits.cast("float64"), axis=1).cast("float32")
 
         if not return_dict:
-            return (output, )
+            return (output,)
 
         return Transformer2DModelOutput(sample=output)
 
@@ -280,9 +261,7 @@ class AttentionBlock(nn.Layer):
         self.num_head_size = num_head_channels
         self.scale = 1 / math.sqrt(self.channels / self.num_heads)
 
-        self.group_norm = nn.GroupNorm(num_channels=channels,
-                                       num_groups=norm_num_groups,
-                                       epsilon=eps)
+        self.group_norm = nn.GroupNorm(num_channels=channels, num_groups=norm_num_groups, epsilon=eps)
 
         # define q,k,v as linear layers
         self.query = nn.Linear(channels, channels)
@@ -295,8 +274,7 @@ class AttentionBlock(nn.Layer):
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
         # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose(
-            [0, 2, 1, 3])
+        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
         return new_projection
 
     def forward(self, hidden_states):
@@ -306,8 +284,7 @@ class AttentionBlock(nn.Layer):
         # norm
         hidden_states = self.group_norm(hidden_states)
 
-        hidden_states = hidden_states.reshape([batch, channel, height * width
-                                               ]).transpose([0, 2, 1])
+        hidden_states = hidden_states.reshape([batch, channel, height * width]).transpose([0, 2, 1])
 
         # proj to q, k, v
         query_proj = self.query(hidden_states)
@@ -320,10 +297,8 @@ class AttentionBlock(nn.Layer):
         value_states = self.transpose_for_scores(value_proj)
 
         # get scores
-        attention_scores = paddle.matmul(
-            query_states, key_states, transpose_y=True) * self.scale
-        attention_probs = F.softmax(attention_scores.cast("float32"),
-                                    axis=-1).cast(attention_scores.dtype)
+        attention_scores = paddle.matmul(query_states, key_states, transpose_y=True) * self.scale
+        attention_probs = F.softmax(attention_scores.cast("float32"), axis=-1).cast(attention_scores.dtype)
 
         # compute attention output
         hidden_states = paddle.matmul(attention_probs, value_states)
@@ -336,8 +311,7 @@ class AttentionBlock(nn.Layer):
 
         # compute next hidden_states
         hidden_states = self.proj_attn(hidden_states)
-        hidden_states = hidden_states.transpose([0, 2, 1]).reshape(
-            [batch, channel, height, width])
+        hidden_states = hidden_states.transpose([0, 2, 1]).reshape([batch, channel, height, width])
 
         # res connect and rescale
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
@@ -381,8 +355,7 @@ class BasicTransformerBlock(nn.Layer):
             dim_head=attention_head_dim,
             dropout=dropout,
             bias=attention_bias,
-            cross_attention_dim=cross_attention_dim
-            if only_cross_attention else None,
+            cross_attention_dim=cross_attention_dim if only_cross_attention else None,
         )  # is a self-attention
         self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn)
         self.attn2 = CrossAttention(
@@ -410,21 +383,19 @@ class BasicTransformerBlock(nn.Layer):
 
     def forward(self, hidden_states, context=None, timestep=None):
         # 1. Self-Attention
-        norm_hidden_states = (self.norm1(hidden_states, timestep)
-                              if self.use_ada_layer_norm else
-                              self.norm1(hidden_states))
+        norm_hidden_states = (
+            self.norm1(hidden_states, timestep) if self.use_ada_layer_norm else self.norm1(hidden_states)
+        )
         if self.only_cross_attention:
-            hidden_states = self.attn1(norm_hidden_states,
-                                       context) + hidden_states
+            hidden_states = self.attn1(norm_hidden_states, context) + hidden_states
         else:
             hidden_states = self.attn1(norm_hidden_states) + hidden_states
 
         # 2. Cross-Attention
-        norm_hidden_states = (self.norm2(hidden_states, timestep)
-                              if self.use_ada_layer_norm else
-                              self.norm2(hidden_states))
-        hidden_states = self.attn2(norm_hidden_states,
-                                   context=context) + hidden_states
+        norm_hidden_states = (
+            self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
+        )
+        hidden_states = self.attn2(norm_hidden_states, context=context) + hidden_states
 
         # 3. Feed-forward
         hidden_states = self.ff(self.norm3(hidden_states)) + hidden_states
@@ -511,8 +482,7 @@ class CrossAttention(nn.Layer):
 
     def _attention(self, query, key, value):
         # TODO: use baddbmm for better performance
-        attention_scores = paddle.matmul(query, key,
-                                         transpose_y=True) * self.scale
+        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
         attention_probs = F.softmax(attention_scores, axis=-1)
         # compute attention output
         hidden_states = paddle.matmul(attention_probs, value)
@@ -527,26 +497,22 @@ class CrossAttention(nn.Layer):
         value = value.flatten(0, 1)
 
         batch_size_attention, sequence_length = query.shape[0], query.shape[1]
-        hidden_states = paddle.zeros(
-            (batch_size_attention, sequence_length, self.head_dim),
-            dtype=query.dtype)
+        hidden_states = paddle.zeros((batch_size_attention, sequence_length, self.head_dim), dtype=query.dtype)
         slice_size = self._slice_size if self._slice_size is not None else batch_size_attention
 
         for i in range(batch_size_attention // slice_size):
             start_idx = i * slice_size
             end_idx = (i + 1) * slice_size
-            attn_slice = (paddle.matmul(query[start_idx:end_idx],
-                                        key[start_idx:end_idx],
-                                        transpose_y=True) * self.scale
-                          )  # TODO: use baddbmm for better performance
+            attn_slice = (
+                paddle.matmul(query[start_idx:end_idx], key[start_idx:end_idx], transpose_y=True) * self.scale
+            )  # TODO: use baddbmm for better performance
             attn_slice = F.softmax(attn_slice, axis=-1)
             attn_slice = paddle.matmul(attn_slice, value[start_idx:end_idx])
 
             hidden_states[start_idx:end_idx] = attn_slice
 
         # reshape back to [bs, num_heads, seqlen, head_dim]
-        hidden_states = hidden_states.reshape(
-            [-1, self.num_heads, sequence_length, self.head_dim])
+        hidden_states = hidden_states.reshape([-1, self.num_heads, sequence_length, self.head_dim])
         # reshape hidden_states
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
         return hidden_states
@@ -675,40 +641,45 @@ class DualTransformer2DModel(nn.Layer):
             Configure if the TransformerBlocks' attention should contain a bias parameter.
     """
 
-    def __init__(self,
-                 num_attention_heads: int = 16,
-                 attention_head_dim: int = 88,
-                 in_channels: Optional[int] = None,
-                 num_layers: int = 1,
-                 dropout: float = 0.0,
-                 norm_num_groups: int = 32,
-                 cross_attention_dim: Optional[int] = None,
-                 attention_bias: bool = False,
-                 sample_size: Optional[int] = None,
-                 num_vector_embeds: Optional[int] = None,
-                 activation_fn: str = "geglu",
-                 num_embeds_ada_norm: Optional[int] = None,
-                 use_linear_projection: bool = False,
-                 only_cross_attention: bool = False):
+    def __init__(
+        self,
+        num_attention_heads: int = 16,
+        attention_head_dim: int = 88,
+        in_channels: Optional[int] = None,
+        num_layers: int = 1,
+        dropout: float = 0.0,
+        norm_num_groups: int = 32,
+        cross_attention_dim: Optional[int] = None,
+        attention_bias: bool = False,
+        sample_size: Optional[int] = None,
+        num_vector_embeds: Optional[int] = None,
+        activation_fn: str = "geglu",
+        num_embeds_ada_norm: Optional[int] = None,
+        use_linear_projection: bool = False,
+        only_cross_attention: bool = False,
+    ):
         super().__init__()
-        self.transformers = nn.LayerList([
-            Transformer2DModel(
-                num_attention_heads=num_attention_heads,
-                attention_head_dim=attention_head_dim,
-                in_channels=in_channels,
-                num_layers=num_layers,
-                dropout=dropout,
-                norm_num_groups=norm_num_groups,
-                cross_attention_dim=cross_attention_dim,
-                attention_bias=attention_bias,
-                sample_size=sample_size,
-                num_vector_embeds=num_vector_embeds,
-                activation_fn=activation_fn,
-                num_embeds_ada_norm=num_embeds_ada_norm,
-                use_linear_projection=use_linear_projection,
-                only_cross_attention=only_cross_attention,
-            ) for _ in range(2)
-        ])
+        self.transformers = nn.LayerList(
+            [
+                Transformer2DModel(
+                    num_attention_heads=num_attention_heads,
+                    attention_head_dim=attention_head_dim,
+                    in_channels=in_channels,
+                    num_layers=num_layers,
+                    dropout=dropout,
+                    norm_num_groups=norm_num_groups,
+                    cross_attention_dim=cross_attention_dim,
+                    attention_bias=attention_bias,
+                    sample_size=sample_size,
+                    num_vector_embeds=num_vector_embeds,
+                    activation_fn=activation_fn,
+                    num_embeds_ada_norm=num_embeds_ada_norm,
+                    use_linear_projection=use_linear_projection,
+                    only_cross_attention=only_cross_attention,
+                )
+                for _ in range(2)
+            ]
+        )
 
         # Variables that can be set by a pipeline:
 
@@ -723,11 +694,7 @@ class DualTransformer2DModel(nn.Layer):
         # E.g. `(1, 0)` means that we'll use `transformers[1](conditions[0])` and `transformers[0](conditions[1])`
         self.transformer_index_for_condition = [1, 0]
 
-    def forward(self,
-                hidden_states,
-                encoder_hidden_states,
-                timestep=None,
-                return_dict: bool = True):
+    def forward(self, hidden_states, encoder_hidden_states, timestep=None, return_dict: bool = True):
         """
         Args:
             hidden_states ( When discrete, `torch.LongTensor` of shape `(batch size, num latent pixels)`.
@@ -751,21 +718,19 @@ class DualTransformer2DModel(nn.Layer):
         tokens_start = 0
         for i in range(2):
             # for each of the two transformers, pass the corresponding condition tokens
-            condition_state = encoder_hidden_states[:,
-                                                    tokens_start:tokens_start +
-                                                    self.condition_lengths[i]]
+            condition_state = encoder_hidden_states[:, tokens_start : tokens_start + self.condition_lengths[i]]
             transformer_index = self.transformer_index_for_condition[i]
-            encoded_state = self.transformers[transformer_index](
-                input_states, condition_state, timestep, return_dict)[0]
+            encoded_state = self.transformers[transformer_index](input_states, condition_state, timestep, return_dict)[
+                0
+            ]
             encoded_states.append(encoded_state - input_states)
             tokens_start += self.condition_lengths[i]
 
-        output_states = encoded_states[0] * self.mix_ratio + encoded_states[
-            1] * (1 - self.mix_ratio)
+        output_states = encoded_states[0] * self.mix_ratio + encoded_states[1] * (1 - self.mix_ratio)
         output_states = output_states + input_states
 
         if not return_dict:
-            return (output_states, )
+            return (output_states,)
 
         return Transformer2DModelOutput(sample=output_states)
 

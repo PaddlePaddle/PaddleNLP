@@ -38,8 +38,7 @@ def get_timestep_embedding(
     assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
 
     half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * paddle.arange(
-        start=0, end=half_dim, dtype="float32")
+    exponent = -math.log(max_period) * paddle.arange(start=0, end=half_dim, dtype="float32")
     exponent = exponent / (half_dim - downscale_freq_shift)
 
     emb = paddle.exp(exponent)
@@ -62,12 +61,7 @@ def get_timestep_embedding(
 
 
 class TimestepEmbedding(nn.Layer):
-
-    def __init__(self,
-                 in_channels: int,
-                 time_embed_dim: int,
-                 act_fn: str = "silu",
-                 out_dim: int = None):
+    def __init__(self, in_channels: int, time_embed_dim: int, act_fn: str = "silu", out_dim: int = None):
         super().__init__()
 
         self.linear_1 = nn.Linear(in_channels, time_embed_dim)
@@ -94,9 +88,7 @@ class TimestepEmbedding(nn.Layer):
 
 
 class Timesteps(nn.Layer):
-
-    def __init__(self, num_channels: int, flip_sin_to_cos: bool,
-                 downscale_freq_shift: float):
+    def __init__(self, num_channels: int, flip_sin_to_cos: bool, downscale_freq_shift: float):
         super().__init__()
         self.num_channels = num_channels
         self.flip_sin_to_cos = flip_sin_to_cos
@@ -115,20 +107,17 @@ class Timesteps(nn.Layer):
 class GaussianFourierProjection(nn.Layer):
     """Gaussian Fourier embeddings for noise levels."""
 
-    def __init__(self,
-                 embedding_size: int = 256,
-                 scale: float = 1.0,
-                 set_W_to_weight=True,
-                 log=True,
-                 flip_sin_to_cos=False):
+    def __init__(
+        self, embedding_size: int = 256, scale: float = 1.0, set_W_to_weight=True, log=True, flip_sin_to_cos=False
+    ):
         super().__init__()
-        self.register_buffer("weight", paddle.randn((embedding_size, )) * scale)
+        self.register_buffer("weight", paddle.randn((embedding_size,)) * scale)
         self.log = log
         self.flip_sin_to_cos = flip_sin_to_cos
 
         if set_W_to_weight:
             # to delete later
-            self.register_buffer("W", paddle.randn((embedding_size, )) * scale)
+            self.register_buffer("W", paddle.randn((embedding_size,)) * scale)
 
             self.weight = self.W
 
@@ -139,11 +128,9 @@ class GaussianFourierProjection(nn.Layer):
         x_proj = x[:, None] * self.weight[None, :] * 2 * np.pi
 
         if self.flip_sin_to_cos:
-            out = paddle.concat(
-                [paddle.cos(x_proj), paddle.sin(x_proj)], axis=-1)
+            out = paddle.concat([paddle.cos(x_proj), paddle.sin(x_proj)], axis=-1)
         else:
-            out = paddle.concat(
-                [paddle.sin(x_proj), paddle.cos(x_proj)], axis=-1)
+            out = paddle.concat([paddle.sin(x_proj), paddle.cos(x_proj)], axis=-1)
         return out
 
 
@@ -192,14 +179,12 @@ class ImagePositionalEmbeddings(nn.Layer):
     def forward(self, index):
         emb = self.emb(index)
 
-        height_emb = self.height_emb(
-            paddle.arange(self.height).reshape([1, self.height]))
+        height_emb = self.height_emb(paddle.arange(self.height).reshape([1, self.height]))
 
         # 1 x H x D -> 1 x H x 1 x D
         height_emb = height_emb.unsqueeze(2)
 
-        width_emb = self.width_emb(
-            paddle.arange(self.width).reshape([1, self.width]))
+        width_emb = self.width_emb(paddle.arange(self.width).reshape([1, self.width]))
 
         # 1 x W x D -> 1 x 1 x W x D
         width_emb = width_emb.unsqueeze(1)
@@ -209,6 +194,6 @@ class ImagePositionalEmbeddings(nn.Layer):
         # 1 x H x W x D -> 1 x L xD
         pos_emb = pos_emb.reshape([1, self.height * self.width, -1])
 
-        emb = emb + pos_emb[:, :emb.shape[1], :]
+        emb = emb + pos_emb[:, : emb.shape[1], :]
 
         return emb
