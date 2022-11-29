@@ -12,13 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
-unset CUDA_VISIBLE_DEVICES
-
-python run_generate.py \
-    --model_name_or_path=pegesus_out/bart_model_50000.pdparams \
-    --prefict_file valid.json \
-    --max_source_length 128 \
-    --max_target_length 64 \
-    --batch_size 128 \
-    --device=gpu \
+echo "Downloading test data"
+wget https://paddlenlp.bj.bcebos.com/datasets/tiny_summary_dataset/test.json
+echo "Downloading train data"
+wget https://paddlenlp.bj.bcebos.com/datasets/tiny_summary_dataset/train.json
+echo "Downloading valid data"
+wget https://paddlenlp.bj.bcebos.com/datasets/tiny_summary_dataset/valid.json
