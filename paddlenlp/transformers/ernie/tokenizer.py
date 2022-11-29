@@ -72,6 +72,12 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqav2-en-marco-para-encoder": 512,
     "ernie-search-base-dual-encoder-marco-en": 512,
     "ernie-search-large-cross-encoder-marco-en": 512,
+    "uie-base": 512,
+    "uie-medium": 512,
+    "uie-mini": 512,
+    "uie-micro": 512,
+    "uie-nano": 512,
+    "uie-base-en": 512,
 }
 
 
@@ -217,6 +223,18 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-large-cross-encoder-marco-en":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
+            "uie-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "uie-medium":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "uie-mini":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "uie-micro":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "uie-nano":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "uie-base-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -353,6 +371,24 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "ernie-search-large-cross-encoder-marco-en": {
+            "do_lower_case": True
+        },
+        "uie-base": {
+            "do_lower_case": True
+        },
+        "uie-medium": {
+            "do_lower_case": True
+        },
+        "uie-mini": {
+            "do_lower_case": True
+        },
+        "uie-micro": {
+            "do_lower_case": True
+        },
+        "uie-nano": {
+            "do_lower_case": True
+        },
+        "uie-base-en": {
             "do_lower_case": True
         },
     }
