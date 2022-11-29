@@ -82,7 +82,13 @@ parser.add_argument("--params_path",
 parser.add_argument(
     '--delete_index',
     action='store_true',
-    help='whether to delete existing index while updating index')
+    help='Whether to delete existing index while updating index')
+
+parser.add_argument(
+    '--share_parameters',
+    action='store_true',
+    help='Use to control the query and title models sharing the same parameters'
+)
 
 args = parser.parse_args()
 
@@ -126,6 +132,7 @@ def offline_ann(index_name, doc_dir):
         passage_embedding_model=args.passage_embedding_model,
         params_path=args.params_path,
         output_emb_size=args.embedding_dim,
+        share_parameters=args.share_parameters,
         max_seq_len_query=64,
         max_seq_len_passage=256,
         batch_size=16,

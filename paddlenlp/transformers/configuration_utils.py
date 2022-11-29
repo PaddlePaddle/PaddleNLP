@@ -31,7 +31,7 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
@@ -669,7 +669,6 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        print(kwargs)
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path,
                                                   **kwargs)
 
@@ -748,7 +747,9 @@ class PretrainedConfig:
             resolved_config_file = hf_hub_download(
                 repo_id=pretrained_model_name_or_path,
                 filename=CONFIG_NAME,
-                cache_dir=MODEL_HOME)
+                cache_dir=HF_CACHE_HOME,
+                library_name="PaddleNLP",
+                library_version=__version__)
 
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
