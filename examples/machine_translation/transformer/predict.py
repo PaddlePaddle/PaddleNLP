@@ -12,110 +12,83 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import yaml
-import logging
 import argparse
-import numpy as np
+import os
 from pprint import pprint
-from attrdict import AttrDict
 
 import paddle
-from paddlenlp.ops import TransformerGenerator
-
 import reader
+import yaml
+from attrdict import AttrDict
+
+from paddlenlp.ops import TransformerGenerator
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="./configs/transformer.big.yaml",
-                        type=str,
-                        help="Path of the config file. ")
+    parser.add_argument(
+        "--config", default="./configs/transformer.big.yaml", type=str, help="Path of the config file. "
+    )
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help=
-        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. ",
     )
     parser.add_argument(
         "--data_dir",
         default=None,
         type=str,
-        help=
-        "The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. "
+        help="The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. ",
     )
     parser.add_argument(
         "--test_file",
-        nargs='+',
+        nargs="+",
         default=None,
         type=str,
-        help=
-        "The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. "
+        help="The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. ",
     )
-    parser.add_argument("--without_ft",
-                        action="store_true",
-                        help="Whether to use FasterTransformer to do predict. ")
+    parser.add_argument("--without_ft", action="store_true", help="Whether to use FasterTransformer to do predict. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help=
-        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
         "--src_vocab",
         default=None,
         type=str,
-        help=
-        "The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. "
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
     )
     parser.add_argument(
         "--trg_vocab",
         default=None,
         type=str,
-        help=
-        "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
     )
-    parser.add_argument("-s",
-                        "--src_lang",
-                        default=None,
-                        type=str,
-                        help="Source language. ")
-    parser.add_argument("-t",
-                        "--trg_lang",
-                        default=None,
-                        type=str,
-                        help="Target language. ")
+    parser.add_argument("-s", "--src_lang", default=None, type=str, help="Source language. ")
+    parser.add_argument("-t", "--trg_lang", default=None, type=str, help="Target language. ")
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help=
-        "The unknown token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. "
+        help="The unknown token. It should be provided when use custom vocab_file. ",
     )
     parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. "
+        "--bos_token", default=None, type=str, help="The bos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
     )
     parser.add_argument(
         "--pad_token",
         default=None,
         type=str,
-        help=
-        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
-    parser.add_argument("--device",
-                        default="gpu",
-                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
-                        help="Device selected for inference.")
+    parser.add_argument(
+        "--device", default="gpu", choices=["gpu", "cpu", "xpu", "npu", "mlu"], help="Device selected for inference."
+    )
 
     args = parser.parse_args()
     return args
@@ -130,10 +103,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
@@ -179,14 +149,13 @@ def do_predict(args):
         rel_len=args.use_rel_len,  # only works when using FT or beam search v2
         alpha=args.alpha,  # only works when using beam search v2
         diversity_rate=args.diversity_rate,  # only works when using FT
-        use_fp16_decoding=False)  # only works when using FT
+        use_fp16_decoding=False,
+    )  # only works when using FT
 
     # Load the trained model
-    assert args.init_from_params, (
-        "Please set init_from_params to load the infer model.")
+    assert args.init_from_params, "Please set init_from_params to load the infer model."
 
-    transformer.load(os.path.join(args.init_from_params,
-                                  "transformer.pdparams"))
+    transformer.load(os.path.join(args.init_from_params, "transformer.pdparams"))
 
     # Providing model_dict still works.
     # state_dict = paddle.load(os.path.join(args.init_from_params,
@@ -198,7 +167,7 @@ def do_predict(args):
 
     f = open(args.output_file, "w", encoding="utf-8")
     with paddle.no_grad():
-        for (src_word, ) in test_loader:
+        for (src_word,) in test_loader:
             # When `output_time_major` argument is `True` for TransformerGenerator,
             # the shape of finished_seq is `[seq_len, batch_size, beam_size]`
             # for beam search v1 or `[seq_len, batch_size, beam_size * 2]` for
@@ -218,7 +187,7 @@ def do_predict(args):
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.benchmark = ARGS.benchmark
     args.without_ft = ARGS.without_ft
@@ -238,14 +207,12 @@ if __name__ == "__main__":
     else:
         args.src_vocab = ARGS.src_vocab
         args.trg_vocab = ARGS.trg_vocab
-        args.joined_dictionary = not (args.src_vocab is not None
-                                      and args.trg_vocab is not None
-                                      and args.src_vocab != args.trg_vocab)
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
     if args.weight_sharing != args.joined_dictionary:
         if args.weight_sharing:
-            raise ValueError(
-                "The src_vocab and trg_vocab must be consistency when weight_sharing is True. "
-            )
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
         else:
             raise ValueError(
                 "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import os
 
 import datasets
@@ -20,14 +19,13 @@ import datasets
 logger = datasets.logging.get_logger(__name__)
 
 _DESCRIPTION = """
-LanguagePairDataset used for machine translation between any pair of languages. 
-"""
+LanguagePairDataset used for machine translation between any pair of languages. """
 
 _URL = "https://bj.bcebos.com/paddlenlp/datasets/WMT14.en-de.tar.gz"
 
 
 class LanguagePairConfig(datasets.BuilderConfig):
-    """BuilderConfig for a general LanguagePairDataset. """
+    """BuilderConfig for a general LanguagePairDataset."""
 
     def __init__(self, **kwargs):
         """BuilderConfig for LanguagePairDataset.
@@ -50,11 +48,13 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "id": datasets.Value("string"),
-                "source": datasets.Value("string"),
-                "target": datasets.Value("string"),
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "source": datasets.Value("string"),
+                    "target": datasets.Value("string"),
+                }
+            ),
             supervised_keys=None,
         )
 
@@ -62,14 +62,14 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
         is_downloaded = False
 
         # Train files.
-        if hasattr(self.config,
-                   "data_files") and "train" in self.config.data_files:
+        if hasattr(self.config, "data_files") and "train" in self.config.data_files:
             train_split = datasets.SplitGenerator(
                 name="train",
                 gen_kwargs={
                     "source_filepath": self.config.data_files["train"][0],
                     "target_filepath": self.config.data_files["train"][1],
-                })
+                },
+            )
 
         else:
             if not is_downloaded:
@@ -78,23 +78,24 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             train_split = datasets.SplitGenerator(
                 name="train",
                 gen_kwargs={
-                    "source_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'train.tok.clean.bpe.33708.en'),
-                    "target_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'train.tok.clean.bpe.33708.de'),
-                })
+                    "source_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "train.tok.clean.bpe.33708.en"
+                    ),
+                    "target_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "train.tok.clean.bpe.33708.de"
+                    ),
+                },
+            )
 
         # Dev files.
-        if hasattr(self.config,
-                   "data_files") and "dev" in self.config.data_files:
+        if hasattr(self.config, "data_files") and "dev" in self.config.data_files:
             dev_split = datasets.SplitGenerator(
                 name="dev",
                 gen_kwargs={
                     "source_filepath": self.config.data_files["dev"][0],
                     "target_filepath": self.config.data_files["dev"][1],
-                })
+                },
+            )
 
         else:
             if not is_downloaded:
@@ -103,24 +104,23 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             dev_split = datasets.SplitGenerator(
                 name="dev",
                 gen_kwargs={
-                    "source_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'newstest2013.tok.bpe.33708.en'),
-                    "target_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'newstest2013.tok.bpe.33708.de'),
-                })
+                    "source_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "newstest2013.tok.bpe.33708.en"
+                    ),
+                    "target_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "newstest2013.tok.bpe.33708.de"
+                    ),
+                },
+            )
 
         # Test files.
-        if hasattr(self.config,
-                   "data_files") and "test" in self.config.data_files:
+        if hasattr(self.config, "data_files") and "test" in self.config.data_files:
             # test may not contain target languages.
             if isinstance(self.config.data_files["test"], str):
-                self.config.data_files["test"] = [
-                    self.config.data_files["test"], None
-                ]
-            elif (isinstance(self.config.data_files["test"], (list, tuple))
-                  and len(self.config.data_files["test"]) == 1):
+                self.config.data_files["test"] = [self.config.data_files["test"], None]
+            elif (
+                isinstance(self.config.data_files["test"], (list, tuple)) and len(self.config.data_files["test"]) == 1
+            ):
                 self.config.data_files["test"].append(None)
 
             test_split = datasets.SplitGenerator(
@@ -128,7 +128,8 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
                 gen_kwargs={
                     "source_filepath": self.config.data_files["test"][0],
                     "target_filepath": self.config.data_files["test"][1],
-                })
+                },
+            )
         else:
             if not is_downloaded:
                 dl_dir = dl_manager.download_and_extract(_URL)
@@ -136,26 +137,26 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             test_split = datasets.SplitGenerator(
                 name="test",
                 gen_kwargs={
-                    "source_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'newstest2014.tok.bpe.33708.en'),
-                    "target_filepath":
-                    os.path.join(dl_dir, 'WMT14.en-de', 'wmt14_ende_data_bpe',
-                                 'newstest2014.tok.bpe.33708.de'),
-                })
+                    "source_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "newstest2014.tok.bpe.33708.en"
+                    ),
+                    "target_filepath": os.path.join(
+                        dl_dir, "WMT14.en-de", "wmt14_ende_data_bpe", "newstest2014.tok.bpe.33708.de"
+                    ),
+                },
+            )
 
         return [train_split, dev_split, test_split]
 
     def _generate_examples(self, source_filepath, target_filepath):
         """This function returns the examples in the raw (text) form."""
 
-        logger.info("generating examples from = source: {} & target: {}".format(
-            source_filepath, target_filepath))
+        logger.info("generating examples from = source: {} & target: {}".format(source_filepath, target_filepath))
         key = 0
 
-        with open(source_filepath, 'r', encoding="utf-8") as src_fin:
+        with open(source_filepath, "r", encoding="utf-8") as src_fin:
             if target_filepath is not None:
-                with open(target_filepath, 'r', encoding="utf-8") as tgt_fin:
+                with open(target_filepath, "r", encoding="utf-8") as tgt_fin:
                     src_seq = src_fin.readlines()
                     tgt_seq = tgt_fin.readlines()
 

@@ -12,162 +12,116 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import numpy as np
-from attrdict import AttrDict
 import argparse
-import time
-
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-
-import yaml
+import os
+import sys
 from pprint import pprint
 
-from paddlenlp.transformers import TransformerModel
-from paddlenlp.transformers import position_encoding_init
+import numpy as np
+import paddle
+import yaml
+from attrdict import AttrDict
+
 from paddlenlp.ops import FasterTransformer
 from paddlenlp.utils.log import logger
 
 sys.path.append("../")
-import reader
+import reader  # noqa: E402
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="../configs/transformer.base.yaml",
-                        type=str,
-                        help="Path of the config file. ")
+    parser.add_argument(
+        "--config", default="../configs/transformer.base.yaml", type=str, help="Path of the config file. "
+    )
     parser.add_argument(
         "--decoding_lib",
         default="../../../../paddlenlp/ops/build/lib/libdecoding_op.so",
         type=str,
-        help="Path of libdecoding_op.so. ")
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 decoding to predict. ")
+        help="Path of libdecoding_op.so. ",
+    )
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
         "--enable_faster_encoder",
         action="store_true",
-        help=
-        "Whether to use faster version encoder to predict. This is experimental option for now. "
+        help="Whether to use faster version encoder to predict. This is experimental option for now. ",
     )
-    parser.add_argument("--use_fp16_encoder",
-                        action="store_true",
-                        help="Whether to use fp16 encoder to predict. ")
+    parser.add_argument("--use_fp16_encoder", action="store_true", help="Whether to use fp16 encoder to predict. ")
     parser.add_argument(
         "--decoding_strategy",
         default="beam_search",
         type=str,
-        choices=[
-            "beam_search", "beam_search_v2", "topk_sampling", "topp_sampling"
-        ],
-        help=
-        "Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. "
+        choices=["beam_search", "beam_search_v2", "topk_sampling", "topp_sampling"],
+        help="Decoding strategy. Can be one of ['beam_search', 'topk_sampling', 'topp_sampling']. ",
     )
     parser.add_argument("--beam_size", default=4, type=int, help="Beam size. ")
-    parser.add_argument("--diversity_rate",
-                        default=0.0,
-                        type=float,
-                        help="The diversity rate for beam search. ")
-    parser.add_argument("--topk",
-                        default=4,
-                        type=int,
-                        help="The k value for topk_sampling. Default is 4. ")
+    parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity rate for beam search. ")
+    parser.add_argument("--topk", default=4, type=int, help="The k value for topk_sampling. Default is 4. ")
     parser.add_argument(
         "--topp",
         default=0.0,
         type=float,
-        help=
-        "The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. "
+        help="The probability threshold for topp_sampling. Default is 0.0 which means it won't go through topp_sampling. ",
     )
-    parser.add_argument("--batch_size",
-                        default=None,
-                        type=int,
-                        help="Batch size. ")
+    parser.add_argument("--batch_size", default=None, type=int, help="Batch size. ")
     parser.add_argument(
-        "--profile",
-        action="store_true",
-        help="Whether to profile the performance using newstest2014 dataset. ")
+        "--profile", action="store_true", help="Whether to profile the performance using newstest2014 dataset. "
+    )
     parser.add_argument(
         "--data_dir",
         default=None,
         type=str,
-        help=
-        "The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. "
+        help="The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. ",
     )
     parser.add_argument(
         "--test_file",
-        nargs='+',
+        nargs="+",
         default=None,
         type=str,
-        help=
-        "The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. "
+        help="The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help=
-        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. ",
     )
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help=
-        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
         "--src_vocab",
         default=None,
         type=str,
-        help=
-        "The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. "
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
     )
     parser.add_argument(
         "--trg_vocab",
         default=None,
         type=str,
-        help=
-        "The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. "
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
     )
-    parser.add_argument("-s",
-                        "--src_lang",
-                        default=None,
-                        type=str,
-                        help="Source language. ")
-    parser.add_argument("-t",
-                        "--trg_lang",
-                        default=None,
-                        type=str,
-                        help="Target language. ")
+    parser.add_argument("-s", "--src_lang", default=None, type=str, help="Source language. ")
+    parser.add_argument("-t", "--trg_lang", default=None, type=str, help="Target language. ")
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help=
-        "The unknown token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. "
+        help="The unknown token. It should be provided when use custom vocab_file. ",
     )
     parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. "
+        "--bos_token", default=None, type=str, help="The bos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
     )
     parser.add_argument(
         "--pad_token",
         default=None,
         type=str,
-        help=
-        "The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. "
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
     args = parser.parse_args()
     return args
@@ -182,10 +136,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
@@ -222,14 +173,14 @@ def do_predict(args):
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
         enable_faster_encoder=args.enable_faster_encoder,
-        use_fp16_encoder=args.use_fp16_encoder)
+        use_fp16_encoder=args.use_fp16_encoder,
+    )
 
     # Set evaluate mode
     transformer.eval()
 
     # Load checkpoint.
-    transformer.load(init_from_params=os.path.join(args.init_from_params,
-                                                   "transformer.pdparams"))
+    transformer.load(init_from_params=os.path.join(args.init_from_params, "transformer.pdparams"))
 
     # Providing model_dict still works.
     # state_dict = paddle.load(os.path.join(args.init_from_params,
@@ -240,49 +191,52 @@ def do_predict(args):
     with paddle.no_grad():
         if args.profile:
             import time
+
             start = time.time()
-        for (src_word, ) in test_loader:
+        for (src_word,) in test_loader:
             finished_seq = transformer(src_word=src_word)
             if not args.profile:
                 if args.decoding_strategy == "beam_search" or args.decoding_strategy == "beam_search_v2":
                     finished_seq = finished_seq.numpy().transpose([1, 2, 0])
                 elif args.decoding_strategy == "topk_sampling" or args.decoding_strategy == "topp_sampling":
-                    finished_seq = np.expand_dims(
-                        finished_seq.numpy().transpose([1, 0]), axis=1)
+                    finished_seq = np.expand_dims(finished_seq.numpy().transpose([1, 0]), axis=1)
                 for ins in finished_seq:
                     for beam_idx, beam in enumerate(ins):
                         if beam_idx >= args.n_best:
                             break
-                        id_list = post_process_seq(beam, args.bos_idx,
-                                                   args.eos_idx)
+                        id_list = post_process_seq(beam, args.bos_idx, args.eos_idx)
                         word_list = to_tokens(id_list)
                         sequence = " ".join(word_list) + "\n"
                         f.write(sequence)
         if args.profile:
             if args.decoding_strategy == "beam_search" or args.decoding_strategy == "beam_search_v2":
                 logger.info(
-                    "Setting info: batch size: {}, beam size: {}, use fp16: {}. "
-                    .format(args.infer_batch_size, args.beam_size,
-                            args.use_fp16_decoding))
+                    "Setting info: batch size: {}, beam size: {}, use fp16: {}. ".format(
+                        args.infer_batch_size, args.beam_size, args.use_fp16_decoding
+                    )
+                )
             elif args.decoding_strategy == "topk_sampling":
                 logger.info(
-                    "Setting info: batch size: {}, topk: {}, use fp16: {}. ".
-                    format(args.infer_batch_size, args.topk,
-                           args.use_fp16_decoding))
+                    "Setting info: batch size: {}, topk: {}, use fp16: {}. ".format(
+                        args.infer_batch_size, args.topk, args.use_fp16_decoding
+                    )
+                )
             elif args.decoding_strategy == "topp_sampling":
                 logger.info(
-                    "Setting info: batch size: {}, topp: {}, use fp16: {}. ".
-                    format(args.infer_batch_size, args.topp,
-                           args.use_fp16_decoding))
+                    "Setting info: batch size: {}, topp: {}, use fp16: {}. ".format(
+                        args.infer_batch_size, args.topp, args.use_fp16_decoding
+                    )
+                )
             paddle.device.cuda.synchronize(place)
-            logger.info("Average time latency is {} ms/batch. ".format(
-                (time.time() - start) / len(test_loader) * 1000))
+            logger.info(
+                "Average time latency is {} ms/batch. ".format((time.time() - start) / len(test_loader) * 1000)
+            )
 
 
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
@@ -313,14 +267,12 @@ if __name__ == "__main__":
     else:
         args.src_vocab = ARGS.src_vocab
         args.trg_vocab = ARGS.trg_vocab
-        args.joined_dictionary = not (args.src_vocab is not None
-                                      and args.trg_vocab is not None
-                                      and args.src_vocab != args.trg_vocab)
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
     if args.weight_sharing != args.joined_dictionary:
         if args.weight_sharing:
-            raise ValueError(
-                "The src_vocab and trg_vocab must be consistency when weight_sharing is True. "
-            )
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
         else:
             raise ValueError(
                 "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "

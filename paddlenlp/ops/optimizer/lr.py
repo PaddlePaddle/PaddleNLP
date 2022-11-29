@@ -41,19 +41,14 @@ class InverseSquareRootSchedule(LRScheduler):
             update. Defaults to ``False``.
     """
 
-    def __init__(self,
-                 warmup_steps,
-                 learning_rate=1.0,
-                 last_epoch=-1,
-                 verbose=False):
+    def __init__(self, warmup_steps, learning_rate=1.0, last_epoch=-1, verbose=False):
         self.warmup_steps = warmup_steps
         warmup_end_lr = learning_rate
         self.warmup_init_lr = 0.0
         self.lr_step = (warmup_end_lr - self.warmup_init_lr) / self.warmup_steps
         self.decay_factor = warmup_end_lr * (self.warmup_steps**0.5)
 
-        super(InverseSquareRootSchedule, self).__init__(learning_rate,
-                                                        last_epoch, verbose)
+        super(InverseSquareRootSchedule, self).__init__(learning_rate, last_epoch, verbose)
 
     def get_lr(self):
         if self.last_epoch < self.warmup_steps:
