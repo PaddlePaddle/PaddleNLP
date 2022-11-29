@@ -12,13 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from paddlenlp.transformers import TinyBertModel
+from paddlenlp import SimpleServer
+from paddlenlp import Taskflow
 
-
-class TestModeling(unittest.TestCase):
-    """Test PretrainedModel single time, not in Transformer models"""
-
-    def test_from_pretrained_with_load_as_state_np_params(self):
-        """init model with `load_state_as_np` params"""
-        TinyBertModel.from_pretrained("tinybert-4l-312d", load_state_as_np=True)
+# The schema changed to your defined schema
+schema = {"武器名称": ["产国", "类型", "研发单位"]}
+# The task path changed to your best model path
+uie = Taskflow('information_extraction',
+               model='uie-data-distill-gp',
+               schema=schema,
+               task_path='../../checkpoint/model_best/')
+# If you want to define the finetuned uie service
+app = SimpleServer()
+app.register_taskflow('uie', uie)
