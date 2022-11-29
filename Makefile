@@ -10,53 +10,29 @@ all : lint test
 # # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
 
 format:
-	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
-	@if test -n "$(modified_py_files)"; then \
-		echo "Checking/fixing $(modified_py_files)"; \
-		echo "======================================== isort ========================================"; \
-		isort $(modified_py_files); \
-		echo "======================================== yapf ========================================"; \
-		pre-commit run; \
-		git add ${modified_py_files}; \
-	else \
-		echo "No library .py files were modified"; \
-	fi
+	echo "============================== run isort ==============================\n"
+	pre-commit run isort
+	echo "============================== run black ==============================\n"
+	pre-commit run black
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 # # # # # # # # # # # # # # # Lint Block # # # # # # # # # # # # # # # 
+
 .PHONY: lint
 lint:
-	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
-	@if test -n "$(modified_py_files)"; then \
-		echo "Checking/fixing $(modified_py_files)"; \
-		isort --check-only $(modified_py_files); \
-	else \
-		echo "No library .py files were modified"; \
-	fi
-
-.PHONY: yapf
-yapf:
-	pre-commit run
-
-.PHONY: isort
-isort:
-	black --preview $(modified_py_files); \
-	python scripts/run_test.py isort
-
-.PHONY: flake8
-flake8:
-	python scripts/run_test.py flake8
-
-# disable: TODO list temporay
-.PHONY: pylint
-pylint:
-	python scripts/run_test.py pylint
+	echo "============================== run isort ==============================\n"
+	pre-commit run isort
+	echo "============================== run black ==============================\n"
+	pre-commit run black
+	echo "============================== run flake8 ==============================\n"
+	pre-commit run flake8
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
 
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # # 
+
 .PHONY: test
 test: unit-test
 
@@ -65,6 +41,7 @@ unit-test:
 	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 .PHONY: install
 install:
 	pip install -r requirements.txt
