@@ -70,6 +70,8 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqav2-en-marco-cross-encoder": 512,
     "rocketqav2-en-marco-query-encoder": 512,
     "rocketqav2-en-marco-para-encoder": 512,
+    "ernie-search-base-dual-encoder-marco-en": 512,
+    "ernie-search-large-cross-encoder-marco-en": 512,
     "uie-base": 512,
     "uie-medium": 512,
     "uie-mini": 512,
@@ -217,6 +219,10 @@ class ErnieTokenizer(PretrainedTokenizer):
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "rocketqav2-en-marco-para-encoder":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-search-base-dual-encoder-marco-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-search-large-cross-encoder-marco-en":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
             "uie-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "uie-medium":
@@ -359,6 +365,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "do_lower_case": True
         },
         "rocketqav2-en-marco-para-encoder": {
+            "do_lower_case": True
+        },
+        "ernie-search-base-dual-encoder-marco-en": {
+            "do_lower_case": True
+        },
+        "ernie-search-large-cross-encoder-marco-en": {
             "do_lower_case": True
         },
         "uie-base": {
