@@ -39,17 +39,19 @@ class Task(metaclass=abc.ABCMeta):
 
     def __init__(self, model, task, priority_path=None, **kwargs):
         self.model = model
+        self.is_static_model = kwargs.get("is_static_model", False)
         self.task = task
         self.kwargs = kwargs
         self._priority_path = priority_path
         self._usage = ""
-        # The dygraph model instantce
+        # The dygraph model instance
         self._model = None
-        # The static model instantce
+        # The static model instance
         self._input_spec = None
         self._config = None
         self._custom_model = False
         self._param_updated = False
+
         self._num_threads = self.kwargs[
             'num_threads'] if 'num_threads' in self.kwargs else math.ceil(
                 cpu_count() / 2)
@@ -62,6 +64,8 @@ class Task(metaclass=abc.ABCMeta):
             'home_path'] if 'home_path' in self.kwargs else PPNLP_HOME
         self._task_flag = self.kwargs[
             'task_flag'] if 'task_flag' in self.kwargs else self.model
+        self.from_hf_hub = kwargs.pop("from_hf_hub", False)
+
         if 'task_path' in self.kwargs:
             self._task_path = self.kwargs['task_path']
             self._custom_model = True
@@ -71,7 +75,9 @@ class Task(metaclass=abc.ABCMeta):
         else:
             self._task_path = os.path.join(self._home_path, "taskflow",
                                            self.task, self.model)
-        download_check(self._task_flag)
+
+        if not self.from_hf_hub:
+            download_check(self._task_flag)
 
     @abstractmethod
     def _construct_model(self, model):
@@ -154,6 +160,34 @@ class Task(metaclass=abc.ABCMeta):
                         "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
                     )
 
+    def _construct_ocr_engine(self, lang="ch", use_angle_cls=True):
+        """
+        Construct the OCR engine
+        """
+        try:
+            from paddleocr import PaddleOCR
+        except:
+            raise ImportError(
+                "Please install the dependencies first, pip install paddleocr")
+        use_gpu = False if paddle.get_device() == 'cpu' else True
+        self._ocr = PaddleOCR(use_angle_cls=use_angle_cls,
+                              show_log=False,
+                              use_gpu=use_gpu,
+                              lang=lang)
+
+    def _construce_layout_analysis_engine(self):
+        """
+        Construct the layout analysis engine
+        """
+        try:
+            from paddleocr import PPStructure
+        except:
+            raise ImportError(
+                "Please install the dependencies first, pip install paddleocr")
+        self._layout_analysis_engine = PPStructure(table=False,
+                                                   ocr=True,
+                                                   show_log=False)
+
     def _prepare_static_mode(self):
         """
         Construct the input data and predictor in the PaddlePaddele static mode. 
@@ -169,8 +203,14 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
+
+        # TODO(linjieccc): some temporary settings and will be remove in future
+        # after fixed
         if self.task in ["document_intelligence", "knowledge_mining"]:
             self._config.switch_ir_optim(False)
+        if self.model == "uie-data-distill-gp":
+            self._config.enable_memory_optim(False)
+
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [
@@ -237,8 +277,12 @@ class Task(metaclass=abc.ABCMeta):
                     fp.write(md5)
                     fp.close()
 
-        inference_model_path = os.path.join(self._task_path, "static",
-                                            "inference")
+        # When the user-provided model path is already a static model, skip to_static conversion
+        if self.is_static_model:
+            inference_model_path = self._task_path
+        else:
+            inference_model_path = os.path.join(self._task_path, "static",
+                                                "inference")
         if not os.path.exists(inference_model_path +
                               ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
@@ -269,6 +313,9 @@ class Task(metaclass=abc.ABCMeta):
         logger.info("The inference model save in the path:{}".format(save_path))
 
     def _check_input_text(self, inputs):
+        """
+        Check whether the input text meet the requirement.
+        """
         inputs = inputs[0]
         if isinstance(inputs, str):
             if len(inputs) == 0:
@@ -287,13 +334,19 @@ class Task(metaclass=abc.ABCMeta):
                 .format(type(inputs)))
         return inputs
 
-    def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
+    def _auto_splitter(self,
+                       input_texts,
+                       max_text_len,
+                       bbox_list=None,
+                       split_sentence=False):
         '''
         Split the raw texts automatically for model inference.
         Args:
             input_texts (List[str]): input raw texts.
             max_text_len (int): cutting length.
-            split_sentence (bool): If True, sentence-level split will be performed.
+            bbox_list (List[float, float,float, float]): bbox for document input. 
+            split_sentence (bool): If True, sentence-level split will be performed. 
+                `split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document.
         return:
             short_input_texts (List[str]): the short input texts for model inference.
             input_mapping (dict): mapping between raw text and short input texts.
@@ -302,19 +355,28 @@ class Task(metaclass=abc.ABCMeta):
         short_input_texts = []
         cnt_org = 0
         cnt_short = 0
-        for text in input_texts:
+        with_bbox = False
+        if bbox_list:
+            with_bbox = True
+            short_bbox_list = []
+            if split_sentence:
+                logger.warning(
+                    "`split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document."
+                )
+                split_sentence = False
+
+        for idx in range(len(input_texts)):
             if not split_sentence:
-                sens = [text]
+                sens = [input_texts[idx]]
             else:
-                sens = cut_chinese_sent(text)
+                sens = cut_chinese_sent(input_texts[idx])
             for sen in sens:
                 lens = len(sen)
                 if lens <= max_text_len:
                     short_input_texts.append(sen)
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = [cnt_short]
-                    else:
-                        input_mapping[cnt_org].append(cnt_short)
+                    if with_bbox:
+                        short_bbox_list.append(bbox_list[idx])
+                    input_mapping.setdefault(cnt_org, []).append(cnt_short)
                     cnt_short += 1
                 else:
                     temp_text_list = [
@@ -322,17 +384,23 @@ class Task(metaclass=abc.ABCMeta):
                         for i in range(0, lens, max_text_len)
                     ]
                     short_input_texts.extend(temp_text_list)
+                    if with_bbox:
+                        temp_bbox_list = [
+                            bbox_list[idx][i:i + max_text_len]
+                            for i in range(0, lens, max_text_len)
+                        ]
+                        short_bbox_list.extend(temp_bbox_list)
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
                     temp_text_id = [
                         short_idx + i for i in range(cnt_short - short_idx)
                     ]
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = temp_text_id
-                    else:
-                        input_mapping[cnt_org].extend(temp_text_id)
+                    input_mapping.setdefault(cnt_org, []).extend(temp_text_id)
             cnt_org += 1
-        return short_input_texts, input_mapping
+        if with_bbox:
+            return short_input_texts, short_bbox_list, input_mapping
+        else:
+            return short_input_texts, input_mapping
 
     def _auto_joiner(self, short_results, input_mapping, is_dict=False):
         '''
