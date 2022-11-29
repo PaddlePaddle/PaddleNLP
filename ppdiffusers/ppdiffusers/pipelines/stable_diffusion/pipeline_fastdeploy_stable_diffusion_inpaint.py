@@ -17,9 +17,10 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 import paddle
-
 import PIL
+
 from paddlenlp.utils.tools import compare_version
+
 if compare_version(PIL.__version__, "9.1.0") >= 0:
     Resampling = PIL.Image.Resampling
 else:
@@ -40,14 +41,11 @@ NUM_LATENT_CHANNELS = 4
 
 
 def prepare_mask_and_masked_image(image, mask, latents_shape):
-    image = np.array(
-        image.convert("RGB").resize(
-            (latents_shape[1] * 8, latents_shape[0] * 8)))
+    image = np.array(image.convert("RGB").resize((latents_shape[1] * 8, latents_shape[0] * 8)))
     image = image[None].transpose(0, 3, 1, 2)
     image = image.astype(np.float32) / 127.5 - 1.0
 
-    image_mask = np.array(
-        mask.convert("L").resize((latents_shape[1] * 8, latents_shape[0] * 8)))
+    image_mask = np.array(mask.convert("L").resize((latents_shape[1] * 8, latents_shape[0] * 8)))
     masked_image = image * (image_mask < 127.5)
 
     mask = mask.resize((latents_shape[1], latents_shape[0]), Resampling.NEAREST)
@@ -112,19 +110,16 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             "`FastDeployStableDiffusionInpaintPipeline` is experimental and will very likely change in the future."
         )
 
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
@@ -237,21 +232,18 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-            )
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
         if generator is None:
             generator = np.random
@@ -269,19 +261,16 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         text_input_ids = text_inputs.input_ids
 
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-            removed_text = self.tokenizer.batch_decode(
-                text_input_ids[:, self.tokenizer.model_max_length:])
+            removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
-            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(
-            input_ids=text_input_ids.astype(np.int64))[0]
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+            )
+            text_input_ids = text_input_ids[:, : self.tokenizer.model_max_length]
+        text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
 
         # duplicate text embeddings for each generation per prompt
-        text_embeddings = np.repeat(text_embeddings,
-                                    num_images_per_prompt,
-                                    axis=0)
+        text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -295,14 +284,16 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}.")
+                    f" {type(prompt)}."
+                )
             elif isinstance(negative_prompt, str):
                 uncond_tokens = [negative_prompt] * batch_size
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`.")
+                    " the batch size of `prompt`."
+                )
             else:
                 uncond_tokens = negative_prompt
 
@@ -315,35 +306,27 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 return_tensors="np",
             )
             uncond_input_ids = uncond_input.input_ids
-            uncond_embeddings = self.text_encoder(
-                input_ids=uncond_input_ids.astype(np.int64))[0]
+            uncond_embeddings = self.text_encoder(input_ids=uncond_input_ids.astype(np.int64))[0]
 
             # duplicate unconditional embeddings for each generation per prompt
-            uncond_embeddings = np.repeat(uncond_embeddings,
-                                          num_images_per_prompt,
-                                          axis=0)
+            uncond_embeddings = np.repeat(uncond_embeddings, num_images_per_prompt, axis=0)
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            text_embeddings = np.concatenate(
-                [uncond_embeddings, text_embeddings])
+            text_embeddings = np.concatenate([uncond_embeddings, text_embeddings])
 
         num_channels_latents = NUM_LATENT_CHANNELS
-        latents_shape = (batch_size * num_images_per_prompt,
-                         num_channels_latents, height // 8, width // 8)
+        latents_shape = (batch_size * num_images_per_prompt, num_channels_latents, height // 8, width // 8)
         latents_dtype = text_embeddings.dtype
         if latents is None:
             latents = generator.randn(*latents_shape).astype(latents_dtype)
         else:
             if latents.shape != latents_shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}"
-                )
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
 
         # prepare mask and masked_image
-        mask, masked_image = prepare_mask_and_masked_image(
-            image, mask_image, latents_shape[-2:])
+        mask, masked_image = prepare_mask_and_masked_image(image, mask_image, latents_shape[-2:])
         mask = mask.astype(latents.dtype)
         masked_image = masked_image.astype(latents.dtype)
 
@@ -352,14 +335,12 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
 
         # duplicate mask and masked_image_latents for each generation per prompt
         mask = mask.repeat(batch_size * num_images_per_prompt, 0)
-        masked_image_latents = masked_image_latents.repeat(
-            batch_size * num_images_per_prompt, 0)
+        masked_image_latents = masked_image_latents.repeat(batch_size * num_images_per_prompt, 0)
 
-        mask = np.concatenate([mask] *
-                              2) if do_classifier_free_guidance else mask
-        masked_image_latents = (np.concatenate([masked_image_latents] *
-                                               2) if do_classifier_free_guidance
-                                else masked_image_latents)
+        mask = np.concatenate([mask] * 2) if do_classifier_free_guidance else mask
+        masked_image_latents = (
+            np.concatenate([masked_image_latents] * 2) if do_classifier_free_guidance else masked_image_latents
+        )
 
         num_channels_mask = mask.shape[1]
         num_channels_masked_image = masked_image_latents.shape[1]
@@ -371,56 +352,52 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 f" {unet_input_channels} but received `num_channels_latents`: {num_channels_latents} +"
                 f" `num_channels_mask`: {num_channels_mask} + `num_channels_masked_image`: {num_channels_masked_image}"
                 f" = {num_channels_latents+num_channels_masked_image+num_channels_mask}. Please verify the config of"
-                " `pipeline.unet` or your `mask_image` or `image` input.")
+                " `pipeline.unet` or your `mask_image` or `image` input."
+            )
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        init_noise_sigma = self.scheduler.init_noise_sigma.numpy(
-        ) if isinstance(self.scheduler.init_noise_sigma,
-                        paddle.Tensor) else self.scheduler.init_noise_sigma
+        init_noise_sigma = (
+            self.scheduler.init_noise_sigma.numpy()
+            if isinstance(self.scheduler.init_noise_sigma, paddle.Tensor)
+            else self.scheduler.init_noise_sigma
+        )
         latents = latents * init_noise_sigma
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
-
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = np.concatenate(
-                [latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
             # concat latents, mask, masked_image_latnets in the channel dimension
-            latent_model_input = np.concatenate(
-                [latent_model_input, mask, masked_image_latents], axis=1)
-            latent_model_input = self.scheduler.scale_model_input(
-                paddle.to_tensor(latent_model_input), t)
+            latent_model_input = np.concatenate([latent_model_input, mask, masked_image_latents], axis=1)
+            latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), t)
             latent_model_input = latent_model_input.numpy()
 
             # predict the noise residual
-            noise_pred = self.unet(sample=latent_model_input.astype(np.float32),
-                                   timestep=np.array(t, dtype=np.int64),
-                                   encoder_hidden_states=text_embeddings.astype(
-                                       np.float32))[0]
-
+            noise_pred = self.unet(
+                sample=latent_model_input.astype(np.float32),
+                timestep=np.array(t, dtype=np.int64),
+                encoder_hidden_states=text_embeddings.astype(np.float32),
+            )[0]
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
 
-            latents = self.scheduler.step(paddle.to_tensor(noise_pred),
-                                          paddle.to_tensor(t),
-                                          paddle.to_tensor(latents),
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(
+                paddle.to_tensor(noise_pred), paddle.to_tensor(t), paddle.to_tensor(latents), **extra_step_kwargs
+            ).prev_sample
             latents = latents.numpy()
 
             # call the callback, if provided
@@ -430,24 +407,23 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         latents = 1 / 0.18215 * latents
         # image = self.vae_decoder(latent_sample=latents)[0]
         # it seems likes there is a strange result for using half-precision vae decoder if batchsize>1
-        image = np.concatenate([
-            self.vae_decoder(latent_sample=latents[i:i + 1])[0]
-            for i in range(latents.shape[0])
-        ])
+        image = np.concatenate(
+            [self.vae_decoder(latent_sample=latents[i : i + 1])[0] for i in range(latents.shape[0])]
+        )
 
         image = np.clip(image / 2 + 0.5, 0, 1)
         image = image.transpose((0, 2, 3, 1))
 
         if self.safety_checker is not None:
             safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image),
-                return_tensors="np").pixel_values.astype(image.dtype)
+                self.numpy_to_pil(image), return_tensors="np"
+            ).pixel_values.astype(image.dtype)
             # There will throw an error if use safety_checker batchsize>1
             images, has_nsfw_concept = [], []
             for i in range(image.shape[0]):
                 image_i, has_nsfw_concept_i = self.safety_checker(
-                    clip_input=safety_checker_input[i:i + 1],
-                    images=image[i:i + 1])
+                    clip_input=safety_checker_input[i : i + 1], images=image[i : i + 1]
+                )
                 images.append(image_i)
                 has_nsfw_concept.append(has_nsfw_concept_i[0])
             image = np.concatenate(images)
@@ -460,5 +436,4 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)
