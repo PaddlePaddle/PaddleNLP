@@ -14,6 +14,7 @@
 
 import argparse
 import time
+import json
 import os
 from functools import partial
 from typing import Optional
@@ -92,6 +93,14 @@ def main():
 
     if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
         model_args.multilingual = True
+    elif os.path.exists(
+            os.path.join(model_args.model_name_or_path, "model_config.json")):
+        with open(
+                os.path.join(model_args.model_name_or_path,
+                             "model_config.json")) as f:
+            init_class = json.load(f)['init_class']
+        if init_class == "UIEM":
+            model_args.multilingual = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
