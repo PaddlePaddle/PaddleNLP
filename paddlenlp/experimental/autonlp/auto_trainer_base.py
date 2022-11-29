@@ -78,15 +78,13 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     @abstractmethod
-    def _data_checks_and_inference(self, train_dataset: Dataset,
-                                   eval_dataset: Dataset):
+    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
         """
         Performs different data checks and inferences on the training and eval datasets
         """
 
     @abstractmethod
-    def _construct_trainable(self, train_dataset: Dataset,
-                             eval_dataset: Dataset) -> Callable:
+    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         """
         Returns the Trainable functions that contains the main preprocessing and training logic
         """
@@ -122,8 +120,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def to_taskflow(self, trial_id=None):
         pass
 
-    def _override_arguments(self, config: Dict[str, Any],
-                            default_arguments: TrainingArguments) -> Any:
+    def _override_arguments(self, config: Dict[str, Any], default_arguments: TrainingArguments) -> Any:
         """
         Overrides the arguments with the provided hyperparameter config
         """
@@ -134,37 +131,29 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 setattr(new_arguments, hp_key, value)
         return new_arguments
 
-    def _override_training_arguments(
-            self, config: Dict[str, Any]) -> TrainingArguments:
+    def _override_training_arguments(self, config: Dict[str, Any]) -> TrainingArguments:
         """
         Overrides the default TrainingArguments with the provided hyperparameter config
         """
         return self._override_arguments(config, self._default_training_argument)
 
-    def _override_compression_arguments(
-            self, config: Dict[str, Any]) -> CompressionArguments:
+    def _override_compression_arguments(self, config: Dict[str, Any]) -> CompressionArguments:
         """
         Overrides the default CompressionArguments with the provided hyperparameter config
         """
         return self._override_arguments(config, self._default_compress_argument)
 
-    def _filter_model_candidates(self,
-                                 language=None,
-                                 preset=None) -> List[Dict[str, Any]]:
+    def _filter_model_candidates(self, language=None, preset=None) -> List[Dict[str, Any]]:
         """
         Model Candidates stored as Ray hyperparameter search space, organized by
         self.language and preset
         """
         model_candidates = self._model_candidates
         if language is not None:
-            model_candidates = filter(lambda x: x["language"] == language,
-                                      model_candidates)
+            model_candidates = filter(lambda x: x["language"] == language, model_candidates)
         if preset is not None:
-            model_candidates = filter(lambda x: x["preset"] == preset,
-                                      model_candidates)
-        hyperopt_search_space = {
-            "config": hp.choice("config", list(model_candidates))
-        }
+            model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
+        hyperopt_search_space = {"config": hp.choice("config", list(model_candidates))}
         return hyperopt_search_space
 
     def _get_model_result(self, trial_id=None):
@@ -224,11 +213,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         self._data_checks_and_inference(train_dataset, eval_dataset)
         trainable = self._construct_trainable(train_dataset, eval_dataset)
-        model_search_space = self._filter_model_candidates(
-            language=self.language, preset=preset)
-        algo = HyperOptSearch(space=model_search_space,
-                              metric=self.metric_for_best_model,
-                              mode="max")
+        model_search_space = self._filter_model_candidates(language=self.language, preset=preset)
+        algo = HyperOptSearch(space=model_search_space, metric=self.metric_for_best_model, mode="max")
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
@@ -237,14 +223,11 @@ class AutoTrainerBase(metaclass=ABCMeta):
             if num_cpus:
                 hardware_resources["cpu"] = num_cpus
             trainable = tune.with_resources(trainable, hardware_resources)
-        tune_config = tune.tune_config.TuneConfig(num_samples=num_models,
-                                                  time_budget_s=time_budget_s,
-                                                  search_alg=algo)
+        tune_config = tune.tune_config.TuneConfig(num_samples=num_models, time_budget_s=time_budget_s, search_alg=algo)
         tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
-            run_config=RunConfig(
-                local_dir=self.output_dir) if self.output_dir else None,
+            run_config=RunConfig(local_dir=self.output_dir) if self.output_dir else None,
         )
         self.training_results = tuner.fit()
         return self.training_results

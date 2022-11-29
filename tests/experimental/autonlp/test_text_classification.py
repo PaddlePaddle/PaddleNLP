@@ -14,16 +14,16 @@
 import os
 import unittest
 from tempfile import TemporaryDirectory
-from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
 
 from pandas import DataFrame
+
 from paddlenlp.datasets import load_dataset
 from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tests.testing_utils import get_tests_dir
 
 
 class TestAutoTrainerForTextClassification(unittest.TestCase):
-
     def test_multiclass_end2end(self):
         with TemporaryDirectory() as temp_dir_path:
             fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
@@ -66,19 +66,16 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            reloaded_model = AutoModelForSequenceClassification.from_pretrained(
-                temp_export_path)
+            reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
             reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
-            input_features = reloaded_tokenizer(dev_ds[0]["sentence"],
-                                                return_tensors="pd")
+            input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
             model_outputs = reloaded_model(**input_features)
             self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
 
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
             with self.assertRaises(LookupError):
-                auto_trainer.export(export_path=temp_export_path,
-                                    trial_id="invalid_trial_id")
+                auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
             taskflow = auto_trainer.to_taskflow()
