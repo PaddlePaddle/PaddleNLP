@@ -29,13 +29,13 @@ CLUE（Chinese Language Understanding Evaluation）作为中文语言理解权�
 ```
 from paddlenlp.datasets import load_dataset
 
-# 通过指定 "fewclue" 和数据集名字 name="tnews" 即可一键加载 FewCLUE 中的 eprstmt 数据集
+# 通过指定 "fewclue" 和数据集名字 name="eprstmt" 即可一键加载 FewCLUE 中的 eprstmt 数据集
 train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="eprstmt", splits=("train_0", "dev_0", "test_public"))
 ```
 
 ### 模型训练、评估、预测
 
-通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `tnews` 数据集上进行训练&评估
+通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `eprstmt` 数据集上进行训练&评估
 ```
 python -u -m paddle.distributed.launch --gpus "0" train.py \
     --output_dir checkpoint_eprstmt \

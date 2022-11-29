@@ -14,7 +14,6 @@
 
 import json
 from functools import partial
-
 import numpy as np
 
 import paddle
