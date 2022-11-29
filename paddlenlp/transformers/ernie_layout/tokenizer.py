@@ -15,10 +15,7 @@
 """ Tokenization classes for ErnieLayout model."""
 
 import os
-import itertools
 import unicodedata
-from dataclasses import dataclass, field
-from collections import OrderedDict
 from typing import List, Optional
 
 import sentencepiece as spm
