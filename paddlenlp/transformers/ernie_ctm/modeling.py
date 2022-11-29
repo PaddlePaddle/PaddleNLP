@@ -232,7 +232,7 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             Defaults to `2`.
     """
 
-    def __init__(self, config: ErnieCtmConfig, *model_args, **kwargs):
+    def __init__(self, config: ErnieCtmConfig):
         super(ErnieCtmModel, self).__init__(config)
 
         self.config = config
@@ -451,7 +451,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             The learning rate of the crf. Defaults to `100`.
     """
 
-    def __init__(self, config: ErnieCtmConfig, *model_args, **kwargs):
+    def __init__(self, config: ErnieCtmConfig):
         super(ErnieCtmWordtagModel, self).__init__(config)
         self.num_tag = config.num_labels
         self.ernie_ctm = ErnieCtmModel(config)
@@ -592,7 +592,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             An instance of :class:`ErnieCtmModel`.
     """
 
-    def __init__(self, config: ErnieCtmConfig, *model_args, **kwargs):
+    def __init__(self, config: ErnieCtmConfig):
         super(ErnieCtmNptagModel, self).__init__(config)
 
         self.ernie_ctm = ErnieCtmModel(config)
