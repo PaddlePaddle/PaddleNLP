@@ -15,12 +15,10 @@
 from __future__ import annotations
 
 from typing import Dict
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = [
-    "T5_PRETRAINED_INIT_CONFIGURATION", "T5Config",
-    "T5_PRETRAINED_RESOURCE_FILES_MAP"
-]
+__all__ = ["T5_PRETRAINED_INIT_CONFIGURATION", "T5Config", "T5_PRETRAINED_RESOURCE_FILES_MAP"]
 
 T5_PRETRAINED_INIT_CONFIGURATION = {
     "t5-small": {
@@ -39,7 +37,7 @@ T5_PRETRAINED_INIT_CONFIGURATION = {
         "dropout_rate": 0.1,
         "layer_norm_epsilon": 1e-06,
         "initializer_factor": 1.0,
-        "feed_forward_proj": "relu"
+        "feed_forward_proj": "relu",
     },
     "t5-base": {
         "tie_word_embeddings": True,
@@ -57,7 +55,7 @@ T5_PRETRAINED_INIT_CONFIGURATION = {
         "dropout_rate": 0.1,
         "layer_norm_epsilon": 1e-06,
         "initializer_factor": 1.0,
-        "feed_forward_proj": "relu"
+        "feed_forward_proj": "relu",
     },
     "t5-large": {
         "tie_word_embeddings": True,
@@ -75,7 +73,7 @@ T5_PRETRAINED_INIT_CONFIGURATION = {
         "dropout_rate": 0.1,
         "layer_norm_epsilon": 1e-06,
         "initializer_factor": 1.0,
-        "feed_forward_proj": "relu"
+        "feed_forward_proj": "relu",
     },
     "t5-v1_1-base": {
         "tie_word_embeddings": False,
@@ -129,7 +127,7 @@ T5_PRETRAINED_INIT_CONFIGURATION = {
         "dropout_rate": 0.1,
         "layer_norm_epsilon": 1e-06,
         "initializer_factor": 1.0,
-        "feed_forward_proj": "relu"
+        "feed_forward_proj": "relu",
     },
     "t5-11b": {
         "tie_word_embeddings": True,
@@ -147,26 +145,19 @@ T5_PRETRAINED_INIT_CONFIGURATION = {
         "dropout_rate": 0.1,
         "layer_norm_epsilon": 1e-06,
         "initializer_factor": 1.0,
-        "feed_forward_proj": "relu"
+        "feed_forward_proj": "relu",
     },
 }
 
 T5_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "t5-small":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/model_state.pdparams",
-        "t5-base":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
-        "t5-large":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
-        "t5-3b":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/model_state.pdparams",
-        "t5-11b":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/model_state.pdparams",
-        "t5-v1_1-base":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/model_state.pdparams",
-        "t5-v1_1-large":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/model_state.pdparams",
+        "t5-small": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/model_state.pdparams",
+        "t5-base": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/model_state.pdparams",
+        "t5-large": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/model_state.pdparams",
+        "t5-3b": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/model_state.pdparams",
+        "t5-11b": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/model_state.pdparams",
+        "t5-v1_1-base": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/model_state.pdparams",
+        "t5-v1_1-large": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/model_state.pdparams",
     }
 }
 
@@ -211,7 +202,7 @@ class T5Config(PretrainedConfig):
             A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
             testing).
         feed_forward_proj (`string`, *optional*, defaults to `"relu"`):
-            he non-linear activation function (function or string) in the feed forward layer in the residual attention block. 
+            he non-linear activation function (function or string) in the feed forward layer in the residual attention block.
             If string, `"relu"`, `"gated-gelu"` are supported. Defaults to `"relu"`.
         use_cache (`bool`, *optional*, defaults to `True`):
             Whether or not the model should return the last key/values attentions (not used by all models).
@@ -229,30 +220,32 @@ class T5Config(PretrainedConfig):
     attribute_map: Dict[str, str] = {
         "hidden_size": "d_model",
         "num_attention_heads": "num_heads",
-        "num_hidden_layers": "num_layers"
+        "num_hidden_layers": "num_layers",
     }
     pretrained_init_configuration = T5_PRETRAINED_INIT_CONFIGURATION
 
-    def __init__(self,
-                 vocab_size: int = 32128,
-                 d_model: int = 512,
-                 d_kv: int = 64,
-                 d_ff: int = 2048,
-                 num_layers: int = 6,
-                 num_decoder_layers: int = None,
-                 num_heads: int = 8,
-                 relative_attention_num_buckets: int = 32,
-                 relative_attention_max_distance: int = 128,
-                 dropout_rate: float = 0.1,
-                 layer_norm_epsilon: float = 1e-6,
-                 initializer_factor: float = 1.0,
-                 feed_forward_proj: str = "relu",
-                 is_encoder_decoder: bool = True,
-                 use_cache: bool = True,
-                 pad_token_id: int = 0,
-                 eos_token_id: int = 1,
-                 enable_recompute: bool = False,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size: int = 32128,
+        d_model: int = 512,
+        d_kv: int = 64,
+        d_ff: int = 2048,
+        num_layers: int = 6,
+        num_decoder_layers: int = None,
+        num_heads: int = 8,
+        relative_attention_num_buckets: int = 32,
+        relative_attention_max_distance: int = 128,
+        dropout_rate: float = 0.1,
+        layer_norm_epsilon: float = 1e-6,
+        initializer_factor: float = 1.0,
+        feed_forward_proj: str = "relu",
+        is_encoder_decoder: bool = True,
+        use_cache: bool = True,
+        pad_token_id: int = 0,
+        eos_token_id: int = 1,
+        enable_recompute: bool = False,
+        **kwargs
+    ):
 
         super().__init__(
             pad_token_id=pad_token_id,
@@ -266,9 +259,9 @@ class T5Config(PretrainedConfig):
         self.d_kv = d_kv
         self.d_ff = d_ff
         self.num_layers = num_layers
-        self.num_decoder_layers = (num_decoder_layers if num_decoder_layers
-                                   is not None else self.num_layers
-                                   )  # default = symmetry
+        self.num_decoder_layers = (
+            num_decoder_layers if num_decoder_layers is not None else self.num_layers
+        )  # default = symmetry
         self.num_heads = num_heads
         self.relative_attention_num_buckets = relative_attention_num_buckets
         self.relative_attention_max_distance = relative_attention_max_distance
