@@ -15,9 +15,13 @@
 from paddlenlp import SimpleServer, Taskflow
 
 # The schema changed to your defined schema
-schema = ["出发地", "目的地", "费用", "时间"]
+schema = ["开票日期", "名称", "纳税人识别号", "开户行及账号", "金额", "价税合计", "No", "税率", "地址、电话", "税额"]
 # The task path changed to your best model path
-uie = Taskflow("information_extraction", schema=schema, task_path="../../checkpoint/model_best/")
+uie = Taskflow(
+    "information_extraction",
+    schema=schema,
+    task_path="../../checkpoint/model_best",
+)
 # If you want to define the finetuned uie service
 app = SimpleServer()
 app.register_taskflow("uie", uie)

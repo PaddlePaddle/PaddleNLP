@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .sentiment_analysis_model import BoWModel, LSTMModel, SkepSequenceModel
-from .lexical_analysis_model import BiGruCrf
 from .dependency_parsing_model import BiAffineParser
+from .lexical_analysis_model import BiGruCrf
+from .sentiment_analysis_model import BoWModel, LSTMModel, SkepSequenceModel
 from .text_correction_model import ErnieForCSC
-from .information_extraction_model import UIE, UIEM
