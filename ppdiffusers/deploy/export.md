@@ -12,24 +12,36 @@ ___Tips: Stable Diffusion是基于以下的License: The CreativeML OpenRAIL M li
 可执行以下命令行完成模型导出。
 
 ```shell
-python export_model.py --pretrained_model_name_or_path CompVis/stable-diffusion-v1-4 --output_path stable-diffusion-v1-4
+python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion-v1-5 --output_path stable-diffusion-v1-5
 ```
 
 输出的模型目录结构如下：
 ```shell
-stable-diffusion-v1-4/
+stable-diffusion-v1-5/
 ├── text_encoder
-│   ├── inference.pdiparams
-│   ├── inference.pdiparams.info
-│   └── inference.pdmodel
+│   ├── inference.pdiparams
+│   ├── inference.pdiparams.info
+│   └── inference.pdmodel
 ├── unet
-│   ├── inference.pdiparams
-│   ├── inference.pdiparams.info
-│   └── inference.pdmodel
-└── vae_decoder
+│   ├── inference.pdiparams
+│   ├── inference.pdiparams.info
+│   └── inference.pdmodel
+├── vae_decoder
+│   ├── inference.pdiparams
+│   ├── inference.pdiparams.info
+│   └── inference.pdmodel
+└── vae_encoder
     ├── inference.pdiparams
     ├── inference.pdiparams.info
     └── inference.pdmodel
+```
+
+#### Inpaint任务模型导出
+
+除了支持常规StableDiffusion文生图、图生图任务的模型导出以外，还支持Inpaint任务模型的导出、如果需要导出inpaint模型，可以执行以下命令：
+
+```shell
+python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion-inpainting --output_path stable-diffusion-v1-5-inpainting --inpaint True
 ```
 
 #### 参数说明
@@ -40,3 +52,4 @@ stable-diffusion-v1-4/
 |----------|--------------|
 |<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](../examples/textual_inversion/README.md)。|
 |--output_path | 导出的模型目录。 |
+|--inpaint | 是否导出inpaint模型(如`runwayml/stable-diffusion-inpainting`)。默认`False`。|

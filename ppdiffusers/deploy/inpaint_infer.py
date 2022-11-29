@@ -310,15 +310,10 @@ if __name__ == "__main__":
     mask_image = download_image(mask_url).resize((512, 512))
 
     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
-    import paddle
-
-    paddle.seed(107)
-    latents = paddle.randn((1, 4, 64, 64), dtype="float32")
     images = pipe(
         prompt=prompt,
         image=init_image,
         mask_image=mask_image,
-        latents=latents.numpy(),
         num_inference_steps=args.inference_steps,
     ).images
 
