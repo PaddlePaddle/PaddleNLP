@@ -21,7 +21,7 @@ import random
 import paddle
 from paddlenlp.transformers import (CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
                                     AutoTokenizer, CodeGenForCausalLM,
-                                    CodeGenModel, CodeGenTokenizer)
+                                    CodeGenModel, CodeGenConfig)
 from ...testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
@@ -129,7 +129,7 @@ class CodeGenModelTester:
         )
 
     def get_config(self):
-        return {
+        return CodeGenConfig.from_dict({
             "vocab_size": self.vocab_size,
             "n_embd": self.hidden_size,
             "n_layer": self.num_hidden_layers,
@@ -144,7 +144,7 @@ class CodeGenModelTester:
             "eos_token_id": self.eos_token_id,
             "pad_token_id": self.pad_token_id,
             "rotary_dim": self.rotary_dim,
-        }
+        })
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -176,7 +176,7 @@ class CodeGenModelTester:
 
     def create_and_check_codegen_model(self, config, input_ids, input_mask,
                                        *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         result = model(input_ids,
@@ -190,7 +190,7 @@ class CodeGenModelTester:
 
     def create_and_check_codegen_model_past(self, config, input_ids, input_mask,
                                             *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # first forward pass
@@ -237,7 +237,7 @@ class CodeGenModelTester:
 
     def create_and_check_codegen_model_attention_mask_past(
             self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # create attention mask
@@ -299,7 +299,7 @@ class CodeGenModelTester:
 
     def create_and_check_codegen_model_past_large_inputs(
             self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # first forward pass
@@ -350,8 +350,7 @@ class CodeGenModelTester:
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask,
                                        *args):
-        base_model = CodeGenModel(**config)
-        model = CodeGenForCausalLM(base_model)
+        model = CodeGenForCausalLM(config)
 
         outputs = model(input_ids,
                         labels=input_ids if self.parent.use_labels else None,
@@ -366,8 +365,7 @@ class CodeGenModelTester:
 
     def create_and_check_forward_and_backwards(self, config, input_ids,
                                                input_mask, *args):
-        base_model = CodeGenModel(**config)
-        model = CodeGenForCausalLM(base_model)
+        model = CodeGenForCausalLM(config)
 
         loss, logits = model(input_ids,
                              return_dict=self.parent.return_dict,

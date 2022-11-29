@@ -509,7 +509,6 @@ class GenerationTesterMixin:
             paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
-
             if self.is_encoder_decoder:
                 max_length = 4
 
