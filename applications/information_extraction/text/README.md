@@ -85,8 +85,6 @@ python ../label_studio.py \
 单卡启动：
 
 ```shell
-export finetuned_model=./checkpoint/model_best
-
 python finetune.py  \
     --device gpu \
     --logging_steps 10 \
@@ -94,7 +92,7 @@ python finetune.py  \
     --eval_steps 100 \
     --seed 1000 \
     --model_name_or_path uie-base \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --max_seq_len 512  \
@@ -106,7 +104,7 @@ python finetune.py  \
     --do_train \
     --do_eval \
     --do_export \
-    --export_model_dir $finetuned_model \
+    --export_model_dir ./checkpoint/model_best \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
@@ -117,8 +115,6 @@ python finetune.py  \
 如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
 
 ```shell
-export finetuned_model=./checkpoint/model_best
-
 python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --device gpu \
     --logging_steps 10 \
@@ -126,7 +122,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --eval_steps 100 \
     --seed 1000 \
     --model_name_or_path uie-base \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --max_seq_len 512  \
@@ -138,7 +134,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" finetune.py \
     --do_train \
     --do_eval \
     --do_export \
-    --export_model_dir $finetuned_model \
+    --export_model_dir ./checkpoint/model_best \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \

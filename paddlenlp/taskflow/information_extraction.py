@@ -377,11 +377,11 @@ class UIETask(Task):
         },
     }
 
-    def __init__(self, task, model, schema, schema_lang="ch", **kwargs):
+    def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
-        self._batch_size = kwargs.get("batch_size", 64)
+        self._batch_size = kwargs.get("batch_size", 16)
         self._split_sentence = kwargs.get("split_sentence", False)
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
@@ -389,6 +389,7 @@ class UIETask(Task):
         self.use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
+        self._schema_lang = kwargs.get("schema_lang", "ch")
         self._expand_to_a4_size = False if self._custom_model else True
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
@@ -401,9 +402,9 @@ class UIETask(Task):
         if self._init_class not in ["UIEX", "UIEM"]:
             if 'sentencepiece_model_file' in self.resource_files_names.keys():
                 del self.resource_files_names['sentencepiece_model_file']
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-        self._keep_whitespace = True
+        self._is_en = True if model in [
+            'uie-base-en'
+        ] or self._schema_lang == 'en' else False
 
         self._summary_token_num = 3
         if self._init_class in ["UIEX"]:
@@ -518,18 +519,17 @@ class UIETask(Task):
                     if "doc" in example.keys():
                         if not self._doc_parser:
                             self._doc_parser = DocParser(
+                                ocr_lang=self._ocr_lang,
                                 layout_analysis=self._layout_analysis)
                         if "layout" in example.keys():
                             data = self._doc_parser.parse(
                                 {"doc": example["doc"]},
-                                keep_whitespace=self._keep_whitespace,
                                 do_ocr=False,
                                 expand_to_a4_size=self._expand_to_a4_size)
                             data["layout"] = example["layout"]
                         else:
                             data = self._doc_parser.parse(
                                 {"doc": example["doc"]},
-                                keep_whitespace=self._keep_whitespace,
                                 expand_to_a4_size=self._expand_to_a4_size)
                     elif "text" in example.keys():
                         if not isinstance(example["text"], str):

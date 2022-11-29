@@ -485,8 +485,8 @@ UIE不限定行业领域和抽取目标，以下是一些通过Taskflow实现开
 
 >>> ie = Taskflow('information_extraction',
                   schema="",
-                  schema_lang="zh",
-                  batch_size=1,
+                  schema_lang="ch",
+                  batch_size=16,
                   model='uie-base',
                   position_prob=0.5,
                   precision='fp32',
@@ -494,8 +494,8 @@ UIE不限定行业领域和抽取目标，以下是一些通过Taskflow实现开
 ```
 
 * `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
-* `schema_lang`：设置schema的语言，默认为`zh`, 可选有`zh`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-x-base`,`uie-m-base`和`uie-m-large`模型有效。
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `schema_lang`：设置schema的语言，默认为`ch`, 可选有`ch`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。该参数只对`uie-x-base`,`uie-m-base`和`uie-m-large`模型有效。
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为16。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`，`uie-x-base`。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。

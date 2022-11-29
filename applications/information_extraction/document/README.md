@@ -85,13 +85,11 @@ python ../label_studio.py \
 
 推荐使用 [Trainer API ](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md) 对模型进行微调。只需输入模型、数据集等就可以使用 Trainer API 高效快速地进行预训练、微调和模型压缩等任务，可以一键启动多卡训练、混合精度训练、梯度累积、断点重启、日志显示等功能，Trainer API 还针对训练过程的通用训练配置做了封装，比如：优化器、学习率调度等。
 
-使用下面的命令，使用 `uie-x-base` 作为预训练模型进行模型微调，将微调后的模型保存至`$finetuned_model`：
+使用下面的命令，使用 `uie-x-base` 作为预训练模型进行模型微调，将微调后的模型保存至`./checkpoint/model_best`：
 
 单卡启动：
 
 ```shell
-export finetuned_model=./checkpoint/model_best
-
 python finetune.py  \
     --device gpu \
     --logging_steps 5 \
@@ -99,7 +97,7 @@ python finetune.py  \
     --eval_steps 25 \
     --seed 42 \
     --model_name_or_path uie-x-base \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --max_seq_len 512  \
@@ -111,7 +109,7 @@ python finetune.py  \
     --do_train \
     --do_eval \
     --do_export \
-    --export_model_dir $finetuned_model \
+    --export_model_dir ./checkpoint/model_best \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
@@ -122,8 +120,6 @@ python finetune.py  \
 如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
 
 ```shell
-export finetuned_model=./checkpoint/model_best
-
 python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --device gpu \
     --logging_steps 5 \
@@ -131,7 +127,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --eval_steps 25 \
     --seed 42 \
     --model_name_or_path uie-x-base \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --train_path data/train.txt \
     --dev_path data/dev.txt  \
     --max_seq_len 512  \
@@ -143,7 +139,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --do_train \
     --do_eval \
     --do_export \
-    --export_model_dir $finetuned_model \
+    --export_model_dir ./checkpoint/model_best \
     --overwrite_output_dir \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
@@ -188,7 +184,7 @@ python evaluate.py \
     --device "gpu" \
     --model_path ./checkpoint/model_best \
     --test_path ./data/dev.txt \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --label_names 'start_positions' 'end_positions'\
     --max_seq_len 512 \
     --per_device_eval_batch_size 16
@@ -202,7 +198,7 @@ python evaluate.py \
     --device "gpu" \
     --model_path ./checkpoint/model_best \
     --test_path ./data/dev.txt \
-    --output_dir $finetuned_model \
+    --output_dir ./checkpoint/model_best \
     --label_names 'start_positions' 'end_positions'\
     --max_seq_len 512 \
     --per_device_eval_batch_size 16 \
@@ -260,7 +256,7 @@ python evaluate.py \
 from pprint import pprint
 from paddlenlp import Taskflow
 schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
-my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best',precison='fp16')
+my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best', precison='fp16')
 ```
 
 我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取：

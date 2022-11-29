@@ -15,6 +15,8 @@
 
 import re
 import os
+import math
+import random
 import base64
 import mimetypes
 from PIL import Image
@@ -30,26 +32,20 @@ class DocParser(object):
     """DocParser"""
 
     def __init__(self,
-                 ocr_model_config='PP-OCRv3',
+                 ocr_lang="ch",
                  layout_analysis=False,
                  pdf_parser_config=None,
                  use_gpu=None,
                  device_id=None):
-        self.ocr_model_config = ocr_model_config
+        self.ocr_lang = ocr_lang
         self.use_angle_cls = False
         self.layout_analysis = layout_analysis
-        if isinstance(ocr_model_config, dict):
-            self.use_angle_cls = ocr_model_config.get('use_angle_cls', False)
         self.pdf_parser_config = pdf_parser_config
         self.ocr_infer_model = None
         self.use_gpu = use_gpu
         self.device_id = device_id
 
-    def parse(self,
-              doc,
-              keep_whitespace=False,
-              expand_to_a4_size=False,
-              do_ocr=True):
+    def parse(self, doc, expand_to_a4_size=False, do_ocr=True):
         """
         parse
         """
@@ -70,7 +66,7 @@ class DocParser(object):
         doc['img_w'] = img_w
         doc['img_h'] = img_h
         if do_ocr:
-            ocr_result = self.ocr(image, keep_whitespace=keep_whitespace)
+            ocr_result = self.ocr(image)
             if expand_to_a4_size:
                 layout = []
                 for segment in ocr_result:
@@ -91,7 +87,7 @@ class DocParser(object):
         """
         return self.parse(*args, **kwargs)
 
-    def ocr(self, image, det=True, rec=True, cls=None, keep_whitespace=True):
+    def ocr(self, image, det=True, rec=True, cls=None):
         """
         Call ocr for an image
         """
@@ -104,6 +100,12 @@ class DocParser(object):
                 max(box[2][1], box[3][1]),  # y2
             ]
             return box
+
+        def _is_ch(s):
+            for ch in s:
+                if u'\u4e00' <= ch <= u'\u9fff':
+                    return True
+            return False
 
         if self.ocr_infer_model is None:
             self.init_ocr_inference()
@@ -118,8 +120,6 @@ class DocParser(object):
                 box = segment[0]
                 box = _get_box(box)
                 text = segment[1][0]
-                if not keep_whitespace:
-                    text = text.replace(' ', '')
                 layout.append((box, text))
         else:
             layout_result = self.layout_analysis_engine(image)
@@ -130,10 +130,9 @@ class DocParser(object):
                         box = segment['text_region']
                         box = _get_box(box)
                         text = segment['text']
-                        if not keep_whitespace:
-                            text = text.replace(' ', '')
                         layout.append((box, text))
                 else:
+                    bbox = region['bbox']
                     table_result = region['res']
                     html = table_result['html']
                     cell_bbox = table_result['cell_bbox']
@@ -143,9 +142,14 @@ class DocParser(object):
                         table_list.extend(re.findall('<td.*?>(.*?)</td>', line))
                     for cell_box, text in zip(cell_bbox, table_list):
                         box = [
-                            cell_box[0], cell_box[1], cell_box[4], cell_box[5]
+                            bbox[0] + cell_box[0],
+                            bbox[3] - cell_box[5],
+                            bbox[0] + cell_box[4],
+                            bbox[3] - cell_box[1],
                         ]
-                        layout.append((box, text.replace(" ", "")))
+                        if _is_ch(text):
+                            text = text.replace(" ", "")
+                        layout.append((box, text))
         return layout
 
     @classmethod
@@ -234,11 +238,7 @@ class DocParser(object):
                     "Need paddleocr to process image input. "
                     "Please install module by: python3 -m pip install paddleocr"
                 )
-            if isinstance(self.ocr_model_config, dict):
-                self.ocr_infer_model = PaddleOCR(**self.ocr_model_config)
-            else:
-                self.ocr_infer_model = PaddleOCR(
-                    ocr_version=self.ocr_model_config, show_log=False)
+            self.ocr_infer_model = PaddleOCR(show_log=False, lang=self.ocr_lang)
         else:
             try:
                 from paddleocr import PPStructure
@@ -249,7 +249,8 @@ class DocParser(object):
                 )
             self.layout_analysis_engine = PPStructure(table=True,
                                                       ocr=True,
-                                                      show_log=False)
+                                                      show_log=False,
+                                                      lang=self.ocr_lang)
 
     @classmethod
     def _normalize_box(self, box, old_size, new_size, offset_x=0, offset_y=0):
@@ -289,3 +290,184 @@ class DocParser(object):
                 exp_img.fill(255)
                 image = np.vstack([image, exp_img])
         return image, offset_x, offset_y
+
+    @classmethod
+    def write_image_with_results(self,
+                                 image,
+                                 layouts=None,
+                                 results=None,
+                                 save_path=None,
+                                 font_path=None,
+                                 return_pil_image=False,
+                                 format=None,
+                                 max_size=None):
+        """
+        write image with boxes and results
+        """
+        from PIL import Image, ImageDraw, ImageFont
+        if font_path is None:
+            font_path = '/workspace/uie-layout/PaddleNLP/fonts/SourceHanSansCN-Regular.ttf'
+        random.seed(0)
+        _image = self.read_image(image)
+        _image = Image.fromarray(np.uint8(_image))
+        h, w = _image.height, _image.width
+        img_render = _image.copy()
+        draw_render = ImageDraw.Draw(img_render)
+
+        def _get_text_height(layouts):
+            hght_list = []
+            for seg in layouts:
+                if isinstance(seg, dict):
+                    box = seg['bbox']
+                else:
+                    box = seg[0]
+                if isinstance(box[0], list):
+                    box = box[0]
+                box = [
+                    (box[0], box[1]),
+                    (box[2], box[1]),
+                    (box[2], box[3]),
+                    (box[0], box[3]),
+                ]
+                box_height = int(
+                    math.sqrt((box[0][0] - box[3][0])**2 +
+                              (box[0][1] - box[3][1])**2))
+                box_width = int(
+                    math.sqrt((box[0][0] - box[1][0])**2 +
+                              (box[0][1] - box[1][1])**2))
+                if box_height > 2 * box_width:
+                    hght_list.append(box_width)
+                else:
+                    hght_list.append(box_height)
+            if hght_list:
+                return int(0.9 * sum(hght_list) / len(hght_list))
+            return 0
+
+        if layouts:
+            def_font_size = _get_text_height(layouts)
+            def_font = ImageFont.truetype(font_path,
+                                          def_font_size,
+                                          encoding="utf-8")
+            for i, seg in enumerate(layouts):
+                if isinstance(seg, dict):
+                    box, seg_text = seg['bbox'], seg['text']
+                else:
+                    box, seg_text = seg[:2]
+                box = [
+                    (box[0], box[1]),
+                    (box[2], box[1]),
+                    (box[2], box[3]),
+                    (box[0], box[3]),
+                ]
+                while True:
+                    color = (random.randint(0, 255), random.randint(0, 255),
+                             random.randint(0, 255))
+                    if sum(color) < 480:
+                        break
+                draw_render.polygon(box, fill=color)
+
+        elif results:
+
+            def _flatten_results(results):
+                """flatten results"""
+                is_single = False
+                if not isinstance(results, list):
+                    results = [results]
+                    is_single = True
+                flat_results = []
+
+                def _flatten(result):
+                    flat_result = []
+                    for key, vals in result.items():
+                        for val in vals:
+                            new_val = val.copy()
+                            if val.get('relations'):
+                                new_val['relations'] = _flatten(
+                                    val['relations'])
+                            new_val['label'] = key
+                            flat_result.append(new_val)
+                    return flat_result
+
+                for result in results:
+                    flat_results.append(_flatten(result))
+                if is_single:
+                    return flat_results[0]
+                return flat_results
+
+            results = _flatten_results(results)
+
+            # draw boxes and label
+            font_size = _get_text_height(results)
+            line_height = int(font_size * 3)
+            box_height = 1
+            font = ImageFont.truetype(font_path, font_size, encoding="utf-8")
+            cur_y = 30
+            cur_x = 20
+            max_x = 20
+
+            def _write_results(results, cur_x, cur_y, max_x, offset_x=0):
+                cur_x += offset_x
+                for i, seg in enumerate(results):
+                    if isinstance(seg, dict):
+                        boxes = seg['bbox']
+                    else:
+                        boxes, seg_text = seg[:2]
+                        score = seg[2] if len(seg) > 2 else None
+                        label = seg[3] if len(seg) > 3 else None
+                    if not isinstance(boxes[0], list):
+                        boxes = [boxes]
+                    boxes = [[
+                        (box[0], box[1]),
+                        (box[2], box[1]),
+                        (box[2], box[3]),
+                        (box[0], box[3]),
+                    ] for box in boxes]
+                    while True:
+                        color = (random.randint(0, 255), random.randint(0, 255),
+                                 random.randint(0, 255))
+                        if sum(color) < 480:
+                            break
+                    for box in boxes:
+                        draw_render.polygon(box, fill=color)
+                    cur_y += line_height + 8
+                    if cur_y + 2 * line_height + 30 > h:
+                        cur_y = 30
+                        cur_x = max_x + 20
+                    if isinstance(seg, dict) and seg.get('relations'):
+                        cur_x, cur_y, max_x = _write_results(seg['relations'],
+                                                             cur_x,
+                                                             cur_y,
+                                                             max_x,
+                                                             offset_x=30)
+                cur_x -= offset_x
+                return cur_x, cur_y, max_x
+
+            _write_results(results, cur_x, cur_y, max_x)
+
+        img_render = Image.blend(_image, img_render, 0.3)
+        img_show = Image.new('RGB', (w, h), (255, 255, 255))
+        img_show.paste(img_render, (0, 0, w, h))
+        w, h = img_show.width, img_show.height
+        if max_size and max(w, h) > max_size:
+            if max(w, h) == h:
+                new_size = (int(w * max_size / h), max_size)
+            else:
+                new_size = (max_size, int(h * max_size / w))
+            img_show = img_show.resize(new_size)
+        if save_path:
+            dir_path = os.path.dirname(save_path)
+            if dir_path and not os.path.isdir(dir_path):
+                os.makedirs(dir_path)
+            img_show.save(save_path)
+            if return_pil_image:
+                return img_show
+        elif return_pil_image:
+            return img_show
+        else:
+            buff = BytesIO()
+            if format is None:
+                format = 'jpeg'
+            if format.lower() == 'jpg':
+                format = 'jpeg'
+            img_show.save(buff, format=format, quality=90)
+            return buff
