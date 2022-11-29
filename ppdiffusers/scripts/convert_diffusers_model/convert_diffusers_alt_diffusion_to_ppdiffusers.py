@@ -270,16 +270,14 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
-            # Make sure the scheduler compatible with PNDM
-            skip_prk_steps=True,
         )
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
     with tempfile.TemporaryDirectory() as tmpdirname:
         # 6. feature_extractor
-        diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
-        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(tmpdirname)
+        # diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
+        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained("CompVis/stable-diffusion-v1-4/feature_extractor")
 
         # 7. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)

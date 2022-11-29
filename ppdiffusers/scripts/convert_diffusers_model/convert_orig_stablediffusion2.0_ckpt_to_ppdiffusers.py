@@ -737,8 +737,6 @@ if __name__ == "__main__":
             clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
-            # Make sure the scheduler compatible with PNDM
-            skip_prk_steps=True,
         )
     else:
         raise ValueError(f"Scheduler of type {args.scheduler_type} doesn't exist!")

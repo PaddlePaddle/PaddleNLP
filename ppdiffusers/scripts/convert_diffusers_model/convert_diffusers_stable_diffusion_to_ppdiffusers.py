@@ -168,8 +168,6 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
-            # Make sure the scheduler compatible with PNDM
-            skip_prk_steps=True,
         )
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
@@ -181,8 +179,10 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
 
         if requires_safety_checker:
             # 6. feature_extractor
-            diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
-            pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(tmpdirname)
+            # diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
+            pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(
+                "CompVis/stable-diffusion-v1-4/feature_extractor"
+            )
             # 7. safety_checker
             safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
                 diffusers_pipe.safety_checker, is_text_encoder=False
