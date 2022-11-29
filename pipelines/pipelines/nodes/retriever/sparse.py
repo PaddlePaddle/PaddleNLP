@@ -12,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Union, Optional
-import os
+from typing import Dict, List, Optional, Union
 
-from pipelines.schema import Document
 from pipelines.document_stores import BaseDocumentStore, KeywordDocumentStore
 from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.schema import Document
 
 
 class BM25Retriever(BaseRetriever):
-
     def __init__(
         self,
         document_store: Optional[KeywordDocumentStore] = None,
@@ -106,8 +104,7 @@ class BM25Retriever(BaseRetriever):
     def retrieve(
         self,
         query: str,
-        filters: Optional[Dict[str, Union[Dict, List, str, int, float,
-                                          bool]]] = None,
+        filters: Optional[Dict[str, Union[Dict, List, str, int, float, bool]]] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
@@ -189,8 +186,7 @@ class BM25Retriever(BaseRetriever):
                 "This Retriever was not initialized with a Document Store. Provide one to the retrieve() method."
             )
         if not isinstance(document_store, KeywordDocumentStore):
-            raise ValueError(
-                "document_store must be a subclass of KeywordDocumentStore.")
+            raise ValueError("document_store must be a subclass of KeywordDocumentStore.")
 
         if top_k is None:
             top_k = self.top_k
@@ -211,10 +207,12 @@ class BM25Retriever(BaseRetriever):
     def retrieve_batch(
         self,
         queries: List[str],
-        filters: Optional[Union[Dict[str, Union[Dict, List, str, int, float,
-                                                bool]],
-                                List[Dict[str, Union[Dict, List, str, int,
-                                                     float, bool]]], ]] = None,
+        filters: Optional[
+            Union[
+                Dict[str, Union[Dict, List, str, int, float, bool]],
+                List[Dict[str, Union[Dict, List, str, int, float, bool]]],
+            ]
+        ] = None,
         top_k: Optional[int] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
@@ -299,8 +297,7 @@ class BM25Retriever(BaseRetriever):
                 "This Retriever was not initialized with a Document Store. Provide one to the retrieve_batch() method."
             )
         if not isinstance(document_store, KeywordDocumentStore):
-            raise ValueError(
-                "document_store must be a subclass of KeywordDocumentStore.")
+            raise ValueError("document_store must be a subclass of KeywordDocumentStore.")
 
         if top_k is None:
             top_k = self.top_k

@@ -12,14 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
 
-import paddle
 from pipelines.document_stores import ElasticsearchDocumentStore
-from pipelines.nodes import DensePassageRetriever, ErnieRanker, BM25Retriever, JoinDocuments
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
+from pipelines.nodes import (
+    BM25Retriever,
+    DensePassageRetriever,
+    ErnieRanker,
+    JoinDocuments,
+)
 from pipelines.pipelines import Pipeline
+from pipelines.utils import (
+    convert_files_to_dicts,
+    fetch_archive_from_http,
+    print_documents,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -34,7 +41,7 @@ parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-para-
 parser.add_argument("--params_path", default="", type=str, help="The checkpoint path")
 parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
 parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
-parser.add_argument('--port', type=str, default="9200",help='port of ANN search engine')
+parser.add_argument('--port', type=str, default="9200", help='port of ANN search engine')
 parser.add_argument("--bm_topk", default=10, type=int, help="The number of candidates for BM25Retriever to retrieve.")
 parser.add_argument("--dense_topk", default=10, type=int, help="The number of candidates for DensePassageRetriever to retrieve.")
 parser.add_argument("--rank_topk", default=10, type=int, help="The number of candidates ranker to filter.")
@@ -49,9 +56,7 @@ def get_retrievers(use_gpu):
     dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
 
     fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
-    dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                   split_paragraphs=True,
-                                   encoding='utf-8')
+    dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
 
     document_store_with_docs = ElasticsearchDocumentStore(
         host=args.host,
@@ -59,8 +64,9 @@ def get_retrievers(use_gpu):
         username="",
         password="",
         embedding_dim=312,
-        search_fields=['content', 'meta'],
-        index=args.index_name)
+        search_fields=["content", "meta"],
+        index=args.index_name,
+    )
     document_store_with_docs.write_documents(dicts)
 
     dpr_retriever = DensePassageRetriever(
@@ -85,54 +91,32 @@ def get_retrievers(use_gpu):
 
 def semantic_search_tutorial():
 
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
 
     dpr_retriever, bm_retriever = get_retrievers(use_gpu)
 
-    ### Ranker
-    ranker = ErnieRanker(model_name_or_path="rocketqa-nano-cross-encoder",
-                         use_gpu=use_gpu)
+    # Ranker
+    ranker = ErnieRanker(model_name_or_path="rocketqa-nano-cross-encoder", use_gpu=use_gpu)
 
-    ### Pipeline
+    # Pipeline
     pipeline = Pipeline()
-    pipeline.add_node(component=bm_retriever,
-                      name="BMRetriever",
-                      inputs=["Query"])
-    pipeline.add_node(component=dpr_retriever,
-                      name="DenseRetriever",
-                      inputs=["Query"])
-    pipeline.add_node(component=JoinDocuments(join_mode="concatenate"),
-                      name="JoinResults",
-                      inputs=["BMRetriever", "DenseRetriever"])
+    pipeline.add_node(component=bm_retriever, name="BMRetriever", inputs=["Query"])
+    pipeline.add_node(component=dpr_retriever, name="DenseRetriever", inputs=["Query"])
+    pipeline.add_node(
+        component=JoinDocuments(join_mode="concatenate"), name="JoinResults", inputs=["BMRetriever", "DenseRetriever"]
+    )
     pipeline.add_node(component=ranker, name="Ranker", inputs=["JoinResults"])
     # Keywords recall results
-    prediction = pipeline.run(query="广播权",
-                              params={
-                                  "BMRetriever": {
-                                      "top_k": 10
-                                  },
-                                  "DenseRetriever": {
-                                      "top_k": 10
-                                  },
-                                  "Ranker": {
-                                      "top_k": 3
-                                  }
-                              })
+    prediction = pipeline.run(
+        query="广播权", params={"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 3}}
+    )
     print_documents(prediction)
     # Dense vector recall results
-    prediction = pipeline.run(query="期货交易手续费指的是什么?",
-                              params={
-                                  "BMRetriever": {
-                                      "top_k": 10
-                                  },
-                                  "DenseRetriever": {
-                                      "top_k": 10
-                                  },
-                                  "Ranker": {
-                                      "top_k": 3
-                                  }
-                              })
-    pipeline.draw('multi_recall.png')
+    prediction = pipeline.run(
+        query="期货交易手续费指的是什么?",
+        params={"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 3}},
+    )
+    pipeline.draw("multi_recall.png")
     print_documents(prediction)
 
 
