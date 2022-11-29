@@ -165,7 +165,6 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
     --weight_decay=0.01 \
     --device=gpu \
 ```
-也可以直接使用`run_train.sh`.
 
 关键参数释义如下：
 - `gpus` 指示了训练所用的GPU卡号。

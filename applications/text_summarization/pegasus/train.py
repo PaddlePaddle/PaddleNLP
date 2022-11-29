@@ -46,8 +46,8 @@ def parse_args():
         type=str,
         help="Path to pre-trained model. ",
     )
-    parser.add_argument("--train_file", type=str, required=False, default="train.json", help="Train data path.")
-    parser.add_argument("--eval_file", type=str, required=False, default="valid.json", help="Eval data path.")
+    parser.add_argument("--train_file", type=str, required=False, default="data/train.json", help="Train data path.")
+    parser.add_argument("--eval_file", type=str, required=False, default="data/valid.json", help="Eval data path.")
     parser.add_argument(
         "--output_dir",
         default="output",

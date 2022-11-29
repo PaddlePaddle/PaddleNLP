@@ -41,7 +41,9 @@ def parse_args():
         required=True,
         help="Path to pre-trained model. ",
     )
-    parser.add_argument("--prefict_file", type=str, required=False, default="valid.json", help="Predict data path.")
+    parser.add_argument(
+        "--prefict_file", type=str, required=False, default="data/valid.json", help="Predict data path."
+    )
     parser.add_argument(
         "--output_path", type=str, default="generate.txt", help="The file path where the infer result will be saved."
     )
