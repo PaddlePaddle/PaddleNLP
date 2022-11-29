@@ -40,6 +40,8 @@ def generate_images(model_name_or_path,
                     eta=0.,
                     num_inference_steps=50,
                     guidance_scales=[3, 4, 5, 6, 7, 8],
+                    height=256,
+                    width=256,
                     device="gpu"):
     paddle.set_device(device)
     pipe = LDMTextToImagePipeline.from_pretrained(model_name_or_path)
@@ -80,18 +82,19 @@ def generate_images(model_name_or_path,
         all_prompt = [p.strip() for p in f.readlines()]
 
     for cfg in guidance_scales:
-        cfg = int(cfg)
         new_save_path = os.path.join(save_path, f"mscoco.en_g{cfg}")
         os.makedirs(new_save_path, exist_ok=True)
-        if seed is not None:
+        if seed is not None and seed > 0:
             random.seed(seed)
         i = 0
         for batch_prompt in tqdm(batchify(all_prompt, batch_size=batch_size)):
             sd = random.randint(0, 2**32)
             images = pipe(batch_prompt,
-                          guidance_scale=cfg,
+                          guidance_scale=float(cfg),
                           seed=sd,
                           eta=eta,
+                          height=height,
+                          width=width,
                           num_inference_steps=num_inference_steps)[0]
             for image in images:
                 path = os.path.join(new_save_path, "{:05d}_000.png".format(i))
@@ -141,6 +144,8 @@ if __name__ == "__main__":
                         nargs="+",
                         type=str,
                         help="guidance_scales list.")
+    parser.add_argument("--height", default=256, type=int, help="height.")
+    parser.add_argument("--width", default=256, type=int, help="width.")
     args = parser.parse_args()
     print('-----------  Configuration Arguments -----------')
     for arg, value in sorted(vars(args).items()):
@@ -154,4 +159,6 @@ if __name__ == "__main__":
                     guidance_scales=args.guidance_scales,
                     num_inference_steps=args.num_inference_steps,
                     scheduler_type=args.scheduler_type,
+                    height=args.height,
+                    width=args.width,
                     device=args.device)
