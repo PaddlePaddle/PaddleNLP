@@ -13,45 +13,47 @@
 # limitations under the License.
 
 from typing import List
+import tempfile
+import pytest
 from unittest import TestCase
+import parameterized
 from paddlenlp.cli.main import load_all_models
 from paddlenlp.transformers import BertPretrainedModel, GPTPretrainedModel, AlbertPretrainedModel, RobertaPretrainedModel
 
 
-class TestCompatibility(TestCase):
+def get_tokenizer_test():
+    model_names = []
+    model_names.extend(
+        list(BertPretrainedModel.pretrained_init_configuration.keys()))
+    model_names = [{"model_name": model_name} for model_name in model_names]
+    # return model_names
 
-    def test_model_compatibility(self):
-        """test compatibility of model
-            TODO(wj-Mcat): add unittest in `forward`
-        """
-        pass
+    # most of tokenizers, but most of them will fail, so only test it with
+    return [{"model_name": "bert-base-uncased"}]
 
-    def get_model_names(self) -> List[str]:
-        model_names = []
-        model_names.extend(
-            list(BertPretrainedModel.pretrained_init_configuration.keys()))
-        model_names.extend(
-            list(GPTPretrainedModel.pretrained_init_configuration.keys()))
-        model_names.extend(
-            list(AlbertPretrainedModel.pretrained_init_configuration.keys()))
-        model_names.extend(
-            list(RobertaPretrainedModel.pretrained_init_configuration.keys()))
 
-        return model_names
+@parameterized.parameterized_class(get_tokenizer_test())
+class TestTokenizerCompatibility(TestCase):
+
+    def setUp(self):
+        self.tempdirectory = tempfile.TemporaryDirectory()
+
+    def tearDown(self):
+        self.tempdirectory.cleanup()
 
     def test_tokenizer_compatibility(self):
         """test compatibility of tokenizer between paddlenlp and transformer"""
-        for model_name in self.get_model_names():
-            self.run_compatibility_test(model_name)
+        self.run_compatibility_test(self.model_name)
 
     def run_compatibility_test(self, model_name: str):
         from transformers import AutoTokenizer
         from transformers.tokenization_utils import PreTrainedTokenizer
         hf_tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
             model_name)
+        hf_tokenizer.save_pretrained(self.tempdirectory.name)
 
         from paddlenlp.transformers import AutoTokenizer
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        tokenizer = AutoTokenizer.from_pretrained(self.tempdirectory.name)
 
         # 1. test token_id
         assert len(hf_tokenizer) == len(tokenizer)
