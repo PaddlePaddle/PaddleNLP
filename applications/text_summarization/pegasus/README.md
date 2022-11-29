@@ -135,7 +135,7 @@ data/
 ```
 这里提供小数据集供测试，运行下面命令即可下载:
 ```bash
-bash run_prepare.sh
+python run_prepare.py
 ```
 
 更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
@@ -150,8 +150,8 @@ unset CUDA_VISIBLE_DEVICES
 
 python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
     --model_name_or_path=IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese \
-    --train_file train.json \
-    --eval_file test.json \
+    --train_file data/train.json \
+    --eval_file data/test.json \
     --output_dir pegesus_out \
     --max_source_length 128 \
     --max_target_length 64 \
@@ -216,7 +216,7 @@ unset CUDA_VISIBLE_DEVICES
 
 python predict.py \
     --init_checkpoint_dir=pegesus_out \
-    --prefict_file valid.json \
+    --prefict_file data/valid.json \
     --max_source_length 128 \
     --max_target_length 64 \
     --batch_size 128 \
