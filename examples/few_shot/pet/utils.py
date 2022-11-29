@@ -12,33 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import json
+import os
 import pathlib
 
 import numpy as np
-
 import paddle
 
 from paddlenlp.datasets import load_dataset
 
 LABEL_TO_STANDARD = {
     "tnews": {
-        'news_story': '100',
-        'news_culture': '101',
-        'news_entertainment': '102',
-        'news_sports': '103',
-        'news_finance': '104',
-        'news_house': '106',
-        'news_car': '107',
-        'news_edu': '108',
-        'news_tech': '109',
-        'news_military': '110',
-        'news_travel': '112',
-        'news_world': '113',
-        'news_stock': '114',
-        'news_agriculture': '115',
-        'news_game': '116'
+        "news_story": "100",
+        "news_culture": "101",
+        "news_entertainment": "102",
+        "news_sports": "103",
+        "news_finance": "104",
+        "news_house": "106",
+        "news_car": "107",
+        "news_edu": "108",
+        "news_tech": "109",
+        "news_military": "110",
+        "news_travel": "112",
+        "news_world": "113",
+        "news_stock": "114",
+        "news_agriculture": "115",
+        "news_game": "116",
     },
     "iflytek": {
         "打车": 0,
@@ -159,8 +158,8 @@ LABEL_TO_STANDARD = {
         "彩票": 97,
         "记账": 98,
         "银行": 99,
-        "政务": 9
-    }
+        "政务": 9,
+    },
 }
 
 
@@ -191,7 +190,7 @@ def load_prompt_arguments(args):
 
 def save_pseudo_data(save_path, task_name, label_preds, verbalizer, labels):
     """
-    Combine unsupervised data and corresponding predicted labels and 
+    Combine unsupervised data and corresponding predicted labels and
     save one example per line.
     """
     if task_name == "cluewsc":
@@ -211,8 +210,7 @@ def save_pseudo_data(save_path, task_name, label_preds, verbalizer, labels):
     save_data(pseudo_data, save_path)
 
 
-def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer,
-                            labels):
+def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer, labels):
     """
     Extract predicted labels and save as the format required by FewCLUE.
     """
@@ -238,8 +236,7 @@ def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer,
             ret_list.append({"id": uid, "label": labels[preds[idx]]})
         elif task_name in ["iflytek", "tnews"]:
             ret_list.append({"id": uid, "label": str(maps[labels[preds[idx]]])})
-    save_file = task_name if task_name in ["bustm", "csldcp", "eprstmt"
-                                           ] else task_name + "f"
+    save_file = task_name if task_name in ["bustm", "csldcp", "eprstmt"] else task_name + "f"
     save_data(ret_list, save_path, save_file + "_predict.json")
 
 

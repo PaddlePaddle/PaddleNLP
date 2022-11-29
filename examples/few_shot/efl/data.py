@@ -13,12 +13,10 @@
 # limitations under the License.
 
 import json
-from functools import partial
+
 import numpy as np
 
-import paddle
-
-from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.datasets import MapDataset, load_dataset
 
 
 def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
@@ -62,12 +60,7 @@ def convert_chid(data_ds):
         fragments = example["content"].split("#idiom#")
         label = example.get("answer", None)
         for index, cand in enumerate(example["candidates"]):
-            text = fragments[0] + "（" + cand + "）" + fragments[1]
-            new_example = {
-                "content_pre": fragments[0],
-                "content_post": fragments[1],
-                "idiom": cand
-            }
+            new_example = {"content_pre": fragments[0], "content_post": fragments[1], "idiom": cand}
             if label is not None:
                 new_example["label"] = str(int(index == label))
             split_data_ds.append(new_example)
@@ -76,7 +69,7 @@ def convert_chid(data_ds):
 
 def convert_cluewsc(data_ds):
     """
-    Mark the pronoun and entity with special tokens. 
+    Mark the pronoun and entity with special tokens.
     """
     marked_data_ds = []
     for example in data_ds:
@@ -94,11 +87,7 @@ def convert_cluewsc(data_ds):
             text.insert(e_index + len(entity) + 1, "]")
             text.insert(p_index, "_")
             text.insert(p_index + len(pronoun) + 1, "_")
-        new_example = {
-            "text": "".join(text),
-            "pronoun": pronoun,
-            "entity": entity
-        }
+        new_example = {"text": "".join(text), "pronoun": pronoun, "entity": entity}
         if label is not None:
             new_example["label"] = label
         marked_data_ds.append(new_example)
@@ -110,15 +99,15 @@ def load_fewclue_dataset(args, verbalizer):
     Load fewclue datasets and convert them to the standard format of PET.
     """
     split_id = args.split_id
-    splits = [f"train_{split_id}", f"dev_{split_id}", f"test_public", "test"]
+    splits = [f"train_{split_id}", f"dev_{split_id}", "test_public", "test"]
     if args.task_name == "cluewsc":
-        train_ds, dev_ds, public_test_ds, test_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
+        train_ds, dev_ds, public_test_ds, test_ds = load_dataset("fewclue", name=args.task_name, splits=splits)
         unlabeled_ds = None
     else:
         splits.append("unlabeled")
         train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
+            "fewclue", name=args.task_name, splits=splits
+        )
     data_ds = [train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds]
 
     # Preprocess data for EFL.
@@ -135,13 +124,11 @@ def load_fewclue_dataset(args, verbalizer):
     elif args.task_name == "iflytek":
         orig_key = "label_des"
     for index, sub_data_ds in enumerate(data_ds):
-        is_train = (index == 0)
+        is_train = index == 0
         if sub_data_ds is not None:
-            data_ds[index] = convert_efl(sub_data_ds, args.label_words,
-                                         orig_key, is_train)
+            data_ds[index] = convert_efl(sub_data_ds, args.label_words, orig_key, is_train)
 
     # Extend train dataset with pseudo-label data.
-    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path,
-                                         verbalizer.labels_to_ids)
+    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path, verbalizer.labels_to_ids)
 
     return data_ds

@@ -17,8 +17,8 @@ from functools import partial
 
 import paddle
 
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
+from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
+from paddlenlp.datasets import MapDataset, load_dataset
 
 
 def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
@@ -33,12 +33,7 @@ def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
     return data_ds
 
 
-def extend_with_data_augment(data_ds,
-                             aug_type,
-                             num_aug=10,
-                             percent=0.1,
-                             aug_base="mlm",
-                             example_keys=None):
+def extend_with_data_augment(data_ds, aug_type, num_aug=10, percent=0.1, aug_base="mlm", example_keys=None):
     """
     Extend train dataset with augmentation.
     """
@@ -54,11 +49,8 @@ def extend_with_data_augment(data_ds,
         aug = WordInsert(aug_base, create_n=num_aug, aug_percent=percent)
     elif aug_type == "swap":
         aug = WordSwap(create_n=num_aug, aug_percent=percent)
-    elif aug_type == "generate":
-        aug = SentenceSynonym(create_n, generate_n=create_n + 3)
     else:
-        raise ValueError(
-            "Unsupported data augment strategy `{}`".format(aug_type))
+        raise ValueError("Unsupported data augment strategy `{}`".format(aug_type))
 
     aug_data = []
     for example in data_ds:
@@ -83,12 +75,7 @@ def convert_chid(data_ds):
         fragments = example["content"].split("#idiom#")
         label = example.get("answer", None)
         for index, cand in enumerate(example["candidates"]):
-            text = fragments[0] + "（" + cand + "）" + fragments[1]
-            new_example = {
-                "content_pre": fragments[0],
-                "content_post": fragments[1],
-                "idiom": cand
-            }
+            new_example = {"content_pre": fragments[0], "content_post": fragments[1], "idiom": cand}
             if label is not None:
                 new_example["label"] = str(int(index == label))
             split_data_ds.append(new_example)
@@ -108,7 +95,7 @@ def convert_csl(data_ds):
 
 def convert_cluewsc(data_ds):
     """
-    Mark the pronoun and entity with special tokens. 
+    Mark the pronoun and entity with special tokens.
     """
     marked_data_ds = []
     for example in data_ds:
@@ -126,11 +113,7 @@ def convert_cluewsc(data_ds):
             text.insert(e_index + len(entity) + 1, "]")
             text.insert(p_index, "_")
             text.insert(p_index + len(pronoun) + 1, "_")
-        new_example = {
-            "text": "".join(text),
-            "pronoun": pronoun,
-            "entity": entity
-        }
+        new_example = {"text": "".join(text), "pronoun": pronoun, "entity": entity}
         if label is not None:
             new_example["label"] = label
         marked_data_ds.append(new_example)
@@ -156,10 +139,8 @@ def convert_ids_to_words(example, token_ids):
     the length of which should coincide with that of `mask` in prompt.
     """
     if "label_ids" in example:
-        example["labels"] = paddle.index_select(token_ids,
-                                                paddle.to_tensor(
-                                                    example.pop("label_ids")),
-                                                axis=0).squeeze(0)
+        labels = paddle.index_select(token_ids, paddle.to_tensor(example.pop("label_ids")), axis=0).squeeze(0)
+        example["labels"] = labels
     return example
 
 
@@ -168,15 +149,15 @@ def load_fewclue_dataset(args, verbalizer, example_keys=None):
     Load fewclue datasets and convert them to the standard format of PET.
     """
     split_id = args.split_id
-    splits = [f"train_{split_id}", f"dev_{split_id}", f"test_public", "test"]
+    splits = [f"train_{split_id}", f"dev_{split_id}", "test_public", "test"]
     if args.task_name == "cluewsc":
-        train_ds, dev_ds, public_test_ds, test_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
+        train_ds, dev_ds, public_test_ds, test_ds = load_dataset("fewclue", name=args.task_name, splits=splits)
         unlabeled_ds = None
     else:
         splits.append("unlabeled")
         train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_dataset(
-            "fewclue", name=args.task_name, splits=splits)
+            "fewclue", name=args.task_name, splits=splits
+        )
     data_ds = [train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds]
 
     # Preprocess data for mask prediction task.
@@ -198,31 +179,24 @@ def load_fewclue_dataset(args, verbalizer, example_keys=None):
         orig_key = "label_des"
         pop_keys = ["id", "label"]
     elif args.task_name == "ocnli":
-        pop_keys = [
-            "level", "label0", "label1", "label2", "label3", "label4", "genre",
-            "prem_id", "id"
-        ]
-    convert_label = partial(convert_labels_to_ids,
-                            orig_key=orig_key,
-                            labels_to_ids=verbalizer.labels_to_ids,
-                            pop_keys=pop_keys)
+        pop_keys = ["level", "label0", "label1", "label2", "label3", "label4", "genre", "prem_id", "id"]
+    convert_label = partial(
+        convert_labels_to_ids, orig_key=orig_key, labels_to_ids=verbalizer.labels_to_ids, pop_keys=pop_keys
+    )
     for index, sub_data_ds in enumerate(data_ds):
         if sub_data_ds is not None:
             data_ds[index] = sub_data_ds.map(convert_label)
 
     # Extend train dataset with data augmentation and pseudo-label data.
-    data_ds[0] = extend_with_data_augment(data_ds[0], args.augment_type,
-                                          args.num_augment,
-                                          args.word_augment_percent,
-                                          args.augment_method, example_keys)
-    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path,
-                                         verbalizer.labels_to_ids)
+    data_ds[0] = extend_with_data_augment(
+        data_ds[0], args.augment_type, args.num_augment, args.word_augment_percent, args.augment_method, example_keys
+    )
+    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path, verbalizer.labels_to_ids)
 
     dev_labels = [x["label_ids"] for x in data_ds[1]]
     test_labels = [x["label_ids"] for x in data_ds[2]]
 
-    convert_fn = partial(convert_ids_to_words,
-                         token_ids=verbalizer.token_ids[:, 0, :])
+    convert_fn = partial(convert_ids_to_words, token_ids=verbalizer.token_ids[:, 0, :])
     data_ds[:3] = [x.map(convert_fn) for x in data_ds[:3]]
 
     return data_ds, (dev_labels, test_labels)

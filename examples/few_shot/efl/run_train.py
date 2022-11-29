@@ -14,24 +14,25 @@
 
 import os
 import time
-from functools import partial
 from dataclasses import dataclass, field
+from functools import partial
 
 import paddle
+from data import load_fewclue_dataset
 from paddle.metric import Accuracy
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from paddlenlp.trainer import PdArgumentParser
+from paddle.static import InputSpec
+from utils import load_prompt_arguments, save_fewclue_prediction, save_pseudo_data
+
 from paddlenlp.prompt import (
-    PromptTuningArguments,
     ManualTemplate,
     ManualVerbalizer,
     PromptModelForSequenceClassification,
     PromptTrainer,
+    PromptTuningArguments,
 )
-
-from data import load_fewclue_dataset
-from utils import load_prompt_arguments, save_pseudo_data, save_fewclue_prediction
+from paddlenlp.trainer import PdArgumentParser
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -45,6 +46,7 @@ class DataArguments:
     do_label: bool = field(default=False, metadata={"help": "Whether to label unsupervised data in unlabeled datasets"})
     do_test: bool = field(default=False, metadata={"help": "Whether to evaluate model on public test datasets."})
 
+
 @dataclass
 class ModelArguments:
     model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Build-in pretrained model name or the path to local model."})
@@ -55,8 +57,7 @@ class ModelArguments:
 
 def main():
     # Parse the arguments.
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, PromptTuningArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, PromptTuningArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     data_args = load_prompt_arguments(data_args)
     training_args.print_config(model_args, "Model")
@@ -69,11 +70,11 @@ def main():
         model_args.model_name_or_path,
         num_labels=2,
         hidden_dropout_prob=model_args.dropout,
-        attention_probs_dropout_prob=model_args.dropout)
+        attention_probs_dropout_prob=model_args.dropout,
+    )
 
     # Define template for preprocess and verbalizer for postprocess.
-    template = ManualTemplate(data_args.prompt, tokenizer,
-                              training_args.max_seq_length)
+    template = ManualTemplate(data_args.prompt, tokenizer, training_args.max_seq_length)
     logger.info("Using template: {}".format(template.prompt))
 
     verbalizer = ManualVerbalizer(data_args.label_words, tokenizer)
@@ -81,19 +82,15 @@ def main():
     logger.info("Using verbalizer: {}".format(data_args.label_words))
 
     # Load datasets.
-    train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_fewclue_dataset(
-        data_args, verbalizer=verbalizer)
+    train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_fewclue_dataset(data_args, verbalizer=verbalizer)
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForSequenceClassification(
-        model,
-        template,
-        None,
-        freeze_plm=training_args.freeze_plm,
-        freeze_dropout=training_args.freeze_dropout)
+        model, template, None, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
+    )
 
     # Define the metric function.
     def compute_metrics(eval_preds, num_labels):
@@ -106,24 +103,24 @@ def main():
         correct = metric.compute(preds, labels)
         metric.update(correct)
         acc = metric.accumulate()
-        return {'accuracy': acc}
+        return {"accuracy": acc}
 
     # Initialize the trainer.
-    compute_metrics = partial(compute_metrics,
-                              num_labels=len(verbalizer.labels))
-    trainer = PromptTrainer(model=prompt_model,
-                            tokenizer=tokenizer,
-                            args=training_args,
-                            criterion=criterion,
-                            train_dataset=train_ds,
-                            eval_dataset=dev_ds,
-                            callbacks=None,
-                            compute_metrics=compute_metrics)
+    compute_metrics = partial(compute_metrics, num_labels=len(verbalizer.labels))
+    trainer = PromptTrainer(
+        model=prompt_model,
+        tokenizer=tokenizer,
+        args=training_args,
+        criterion=criterion,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        callbacks=None,
+        compute_metrics=compute_metrics,
+    )
 
     # Traininig.
     if training_args.do_train:
-        train_result = trainer.train(
-            resume_from_checkpoint=training_args.resume_from_checkpoint)
+        train_result = trainer.train(resume_from_checkpoint=training_args.resume_from_checkpoint)
         metrics = train_result.metrics
         trainer.save_model()
         trainer.log_metrics("train", metrics)
@@ -136,13 +133,10 @@ def main():
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
             InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
             InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None],
-                      dtype="float32")  # attention_mask
+            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
         ]
-        export_path = os.path.join(training_args.output_dir, 'export')
-        trainer.export_model(export_path,
-                             input_spec=input_spec,
-                             export_type=model_args.export_type)
+        export_path = os.path.join(training_args.output_dir, "export")
+        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
 
     time_stamp = time.strftime("%m%d-%H-%M-%S", time.localtime())
 
@@ -155,19 +149,15 @@ def main():
     if training_args.do_predict and test_ds is not None:
         pred_ret = trainer.predict(test_ds)
         logger.info("Prediction done.")
-        predict_path = os.path.join(training_args.output_dir,
-                                    "fewclue_submit_examples_" + time_stamp)
-        save_fewclue_prediction(predict_path, data_args.task_name, pred_ret,
-                                verbalizer, ids_to_labels)
+        predict_path = os.path.join(training_args.output_dir, "fewclue_submit_examples_" + time_stamp)
+        save_fewclue_prediction(predict_path, data_args.task_name, pred_ret, verbalizer, ids_to_labels)
 
     # Label unsupervised data.
     if data_args.do_label and unlabeled_ds is not None:
         label_ret = trainer.predict(unlabeled_ds)
         logger.info("Labeling done.")
-        pseudo_path = os.path.join(training_args.output_dir,
-                                   "pseudo_data_" + time_stamp + ".txt")
-        save_pseudo_data(pseudo_path, data_args.task_name, label_ret,
-                         verbalizer, ids_to_labels)
+        pseudo_path = os.path.join(training_args.output_dir, "pseudo_data_" + time_stamp + ".txt")
+        save_pseudo_data(pseudo_path, data_args.task_name, label_ret, verbalizer, ids_to_labels)
 
 
 if __name__ == "__main__":

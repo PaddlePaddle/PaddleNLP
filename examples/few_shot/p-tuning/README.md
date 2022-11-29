@@ -2,7 +2,6 @@
 
 [GPT Understands, Too](https://arxiv.org/pdf/2103.10385.pdf)
 
-
 ## 算法简介
 
 P-tuning 引入可学习的连续型提示向量 prompt embeddings 参数, 让模型自己去学习最优的 prompt embedding, 而不再依赖人工去设置自然语言形式的提示（Prompt）信息。P-Tuning 算法的数据和模型定义如下图所示，对应于数据预处理模块 `SoftTemplate` 和标签词映射模块 `MaskedLMVerbalizer`，详细介绍及定义方法参见 [Prompt API 文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/advanced_guide/prompt.md)。
