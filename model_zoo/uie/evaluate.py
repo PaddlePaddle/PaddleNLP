@@ -18,12 +18,11 @@ from functools import partial
 
 import paddle
 from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, UIE, UIEM
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 from paddlenlp.data import DataCollatorWithPadding
 
-from model import UIE, UIEM
 from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
 
 
