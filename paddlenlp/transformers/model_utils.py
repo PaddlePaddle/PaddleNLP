@@ -163,10 +163,15 @@ def load_hf_model_config_file(cls: Type[PretrainedModel],
             with open(config, 'r', encoding='utf-8') as f:
                 config = json.load(f)
 
-        if cls.config_attribute_mapping:
-            for hf_key, paddle_key in cls.config_attribute_mapping.items():
-                config[paddle_key] = config.pop(paddle_key, None) or config.pop(
-                    hf_key, None)
+        hf_config_map = {}
+        if cls.config_class is not None:
+            hf_config_map = cls.config_class.hf_config_map
+        else:
+            hf_config_map = cls.hf_config_map
+
+        for hf_key, paddle_key in hf_config_map.items():
+            config[paddle_key] = config.pop(paddle_key, None) or config.pop(
+                hf_key, None)
 
         config_file = os.path.join(_cache_dir, "model_config.json")
 
@@ -255,7 +260,9 @@ class PretrainedModel(Layer, GenerationMixin):
     base_model_prefix = ""
     main_input_name = "input_ids"
     config_class = None
-    config_attribute_mapping = {}
+
+    # map hf attribute to paddle attribute, only work for no PretrainedConfig models
+    hf_config_map: Dict[str, str] = {}
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.

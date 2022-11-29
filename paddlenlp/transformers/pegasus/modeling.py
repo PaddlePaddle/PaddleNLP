@@ -16,6 +16,7 @@
 from functools import partial
 import math
 import numpy as np
+from typing import Dict
 
 import paddle
 import paddle.nn as nn
@@ -58,7 +59,7 @@ class PegasusPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {}
     pretrained_resource_files_map = {}
     base_model_prefix = "pegasus"
-    config_attribute_mapping = {
+    hf_config_map: Dict[str, str] = {
         "num_encoder_layers": "encoder_layers",
         "num_decoder_layers": "decoder_layers",
     }

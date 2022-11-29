@@ -404,6 +404,10 @@ class PretrainedConfig:
 
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
+
+    # map hf attribute to paddle attribute
+    hf_config_map: Dict[str, str] = {}
+
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):
