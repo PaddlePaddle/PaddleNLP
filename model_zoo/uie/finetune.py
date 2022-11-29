@@ -20,15 +20,17 @@ from typing import Optional
 from dataclasses import dataclass, field
 
 import paddle
+from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, UIE, UIEM, export_model
+from paddlenlp.transformers import AutoTokenizer, export_model
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, CompressionArguments, Trainer
 from paddlenlp.trainer import get_last_checkpoint
 from paddlenlp.utils.log import logger
 
-from utils import reader, map_offset, convert_example
+from model import UIE, UIEM
+from utils import reader, MODEL_MAP, map_offset, convert_example
 
 
 @dataclass
@@ -90,9 +92,6 @@ def main():
         (ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
-        model_args.multilingual = True
-
     # Log model and data config
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -122,6 +121,15 @@ def main():
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
+    if model_args.model_name_or_path in MODEL_MAP:
+        resource_file_urls = MODEL_MAP[
+            model_args.model_name_or_path]['resource_file_urls']
+
+        logger.info("Downloading resource files...")
+        for key, val in resource_file_urls.items():
+            file_path = os.path.join(model_args.model_name_or_path, key)
+            if not os.path.exists(file_path):
+                get_path_from_url(val, model_args.model_name_or_path)
 
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     if model_args.multilingual:
@@ -221,7 +229,7 @@ def main():
                                         name='input_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='position_ids'),
+                                        name='pos_ids'),
             ]
         else:
             input_spec = [
@@ -233,10 +241,10 @@ def main():
                                         name='token_type_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='position_ids'),
+                                        name='pos_ids'),
                 paddle.static.InputSpec(shape=[None, None],
                                         dtype="int64",
-                                        name='attention_mask'),
+                                        name='att_mask'),
             ]
         if model_args.export_model_dir is None:
             model_args.export_model_dir = os.path.join(training_args.output_dir,
@@ -254,12 +262,12 @@ def main():
             for batch in data_loader:
                 if model_args.multilingual:
                     logits = model(input_ids=batch['input_ids'],
-                                   position_ids=batch["position_ids"])
+                                   pos_ids=batch["pos_ids"])
                 else:
                     logits = model(input_ids=batch['input_ids'],
                                    token_type_ids=batch['token_type_ids'],
-                                   position_ids=batch["position_ids"],
-                                   attention_mask=batch["attention_mask"])
+                                   pos_ids=batch["pos_ids"],
+                                   att_mask=batch["att_mask"])
                 start_prob, end_prob = logits
                 start_ids, end_ids = batch["start_positions"], batch[
                     "end_positions"]

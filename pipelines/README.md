@@ -187,6 +187,15 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 
 对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
+#### REST API
+
+Pipelines可以服务化，通过HTTP接口的形式供其他程序进行调用，Pipelines提供了Swagger API方便用户查询接口文档，从而把Pipelines的能力接入到自己的应用系统中，只需要在启动REST API后通过浏览器访问 [http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/204282574-4a468ba5-d32f-4ead-970b-87139b613521.png" width="500px">
+</div>
+
+
 ## :man_office_worker: 用户案例
 
 ### 案例1: [寻规-工程规范搜索引擎](https://xungui365.com/)

@@ -12,16 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Union, Tuple, Iterator
 import logging
 from pathlib import Path
-from tqdm import tqdm
+from typing import Iterator, List, Optional, Tuple, Union
 
 import paddle
-from paddlenlp.transformers import ErnieCrossEncoder, AutoTokenizer
+from tqdm import tqdm
 
-from pipelines.schema import Document
+from paddlenlp.transformers import AutoTokenizer, ErnieCrossEncoder
 from pipelines.nodes.ranker import BaseRanker
+from pipelines.schema import Document
 from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ class ErnieRanker(BaseRanker):
         model_name_or_path: Union[str, Path],
         top_k: int = 10,
         use_gpu: bool = True,
-        max_seq_len: int = 256,
+        max_seq_len: int = 512,
         progress_bar: bool = True,
         batch_size: int = 1000,
         reinitialize: bool = False,
@@ -69,11 +69,9 @@ class ErnieRanker(BaseRanker):
         # Parameter to control the use of English Cross Encoder Model
         self.use_en = use_en
 
-        self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
-                                                     multi_gpu=True)
+        self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
         print("Loading Parameters from:{}".format(model_name_or_path))
-        self.transformer_model = ErnieCrossEncoder(model_name_or_path,
-                                                   reinitialize=reinitialize)
+        self.transformer_model = ErnieCrossEncoder(model_name_or_path, reinitialize=reinitialize)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
         self.transformer_model.eval()
         self.progress_bar = progress_bar
@@ -83,10 +81,7 @@ class ErnieRanker(BaseRanker):
         if len(self.devices) > 1:
             self.model = paddle.DataParallel(self.transformer_model)
 
-    def predict(self,
-                query: str,
-                documents: List[Document],
-                top_k: Optional[int] = None) -> List[Document]:
+    def predict(self, query: str, documents: List[Document], top_k: Optional[int] = None) -> List[Document]:
         """
         Use loaded ranker model to re-rank the supplied list of Document.
 
@@ -100,17 +95,18 @@ class ErnieRanker(BaseRanker):
         if top_k is None:
             top_k = self.top_k
 
-        features = self.tokenizer([query for doc in documents],
-                                  [doc.content for doc in documents],
-                                  max_seq_len=self.max_seq_len,
-                                  pad_to_max_seq_len=True,
-                                  truncation_strategy="longest_first")
+        features = self.tokenizer(
+            [query for doc in documents],
+            [doc.content for doc in documents],
+            max_seq_len=self.max_seq_len,
+            pad_to_max_seq_len=True,
+            truncation_strategy="longest_first",
+        )
 
         tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
         with paddle.no_grad():
-            similarity_scores = self.transformer_model.matching(
-                **tensors).numpy()
+            similarity_scores = self.transformer_model.matching(**tensors).numpy()
 
         for doc, rank_score in zip(documents, similarity_scores):
             doc.rank_score = rank_score
@@ -150,31 +146,28 @@ class ErnieRanker(BaseRanker):
             batch_size = self.batch_size
 
         number_of_docs, all_queries, all_docs, single_list_of_docs = self._preprocess_batch_queries_and_docs(
-            queries=queries, documents=documents)
-        batches = self._get_batches(all_queries=all_queries,
-                                    all_docs=all_docs,
-                                    batch_size=batch_size)
-        pb = tqdm(total=len(all_docs),
-                  disable=not self.progress_bar,
-                  desc="Ranking")
+            queries=queries, documents=documents
+        )
+        batches = self._get_batches(all_queries=all_queries, all_docs=all_docs, batch_size=batch_size)
+        pb = tqdm(total=len(all_docs), disable=not self.progress_bar, desc="Ranking")
 
         preds = []
         for cur_queries, cur_docs in batches:
-            features = self.tokenizer(cur_queries,
-                                      [doc.content for doc in cur_docs],
-                                      max_seq_len=self.max_seq_len,
-                                      pad_to_max_seq_len=True,
-                                      truncation_strategy="longest_first")
+            features = self.tokenizer(
+                cur_queries,
+                [doc.content for doc in cur_docs],
+                max_seq_len=self.max_seq_len,
+                pad_to_max_seq_len=True,
+                truncation_strategy="longest_first",
+            )
 
             tensors = {k: paddle.to_tensor(v) for (k, v) in features.items()}
 
             with paddle.no_grad():
-                if (self.use_en):
-                    similarity_scores = self.transformer_model.matching_v2(
-                        **tensors).numpy()
+                if self.use_en:
+                    similarity_scores = self.transformer_model.matching_v2(**tensors).numpy()
                 else:
-                    similarity_scores = self.transformer_model.matching(
-                        **tensors).numpy()
+                    similarity_scores = self.transformer_model.matching(**tensors).numpy()
                 preds.extend(similarity_scores)
 
             for doc, rank_score in zip(cur_docs, similarity_scores):
@@ -185,8 +178,7 @@ class ErnieRanker(BaseRanker):
         if single_list_of_docs:
             sorted_scores_and_documents = sorted(
                 zip(preds, documents),
-                key=lambda similarity_document_tuple: similarity_document_tuple[
-                    0],
+                key=lambda similarity_document_tuple: similarity_document_tuple[0],
                 reverse=True,
             )
             sorted_documents = [doc for _, doc in sorted_scores_and_documents]
@@ -203,19 +195,15 @@ class ErnieRanker(BaseRanker):
             for pred_group, doc_group in zip(grouped_predictions, documents):
                 sorted_scores_and_documents = sorted(
                     zip(pred_group, doc_group),
-                    key=lambda similarity_document_tuple:
-                    similarity_document_tuple[0],
+                    key=lambda similarity_document_tuple: similarity_document_tuple[0],
                     reverse=True,
                 )
-                sorted_documents = [
-                    doc for _, doc in sorted_scores_and_documents
-                ]
+                sorted_documents = [doc for _, doc in sorted_scores_and_documents]
                 result.append(sorted_documents[:top_k])
             return result
 
     def _preprocess_batch_queries_and_docs(
-        self, queries: List[str], documents: Union[List[Document],
-                                                   List[List[Document]]]
+        self, queries: List[str], documents: Union[List[Document], List[List[Document]]]
     ) -> Tuple[List[int], List[str], List[Document], bool]:
         number_of_docs = []
         all_queries = []
@@ -225,9 +213,7 @@ class ErnieRanker(BaseRanker):
         # Docs case 1: single list of Documents -> rerank single list of Documents based on single query
         if len(documents) > 0 and isinstance(documents[0], Document):
             if len(queries) != 1:
-                raise Exception(
-                    "Number of queries must be 1 if a single list of Documents is provided."
-                )
+                raise Exception("Number of queries must be 1 if a single list of Documents is provided.")
             query = queries[0]
             number_of_docs = [len(documents)]
             all_queries = [query] * len(documents)
@@ -240,14 +226,10 @@ class ErnieRanker(BaseRanker):
             if len(queries) == 1:
                 queries = queries * len(documents)
             if len(queries) != len(documents):
-                raise Exception(
-                    "Number of queries must be equal to number of provided Document lists."
-                )
+                raise Exception("Number of queries must be equal to number of provided Document lists.")
             for query, cur_docs in zip(queries, documents):
                 if not isinstance(cur_docs, list):
-                    raise Exception(
-                        f"cur_docs was of type {type(cur_docs)}, but expected a list of Documents."
-                    )
+                    raise Exception(f"cur_docs was of type {type(cur_docs)}, but expected a list of Documents.")
                 number_of_docs.append(len(cur_docs))
                 all_queries.extend([query] * len(cur_docs))
                 all_docs.extend(cur_docs)
@@ -256,14 +238,11 @@ class ErnieRanker(BaseRanker):
 
     @staticmethod
     def _get_batches(
-        all_queries: List[str], all_docs: List[Document],
-        batch_size: Optional[int]
+        all_queries: List[str], all_docs: List[Document], batch_size: Optional[int]
     ) -> Iterator[Tuple[List[str], List[Document]]]:
         if batch_size is None:
             yield all_queries, all_docs
             return
         else:
             for index in range(0, len(all_queries), batch_size):
-                yield all_queries[index:index +
-                                  batch_size], all_docs[index:index +
-                                                        batch_size]
+                yield all_queries[index : index + batch_size], all_docs[index : index + batch_size]
