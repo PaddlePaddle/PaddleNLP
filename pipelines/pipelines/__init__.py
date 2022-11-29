@@ -12,32 +12,47 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+# flake8: noqa
 __version__ = "0.3.0a0"  # Maybe dev is better
 
-import logging
-import sys
 from types import ModuleType
 from typing import Union
 
-import pandas as pd
+try:
+    from importlib import metadata
+except (ModuleNotFoundError, ImportError):
+    # Python <= 3.7
+    import importlib_metadata as metadata  # type: ignore
 
-# This self-import is used to monkey-patch, keep for now
-import pipelines  # pylint: disable=import-self
-from pipelines.nodes import file_converter, preprocessor, ranker, reader, retriever
-from pipelines.nodes.file_classifier import FileTypeClassifier
-from pipelines.nodes.other import Docs2Answers
-from pipelines.utils import cleaning, preprocessing
-
-# All modules to be aliased need to be imported here
-
+# This configuration must be done before any import to apply to all submodules
+import logging
 
 logging.basicConfig(
     format="%(levelname)s - %(name)s -  %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.WARNING
 )
 logging.getLogger("pipelines").setLevel(logging.INFO)
 
+import pandas as pd
+
+from pipelines import pipelines, utils
+from pipelines.nodes import BaseComponent
+from pipelines.pipelines import Pipeline
+from pipelines.pipelines.standard_pipelines import (
+    BaseStandardPipeline,
+    DocPipeline,
+    ExtractiveQAPipeline,
+    QAGenerationPipeline,
+    SemanticSearchPipeline,
+    TextToImagePipeline,
+)
+from pipelines.schema import Answer, Document, Label, Span
+
 pd.options.display.max_colwidth = 80
+
+# ###########################################
+# Enable old style imports (temporary)
+import sys
+
 logger = logging.getLogger(__name__)
 
 
@@ -66,6 +81,12 @@ def DeprecatedModule(mod, deprecated_attributes=None, is_module_deprecated=True)
     return DeprecationWrapper()
 
 
+# All modules to be aliased need to be imported here
+
+# This self-import is used to monkey-patch, keep for now
+import pipelines  # pylint: disable=import-self
+from pipelines.nodes import file_converter, preprocessor, ranker, reader, retriever
+
 # Note that we ignore the ImportError here because if the user did not install
 # the correct dependency group for a document store, we don't need to setup
 # import warnings for that, so the import here is useless and should fail silently.
@@ -76,6 +97,9 @@ try:
 except ImportError:
     pass
 
+from pipelines.nodes.file_classifier import FileTypeClassifier
+from pipelines.nodes.other import Docs2Answers, JoinAnswers, JoinDocuments
+from pipelines.utils import cleaning, preprocessing
 
 # For the alias to work as an importable module (like `from pipelines import reader`),
 # modules need to be set as attributes of their parent model.
