@@ -340,11 +340,6 @@ TASKS = {
                 "hidden_size": 1024,
                 "task_flag": "information_extraction-uie-m-large"
             },
-            "uie-x-base": {
-                "task_class": UIETask,
-                "hidden_size": 768,
-                "task_flag": "information_extraction-uie-x-base"
-            },
             "uie-data-distill-gp": {
                 "task_class": GPTask,
                 "task_flag": "information_extraction-uie-data-distill-gp"
@@ -525,8 +520,7 @@ TASKS = {
 
 support_schema_list = [
     "uie-base", "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-tiny",
-    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base",
-    "uie-x-base"
+    "uie-medical-base", "uie-base-en", "wordtag", "uie-m-large", "uie-m-base"
 ]
 
 support_argument_list = [
