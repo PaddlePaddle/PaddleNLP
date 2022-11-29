@@ -27,6 +27,7 @@ from .import_utils import (
     is_paddle_available,
     is_paddlenlp_available,
     is_unidecode_available,
+    is_fastdeploy_available,
     requires_backends,
 )
 from .logging import get_logger
@@ -45,6 +46,8 @@ default_cache_path = _get_sub_home('models')
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"
 ONNX_WEIGHTS_NAME = "model.onnx"
+FASTDEPLOY_WEIGHTS_NAME = "inference.pdiparams"
+FASTDEPLOY_MODEL_NAME = "inference.pdmodel"
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPDIFFUSERS_CACHE = default_cache_path
 PPDIFFUSERS_DYNAMIC_MODULE_NAME = "ppdiffusers_modules"
