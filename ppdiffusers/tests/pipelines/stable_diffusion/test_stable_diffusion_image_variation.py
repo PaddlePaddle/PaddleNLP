@@ -326,7 +326,7 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
                     -2.9535622596740723
                 ])
                 assert np.abs(latents_slice.flatten() -
-                              expected_slice).max() < 1e-3
+                              expected_slice).max() < 5e-3
             elif step == 37:
                 latents = latents.detach().cpu().numpy()
                 assert latents.shape == (1, 4, 64, 64)
@@ -362,4 +362,4 @@ class StableDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase):
             callback_steps=1,
         )
         assert test_callback_fn.has_been_called
-        assert number_of_steps == 51
+        assert number_of_steps == 50

@@ -62,6 +62,7 @@ if is_paddle_available():
         DPMSolverMultistepScheduler,
         EulerAncestralDiscreteScheduler,
         EulerDiscreteScheduler,
+        HeunDiscreteScheduler,
         IPNDMScheduler,
         KarrasVeScheduler,
         PNDMScheduler,

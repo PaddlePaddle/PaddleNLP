@@ -37,6 +37,7 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
     """
+    order = 1
 
     @register_to_config
     def __init__(self, num_train_timesteps: int = 1000):

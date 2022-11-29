@@ -729,12 +729,12 @@ class StableDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
 
         prompt = "hey"
 
-        output = sd_pipe(prompt, number_of_steps=1, output_type="np")
+        output = sd_pipe(prompt, num_inference_steps=1, output_type="np")
         image_shape = output.images[0].shape[:2]
         assert image_shape == (64, 64)
 
         output = sd_pipe(prompt,
-                         number_of_steps=1,
+                         num_inference_steps=1,
                          height=96,
                          width=96,
                          output_type="np")
@@ -744,7 +744,7 @@ class StableDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         config = dict(sd_pipe.unet.config)
         config["sample_size"] = 96
         sd_pipe.unet = UNet2DConditionModel.from_config(config)
-        output = sd_pipe(prompt, number_of_steps=1, output_type="np")
+        output = sd_pipe(prompt, num_inference_steps=1, output_type="np")
         image_shape = output.images[0].shape[:2]
         assert image_shape == (192, 192)
 
@@ -853,7 +853,6 @@ class StableDiffusionPipelineIntegrationTests(unittest.TestCase):
 
         generator = paddle.Generator().manual_seed(0)
         output = pipe(prompt=prompt,
-                      strength=0.75,
                       guidance_scale=7.5,
                       generator=generator,
                       output_type="np")
@@ -916,4 +915,4 @@ class StableDiffusionPipelineIntegrationTests(unittest.TestCase):
                 callback_steps=1,
             )
         assert test_callback_fn.has_been_called
-        assert number_of_steps == 51
+        assert number_of_steps == 50

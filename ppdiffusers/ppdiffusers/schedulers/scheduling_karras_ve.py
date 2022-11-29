@@ -76,6 +76,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
             A reasonable range is [0.2, 80].
 
     """
+    order = 2
 
     @register_to_config
     def __init__(

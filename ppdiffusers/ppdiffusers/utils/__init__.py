@@ -68,6 +68,7 @@ _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
     "PNDMScheduler",
     "LMSDiscreteScheduler",
     "EulerDiscreteScheduler",
+    "HeunDiscreteScheduler",
     "EulerAncestralDiscreteScheduler",
     "DPMSolverMultistepScheduler",
 ]

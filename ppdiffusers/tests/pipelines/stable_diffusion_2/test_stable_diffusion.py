@@ -631,4 +631,4 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
             callback_steps=1,
         )
         assert test_callback_fn.has_been_called
-        assert number_of_steps == 21
+        assert number_of_steps == 20
