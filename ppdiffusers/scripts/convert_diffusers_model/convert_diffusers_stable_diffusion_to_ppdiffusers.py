@@ -152,7 +152,6 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             beta_end=beta_end,
             beta_schedule="scaled_linear",
             # Make sure the scheduler compatible with DDIM
-            clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
             # Make sure the scheduler compatible with PNDM
