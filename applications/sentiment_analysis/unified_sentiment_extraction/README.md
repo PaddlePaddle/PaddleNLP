@@ -27,8 +27,6 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 <div align="center">
     <img src="https://user-images.githubusercontent.com/35913314/199965793-f0933baa-5b82-47da-9271-ba36642119f8.png" />
 </div>
-<br>
-
 
 **方案亮点**：
 
