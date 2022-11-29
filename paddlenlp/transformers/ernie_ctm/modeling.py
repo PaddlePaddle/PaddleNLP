@@ -150,12 +150,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ernie_ctm"
     
-    config = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION["ernie-ctm"]
-    pretrained_init_configuration = {
-        "ernie-ctm": config,
-        "wordtag": config,
-        "nptag": config,
-    }
+    pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):

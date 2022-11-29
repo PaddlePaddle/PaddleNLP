@@ -16,26 +16,30 @@ from __future__ import annotations
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
+ERNIE_CTM_CONFIG = {
+    "vocab_size": 23000,
+    "embedding_size": 128,
+    "num_hidden_layers": 12,
+    "num_attention_heads": 12,
+    "intermediate_size": 3072,
+    "hidden_dropout_prob": 0.1,
+    "layer_norm_eps": 1e-12,
+    "max_position_embeddings": 512,
+    "type_vocab_size": 2,
+    "initializer_range": 0.02,
+    "pad_token_id": 0,
+    "use_content_summary": True,
+    "content_summary_index": 1,
+    "cls_num": 2,
+    "num_prompt_placeholders": 5,
+    "prompt_vocab_ids": None
+}
+
 
 ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION = {
-    "ernie-ctm": {
-        "vocab_size": 23000,
-        "embedding_size": 128,
-        "num_hidden_layers": 12,
-        "num_attention_heads": 12,
-        "intermediate_size": 3072,
-        "hidden_dropout_prob": 0.1,
-        "layer_norm_eps": 1e-12,
-        "max_position_embeddings": 512,
-        "type_vocab_size": 2,
-        "initializer_range": 0.02,
-        "pad_token_id": 0,
-        "use_content_summary": True,
-        "content_summary_index": 1,
-        "cls_num": 2,
-        "num_prompt_placeholders": 5,
-        "prompt_vocab_ids": None
-    },
+    "ernie-ctm": ERNIE_CTM_CONFIG,
+    "wordtag": ERNIE_CTM_CONFIG,
+    "nptag": ERNIE_CTM_CONFIG
 }
 
 ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP = {
