@@ -58,6 +58,7 @@ def main():
     training_args.image_logging_steps = model_args.image_logging_steps = (
         math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps
     )
+    training_args.resolution = data_args.resolution
     training_args.print_config(training_args, "Training")
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")

@@ -33,6 +33,7 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # report to custom_visualdl
     training_args.report_to = ["custom_visualdl"]
+    training_args.resolution = data_args.resolution
     training_args.image_logging_steps = model_args.image_logging_steps = (
         math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps
     )
