@@ -12,11 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
+__version__ = "0.3.0a0"  # Maybe dev is better
 
-__version__ = '0.1.0a0'  # Maybe dev is better
-
-from typing import Union
 from types import ModuleType
+from typing import Union
 
 try:
     from importlib import metadata
@@ -27,20 +27,25 @@ except (ModuleNotFoundError, ImportError):
 # This configuration must be done before any import to apply to all submodules
 import logging
 
-logging.basicConfig(format="%(levelname)s - %(name)s -  %(message)s",
-                    datefmt="%m/%d/%Y %H:%M:%S",
-                    level=logging.WARNING)
+logging.basicConfig(
+    format="%(levelname)s - %(name)s -  %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.WARNING
+)
 logging.getLogger("pipelines").setLevel(logging.INFO)
 
-from pipelines import utils
-from pipelines import pipelines
-from pipelines.schema import Document, Answer, Label, Span
+import pandas as pd
+
+from pipelines import pipelines, utils
 from pipelines.nodes import BaseComponent
 from pipelines.pipelines import Pipeline
 from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline, ExtractiveQAPipeline, SemanticSearchPipeline,
-    TextToImagePipeline, QAGenerationPipeline, DocPipeline)
-import pandas as pd
+    BaseStandardPipeline,
+    DocPipeline,
+    ExtractiveQAPipeline,
+    QAGenerationPipeline,
+    SemanticSearchPipeline,
+    TextToImagePipeline,
+)
+from pipelines.schema import Answer, Document, Label, Span
 
 pd.options.display.max_colwidth = 80
 
@@ -52,9 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 # Wrapper emitting a warning on import
-def DeprecatedModule(mod,
-                     deprecated_attributes=None,
-                     is_module_deprecated=True):
+def DeprecatedModule(mod, deprecated_attributes=None, is_module_deprecated=True):
     """
     Return a wrapped object that warns about deprecated accesses at import
     """
@@ -64,14 +67,11 @@ def DeprecatedModule(mod,
 
         def __getattr__(self, attr):
             is_a_deprecated_attr = deprecated_attributes and attr in deprecated_attributes
-            is_a_deprecated_module = is_module_deprecated and attr not in [
-                "__path__", "__spec__", "__name__"
-            ]
+            is_a_deprecated_module = is_module_deprecated and attr not in ["__path__", "__spec__", "__name__"]
             warning_already_emitted = attr in self.warned
             attribute_exists = getattr(mod, attr) is not None
 
-            if (is_a_deprecated_attr or is_a_deprecated_module
-                ) and not warning_already_emitted and attribute_exists:
+            if (is_a_deprecated_attr or is_a_deprecated_module) and not warning_already_emitted and attribute_exists:
                 logger.warn(
                     f"Object '{attr}' is imported through a deprecated path. Please check out the docs for the new import path."
                 )
@@ -85,8 +85,7 @@ def DeprecatedModule(mod,
 
 # This self-import is used to monkey-patch, keep for now
 import pipelines  # pylint: disable=import-self
-from pipelines.nodes import (file_converter, preprocessor, ranker, reader,
-                             retriever)
+from pipelines.nodes import file_converter, preprocessor, ranker, reader, retriever
 
 # Note that we ignore the ImportError here because if the user did not install
 # the correct dependency group for a document store, we don't need to setup
@@ -99,9 +98,8 @@ except ImportError:
     pass
 
 from pipelines.nodes.file_classifier import FileTypeClassifier
-from pipelines.nodes.other import JoinDocuments, Docs2Answers, JoinAnswers
-from pipelines.utils import preprocessing
-from pipelines.utils import cleaning
+from pipelines.nodes.other import Docs2Answers, JoinAnswers, JoinDocuments
+from pipelines.utils import cleaning, preprocessing
 
 # For the alias to work as an importable module (like `from pipelines import reader`),
 # modules need to be set as attributes of their parent model.
@@ -114,10 +112,7 @@ sys.modules["pipelines.preprocessor.utils"] = DeprecatedModule(preprocessing)
 sys.modules["pipelines.preprocessor.cleaning"] = DeprecatedModule(cleaning)
 
 setattr(pipelines, "document_store", DeprecatedModule(document_stores))
-setattr(
-    pipelines, "file_converter",
-    DeprecatedModule(file_converter,
-                     deprecated_attributes=["FileTypeClassifier"]))
+setattr(pipelines, "file_converter", DeprecatedModule(file_converter, deprecated_attributes=["FileTypeClassifier"]))
 setattr(
     pipelines,
     "pipeline",
@@ -129,9 +124,7 @@ setattr(
         ],
     ),
 )
-setattr(
-    pipelines, "preprocessor",
-    DeprecatedModule(preprocessor, deprecated_attributes=["utils", "cleaning"]))
+setattr(pipelines, "preprocessor", DeprecatedModule(preprocessor, deprecated_attributes=["utils", "cleaning"]))
 setattr(pipelines, "ranker", DeprecatedModule(ranker))
 setattr(pipelines, "reader", DeprecatedModule(reader))
 setattr(pipelines, "retriever", DeprecatedModule(retriever))
@@ -139,8 +132,7 @@ setattr(pipelines, "retriever", DeprecatedModule(retriever))
 sys.modules["pipelines.document_store"] = DeprecatedModule(document_stores)
 sys.modules["pipelines.file_converter"] = DeprecatedModule(file_converter)
 sys.modules["pipelines.pipeline"] = DeprecatedModule(pipelines)
-sys.modules["pipelines.preprocessor"] = DeprecatedModule(
-    preprocessor, deprecated_attributes=["utils", "cleaning"])
+sys.modules["pipelines.preprocessor"] = DeprecatedModule(preprocessor, deprecated_attributes=["utils", "cleaning"])
 sys.modules["pipelines.ranker"] = DeprecatedModule(ranker)
 sys.modules["pipelines.reader"] = DeprecatedModule(reader)
 sys.modules["pipelines.retriever"] = DeprecatedModule(retriever)
@@ -164,6 +156,5 @@ deprecated_attributes = [
 ]
 
 sys.modules["pipelines"] = DeprecatedModule(
-    pipelines,
-    is_module_deprecated=False,
-    deprecated_attributes=deprecated_attributes)
+    pipelines, is_module_deprecated=False, deprecated_attributes=deprecated_attributes
+)
