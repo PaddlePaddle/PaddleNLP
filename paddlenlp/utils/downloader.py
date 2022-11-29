@@ -11,22 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import hashlib
+import json
 import os
-import sys
 import os.path as osp
 import shutil
 from typing import Optional
 import json
 import requests
 import hashlib
+import sys
 import tarfile
-import zipfile
+import threading
 import time
 import uuid
-import threading
+import zipfile
 from collections import OrderedDict
+
 from .env import DOWNLOAD_SERVER, SUCCESS_STATUS, FAILED_STATUS
 from huggingface_hub.file_download import hf_hub_download
+from typing import Optional
+
+import requests
+
+from .env import DOWNLOAD_SERVER, FAILED_STATUS, LOCK_FILE_HOME, SUCCESS_STATUS
+from .file_lock import FileLock
 
 try:
     from tqdm import tqdm
@@ -173,6 +182,38 @@ def get_path_from_url(url, root_dir, md5sum=None, check_exist=True):
             fullpath = _decompress(fullpath)
 
     return fullpath
+
+
+def get_path_from_url_with_filelock(url: str,
+                                    root_dir: str,
+                                    md5sum: Optional[str] = None,
+                                    check_exist: bool = True) -> str:
+    """construct `get_path_from_url` for `model_utils` to enable downloading multiprocess-safe
+
+    Args:
+        url (str): the url of resource file
+        root_dir (str): the local download path
+        md5sum (str, optional): md5sum string for file. Defaults to None.
+        check_exist (bool, optional): whether check the file is exist. Defaults to True.
+
+    Returns:
+        str: the path of downloaded file
+    """
+    os.makedirs(root_dir, exist_ok=True)
+
+    # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
+    lock_file_name = hashlib.md5((url + root_dir).encode("utf-8")).hexdigest()
+    lock_file_path = os.path.join(LOCK_FILE_HOME, lock_file_name)
+
+    with FileLock(lock_file_path):
+        # import get_path_from_url from paddle framework
+        from paddle.utils.download import \
+            get_path_from_url as _get_path_from_url
+        result = _get_path_from_url(url=url,
+                                    root_dir=root_dir,
+                                    md5sum=md5sum,
+                                    check_exist=check_exist)
+    return result
 
 
 def _download(url, path, md5sum=None):
@@ -406,6 +447,7 @@ class DownloaderCheck(threading.Thread):
             extra.update({"addition": addition})
         try:
             import paddle
+
             import paddlenlp
             payload['hub_version'] = " "
             payload['ppnlp_version'] = paddlenlp.__version__

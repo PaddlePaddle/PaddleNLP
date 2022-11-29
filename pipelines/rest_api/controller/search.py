@@ -25,7 +25,7 @@ from fastapi import APIRouter
 
 import pipelines
 from pipelines.pipelines.base import Pipeline
-from rest_api.config import PIPELINE_YAML_PATH, QUERY_PIPELINE_NAME
+from rest_api.config import PIPELINE_YAML_PATH, QUERY_PIPELINE_NAME, QUERY_QA_PAIRS_NAME
 from rest_api.config import LOG_LEVEL, CONCURRENT_REQUEST_PER_WORKER
 from rest_api.schema import QueryRequest, QueryResponse, DocumentRequest, DocumentResponse, QueryImageResponse, QueryQAPairResponse, QueryQAPairRequest
 from rest_api.controller.utils import RequestLimiter
@@ -42,8 +42,11 @@ router = APIRouter()
 PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
                                    pipeline_name=QUERY_PIPELINE_NAME)
 
-QA_PAIR_PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
-                                           pipeline_name="query_qa_pairs")
+try:
+    QA_PAIR_PIPELINE = Pipeline.load_from_yaml(
+        Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_QA_PAIRS_NAME)
+except Exception as e:
+    logger.warning(f"Request pipeline ('{QUERY_QA_PAIRS_NAME}: is null'). ")
 DOCUMENT_STORE = PIPELINE.get_document_store()
 logging.info(f"Loaded pipeline nodes: {PIPELINE.graph.nodes.keys()}")
 
