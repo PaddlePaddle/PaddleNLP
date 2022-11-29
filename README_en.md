@@ -30,6 +30,9 @@
 
 ## News 📢
 
+* 🔥 **2022.11.28 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
+  * 💪 Framework upgrade：Introduced [**Huggingface Hub Integration**](https://huggingface.co/) with a plan to gradually support all Models, Tokenizers and Taskflows to directly load from Huggingface Hub; Added PET implementation to [**Prompt API**](./docs/advanced_guide/prompt.md).
+  * 💎 NLP Tool：[**Pipelines**](./pipelines) now supports [Ernie-Search](./pipelines/API.md); Released [**SimpleServing**](./model_zoo/ernie-health/cblue/deploy/serving/SimpleServing/README.md), a quick out-of-box solution to deploy Taskflows and Pretrained Models.
 * 🔥 **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
   * 💪 Framework upgrade：🏆 Upgrade [**Prompt API**](./docs/advanced_guide/prompt.md), supporting more flexible prompt definitions and winning the 1st place in [FewCLUE](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA); 🕸 Upgrade [**Trainer API**](./docs/trainer.md), supporting Seq2seqTrainer, IterableDataset as well as bf16 and sharding strategies.
   * 🔨 Industrial application：🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie). Support **quantization aware training** and INT8 precision inference for inference performance boost.
