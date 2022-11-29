@@ -30,7 +30,7 @@ from .visual_backbone import ResNet
 __all__ = [
     'ErnieLayoutModel', "ErnieLayoutPretrainedModel",
     "ErnieLayoutForTokenClassification", "ErnieLayoutForSequenceClassification",
-    "ErnieLayoutForPretraining", "ErnieLayoutForQuestionAnswering"
+    "ErnieLayoutForPretraining", "ErnieLayoutForQuestionAnswering", "UIEX"
 ]
 
 
@@ -220,13 +220,46 @@ class ErnieLayoutPretrainedModel(PretrainedModel):
             "rel_pos_bins": 32,
             "type_vocab_size": 100,
             "vocab_size": 250002,
-        }
+        },
+        "uie-x-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "bos_token_id": 0,
+            "coordinate_size": 128,
+            "eos_token_id": 2,
+            "gradient_checkpointing": False,
+            "has_relative_attention_bias": True,
+            "has_spatial_attention_bias": True,
+            "has_visual_segment_embedding": False,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "image_feature_pool_shape": [7, 7, 256],
+            "initializer_range": 0.02,
+            "intermediate_size": 3072,
+            "layer_norm_eps": 1e-12,
+            "max_2d_position_embeddings": 1024,
+            "max_position_embeddings": 514,
+            "max_rel_2d_pos": 256,
+            "max_rel_pos": 128,
+            "model_type": "ernie_layout",
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "output_past": True,
+            "pad_token_id": 1,
+            "shape_size": 128,
+            "rel_2d_pos_bins": 64,
+            "rel_pos_bins": 32,
+            "type_vocab_size": 100,
+            "vocab_size": 250002,
+        },
     }
-    resource_files_names = {"model_state": "model_state.pdparams"}
+    # resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-layoutx-base-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/ernie_layoutx_base_uncased.pdparams",
+            "uie-x-base":
+            "https://bj.bcebos.com/paddlenlp/models/transformers/uie_x/uie_x_base.pdparams",
         }
     }
     base_model_prefix = "ernie_layout"
@@ -1263,3 +1296,36 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
         else:
             outputs = (total_loss, ) + outputs
             return outputs
+
+
+class UIEX(ErnieLayoutPretrainedModel):
+
+    def __init__(self, ernie_layout):
+        super(UIEX, self).__init__()
+        self.ernie_layout = ernie_layout
+        hidden_size = self.ernie_layout.config["hidden_size"]
+        self.linear_start = paddle.nn.Linear(hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+        self.sigmoid = paddle.nn.Sigmoid()
+        self.apply(self.init_weights)
+
+    def forward(self,
+                input_ids,
+                token_type_ids=None,
+                position_ids=None,
+                attention_mask=None,
+                bbox=None,
+                image=None):
+        sequence_output, _ = self.ernie_layout(input_ids=input_ids,
+                                               token_type_ids=token_type_ids,
+                                               position_ids=position_ids,
+                                               attention_mask=attention_mask,
+                                               bbox=bbox,
+                                               image=image)
+        start_logits = self.linear_start(sequence_output)
+        start_logits = paddle.squeeze(start_logits, -1)
+        start_prob = self.sigmoid(start_logits)
+        end_logits = self.linear_end(sequence_output)
+        end_logits = paddle.squeeze(end_logits, -1)
+        end_prob = self.sigmoid(end_logits)
+        return start_prob, end_prob

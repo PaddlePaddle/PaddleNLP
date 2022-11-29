@@ -21,9 +21,10 @@ from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoTokenizer, UIE, UIEM
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.ie_utils import unify_prompt_name, get_relation_type_dict
 from paddlenlp.data import DataCollatorWithPadding
 
-from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
+from utils import convert_example, reader, create_data_loader
 
 
 @paddle.no_grad()
@@ -40,11 +41,13 @@ def evaluate(model, metric, data_loader, multilingual=False):
     metric.reset()
     for batch in data_loader:
         if multilingual:
-            start_prob, end_prob = model(batch["input_ids"], batch["pos_ids"])
+            start_prob, end_prob = model(batch["input_ids"],
+                                         batch["position_ids"])
         else:
             start_prob, end_prob = model(batch["input_ids"],
                                          batch["token_type_ids"],
-                                         batch["pos_ids"], batch["att_mask"])
+                                         batch["position_ids"],
+                                         batch["attention_mask"])
 
         start_ids = paddle.cast(batch["start_positions"], 'float32')
         end_ids = paddle.cast(batch["end_positions"], 'float32')
@@ -57,6 +60,8 @@ def evaluate(model, metric, data_loader, multilingual=False):
 
 
 def do_eval():
+    if args.model_path in ["uie-m-base", "uie-m-large"]:
+        args.multilingual = True
     tokenizer = AutoTokenizer.from_pretrained(args.model_path)
     if args.multilingual:
         model = UIEM.from_pretrained(args.model_path)
