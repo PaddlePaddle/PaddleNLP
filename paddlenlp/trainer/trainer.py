@@ -270,6 +270,9 @@ class Trainer:
             )
 
         self.do_grad_scaling = False
+        self.max_update_step = 110000
+        if args.fp16:
+            self.max_update_step = 1000
         if (args.fp16 or args.bf16):
             logger.info("Using half precision")
             self.do_grad_scaling = True
@@ -694,9 +697,12 @@ class Trainer:
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
                         self.scaler.step(self.optimizer)
-                        self.scaler.update()
+                        if step <= self.max_update_step:
+                            self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
                         optimizer_was_run = scale_before <= scale_after
+                        if not optimizer_was_run:
+                            self.max_update_step += 1000
                     else:
                         self.optimizer.step()
 
