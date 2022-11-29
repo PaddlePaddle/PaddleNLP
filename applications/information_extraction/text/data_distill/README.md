@@ -10,44 +10,9 @@
 
 - **Step 3**: 使用标注数据以及步骤2得到的合成数据训练出封闭域Student Model。
 
-## 数据准备
-
-本项目中从CMeIE数据集中采样少量数据展示了UIE数据蒸馏流程，[示例数据下载](https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip)，解压后放在``../data``目录下。
-
-```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/uie/data_distill/data.zip && unzip data.zip -d ../
-```
-
-示例数据包含以下两部分：
-
-| 名称 |  数量  |
-| :---: | :-----: |
-| doccano格式标注数据（doccano_ext.json）| 200 |
-| 无标注数据（unlabeled_data.txt）| 1277 |
-
 ## UIE Finetune
 
-参考[UIE主文档](../README.md)完成UIE模型微调。
-
-训练集/验证集切分：
-
-```shell
-python doccano.py \
-    --doccano_file ./data/doccano_ext.json \
-    --task_type ext \
-    --save_dir ./data \
-    --splits 0.8 0.2 0
-```
-
-模型微调：
-
-```shell
-python finetune.py \
-    --train_path ./data/train.txt \
-    --dev_path ./data/dev.txt \
-    --learning_rate 5e-6 \
-    --batch_size 2
-```
+参考[UIE关系抽取微调](../README.md)完成模型微调，得到``../checkpoint/model_best``。
 
 ## 离线蒸馏
 
@@ -68,12 +33,13 @@ python data_distill.py \
 - `model_path`: 训练好的UIE定制模型路径。
 - `save_dir`: 学生模型训练数据保存路径。
 - `synthetic_ratio`: 控制合成数据的比例。最大合成数据数量=synthetic_ratio*标注数据数量。
-- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取，需指定任务类型。
+- `platform`: 标注数据的所使用的标注平台，可选有`doccano`，`label_studio`，默认为`label_studio`。
+- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域抽取，不同任务的后处理逻辑不同，因此需指定任务类型。
 - `seed`: 随机种子，默认为1000。
 
 #### 老师模型评估
 
-UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，不适合关系、事件等任务），可通过以下评估脚本针对原始标注格式数据评估模型效果
+UIE微调阶段针对UIE训练格式数据评估模型效果（该评估方式非端到端评估，非关系抽取或事件抽取的标准评估方式），可通过以下评估脚本进行端到端评估。
 
 ```shell
 python evaluate_teacher.py \
@@ -101,7 +67,7 @@ python train.py \
     --train_path student_data/train_data.json \
     --dev_path student_data/dev_data.json \
     --label_maps_path student_data/label_maps.json \
-    --num_epochs 200 \
+    --num_epochs 50 \
     --encoder ernie-3.0-mini-zh
 ```
 
@@ -120,10 +86,30 @@ python train.py \
 - `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
 - `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取，需指定任务类型。
 - `logging_steps`: 日志打印的间隔steps数，默认10。
-- `valid_steps`: evaluate的间隔steps数，默认200。
+- `eval_steps`: evaluate的间隔steps数，默认200。
 - `device`: 选用什么设备进行训练，可选cpu或gpu。
 - `init_from_ckpt`: 可选，模型参数路径，热启动模型训练；默认为None。
 
+#### 学生模型评估
+
+```shell
+python evaluate.py \
+    --model_path ./checkpoint/model_best \
+    --test_path student_data/dev_data.json \
+    --task_type relation_extraction \
+    --label_maps_path student_data/label_maps.json \
+    --encoder ernie-3.0-mini-zh
+```
+
+可配置参数说明：
+
+- `model_path`: 训练好的UIE定制模型路径。
+- `test_path`: 测试数据集路径。
+- `label_maps_path`: 学生模型标签字典。
+- `batch_size`: 批处理大小，默认为8。
+- `max_seq_len`: 最大文本长度，默认为256。
+- `encoder`: 选择学生模型的模型底座，默认为`ernie-3.0-mini-zh`。
+- `task_type`: 选择任务类型，可选有`entity_extraction`，`relation_extraction`，`event_extraction`和`opinion_extraction`。因为是封闭域信息抽取的评估，需指定任务类型。
 
 ## Taskflow部署学生模型
 
@@ -133,17 +119,27 @@ python train.py \
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 
->>> ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
->>> pprint(ie("登革热@结果 升高 ### 血清白蛋白水平 检查 结果 检查 在资源匮乏地区和富足地区，对有症状患者均应早期检测。"))
-[{'疾病': [{'end': 3,
-          'probability': 0.99952424,
-          'relations': {'实验室检查': [{'end': 21,
-                                   'probability': 0.994445,
-                                   'relations': {},
-                                   'start': 14,
-                                   'text': '血清白蛋白水平'}]},
-          'start': 0,
-          'text': '登革热'}]}]
+>>> my_ie = Taskflow("information_extraction", model="uie-data-distill-gp", task_path="checkpoint/model_best/") # Schema is fixed in closed-domain information extraction
+>>> pprint(my_ie("威尔哥（Virgo）减速炸弹是由瑞典FFV军械公司专门为瑞典皇家空军的攻击机实施低空高速轰炸而研制，1956年开始研制，1963年进入服役，装备于A32“矛盾”、A35“龙”、和AJ134“雷”攻击机，主要用于攻击登陆艇、停放的飞机、高炮、野战火炮、轻型防护装甲车辆以及有生力量。"))
+[{'武器名称': [{'end': 14,
+            'probability': 0.9976037,
+            'relations': {'产国': [{'end': 18,
+                                  'probability': 0.9988706,
+                                  'relations': {},
+                                  'start': 16,
+                                  'text': '瑞典'}],
+                          '研发单位': [{'end': 25,
+                                    'probability': 0.9978277,
+                                    'relations': {},
+                                    'start': 18,
+                                    'text': 'FFV军械公司'}],
+                          '类型': [{'end': 14,
+                                  'probability': 0.99837446,
+                                  'relations': {},
+                                  'start': 12,
+                                  'text': '炸弹'}]},
+            'start': 0,
+            'text': '威尔哥（Virgo）减速炸弹'}]}]
 ```
 
 
