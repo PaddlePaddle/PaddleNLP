@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import unittest
-from typing import Optional, Union, Dict
+from typing import Dict
 from paddlenlp.transformers.configuration_utils import attribute_map, PretrainedConfig
-from paddlenlp.transformers.model_utils import PretrainedModel
 
 
 class FakeSimplePretrainedModelConfig(PretrainedConfig):

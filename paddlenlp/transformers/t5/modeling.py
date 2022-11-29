@@ -13,10 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-from distutils.command.config import config
 
 import math
-from typing import Optional, Tuple, Union, List
+from typing import Optional, Tuple
 
 import numpy as np
 import paddle
@@ -36,7 +35,6 @@ from ..model_outputs import (
     Seq2SeqModelOutput,
     Seq2SeqLMOutput,
     BaseModelOutput,
-    ModelOutput,
     convert_encoder_output,
 )
 

@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 from typing import Dict
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
     "T5_PRETRAINED_INIT_CONFIGURATION", "T5Config",

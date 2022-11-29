@@ -15,15 +15,13 @@
 
 import numpy as np
 import random
-import copy
-import tempfile
 import unittest
 from parameterized import parameterized_class
 
 from tests.testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
+from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 import paddle
 from paddlenlp.transformers.t5.configuration import T5Config
