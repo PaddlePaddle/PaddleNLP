@@ -14,12 +14,12 @@
 
 import unittest
 from typing import Dict
-from paddlenlp.transformers.configuration_utils import attribute_map, PretrainedConfig
+
+from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
 
 class FakeSimplePretrainedModelConfig(PretrainedConfig):
-    """simple fake Pretrained Model Config
-    """
+    """simple fake Pretrained Model Config"""
 
     def __init__(self, a=0, b=1, c=2):
         self.a = a
@@ -28,8 +28,8 @@ class FakeSimplePretrainedModelConfig(PretrainedConfig):
 
 
 class FakePretrainedModelConfig(PretrainedConfig):
-    """Fake Pretrained Model which is similar with actual situation
-    """
+    """Fake Pretrained Model which is similar with actual situation"""
+
     attribute_map: Dict[str, str] = {
         "num_classes": "num_labels",
     }
