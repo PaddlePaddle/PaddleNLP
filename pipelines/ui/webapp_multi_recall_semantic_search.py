@@ -233,9 +233,7 @@ def main():
                     width=
                     400,  # Manually Adjust the width of the image as per requirement
                 )
-            st.write(
-                f"**Relevance:** {result['relevance']} -  **Source:** {result['source']}"
-            )
+            st.write("**Relevance:** ", result["relevance"])
 
             st.write("___")
 

@@ -1,4 +1,6 @@
-# 端到端两路召回检索系统
+# 端到端两路召回语义检索系统
+
+## 1. 概述
 
 多路召回是指采用不同的策略、特征或者简单的模型，分别召回一部分候选集合，然后把这些候选集混合在一起供后续的排序模型进行重排，也可以定制自己的重排序的规则等等。本项目使用关键字和语义检索两路召回的检索系统，系统的架构如下，用户输入的Query会分别通过关键字召回BMRetriever（Okapi BM 25算法，Elasticsearch默认使用的相关度评分算法，是基于词频和文档频率和文档长度相关性来计算相关度），语义向量检索召回DenseRetriever（使用RocketQA抽取向量，然后比较向量之间相似度）后得到候选集，然后通过JoinResults进行结果聚合，最后通过通用的Ranker模块得到重排序的结果返回给用户。
 
@@ -6,11 +8,17 @@
     <img src="https://user-images.githubusercontent.com/12107462/204423532-90f62781-5f81-4b6d-9f94-741416ae3fcb.png" width="500px">
 </div>
 
+## 2. 产品功能介绍
 
+本项目提供了低成本搭建端到端两路召回语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的两路召回语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的检索系统，并可以提供 Web 化产品服务。
 
-## 1. 快速开始: 快速搭建语义检索系统
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/204435911-0ba1cb9f-cb56-4bcd-9f64-63ff173826d6.png" width="500px">
+</div>
 
-### 1.1 运行环境和安装说明
+## 3. 快速开始: 快速搭建两路召回语义检索系统
+
+### 3.1 运行环境和安装说明
 
 本实验采用了以下的运行环境进行，详细说明如下，用户也可以在自己 GPU 硬件环境进行：
 
@@ -43,13 +51,13 @@ python setup.py install
 - Windows的安装复杂一点，教程请参考：[Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
 - 以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
-### 1.2 数据说明
+### 3.2 数据说明
 
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
-### 1.3 一键体验语义检索系统
+### 3.3 一键体验语义检索系统
 
-#### 1.3.1 启动 ANN 服务
+#### 3.3.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
 首先修改`config/elasticsearch.yml`的配置：
@@ -66,7 +74,7 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 备注：ES 服务默认开启端口为 9200
 
-#### 1.3.2 快速一键启动
+#### 3.3.2 快速一键启动
 
 我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
 ```bash
@@ -99,11 +107,11 @@ python examples/semantic-search/multi_recall_semantic_search_example.py --device
 * `dense_topk`: 语义向量召回节点DensePassageRetriever的召回数量
 * `rank_topk`: 排序模型节点ErnieRanker的排序过滤数量
 
-### 1.4 构建 Web 可视化语义检索系统
+### 3.4 构建 Web 可视化语义检索系统
 
 整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，搭建ANN服务请参考1.3.1节，接下来我们依次搭建后台和前端两个服务。
 
-#### 1.4.1 文档数据写入 ANN 索引库
+#### 3.4.1 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
 python utils/offline_ann.py --index_name dureader_nano_query_encoder \
@@ -126,7 +134,7 @@ curl http://localhost:9200/dureader_nano_query_encoder/_search
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
-#### 1.4.2 启动 RestAPI 模型服务
+#### 3.4.2 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
 export PIPELINE_YAML_PATH=rest_api/pipeline/multi_recall_semantic_search.yaml
@@ -138,7 +146,7 @@ python rest_api/application.py 8891
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker":{"top_k": 3}}}'
 ```
-#### 1.4.3 启动 WebUI
+#### 3.4.3 启动 WebUI
 ```bash
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
@@ -148,7 +156,7 @@ python -m streamlit run ui/webapp_multi_recall_semantic_search.py --server.port 
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
-#### 1.4.4 数据更新
+#### 3.4.4 数据更新
 
 数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（支持图文，需要按照空行进行划分段落），txt（需要按照空行划分段落）三种格式的文件建索引：
 
