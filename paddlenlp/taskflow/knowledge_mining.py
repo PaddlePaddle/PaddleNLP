@@ -37,6 +37,7 @@ from paddlenlp.utils.tools import compare_version
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
+from ..transformers.ernie_ctm.configuration import ErnieCtmConfig
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import TermTree, BurkhardKellerTree
 from .utils import Customization, WordTagRelationExtractor
@@ -456,8 +457,9 @@ class WordTagTask(Task):
         """
         Construct the inference model for the predictor.
         """
+        model_config = ErnieCtmConfig.from_pretrained(self._task_path, num_labels=len(self._tags_to_index))
         model_instance = ErnieCtmWordtagModel.from_pretrained(
-            self._task_path, num_tag=len(self._tags_to_index))
+            self._task_path, config=model_config)
         if self._params_path is not None:
             state_dict = paddle.load(self._params_path)
             model_instance.set_dict(state_dict)
