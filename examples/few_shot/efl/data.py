@@ -15,6 +15,8 @@
 import json
 from functools import partial
 
+import numpy as np
+
 import paddle
 
 from paddlenlp.datasets import load_dataset, MapDataset
@@ -32,12 +34,16 @@ def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
     return data_ds
 
 
-def convert_efl(data_ds, label_words, orig_key):
+def convert_efl(data_ds, label_words, orig_key, is_train=False, num_neg=5):
     efl_data_ds = []
     label_list = sorted(label_words.keys())
     for example in data_ds:
         label = label_words[example[orig_key]] if orig_key in example else None
-        for key in label_list:
+        sub_list = label_list
+        if is_train and label is not None:
+            rand_index = np.random.permutation(len(label_list))
+            sub_list = [label] + [label_list[i] for i in rand_index[:num_neg]]
+        for key in sub_list:
             new_example = example.copy()
             cand = label_words[key]
             new_example["candidate_label"] = cand
@@ -130,9 +136,10 @@ def load_fewclue_dataset(args, verbalizer):
     elif args.task_name == "iflytek":
         orig_key = "label_des"
     for index, sub_data_ds in enumerate(data_ds):
+        is_train = (index == 0)
         if sub_data_ds is not None:
             data_ds[index] = convert_efl(sub_data_ds, args.label_words,
-                                         orig_key)
+                                         orig_key, is_train)
 
     # Extend train dataset with pseudo-label data.
     data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path,
