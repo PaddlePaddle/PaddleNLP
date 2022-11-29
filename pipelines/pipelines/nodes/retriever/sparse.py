@@ -28,7 +28,6 @@ class BM25Retriever(BaseRetriever):
         top_k: int = 10,
         all_terms_must_match: bool = False,
         custom_query: Optional[str] = None,
-        scale_score: bool = True,
     ):
         """
         :param document_store: an instance of one of the following DocumentStores to retrieve from: ElasticsearchDocumentStore, OpenSearchDocumentStore and OpenDistroElasticsearchDocumentStore.
@@ -97,16 +96,12 @@ class BM25Retriever(BaseRetriever):
                                 |    highlighted_title = docs[0].meta["highlighted"]["title"]
                                 ```
         :param top_k: How many documents to return per query.
-        :param scale_score: Whether to scale the similarity score to the unit interval (range of [0,1]).
-                            If true (default) similarity scores (e.g. cosine or dot_product) which naturally have a different value range will be scaled to a range of [0,1], where 1 means extremely relevant.
-                            Otherwise raw similarity scores (e.g. cosine or dot_product) will be used.
         """
         super().__init__()
         self.document_store: Optional[KeywordDocumentStore] = document_store
         self.top_k = top_k
         self.custom_query = custom_query
         self.all_terms_must_match = all_terms_must_match
-        self.scale_score = scale_score
 
     def retrieve(
         self,
@@ -116,7 +111,6 @@ class BM25Retriever(BaseRetriever):
         top_k: Optional[int] = None,
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
-        scale_score: Optional[bool] = None,
         document_store: Optional[BaseDocumentStore] = None,
     ) -> List[Document]:
         """
@@ -187,9 +181,6 @@ class BM25Retriever(BaseRetriever):
         :param index: The name of the index in the DocumentStore from which to retrieve documents
         :param headers: Custom HTTP headers to pass to elasticsearch client (e.g. {'Authorization': 'Basic YWRtaW46cm9vdA=='})
                 Check out https://www.elastic.co/guide/en/elasticsearch/reference/current/http-clients.html for more information.
-        :param scale_score: Whether to scale the similarity score to the unit interval (range of [0,1]).
-                                           If true similarity scores (e.g. cosine or dot_product) which naturally have a different value range will be scaled to a range of [0,1], where 1 means extremely relevant.
-                                           Otherwise raw similarity scores (e.g. cosine or dot_product) will be used.
         :param document_store: the docstore to use for retrieval. If `None`, the one given in the `__init__` is used instead.
         """
         document_store = document_store or self.document_store
@@ -205,8 +196,6 @@ class BM25Retriever(BaseRetriever):
             top_k = self.top_k
         if index is None:
             index = document_store.index
-        if scale_score is None:
-            scale_score = self.scale_score
 
         documents = document_store.query(
             query=query,
@@ -216,7 +205,6 @@ class BM25Retriever(BaseRetriever):
             custom_query=self.custom_query,
             index=index,
             headers=headers,
-            scale_score=scale_score,
         )
         return documents
 
@@ -231,7 +219,6 @@ class BM25Retriever(BaseRetriever):
         index: Optional[str] = None,
         headers: Optional[Dict[str, str]] = None,
         batch_size: Optional[int] = None,
-        scale_score: Optional[bool] = None,
         document_store: Optional[BaseDocumentStore] = None,
     ) -> List[List[Document]]:
         """
@@ -304,10 +291,6 @@ class BM25Retriever(BaseRetriever):
         :param headers: Custom HTTP headers to pass to elasticsearch client (e.g. {'Authorization': 'Basic YWRtaW46cm9vdA=='})
                 Check out https://www.elastic.co/guide/en/elasticsearch/reference/current/http-clients.html for more information.
         :param batch_size: Not applicable.
-        :param scale_score: Whether to scale the similarity score to the unit interval (range of [0,1]).
-                            If true similarity scores (e.g. cosine or dot_product) which naturally have a different
-                            value range will be scaled to a range of [0,1], where 1 means extremely relevant.
-                            Otherwise raw similarity scores (e.g. cosine or dot_product) will be used.
         :param document_store: the docstore to use for retrieval. If `None`, the one given in the `__init__` is used instead.
         """
         document_store = document_store or self.document_store
@@ -323,8 +306,6 @@ class BM25Retriever(BaseRetriever):
             top_k = self.top_k
         if index is None:
             index = document_store.index
-        if scale_score is None:
-            scale_score = self.scale_score
 
         documents = document_store.query_batch(
             queries=queries,
@@ -334,6 +315,5 @@ class BM25Retriever(BaseRetriever):
             custom_query=self.custom_query,
             index=index,
             headers=headers,
-            scale_score=scale_score,
         )
         return documents

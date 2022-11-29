@@ -32,7 +32,6 @@ class GPTTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = GPTTokenizer
     from_pretrained_kwargs = {"add_prefix_space": True}
     test_seq2seq = False
-    test_offsets = False
 
     def setUp(self):
         super().setUp()

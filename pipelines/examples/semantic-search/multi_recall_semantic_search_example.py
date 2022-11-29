@@ -27,35 +27,17 @@ parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Sel
 parser.add_argument("--index_name", default='dureader_nano_query_encoder', type=str, help="The ann index name of ANN.")
 parser.add_argument("--search_engine", choices=['elastic'], default="elastic", help="The type of ANN search engine.")
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
-parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
+parser.add_argument("--max_seq_len_passage", default=384, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
-parser.add_argument("--query_embedding_model",
-                    default="rocketqa-zh-nano-query-encoder",
-                    type=str,
-                    help="The query_embedding_model path")
-
-parser.add_argument("--passage_embedding_model",
-                    default="rocketqa-zh-nano-para-encoder",
-                    type=str,
-                    help="The passage_embedding_model path")
-parser.add_argument("--params_path",
-                    default="checkpoints/model_40/model_state.pdparams",
-                    type=str,
-                    help="The checkpoint path")
-parser.add_argument("--embedding_dim",
-                    default=312,
-                    type=int,
-                    help="The embedding_dim of index")
-
-parser.add_argument('--host',
-                    type=str,
-                    default="localhost",
-                    help='host ip of ANN search engine')
-
-parser.add_argument('--port',
-                    type=str,
-                    default="9200",
-                    help='port of ANN search engine')
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path")
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-para-encoder", type=str, help="The passage_embedding_model path")
+parser.add_argument("--params_path", default="", type=str, help="The checkpoint path")
+parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
+parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
+parser.add_argument('--port', type=str, default="9200",help='port of ANN search engine')
+parser.add_argument("--bm_topk", default=10, type=int, help="The number of candidates for BM25Retriever to retrieve.")
+parser.add_argument("--dense_topk", default=10, type=int, help="The number of candidates for DensePassageRetriever to retrieve.")
+parser.add_argument("--rank_topk", default=10, type=int, help="The number of candidates ranker to filter.")
 
 args = parser.parse_args()
 # yapf: enable
@@ -150,6 +132,7 @@ def semantic_search_tutorial():
                                       "top_k": 3
                                   }
                               })
+    pipeline.draw('multi_recall.png')
     print_documents(prediction)
 
 

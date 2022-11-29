@@ -1,4 +1,12 @@
-# 端到端两路检索系统
+# 端到端两路召回检索系统
+
+多路召回是指采用不同的策略、特征或者简单的模型，分别召回一部分候选集合，然后把这些候选集混合在一起供后续的排序模型进行重排，也可以定制自己的重排序的规则等等。本项目使用关键字和语义检索两路召回的检索系统，系统的架构如下，用户输入的Query会分别通过关键字召回BMRetriever（Okapi BM 25算法，Elasticsearch默认使用的相关度评分算法，是基于词频和文档频率和文档长度相关性来计算相关度），语义向量检索召回DenseRetriever（使用RocketQA抽取向量，然后比较向量之间相似度）后得到候选集，然后通过JoinResults进行结果聚合，最后通过通用的Ranker模块得到重排序的结果返回给用户。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/204423532-90f62781-5f81-4b6d-9f94-741416ae3fcb.png" width="500px">
+</div>
+
+
 
 ## 1. 快速开始: 快速搭建语义检索系统
 
@@ -29,7 +37,11 @@ cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
-【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
+
+【注意】
+
+- Windows的安装复杂一点，教程请参考：[Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
+- 以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 1.2 数据说明
 
@@ -68,8 +80,24 @@ unset CUDA_VISIBLE_DEVICES
 python examples/semantic-search/multi_recall_semantic_search_example.py --device cpu \
                                                           --search_engine elastic
 ```
-`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
+`multi_recall_semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
 
+参数含义说明
+* `device`: 设备名称，cpu/gpu，默认为gpu
+* `index_name`: 索引的名称
+* `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
+* `max_seq_len_query`: query的最大长度，默认是64
+* `max_seq_len_passage`: passage的最大长度，默认是384
+* `retriever_batch_size`: 召回模型一次处理的数据的数量
+* `query_embedding_model`: query模型的名称，默认为rocketqa-zh-nano-query-encoder
+* `passage_embedding_model`: 段落模型的名称，默认为rocketqa-zh-nano-para-encoder
+* `params_path`: Neural Search的召回模型的名称，默认为
+* `embedding_dim`: 模型抽取的向量的维度,默认为312，为rocketqa-zh-nano-query-encoder的向量维度
+* `host`: ANN索引引擎的IP地址
+* `port`: ANN索引引擎的端口号
+* `bm_topk`: 关键字召回节点BM25Retriever的召回数量
+* `dense_topk`: 语义向量召回节点DensePassageRetriever的召回数量
+* `rank_topk`: 排序模型节点ErnieRanker的排序过滤数量
 
 ### 1.4 构建 Web 可视化语义检索系统
 

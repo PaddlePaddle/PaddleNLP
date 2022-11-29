@@ -41,6 +41,7 @@ router = APIRouter()
 
 PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH),
                                    pipeline_name=QUERY_PIPELINE_NAME)
+
 try:
     QA_PAIR_PIPELINE = Pipeline.load_from_yaml(
         Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_QA_PAIRS_NAME)
