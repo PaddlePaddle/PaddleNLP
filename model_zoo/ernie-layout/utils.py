@@ -113,6 +113,8 @@ def _permute(im, channel_first=True, to_bgr=False):
 def _str2im(
     im_base64,
     target_size=224,
+    mean=[103.530, 116.280, 123.675],
+    std=[57.375, 57.120, 58.395],
 ):
     # Step1: decode image
     origin_im = _decode_image(im_base64)

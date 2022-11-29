@@ -25,7 +25,7 @@ import paddle
 from paddlenlp import Taskflow
 from paddlenlp.utils.log import logger
 
-from utils import set_seed, build_tree, schema2label_maps, anno2distill, synthetic2distill
+from utils import set_seed, build_tree, schema2label_maps, doccano2distill, synthetic2distill
 
 
 def do_data_distill():
@@ -49,28 +49,19 @@ def do_data_distill():
     dev_ids = sample_index["dev_ids"]
     test_ids = sample_index["test_ids"]
 
-    if args.platform == "label_studio":
-        with open(os.path.join(args.data_path, "label_studio.json")) as fp:
-            json_lines = json.loads(fp.read())
-    elif args.platform == "doccano":
-        json_lines = []
-        with open(os.path.join(args.data_path, "doccano_ext.json")) as fp:
-            for line in fp:
-                json_lines.append(json.loads(line))
-    else:
-        raise ValueError("Unsupported annotation platform!")
+    json_lines = []
+    with open(os.path.join(args.data_path, "doccano_ext.json")) as fp:
+        for line in fp:
+            json_lines.append(json.loads(line))
 
     train_lines = [json_lines[i] for i in train_ids]
-    train_lines = anno2distill(train_lines, args.task_type, label_maps,
-                               args.platform)
+    train_lines = doccano2distill(train_lines, args.task_type, label_maps)
 
     dev_lines = [json_lines[i] for i in dev_ids]
-    dev_lines = anno2distill(dev_lines, args.task_type, label_maps,
-                             args.platform)
+    dev_lines = doccano2distill(dev_lines, args.task_type, label_maps)
 
     test_lines = [json_lines[i] for i in test_ids]
-    test_lines = anno2distill(test_lines, args.task_type, label_maps,
-                              args.platform)
+    test_lines = doccano2distill(test_lines, args.task_type, label_maps)
 
     # Load trained UIE model
     uie = Taskflow("information_extraction",
@@ -124,13 +115,12 @@ if __name__ == "__main__":
     parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
-    parser.add_argument("--platform", choices=['doccano', 'label_studio'], type=str, default="label_studio", help="Select the annotation platform.")
 
     args = parser.parse_args()
     # yapf: enable
 
     # Define your schema here
-    schema = {"武器名称": ["产国", "类型", "研发单位"]}
+    schema = {"疾病": ["手术治疗", "实验室检查", "影像学检查"]}
 
     args.schema = schema
 
