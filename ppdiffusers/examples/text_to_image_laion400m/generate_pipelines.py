@@ -139,8 +139,6 @@ def build_pipelines(
         clip_sample=False,
         set_alpha_to_one=False,
         steps_offset=1,
-        # Make sure the scheduler compatible with PNDM
-        skip_prk_steps=True,
     )
     unet_dict, vae_dict, text_encoder_dict = extract_paramaters(model_file)
     check_keys(unet, unet_dict)

@@ -118,8 +118,6 @@ class LatentDiffusionModel(nn.Layer):
             clip_sample=False,
             set_alpha_to_one=False,
             steps_offset=1,
-            # Make sure the scheduler compatible with PNDM
-            skip_prk_steps=True,
         )
         self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.init_weights()
