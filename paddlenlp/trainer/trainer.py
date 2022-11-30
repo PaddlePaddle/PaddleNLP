@@ -962,7 +962,9 @@ class Trainer:
                 decay_parameters = [
                     p.name for n, p in self.model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])
                 ]
-                apply_decay_param_fun = lambda x: x in decay_parameters  # noqa: E731
+
+                def apply_decay_param_fun(x):
+                    return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
 
@@ -1803,7 +1805,7 @@ class Trainer:
             return (loss, None, None)
 
         logits = nested_detach(logits)
-        if len(logits) == 1:
+        if isinstance(logits, (list, tuple)) and len(logits) == 1:
             logits = logits[0]
 
         return (loss, logits, labels)
