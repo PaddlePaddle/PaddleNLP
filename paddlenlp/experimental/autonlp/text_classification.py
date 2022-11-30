@@ -18,6 +18,7 @@ from typing import Any, Callable, Dict, List
 import numpy as np
 import paddle
 from paddle.io import Dataset
+from scipy.special import expit as sigmoid
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
 from paddlenlp.data import DataCollatorWithPadding
@@ -51,6 +52,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         label_column: str,
         metric_for_best_model: str = "eval_accuracy",
         greater_is_better: bool = True,
+        problem_type: str = "multi_label",
         **kwargs
     ):
 
@@ -59,6 +61,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         )
         self.text_column = text_column
         self.label_column = label_column
+        if problem_type in ["multi_label", "multi_class"]:
+            self.problem_type = problem_type
+        else:
+            raise ValueError(
+                f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
+            )
 
     @property
     def _default_training_argument(self) -> TrainingArguments:
@@ -102,11 +110,24 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         ]
 
     def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+        self.id2label, self.label2id = {}, {}
         # TODO: support label ids that is already encoded
-        train_labels = {i[self.label_column] for i in train_dataset}
-        dev_labels = {i[self.label_column] for i in eval_dataset}
-        self.id2label = list(train_labels.union(dev_labels))
-        self.label2id = {label: i for i, label in enumerate(self.id2label)}
+        if self.problem_type == "multi_class":
+            for dataset in [train_dataset, eval_dataset]:
+                for example in dataset:
+                    label = example[self.label_column]
+                    if label not in self.label2id:
+                        self.label2id[label] = len(self.label2id)
+                        self.id2label[len(self.id2label)] = label
+        # multi_label
+        else:
+            for dataset in [train_dataset, eval_dataset]:
+                for example in dataset:
+                    labels = example[self.label_column]
+                    for label in labels:
+                        if label not in self.label2id:
+                            self.label2id[label] = len(self.label2id)
+                            self.id2label[len(self.id2label)] = label
 
     def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         def trainable(config):
@@ -123,13 +144,18 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
 
             # define model
-            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
+            problem_type = (
+                "multi_label_classification" if self.problem_type == "multi_label" else "single_label_classification"
+            )
+            model = AutoModelForSequenceClassification.from_pretrained(
+                model_path, num_classes=len(self.id2label), problem_type=problem_type
+            )
             training_args = self._override_training_arguments(config)
             trainer = Trainer(
                 model=model,
                 tokenizer=tokenizer,
                 args=training_args,
-                criterion=paddle.nn.loss.CrossEntropyLoss(),
+                # criterion=paddle.nn.loss.CrossEntropyLoss(),
                 train_dataset=processed_train_dataset,
                 eval_dataset=processed_eval_dataset,
                 data_collator=DataCollatorWithPadding(tokenizer),
@@ -143,8 +169,30 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return trainable
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
+        if self.problem_type == "multi_class":
+            return self._compute_multi_class_metrics(eval_preds=eval_preds)
+        else:  # multi_label
+            return self._compute_multi_label_metrics(eval_preds=eval_preds)
+
+    def _compute_multi_class_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         pred_ids = np.argmax(eval_preds.predictions, axis=-1)
         metrics = {}
+        metrics["accuracy"] = accuracy_score(y_true=eval_preds.label_ids, y_pred=pred_ids)
+        for average in ["micro", "macro"]:
+            precision, recall, f1, _ = precision_recall_fscore_support(
+                y_true=eval_preds.label_ids, y_pred=pred_ids, average=average
+            )
+            metrics[f"{average}_precision"] = precision
+            metrics[f"{average}_recall"] = recall
+            metrics[f"{average}_f1"] = f1
+        return metrics
+
+    def _compute_multi_label_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
+        pred_probs = sigmoid(eval_preds.predictions)
+        pred_ids = pred_probs > 0.5
+        metrics = {}
+        # In multilabel classification, this function computes subset accuracy:
+        # the set of labels predicted for a sample must exactly match the corresponding set of labels in y_true.
         metrics["accuracy"] = accuracy_score(y_true=eval_preds.label_ids, y_pred=pred_ids)
         for average in ["micro", "macro"]:
             precision, recall, f1, _ = precision_recall_fscore_support(
@@ -167,7 +215,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         result = tokenizer(text=example[self.text_column], max_length=max_length)
         if not is_test:
-            result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
+            if self.problem_type == "multi_class":
+                result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
+            # multi_label
+            else:
+                labels = [1.0 if i in example[self.label_column] else 0.0 for i in self.label2id]
+                result["labels"] = paddle.to_tensor(labels, dtype="float32")
         return result
 
     def export(self, export_path, trial_id=None):

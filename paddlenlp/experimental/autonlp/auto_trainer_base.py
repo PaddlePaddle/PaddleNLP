@@ -108,9 +108,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    @abstractmethod
-    def predict(self, test_dataset, trial_id=None) -> Dataset:
-        pass
+    # @abstractmethod
+    # def predict(self, test_dataset, trial_id=None) -> Dataset:
+    #     pass
 
     @abstractmethod
     def export(self, export_path, trial_id=None):
