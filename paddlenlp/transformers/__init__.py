@@ -52,6 +52,8 @@ from .blenderbot.modeling import *
 from .blenderbot.tokenizer import *
 from .blenderbot_small.modeling import *
 from .blenderbot_small.tokenizer import *
+from .canine.modeling import *
+from .canine.tokenizer import *
 from .chinesebert.modeling import *
 from .chinesebert.tokenizer import *
 from .convbert.modeling import *
