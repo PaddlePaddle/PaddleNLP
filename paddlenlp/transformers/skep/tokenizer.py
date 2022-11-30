@@ -24,7 +24,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.env import MODEL_HOME
 
 __all__ = [
-    'SkepTokenizer',
+    "SkepTokenizer",
 ]
 
 
@@ -38,8 +38,7 @@ def bytes_to_unicode():
     To avoid that, we want lookup tables between utf-8 bytes and unicode strings.
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
-    bs = list(range(33, 126 + 1)) + list(range(161, 172 + 1)) + list(
-        range(174, 255 + 1))
+    bs = list(range(33, 126 + 1)) + list(range(161, 172 + 1)) + list(range(174, 255 + 1))
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -66,12 +65,7 @@ def get_pairs(word):
 class BpeEncoder(object):
     """BpeEncoder"""
 
-    def __init__(self,
-                 encoder_json_file,
-                 vocab_bpe_file,
-                 errors='replace',
-                 unk_token="<|endoftext|>",
-                 **kwargs):
+    def __init__(self, encoder_json_file, vocab_bpe_file, errors="replace", unk_token="<|endoftext|>", **kwargs):
         """
         Constructs a BpeEncoder.
 
@@ -90,21 +84,17 @@ class BpeEncoder(object):
         self.unk_token = unk_token
         self.cache = {}
         re = try_import("regex")
-        self.pat = re.compile(
-            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-        )
+        self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
     def __get_encoder(self, encoder_json_file):
-        with open(encoder_json_file, 'r') as f:
+        with open(encoder_json_file, "r") as f:
             encoder = json.load(f)
         return encoder
 
     def __get_bpe_ranks(self, vocab_bpe_file):
-        with open(vocab_bpe_file, 'r', encoding="utf-8") as f:
+        with open(vocab_bpe_file, "r", encoding="utf-8") as f:
             bpe_data = f.read()
-        bpe_merges = [
-            tuple(merge_str.split()) for merge_str in bpe_data.split('\n')[1:-1]
-        ]
+        bpe_merges = [tuple(merge_str.split()) for merge_str in bpe_data.split("\n")[1:-1]]
         bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         return bpe_ranks
 
@@ -121,8 +111,7 @@ class BpeEncoder(object):
             return token
 
         while True:
-            bigram = min(
-                pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -137,8 +126,7 @@ class BpeEncoder(object):
                     new_word.extend(word[i:])
                     break
 
-                if word[i] == first and i < len(word) - 1 and word[i +
-                                                                   1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -150,7 +138,7 @@ class BpeEncoder(object):
                 break
             else:
                 pairs = get_pairs(word)
-        word = ' '.join(word)
+        word = " ".join(word)
         self.cache[token] = word
         return word
 
@@ -162,9 +150,8 @@ class BpeEncoder(object):
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(self.encoder[bpe_token]
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(self.encoder[bpe_token] for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def decode(self, tokens: List[str]) -> str:
@@ -172,9 +159,8 @@ class BpeEncoder(object):
         decode
         TODO(wj-Mcat): to be deprecated
         """
-        text = ''.join([self.decoder[token] for token in tokens])
-        text = bytearray([self.byte_decoder[c]
-                          for c in text]).decode('utf-8', errors=self.errors)
+        text = "".join([self.decoder[token] for token in tokens])
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
         return text
 
     def _tokenize(self, text: str) -> List[str]:
@@ -189,9 +175,8 @@ class BpeEncoder(object):
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def _convert_token_to_id(self, token: str) -> int:
@@ -205,8 +190,7 @@ class BpeEncoder(object):
     def convert_tokens_to_string(self, tokens: List[str]) -> str:
         """Converts a sequence of tokens (string) in a single string."""
         text = "".join(tokens)
-        text = bytearray([self.byte_decoder[c]
-                          for c in text]).decode("utf-8", errors=self.errors)
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
         return text
 
 
@@ -265,33 +249,24 @@ class SkepTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "vocab_file": "vocab.txt",
         "bpe_vocab_file": "vocab.bpe",
-        "bpe_json_file": "encoder.json"
+        "bpe_json_file": "encoder.json",
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "skep_ernie_1.0_large_ch":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
-            "skep_ernie_2.0_large_en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
-            "skep_roberta_large_en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.txt",
+            "skep_ernie_1.0_large_ch": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_1.0_large_ch.vocab.txt",
+            "skep_ernie_2.0_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_ernie_2.0_large_en.vocab.txt",
+            "skep_roberta_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.txt",
         },
         "bpe_vocab_file": {
-            "skep_ernie_1.0_large_ch":
-            None,
-            "skep_ernie_2.0_large_en":
-            None,
-            "skep_roberta_large_en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
+            "skep_ernie_1.0_large_ch": None,
+            "skep_ernie_2.0_large_en": None,
+            "skep_roberta_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.vocab.bpe",
         },
         "bpe_json_file": {
-            "skep_ernie_1.0_large_ch":
-            None,
-            "skep_ernie_2.0_large_en":
-            None,
-            "skep_roberta_large_en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
-        }
+            "skep_ernie_1.0_large_ch": None,
+            "skep_ernie_2.0_large_en": None,
+            "skep_roberta_large_en": "https://bj.bcebos.com/paddlenlp/models/transformers/skep/skep_roberta_large_en.encoder.json",
+        },
     }
     max_model_input_sizes = {
         "skep_ernie_1.0_large_ch": 512,
@@ -320,35 +295,39 @@ class SkepTokenizer(PretrainedTokenizer):
         },
     }
 
-    def __init__(self,
-                 vocab_file,
-                 bpe_vocab_file=None,
-                 bpe_json_file=None,
-                 do_lower_case=True,
-                 use_bpe_encoder=False,
-                 need_token_type_id=True,
-                 add_two_sep_token_inter=False,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        bpe_vocab_file=None,
+        bpe_json_file=None,
+        do_lower_case=True,
+        use_bpe_encoder=False,
+        need_token_type_id=True,
+        add_two_sep_token_inter=False,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = SkepTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = SkepTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.vocab_file = vocab_file
         self.bpe_vocab_file = bpe_vocab_file
         self.bpe_json_file = bpe_json_file
-        self.vocab = self.load_vocabulary(vocab_file,
-                                          unk_token=unk_token,
-                                          pad_token=pad_token,
-                                          bos_token=cls_token,
-                                          eos_token=sep_token,
-                                          mask_token=mask_token)
+        self.vocab = self.load_vocabulary(
+            vocab_file,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            bos_token=cls_token,
+            eos_token=sep_token,
+            mask_token=mask_token,
+        )
 
         self.use_bpe_encoder = use_bpe_encoder
         self.need_token_type_id = need_token_type_id
@@ -356,15 +335,11 @@ class SkepTokenizer(PretrainedTokenizer):
 
         if not self.use_bpe_encoder:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-            self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                          unk_token=unk_token)
+            self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
         else:
-            assert (bpe_vocab_file and bpe_json_file) is not None, (
-                "bpe_vocab_file and bpe_json_file must be not None.")
+            assert (bpe_vocab_file and bpe_json_file) is not None, "bpe_vocab_file and bpe_json_file must be not None."
             if os.path.isfile(bpe_vocab_file) and os.path.isfile(bpe_json_file):
-                self.bpe_tokenizer = BpeEncoder(bpe_json_file,
-                                                bpe_vocab_file,
-                                                unk_token=unk_token)
+                self.bpe_tokenizer = BpeEncoder(bpe_json_file, bpe_vocab_file, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -412,13 +387,9 @@ class SkepTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -436,8 +407,7 @@ class SkepTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -477,9 +447,7 @@ class SkepTokenizer(PretrainedTokenizer):
             _sep = [self.sep_token_id]
             return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         r"""
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
@@ -497,7 +465,7 @@ class SkepTokenizer(PretrainedTokenizer):
             token_ids_0 (List[int]):
                 List of IDs.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. 
+                Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
@@ -508,8 +476,7 @@ class SkepTokenizer(PretrainedTokenizer):
             _cls = [self.cls_token_id]
             if token_ids_1 is None:
                 return len(_cls + token_ids_0 + _sep) * [0]
-            return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                              _sep) * [1]
+            return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
         else:
             # For model skep-roberta-large-en, token type ids is no need.
             return None
@@ -553,7 +520,7 @@ class SkepTokenizer(PretrainedTokenizer):
 
         """
         # to handle the bpe and wordpiece case
-        if hasattr(self, 'wordpiece_tokenizer'):
+        if hasattr(self, "wordpiece_tokenizer"):
             return " ".join(tokens).replace(" ##", "").strip()
         else:
             return self.bpe_tokenizer.convert_tokens_to_string(tokens)
@@ -602,8 +569,7 @@ class SkepTokenizer(PretrainedTokenizer):
             )
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def get_vocab(self) -> Dict[str, int]:

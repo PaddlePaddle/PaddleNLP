@@ -23,13 +23,12 @@ import paddle.nn.functional as F
 def spherical_dist_loss(x, y):
     x = F.normalize(x, axis=-1)
     y = F.normalize(y, axis=-1)
-    return (x - y).norm(axis=-1).divide(
-        paddle.to_tensor(2.0)).asin().pow(2).multiply(paddle.to_tensor(2.0))
+    return (x - y).norm(axis=-1).divide(paddle.to_tensor(2.0)).asin().pow(2).multiply(paddle.to_tensor(2.0))
 
 
 def tv_loss(input):
     """L2 total variation loss, as in Mahendran et al."""
-    input = F.pad(input, (0, 1, 0, 1), 'replicate')
+    input = F.pad(input, (0, 1, 0, 1), "replicate")
     x_diff = input[..., :-1, 1:] - input[..., :-1, :-1]
     y_diff = input[..., 1:, :-1] - input[..., :-1, :-1]
     return (x_diff**2 + y_diff**2).mean([1, 2, 3])
