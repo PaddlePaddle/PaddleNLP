@@ -12,14 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import requests
 import json
+
+import requests
 
 url = "http://0.0.0.0:8189/taskflow/uie"
 headers = {"Content-Type": "application/json"}
-texts = ['城市内交通费7月5日金额114广州至佛山', '5月9日交通费29元从北苑到望京搜后']
+texts = ["城市内交通费7月5日金额114广州至佛山", "5月9日交通费29元从北苑到望京搜后"]
 data = {
-    'data': texts
+    "data": {
+        "text": texts,
+    }
 }
 r = requests.post(url=url, headers=headers, data=json.dumps(data))
 datas = json.loads(r.text)

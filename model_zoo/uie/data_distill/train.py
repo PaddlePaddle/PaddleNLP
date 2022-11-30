@@ -126,7 +126,7 @@ def do_train():
                 logging_loss = tr_loss
                 tic_train = time.time()
 
-            if global_step % args.eval_steps == 0 and rank == 0:
+            if global_step % args.valid_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
@@ -182,7 +182,7 @@ if __name__ == "__main__":
     parser.add_argument("--encoder", default="ernie-3.0-mini-zh", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-    parser.add_argument("--eval_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
+    parser.add_argument("--valid_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 
