@@ -1,6 +1,8 @@
 [tool.isort]
 profile = 'black'
+skip = ['paddlenlp/transformers/__init__.py']
 
 [tool.black]
 line-length = 119
 target_version = ['py35', 'py36', 'py37', 'py38', 'py39', 'py310']
+exclude = ['.flake8']
