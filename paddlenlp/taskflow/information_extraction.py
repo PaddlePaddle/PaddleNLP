@@ -1049,11 +1049,21 @@ class UIETask(Task):
             for vs in result.values():
                 for v in vs:
                     if "start" in v.keys():
-                        start_box = char_boxes[v["start"]][1]
-                        end_box = char_boxes[v["end"] - 1][1]
-                        bbox = [int(start_box[0]), int(end_box[1]), int(end_box[2]), int(start_box[3])]
-                        # TODO: multi boxes for result with multiple region
-                        v["bbox"] = [bbox]
+                        boxes = []
+                        for i in range(v["start"], v["end"]):
+                            cur_box = char_boxes[i][1]
+                            if i == v["start"]:
+                                box = cur_box
+                                continue
+                            _, cur_y1, cur_x2, cur_y2 = cur_box
+                            if cur_y1 == box[1] and cur_y2 == box[3]:
+                                box[2] = cur_x2
+                            else:
+                                boxes.append(box)
+                                box = cur_box
+                        if box:
+                            boxes.append(box)
+                        v["bbox"] = boxes
                     if v.get("relations"):
                         _add_bbox(v["relations"], char_boxes)
             return result

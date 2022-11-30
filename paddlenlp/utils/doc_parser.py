@@ -134,9 +134,9 @@ class DocParser(object):
                     for cell_box, text in zip(cell_bbox, table_list):
                         box = [
                             bbox[0] + cell_box[0],
-                            bbox[3] - cell_box[5],
+                            bbox[1] + cell_box[5],
                             bbox[0] + cell_box[4],
-                            bbox[3] - cell_box[1],
+                            bbox[1] + cell_box[1],
                         ]
                         if _is_ch(text):
                             text = text.replace(" ", "")
