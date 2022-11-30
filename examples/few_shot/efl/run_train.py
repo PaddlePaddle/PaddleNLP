@@ -40,7 +40,7 @@ from paddlenlp.utils.log import logger
 class DataArguments:
     task_name: str = field(default="eprstmt", metadata={"help": "The task name in FewCLUE."})
     split_id: str = field(default="0", metadata={"help": "The split id of datasets, including 0, 1, 2, 3, 4, few_all."})
-    prompt_path: str = field(default="prompt.json", metadata={"help": "Path to the defined prompts."})
+    prompt_path: str = field(default="prompt/eprstmt.json", metadata={"help": "Path to the defined prompts."})
     prompt_index: int = field(default=0, metadata={"help": "The index of defined prompt for training."})
     pseudo_data_path: str = field(default=None, metadata={"help": "Path to data with pseudo labels."})
     do_label: bool = field(default=False, metadata={"help": "Whether to label unsupervised data in unlabeled datasets"})

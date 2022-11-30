@@ -40,7 +40,7 @@ from paddlenlp.utils.log import logger
 class DataArguments:
     task_name: str = field(default="eprstmt", metadata={"help": "The task name in FewCLUE."})
     split_id: str = field(default="0", metadata={"help": "The split id of datasets, including 0, 1, 2, 3, 4, few_all."})
-    prompt_path: str = field(default="prompt.json", metadata={"help": "Path to the defined prompts."})
+    prompt_path: str = field(default="prompt/eprstmt.json", metadata={"help": "Path to the defined prompts."})
     prompt_index: int = field(default=0, metadata={"help": "The index of defined prompt for training."})
     augment_type: str = field(default=None, metadata={"help": "The strategy used for data augmentation, including `swap`, `delete`, `insert`, `subsitute`."})
     num_augment: str = field(default=5, metadata={"help": "Number of augmented data per example, which works when `augment_type` is set."})
