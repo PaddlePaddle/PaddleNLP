@@ -22,19 +22,17 @@ __all__ = ["XLNetConverter"]
 
 
 class XLNetConverter(Converter):
-    _ignore_state_dict_keys = ['embeddings.position_ids']
+    _ignore_state_dict_keys = ["embeddings.position_ids"]
     num_layer_key = "n_layer"
     architectures: Dict[str, Type[PretrainedModel]] = {"XLNetModel": XLNetModel}
 
     def get_paddle_pytorch_model_classes(self):
         from paddlenlp.transformers import XLNetModel as PaddleModel
         from transformers import XLNetModel as PytorchModel
+
         return PaddleModel, PytorchModel
 
-    def get_name_mapping(
-        self,
-        config_or_num_layers: Union[dict, int] = None
-    ) -> List[StateDictNameMapping]:
+    def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
         num_layer = self.resolve_num_layer(config_or_num_layers)
 
         hard_mapping = [
@@ -44,77 +42,23 @@ class XLNetConverter(Converter):
 
         for layer_index in range(num_layer):
             layer_mappings = [
-                [
-                    f"layer.{layer_index}.rel_attn.q",
-                    f"layer.{layer_index}.rel_attn.q", "merge_last_two_dim"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.k",
-                    f"layer.{layer_index}.rel_attn.k", "merge_last_two_dim"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.v",
-                    f"layer.{layer_index}.rel_attn.v", "merge_last_two_dim"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.o",
-                    f"layer.{layer_index}.rel_attn.o", "merge_last_two_dim"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.r",
-                    f"layer.{layer_index}.rel_attn.r", "merge_last_two_dim"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.r_r_bias",
-                    f"layer.{layer_index}.rel_attn.r_r_bias"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.r_s_bias",
-                    f"layer.{layer_index}.rel_attn.r_s_bias"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.r_w_bias",
-                    f"layer.{layer_index}.rel_attn.r_w_bias"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.seg_embed",
-                    f"layer.{layer_index}.rel_attn.seg_embed"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.layer_norm.weight",
-                    f"layer.{layer_index}.rel_attn.layer_norm.weight"
-                ],
-                [
-                    f"layer.{layer_index}.rel_attn.layer_norm.bias",
-                    f"layer.{layer_index}.rel_attn.layer_norm.bias"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_norm.weight",
-                    f"layer.{layer_index}.ff.layer_norm.weight"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_norm.bias",
-                    f"layer.{layer_index}.ff.layer_norm.bias"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_1.weight",
-                    f"layer.{layer_index}.ff.layer_1.weight", "transpose"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_2.weight",
-                    f"layer.{layer_index}.ff.layer_2.weight", "transpose"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_1.bias",
-                    f"layer.{layer_index}.ff.layer_1.bias"
-                ],
-                [
-                    f"layer.{layer_index}.ff.layer_2.bias",
-                    f"layer.{layer_index}.ff.layer_2.bias"
-                ],
+                [f"layer.{layer_index}.rel_attn.q", f"layer.{layer_index}.rel_attn.q", "merge_last_two_dim"],
+                [f"layer.{layer_index}.rel_attn.k", f"layer.{layer_index}.rel_attn.k", "merge_last_two_dim"],
+                [f"layer.{layer_index}.rel_attn.v", f"layer.{layer_index}.rel_attn.v", "merge_last_two_dim"],
+                [f"layer.{layer_index}.rel_attn.o", f"layer.{layer_index}.rel_attn.o", "merge_last_two_dim"],
+                [f"layer.{layer_index}.rel_attn.r", f"layer.{layer_index}.rel_attn.r", "merge_last_two_dim"],
+                [f"layer.{layer_index}.rel_attn.r_r_bias", f"layer.{layer_index}.rel_attn.r_r_bias"],
+                [f"layer.{layer_index}.rel_attn.r_s_bias", f"layer.{layer_index}.rel_attn.r_s_bias"],
+                [f"layer.{layer_index}.rel_attn.r_w_bias", f"layer.{layer_index}.rel_attn.r_w_bias"],
+                [f"layer.{layer_index}.rel_attn.seg_embed", f"layer.{layer_index}.rel_attn.seg_embed"],
+                [f"layer.{layer_index}.rel_attn.layer_norm.weight", f"layer.{layer_index}.rel_attn.layer_norm.weight"],
+                [f"layer.{layer_index}.rel_attn.layer_norm.bias", f"layer.{layer_index}.rel_attn.layer_norm.bias"],
+                [f"layer.{layer_index}.ff.layer_norm.weight", f"layer.{layer_index}.ff.layer_norm.weight"],
+                [f"layer.{layer_index}.ff.layer_norm.bias", f"layer.{layer_index}.ff.layer_norm.bias"],
+                [f"layer.{layer_index}.ff.layer_1.weight", f"layer.{layer_index}.ff.layer_1.weight", "transpose"],
+                [f"layer.{layer_index}.ff.layer_2.weight", f"layer.{layer_index}.ff.layer_2.weight", "transpose"],
+                [f"layer.{layer_index}.ff.layer_1.bias", f"layer.{layer_index}.ff.layer_1.bias"],
+                [f"layer.{layer_index}.ff.layer_2.bias", f"layer.{layer_index}.ff.layer_2.bias"],
             ]
             hard_mapping.extend(layer_mappings)
-        return [
-            StateDictNameMapping(*mapping, index=index)
-            for index, mapping in enumerate(hard_mapping)
-        ]
+        return [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mapping)]
