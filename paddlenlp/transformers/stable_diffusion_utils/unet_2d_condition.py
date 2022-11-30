@@ -23,7 +23,6 @@ from .unet_blocks import UNetMidBlock2DCrossAttn, get_down_block, get_up_block
 
 
 class UNet2DConditionModel(nn.Layer):
-
     def __init__(
         self,
         sample_size=64,
@@ -61,18 +60,13 @@ class UNet2DConditionModel(nn.Layer):
         time_embed_dim = block_out_channels[0] * 4
 
         # input
-        self.conv_in = nn.Conv2D(in_channels,
-                                 block_out_channels[0],
-                                 kernel_size=3,
-                                 padding=(1, 1))
+        self.conv_in = nn.Conv2D(in_channels, block_out_channels[0], kernel_size=3, padding=(1, 1))
 
         # time
-        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos,
-                                   freq_shift)
+        self.time_proj = Timesteps(block_out_channels[0], flip_sin_to_cos, freq_shift)
         timestep_input_dim = block_out_channels[0]
 
-        self.time_embedding = TimestepEmbedding(timestep_input_dim,
-                                                time_embed_dim)
+        self.time_embedding = TimestepEmbedding(timestep_input_dim, time_embed_dim)
 
         self.down_blocks = nn.LayerList([])
         self.mid_block = None
@@ -119,9 +113,7 @@ class UNet2DConditionModel(nn.Layer):
         for i, up_block_type in enumerate(up_block_types):
             prev_output_channel = output_channel
             output_channel = reversed_block_out_channels[i]
-            input_channel = reversed_block_out_channels[min(
-                i + 1,
-                len(block_out_channels) - 1)]
+            input_channel = reversed_block_out_channels[min(i + 1, len(block_out_channels) - 1)]
 
             is_final_block = i == len(block_out_channels) - 1
 
@@ -148,10 +140,7 @@ class UNet2DConditionModel(nn.Layer):
             epsilon=norm_eps,
         )
         self.conv_act = nn.Silu()
-        self.conv_out = nn.Conv2D(block_out_channels[0],
-                                  out_channels,
-                                  3,
-                                  padding=1)
+        self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, 3, padding=1)
 
     def forward(
         self,
@@ -181,36 +170,30 @@ class UNet2DConditionModel(nn.Layer):
         sample = self.conv_in(sample)
 
         # 3. down
-        down_block_res_samples = (sample, )
+        down_block_res_samples = (sample,)
         for downsample_block in self.down_blocks:
 
-            if (hasattr(downsample_block, "attentions")
-                    and downsample_block.attentions is not None):
+            if hasattr(downsample_block, "attentions") and downsample_block.attentions is not None:
                 sample, res_samples = downsample_block(
                     hidden_states=sample,
                     temb=emb,
                     encoder_hidden_states=encoder_hidden_states,
                 )
             else:
-                sample, res_samples = downsample_block(hidden_states=sample,
-                                                       temb=emb)
+                sample, res_samples = downsample_block(hidden_states=sample, temb=emb)
 
             down_block_res_samples += res_samples
 
         # 4. mid
-        sample = self.mid_block(sample,
-                                emb,
-                                encoder_hidden_states=encoder_hidden_states)
+        sample = self.mid_block(sample, emb, encoder_hidden_states=encoder_hidden_states)
 
         # 5. up
         for upsample_block in self.up_blocks:
 
-            res_samples = down_block_res_samples[-len(upsample_block.resnets):]
-            down_block_res_samples = down_block_res_samples[:-len(upsample_block
-                                                                  .resnets)]
+            res_samples = down_block_res_samples[-len(upsample_block.resnets) :]
+            down_block_res_samples = down_block_res_samples[: -len(upsample_block.resnets)]
 
-            if (hasattr(upsample_block, "attentions")
-                    and upsample_block.attentions is not None):
+            if hasattr(upsample_block, "attentions") and upsample_block.attentions is not None:
                 sample = upsample_block(
                     hidden_states=sample,
                     temb=emb,
@@ -218,15 +201,12 @@ class UNet2DConditionModel(nn.Layer):
                     encoder_hidden_states=encoder_hidden_states,
                 )
             else:
-                sample = upsample_block(hidden_states=sample,
-                                        temb=emb,
-                                        res_hidden_states_tuple=res_samples)
+                sample = upsample_block(hidden_states=sample, temb=emb, res_hidden_states_tuple=res_samples)
 
         # 6. post-process
         # make sure hidden states is in float32
         # when running in half-precision
-        sample = self.conv_norm_out(sample.astype("float32")).astype(
-            sample.dtype)
+        sample = self.conv_norm_out(sample.astype("float32")).astype(sample.dtype)
         sample = self.conv_act(sample)
         sample = self.conv_out(sample)
 
