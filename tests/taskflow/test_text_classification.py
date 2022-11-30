@@ -73,7 +73,6 @@ class TestTextClassificationTask(unittest.TestCase):
         )
 
         dygraph_results = dygraph_taskflow(input_text)
-        print(dygraph_results, len(dygraph_results))
 
         self.assertEqual(len(dygraph_results), len(input_text[0]))
 
@@ -96,7 +95,7 @@ class TestTextClassificationTask(unittest.TestCase):
                 self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
                 # if multi_label, all predictions should be greater than the threshold
                 if model == "multi_label":
-                    self.assertGreater(dygraph_pred["score"], 0.5)
+                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.multilabel_threshold)
 
     @parameterized.expand(
         [
@@ -141,4 +140,4 @@ class TestTextClassificationTask(unittest.TestCase):
                 self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
                 # if multi_label, all predictions should be greater than the threshold
                 if model == "multi_label":
-                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.multilabel_thresold)
+                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.task_instance.multilabel_threshold)
