@@ -578,6 +578,8 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
 
         return AutoencoderKLOutput(latent_dist=posterior)
 
+    # (TODO junnyu) support vae slice
+    # https://github.com/huggingface/diffusers/commit/c28d3c82ce6f56c4b373a8260c56357d13db900a#diff-64804f08bc5e7a09947fb4eced462f15965acfa2d797354d85033e788f23b443
     def decode(self, z: paddle.Tensor, return_dict: bool = True):
         z = self.post_quant_conv(z)
         dec = self.decoder(z)

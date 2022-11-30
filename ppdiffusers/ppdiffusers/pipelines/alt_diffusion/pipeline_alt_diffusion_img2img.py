@@ -237,7 +237,7 @@ class AltDiffusionImg2ImgPipeline(DiffusionPipeline):
         if not paddle.equal_all(text_input_ids, untruncated_ids):
             removed_text = self.tokenizer.batch_decode(untruncated_ids[:, self.tokenizer.model_max_length - 1 : -1])
             logger.warning(
-                "The following part of your input was truncated because CLIP can only handle sequences up to"
+                "The following part of your input was truncated because XLM-Roberta can only handle sequences up to"
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}"
             )
 

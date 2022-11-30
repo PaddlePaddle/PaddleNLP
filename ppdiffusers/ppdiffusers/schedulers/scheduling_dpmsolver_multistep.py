@@ -241,6 +241,9 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
 
             if self.config.thresholding:
                 # Dynamic thresholding in https://arxiv.org/abs/2205.11487
+                orig_dtype = x0_pred.dtype
+                if orig_dtype not in [paddle.float32, paddle.float64]:
+                    x0_pred = x0_pred.cast("float32")
                 dynamic_max_val = paddle.quantile(
                     paddle.abs(x0_pred).reshape((x0_pred.shape[0], -1)), self.config.dynamic_thresholding_ratio, axis=1
                 )
@@ -249,6 +252,7 @@ class DPMSolverMultistepScheduler(SchedulerMixin, ConfigMixin):
                     self.config.sample_max_value * paddle.ones_like(dynamic_max_val),
                 )[(...,) + (None,) * (x0_pred.ndim - 1)]
                 x0_pred = paddle.clip(x0_pred, -dynamic_max_val, dynamic_max_val) / dynamic_max_val
+                x0_pred = x0_pred.cast(orig_dtype)
             return x0_pred
         # DPM-Solver needs to solve an integral of the noise prediction model.
         elif self.config.algorithm_type == "dpmsolver":
