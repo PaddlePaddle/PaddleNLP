@@ -24,7 +24,7 @@ from paddlenlp.utils.env import MODEL_HOME
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
-__all__ = ['ErnieTokenizer', 'ErnieTinyTokenizer']
+__all__ = ["ErnieTokenizer", "ErnieTinyTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "ernie-1.0": 513,
@@ -86,30 +86,30 @@ class ErnieTokenizer(PretrainedTokenizer):
     please refer to this superclass.
 
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
-        do_lower_case (str, optional): 
+        do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
-        unk_token (str, optional): 
+        unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
+        sep_token (str, optional):
             A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
+        pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
+        cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str, optional): 
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-    
+
     Examples:
         .. code-block::
 
@@ -117,7 +117,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             tokenizer = ErnieTokenizer.from_pretrained('ernie-1.0')
 
             encoded_inputs = tokenizer('He was a puppeteer')
-            # encoded_inputs: 
+            # encoded_inputs:
             # { 'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
             #  'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
             # }
@@ -127,259 +127,125 @@ class ErnieTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             # Deprecated, alias for ernie-1.0-base-zh
-            "ernie-1.0":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-1.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-1.0-base-zh-cw":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_base_zh_cw_vocab.txt",
-            "ernie-1.0-large-zh-cw":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
-            "ernie-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
-            "ernie-2.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_base_zh_vocab.txt",
-            "ernie-2.0-large-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_large_zh_vocab.txt",
-            "ernie-2.0-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-base-en-finetuned-squad":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-2.0-large-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
-            "ernie-gen-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base-en/vocab.txt",
-            "ernie-gen-large-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
-            "ernie-gen-large-en-430g":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
-            "rocketqa-zh-dureader-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-zh-dureader-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-v1-marco-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "rocketqa-v1-marco-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "rocketqa-zh-dureader-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
-            "rocketqa-v1-marco-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
-            "ernie-3.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
-            "ernie-3.0-xbase-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_xbase_zh_vocab.txt",
-            "ernie-3.0-medium-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-            "ernie-3.0-mini-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
-            "ernie-3.0-micro-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
-            "ernie-3.0-nano-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "rocketqa-zh-base-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
-            "rocketqa-zh-base-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
-            "rocketqa-zh-medium-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-            "rocketqa-zh-medium-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-            "rocketqa-zh-mini-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
-            "rocketqa-zh-mini-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
-            "rocketqa-zh-micro-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
-            "rocketqa-zh-micro-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
-            "rocketqa-zh-nano-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "rocketqa-zh-nano-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "rocketqa-base-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
-            "rocketqa-medium-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-            "rocketqa-mini-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
-            "rocketqa-micro-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
-            "rocketqa-nano-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "rocketqav2-en-marco-cross-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "rocketqav2-en-marco-query-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "rocketqav2-en-marco-para-encoder":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-search-base-dual-encoder-marco-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
-            "ernie-search-large-cross-encoder-marco-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
+            "ernie-1.0": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-1.0-base-zh-cw": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_base_zh_cw_vocab.txt",
+            "ernie-1.0-large-zh-cw": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/vocab.txt",
+            "ernie-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt",
+            "ernie-2.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_base_zh_vocab.txt",
+            "ernie-2.0-large-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_2.0/ernie_2.0_large_zh_vocab.txt",
+            "ernie-2.0-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-2.0-base-en-finetuned-squad": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-2.0-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
+            "ernie-gen-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-base-en/vocab.txt",
+            "ernie-gen-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large/vocab.txt",
+            "ernie-gen-large-en-430g": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-gen-large-430g/vocab.txt",
+            "rocketqa-zh-dureader-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-zh-dureader-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-v1-marco-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "rocketqa-v1-marco-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "rocketqa-zh-dureader-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-zh-dureader-vocab.txt",
+            "rocketqa-v1-marco-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/rocketqa/rocketqa-v1-marco-vocab.txt",
+            "ernie-3.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "ernie-3.0-xbase-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_xbase_zh_vocab.txt",
+            "ernie-3.0-medium-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "ernie-3.0-mini-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "ernie-3.0-micro-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "ernie-3.0-nano-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-zh-base-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-zh-base-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-zh-medium-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-zh-medium-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-zh-mini-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-zh-mini-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-zh-micro-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-zh-micro-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-zh-nano-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-zh-nano-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqa-base-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "rocketqa-medium-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "rocketqa-mini-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "rocketqa-micro-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "rocketqa-nano-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "rocketqav2-en-marco-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "rocketqav2-en-marco-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "rocketqav2-en-marco-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-search-base-dual-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "ernie-search-large-cross-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "ernie-1.0": {
-            "do_lower_case": True
-        },
-        "ernie-1.0-base-zh": {
-            "do_lower_case": True
-        },
-        "ernie-1.0-base-zh-cw": {
-            "do_lower_case": True
-        },
-        "ernie-1.0-large-zh-cw": {
-            "do_lower_case": True
-        },
-        "ernie-tiny": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-base-zh": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-large-zh": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-base-en": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-base-en-finetuned-squad": {
-            "do_lower_case": True
-        },
-        "ernie-2.0-large-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-base-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-large-en": {
-            "do_lower_case": True
-        },
-        "ernie-gen-large-en-430g": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-dureader-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-v1-marco-cross-encoder": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-base-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-xbase-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-medium-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-mini-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-micro-zh": {
-            "do_lower_case": True
-        },
-        "ernie-3.0-nano-zh": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-base-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-base-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-medium-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-medium-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-mini-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-mini-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-micro-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-micro-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-nano-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-zh-nano-para-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-base-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-medium-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-mini-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-micro-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqa-nano-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqav2-en-marco-cross-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqav2-en-marco-query-encoder": {
-            "do_lower_case": True
-        },
-        "rocketqav2-en-marco-para-encoder": {
-            "do_lower_case": True
-        },
-        "ernie-search-base-dual-encoder-marco-en": {
-            "do_lower_case": True
-        },
-        "ernie-search-large-cross-encoder-marco-en": {
-            "do_lower_case": True
-        },
+        "ernie-1.0": {"do_lower_case": True},
+        "ernie-1.0-base-zh": {"do_lower_case": True},
+        "ernie-1.0-base-zh-cw": {"do_lower_case": True},
+        "ernie-1.0-large-zh-cw": {"do_lower_case": True},
+        "ernie-tiny": {"do_lower_case": True},
+        "ernie-2.0-base-zh": {"do_lower_case": True},
+        "ernie-2.0-large-zh": {"do_lower_case": True},
+        "ernie-2.0-base-en": {"do_lower_case": True},
+        "ernie-2.0-base-en-finetuned-squad": {"do_lower_case": True},
+        "ernie-2.0-large-en": {"do_lower_case": True},
+        "ernie-gen-base-en": {"do_lower_case": True},
+        "ernie-gen-large-en": {"do_lower_case": True},
+        "ernie-gen-large-en-430g": {"do_lower_case": True},
+        "rocketqa-zh-dureader-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-dureader-para-encoder": {"do_lower_case": True},
+        "rocketqa-v1-marco-query-encoder": {"do_lower_case": True},
+        "rocketqa-v1-marco-para-encoder": {"do_lower_case": True},
+        "rocketqa-zh-dureader-cross-encoder": {"do_lower_case": True},
+        "rocketqa-v1-marco-cross-encoder": {"do_lower_case": True},
+        "ernie-3.0-base-zh": {"do_lower_case": True},
+        "ernie-3.0-xbase-zh": {"do_lower_case": True},
+        "ernie-3.0-medium-zh": {"do_lower_case": True},
+        "ernie-3.0-mini-zh": {"do_lower_case": True},
+        "ernie-3.0-micro-zh": {"do_lower_case": True},
+        "ernie-3.0-nano-zh": {"do_lower_case": True},
+        "rocketqa-zh-base-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-base-para-encoder": {"do_lower_case": True},
+        "rocketqa-zh-medium-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-medium-para-encoder": {"do_lower_case": True},
+        "rocketqa-zh-mini-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-mini-para-encoder": {"do_lower_case": True},
+        "rocketqa-zh-micro-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-micro-para-encoder": {"do_lower_case": True},
+        "rocketqa-zh-nano-query-encoder": {"do_lower_case": True},
+        "rocketqa-zh-nano-para-encoder": {"do_lower_case": True},
+        "rocketqa-base-cross-encoder": {"do_lower_case": True},
+        "rocketqa-medium-cross-encoder": {"do_lower_case": True},
+        "rocketqa-mini-cross-encoder": {"do_lower_case": True},
+        "rocketqa-micro-cross-encoder": {"do_lower_case": True},
+        "rocketqa-nano-cross-encoder": {"do_lower_case": True},
+        "rocketqav2-en-marco-cross-encoder": {"do_lower_case": True},
+        "rocketqav2-en-marco-query-encoder": {"do_lower_case": True},
+        "rocketqav2-en-marco-para-encoder": {"do_lower_case": True},
+        "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
+        "ernie-search-large-cross-encoder-marco-en": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -393,7 +259,7 @@ class ErnieTokenizer(PretrainedTokenizer):
 
     def extend_chinese_char(self):
         """
-        For, char level model such as ERNIE, we need add ## chinese token 
+        For, char level model such as ERNIE, we need add ## chinese token
         to demonstrate the segment information.
         """
         vocab_set = set(self.vocab.token_to_idx.keys())
@@ -414,22 +280,20 @@ class ErnieTokenizer(PretrainedTokenizer):
         tokens_to_add = []
         for token in new_tokens:
             if not isinstance(token, str):
-                raise TypeError(
-                    f"Token {token} is not a string but a {type(token)}.")
+                raise TypeError(f"Token {token} is not a string but a {type(token)}.")
             if hasattr(self, "do_lower_case") and self.do_lower_case:
                 token = token.lower()
-            if (token != self.unk_token and self.convert_tokens_to_ids(token)
-                    == self.convert_tokens_to_ids(self.unk_token)
-                    and token not in tokens_to_add):
+            if (
+                token != self.unk_token
+                and self.convert_tokens_to_ids(token) == self.convert_tokens_to_ids(self.unk_token)
+                and token not in tokens_to_add
+            ):
                 tokens_to_add.append(token)
 
         if self.verbose:
-            print(
-                f"Adding {len(tokens_to_add)} ## chinese tokens to the vocabulary"
-            )
+            print(f"Adding {len(tokens_to_add)} ## chinese tokens to the vocabulary")
 
-        added_tok_encoder = dict(
-            (tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
+        added_tok_encoder = dict((tok, len(self) + i) for i, tok in enumerate(tokens_to_add))
         added_tok_decoder = {v: k for k, v in added_tok_encoder.items()}
         self.added_tokens_encoder.update(added_tok_encoder)
         self.added_tokens_decoder.update(added_tok_decoder)
@@ -443,7 +307,7 @@ class ErnieTokenizer(PretrainedTokenizer):
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             List[str]: A list of string representing converted tokens.
         """
@@ -484,7 +348,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         Returns the number of added tokens when encoding a sequence with special tokens.
 
         Note:
-            This encodes inputs and checks the number of added tokens, and is therefore not efficient. 
+            This encodes inputs and checks the number of added tokens, and is therefore not efficient.
             Do not put this inside your training loop.
 
         Args:
@@ -497,9 +361,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -527,26 +389,23 @@ class ErnieTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         r"""
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
 
         Args:
-            token_ids_0 (List[int]): 
+            token_ids_0 (List[int]):
                 List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): 
+            token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
-            already_has_special_tokens (str, optional): 
-                Whether or not the token list is already formatted with special tokens for the model. 
+            already_has_special_tokens (str, optional):
+                Whether or not the token list is already formatted with special tokens for the model.
                 Defaults to `False`.
 
         Returns:
-            List[int]: 
+            List[int]:
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
@@ -556,28 +415,21 @@ class ErnieTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
         An ERNIE offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
-        
+
         Args:
             offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
@@ -591,14 +443,11 @@ class ErnieTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         r"""
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         A ERNIE sequence pair mask has the following format:
         ::
@@ -612,7 +461,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             token_ids_0 (List[int]):
                 A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. 
+                Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
 
         Returns:
@@ -622,27 +471,23 @@ class ErnieTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         r"""
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
         Args:
-            token_ids_0 (List[int]): 
+            token_ids_0 (List[int]):
                 List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): 
+            token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
-            already_has_special_tokens (str, optional): 
-                Whether or not the token list is already formatted with special tokens for the model. 
+            already_has_special_tokens (str, optional):
+                Whether or not the token list is already formatted with special tokens for the model.
                 Defaults to `False`.
         Returns:
-            List[int]: 
+            List[int]:
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
@@ -652,29 +497,21 @@ class ErnieTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
 
 class ErnieTinyTokenizer(PretrainedTokenizer):
     r"""
-    Constructs a ErnieTiny tokenizer. It uses the `dict.wordseg.pickle` cut the text to words, and 
+    Constructs a ErnieTiny tokenizer. It uses the `dict.wordseg.pickle` cut the text to words, and
     use the `sentencepiece` tools to cut the words to sub-words.
 
     Examples:
@@ -690,29 +527,29 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             # }
 
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             The file path of the vocabulary.
         sentencepiece_model_file (str):
             The file path of sentencepiece model.
         word_dict(str):
             The file path of word vocabulary, which is used to do chinese word segmentation.
-        do_lower_case (str, optional): 
+        do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
-        unk_token (str, optional): 
+        unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
+        sep_token (str, optional):
             A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
+        pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
+        cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str, optional): 
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
@@ -731,36 +568,33 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
     resource_files_names = {
         "sentencepiece_model_file": "spm_cased_simp_sampled.model",
         "vocab_file": "vocab.txt",
-        "word_dict": "dict.wordseg.pickle"
+        "word_dict": "dict.wordseg.pickle",
     }  # for save_pretrained
     pretrained_resource_files_map = {
-        "vocab_file": {
-            "ernie-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt"
-        },
+        "vocab_file": {"ernie-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/vocab.txt"},
         "sentencepiece_model_file": {
-            "ernie-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/spm_cased_simp_sampled.model"
+            "ernie-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/spm_cased_simp_sampled.model"
         },
         "word_dict": {
-            "ernie-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/dict.wordseg.pickle"
+            "ernie-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_tiny/dict.wordseg.pickle"
         },
     }
     pretrained_init_configuration = {"ernie-tiny": {"do_lower_case": True}}
 
-    def __init__(self,
-                 vocab_file,
-                 sentencepiece_model_file,
-                 word_dict,
-                 do_lower_case=True,
-                 encoding="utf8",
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        sentencepiece_model_file,
+        word_dict,
+        do_lower_case=True,
+        encoding="utf8",
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
         self.sp_model = spm.SentencePieceProcessor()
         self.word_dict = word_dict
 
@@ -770,15 +604,15 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = ErnieTinyTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = ErnieTinyTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         if not os.path.isfile(word_dict):
             raise ValueError(
                 "Can't find a file at path '{}'. To load the "
                 "word dict from a pretrained model please use "
-                "`tokenizer = ErnieTinyTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(word_dict))
-        self.dict = pickle.load(open(word_dict, 'rb'))
+                "`tokenizer = ErnieTinyTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(word_dict)
+            )
+        self.dict = pickle.load(open(word_dict, "rb"))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
 
         # if the sentencepiece_model_file is not exists, just the default sentence-piece model
@@ -803,7 +637,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             matched = False
 
             for i in range(window_size, 0, -1):
-                cand = chars[idx:idx + i]
+                cand = chars[idx : idx + i]
                 if cand in self.dict:
                     words.append(cand)
                     matched = True
@@ -819,11 +653,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         End-to-end tokenization for ErnieTiny models.
 
         Args:
-            text (str): 
+            text (str):
                 The text to be tokenized.
-        
+
         Returns:
-            List(str): 
+            List(str):
                 A list of string representing converted tokens.
         """
         if len(text) == 0:
@@ -831,8 +665,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         if not isinstance(text, six.string_types):
             text = text.decode(self.encoding)
 
-        text = [s for s in self.cut(text) if s != ' ']
-        text = ' '.join(text)
+        text = [s for s in self.cut(text) if s != " "]
+        text = " ".join(text)
         text = text.lower()
 
         tokens = self.sp_model.EncodeAsPieces(text)
@@ -879,9 +713,8 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         """
         for name, file_name in self.resource_files_names.items():
             ### TODO: make the name 'ernie-tiny' as a variable
-            source_path = os.path.join(MODEL_HOME, 'ernie-tiny', file_name)
-            save_path = os.path.join(save_directory,
-                                     self.resource_files_names[name])
+            source_path = os.path.join(MODEL_HOME, "ernie-tiny", file_name)
+            save_path = os.path.join(save_directory, self.resource_files_names[name])
 
             if os.path.abspath(source_path) != os.path.abspath(save_path):
                 shutil.copyfile(source_path, save_path)
@@ -904,15 +737,13 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         An ERNIE sequence has the following format:
 
         - single sequence:       ``[CLS] X [SEP]``
@@ -934,17 +765,15 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
         An ERNIE offset_mapping has the following format:
 
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
-        
+
         Args:
             offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
@@ -958,14 +787,11 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         r"""
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         A ERNIE sequence pair mask has the following format:
         ::
@@ -989,29 +815,25 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         r"""
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
 
         Args:
-            token_ids_0 (List[int]): 
+            token_ids_0 (List[int]):
                 List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): 
+            token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
-            already_has_special_tokens (str, optional): 
-                Whether or not the token list is already formatted with special tokens for the model. 
+            already_has_special_tokens (str, optional):
+                Whether or not the token list is already formatted with special tokens for the model.
                 Defaults to `False`.
 
         Returns:
-            List[int]: 
+            List[int]:
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
@@ -1021,21 +843,13 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
