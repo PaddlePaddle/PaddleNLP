@@ -10,9 +10,7 @@ all : lint test
 # # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
 
 format:
-	echo "============================== run isort ==============================\n"
 	pre-commit run isort
-	echo "============================== run black ==============================\n"
 	pre-commit run black
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -21,15 +19,9 @@ format:
 
 .PHONY: lint
 lint:
-	echo "============================== run isort ==============================\n"
-	pre-commit run isort
-	echo "============================== run black ==============================\n"
-	pre-commit run black
-	echo "============================== run flake8 ==============================\n"
-	pre-commit run flake8
+	pre-commit run
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
 
 # # # # # # # # # # # # # # # Test Block # # # # # # # # # # # # # # # 
 
