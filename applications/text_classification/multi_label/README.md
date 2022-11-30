@@ -210,7 +210,7 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" train.py \
+python -m paddle.distributed.launch --gpus "0,1" train.py \
     --dataset_dir "data" \
     --device "gpu" \
     --max_seq_length 128 \
