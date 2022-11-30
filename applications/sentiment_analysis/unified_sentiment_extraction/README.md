@@ -694,8 +694,8 @@ paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件�
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/203913660-ac95caad-c5e2-43c5-b291-6208babd58d3.png />
 </div>
-<a name="2.7"></a>
 
+<a name="2.7"></a>
 
 **隐性观点词抽取样本预测**  
 由于在构造样本时，引入了酒店场景的部分高频隐性观点，因此模型可以很好地支持对于相关隐性观点的抽取。
