@@ -13,23 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Dict, Union, Optional
-import os
-
 import logging
-import numpy as np
+import os
 from pathlib import Path
+from typing import Dict, List, Optional, Union
+
+import numpy as np
+import paddle
 from tqdm.auto import tqdm
 
-import paddle
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieDualEncoder, AutoTokenizer, AutoModel
-
-from pipelines.schema import Document
-from pipelines.document_stores import BaseDocumentStore
-from pipelines.nodes.retriever.base import BaseRetriever
-from pipelines.nodes.models import SemanticIndexBatchNeg
+from paddlenlp.data import Pad
+from paddlenlp.transformers import AutoModel, AutoTokenizer, ErnieDualEncoder
 from pipelines.data_handler.processor import TextSimilarityProcessor
+from pipelines.document_stores import BaseDocumentStore
+from pipelines.nodes.models import SemanticIndexBatchNeg
+from pipelines.nodes.retriever.base import BaseRetriever
+from pipelines.schema import Document
 from pipelines.utils.common_utils import initialize_device_settings
 
 logger = logging.getLogger(__name__)
@@ -37,23 +36,21 @@ logger = logging.getLogger(__name__)
 
 class DensePassageRetriever(BaseRetriever):
     """
-    Retriever that uses a bi-encoder (one transformer for query, one transformer for passage).    
+    Retriever that uses a bi-encoder (one transformer for query, one transformer for passage).
     """
 
     def __init__(
         self,
         document_store: BaseDocumentStore,
-        query_embedding_model: Union[
-            Path, str] = "rocketqa-zh-dureader-query-encoder",
-        passage_embedding_model: Union[
-            Path, str] = "rocketqa-zh-dureader-para-encoder",
+        query_embedding_model: Union[Path, str] = "rocketqa-zh-dureader-query-encoder",
+        passage_embedding_model: Union[Path, str] = "rocketqa-zh-dureader-para-encoder",
         params_path: Optional[str] = "",
         model_version: Optional[str] = None,
         output_emb_size: Optional[int] = None,
         reinitialize: bool = False,
         share_parameters: bool = False,
         max_seq_len_query: int = 64,
-        max_seq_len_passage: int = 256,
+        max_seq_len_passage: int = 384,
         top_k: int = 10,
         use_gpu: bool = True,
         batch_size: int = 16,
@@ -119,13 +116,10 @@ class DensePassageRetriever(BaseRetriever):
             progress_bar=progress_bar,
         )
 
-        self.devices, _ = initialize_device_settings(use_cuda=use_gpu,
-                                                     multi_gpu=True)
+        self.devices, _ = initialize_device_settings(use_cuda=use_gpu, multi_gpu=True)
 
         if batch_size < len(self.devices):
-            logger.warning(
-                "Batch size is less than the number of devices. All gpus will not be utilized."
-            )
+            logger.warning("Batch size is less than the number of devices. All gpus will not be utilized.")
 
         self.document_store = document_store
         self.batch_size = batch_size
@@ -133,38 +127,34 @@ class DensePassageRetriever(BaseRetriever):
         self.top_k = top_k
 
         if document_store is None:
-            logger.warning(
-                "DensePassageRetriever initialized without a document store. ")
+            logger.warning("DensePassageRetriever initialized without a document store. ")
         elif document_store.similarity != "dot_product":
             logger.warning(
                 f"You are using a Dense Passage Retriever model with the {document_store.similarity} function. "
                 "We recommend you use dot_product instead. "
-                "This can be set when initializing the DocumentStore")
+                "This can be set when initializing the DocumentStore"
+            )
 
         # Init & Load Encoders
-        if (os.path.exists(params_path)):
+        if os.path.exists(params_path):
             pretrained_model = AutoModel.from_pretrained(query_embedding_model)
-            self.ernie_dual_encoder = SemanticIndexBatchNeg(
-                pretrained_model, output_emb_size=output_emb_size)
+            self.ernie_dual_encoder = SemanticIndexBatchNeg(pretrained_model, output_emb_size=output_emb_size)
             # Load Custom models
             print("Loading Parameters from:{}".format(params_path))
             state_dict = paddle.load(params_path)
             self.ernie_dual_encoder.set_dict(state_dict)
-            self.query_tokenizer = AutoTokenizer.from_pretrained(
-                query_embedding_model)
-            self.passage_tokenizer = AutoTokenizer.from_pretrained(
-                query_embedding_model)
+            self.query_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
         else:
             self.ernie_dual_encoder = ErnieDualEncoder(
                 query_embedding_model,
                 passage_embedding_model,
                 output_emb_size=output_emb_size,
                 reinitialize=reinitialize,
-                share_parameters=share_parameters)
-            self.query_tokenizer = AutoTokenizer.from_pretrained(
-                query_embedding_model)
-            self.passage_tokenizer = AutoTokenizer.from_pretrained(
-                passage_embedding_model)
+                share_parameters=share_parameters,
+            )
+            self.query_tokenizer = AutoTokenizer.from_pretrained(query_embedding_model)
+            self.passage_tokenizer = AutoTokenizer.from_pretrained(passage_embedding_model)
 
         self.processor = TextSimilarityProcessor(
             query_tokenizer=self.query_tokenizer,
@@ -198,30 +188,26 @@ class DensePassageRetriever(BaseRetriever):
         if top_k is None:
             top_k = self.top_k
         if not self.document_store:
-            logger.error(
-                "Cannot perform retrieve() since DensePassageRetriever initialized with document_store=None"
-            )
+            logger.error("Cannot perform retrieve() since DensePassageRetriever initialized with document_store=None")
             return []
         if index is None:
             index = self.document_store.index
 
         query_emb = self.embed_queries(texts=[query])
         documents = self.document_store.query_by_embedding(
-            query_emb=query_emb[0],
-            top_k=top_k,
-            filters=filters,
-            index=index,
-            headers=headers,
-            return_embedding=False)
+            query_emb=query_emb[0], top_k=top_k, filters=filters, index=index, headers=headers, return_embedding=False
+        )
         return documents
 
     def retrieve_batch(
         self,
         queries: List[str],
-        filters: Optional[Union[Dict[str, Union[Dict, List, str, int, float,
-                                                bool]],
-                                List[Dict[str, Union[Dict, List, str, int,
-                                                     float, bool]]], ]] = None,
+        filters: Optional[
+            Union[
+                Dict[str, Union[Dict, List, str, int, float, bool]],
+                List[Dict[str, Union[Dict, List, str, int, float, bool]]],
+            ]
+        ] = None,
         top_k: Optional[int] = None,
         index: str = None,
         headers: Optional[Dict[str, str]] = None,
@@ -240,8 +226,7 @@ class DensePassageRetriever(BaseRetriever):
                     " as queries or a single filter that will be applied to each query."
                 )
         else:
-            filters = [filters] * len(
-                queries) if filters is not None else [{}] * len(queries)
+            filters = [filters] * len(queries) if filters is not None else [{}] * len(queries)
         if index is None:
             index = self.document_store.index
         if not self.document_store:
@@ -253,10 +238,9 @@ class DensePassageRetriever(BaseRetriever):
         query_embs: List[np.ndarray] = []
         for batch in self._get_batches(queries=queries, batch_size=batch_size):
             query_embs.extend(self.embed_queries(texts=batch))
-        for query_emb, cur_filters in tqdm(zip(query_embs, filters),
-                                           total=len(query_embs),
-                                           disable=not self.progress_bar,
-                                           desc="Querying"):
+        for query_emb, cur_filters in tqdm(
+            zip(query_embs, filters), total=len(query_embs), disable=not self.progress_bar, desc="Querying"
+        ):
             cur_docs = self.document_store.query_by_embedding(
                 query_emb=query_emb,
                 top_k=top_k,
@@ -286,25 +270,28 @@ class DensePassageRetriever(BaseRetriever):
                     "external_id": '19930582'}, ...]
         :return: dictionary of embeddings for "passages" and "query"
         """
-
         dataset, tensor_names, _, baskets = self.processor.dataset_from_dicts(
-            dicts, indices=[i for i in range(len(dicts))], return_baskets=True)
+            dicts, indices=[i for i in range(len(dicts))], return_baskets=True
+        )
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id
-                ),  # input_ids
-            Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id
-                ),  # token_type_ids
-        ): [data for data in fn(samples)]
+        def token_padding_inputs(features):
+            input_ids = [item[0] for item in features]
+            token_type_ids = [item[1] for item in features]
+            input_ids = Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_id, dtype="int64")(input_ids)
+            token_type_ids = Pad(axis=0, pad_val=self.passage_tokenizer.pad_token_type_id, dtype="int64")(
+                token_type_ids
+            )
+            return input_ids, token_type_ids
 
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=self.batch_size,
-                                               shuffle=False)
+        # dataset is a MapDataset, it will raise an error when using datacollator: AttributeError: 'list' object has no attribute 'keys'
+        # collate_fn = DataCollatorWithPadding(self.passage_tokenizer)
+        collate_fn = token_padding_inputs
 
-        data_loader = paddle.io.DataLoader(dataset=dataset,
-                                           batch_sampler=batch_sampler,
-                                           collate_fn=batchify_fn,
-                                           return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dicts, batch_size=self.batch_size, shuffle=False)
+
+        data_loader = paddle.io.DataLoader(
+            dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, return_list=True
+        )
 
         all_embeddings = {"query": [], "passages": []}
 
@@ -318,29 +305,27 @@ class DensePassageRetriever(BaseRetriever):
             disable_tqdm = not self.progress_bar
 
         with tqdm(
-                total=len(data_loader) * self.batch_size,
-                unit=" Docs",
-                desc=f"Create embeddings",
-                position=1,
-                leave=False,
-                disable=disable_tqdm,
+            total=len(data_loader) * self.batch_size,
+            unit=" Docs",
+            desc="Create embeddings",
+            position=1,
+            leave=False,
+            disable=disable_tqdm,
         ) as progress_bar:
             for batch in data_loader:
                 input_ids, token_type_ids = batch
                 with paddle.no_grad():
                     cls_embeddings = self.ernie_dual_encoder.get_pooled_embedding(
-                        input_ids=input_ids, token_type_ids=token_type_ids)
+                        input_ids=input_ids, token_type_ids=token_type_ids
+                    )
                     if "query" in dicts[0]:
-                        all_embeddings["query"].append(
-                            cls_embeddings.cpu().numpy())
+                        all_embeddings["query"].append(cls_embeddings.cpu().numpy())
                     if "passages" in dicts[0]:
-                        all_embeddings["passages"].append(
-                            cls_embeddings.cpu().numpy())
+                        all_embeddings["passages"].append(cls_embeddings.cpu().numpy())
                 progress_bar.update(self.batch_size)
 
         if all_embeddings["passages"]:
-            all_embeddings["passages"] = np.concatenate(
-                all_embeddings["passages"])
+            all_embeddings["passages"] = np.concatenate(all_embeddings["passages"])
         if all_embeddings["query"]:
             all_embeddings["query"] = np.concatenate(all_embeddings["query"])
         return all_embeddings
@@ -370,18 +355,19 @@ class DensePassageRetriever(BaseRetriever):
             )
             self.processor.num_hard_negatives = 0
 
-        passages = [{
-            "passages": [{
-                "title":
-                d.meta["name"] if d.meta and "name" in d.meta else "",
-                "text":
-                d.content,
-                "label":
-                d.meta["label"] if d.meta and "label" in d.meta else "positive",
-                "external_id":
-                d.id,
-            }]
-        } for d in docs]
+        passages = [
+            {
+                "passages": [
+                    {
+                        "title": d.meta["name"] if d.meta and "name" in d.meta else "",
+                        "text": d.content,
+                        "label": d.meta["label"] if d.meta and "label" in d.meta else "positive",
+                        "external_id": d.id,
+                    }
+                ]
+            }
+            for d in docs
+        ]
         embeddings = self._get_predictions(passages)["passages"]
 
         return embeddings

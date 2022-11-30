@@ -28,7 +28,7 @@ else:
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
 
 from ...configuration_utils import FrozenDict
-from ...onnx_utils import OnnxRuntimeModel
+from ...fastdeploy_utils import FastDeployRuntimeModel
 from ...pipeline_utils import DiffusionPipeline
 from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ...utils import deprecate, logging
@@ -58,7 +58,7 @@ def prepare_mask_and_masked_image(image, mask, latents_shape):
     return mask, masked_image
 
 
-class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
+class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
     r"""
     Pipeline for text-guided image inpainting using Stable Diffusion. *This is an experimental feature*.
 
@@ -85,28 +85,30 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
         feature_extractor ([`CLIPFeatureExtractor`]):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
-    vae_encoder: OnnxRuntimeModel
-    vae_decoder: OnnxRuntimeModel
-    text_encoder: OnnxRuntimeModel
+    vae_encoder: FastDeployRuntimeModel
+    vae_decoder: FastDeployRuntimeModel
+    text_encoder: FastDeployRuntimeModel
     tokenizer: CLIPTokenizer
-    unet: OnnxRuntimeModel
+    unet: FastDeployRuntimeModel
     scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler]
-    safety_checker: OnnxRuntimeModel
+    safety_checker: FastDeployRuntimeModel
     feature_extractor: CLIPFeatureExtractor
 
     def __init__(
         self,
-        vae_encoder: OnnxRuntimeModel,
-        vae_decoder: OnnxRuntimeModel,
-        text_encoder: OnnxRuntimeModel,
+        vae_encoder: FastDeployRuntimeModel,
+        vae_decoder: FastDeployRuntimeModel,
+        text_encoder: FastDeployRuntimeModel,
         tokenizer: CLIPTokenizer,
-        unet: OnnxRuntimeModel,
+        unet: FastDeployRuntimeModel,
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
-        safety_checker: OnnxRuntimeModel,
+        safety_checker: FastDeployRuntimeModel,
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
-        logger.info("`OnnxStableDiffusionInpaintPipeline` is experimental and will very likely change in the future.")
+        logger.info(
+            "`FastDeployStableDiffusionInpaintPipeline` is experimental and will very likely change in the future."
+        )
 
         if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
@@ -265,7 +267,7 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
                 f" {self.tokenizer.model_max_length} tokens: {removed_text}"
             )
             text_input_ids = text_input_ids[:, : self.tokenizer.model_max_length]
-        text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int32))[0]
+        text_embeddings = self.text_encoder(input_ids=text_input_ids.astype(np.int64))[0]
 
         # duplicate text embeddings for each generation per prompt
         text_embeddings = np.repeat(text_embeddings, num_images_per_prompt, axis=0)
@@ -304,7 +306,7 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
                 return_tensors="np",
             )
             uncond_input_ids = uncond_input.input_ids
-            uncond_embeddings = self.text_encoder(input_ids=uncond_input_ids.astype(np.int32))[0]
+            uncond_embeddings = self.text_encoder(input_ids=uncond_input_ids.astype(np.int64))[0]
 
             # duplicate unconditional embeddings for each generation per prompt
             uncond_embeddings = np.repeat(uncond_embeddings, num_images_per_prompt, axis=0)
@@ -357,7 +359,12 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
         self.scheduler.set_timesteps(num_inference_steps)
 
         # scale the initial noise by the standard deviation required by the scheduler
-        latents = latents * self.scheduler.init_noise_sigma
+        init_noise_sigma = (
+            self.scheduler.init_noise_sigma.numpy()
+            if isinstance(self.scheduler.init_noise_sigma, paddle.Tensor)
+            else self.scheduler.init_noise_sigma
+        )
+        latents = latents * init_noise_sigma
 
         # prepare extra kwargs for the scheduler step, since not all schedulers have the same signature
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
@@ -367,7 +374,6 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
-
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             # expand the latents if we are doing classifier free guidance
             latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
@@ -378,7 +384,9 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
 
             # predict the noise residual
             noise_pred = self.unet(
-                sample=latent_model_input, timestep=np.array([t]), encoder_hidden_states=text_embeddings
+                sample=latent_model_input.astype(np.float32),
+                timestep=np.array(t, dtype=np.int64),
+                encoder_hidden_states=text_embeddings.astype(np.float32),
             )[0]
             # perform guidance
             if do_classifier_free_guidance:
@@ -386,7 +394,10 @@ class OnnxStableDiffusionInpaintPipeline(DiffusionPipeline):
                 noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
+
+            latents = self.scheduler.step(
+                paddle.to_tensor(noise_pred), paddle.to_tensor(t), paddle.to_tensor(latents), **extra_step_kwargs
+            ).prev_sample
             latents = latents.numpy()
 
             # call the callback, if provided
