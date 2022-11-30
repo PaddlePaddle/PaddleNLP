@@ -697,8 +697,9 @@ class Trainer:
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
                         self.scaler.step(self.optimizer)
-                        if step <= self.max_update_step:
-                            self.scaler.update()
+                        if step > self.max_update_step and self.scaler.is_use_dynamic_loss_scaling():
+                            self.scaler._use_dynamic_loss_scaling = False
+                        self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
                         optimizer_was_run = scale_before <= scale_after
                         if not optimizer_was_run:
