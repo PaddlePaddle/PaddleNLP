@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available, is_fastdeploy_available
 
 if is_paddle_available():
     from .ddim import DDIMPipeline
@@ -39,3 +39,8 @@ if is_paddlenlp_available() and is_onnx_available():
         OnnxStableDiffusionInpaintPipeline,
         OnnxStableDiffusionPipeline,
     )
+
+if is_paddlenlp_available() and is_fastdeploy_available():
+    from .stable_diffusion import (FastDeployStableDiffusionImg2ImgPipeline,
+                                   FastDeployStableDiffusionInpaintPipeline,
+                                   FastDeployStableDiffusionPipeline)

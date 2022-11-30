@@ -1,41 +1,22 @@
-# 端到端语义检索系统
+# 端到端两路召回语义检索系统
 
-## 1. 场景概述
+## 1. 概述
 
-检索系统存在于我们日常使用的很多产品中，比如商品搜索系统、学术文献检索系等等，本方案提供了检索系统完整实现。限定场景是用户通过输入检索词 Query，快速在海量数据中查找相似文档。
+多路召回是指采用不同的策略、特征或者简单的模型，分别召回一部分候选集合，然后把这些候选集混合在一起供后续的排序模型进行重排，也可以定制自己的重排序的规则等等。本项目使用关键字和语义检索两路召回的检索系统，系统的架构如下，用户输入的Query会分别通过关键字召回BMRetriever（Okapi BM 25算法，Elasticsearch默认使用的相关度评分算法，是基于词频和文档频率和文档长度相关性来计算相关度），语义向量检索召回DenseRetriever（使用RocketQA抽取向量，然后比较向量之间相似度）后得到候选集，然后通过JoinResults进行结果聚合，最后通过通用的Ranker模块得到重排序的结果返回给用户。
 
-所谓语义检索（也称基于向量的检索），是指检索系统不再拘泥于用户 Query 字面本身，而是能精准捕捉到用户 Query 后面的真正意图并以此来搜索，从而更准确地向用户返回最符合的结果。通过使用最先进的语义索引模型找到文本的向量表示，在高维向量空间中对它们进行索引，并度量查询向量与索引文档的相似程度，从而解决了关键词索引带来的缺陷。
-
-例如下面两组文本 Pair，如果基于关键词去计算相似度，两组的相似度是相同的。而从实际语义上看，第一组相似度高于第二组。
-
-```
-车头如何放置车牌    前牌照怎么装
-车头如何放置车牌    后牌照怎么装
-```
-
-语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。如果需要关键字和语义检索两种结合方式请参考文档[多路召回](./Multi_Recall.md)
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/204423532-90f62781-5f81-4b6d-9f94-741416ae3fcb.png" width="500px">
+</div>
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search),接入流程可以参考[Neural Search的流程](./Neural_Search.md)。
+本项目提供了低成本搭建端到端两路召回语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的两路召回语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的检索系统，并可以提供 Web 化产品服务。
 
 <div align="center">
-    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+    <img src="https://user-images.githubusercontent.com/12107462/204435911-0ba1cb9f-cb56-4bcd-9f64-63ff173826d6.png" width="500px">
 </div>
 
-
-### 2.1 系统特色
-
-+ 端到端
-    + 提供包括数据建库、模型服务部署、WebUI 可视化一整套端到端语义检索系统能力
-    + 多源数据支持: 支持对 Txt、Word、PDF、Image 多源数据进行解析、识别并写入 ANN 数据库
-+ 效果好
-    + 依托百度领先的NLP技术，包括[ERNIE](https://github.com/PaddlePaddle/ERNIE)语义理解技术与[RocketQA](https://github.com/PaddlePaddle/RocketQA)开放域问答技术
-    + 预置领先的深度学习模型
-
-## 3. 快速开始: 快速搭建语义检索系统
-
-以下是针对mac和linux的安装流程，windows的安装和使用流程请参考[windows](./Install_windows.md)
+## 3. 快速开始: 快速搭建两路召回语义检索系统
 
 ### 3.1 运行环境和安装说明
 
@@ -43,7 +24,7 @@
 
 a. 软件环境：
 - python >= 3.7.0
-- paddlenlp >= 2.2.1
+- paddlenlp >= 2.4.3
 - paddlepaddle-gpu >=2.3
 - CUDA Version: 10.2
 - NVIDIA Driver Version: 440.64.00
@@ -64,35 +45,19 @@ cd ${HOME}/PaddleNLP/pipelines/
 pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 python setup.py install
 ```
-【注意】以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
+
+【注意】
+
+- Windows的安装复杂一点，教程请参考：[Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
+- 以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录
 
 ### 3.2 数据说明
+
 语义检索数据库的数据来自于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)，共包含 46972 个段落文本，并选取了其中验证集1417条段落文本来搭建语义检索系统。
 
 ### 3.3 一键体验语义检索系统
 
-#### 3.3.1 快速一键启动
-
-我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
-```bash
-# 我们建议在 GPU 环境下运行本示例，运行速度较快
-# 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
-export CUDA_VISIBLE_DEVICES=0
-python examples/semantic-search/semantic_search_example.py --device gpu \
-                                                          --search_engine faiss
-# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
-unset CUDA_VISIBLE_DEVICES
-python examples/semantic-search/semantic_search_example.py --device cpu \
-                                                          --search_engine faiss
-```
-`semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
-
-
-### 3.4 构建 Web 可视化语义检索系统
-
-整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，接下来我们依次搭建这 3 个服务并最终形成可视化的语义检索系统。
-
-#### 3.4.1 启动 ANN 服务
+#### 3.3.1 启动 ANN 服务
 1. 参考官方文档下载安装 [elasticsearch-8.3.2](https://www.elastic.co/cn/downloads/elasticsearch) 并解压。
 2. 启动 ES 服务
 首先修改`config/elasticsearch.yml`的配置：
@@ -109,10 +74,47 @@ curl http://localhost:9200/_aliases?pretty=true
 ```
 备注：ES 服务默认开启端口为 9200
 
-#### 3.4.2 文档数据写入 ANN 索引库
+#### 3.3.2 快速一键启动
+
+我们预置了基于[DuReader-Robust数据集](https://github.com/baidu/DuReader/tree/master/DuReader-Robust)搭建语义检索系统的代码示例，您可以通过如下命令快速体验语义检索系统的效果
+```bash
+# 我们建议在 GPU 环境下运行本示例，运行速度较快
+# 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
+export CUDA_VISIBLE_DEVICES=0
+python examples/semantic-search/multi_recall_semantic_search_example.py --device gpu \
+                                                          --search_engine elastic
+# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
+unset CUDA_VISIBLE_DEVICES
+python examples/semantic-search/multi_recall_semantic_search_example.py --device cpu \
+                                                          --search_engine elastic
+```
+`multi_recall_semantic_search_example.py`中`DensePassageRetriever`和`ErnieRanker`的模型介绍请参考[API介绍](../../API.md)
+
+参数含义说明
+* `device`: 设备名称，cpu/gpu，默认为gpu
+* `index_name`: 索引的名称
+* `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
+* `max_seq_len_query`: query的最大长度，默认是64
+* `max_seq_len_passage`: passage的最大长度，默认是384
+* `retriever_batch_size`: 召回模型一次处理的数据的数量
+* `query_embedding_model`: query模型的名称，默认为rocketqa-zh-nano-query-encoder
+* `passage_embedding_model`: 段落模型的名称，默认为rocketqa-zh-nano-para-encoder
+* `params_path`: Neural Search的召回模型的名称，默认为
+* `embedding_dim`: 模型抽取的向量的维度,默认为312，为rocketqa-zh-nano-query-encoder的向量维度
+* `host`: ANN索引引擎的IP地址
+* `port`: ANN索引引擎的端口号
+* `bm_topk`: 关键字召回节点BM25Retriever的召回数量
+* `dense_topk`: 语义向量召回节点DensePassageRetriever的召回数量
+* `rank_topk`: 排序模型节点ErnieRanker的排序过滤数量
+
+### 3.4 构建 Web 可视化语义检索系统
+
+整个 Web 可视化语义检索系统主要包含 3 大组件: 1. 基于 ElasticSearch 的 ANN 服务 2. 基于 RestAPI 构建模型服务 3. 基于 Streamlit 构建 WebUI，搭建ANN服务请参考1.3.1节，接下来我们依次搭建后台和前端两个服务。
+
+#### 3.4.1 文档数据写入 ANN 索引库
 ```
 # 以DuReader-Robust 数据集为例建立 ANN 索引库
-python utils/offline_ann.py --index_name dureader_robust_query_encoder \
+python utils/offline_ann.py --index_name dureader_nano_query_encoder \
                             --doc_dir data/dureader_dev \
                             --search_engine elastic \
                             --delete_index
@@ -121,7 +123,7 @@ python utils/offline_ann.py --index_name dureader_robust_query_encoder \
 
 ```
 # 打印几条数据
-curl http://localhost:9200/dureader_robust_query_encoder/_search
+curl http://localhost:9200/dureader_nano_query_encoder/_search
 ```
 
 参数含义说明
@@ -132,48 +134,29 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
-删除索引也可以使用下面的命令：
-
-```
-curl -XDELETE http://localhost:9200/dureader_robust_query_encoder
-```
-
-#### 3.4.3 启动 RestAPI 模型服务
+#### 3.4.2 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
-export PIPELINE_YAML_PATH=rest_api/pipeline/semantic_search.yaml
+export PIPELINE_YAML_PATH=rest_api/pipeline/multi_recall_semantic_search.yaml
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
-```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
-
-```bash
-sh examples/semantic-search/run_search_server.sh
 ```
 启动后可以使用curl命令验证是否成功运行：
 
 ```
-curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
+curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker":{"top_k": 3}}}'
 ```
-
-更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
-
-#### 3.4.4 启动 WebUI
+#### 3.4.3 启动 WebUI
 ```bash
 # 配置模型服务地址
 export API_ENDPOINT=http://127.0.0.1:8891
 # 在指定端口 8502 启动 WebUI
-python -m streamlit run ui/webapp_semantic_search.py --server.port 8502
-```
-Linux 用户推荐采用 Shell 脚本来启动服务：：
-
-```bash
-sh examples/semantic-search/run_search_web.sh
+python -m streamlit run ui/webapp_multi_recall_semantic_search.py --server.port 8502
 ```
 
 到这里您就可以打开浏览器访问 http://127.0.0.1:8502 地址体验语义检索系统服务了。
 
-#### 3.4.5 数据更新
+#### 3.4.4 数据更新
 
 数据更新的方法有两种，第一种使用前面的 `utils/offline_ann.py`进行数据更新，第二种是使用前端界面的文件上传（在界面的左侧）进行数据更新。对于第一种使用脚本的方式，可以使用多种文件更新数据，示例的文件更新建索引的命令如下，里面包含了图片（目前仅支持把图中所有的文字合并建立索引），docx（支持图文，需要按照空行进行划分段落），txt（需要按照空行划分段落）三种格式的文件建索引：
 
