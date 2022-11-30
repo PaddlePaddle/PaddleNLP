@@ -287,7 +287,7 @@ class DensePassageRetriever(BaseRetriever):
         # collate_fn = DataCollatorWithPadding(self.passage_tokenizer)
         collate_fn = token_padding_inputs
 
-        batch_sampler = paddle.io.BatchSampler(dicts, batch_size=self.batch_size, shuffle=False)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=self.batch_size, shuffle=False)
 
         data_loader = paddle.io.DataLoader(
             dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, return_list=True
