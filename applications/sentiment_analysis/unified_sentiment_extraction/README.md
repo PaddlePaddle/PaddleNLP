@@ -108,7 +108,7 @@ unified_sentiment_extraction/
 
 基于UIE的情感分析功能已经集成到了 Taskflow，可以通过 Taskflow 直接进行情感分析预测。为自动分析文本评论中的属性、观点词和情感极性，定义 schema 如下：
 ```
-[{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
+[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
 ```
 
 调用示例如下：
@@ -116,7 +116,7 @@ unified_sentiment_extraction/
 ```python
 >>> from paddlenlp import Taskflow
 
->>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
 >>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
 >>> print(senta('蛋糕味道不错，店家服务也很好'))
 
@@ -172,29 +172,27 @@ unified_sentiment_extraction/
 ]
 ```
 
-当需要分析数据规模较大时，可以借助脚本`batch_predict.py`以文件的形式传入数据，分析结果会以文件的形式进行保存。使用示例如下：
+当数据规模较大时，可以以文件的形式传入数据，同时将分析结果保存至指定的文件中，文件内容可以按照如下方式进行组织，每行表示一条样本:
+```
+酒店环境很好，安静，周边餐饮很方便
+环境美，房间不大，但舒适温馨，老板服务周到贴心
+房间整洁，设施完好，客服人员不错
+```
 
+支持以文件形式批量传入的代码示例如下：
+```python
+>>> from paddlenlp import Taskflow
 
-
-可使用`predict/batch_predict.py`文件进行情感预测，默认情况下，会自动分析文本评论中的属性、观点词和情感极性，分析完成后会保存情感分析结果，用以后续可视化。
+>>> file_path = './data/test_hotel.txt'
+>>> save_path = './outputs/test_hotel.json'
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> senta(file_path, save_path)
 
 ```
-python predict/batch_predict.py \
-    --ckpt_dir "./checkpoint/model_best" \
-    --test_set_path "./data/test_hotel.txt" \
-    --save_path "./outputs/test_hotel.json" \
-    --position_prob 0.5 \
-    --max_seq_len 512 \
-    --batch_size 8
-````
 
-**参数说明**：
-- ckpt_dir: 用于加载模型的保存目录，可以在上述模型下载后，进行解压，然后传入该模型目录。
-- test_set_path： 指定测试集文件路径。
-- save_path： 在进行情感分析预测后，分析结果的保存地址，该结果可用于后续数据可视化。
-- position_prob：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
-- max_seq_len: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
-- batch_size: 批处理大小，请结合机器情况进行调整，默认为 4。
+在执行完以上命令后，情感分析的结果将被保存至 `save_path` 指定的文件中。
+
 
 <a name="2.3.3"></a>
 
@@ -205,7 +203,7 @@ python predict/batch_predict.py \
 ```
 python visual_analysis.py \
     --file_path "./outputs/test_hotel.json" \
-    --save_dir "./images" \
+    --save_dir "./outputs/images" \
     --font_path "./SimHei.ttf" \
     --sentiment_name "情感倾向[正向,负向]"
 ```
@@ -213,7 +211,7 @@ python visual_analysis.py \
 - file_path: 指定情感分析结果的保存路径。
 - save_dir: 指定图片的保存目录。
 - font_path: 指定字体文件的路径，用以在生成的wordcloud图片中辅助显示中文。
-- sentiment_name: 情感分析的Prompt文本，如果在预先给定的属性集上进行情感分析，则需要指定为"情感倾向[正向,负向,未提及]"，如果不预先指定属性，则需要指定为"情感倾向[正向,负向]"。
+- sentiment_name: 情感分析的Prompt文本，默认为"情感倾向[正向,负向,未提及]"。
 
 在执行完成后，可以在`save_dir`指定的目录下查看可视化结果，部分结果示例如下。
 
@@ -232,66 +230,50 @@ python visual_analysis.py \
 
 对给定的文本评论，直接进行情感分析。可以在`predict/predict.py`或`predict/batch_predict.py`文件中，通过设置不同的Schema进行相应信息的抽取。其中`predict/predict.py`即时运行情感分析功能，`predict/batch_predict.py`会接收文件，同时将结果保存相应文件中。
 
-**（1）整句情感分析**
-整句情感分析功能当前支持二分类：正向和负向。可以设置其schema为：
+**（1）整句情感分析**  
+整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
 
 ```python
-schema =  ['情感倾向[正向，负向]']
-```
-在`predict/predict.py`文件中设置schema后，可以通过如下代码进行运行。
+>>> from paddlenlp import Taskflow
 
-```shell
-python predict/predict.py \
-    --ckpt_dir "./checkpoint/model_best" \
-    --position_prob 0.5 \
-    --max_seq_len 512 \
-    --batch_size 8
+>>> schema = ['情感倾向[正向，负向]']
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
 ```
-**参数说明**：
-- ckpt_dir: 用于加载模型的保存目录，可以在上述模型下载后，进行解压，然后传入该模型目录。
-- position_prob：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
-- max_seq_len: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
-- batch_size: 批处理大小，请结合机器情况进行调整，默认为 4。、
 
-**（2）属性级情感分析**
-除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取。
+**（2）属性级情感分析**  
+除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取，其调用示例如下。
 
 ```python
-# Aspect Term Extraction
-schema =  ["评价维度"]
-# Aspect - Opinion Extraction
-schema =  [{"评价维度":["观点词"]}]
-# Aspect - Sentiment Extraction
-schema =  [{"评价维度":["情感倾向[正向，负向]"]}]
-# Aspect - Sentiment - Opinion Extraction
-schema =  [{"评价维度":["观点词", "情感倾向[正向，负向]"]}]
+>>> from paddlenlp import Taskflow
+
+>>> # Aspect Term Extraction
+>>> # schema =  ["评价维度"]
+>>> # Aspect - Opinion Extraction
+>>> # schema =  [{"评价维度":["观点词"]}]
+>>> # Aspect - Sentiment Extraction
+>>> # schema =  [{"评价维度":["情感倾向[正向，负向]"]}]
+>>> # Aspect - Sentiment - Opinion Extraction
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向，负向]"]}]
+
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
 ```
-
-在设置好schema之后，可以通过`predict/predict.py`文件进行情感预测。
-
 
 <a name="2.4.2"></a>
 
 #### 2.4.2 预先给定属性集
 
-本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。可以通过`predict/predict_with_aspect.py`或`predict/batch_predict_with_aspect.py`文件定义的预测方式进行实现。其中，在`predict/predict_with_aspect.py`定义的属性级和schema如下。
+本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。
 
 ```python
-    # define schema for pre-defined aspects, schema and initializing UIEPredictor
-    schema = ["观点词", "情感倾向[正向,负向,未提及]"]
-    aspects = ["房间","服务", "环境", "位置", "隔音", "价格"]
+>>> # define schema for pre-defined aspects, schema
+>>> schema = ["观点词", "情感倾向[正向,负向,未提及]"]
+>>> aspects = ["房间", "位置", "隔音"]
+>>> # set aspects for Taskflow
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, aspects=aspects)
+>>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
 ```
-其表示对指定数据集，分析"房间","服务", "环境", "位置", "隔音" 和 "价格"的观点词和情感倾向。 在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。在设置完成后，可通过如下命令进行情感分析预测。
-
-```shell
-python predict/predict_with_aspect.py \
-    --ckpt_dir "./checkpoint/model_best" \
-    --position_prob 0.5 \
-    --max_seq_len 512 \
-    --batch_size 8
-```
-其可配置参数解释同`predict/predict.py`。
-
 
 <a name="2.5"></a>
 
@@ -299,7 +281,7 @@ python predict/predict_with_aspect.py \
 
 基于情感分析的预测结果，本项目提供了结果可视化功能。默认情况下，可视化功能支持围绕属性、观点、属性+观点、属性+情感、固定属性+观点分析功能。在各项分析中，均支持词云和直方图两类图像展示。以下各项功能介绍中，以酒店场景数据为例进行展示。
 
- **(1) 属性分析**
+**(1) 属性分析**
 通过属性信息，可以查看客户对于产品/服务的重点关注方面. 可以通过`plot_aspect_with_frequency`函数对属性进行可视化，当前可通过参数`image_type`分别指定`wordcloud`和'histogram'，通过词云和直方图的形式进行可视化。
 
 ```python
@@ -380,18 +362,16 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
     <img src="https://user-images.githubusercontent.com/35913314/200213998-e646c422-7ab5-48ae-9e28-d6068cdf7b8f.png"/>
 </div>
 
-
-
 <a name="2.6"></a>
 
-### 2.6 支持定制面向垂域的情感分析能力，解决同义属性聚合以及隐性观点抽取
+### **2.6 支持定制面向垂域的情感分析能力，解决同义属性聚合以及隐性观点抽取**
 考虑到用户在对业务数据进行情感分析时，往往聚焦于某个特定场景或领域，为满足用户更高的情感分析要求，本项目除了预先设定的通用情感分析能力之外，同时支持进一步地微调，以在当前业务侧获取更好的效果。
 
 本节以酒店场景为例，讲解定制酒店垂域的情感分析能力。接下来，将从数据标注及样本构建 - 模型训练 - 模型测试 - 模型预测及效果展示等全流程展开介绍。
 
 <a name="2.6.1"></a>
 
-#### 2.6.1 打通数据标注到训练样本构建
+#### **2.6.1 打通数据标注到训练样本构建**
 本项目打通了标注平台 label-studio， 支持用户自己标注业务侧数据进行模型训练，同时支持将label-studio平台导出数据一键转换成模型训练样本形式，如下图所示。如果对label-studio数据标注规则尚不清楚，请参考[情感分析任务Label Studio使用指南](./label_studio.md)。
 
 在利用 label-studio 导出标注好的json数据之后，本项目提供了`label_studio.py`文件，用于将导出数据一键转换为模型训练数据。
@@ -401,11 +381,27 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
 </div>
 
 
-##### 2.6.1.1 **属性抽取相关任务**
+#### **2.6.1.1 语句级情感分类任务**
 
-**基础使用方式**：
+对于语句级情感分类任务，可以配置参数`prompt_prefix`和`options`，通过以下命令构造相关训练数据。
 
-针对属性抽取式的任务，比如属性、观点抽取、属性分类任务等，可以使用如下命令将label-studio导出数据转换为模型训练数据：
+```shell
+python label_studio.py \
+    --label_studio_file ./data/label_studio.json \
+    --task_type cls \
+    --save_dir ./data \
+    --splits 0.8 0.1 0.1 \
+    --prompt_prefix "情感倾向" \
+    --options "正向" "负向"
+```
+
+#### **2.6.1.2 属性抽取相关任务**
+
+
+针对属性抽取式的任务，比如属性、观点抽取、属性分类任务等，本项目提供了基础和升级的功能构造相关训练数据。即除了基础的属性相关信息抽取能力之外，本项目还支持属性聚合，以及加强了对隐性观点抽取的升级功能。
+
+**基础使用方式**：  
+可以使用如下命令将label-studio导出数据转换为模型训练数据：
 
 ```shell
 python label_studio.py \
@@ -433,8 +429,6 @@ python label_studio.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 
-
-除了基础的属性相关信息抽取能力之外，本项目还支持属性聚合，以及加强了对隐性观点抽取的功能。
 
 **升级1：支持属性聚合能力**: 在用户对产品或服务进行评论时，对某一些属性可能会有不同的说法，这会在后续对属性分析时可能会带来困扰。如以下示例中的"价格","价钱"和"费用"。
 
@@ -472,7 +466,6 @@ python label_studio.py \
 位置, 负向[不太好找]
 ```
 
-
 可以分别通过参数"synonym_file"和"implicit_file"分别将同义词文件和隐性观点文件传入以下命令中，进行相关数据构建。
 
 ```shell
@@ -498,28 +491,13 @@ python label_studio.py \
 - 对于从label_studio导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
 
-##### 2.6.1.2 **语句级情感分类任务**
-
-对于语句级情感分类任务，可以配置参数`prompt_prefix`和`options`，通过以下命令构造相关训练数据。
-
-```shell
-python label_studio.py \
-    --label_studio_file ./data/label_studio.json \
-    --task_type cls \
-    --save_dir ./data \
-    --splits 0.8 0.1 0.1 \
-    --prompt_prefix "情感倾向" \
-    --options "正向" "负向"
-```
-
-
 <a name="2.6.2"></a>
 
 #### 2.6.2 模型微调
 在生成酒店场景的训练数据后，可以通过以下命令启动模型微调。
 
 ```shell
-python -u -m paddle.distributed.launch --gpus "7" finetune.py \
+python -u -m paddle.distributed.launch --gpus "0" finetune.py \
   --train_path ./data/train.txt \
   --dev_path ./data/dev.txt \
   --save_dir ./checkpoint \
@@ -550,7 +528,7 @@ python -u -m paddle.distributed.launch --gpus "7" finetune.py \
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 
 
-#### 2.6.3 模型测试
+#### **2.6.3 模型测试**
 
 通过运行以下命令进行对酒店场景的测试集进行评估：
 
@@ -570,154 +548,146 @@ python evaluate.py \
 * `max_seq_len`：模型支持处理的最大序列长度，默认为512。
 
 
-#### 2.6.4 预测及效果展示
-可以通过 `predict` 目录下的预测样本进行预测，相关功能如下所示。
+#### **2.6.4 定制预测及效果展示**
 
-```
-├── predict # 模型预测
-│   └── predictor.py # 模型预测核心脚本
-│   ├── predict.py # 模型预测Demo脚本
-│   ├── batch_predict.py # 模型批量预测脚本
-│   ├── predict_with_aspect.py # 根据给定评价属性进行预测Demo脚本
-│   └── batch_predict_with_aspect # 根据给定评价属性进行批量预测脚本
-```
+paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件的路径，路径下需要包含训练好的模型权重文件model_state.pdparams。
 
-**预测脚本使用**
-假设给定以下样本进行预测：
-```
-店面干净，很清静，服务员服务热情，性价比很高，发现收银台有排队
-```
-
-如果**不指定属性**进行分析的话，可以通过`predict.py`脚本对输入样本进行预测：
-```
-python predict/predict.py 
-```
-其预测结果如下：
-
-```
-{
-    '评价维度': [
-        {
-            'end': 14,
-            'probability': 0.5057273450270259,
-            'relations': {
-                '情感倾向[正向,负向,未提及]': [
-                    {
-                        'probability': 0.9164003249203745,
-                        'text': '正向'
-                    }
-                ],
-                '观点词': [
-                    {
-                        'end': 16,
-                        'probability': 0.9901230595644215,
-                        'start': 14,
-                        'text': '热情'
-                    }
-                ]
+```python
+>>> # define schema
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, task_path="./checkpoint/model_best")
+>>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
+[
+    {
+        '评价维度': [
+            {
+                'text': '服务',
+                'start': 11,
+                'end': 13,
+                'probability': 0.9600759151746807,
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '热情',
+                            'start': 15,
+                            'end': 17,
+                            'probability': 0.9995151134519027
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '正向',
+                            'probability': 0.9998306104766073
+                        }
+                    ]
+                }
             },
-            'start': 12,
-            'text': '服务'
-        },
-        {
-            'end': 2,
-            'probability': 0.9972058290336498,
-            'relations': {
-                '情感倾向[正向,负向,未提及]': [
-                    {
-                        'probability': 0.9988713449309117,
-                        'text': '正向'
-                    }
-                ],
-                '观点词': [
-                    {
-                        'end': 8,
-                        'probability': 0.9979115454266321,
-                        'start': 6,
-                        'text': '清静'
-                    },
-                    {
-                        'end': 4,
-                        'probability': 0.9994972946268277,
-                        'start': 2,
-                        'text': '干净'
-                    }
-                ]
+            {
+                'text': '隔音',
+                'start': 22,
+                'end': 24,
+                'probability': 0.9993525950520166,
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '不好',
+                            'start': 24,
+                            'end': 26,
+                            'probability': 0.9992370362201655
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '负向',
+                            'probability': 0.9842680108546062
+                        }
+                    ]
+                }
             },
-            'start': 0,
-            'text': '店面'
-        },
-        {
-            'end': 20,
-            'probability': 0.9995450845431009,
-            'relations': {
-                '情感倾向[正向,负向,未提及]': [
-                    {
-                        'probability': 0.9980333837608555,
-                        'text': '正向'
-                    }
-                ],
-                '观点词': [
-                    {
-                        'end': 22,
-                        'probability': 0.9758514523453563,
-                        'start': 21,
-                        'text': '高'
-                    }
-                ]
-            },
-            'start': 17,
-            'text': '性价比'
-        }
-    ]
-}
+            {
+                'text': '房间',
+                'start': 4,
+                'end': 6,
+                'probability': 0.9991784415865368,
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '很大',
+                            'start': 6,
+                            'end': 8,
+                            'probability': 0.8359714693985723
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '正向',
+                            'probability': 0.997688853839179
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+]
 ```
 
-如果预先给定属性集["服务", "位置"]进行分析，则可以使用`predict_with_aspect.py`脚本进行预测：
-```
-python predict/predict_with_aspect.py
-```
-其结果如下：
-
-```
-{
-    '评价维度': [
-        {
-            'relations': {
-                '情感倾向[正向,负向,未提及]': [
-                    {
-                        'probability': 0.9885644291685693,
-                        'text': '正向'
-                    }
-                ],
-                '观点词': [
-                    {
-                        'end': 16,
-                        'probability': 0.9888024893355762,
-                        'start': 14,
-                        'text': '热情'
-                    }
-                ]
-            },
-            'text': '服务'
-        },
-        {
-            'relations': {
-                '情感倾向[正向,负向,未提及]': [
-                    {
-                        'probability': 0.9987500516857182,
-                        'text': '未提及'
-                    }
-                ]
-            },
-            'text': '价格'
-        }
-    ]
-}
-```
-
-**属性聚合样本预测**
+**属性聚合样本预测**  
 由于在构造样本时，引入酒店场景的部分属性的同义词，可以看到对于"隔音"与"隔声"、"位置"与"所处位置", "价格"、"价钱"与"费用"等各项内容均能识别出正确的观点和情感倾向。
+
+对于"隔音"与"隔声"的调用示例：
+```python
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
+>>> aspects = ["隔声", "隔音"]
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, task_path="./checkpoint/model_best", aspects=aspects)
+>>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
+[
+    {
+        '评价维度': [
+            {
+                'text': '隔声',
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '不好',
+                            'start': 24,
+                            'end': 26,
+                            'probability': 0.9990923567964849
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '负向',
+                            'probability': 0.9840917780791472
+                        }
+                    ]
+                }
+            },
+            {
+                'text': '隔音',
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '不好',
+                            'start': 24,
+                            'end': 26,
+                            'probability': 0.9992370362201655
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '负向',
+                            'probability': 0.9842680108546062
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+]
+
+```
+
+下图展示了关于模型对于属性聚合能力支持的样本：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/203913660-ac95caad-c5e2-43c5-b291-6208babd58d3.png />
@@ -725,8 +695,43 @@ python predict/predict_with_aspect.py
 <a name="2.7"></a>
 
 
-**隐性观点词抽取样本预测**
-由于在构造样本时，引入了酒店场景的部分高频隐性观点，可以看到在以下case中，对于属性"价格"和"卫生"，能够正确识别出对应的观点词和情感极性。
+**隐性观点词抽取样本预测**  
+由于在构造样本时，引入了酒店场景的部分高频隐性观点，因此模型可以很好地支持对于相关隐性观点的抽取。
+
+对于"价格"的调用示例：
+```python
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
+>>> aspects = ["价格"]
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, task_path="./checkpoint/model_best", aspects=aspects)
+>>> senta("这家点的房间很大，店家服务也很热情，而且还很便宜")
+[
+    {
+        '评价维度': [
+            {
+                'text': '价格',
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '便宜',
+                            'start': 22,
+                            'end': 24,
+                            'probability': 0.9994707157967682
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '正向',
+                            'probability': 0.9950765734397677
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+]
+```
+
+下图展示了关于模型对于隐性观点抽取的样本：
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/203913490-a6fbf0aa-1f9c-476d-83c7-ea4604ab94d0.png />

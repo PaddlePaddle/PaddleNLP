@@ -29,6 +29,7 @@ from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
 from ..transformers import SkepTokenizer, AutoTokenizer, AutoModel
 from .task import Task
 from .models import BoWModel, LSTMModel, SkepSequenceModel, UIE
+from ..utils.log import logger
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard, SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc
 
 usage = r"""
@@ -430,6 +431,7 @@ class UIESentaTask(Task):
     def __init__(self, task, model, schema, aspects=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._schema_tree = None
+        self.save_path = None
         self.set_schema(schema)
         self._check_task_files()
         self._check_predictor_type()
@@ -515,13 +517,20 @@ class UIESentaTask(Task):
 
     def _preprocess(self, inputs):
         """
-        Transform the raw text to the model inputs, two steps involved:
-           1) Transform the raw text to token ids.
-           2) Generate the other model inputs from the raw text and token ids.
+        Read and analyze inputs.        
         """
-        inputs = self._check_input_text(inputs)
+        if isinstance(inputs[0], str) and os.path.isfile(inputs[0]):
+            examples = []
+            with open(inputs[0], "r", encoding="utf-8") as f:
+                for line in f.readlines():
+                    examples.append(line.strip())
+            if len(inputs) == 2:
+                self.save_path = inputs[1]
+        else:
+            examples = self._check_input_text(inputs)
+
         outputs = {}
-        outputs['text'] = inputs
+        outputs['text'] = examples
         return outputs
 
     def _single_stage_predict(self, inputs):
@@ -690,7 +699,6 @@ class UIESentaTask(Task):
             list: a list of predictions, where the list's length
                 equals to the length of `data`
         """
-
         if self.aspects is not None:
             # predict with pre-give aspects
             results = []
@@ -864,4 +872,15 @@ class UIESentaTask(Task):
         """
         This function will convert the model output to raw text.
         """
+        if self.save_path is not None:
+            dir_name = os.path.dirname(self.save_path)
+            if not os.path.exists(dir_name):
+                os.makedirs(dir_name)
+            with open(self.save_path, "w", encoding="utf-8") as f:
+                for result in inputs['result']:
+                    line = json.dumps(result, ensure_ascii=False) + "\n"
+                    f.write(line)
+            logger.info("The result of sentiment analysis has been saved to : {}".format(self.save_path))
+            self.save_path = None
+            return ''
         return inputs['result']
