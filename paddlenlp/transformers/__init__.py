@@ -99,8 +99,6 @@ from .nezha.modeling import *
 from .nezha.tokenizer import *
 from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
-from .prophetnet.modeling import *
-from .prophetnet.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
 from .rembert.modeling import *
