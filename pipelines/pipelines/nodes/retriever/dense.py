@@ -50,7 +50,7 @@ class DensePassageRetriever(BaseRetriever):
         reinitialize: bool = False,
         share_parameters: bool = False,
         max_seq_len_query: int = 64,
-        max_seq_len_passage: int = 256,
+        max_seq_len_passage: int = 384,
         top_k: int = 10,
         use_gpu: bool = True,
         batch_size: int = 16,
@@ -270,7 +270,6 @@ class DensePassageRetriever(BaseRetriever):
                     "external_id": '19930582'}, ...]
         :return: dictionary of embeddings for "passages" and "query"
         """
-
         dataset, tensor_names, _, baskets = self.processor.dataset_from_dicts(
             dicts, indices=[i for i in range(len(dicts))], return_baskets=True
         )

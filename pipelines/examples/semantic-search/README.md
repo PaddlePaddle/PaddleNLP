@@ -132,6 +132,12 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
+删除索引也可以使用下面的命令：
+
+```
+curl -XDELETE http://localhost:9200/dureader_robust_query_encoder
+```
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
@@ -149,6 +155,9 @@ sh examples/semantic-search/run_search_server.sh
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 ```
+
+更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址
