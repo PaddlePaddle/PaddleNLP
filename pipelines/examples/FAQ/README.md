@@ -145,6 +145,8 @@ curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' 
 ```
 如果成功运行，则会返回结果。
 
+更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址

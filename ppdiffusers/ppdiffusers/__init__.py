@@ -16,6 +16,7 @@
 
 from .ppnlp_patch_utils import *
 from .utils import (
+    is_fastdeploy_available,
     is_inflect_available,
     is_onnx_available,
     is_paddle_available,
@@ -28,6 +29,7 @@ from .version import VERSION
 __version__ = VERSION
 
 from .configuration_utils import ConfigMixin
+from .fastdeploy_utils import FastDeployRuntimeModel
 from .onnx_utils import OnnxRuntimeModel
 from .utils import logging
 
@@ -121,3 +123,12 @@ if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
     )
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403
+
+if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available():
+    from .pipelines import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionPipeline,
+    )
+else:
+    from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403

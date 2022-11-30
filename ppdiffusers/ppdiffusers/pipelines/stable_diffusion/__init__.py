@@ -22,6 +22,7 @@ import PIL
 
 from ...utils import (
     BaseOutput,
+    is_fastdeploy_available,
     is_onnx_available,
     is_paddle_available,
     is_paddlenlp_available,
@@ -75,6 +76,12 @@ if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion_inpaint import (
         OnnxStableDiffusionInpaintPipeline,
     )
-    from .pipeline_onnx_stable_diffusion_inpaint_legacy import (
-        OnnxStableDiffusionInpaintPipelineLegacy,
+
+if is_paddlenlp_available() and is_fastdeploy_available():
+    from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline
+    from .pipeline_fastdeploy_stable_diffusion_img2img import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+    )
+    from .pipeline_fastdeploy_stable_diffusion_inpaint import (
+        FastDeployStableDiffusionInpaintPipeline,
     )

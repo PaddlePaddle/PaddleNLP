@@ -14,7 +14,12 @@
 # limitations under the License.
 # flake8: noqa
 
-from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ..utils import (
+    is_fastdeploy_available,
+    is_onnx_available,
+    is_paddle_available,
+    is_paddlenlp_available,
+)
 
 if is_paddle_available():
     from .dance_diffusion import DanceDiffusionPipeline
@@ -65,4 +70,11 @@ if is_paddlenlp_available() and is_onnx_available():
         OnnxStableDiffusionInpaintPipeline,
         OnnxStableDiffusionInpaintPipelineLegacy,
         OnnxStableDiffusionPipeline,
+    )
+
+if is_paddlenlp_available() and is_fastdeploy_available():
+    from .stable_diffusion import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionPipeline,
     )

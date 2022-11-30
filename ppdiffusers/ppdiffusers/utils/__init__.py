@@ -22,6 +22,7 @@ from .import_utils import (
     ENV_VARS_TRUE_VALUES,
     USE_PADDLE,
     DummyObject,
+    is_fastdeploy_available,
     is_inflect_available,
     is_modelcards_available,
     is_onnx_available,
