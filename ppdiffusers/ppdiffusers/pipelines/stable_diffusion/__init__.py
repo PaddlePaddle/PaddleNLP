@@ -21,7 +21,7 @@ import numpy as np
 import PIL
 from PIL import Image
 
-from ...utils import BaseOutput, is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ...utils import BaseOutput, is_onnx_available, is_paddle_available, is_paddlenlp_available, is_fastdeploy_available
 
 
 @dataclass
@@ -54,3 +54,8 @@ if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion import OnnxStableDiffusionPipeline
     from .pipeline_onnx_stable_diffusion_img2img import OnnxStableDiffusionImg2ImgPipeline
     from .pipeline_onnx_stable_diffusion_inpaint import OnnxStableDiffusionInpaintPipeline
+
+if is_paddlenlp_available() and is_fastdeploy_available():
+    from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline
+    from .pipeline_fastdeploy_stable_diffusion_img2img import FastDeployStableDiffusionImg2ImgPipeline
+    from .pipeline_fastdeploy_stable_diffusion_inpaint import FastDeployStableDiffusionInpaintPipeline

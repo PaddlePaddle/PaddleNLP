@@ -54,13 +54,9 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "ernie-layoutx-base-uncased":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
-            "uie-x-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
         },
         "sentencepiece_model_file": {
             "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
-            "uie-x-base":
             "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
         }
     }
@@ -69,14 +65,9 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
             "do_lower_case": True,
             "do_tokenize_postprocess": False
         },
-        "uie-x-base": {
-            "do_lower_case": True,
-            "do_tokenize_postprocess": True
-        },
     }
     pretrained_positional_embedding_sizes = {
         "ernie-layoutx-base-uncased": 512,
-        "uie-x-base": 512
     }
     max_model_input_sizes = pretrained_positional_embedding_sizes
     model_input_names = ["input_ids", "attention_mask"]
