@@ -312,7 +312,13 @@ def _encode_doc(tokenizer, offset_mapping, last_offset, prompt, this_text_line, 
         inputs_ids += content_encoded_inputs["input_ids"][1:-1]
         sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
 
-        for sub_list in sub_offset_mapping[1:-1]:
+        for i, sub_list in enumerate(sub_offset_mapping[1:-1]):
+            if i == 0:
+                org_offset = sub_list[1]
+            else:
+                if sub_list[0] != org_offset:
+                    last_offset += 1
+                org_offset = sub_list[1]
             offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
             last_offset = offset_mapping[-1][-1]
     return offset_mapping, last_offset, q_sep_index, inputs_ids

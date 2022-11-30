@@ -132,12 +132,20 @@ class DocParser(object):
                     for line in lines:
                         table_list.extend(re.findall("<td.*?>(.*?)</td>", line))
                     for cell_box, text in zip(cell_bbox, table_list):
-                        box = [
-                            bbox[0] + cell_box[0],
-                            bbox[1] + cell_box[5],
-                            bbox[0] + cell_box[4],
-                            bbox[1] + cell_box[1],
-                        ]
+                        if self.ocr_lang == "ch":
+                            box = [
+                                bbox[0] + cell_box[0],
+                                bbox[1] + cell_box[5],
+                                bbox[0] + cell_box[4],
+                                bbox[1] + cell_box[1],
+                            ]
+                        else:
+                            box = [
+                                bbox[0] + cell_box[0],
+                                bbox[1] + cell_box[1],
+                                bbox[0] + cell_box[2],
+                                bbox[1] + cell_box[3],
+                            ]
                         if _is_ch(text):
                             text = text.replace(" ", "")
                         layout.append((box, text))
@@ -278,7 +286,7 @@ class DocParser(object):
 
     @classmethod
     def write_image_with_results(
-        self, image, layouts=None, results=None, save_path=None, return_pil_image=False, format=None, max_size=None
+        self, image, layout=None, results=None, save_path=None, return_pil_image=False, format=None, max_size=None
     ):
         """
         write image with boxes and results
@@ -342,8 +350,8 @@ class DocParser(object):
         img_render = _image.copy()
         draw_render = ImageDraw.Draw(img_render)
 
-        if layouts:
-            for segment in layouts:
+        if layout:
+            for segment in layout:
                 if isinstance(segment, dict):
                     box = segment["bbox"]
                 else:

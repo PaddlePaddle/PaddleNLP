@@ -607,6 +607,7 @@ class UIETask(Task):
                         return_dict=False,
                         return_offsets_mapping=True,
                     )
+
                     content_encoded_inputs = content_encoded_inputs[0]
                     inputs_ids = content_encoded_inputs["input_ids"][:-1]
                     sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
@@ -633,7 +634,13 @@ class UIETask(Task):
                     inputs_ids += content_encoded_inputs["input_ids"][1:-1]
                     sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
 
-                    for sub_list in sub_offset_mapping[1:-1]:
+                    for i, sub_list in enumerate(sub_offset_mapping[1:-1]):
+                        if i == 0:
+                            org_offset = sub_list[1]
+                        else:
+                            if sub_list[0] != org_offset:
+                                last_offset += 1
+                            org_offset = sub_list[1]
                         offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
                         last_offset = offset_mapping[-1][-1]
                 return offset_mapping, last_offset, q_sep_index, inputs_ids
@@ -643,7 +650,6 @@ class UIETask(Task):
                 prompt = example["prompt"]
                 bbox_lines = example.get("bbox", None)
                 image_buff_string = example.get("image", None)
-
                 # Text
                 if bbox_lines is None:
                     encoded_inputs = self._tokenizer(
@@ -704,7 +710,6 @@ class UIETask(Task):
                             )
                             this_text_line = char
                         prev_bbox = bbox
-
                     if len(this_text_line) > 0:
                         offset_mapping, last_offset, q_sep_index, inputs_ids = _encode_doc(
                             self._tokenizer,
@@ -716,7 +721,6 @@ class UIETask(Task):
                             q_sep_index,
                             self._max_seq_len,
                         )
-
                     if len(inputs_ids) > self._max_seq_len:
                         inputs_ids = inputs_ids[: (self._max_seq_len - 1)] + [c_sep_id]
                         offset_mapping = offset_mapping[: (self._max_seq_len - 1)] + [[0, 0]]
@@ -758,7 +762,6 @@ class UIETask(Task):
                     padded_image,
                     offset_mapping,
                 ]
-
                 input_list = [inputs_ids, token_type_ids, position_ids, attention_mask, bbox_list]
                 return_list = [np.array(x, dtype="int64") for x in input_list]
                 return_list.append(np.array(padded_image, dtype="float32"))
