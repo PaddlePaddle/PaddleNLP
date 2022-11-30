@@ -401,13 +401,10 @@ class UIETask(Task):
                 del self.resource_files_names["sentencepiece_model_file"]
         self._is_en = True if model in ["uie-base-en"] or self._schema_lang == "en" else False
 
-        self._summary_token_num = 3
         if self._init_class in ["UIEX"]:
             self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
-            if not self._layout_analysis:
-                self._construct_ocr_engine(lang=self._ocr_lang)
-            else:
-                self._construce_layout_analysis_engine()
+        else:
+            self._summary_token_num = 3  # [CLS] prompt [SEP] text [SEP]
 
         self._doc_parser = None
         self._schema_tree = None
