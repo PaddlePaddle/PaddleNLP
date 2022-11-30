@@ -24,12 +24,17 @@ from .. import PretrainedModel, register_base_model
 from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
 from ..ernie.modeling import ErnieModel
 from ..clip.modeling import VisionTransformer, clip_loss
-from ..guided_diffusion_utils import DiscoDiffusionMixin, create_gaussian_diffusion, create_unet_model, create_secondary_model
+from ..guided_diffusion_utils import (
+    DiscoDiffusionMixin,
+    create_gaussian_diffusion,
+    create_unet_model,
+    create_secondary_model,
+)
 
 __all__ = [
-    'ErnieViLModel',
-    'ErnieViLPretrainedModel',
-    'ErnieViLForImageGeneration',
+    "ErnieViLModel",
+    "ErnieViLPretrainedModel",
+    "ErnieViLForImageGeneration",
 ]
 
 
@@ -73,9 +78,9 @@ class ErnieViLOutput(ModelOutput):
 
     def to_tuple(self) -> Tuple[Any]:
         return tuple(
-            self[k] if k not in ["text_model_output", "vision_model_output"
-                                 ] else getattr(self, k).to_tuple()
-            for k in self.keys())
+            self[k] if k not in ["text_model_output", "vision_model_output"] else getattr(self, k).to_tuple()
+            for k in self.keys()
+        )
 
 
 class ErnieViLPretrainedModel(PretrainedModel):
@@ -112,7 +117,7 @@ class ErnieViLPretrainedModel(PretrainedModel):
             "use_task_id": False,
             "text_epsilon": 1e-5,
             "initializer_range": 0.02,
-            "pad_token_id": 0
+            "pad_token_id": 0,
         },
         "disco_diffusion_ernie_vil-2.0-base-zh": {
             "image_resolution": 224,
@@ -138,45 +143,47 @@ class ErnieViLPretrainedModel(PretrainedModel):
             "use_task_id": False,
             "text_epsilon": 1e-5,
             "initializer_range": 0.02,
-            "pad_token_id": 0
+            "pad_token_id": 0,
         },
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "ernie_vil-2.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/model_state.pdparams",
-            "disco_diffusion_ernie_vil-2.0-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/model_state.pdparams",
+            "ernie_vil-2.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/ernie_vil-2.0-base-zh/model_state.pdparams",
+            "disco_diffusion_ernie_vil-2.0-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_vil/disco_diffusion_ernie_vil-2.0-base-zh/model_state.pdparams",
         }
     }
     base_model_prefix = "ernie_vil"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, VisionTransformer):
             # find nn.LayerNorm
             for sub_layer in layer.sublayers():
                 if isinstance(sub_layer, nn.LayerNorm):
-                    sub_layer._epsilon = self.vision_epsilon if hasattr(
-                        self, "vision_epsilon"
-                    ) else self.ernie_vil.config["vision_epsilon"]
+                    sub_layer._epsilon = (
+                        self.vision_epsilon
+                        if hasattr(self, "vision_epsilon")
+                        else self.ernie_vil.config["vision_epsilon"]
+                    )
 
         elif isinstance(layer, ErnieModel):
             # find nn.LayerNorm
             for sub_layer in layer.sublayers():
                 if isinstance(sub_layer, nn.LayerNorm):
-                    sub_layer._epsilon = self.text_epsilon if hasattr(
-                        self, "text_epsilon"
-                    ) else self.ernie_vil.config["text_epsilon"]
+                    sub_layer._epsilon = (
+                        self.text_epsilon if hasattr(self, "text_epsilon") else self.ernie_vil.config["text_epsilon"]
+                    )
                 elif isinstance(layer, (nn.Linear, nn.Embedding)):
                     if isinstance(layer.weight, paddle.Tensor):
                         layer.weight.set_value(
                             paddle.normal(
                                 mean=0.0,
-                                std=self.initializer_range if hasattr(
-                                    self, "initializer_range") else
-                                self.ernie_vil.config["initializer_range"],
-                                shape=layer.weight.shape))
+                                std=self.initializer_range
+                                if hasattr(self, "initializer_range")
+                                else self.ernie_vil.config["initializer_range"],
+                                shape=layer.weight.shape,
+                            )
+                        )
 
 
 @register_base_model
@@ -260,50 +267,53 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             Defaults to `0.02`.
         pad_token_id(int, optional):
             The index of padding token in the token vocabulary.
-            Defaults to `0`.       
-        
+            Defaults to `0`.
+
     """
 
     def __init__(
-            self,
-            # vision
-            image_resolution: int = 224,
-            vision_layers: int = 12,
-            vision_heads: int = 12,
-            vision_embed_dim: int = 768,
-            vision_patch_size: int = 16,
-            vision_mlp_ratio: int = 4,
-            vision_hidden_act: str = "quick_gelu",
-            vision_epsilon: float = 1e-6,
-            # ernie
-            vocab_size: int = 40000,
-            hidden_size: int = 768,
-            num_hidden_layers: int = 12,
-            num_attention_heads: int = 12,
-            intermediate_size: int = 3072,
-            hidden_dropout_prob: float = 0.1,
-            attention_probs_dropout_prob: float = 0.1,
-            max_position_embeddings: int = 2048,
-            type_vocab_size: int = 4,
-            task_type_vocab_size: int = 3,
-            hidden_act: str = "gelu",
-            task_id: int = 0,
-            use_task_id: bool = False,
-            text_epsilon: float = 1e-5,
-            initializer_range: float = 0.02,
-            pad_token_id: int = 0):
+        self,
+        # vision
+        image_resolution: int = 224,
+        vision_layers: int = 12,
+        vision_heads: int = 12,
+        vision_embed_dim: int = 768,
+        vision_patch_size: int = 16,
+        vision_mlp_ratio: int = 4,
+        vision_hidden_act: str = "quick_gelu",
+        vision_epsilon: float = 1e-6,
+        # ernie
+        vocab_size: int = 40000,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 2048,
+        type_vocab_size: int = 4,
+        task_type_vocab_size: int = 3,
+        hidden_act: str = "gelu",
+        task_id: int = 0,
+        use_task_id: bool = False,
+        text_epsilon: float = 1e-5,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+    ):
         super().__init__()
         self.initializer_range = initializer_range
         self.vision_epsilon = vision_epsilon
         self.text_epsilon = text_epsilon
-        self.vision_model = VisionTransformer(input_resolution=image_resolution,
-                                              patch_size=vision_patch_size,
-                                              width=vision_embed_dim,
-                                              layers=vision_layers,
-                                              heads=vision_heads,
-                                              activation=vision_hidden_act,
-                                              mlp_ratio=vision_mlp_ratio,
-                                              normalize_before=True)
+        self.vision_model = VisionTransformer(
+            input_resolution=image_resolution,
+            patch_size=vision_patch_size,
+            width=vision_embed_dim,
+            layers=vision_layers,
+            heads=vision_heads,
+            activation=vision_hidden_act,
+            mlp_ratio=vision_mlp_ratio,
+            normalize_before=True,
+        )
 
         self.text_model = ErnieModel(
             vocab_size,
@@ -320,46 +330,45 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             pad_token_id=pad_token_id,
             task_type_vocab_size=task_type_vocab_size,
             task_id=task_id,
-            use_task_id=use_task_id)
+            use_task_id=use_task_id,
+        )
 
         self.temperature = self.create_parameter(
-            shape=(1, ),
-            default_initializer=nn.initializer.Constant(2.65926),
-            dtype=paddle.get_default_dtype())
+            shape=(1,), default_initializer=nn.initializer.Constant(2.65926), dtype=paddle.get_default_dtype()
+        )
 
         self.apply(self.init_weights)
 
-    def get_image_features(self,
-                           pixel_values=None,
-                           output_attentions=False,
-                           output_hidden_states=False,
-                           return_dict=False):
+    def get_image_features(
+        self, pixel_values=None, output_attentions=False, output_hidden_states=False, return_dict=False
+    ):
         r"""
         Returns:
             image_features (`paddle.Tensor` of shape `(batch_size, output_dim`): The image embeddings obtained by
             applying the projection layer to the pooled output of [`VisionTransformer`].
-            
+
         Examples:
             .. code-block::
-        
+
                 import requests
                 from PIL import Image
                 from paddlenlp.transformers import ErnieViLProcessor, ErnieViLModel
-                
+
                 model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
                 processor = ErnieViLProcessor.from_pretrained("ernie_vil-2.0-base-zh")
-                
+
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
                 inputs = processor(images=image, return_tensors="pd")
                 image_features = model.get_image_features(**inputs)
-                
+
         """
         vision_outputs = self.vision_model(
             pixel_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
+            return_dict=return_dict,
+        )
         image_features = vision_outputs[1]
         return image_features
 
@@ -378,18 +387,18 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         Returns:
             text_features (`paddle.Tensor` of shape `(batch_size, output_dim`): The text embeddings obtained by
             applying the projection layer to the pooled output of [`ErnieModel`].
-            
+
         Example:
             .. code-block::
 
                 from paddlenlp.transformers import ErnieViLModel, ErnieViLTokenizer
-                
+
                 model = ErnieViLModel.from_pretrained("ernie_vil-2.0-base-zh")
                 tokenizer = ErnieViLTokenizer.from_pretrained("ernie_vil-2.0-base-zh")
-                
+
                 inputs = tokenizer(["一只猫的照片", "一条狗的照片"], padding=True, return_tensors="pd")
                 text_features = model.get_text_features(**inputs)
-                
+
         """
         text_outputs = self.text_model(
             input_ids=input_ids,
@@ -399,24 +408,27 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             task_type_ids=task_type_ids,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
+            return_dict=return_dict,
+        )
         text_features = text_outputs[1]
         return text_features
 
-    def forward(self,
-                input_ids,
-                pixel_values,
-                attention_mask=None,
-                position_ids=None,
-                token_type_ids=None,
-                task_type_ids=None,
-                return_loss=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False):
-        r'''
+    def forward(
+        self,
+        input_ids,
+        pixel_values,
+        attention_mask=None,
+        position_ids=None,
+        token_type_ids=None,
+        task_type_ids=None,
+        return_loss=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        r"""
         The ErnieViLModel forward method, overrides the `__call__()` special method.
-        
+
         Args:
             input_ids (Tensor):
                 Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide it.
@@ -425,7 +437,7 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 Pixel values. Padding will be ignored by default should you provide it.
                 Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
             position_ids (Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings (ErnieModel). Selected in 
+                Indices of positions of each input sequence tokens in the position embeddings (ErnieModel). Selected in
                 the range ``[0, max_position_embeddings - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             token_type_ids (Tensor, optional):
@@ -440,7 +452,7 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
                 Defaults to `None`, which means we don't add segment embeddings.
             task_type_ids (Tensor, optional):
-                Indices of tasks of each input sequence tokens in the task embeddings (ErnieModel). Selected in 
+                Indices of tasks of each input sequence tokens in the task embeddings (ErnieModel). Selected in
                 the range ``[0, task_type_vocab_size - 1]``.
                 Shape as `(batch_size, sequence_length)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
@@ -461,11 +473,11 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             return_dict (bool, optional):
                 Whether to return a :class:`ErnieViLOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `False`.
-                                 
+
         Returns:
-            An instance of :class:`ErnieViLOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors 
+            An instance of :class:`ErnieViLOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
             corresponding to ordered and not None (depending on the input arguments) fields of :class:`ErnieViLOutput`.
-            
+
         Example:
             .. code-block::
 
@@ -473,10 +485,10 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                 import paddle.nn.functional as F
                 from PIL import Image
                 from paddlenlp.transformers import ErnieViLModel, ErnieViLProcessor
-                
+
                 processor = ErnieViLProcessor.from_pretrained('ernie_vil-2.0-base-zh')
                 model = ErnieViLModel.from_pretrained('ernie_vil-2.0-base-zh')
-                
+
                 url = "http://images.cocodataset.org/val2017/000000039769.jpg"
                 image = Image.open(requests.get(url, stream=True).raw)
 
@@ -486,11 +498,11 @@ class ErnieViLModel(ErnieViLPretrainedModel):
                                 return_tensors="pd")
 
                 outputs = model(**inputs)
-                
+
                 logits_per_image = outputs[0]
                 probs = F.softmax(logits_per_image, axis=1)  # we can take the softmax to get the label probabilities
 
-        '''
+        """
 
         vision_outputs = self.vision_model(
             pixel_values=pixel_values,
@@ -527,9 +539,7 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         # cosine similarity as logits
         logit_scale = self.temperature.exp()
 
-        logits_per_text = paddle.matmul(text_embeds * logit_scale,
-                                        image_embeds,
-                                        transpose_y=True)
+        logits_per_text = paddle.matmul(text_embeds * logit_scale, image_embeds, transpose_y=True)
         logits_per_image = logits_per_text.t()
 
         # clip temperature
@@ -541,9 +551,8 @@ class ErnieViLModel(ErnieViLPretrainedModel):
             loss = clip_loss(logits_per_text)
 
         if not return_dict:
-            output = (logits_per_image, logits_per_text, text_embeds,
-                      image_embeds, text_outputs, vision_outputs)
-            return ((loss, ) + output) if loss is not None else output
+            output = (logits_per_image, logits_per_text, text_embeds, image_embeds, text_outputs, vision_outputs)
+            return ((loss,) + output) if loss is not None else output
 
         return ErnieViLOutput(
             loss=loss,
@@ -574,7 +583,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             channel_mult="",
             learn_sigma=True,
             class_cond=False,
-            attention_resolutions='32, 16, 8',
+            attention_resolutions="32, 16, 8",
             num_heads=4,
             num_head_channels=64,
             num_heads_upsample=-1,
@@ -598,7 +607,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
         token_type_ids=None,
         task_type_ids=None,
         init_image=None,
-        output_dir='disco_diffusion_ernie_vil-2.0-base-zh/',
+        output_dir="disco_diffusion_ernie_vil-2.0-base-zh/",
         width_height=[1280, 768],
         skip_steps=0,
         steps=250,
@@ -610,14 +619,14 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
         sat_scale=0,
         cutn_batches=4,
         perlin_init=False,
-        perlin_mode='mixed',
+        perlin_mode="mixed",
         seed=None,
         eta=0.8,
         clamp_grad=True,
         clamp_max=0.05,
-        cut_overview='[12]*400+[4]*600',
-        cut_innercut='[4]*400+[12]*600',
-        cut_icgray_p='[0.2]*400+[0]*600',
+        cut_overview="[12]*400+[4]*600",
+        cut_innercut="[4]*400+[12]*600",
+        cut_icgray_p="[0.2]*400+[0]*600",
         save_rate=10,
         n_batches=1,
         batch_name="",
@@ -627,7 +636,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
     ):
         r"""
         The ErnieViLForImageGeneration generate method.
-        
+
         Args:
             input_ids (Tensor):
                 See :class:`ErnieViLModel`.
@@ -639,138 +648,138 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
                 See :class:`ErnieViLModel`.
             task_type_ids (Tensor, optional):
                 See :class:`ErnieViLModel`.
-            init_image (Path, optional): 
-                Recall that in the image sequence above, the first image shown is just noise.  If an init_image 
-                is provided, diffusion will replace the noise with the init_image as its starting state.  To use 
-                an init_image, upload the image to the Colab instance or your Google Drive, and enter the full 
-                image path here. If using an init_image, you may need to increase skip_steps to ~ 50% of total 
+            init_image (Path, optional):
+                Recall that in the image sequence above, the first image shown is just noise.  If an init_image
+                is provided, diffusion will replace the noise with the init_image as its starting state.  To use
+                an init_image, upload the image to the Colab instance or your Google Drive, and enter the full
+                image path here. If using an init_image, you may need to increase skip_steps to ~ 50% of total
                 steps to retain the character of the init. See skip_steps above for further discussion.
                 Default to `None`.
             output_dir (Path, optional):
                 Output directory.
                 Default to `disco_diffusion_ernie_vil-2.0-base-zh/`.
-            width_height (List[int, int], optional): 
-                Desired final image size, in pixels. You can have a square, wide, or tall image, but each edge 
-                length should be set to a multiple of 64px, and a minimum of 512px on the default ErnieViL model setting.  
-                If you forget to use multiples of 64px in your dimensions, DD will adjust the dimensions of your 
+            width_height (List[int, int], optional):
+                Desired final image size, in pixels. You can have a square, wide, or tall image, but each edge
+                length should be set to a multiple of 64px, and a minimum of 512px on the default ErnieViL model setting.
+                If you forget to use multiples of 64px in your dimensions, DD will adjust the dimensions of your
                 image to make it so.
                 Default to `[1280, 768]`.
-            skip_steps (int, optional): 
-                Consider the chart shown here.  Noise scheduling (denoise strength) starts very high and progressively 
-                gets lower and lower as diffusion steps progress. The noise levels in the first few steps are very high, 
-                so images change dramatically in early steps.As DD moves along the curve, noise levels (and thus the 
+            skip_steps (int, optional):
+                Consider the chart shown here.  Noise scheduling (denoise strength) starts very high and progressively
+                gets lower and lower as diffusion steps progress. The noise levels in the first few steps are very high,
+                so images change dramatically in early steps.As DD moves along the curve, noise levels (and thus the
                 amount an image changes per step) declines, and image coherence from one step to the next increases.
-                The first few steps of denoising are often so dramatic that some steps (maybe 10-15% of total) can be 
+                The first few steps of denoising are often so dramatic that some steps (maybe 10-15% of total) can be
                 skipped without affecting the final image. You can experiment with this as a way to cut render times.
-                If you skip too many steps, however, the remaining noise may not be high enough to generate new content, 
-                and thus may not have time left to finish an image satisfactorily.Also, depending on your other settings, 
-                you may need to skip steps to prevent ErnieViL from overshooting your goal, resulting in blown out colors 
-                (hyper saturated, solid white, or solid black regions) or otherwise poor image quality.  Consider that 
-                the denoising process is at its strongest in the early steps, so skipping steps can sometimes mitigate 
-                other problems.Lastly, if using an init_image, you will need to skip ~50% of the diffusion steps to retain 
-                the shapes in the original init image. However, if you're using an init_image, you can also adjust 
-                skip_steps up or down for creative reasons.  With low skip_steps you can get a result "inspired by" 
-                the init_image which will retain the colors and rough layout and shapes but look quite different. 
+                If you skip too many steps, however, the remaining noise may not be high enough to generate new content,
+                and thus may not have time left to finish an image satisfactorily.Also, depending on your other settings,
+                you may need to skip steps to prevent ErnieViL from overshooting your goal, resulting in blown out colors
+                (hyper saturated, solid white, or solid black regions) or otherwise poor image quality.  Consider that
+                the denoising process is at its strongest in the early steps, so skipping steps can sometimes mitigate
+                other problems.Lastly, if using an init_image, you will need to skip ~50% of the diffusion steps to retain
+                the shapes in the original init image. However, if you're using an init_image, you can also adjust
+                skip_steps up or down for creative reasons.  With low skip_steps you can get a result "inspired by"
+                the init_image which will retain the colors and rough layout and shapes but look quite different.
                 With high skip_steps you can preserve most of the init_image contents and just do fine tuning of the texture.
                 Default to `0`.
-            steps: 
-                When creating an image, the denoising curve is subdivided into steps for processing. Each step (or iteration) 
-                involves the AI looking at subsets of the image called 'cuts' and calculating the 'direction' the image 
-                should be guided to be more like the prompt. Then it adjusts the image with the help of the diffusion denoiser, 
-                and moves to the next step.Increasing steps will provide more opportunities for the AI to adjust the image, 
-                and each adjustment will be smaller, and thus will yield a more precise, detailed image.  Increasing steps 
-                comes at the expense of longer render times.  Also, while increasing steps should generally increase image 
-                quality, there is a diminishing return on additional steps beyond 250 - 500 steps.  However, some intricate 
-                images can take 1000, 2000, or more steps.  It is really up to the user.  Just know that the render time is 
-                directly related to the number of steps, and many other parameters have a major impact on image quality, without 
+            steps:
+                When creating an image, the denoising curve is subdivided into steps for processing. Each step (or iteration)
+                involves the AI looking at subsets of the image called 'cuts' and calculating the 'direction' the image
+                should be guided to be more like the prompt. Then it adjusts the image with the help of the diffusion denoiser,
+                and moves to the next step.Increasing steps will provide more opportunities for the AI to adjust the image,
+                and each adjustment will be smaller, and thus will yield a more precise, detailed image.  Increasing steps
+                comes at the expense of longer render times.  Also, while increasing steps should generally increase image
+                quality, there is a diminishing return on additional steps beyond 250 - 500 steps.  However, some intricate
+                images can take 1000, 2000, or more steps.  It is really up to the user.  Just know that the render time is
+                directly related to the number of steps, and many other parameters have a major impact on image quality, without
                 costing additional time.
-            cut_ic_pow (int, optional): 
-                This sets the size of the border used for inner cuts.  High cut_ic_pow values have larger borders, and 
-                therefore the cuts themselves will be smaller and provide finer details.  If you have too many or too-small 
-                inner cuts, you may lose overall image coherency and/or it may cause an undesirable 'mosaic' effect.   
-                Low cut_ic_pow values will allow the inner cuts to be larger, helping image coherency while still helping 
+            cut_ic_pow (int, optional):
+                This sets the size of the border used for inner cuts.  High cut_ic_pow values have larger borders, and
+                therefore the cuts themselves will be smaller and provide finer details.  If you have too many or too-small
+                inner cuts, you may lose overall image coherency and/or it may cause an undesirable 'mosaic' effect.
+                Low cut_ic_pow values will allow the inner cuts to be larger, helping image coherency while still helping
                 with some details.
                 Default to `1`.
-            init_scale (int, optional): 
-                This controls how strongly ErnieViL will try to match the init_image provided.  This is balanced against the 
-                clip_guidance_scale (CGS) above.  Too much init scale, and the image won't change much during diffusion. 
+            init_scale (int, optional):
+                This controls how strongly ErnieViL will try to match the init_image provided.  This is balanced against the
+                clip_guidance_scale (CGS) above.  Too much init scale, and the image won't change much during diffusion.
                 Too much CGS and the init image will be lost.
                 Default to `1000`.
-            clip_guidance_scale (int, optional): 
-                CGS is one of the most important parameters you will use. It tells DD how strongly you want ErnieViL to move 
-                toward your prompt each timestep.  Higher is generally better, but if CGS is too strong it will overshoot 
-                the goal and distort the image. So a happy medium is needed, and it takes experience to learn how to adjust 
-                CGS. Note that this parameter generally scales with image dimensions. In other words, if you increase your 
-                total dimensions by 50% (e.g. a change from 512 x 512 to 512 x 768), then to maintain the same effect on the 
-                image, you'd want to increase clip_guidance_scale from 5000 to 7500. Of the basic settings, clip_guidance_scale, 
+            clip_guidance_scale (int, optional):
+                CGS is one of the most important parameters you will use. It tells DD how strongly you want ErnieViL to move
+                toward your prompt each timestep.  Higher is generally better, but if CGS is too strong it will overshoot
+                the goal and distort the image. So a happy medium is needed, and it takes experience to learn how to adjust
+                CGS. Note that this parameter generally scales with image dimensions. In other words, if you increase your
+                total dimensions by 50% (e.g. a change from 512 x 512 to 512 x 768), then to maintain the same effect on the
+                image, you'd want to increase clip_guidance_scale from 5000 to 7500. Of the basic settings, clip_guidance_scale,
                 steps and skip_steps are the most important contributors to image quality, so learn them well.
                 Default to `5000`.
-            tv_scale (int, optional): 
-                Total variance denoising. Optional, set to zero to turn off. Controls smoothness of final output. If used, 
-                tv_scale will try to smooth out your final image to reduce overall noise. If your image is too 'crunchy', 
-                increase tv_scale. TV denoising is good at preserving edges while smoothing away noise in flat regions.  
+            tv_scale (int, optional):
+                Total variance denoising. Optional, set to zero to turn off. Controls smoothness of final output. If used,
+                tv_scale will try to smooth out your final image to reduce overall noise. If your image is too 'crunchy',
+                increase tv_scale. TV denoising is good at preserving edges while smoothing away noise in flat regions.
                 See https://en.wikipedia.org/wiki/Total_variation_denoising
                 Default to `0`.
-            range_scale (int, optional): 
-                Optional, set to zero to turn off.  Used for adjustment of color contrast.  Lower range_scale will increase 
-                contrast. Very low numbers create a reduced color palette, resulting in more vibrant or poster-like images. 
+            range_scale (int, optional):
+                Optional, set to zero to turn off.  Used for adjustment of color contrast.  Lower range_scale will increase
+                contrast. Very low numbers create a reduced color palette, resulting in more vibrant or poster-like images.
                 Higher range_scale will reduce contrast, for more muted images.
                 Default to `0`.
-            sat_scale (int, optional): 
-                Saturation scale. Optional, set to zero to turn off.  If used, sat_scale will help mitigate oversaturation. 
+            sat_scale (int, optional):
+                Saturation scale. Optional, set to zero to turn off.  If used, sat_scale will help mitigate oversaturation.
                 If your image is too saturated, increase sat_scale to reduce the saturation.
                 Default to `0`.
-            cutn_batches (int, optional): 
-                Each iteration, the AI cuts the image into smaller pieces known as cuts, and compares each cut to the prompt 
-                to decide how to guide the next diffusion step.  More cuts can generally lead to better images, since DD has 
-                more chances to fine-tune the image precision in each timestep.  Additional cuts are memory intensive, however, 
-                and if DD tries to evaluate too many cuts at once, it can run out of memory.  You can use cutn_batches to increase 
-                cuts per timestep without increasing memory usage. At the default settings, DD is scheduled to do 16 cuts per 
-                timestep.  If cutn_batches is set to 1, there will indeed only be 16 cuts total per timestep. However, if 
-                cutn_batches is increased to 4, DD will do 64 cuts total in each timestep, divided into 4 sequential batches 
-                of 16 cuts each.  Because the cuts are being evaluated only 16 at a time, DD uses the memory required for only 16 cuts, 
-                but gives you the quality benefit of 64 cuts.  The tradeoff, of course, is that this will take ~4 times as long to 
-                render each image.So, (scheduled cuts) x (cutn_batches) = (total cuts per timestep). Increasing cutn_batches will 
-                increase render times, however, as the work is being done sequentially.  DD's default cut schedule is a good place 
+            cutn_batches (int, optional):
+                Each iteration, the AI cuts the image into smaller pieces known as cuts, and compares each cut to the prompt
+                to decide how to guide the next diffusion step.  More cuts can generally lead to better images, since DD has
+                more chances to fine-tune the image precision in each timestep.  Additional cuts are memory intensive, however,
+                and if DD tries to evaluate too many cuts at once, it can run out of memory.  You can use cutn_batches to increase
+                cuts per timestep without increasing memory usage. At the default settings, DD is scheduled to do 16 cuts per
+                timestep.  If cutn_batches is set to 1, there will indeed only be 16 cuts total per timestep. However, if
+                cutn_batches is increased to 4, DD will do 64 cuts total in each timestep, divided into 4 sequential batches
+                of 16 cuts each.  Because the cuts are being evaluated only 16 at a time, DD uses the memory required for only 16 cuts,
+                but gives you the quality benefit of 64 cuts.  The tradeoff, of course, is that this will take ~4 times as long to
+                render each image.So, (scheduled cuts) x (cutn_batches) = (total cuts per timestep). Increasing cutn_batches will
+                increase render times, however, as the work is being done sequentially.  DD's default cut schedule is a good place
                 to start, but the cut schedule can be adjusted in the Cutn Scheduling section, explained below.
                 Default to `4`.
             perlin_init (bool, optional):
-                Normally, DD will use an image filled with random noise as a starting point for the diffusion curve.  
-                If perlin_init is selected, DD will instead use a Perlin noise model as an initial state.  Perlin has very 
-                interesting characteristics, distinct from random noise, so it's worth experimenting with this for your projects. 
-                Beyond perlin, you can, of course, generate your own noise images (such as with GIMP, etc) and use them as an 
-                init_image (without skipping steps). Choosing perlin_init does not affect the actual diffusion process, just the 
-                starting point for the diffusion. Please note that selecting a perlin_init will replace and override any init_image 
-                you may have specified. Further, because the 2D, 3D and video animation systems all rely on the init_image system, 
-                if you enable Perlin while using animation modes, the perlin_init will jump in front of any previous image or video 
-                input, and DD will NOT give you the expected sequence of coherent images. All of that said, using Perlin and 
+                Normally, DD will use an image filled with random noise as a starting point for the diffusion curve.
+                If perlin_init is selected, DD will instead use a Perlin noise model as an initial state.  Perlin has very
+                interesting characteristics, distinct from random noise, so it's worth experimenting with this for your projects.
+                Beyond perlin, you can, of course, generate your own noise images (such as with GIMP, etc) and use them as an
+                init_image (without skipping steps). Choosing perlin_init does not affect the actual diffusion process, just the
+                starting point for the diffusion. Please note that selecting a perlin_init will replace and override any init_image
+                you may have specified. Further, because the 2D, 3D and video animation systems all rely on the init_image system,
+                if you enable Perlin while using animation modes, the perlin_init will jump in front of any previous image or video
+                input, and DD will NOT give you the expected sequence of coherent images. All of that said, using Perlin and
                 animation modes together do make a very colorful rainbow effect, which can be used creatively.
                 Default to `False`.
             perlin_mode (str, optional):
-                sets type of Perlin noise: colored, gray, or a mix of both, giving you additional options for noise types. Experiment 
+                sets type of Perlin noise: colored, gray, or a mix of both, giving you additional options for noise types. Experiment
                 to see what these do in your projects.
                 Default to `mixed`.
             seed (int, optional):
-                Deep in the diffusion code, there is a random number seed which is used as the basis for determining the initial 
-                state of the diffusion.  By default, this is random, but you can also specify your own seed. This is useful if you like a 
-                particular result and would like to run more iterations that will be similar. After each run, the actual seed value used will be 
-                reported in the parameters report, and can be reused if desired by entering seed # here.  If a specific numerical seed is used 
+                Deep in the diffusion code, there is a random number seed which is used as the basis for determining the initial
+                state of the diffusion.  By default, this is random, but you can also specify your own seed. This is useful if you like a
+                particular result and would like to run more iterations that will be similar. After each run, the actual seed value used will be
+                reported in the parameters report, and can be reused if desired by entering seed # here.  If a specific numerical seed is used
                 repeatedly, the resulting images will be quite similar but not identical.
                 Default to `None`.
             eta (float, optional):
-                Eta (greek letter η) is a diffusion model variable that mixes in a random amount of scaled noise into each timestep. 
-                0 is no noise, 1.0 is more noise. As with most DD parameters, you can go below zero for eta, but it may give you 
-                unpredictable results. The steps parameter has a close relationship with the eta parameter. If you set eta to 0, 
-                then you can get decent output with only 50-75 steps. Setting eta to 1.0 favors higher step counts, ideally around 
+                Eta (greek letter η) is a diffusion model variable that mixes in a random amount of scaled noise into each timestep.
+                0 is no noise, 1.0 is more noise. As with most DD parameters, you can go below zero for eta, but it may give you
+                unpredictable results. The steps parameter has a close relationship with the eta parameter. If you set eta to 0,
+                then you can get decent output with only 50-75 steps. Setting eta to 1.0 favors higher step counts, ideally around
                 250 and up. eta has a subtle, unpredictable effect on image, so you'll need to experiment to see how this affects your projects.
                 Default to `0.8`.
             clamp_grad (bool, optional):
-                As I understand it, clamp_grad is an internal limiter that stops DD from producing extreme results. Try your images with and without 
-                clamp_grad. If the image changes drastically with clamp_grad turned off, it probably means your clip_guidance_scale is too high and 
+                As I understand it, clamp_grad is an internal limiter that stops DD from producing extreme results. Try your images with and without
+                clamp_grad. If the image changes drastically with clamp_grad turned off, it probably means your clip_guidance_scale is too high and
                 should be reduced.
                 Default to `True`.
             clamp_max (float, optional):
-                Sets the value of the clamp_grad limitation. Default is 0.05, providing for smoother, more muted coloration in images, but setting 
+                Sets the value of the clamp_grad limitation. Default is 0.05, providing for smoother, more muted coloration in images, but setting
                 higher values (0.15-0.3) can provide interesting contrast and vibrancy.
                 Default to `0.05`.
             cut_overview (str, optional):
@@ -780,16 +789,16 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
                 The schedule of inner cuts.
                 Default to `'[4]*400+[12]*600'`.
             cut_icgray_p (str, optional):
-                This sets the size of the border used for inner cuts.  High cut_ic_pow values have larger borders, and therefore the cuts 
-                themselves will be smaller and provide finer details.  If you have too many or too-small inner cuts, you may lose overall 
-                image coherency and/or it may cause an undesirable 'mosaic' effect.   Low cut_ic_pow values will allow the inner cuts to be 
+                This sets the size of the border used for inner cuts.  High cut_ic_pow values have larger borders, and therefore the cuts
+                themselves will be smaller and provide finer details.  If you have too many or too-small inner cuts, you may lose overall
+                image coherency and/or it may cause an undesirable 'mosaic' effect.   Low cut_ic_pow values will allow the inner cuts to be
                 larger, helping image coherency while still helping with some details.
                 Default to `'[0.2]*400+[0]*600'`.
             save_rate (int, optional):
-                During a diffusion run, you can monitor the progress of each image being created with this variable.  If display_rate is set 
-                to 50, DD will show you the in-progress image every 50 timesteps. Setting this to a lower value, like 5 or 10, is a good way 
+                During a diffusion run, you can monitor the progress of each image being created with this variable.  If display_rate is set
+                to 50, DD will show you the in-progress image every 50 timesteps. Setting this to a lower value, like 5 or 10, is a good way
                 to get an early peek at where your image is heading. If you don't like the progression, just interrupt execution, change some
-                settings, and re-run.  If you are planning a long, unmonitored batch, it's better to set display_rate equal to steps, because 
+                settings, and re-run.  If you are planning a long, unmonitored batch, it's better to set display_rate equal to steps, because
                 displaying interim images does slow Colab down slightly.
                 Default to `10`.
             n_batches (int, optional):
@@ -797,7 +806,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
                 DD will ignore n_batches and create a single set of animated frames based on the animation settings.
                 Default to `1`.
             batch_name (str, optional):
-                The name of the batch, the batch id will be named as "progress-[batch_name]-seed-[range(n_batches)]-[save_rate]". To avoid your 
+                The name of the batch, the batch id will be named as "progress-[batch_name]-seed-[range(n_batches)]-[save_rate]". To avoid your
                 artworks be overridden by other users, please use a unique name.
                 Default to `''`.
             use_secondary_model (bool, optional):
@@ -805,18 +814,18 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
                 Default to `True`.
             randomize_class (bool, optional):
                 Random class.
-                Default to `True`.                
+                Default to `True`.
             clip_denoised (bool, optional):
                 Clip denoised.
-                Default to `False`.                  
-                
+                Default to `False`.
+
         Returns:
             List[PIL.Image]: Returns n_batches of final image.
             Its data type should be PIL.Image.
 
         Example:
             .. code-block::
-            
+
             from paddlenlp.transformers import ErnieViLForImageGeneration, ErnieViLTokenizer
 
             # Initialize the model and tokenizer
@@ -835,7 +844,7 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             images = model.generate(**tokenized_inputs)
             # return List[PIL.Image]
             images[0].save("figure.png")
-                
+
         """
         self.diffusion = create_gaussian_diffusion(
             steps=steps,
@@ -850,7 +859,8 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             attention_mask=attention_mask,
             position_ids=position_ids,
             token_type_ids=token_type_ids,
-            task_type_ids=task_type_ids)
+            task_type_ids=task_type_ids,
+        )
 
         images_list = super().disco_diffusion_generate(
             target_text_embeds=target_text_embeds,
@@ -881,12 +891,13 @@ class ErnieViLForImageGeneration(ErnieViLPretrainedModel, DiscoDiffusionMixin):
             width_height=width_height,
             image_mean=[0.485, 0.456, 0.406],
             image_std=[0.229, 0.224, 0.225],
-            batch_name=batch_name)
+            batch_name=batch_name,
+        )
 
         return images_list
 
     def preprocess_text_prompt(self, text_prompt, style=None, artist=None):
-        text_prompt = text_prompt.rstrip(',.，。')
+        text_prompt = text_prompt.rstrip(",.，。")
         if style is not None:
             text_prompt += "，{}".format(style)
         if artist is not None:

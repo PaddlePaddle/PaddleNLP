@@ -15,12 +15,9 @@
 """ Tokenization classes for LayoutLM model."""
 from ..bert.tokenizer import BertTokenizer
 
-__all__ = ['LayoutLMTokenizer']
+__all__ = ["LayoutLMTokenizer"]
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "layoutlm-base-uncased": 512,
-    "layoutlm-large-uncased": 512
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"layoutlm-base-uncased": 512, "layoutlm-large-uncased": 512}
 
 
 class LayoutLMTokenizer(BertTokenizer):
@@ -29,22 +26,17 @@ class LayoutLMTokenizer(BertTokenizer):
     `BertTokenizer <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.tokenizer.html>`__.
     For more information regarding those methods, please refer to this superclass.
     """
+
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "layoutlm-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-base-uncased/vocab.txt",
-            "layoutlm-large-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-large-uncased/vocab.txt",
+            "layoutlm-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-base-uncased/vocab.txt",
+            "layoutlm-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutlm/layoutlm-large-uncased/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "layoutlm-base-uncased": {
-            "do_lower_case": True
-        },
-        "layoutlm-large-uncased": {
-            "do_lower_case": True
-        },
+        "layoutlm-base-uncased": {"do_lower_case": True},
+        "layoutlm-large-uncased": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES

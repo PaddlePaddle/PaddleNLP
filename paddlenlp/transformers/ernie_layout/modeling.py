@@ -28,16 +28,16 @@ from .. import PretrainedModel, register_base_model
 from .visual_backbone import ResNet
 
 __all__ = [
-    'ErnieLayoutModel', "ErnieLayoutPretrainedModel",
-    "ErnieLayoutForTokenClassification", "ErnieLayoutForSequenceClassification",
-    "ErnieLayoutForPretraining", "ErnieLayoutForQuestionAnswering"
+    "ErnieLayoutModel",
+    "ErnieLayoutPretrainedModel",
+    "ErnieLayoutForTokenClassification",
+    "ErnieLayoutForSequenceClassification",
+    "ErnieLayoutForPretraining",
+    "ErnieLayoutForQuestionAnswering",
 ]
 
 
-def relative_position_bucket(relative_position,
-                             bidirectional=True,
-                             num_buckets=32,
-                             max_distance=128):
+def relative_position_bucket(relative_position, bidirectional=True, num_buckets=32, max_distance=128):
     """
     Adapted from Mesh Tensorflow:
     https://github.com/tensorflow/mesh/blob/0cb87fe07da627bf0b7e60475d59f95ed6b5be3d/mesh_tensorflow/transformer/transformer_layers.py#L593
@@ -72,19 +72,18 @@ def relative_position_bucket(relative_position,
 
     # The other half of the buckets are for logarithmically bigger bins in positions up to max_distance
     val_if_large = max_exact + (
-        paddle.log(n.astype(paddle.float32) / max_exact) /
-        math.log(max_distance / max_exact) *
-        (num_buckets - max_exact)).astype(paddle.int64)
+        paddle.log(n.astype(paddle.float32) / max_exact)
+        / math.log(max_distance / max_exact)
+        * (num_buckets - max_exact)
+    ).astype(paddle.int64)
 
-    val_if_large = paddle.minimum(
-        val_if_large, paddle.full_like(val_if_large, num_buckets - 1))
+    val_if_large = paddle.minimum(val_if_large, paddle.full_like(val_if_large, num_buckets - 1))
 
     ret += paddle.where(is_small, n, val_if_large)
     return ret
 
 
 class ErnieLayoutPooler(Layer):
-
     def __init__(self, hidden_size, with_pool):
         super(ErnieLayoutPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -96,7 +95,7 @@ class ErnieLayoutPooler(Layer):
         # to the first token.
         first_token_tensor = hidden_states[:, 0]
         pooled_output = self.dense(first_token_tensor)
-        if self.with_pool == 'tanh':
+        if self.with_pool == "tanh":
             pooled_output = self.activation(pooled_output)
         return pooled_output
 
@@ -108,60 +107,41 @@ class ErnieLayoutEmbeddings(Layer):
 
     def __init__(self, config):
         super(ErnieLayoutEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(config["vocab_size"],
-                                            config["hidden_size"])
-        self.position_embeddings = nn.Embedding(
-            config["max_position_embeddings"], config["hidden_size"])
+        self.word_embeddings = nn.Embedding(config["vocab_size"], config["hidden_size"])
+        self.position_embeddings = nn.Embedding(config["max_position_embeddings"], config["hidden_size"])
 
-        self.x_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["hidden_size"])
-        self.y_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["hidden_size"])
-        self.h_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["hidden_size"])
-        self.w_position_embeddings = nn.Embedding(
-            config["max_2d_position_embeddings"], config["hidden_size"])
+        self.x_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
+        self.y_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
+        self.h_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
+        self.w_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
 
-        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"],
-                                                  config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"],
-                                      epsilon=config["layer_norm_eps"])
+        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"], config["hidden_size"])
+        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.dropout = nn.Dropout(config["hidden_dropout_prob"])
 
-        self.register_buffer(
-            "position_ids",
-            paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
 
     def _cal_spatial_position_embeddings(self, bbox):
         try:
             left_position_embeddings = self.x_position_embeddings(bbox[:, :, 0])
-            upper_position_embeddings = self.y_position_embeddings(bbox[:, :,
-                                                                        1])
-            right_position_embeddings = self.x_position_embeddings(bbox[:, :,
-                                                                        2])
-            lower_position_embeddings = self.y_position_embeddings(bbox[:, :,
-                                                                        3])
+            upper_position_embeddings = self.y_position_embeddings(bbox[:, :, 1])
+            right_position_embeddings = self.x_position_embeddings(bbox[:, :, 2])
+            lower_position_embeddings = self.y_position_embeddings(bbox[:, :, 3])
         except IndexError as e:
-            raise IndexError(
-                "The :obj:`bbox`coordinate values should be within 0-1000 range."
-            ) from e
+            raise IndexError("The :obj:`bbox`coordinate values should be within 0-1000 range.") from e
 
-        h_position_embeddings = self.h_position_embeddings(bbox[:, :, 3] -
-                                                           bbox[:, :, 1])
-        w_position_embeddings = self.w_position_embeddings(bbox[:, :, 2] -
-                                                           bbox[:, :, 0])
-        return left_position_embeddings, \
-                upper_position_embeddings, \
-                right_position_embeddings, \
-                lower_position_embeddings, \
-                h_position_embeddings, \
-                w_position_embeddings
+        h_position_embeddings = self.h_position_embeddings(bbox[:, :, 3] - bbox[:, :, 1])
+        w_position_embeddings = self.w_position_embeddings(bbox[:, :, 2] - bbox[:, :, 0])
+        return (
+            left_position_embeddings,
+            upper_position_embeddings,
+            right_position_embeddings,
+            lower_position_embeddings,
+            h_position_embeddings,
+            w_position_embeddings,
+        )
 
-    def forward(self,
-                input_ids,
-                bbox=None,
-                token_type_ids=None,
-                position_ids=None):
+    def forward(self, input_ids, bbox=None, token_type_ids=None, position_ids=None):
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
@@ -174,13 +154,11 @@ class ErnieLayoutEmbeddings(Layer):
         input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
 
-        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(
-            bbox)
+        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(bbox)
 
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
 
-        embeddings = (input_embedings + position_embeddings + x1 + y1 + x2 +
-                      y2 + h + w + token_type_embeddings)
+        embeddings = input_embedings + position_embeddings + x1 + y1 + x2 + y2 + h + w + token_type_embeddings
 
         embeddings = self.layer_norm(embeddings)
         embeddings = self.dropout(embeddings)
@@ -225,33 +203,31 @@ class ErnieLayoutPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/ernie_layoutx_base_uncased.pdparams",
+            "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/ernie_layoutx_base_uncased.pdparams",
         }
     }
     base_model_prefix = "ernie_layout"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.
-                        pretrained_init_configuration["initializer_range"]
-                        if "initializer_range"
-                        in self.pretrained_init_configuration else 0.02,
-                        shape=layer.weight.shape))
+                        std=self.pretrained_init_configuration["initializer_range"]
+                        if "initializer_range" in self.pretrained_init_configuration
+                        else 0.02,
+                        shape=layer.weight.shape,
+                    )
+                )
 
 
 class ErnieLayoutSelfOutput(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutSelfOutput, self).__init__()
         self.dense = nn.Linear(config["hidden_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"],
-                                      epsilon=config["layer_norm_eps"])
+        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.dropout = nn.Dropout(config["hidden_dropout_prob"])
 
     def forward(self, hidden_states, input_tensor):
@@ -262,19 +238,15 @@ class ErnieLayoutSelfOutput(nn.Layer):
 
 
 class ErnieLayoutSelfAttention(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutSelfAttention, self).__init__()
-        if config["hidden_size"] % config[
-                "num_attention_heads"] != 0 and not hasattr(
-                    config, "embedding_size"):
+        if config["hidden_size"] % config["num_attention_heads"] != 0 and not hasattr(config, "embedding_size"):
             raise ValueError(
                 "The hidden size {} is not a multiple of the number of attention "
-                "heads {}".format(config["hidden_size"],
-                                  config["num_attention_heads"]))
+                "heads {}".format(config["hidden_size"], config["num_attention_heads"])
+            )
         self.num_attention_heads = config["num_attention_heads"]
-        self.attention_head_size = int(config["hidden_size"] /
-                                       config["num_attention_heads"])
+        self.attention_head_size = int(config["hidden_size"] / config["num_attention_heads"])
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
@@ -287,11 +259,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
         self.dropout = nn.Dropout(config["attention_probs_dropout_prob"])
 
     def transpose_for_scores(self, x):
-        x = x.reshape([
-            paddle.shape(x)[0],
-            paddle.shape(x)[1], self.num_attention_heads,
-            self.attention_head_size
-        ])
+        x = x.reshape([paddle.shape(x)[0], paddle.shape(x)[1], self.num_attention_heads, self.attention_head_size])
         return x.transpose([0, 2, 1, 3])
 
     def compute_qkv(self, hidden_states):
@@ -321,9 +289,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
 
         query_layer = query_layer / math.sqrt(self.attention_head_size)
         # [BSZ, NAT, L, L]
-        attention_scores = paddle.matmul(query_layer,
-                                         key_layer,
-                                         transpose_y=True)
+        attention_scores = paddle.matmul(query_layer, key_layer, transpose_y=True)
 
         if self.has_relative_attention_bias:
             attention_scores += rel_pos
@@ -335,17 +301,17 @@ class ErnieLayoutSelfAttention(nn.Layer):
         attention_scores = paddle.where(
             bool_attention_mask.expand(attention_scores_shape),
             paddle.ones(attention_scores_shape) * float("-1e10"),
-            attention_scores)
+            attention_scores,
+        )
         attention_probs = F.softmax(attention_scores, axis=-1)
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
         context_layer = paddle.matmul(attention_probs, value_layer)
         context_layer = context_layer.transpose([0, 2, 1, 3])
-        context_layer = context_layer.reshape([
-            paddle.shape(context_layer)[0],
-            paddle.shape(context_layer)[1], self.all_head_size
-        ])
+        context_layer = context_layer.reshape(
+            [paddle.shape(context_layer)[0], paddle.shape(context_layer)[1], self.all_head_size]
+        )
 
         if output_attentions:
             outputs = [context_layer, attention_probs]
@@ -355,7 +321,6 @@ class ErnieLayoutSelfAttention(nn.Layer):
 
 
 class ErnieLayoutAttention(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutAttention, self).__init__()
         self.self = ErnieLayoutSelfAttention(config)
@@ -397,13 +362,10 @@ class ErnieLayoutAttention(nn.Layer):
 
 
 class ErnieLayoutEncoder(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutEncoder, self).__init__()
         self.config = config
-        self.layer = nn.LayerList([
-            ErnieLayoutLayer(config) for _ in range(config["num_hidden_layers"])
-        ])
+        self.layer = nn.LayerList([ErnieLayoutLayer(config) for _ in range(config["num_hidden_layers"])])
 
         self.has_relative_attention_bias = config["has_relative_attention_bias"]
         self.has_spatial_attention_bias = config["has_spatial_attention_bias"]
@@ -411,23 +373,20 @@ class ErnieLayoutEncoder(nn.Layer):
             self.rel_pos_bins = config["rel_pos_bins"]
             self.max_rel_pos = config["max_rel_pos"]
             self.rel_pos_onehot_size = config["rel_pos_bins"]
-            self.rel_pos_bias = paddle.create_parameter(shape=[self.rel_pos_onehot_size, \
-                    config["num_attention_heads"]], dtype=paddle.get_default_dtype())
+            self.rel_pos_bias = paddle.create_parameter(
+                shape=[self.rel_pos_onehot_size, config["num_attention_heads"]], dtype=paddle.get_default_dtype()
+            )
 
         if self.has_spatial_attention_bias:
             self.max_rel_2d_pos = config["max_rel_2d_pos"]
             self.rel_2d_pos_bins = config["rel_2d_pos_bins"]
             self.rel_2d_pos_onehot_size = config["rel_2d_pos_bins"]
             self.rel_pos_x_bias = paddle.create_parameter(
-                shape=[
-                    self.rel_2d_pos_onehot_size, config["num_attention_heads"]
-                ],
-                dtype=paddle.get_default_dtype())
+                shape=[self.rel_2d_pos_onehot_size, config["num_attention_heads"]], dtype=paddle.get_default_dtype()
+            )
             self.rel_pos_y_bias = paddle.create_parameter(
-                shape=[
-                    self.rel_2d_pos_onehot_size, config["num_attention_heads"]
-                ],
-                dtype=paddle.get_default_dtype())
+                shape=[self.rel_2d_pos_onehot_size, config["num_attention_heads"]], dtype=paddle.get_default_dtype()
+            )
 
     def _cal_1d_pos_emb(self, hidden_states, position_ids):
         rel_pos_mat = position_ids.unsqueeze(-2) - position_ids.unsqueeze(-1)
@@ -436,20 +395,17 @@ class ErnieLayoutEncoder(nn.Layer):
             num_buckets=self.rel_pos_bins,
             max_distance=self.max_rel_pos,
         )
-        rel_pos = paddle.nn.functional.one_hot(
-            rel_pos,
-            num_classes=self.rel_pos_onehot_size).astype(hidden_states.dtype)
-        rel_pos = paddle.fluid.layers.matmul(
-            rel_pos, self.rel_pos_bias).transpose([0, 3, 1, 2])
+        rel_pos = paddle.nn.functional.one_hot(rel_pos, num_classes=self.rel_pos_onehot_size).astype(
+            hidden_states.dtype
+        )
+        rel_pos = paddle.fluid.layers.matmul(rel_pos, self.rel_pos_bias).transpose([0, 3, 1, 2])
         return rel_pos
 
     def _cal_2d_pos_emb(self, hidden_states, bbox):
         position_coord_x = bbox[:, :, 0]
         position_coord_y = bbox[:, :, 3]
-        rel_pos_x_2d_mat = position_coord_x.unsqueeze(
-            -2) - position_coord_x.unsqueeze(-1)
-        rel_pos_y_2d_mat = position_coord_y.unsqueeze(
-            -2) - position_coord_y.unsqueeze(-1)
+        rel_pos_x_2d_mat = position_coord_x.unsqueeze(-2) - position_coord_x.unsqueeze(-1)
+        rel_pos_y_2d_mat = position_coord_y.unsqueeze(-2) - position_coord_y.unsqueeze(-1)
         rel_pos_x = relative_position_bucket(
             rel_pos_x_2d_mat,
             num_buckets=self.rel_2d_pos_bins,
@@ -460,16 +416,10 @@ class ErnieLayoutEncoder(nn.Layer):
             num_buckets=self.rel_2d_pos_bins,
             max_distance=self.max_rel_2d_pos,
         )
-        rel_pos_x = F.one_hot(rel_pos_x,
-                              num_classes=self.rel_2d_pos_onehot_size).astype(
-                                  hidden_states.dtype)
-        rel_pos_y = F.one_hot(rel_pos_y,
-                              num_classes=self.rel_2d_pos_onehot_size).astype(
-                                  hidden_states.dtype)
-        rel_pos_x = paddle.fluid.layers.matmul(
-            rel_pos_x, self.rel_pos_x_bias).transpose([0, 3, 1, 2])
-        rel_pos_y = paddle.fluid.layers.matmul(
-            rel_pos_y, self.rel_pos_y_bias).transpose([0, 3, 1, 2])
+        rel_pos_x = F.one_hot(rel_pos_x, num_classes=self.rel_2d_pos_onehot_size).astype(hidden_states.dtype)
+        rel_pos_y = F.one_hot(rel_pos_y, num_classes=self.rel_2d_pos_onehot_size).astype(hidden_states.dtype)
+        rel_pos_x = paddle.fluid.layers.matmul(rel_pos_x, self.rel_pos_x_bias).transpose([0, 3, 1, 2])
+        rel_pos_y = paddle.fluid.layers.matmul(rel_pos_y, self.rel_pos_y_bias).transpose([0, 3, 1, 2])
         rel_2d_pos = rel_pos_x + rel_pos_y
         return rel_2d_pos
 
@@ -488,22 +438,18 @@ class ErnieLayoutEncoder(nn.Layer):
     ):
         all_hidden_states = () if output_hidden_states else None
 
-        rel_pos = self._cal_1d_pos_emb(
-            hidden_states,
-            position_ids) if self.has_relative_attention_bias else None
-        rel_2d_pos = self._cal_2d_pos_emb(
-            hidden_states, bbox) if self.has_spatial_attention_bias else None
+        rel_pos = self._cal_1d_pos_emb(hidden_states, position_ids) if self.has_relative_attention_bias else None
+        rel_2d_pos = self._cal_2d_pos_emb(hidden_states, bbox) if self.has_spatial_attention_bias else None
 
         hidden_save = dict()
         hidden_save["input_hidden_states"] = hidden_states
 
         for i, layer_module in enumerate(self.layer):
             if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states, )
+                all_hidden_states = all_hidden_states + (hidden_states,)
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
-            past_key_value = past_key_values[
-                i] if past_key_values is not None else None
+            past_key_value = past_key_values[i] if past_key_values is not None else None
 
             # gradient_checkpointing is set as False here so we remove some codes here
             hidden_save["input_attention_mask"] = attention_mask
@@ -524,20 +470,17 @@ class ErnieLayoutEncoder(nn.Layer):
 
             hidden_save["{}_data".format(i)] = hidden_states
 
-        return hidden_states,
+        return (hidden_states,)
 
 
 class ErnieLayoutIntermediate(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutIntermediate, self).__init__()
-        self.dense = nn.Linear(config["hidden_size"],
-                               config["intermediate_size"])
+        self.dense = nn.Linear(config["hidden_size"], config["intermediate_size"])
         if config["hidden_act"] == "gelu":
             self.intermediate_act_fn = nn.GELU()
         else:
-            assert False, "hidden_act is set as: {}, please check it..".format(
-                config["hidden_act"])
+            assert False, "hidden_act is set as: {}, please check it..".format(config["hidden_act"])
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -546,13 +489,10 @@ class ErnieLayoutIntermediate(nn.Layer):
 
 
 class ErnieLayoutOutput(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutOutput, self).__init__()
-        self.dense = nn.Linear(config["intermediate_size"],
-                               config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"],
-                                      epsilon=config["layer_norm_eps"])
+        self.dense = nn.Linear(config["intermediate_size"], config["hidden_size"])
+        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.dropout = nn.Dropout(config["hidden_dropout_prob"])
 
     def forward(self, hidden_states, input_tensor):
@@ -563,7 +503,6 @@ class ErnieLayoutOutput(nn.Layer):
 
 
 class ErnieLayoutLayer(nn.Layer):
-
     def __init__(self, config):
         super(ErnieLayoutLayer, self).__init__()
         # since chunk_size_feed_forward is 0 as default, no chunk is needed here.
@@ -591,8 +530,7 @@ class ErnieLayoutLayer(nn.Layer):
         rel_2d_pos=None,
     ):
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
-        self_attn_past_key_value = past_key_value[:
-                                                  2] if past_key_value is not None else None
+        self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
         self_attention_outputs = self.attention(
             hidden_states,
             attention_mask,
@@ -606,8 +544,7 @@ class ErnieLayoutLayer(nn.Layer):
         layer_output = self.feed_forward_chunk(attention_output)
 
         if output_attentions:
-            outputs = self_attention_outputs[
-                1:]  # add self attentions if we output attention weights
+            outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
             outputs = [
                 layer_output,
             ] + list(outputs)
@@ -617,27 +554,20 @@ class ErnieLayoutLayer(nn.Layer):
 
 
 class VisualBackbone(nn.Layer):
-
     def __init__(self, config):
         super(VisualBackbone, self).__init__()
 
         self.backbone = ResNet(layers=101)
 
-        self.register_buffer(
-            "pixel_mean",
-            paddle.to_tensor([103.53, 116.28, 123.675]).reshape([3, 1, 1]))
-        self.register_buffer(
-            "pixel_std",
-            paddle.to_tensor([57.375, 57.12, 58.395]).reshape([3, 1, 1]))
+        self.register_buffer("pixel_mean", paddle.to_tensor([103.53, 116.28, 123.675]).reshape([3, 1, 1]))
+        self.register_buffer("pixel_std", paddle.to_tensor([57.375, 57.12, 58.395]).reshape([3, 1, 1]))
 
         self.pool = nn.AdaptiveAvgPool2D(config["image_feature_pool_shape"][:2])
 
     def forward(self, images):
-        images_input = (paddle.to_tensor(images) -
-                        self.pixel_mean) / self.pixel_std
+        images_input = (paddle.to_tensor(images) - self.pixel_mean) / self.pixel_std
         features = self.backbone(images_input)
-        features = self.pool(features).flatten(start_axis=2).transpose(
-            [0, 2, 1])
+        features = self.pool(features).flatten(start_axis=2).transpose([0, 2, 1])
         return features
 
 
@@ -684,40 +614,35 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
     def __init__(
         self,
-        with_pool='tanh',
+        with_pool="tanh",
         **kwargs,
     ):
         super(ErnieLayoutModel, self).__init__()
         config = kwargs
         self.config = kwargs
-        self.has_visual_segment_embedding = config[
-            "has_visual_segment_embedding"]
+        self.has_visual_segment_embedding = config["has_visual_segment_embedding"]
         self.embeddings = ErnieLayoutEmbeddings(config)
 
         self.visual = VisualBackbone(config)
-        self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1],
-                                     config["hidden_size"])
+        self.visual_proj = nn.Linear(config["image_feature_pool_shape"][-1], config["hidden_size"])
         self.visual_act_fn = nn.GELU()
         if self.has_visual_segment_embedding:
             self.visual_segment_embedding = self.create_parameter(
                 shape=[
                     config["hidden_size"],
                 ],
-                dtype=self.embedding.weight.dtype)
-        self.visual_LayerNorm = nn.LayerNorm(config["hidden_size"],
-                                             epsilon=config["layer_norm_eps"])
+                dtype=self.embedding.weight.dtype,
+            )
+        self.visual_LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.visual_dropout = nn.Dropout(config["hidden_dropout_prob"])
         self.encoder = ErnieLayoutEncoder(config)
         self.pooler = ErnieLayoutPooler(config["hidden_size"], with_pool)
 
-    def _calc_text_embeddings(self, input_ids, bbox, position_ids,
-                              token_type_ids):
+    def _calc_text_embeddings(self, input_ids, bbox, position_ids, token_type_ids):
         words_embeddings = self.embeddings.word_embeddings(input_ids)
         position_embeddings = self.embeddings.position_embeddings(position_ids)
-        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(
-            bbox)
-        token_type_embeddings = self.embeddings.token_type_embeddings(
-            token_type_ids)
+        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(bbox)
+        token_type_embeddings = self.embeddings.token_type_embeddings(token_type_ids)
         embeddings = words_embeddings + position_embeddings + x1 + y1 + x2 + y2 + w + h + token_type_embeddings
 
         embeddings = self.embeddings.LayerNorm(embeddings)
@@ -726,11 +651,9 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
     def _calc_img_embeddings(self, image, bbox, position_ids):
         if image is not None:
-            visual_embeddings = self.visual_act_fn(
-                self.visual_proj(self.visual(image.astype(paddle.float32))))
+            visual_embeddings = self.visual_act_fn(self.visual_proj(self.visual(image.astype(paddle.float32))))
         position_embeddings = self.embeddings.position_embeddings(position_ids)
-        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(
-            bbox)
+        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(bbox)
         if image is not None:
             embeddings = visual_embeddings + position_embeddings + x1 + y1 + x2 + y2 + w + h
         else:
@@ -743,18 +666,24 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
         return embeddings
 
     def _calc_visual_bbox(self, image_feature_pool_shape, bbox, visual_shape):
-        visual_bbox_x = (paddle.arange(
-            0,
-            1000 * (image_feature_pool_shape[1] + 1),
-            1000,
-            dtype=bbox.dtype,
-        ) // image_feature_pool_shape[1])
-        visual_bbox_y = (paddle.arange(
-            0,
-            1000 * (image_feature_pool_shape[0] + 1),
-            1000,
-            dtype=bbox.dtype,
-        ) // image_feature_pool_shape[0])
+        visual_bbox_x = (
+            paddle.arange(
+                0,
+                1000 * (image_feature_pool_shape[1] + 1),
+                1000,
+                dtype=bbox.dtype,
+            )
+            // image_feature_pool_shape[1]
+        )
+        visual_bbox_y = (
+            paddle.arange(
+                0,
+                1000 * (image_feature_pool_shape[0] + 1),
+                1000,
+                dtype=bbox.dtype,
+            )
+            // image_feature_pool_shape[0]
+        )
 
         expand_shape = image_feature_pool_shape[0:2]
         visual_bbox = paddle.stack(
@@ -765,11 +694,9 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
                 visual_bbox_y[1:].expand(expand_shape[::-1]).transpose([1, 0]),
             ],
             axis=-1,
-        ).reshape([expand_shape[0] * expand_shape[1],
-                   paddle.shape(bbox)[-1]])
+        ).reshape([expand_shape[0] * expand_shape[1], paddle.shape(bbox)[-1]])
 
-        visual_bbox = visual_bbox.expand(
-            [visual_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
+        visual_bbox = visual_bbox.expand([visual_shape[0], visual_bbox.shape[0], visual_bbox.shape[1]])
         return visual_bbox
 
     def resize_position_embeddings(self, new_num_position_embeddings):
@@ -782,47 +709,43 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        num_position_embeds_diff = new_num_position_embeddings - self.config[
-            "max_position_embeddings"]
+        num_position_embeds_diff = new_num_position_embeddings - self.config["max_position_embeddings"]
 
         # no resizing needs to be done if the length stays the same
         if num_position_embeds_diff == 0:
             return
 
-        logger.info(
-            f"Setting `config.max_position_embeddings={new_num_position_embeddings}`..."
-        )
+        logger.info(f"Setting `config.max_position_embeddings={new_num_position_embeddings}`...")
         self.config["max_position_embeddings"] = new_num_position_embeddings
 
         old_position_embeddings_weight = self.embeddings.position_embeddings.weight
 
         self.embeddings.position_embeddings = nn.Embedding(
-            self.config["max_position_embeddings"], self.config["hidden_size"])
+            self.config["max_position_embeddings"], self.config["hidden_size"]
+        )
 
         with paddle.no_grad():
             if num_position_embeds_diff > 0:
-                self.embeddings.position_embeddings.weight[:
-                                                           -num_position_embeds_diff] = old_position_embeddings_weight
+                self.embeddings.position_embeddings.weight[:-num_position_embeds_diff] = old_position_embeddings_weight
             else:
-                self.embeddings.position_embeddings.weight = old_position_embeddings_weight[:
-                                                                                            num_position_embeds_diff]
+                self.embeddings.position_embeddings.weight = old_position_embeddings_weight[:num_position_embeds_diff]
 
-    def forward(self,
-                input_ids=None,
-                bbox=None,
-                image=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                head_mask=None,
-                output_hidden_states=False,
-                output_attentions=False):
+    def forward(
+        self,
+        input_ids=None,
+        bbox=None,
+        image=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        head_mask=None,
+        output_hidden_states=False,
+        output_attentions=False,
+    ):
         input_shape = paddle.shape(input_ids)
         visual_shape = list(input_shape)
-        visual_shape[1] = self.config["image_feature_pool_shape"][
-            0] * self.config["image_feature_pool_shape"][1]
-        visual_bbox = self._calc_visual_bbox(
-            self.config["image_feature_pool_shape"], bbox, visual_shape)
+        visual_shape[1] = self.config["image_feature_pool_shape"][0] * self.config["image_feature_pool_shape"][1]
+        visual_bbox = self._calc_visual_bbox(self.config["image_feature_pool_shape"], bbox, visual_shape)
 
         final_bbox = paddle.concat([bbox, visual_bbox], axis=1)
         if attention_mask is None:
@@ -832,8 +755,7 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
         attention_mask = attention_mask.astype(visual_attention_mask.dtype)
 
-        final_attention_mask = paddle.concat(
-            [attention_mask, visual_attention_mask], axis=1)
+        final_attention_mask = paddle.concat([attention_mask, visual_attention_mask], axis=1)
 
         if token_type_ids is None:
             token_type_ids = paddle.zeros(input_shape, dtype=paddle.int64)
@@ -843,10 +765,8 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
             position_ids = self.embeddings.position_ids[:, :seq_length]
             position_ids = position_ids.expand(input_shape)
 
-        visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], visual_shape[1]])
-        final_position_ids = paddle.concat([position_ids, visual_position_ids],
-                                           axis=1)
+        visual_position_ids = paddle.arange(0, visual_shape[1]).expand([input_shape[0], visual_shape[1]])
+        final_position_ids = paddle.concat([position_ids, visual_position_ids], axis=1)
 
         if bbox is None:
             bbox = paddle.zeros(input_shape + [4])
@@ -871,10 +791,8 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
         if head_mask is not None:
             if head_mask.dim() == 1:
-                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(
-                    -1).unsqueeze(-1)
-                head_mask = head_mask.expand(self.config["num_hidden_layers"],
-                                             -1, -1, -1, -1)
+                head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+                head_mask = head_mask.expand(self.config["num_hidden_layers"], -1, -1, -1, -1)
             elif head_mask.dim() == 2:
                 head_mask = head_mask.unsqueeze(1).unsqueeze(-1).unsqueeze(-1)
         else:
@@ -895,7 +813,6 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
 
 class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
-
     def __init__(self, ernie_layout, num_classes=2, dropout=None):
         super(ErnieLayoutForSequenceClassification, self).__init__()
         self.num_classes = num_classes
@@ -903,10 +820,8 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
             self.ernie_layout = ErnieLayoutModel(**ernie_layout)
         else:
             self.ernie_layout = ernie_layout
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  ernie_layout.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"] * 3,
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"] * 3, num_classes)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -922,8 +837,7 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        self.ernie_layout.resize_position_embeddings(
-            new_num_position_embeddings)
+        self.ernie_layout.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(
         self,
@@ -938,14 +852,15 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
     ):
         input_shape = paddle.shape(input_ids)
         visual_shape = list(input_shape)
-        visual_shape[1] = self.ernie_layout.config["image_feature_pool_shape"][
-            0] * self.ernie_layout.config["image_feature_pool_shape"][1]
+        visual_shape[1] = (
+            self.ernie_layout.config["image_feature_pool_shape"][0]
+            * self.ernie_layout.config["image_feature_pool_shape"][1]
+        )
         visual_bbox = self.ernie_layout._calc_visual_bbox(
-            self.ernie_layout.config["image_feature_pool_shape"], bbox,
-            visual_shape)
+            self.ernie_layout.config["image_feature_pool_shape"], bbox, visual_shape
+        )
 
-        visual_position_ids = paddle.arange(0, visual_shape[1]).expand(
-            [input_shape[0], visual_shape[1]])
+        visual_position_ids = paddle.arange(0, visual_shape[1]).expand([input_shape[0], visual_shape[1]])
 
         initial_image_embeddings = self.ernie_layout._calc_img_embeddings(
             image=image,
@@ -964,8 +879,7 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
         )
         seq_length = input_ids.shape[1]
         # sequence out and image out
-        sequence_output, final_image_embeddings = outputs[
-            0][:, :seq_length], outputs[0][:, seq_length:]
+        sequence_output, final_image_embeddings = outputs[0][:, :seq_length], outputs[0][:, seq_length:]
 
         cls_final_output = sequence_output[:, 0, :]
 
@@ -973,26 +887,28 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
         pooled_initial_image_embeddings = initial_image_embeddings.mean(axis=1)
         pooled_final_image_embeddings = final_image_embeddings.mean(axis=1)
         # concatenate with cls_final_output
-        sequence_output = paddle.concat([
-            cls_final_output, pooled_initial_image_embeddings,
-            pooled_final_image_embeddings
-        ],
-                                        axis=1)
+        sequence_output = paddle.concat(
+            [cls_final_output, pooled_initial_image_embeddings, pooled_final_image_embeddings], axis=1
+        )
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = logits,
+        outputs = (logits,)
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
 
-            loss = loss_fct(logits.reshape([-1, self.num_classes]),
-                            labels.reshape([
-                                -1,
-                            ]))
+            loss = loss_fct(
+                logits.reshape([-1, self.num_classes]),
+                labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
+            )
 
-            outputs = (loss, ) + outputs
+            outputs = (loss,) + outputs
 
         return outputs
 
@@ -1002,49 +918,34 @@ class ErnieLayoutPredictionHead(Layer):
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights=None):
         super(ErnieLayoutPredictionHead, self).__init__()
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = getattr(nn.functional, activation)
         self.layer_norm = nn.LayerNorm(hidden_size)
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=self.transform.weight.dtype,
-            is_bias=False) if embedding_weights is None else embedding_weights
-        self.decoder_bias = self.create_parameter(
-            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.decoder_weight = (
+            self.create_parameter(shape=[vocab_size, hidden_size], dtype=self.transform.weight.dtype, is_bias=False)
+            if embedding_weights is None
+            else embedding_weights
+        )
+        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
-            hidden_states = paddle.reshape(hidden_states,
-                                           [-1, hidden_states.shape[-1]])
-            hidden_states = paddle.tensor.gather(hidden_states,
-                                                 masked_positions)
+            hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states, masked_positions)
         # gather masked tokens might be more quick
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
 class ErnieLayoutPretrainingHeads(Layer):
-
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights=None):
         super(ErnieLayoutPretrainingHeads, self).__init__()
-        self.predictions = ErnieLayoutPredictionHead(hidden_size, vocab_size,
-                                                     activation,
-                                                     embedding_weights)
+        self.predictions = ErnieLayoutPredictionHead(hidden_size, vocab_size, activation, embedding_weights)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1052,7 +953,6 @@ class ErnieLayoutPretrainingHeads(Layer):
 
 
 class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
-
     def __init__(self, ernie_layout):
         super(ErnieLayoutForPretraining, self).__init__()
         self.ernie_layout = ernie_layout
@@ -1060,8 +960,8 @@ class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
             self.ernie_layout.config["hidden_size"],
             self.ernie_layout.config["vocab_size"],
             self.ernie_layout.config["hidden_act"],
-            embedding_weights=self.ernie_layout.embeddings.word_embeddings.
-            weight)
+            embedding_weights=self.ernie_layout.embeddings.word_embeddings.weight,
+        )
 
     def resize_position_embeddings(self, new_num_position_embeddings):
         """
@@ -1073,18 +973,19 @@ class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        self.ernie_layout.resize_position_embeddings(
-            new_num_position_embeddings)
+        self.ernie_layout.resize_position_embeddings(new_num_position_embeddings)
 
-    def forward(self,
-                input_ids=None,
-                bbox=None,
-                image=None,
-                attention_mask=None,
-                token_type_ids=None,
-                position_ids=None,
-                head_mask=None,
-                masked_positions=None):
+    def forward(
+        self,
+        input_ids=None,
+        bbox=None,
+        image=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        masked_positions=None,
+    ):
         outputs = self.ernie_layout(
             input_ids=input_ids,
             bbox=bbox,
@@ -1100,7 +1001,6 @@ class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
 
 
 class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
-
     def __init__(self, ernie_layout, num_classes=2, dropout=None):
         super(ErnieLayoutForTokenClassification, self).__init__()
         self.num_classes = num_classes
@@ -1108,10 +1008,8 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
             self.ernie_layout = ErnieLayoutModel(**ernie_layout)
         else:
             self.ernie_layout = ernie_layout
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  ernie_layout.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"], num_classes)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1127,8 +1025,7 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
                 will add newly initialized vectors at the end, whereas reducing the size will remove vectors from the
                 end.
         """
-        self.ernie_layout.resize_position_embeddings(
-            new_num_position_embeddings)
+        self.ernie_layout.resize_position_embeddings(new_num_position_embeddings)
 
     def forward(
         self,
@@ -1155,39 +1052,44 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
 
-        outputs = logits,
+        outputs = (logits,)
 
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
 
             if attention_mask is not None:
-                active_loss = attention_mask.reshape([
-                    -1,
-                ]) == 1
-                active_logits = logits.reshape([-1,
-                                                self.num_classes])[active_loss]
-                active_labels = labels.reshape([
-                    -1,
-                ])[active_loss]
+                active_loss = (
+                    attention_mask.reshape(
+                        [
+                            -1,
+                        ]
+                    )
+                    == 1
+                )
+                active_logits = logits.reshape([-1, self.num_classes])[active_loss]
+                active_labels = labels.reshape(
+                    [
+                        -1,
+                    ]
+                )[active_loss]
                 loss = loss_fct(active_logits, active_labels)
             else:
-                loss = loss_fct(logits.reshape([-1, self.num_classes]),
-                                labels.reshape([
-                                    -1,
-                                ]))
+                loss = loss_fct(
+                    logits.reshape([-1, self.num_classes]),
+                    labels.reshape(
+                        [
+                            -1,
+                        ]
+                    ),
+                )
 
-            outputs = (loss, ) + outputs
+            outputs = (loss,) + outputs
 
         return outputs
 
 
 class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
-
-    def __init__(self,
-                 ernie_layout,
-                 num_classes=2,
-                 dropout=None,
-                 has_visual_segment_embedding=False):
+    def __init__(self, ernie_layout, num_classes=2, dropout=None, has_visual_segment_embedding=False):
         super(ErnieLayoutForQuestionAnswering, self).__init__()
         self.num_classes = num_classes
         if isinstance(ernie_layout, dict):
@@ -1195,25 +1097,25 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
         else:
             self.ernie_layout = ernie_layout
         self.has_visual_segment_embedding = has_visual_segment_embedding
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  ernie_layout.config["hidden_dropout_prob"])
-        self.qa_outputs = nn.Linear(self.ernie_layout.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
+        self.qa_outputs = nn.Linear(self.ernie_layout.config["hidden_size"], num_classes)
         self.qa_outputs.apply(self.init_weights)
 
     def get_input_embeddings(self):
         return self.ernie_layout.embeddings.word_embeddings
 
-    def forward(self,
-                input_ids=None,
-                bbox=None,
-                image=None,
-                attention_mask=None,
-                token_type_ids=None,
-                position_ids=None,
-                head_mask=None,
-                start_positions=None,
-                end_positions=None):
+    def forward(
+        self,
+        input_ids=None,
+        bbox=None,
+        image=None,
+        attention_mask=None,
+        token_type_ids=None,
+        position_ids=None,
+        head_mask=None,
+        start_positions=None,
+        end_positions=None,
+    ):
         outputs = self.ernie_layout(
             input_ids=input_ids,
             bbox=bbox,
@@ -1233,9 +1135,7 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
             span_mask = 0
 
         logits = self.qa_outputs(sequence_output)
-        start_logits, end_logits = paddle.split(logits,
-                                                num_or_sections=2,
-                                                axis=-1)
+        start_logits, end_logits = paddle.split(logits, num_or_sections=2, axis=-1)
         start_logits = start_logits.squeeze(-1) + span_mask
         end_logits = end_logits.squeeze(-1) + span_mask
 
@@ -1261,5 +1161,5 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
         if not total_loss:
             return outputs
         else:
-            outputs = (total_loss, ) + outputs
+            outputs = (total_loss,) + outputs
             return outputs
