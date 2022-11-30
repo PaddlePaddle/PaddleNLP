@@ -5,7 +5,7 @@
 - [2. 快速开始](#2)
   - [2.1 运行环境](#2.1)
   - [2.2 代码结构](#2.2)
-  - [2.3 快速开始：从输入数据到分析结果可视化](#2.3)
+  - [2.3 开箱即用：从输入数据到分析结果可视化](#2.3)
     - [2.3.1 数据描述](#2.3.1)
     - [2.3.2 批量情感分析](#2.3.2)
     - [2.3.3 情感分析结果可视化](#2.3.3)
@@ -72,12 +72,6 @@ python3 -m pip install wordcloud==1.8.2.2
 ### 2.2 代码结构
 ```
 unified_sentiment_extraction/
-├── predict # 模型预测
-│   └── predictor.py # 模型预测核心脚本
-│   ├── predict.py # 模型预测Demo脚本
-│   ├── batch_predict.py # 模型批量预测脚本
-│   ├── predict_with_aspect.py # 根据给定评价属性进行预测Demo脚本
-│   └── batch_predict_with_aspect # 根据给定评价属性进行批量预测脚本
 ├── train.py # 训练评估脚本
 ├── model.py # 模型定义脚本
 ├── finetune.py # 模型微调脚本
@@ -89,9 +83,9 @@ unified_sentiment_extraction/
 ```
 
 <a name="2.3"></a>
-### 2.3 快速开始：从输入数据到分析结果可视化
+### 2.3 开箱即用：从输入数据到分析结果可视化
 
-为增强通用信息抽取模型UIE对于情感分析知识的处理能力，本项目基于大量情感分析数据进行了训练，以更好地支持常见的基础情感分析能力，可以点击[这里](https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/sentiment_uie.tar.gz)进行下载，下载解压后，可将模型放至当前目录`./checkpoint/model_best`。
+为增强通用信息抽取模型UIE对于情感分析知识的处理能力，本项目基于大量情感分析数据进行了训练，以更好地支持常见的基础情感分析能力。同时该模型集成到了 Taskflow 中，可以通过 TaskFlow 提供的API直接进行情感分析。
 
 另外，在分析结果可视化时，如果需要在词云中显示中文，需要指定字体路径，这里可以使用黑体进行显示，点击[这里](https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/SimHei.ttf)进行下载。
 
@@ -110,7 +104,77 @@ unified_sentiment_extraction/
 
 <a name="2.3.2"></a>
 
-#### 2.3.2 快速情感分析
+#### 2.3.2 开箱即用：情感分析
+
+基于UIE的情感分析功能已经集成到了 Taskflow，可以通过 Taskflow 直接进行情感分析预测。为自动分析文本评论中的属性、观点词和情感极性，定义 schema 如下：
+```
+[{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
+```
+
+调用示例如下：
+
+```python
+>>> from paddlenlp import Taskflow
+
+>>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
+
+[
+    {
+        '评价维度': [
+            {
+                'end': 11,
+                'probability': 0.9978359659431995,
+                'relations': {
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'probability': 0.9999209657300412,
+                            'text': '正向'
+                        }
+                    ],
+                    '观点词': [
+                        {
+                            'end': 14,
+                            'probability': 0.9998056980106895,
+                            'start': 13,
+                            'text': '好'
+                        }
+                    ]
+                },
+                'start': 9,
+                'text': '服务'
+            },
+            {
+                'end': 4,
+                'probability': 0.9152585827976623,
+                'relations': {
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'probability': 0.9998750722759127,
+                            'text': '正向'
+                        }
+                    ],
+                    '观点词': [
+                        {
+                            'end': 6,
+                            'probability': 0.9855414084471477,
+                            'start': 4,
+                            'text': '不错'
+                        }
+                    ]
+                },
+                'start': 2,
+                'text': '味道'
+            }
+        ]
+    }
+]
+```
+
+当需要分析数据规模较大时，可以借助脚本`batch_predict.py`以文件的形式传入数据，分析结果会以文件的形式进行保存。使用示例如下：
+
+
 
 可使用`predict/batch_predict.py`文件进行情感预测，默认情况下，会自动分析文本评论中的属性、观点词和情感极性，分析完成后会保存情感分析结果，用以后续可视化。
 
