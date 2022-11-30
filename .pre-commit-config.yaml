@@ -5,6 +5,7 @@ repos:
     hooks:
     -   id: black
         files: \.py$
+        additional_dependencies: [toml]
 -   repo: https://github.com/PyCQA/isort
     rev: 5.10.1
     hooks:
