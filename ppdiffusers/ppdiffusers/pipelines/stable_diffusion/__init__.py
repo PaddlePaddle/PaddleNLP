@@ -76,6 +76,9 @@ if is_paddlenlp_available() and is_onnx_available():
     from .pipeline_onnx_stable_diffusion_inpaint import (
         OnnxStableDiffusionInpaintPipeline,
     )
+    from .pipeline_onnx_stable_diffusion_inpaint_legacy import (
+        OnnxStableDiffusionInpaintPipelineLegacy,
+    )
 
 if is_paddlenlp_available() and is_fastdeploy_available():
     from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline

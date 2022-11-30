@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import os
 import shutil
 from pathlib import Path
@@ -31,6 +32,7 @@ from .utils import (
 
 if is_onnx_available():
     import onnxruntime as ort
+
 
 logger = logging.get_logger(__name__)
 
@@ -65,7 +67,6 @@ class OnnxRuntimeModel:
     def load_model(path: Union[str, Path], provider=None, sess_options=None):
         """
         Loads an ONNX Inference session with an ExecutionProvider. Default provider is `CPUExecutionProvider`
-
         Arguments:
             path (`str` or `Path`):
                 Directory from which to load
@@ -83,7 +84,6 @@ class OnnxRuntimeModel:
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
         [`~optimum.onnxruntime.modeling_ort.ORTModel.from_pretrained`] class method. It will always save the
         latest_model_name.
-
         Arguments:
             save_directory (`str` or `Path`):
                 Directory where to save the model file.
@@ -117,7 +117,6 @@ class OnnxRuntimeModel:
         """
         Save a model to a directory, so that it can be re-loaded using the [`~OnnxModel.from_pretrained`] class
         method.:
-
         Arguments:
             save_directory (`str` or `os.PathLike`):
                 Directory to which to save. Will be created if it doesn't exist.
@@ -143,7 +142,6 @@ class OnnxRuntimeModel:
     ):
         """
         Load a model from a directory or the BOS.
-
         Arguments:
             model_id (`str` or `Path`):
                 Directory from which to load
@@ -182,20 +180,11 @@ class OnnxRuntimeModel:
     def from_pretrained(
         cls,
         model_id: Union[str, Path],
-        force_download: bool = True,
-        use_auth_token: Optional[str] = None,
         cache_dir: Optional[str] = None,
         **model_kwargs,
     ):
-        revision = None
-        if len(str(model_id).split("@")) == 2:
-            model_id, revision = model_id.split("@")
-
         return cls._from_pretrained(
             model_id=model_id,
-            revision=revision,
             cache_dir=cache_dir,
-            force_download=force_download,
-            use_auth_token=use_auth_token,
             **model_kwargs,
         )
