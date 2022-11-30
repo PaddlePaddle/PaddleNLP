@@ -392,10 +392,13 @@ class UNIMOModel(UNIMOPretrainedModel):
             normalize_before=normalize_before)
 
         self.encoder_norm = nn.LayerNorm(hidden_size)
+        # post_encoder_norm = nn.LayerNorm(hidden_size)
+
         self.dropout = nn.Dropout(hidden_dropout_prob)
         self.encoder = nn.TransformerEncoder(
             encoder_layer,
             num_hidden_layers,
+            # post_encoder_norm,
         )
 
         self.apply(self.init_weights)
@@ -673,7 +676,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         )
 
     def prepare_faster_entry(self, kwargs):
-        from paddlenlp.ops import FasterUNIMOText
+        from paddlenlp.ops import FasterUNIMOText, FasterMIRO
         use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
         decode_strategy = kwargs.get('decode_strategy')
         if decode_strategy == 'sampling' and kwargs.get(
@@ -691,8 +694,12 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             raise AttributeError(
                 "'forced_bos_token_id != None' is not supported yet in the faster version"
             )
-        self._faster_entry = FasterUNIMOText(
-            self, use_fp16_decoding=use_fp16_decoding).forward
+        if getattr(self.encoder, "norm", None) is None:
+            self._faster_entry = FasterUNIMOText(
+                self, use_fp16_decoding=use_fp16_decoding).forward
+        else:
+            self._faster_entry = FasterMIRO(
+                self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
     def adjust_logits_during_generation(self, logits):
@@ -744,8 +751,8 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-        if attention_mask is not None:
-            attention_mask = attention_mask[:, :, -1:, :]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
