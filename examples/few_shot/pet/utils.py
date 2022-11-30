@@ -198,7 +198,7 @@ def save_pseudo_data(save_path, task_name, label_preds, verbalizer, labels):
 
     data_ds = load_dataset("fewclue", name=task_name, splits="unlabeled")
     preds = paddle.to_tensor(label_preds.predictions)
-    preds = verbalizer.eval_process_outputs(preds)
+    preds = verbalizer.aggregate_multiple_mask(preds)
     preds = paddle.nn.functional.softmax(preds, axis=1).numpy()
     label_preds = np.argmax(preds, axis=1)
     label_probs = np.max(preds, axis=1)
@@ -215,7 +215,7 @@ def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer, label
     Extract predicted labels and save as the format required by FewCLUE.
     """
     preds = paddle.to_tensor(label_preds.predictions)
-    preds = verbalizer.eval_process_outputs(preds)
+    preds = verbalizer.aggregate_multiple_mask(preds)
     if task_name == "chid":
         batch_size = preds.shape[0]
         preds = paddle.nn.functional.softmax(preds, axis=1)[:, 1]

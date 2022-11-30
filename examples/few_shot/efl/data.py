@@ -37,9 +37,9 @@ def convert_efl(data_ds, label_words, orig_key, is_train=False, num_neg=5):
     for example in data_ds:
         label = label_words[example[orig_key]] if orig_key in example else None
         sub_list = label_list
-        if is_train and label is not None:
+        if is_train and label is not None and len(label_list) > num_neg:
             rand_index = np.random.permutation(len(label_list))
-            sub_list = [label] + [label_list[i] for i in rand_index[:num_neg]]
+            sub_list = [example[orig_key]] + [label_list[i] for i in rand_index[:num_neg]]
         for key in sub_list:
             new_example = example.copy()
             cand = label_words[key]

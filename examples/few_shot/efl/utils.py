@@ -217,7 +217,7 @@ def save_fewclue_prediction(save_path, task_name, label_preds, verbalizer, label
     """
     num_labels = len(labels)
     preds = paddle.to_tensor(label_preds.predictions)
-    preds = paddle.nn.functional.softmax(preds, axis=1)[:, 1].numpy()
+    preds = paddle.nn.functional.softmax(preds, axis=1)[:, 1]
     preds = preds.reshape([-1, num_labels])
     if task_name == "chid":
         batch_size = preds.shape[0]

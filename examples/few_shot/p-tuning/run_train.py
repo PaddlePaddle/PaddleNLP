@@ -130,20 +130,6 @@ def main():
         trainer.save_metrics("train", metrics)
         trainer.save_state()
 
-    # Export static model.
-    if training_args.do_export:
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
-            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
-            InputSpec(shape=[None], dtype="int64"),  # masked_positions
-            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # encoder_ids
-        ]
-        export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
-
     time_stamp = time.strftime("%m%d-%H-%M-%S", time.localtime())
 
     # Test.
@@ -166,6 +152,23 @@ def main():
         logger.info("Labeling done.")
         pseudo_path = os.path.join(training_args.output_dir, "pseudo_data_" + time_stamp + ".txt")
         save_pseudo_data(pseudo_path, data_args.task_name, label_ret, verbalizer, ids_to_labels)
+
+    # Export static model.
+    if training_args.do_export:
+        template = prompt_model.template
+        template_keywords = template.extract_template_keywords(template.prompt)
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
+            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
+            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
+            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
+            InputSpec(shape=[None], dtype="int64"),  # masked_positions
+            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
+        ]
+        if "encoder" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # encoder_ids
+        export_path = os.path.join(training_args.output_dir, "export")
+        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
 
 
 if __name__ == "__main__":

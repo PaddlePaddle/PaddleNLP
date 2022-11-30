@@ -37,7 +37,7 @@ train_ds, dev_ds, public_test_ds = load_dataset("fewclue", name="eprstmt", split
 
 通过如下命令，指定 GPU 0 卡,  在 FewCLUE 的 `eprstmt` 数据集上进行训练&评估
 ```
-python -u -m paddle.distributed.launch --gpus "0" train.py \
+python -u -m paddle.distributed.launch --gpus "0" run_train.py \
     --output_dir checkpoint_eprstmt \
     --task_name eprstmt \
     --split_id few_all \
