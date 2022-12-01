@@ -11,10 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from pipelines.utils.import_utils import safe_import
-
+# flake8: noqa
+from pipelines.nodes.answer_extractor import (
+    AnswerExtractor,
+    AnswerExtractorPreprocessor,
+    QAFilter,
+    QAFilterPostprocessor,
+)
 from pipelines.nodes.base import BaseComponent
+from pipelines.nodes.document import DocOCRProcessor, DocPrompter
 from pipelines.nodes.file_classifier import FileTypeClassifier
 from pipelines.nodes.file_converter import (
     BaseConverter,
@@ -26,10 +31,9 @@ from pipelines.nodes.file_converter import (
     TextConverter,
 )
 from pipelines.nodes.preprocessor import BasePreProcessor, PreProcessor
+from pipelines.nodes.question_generator import QuestionGenerator
 from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
 from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
-from pipelines.nodes.document import DocOCRProcessor, DocPrompter
 from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
-from pipelines.nodes.answer_extractor import AnswerExtractor, QAFilter, AnswerExtractorPreprocessor, QAFilterPostprocessor
-from pipelines.nodes.question_generator import QuestionGenerator
+from pipelines.utils.import_utils import safe_import

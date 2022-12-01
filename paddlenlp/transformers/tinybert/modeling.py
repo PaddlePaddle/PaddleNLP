@@ -22,16 +22,22 @@ from ..bert.modeling import BertPooler, BertEmbeddings
 from .. import PretrainedModel, register_base_model
 from ..configuration_utils import PretrainedConfig
 
-from ..model_outputs import (BaseModelOutputWithPooling,
-                             BaseModelOutputWithPoolingAndCrossAttentions,
-                             SequenceClassifierOutput,
-                             QuestionAnsweringModelOutput,
-                             MultipleChoiceModelOutput, tuple_output)
+from ..model_outputs import (
+    BaseModelOutputWithPooling,
+    BaseModelOutputWithPoolingAndCrossAttentions,
+    SequenceClassifierOutput,
+    QuestionAnsweringModelOutput,
+    MultipleChoiceModelOutput,
+    tuple_output,
+)
 
 __all__ = [
-    'TinyBertModel', 'TinyBertPretrainedModel', 'TinyBertForPretraining',
-    'TinyBertForSequenceClassification', 'TinyBertForQuestionAnswering',
-    'TinyBertForMultipleChoice'
+    "TinyBertModel",
+    "TinyBertPretrainedModel",
+    "TinyBertForPretraining",
+    "TinyBertForSequenceClassification",
+    "TinyBertForQuestionAnswering",
+    "TinyBertForMultipleChoice",
 ]
 
 
@@ -132,24 +138,18 @@ class TinyBertPretrainedModel(PretrainedModel):
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "tinybert-4l-312d":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams",
-            "tinybert-6l-768d":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d.pdparams",
-            "tinybert-4l-312d-v2":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
-            "tinybert-6l-768d-v2":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
-            "tinybert-4l-312d-zh":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh.pdparams",
-            "tinybert-6l-768d-zh":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh.pdparams",
+            "tinybert-4l-312d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d.pdparams",
+            "tinybert-6l-768d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d.pdparams",
+            "tinybert-4l-312d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2.pdparams",
+            "tinybert-6l-768d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2.pdparams",
+            "tinybert-4l-312d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh.pdparams",
+            "tinybert-6l-768d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh.pdparams",
         }
     }
     base_model_prefix = "tinybert"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -157,10 +157,12 @@ class TinyBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else
-                        self.tinybert.config["initializer_range"],
-                        shape=layer.weight.shape))
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.tinybert.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -232,20 +234,22 @@ class TinyBertModel(TinyBertPretrainedModel):
             Defaults to `768`.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 fit_size=768):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        pad_token_id=0,
+        fit_size=768,
+    ):
         super(TinyBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
@@ -259,7 +263,8 @@ class TinyBertModel(TinyBertPretrainedModel):
             max_position_embeddings=max_position_embeddings,
             type_vocab_size=type_vocab_size,
             # the default pool_act is `tanh`
-            pool_act="tanh")
+            pool_act="tanh",
+        )
         self.embeddings = BertEmbeddings(config)
 
         encoder_layer = nn.TransformerEncoderLayer(
@@ -269,17 +274,15 @@ class TinyBertModel(TinyBertPretrainedModel):
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
+            act_dropout=0,
+        )
 
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
 
         self.pooler = BertPooler(config)
         # fit_dense(s) means a hidden states' transformation from student to teacher.
         # `fit_denses` is used in v2 model, and `fit_dense` is used in other pretraining models.
-        self.fit_denses = nn.LayerList([
-            nn.Linear(hidden_size, fit_size)
-            for i in range(num_hidden_layers + 1)
-        ])
+        self.fit_denses = nn.LayerList([nn.Linear(hidden_size, fit_size) for i in range(num_hidden_layers + 1)])
         self.fit_dense = nn.Linear(hidden_size, fit_size)
         self.apply(self.init_weights)
 
@@ -299,18 +302,20 @@ class TinyBertModel(TinyBertPretrainedModel):
         """
         self.embeddings.word_embeddings = embedding
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None,
-                attention_mask: Optional[Tensor] = None,
-                inputs_embeds: Optional[Tensor] = None,
-                past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
-                use_cache: Optional[bool] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
-        r'''
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
         The TinyBertModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -397,12 +402,10 @@ class TinyBertModel(TinyBertPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP! ")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError(
-                "You cannot specify both input_ids and inputs_embeds at the same time."
-            )
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
 
         # init the default bool value
         output_attentions = output_attentions if output_attentions is not None else False
@@ -416,29 +419,22 @@ class TinyBertModel(TinyBertPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+            )
 
             if past_key_values is not None:
                 batch_size = past_key_values[0][0].shape[0]
-                past_mask = paddle.zeros(
-                    [batch_size, 1, 1, past_key_values_length],
-                    dtype=attention_mask.dtype)
-                attention_mask = paddle.concat([past_mask, attention_mask],
-                                               axis=-1)
+                past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
         elif attention_mask.ndim == 2:
             # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
-                paddle.get_default_dtype())
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
         # TODO(wj-Mcat): in current branch, not support `inputs_embeds`
         embedding_output = self.embeddings(
-            input_ids,
-            token_type_ids,
-            position_ids,
-            past_key_values_length=past_key_values_length)
+            input_ids, token_type_ids, position_ids, past_key_values_length=past_key_values_length
+        )
 
         self.encoder._use_cache = use_cache  # To be consistent with HF
         encoder_outputs = self.encoder(
@@ -447,7 +443,8 @@ class TinyBertModel(TinyBertPretrainedModel):
             cache=past_key_values,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
+            return_dict=return_dict,
+        )
 
         if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = encoder_outputs
@@ -463,7 +460,8 @@ class TinyBertModel(TinyBertPretrainedModel):
             pooler_output=pooled_output,
             past_key_values=encoder_outputs.past_key_values,
             hidden_states=encoder_outputs.hidden_states,
-            attentions=encoder_outputs.attentions)
+            attentions=encoder_outputs.attentions,
+        )
 
 
 class TinyBertForPretraining(TinyBertPretrainedModel):
@@ -481,15 +479,17 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
         self.tinybert: TinyBertModel = tinybert
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None,
-                attention_mask: Optional[Tensor] = None,
-                inputs_embeds: Optional[Tensor] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The TinyBertForPretraining forward method, overrides the __call__() special method.
 
@@ -525,14 +525,16 @@ class TinyBertForPretraining(TinyBertPretrainedModel):
 
 
         """
-        outputs = self.tinybert(input_ids,
-                                token_type_ids,
-                                position_ids,
-                                attention_mask,
-                                inputs_embeds=inputs_embeds,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
+        outputs = self.tinybert(
+            input_ids,
+            token_type_ids,
+            position_ids,
+            attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
         # return the sequence presentation
         if not return_dict:
@@ -560,23 +562,23 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
         super(TinyBertForSequenceClassification, self).__init__()
         self.tinybert = tinybert
         self.num_classes = num_classes
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  tinybert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.tinybert.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.tinybert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.tinybert.config["hidden_size"], num_classes)
         self.activation = nn.ReLU()
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None,
-                attention_mask: Optional[Tensor] = None,
-                labels: Optional[Tensor] = None,
-                inputs_embeds: Optional[Tensor] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The TinyBertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -626,14 +628,16 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 logits = outputs[0]
         """
 
-        outputs = self.tinybert(input_ids,
-                                token_type_ids=token_type_ids,
-                                position_ids=position_ids,
-                                attention_mask=attention_mask,
-                                inputs_embeds=inputs_embeds,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
+        outputs = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
         logits = self.classifier(self.activation(outputs[1]))
 
@@ -644,14 +648,13 @@ class TinyBertForSequenceClassification(TinyBertPretrainedModel):
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)),
-                                labels.reshape((-1, )))
+                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, ) + outputs[2:]
+            output = (logits,) + outputs[2:]
             return tuple_output(output, loss)
 
         return SequenceClassifierOutput(
@@ -669,7 +672,7 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
     designed for question-answering tasks like SQuAD.
 
     Args:
-        tinybert (`TinyBertModel`): 
+        tinybert (`TinyBertModel`):
             An instance of `TinyBertModel`.
     """
 
@@ -679,17 +682,19 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
         self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None,
-                attention_mask: Optional[Tensor] = None,
-                inputs_embeds: Optional[Tensor] = None,
-                start_positions: Optional[Tensor] = None,
-                end_positions: Optional[Tensor] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -745,14 +750,16 @@ class TinyBertForQuestionAnswering(TinyBertPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.tinybert(input_ids,
-                                token_type_ids=token_type_ids,
-                                position_ids=position_ids,
-                                attention_mask=attention_mask,
-                                inputs_embeds=inputs_embeds,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
+        outputs = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
@@ -791,7 +798,7 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
     """
     TinyBERT Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
-    
+
     Args:
         tinybert (:class:`TinyBertModel`):
             An instance of TinyBertModel.
@@ -807,21 +814,22 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
         super(TinyBertForMultipleChoice, self).__init__()
         self.num_choices = num_choices
         self.tinybert = tinybert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  tinybert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.tinybert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.tinybert.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids: Optional[Tensor] = None,
-                token_type_ids: Optional[Tensor] = None,
-                position_ids: Optional[Tensor] = None,
-                attention_mask: Optional[Tensor] = None,
-                inputs_embeds: Optional[Tensor] = None,
-                labels: Optional[Tensor] = None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The TinyBertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -855,47 +863,38 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
         """
         # input_ids: [bs, num_choice, seq_l]
         if input_ids is not None and inputs_embeds is not None:
-            raise ValueError(
-                "You cannot specify both input_ids and inputs_embeds at the same time."
-            )
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time.")
 
         if input_ids is None and inputs_embeds is None:
-            raise ValueError(
-                "input_ids and inputs_embeds should not be None at the same time."
-            )
+            raise ValueError("input_ids and inputs_embeds should not be None at the same time.")
         if inputs_embeds is not None:
-            inputs_embeds = inputs_embeds.reshape(
-                [-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
+            inputs_embeds = inputs_embeds.reshape([-1, inputs_embeds.shape[-2], inputs_embeds.shape[-1]])
         else:
-            input_ids = input_ids.reshape(shape=(
-                -1,
-                input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+            input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(
-                shape=(-1, token_type_ids.shape[-1]))
+            token_type_ids = token_type_ids.reshape(shape=(-1, token_type_ids.shape[-1]))
 
         if position_ids is not None:
-            position_ids = position_ids.reshape(shape=(-1,
-                                                       position_ids.shape[-1]))
+            position_ids = position_ids.reshape(shape=(-1, position_ids.shape[-1]))
 
         if attention_mask is not None:
-            attention_mask = attention_mask.reshape(
-                shape=(-1, attention_mask.shape[-1]))
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
 
-        outputs = self.tinybert(input_ids,
-                                token_type_ids=token_type_ids,
-                                position_ids=position_ids,
-                                inputs_embeds=inputs_embeds,
-                                attention_mask=attention_mask,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
+        outputs = self.tinybert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         pooled_output = self.dropout(outputs[1])
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
-        reshaped_logits = logits.reshape(
-            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+        reshaped_logits = logits.reshape(shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
         loss = None
         if labels is not None:
@@ -903,7 +902,7 @@ class TinyBertForMultipleChoice(TinyBertPretrainedModel):
             loss = loss_fct(reshaped_logits, labels)
 
         if not return_dict:
-            output = (reshaped_logits, ) + outputs[2:]
+            output = (reshaped_logits,) + outputs[2:]
             return tuple_output(output, loss)
 
         return MultipleChoiceModelOutput(

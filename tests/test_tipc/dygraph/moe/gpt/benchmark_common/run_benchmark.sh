@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Test training benchmark for a model.
 # Usage：bash benchmark/run_benchmark.sh ${model_item} ${fp_item} ${mp_degree} ${pp_degree} ${dp_degree} ${micro_batch_size} ${global_batch_size} ${run_mode} ${device_num} ${use_sharding}
 function _set_params(){
@@ -97,31 +112,36 @@ function _train(){
                 --scale_loss 32768 \
                 --gate gshard \
                 --balance_loss_weight 1.0"
-
+    if [ ${PADDLE_TRAINER_ID} ]
+    then
+        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
+    else
+        PADDLE_RANK_OPTION=""
+    fi
     # 以下为通用执行命令，无特殊可不用修改
     case ${run_mode} in
     DP_MoE_C1) echo "run run_mode: DP_MoE_C1"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 ${PADDLE_RANK_OPTION}\
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     DP_MoE_C8|DP_MoE_C16) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     DP_MoE_C32) echo "run run_mode: DP_MoE_C32"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     Sharding_MoE_C8|Sharding_MoE_C16) echo "run run_mode: ${run_mode}"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
     Sharding_MoE_C32) echo "run run_mode: Sharding_MoE_C32"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
               run_moe_pretrain.py ${train_cmd}"
         workerlog_id=0
         ;;
