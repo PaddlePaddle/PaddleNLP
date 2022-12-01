@@ -201,7 +201,6 @@ python train.py \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
-    --num_train_epochs 100 \
     --do_train \
     --do_eval \
     --metric_for_best_model accuracy \
@@ -223,7 +222,6 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
-    --num_train_epochs 100 \
     --early_stopping_patience 4 \
     --do_train \
     --do_eval \
