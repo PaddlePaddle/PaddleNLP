@@ -217,7 +217,7 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
     --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir checkpoint \
-    --device gpu \
+    --device cpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
@@ -241,7 +241,7 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus 0,1 train.py \
     --data_dir ./data/ \
     --output_dir checkpoint \
-    --device cpu \
+    --device gpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
