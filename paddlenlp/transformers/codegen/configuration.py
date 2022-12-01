@@ -15,12 +15,10 @@
 from __future__ import annotations
 
 from typing import Dict
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
-__all__ = [
-    "CODEGEN_PRETRAINED_INIT_CONFIGURATION", "CodeGenConfig",
-    "CODEGEN_PRETRAINED_RESOURCE_FILES_MAP"
-]
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+
+__all__ = ["CODEGEN_PRETRAINED_INIT_CONFIGURATION", "CodeGenConfig", "CODEGEN_PRETRAINED_RESOURCE_FILES_MAP"]
 
 CODEGEN_PRETRAINED_INIT_CONFIGURATION = {}
 CODEGEN_PRETRAINED_RESOURCE_FILES_MAP = {"model_state": {}}
@@ -58,7 +56,7 @@ class CodeGenConfig(PretrainedConfig):
             The dropout probability used in MultiHeadAttention in all decoder layers to drop some attention target.
             Defaults to `0.0`.
         resid_pdrop (float, optional):
-            The dropout probability for all residual layers in the decoder. 
+            The dropout probability for all residual layers in the decoder.
             Defaults to `0.0`.
         embd_pdrop (float, optional):
             The dropout probability used in embedding layers. Defaults to `0.0`.
@@ -103,17 +101,19 @@ class CodeGenConfig(PretrainedConfig):
         activation_function: str = "gelu_new",
         layer_norm_epsilon: float = 1e-05,
         initializer_range: float = 0.02,
-        scale_attn_weights: bool = True,  #TODO 默认True，HF也不支持False 加上warning
-        tie_word_embeddings: bool = False,  #TODO 没有用到该参数 加上warning
-        n_inner: int = None,  #TODO 没有用到该参数，我们是直接默认 4 * n_embd.
+        scale_attn_weights: bool = True,
+        tie_word_embeddings: bool = False,
+        n_inner: int = None,
         use_cache: bool = True,
         **kwargs,
     ):
-        super().__init__(bos_token_id=bos_token_id,
-                         eos_token_id=eos_token_id,
-                         pad_token_id=pad_token_id,
-                         tie_word_embeddings=tie_word_embeddings,
-                         **kwargs)
+        super().__init__(
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            tie_word_embeddings=tie_word_embeddings,
+            **kwargs,
+        )
         self.vocab_size = vocab_size
         self.n_ctx = n_ctx
         self.n_positions = n_positions

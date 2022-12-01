@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -28,10 +29,13 @@ from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
+# isort: split
 from .bert.modeling import *
 from .bert.tokenizer import *
 from .bert.configuration import *
 from .bert.converter import *
+
+# isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *

@@ -15,13 +15,12 @@
 from __future__ import annotations
 
 from typing import Dict
-from ...utils.log import logger
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
-__all__ = [
-    "MBART_PRETRAINED_INIT_CONFIGURATION", "MBartConfig",
-    "MBART_PRETRAINED_RESOURCE_FILES_MAP"
-]
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+
+from ...utils.log import logger
+
+__all__ = ["MBART_PRETRAINED_INIT_CONFIGURATION", "MBartConfig", "MBART_PRETRAINED_RESOURCE_FILES_MAP"]
 
 MBART_PRETRAINED_INIT_CONFIGURATION = {
     "mbart-large-cc25": {
@@ -123,21 +122,16 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
-    }
+    },
 }
 
 MBART_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "mbart-large-cc25":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
-        "mbart-large-en-ro":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
-        "mbart-large-50-one-to-many-mmt":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
-        "mbart-large-50-many-to-one-mmt":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
-        "mbart-large-50-many-to-many-mmt":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
+        "mbart-large-cc25": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
+        "mbart-large-en-ro": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
+        "mbart-large-50-one-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
+        "mbart-large-50-many-to-one-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
+        "mbart-large-50-many-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams",
     }
 }
 
@@ -263,33 +257,33 @@ class MBartConfig(PretrainedConfig):
     pretrained_init_configuration = MBART_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
-            self,
-            vocab_size: int = 50265,
-            bos_token_id: int = 0,
-            pad_token_id: int = 1,
-            eos_token_id: int = 2,
-            decoder_start_token_id: int = 2,
-            forced_bos_token_id: int = 250004,
-            forced_eos_token_id: int = 2,
-            d_model: int = 768,
-            encoder_layers: int = 12,
-            decoder_layers: int = 12,
-            encoder_attention_heads: int = 16,
-            decoder_attention_heads: int = 16,
-            encoder_ffn_dim: int = 4096,
-            decoder_ffn_dim: int = 4096,
-            use_cache: bool = True,
-            dropout: float = 0.1,
-            activation_function: str = 'gelu',
-            attention_dropout: float = 0.0,
-            activation_dropout: float = 0.0,
-            classifier_dropout: float = 0.0,
-            max_position_embeddings: int = 1024,
-            init_std: float = 0.02,
-            is_encoder_decoder: bool = True,
-            scale_embedding:
-        bool = False,  #TODO 将scale修改应用到modeling和test_modeling
-            **kwargs):
+        self,
+        vocab_size: int = 50265,
+        bos_token_id: int = 0,
+        pad_token_id: int = 1,
+        eos_token_id: int = 2,
+        decoder_start_token_id: int = 2,
+        forced_bos_token_id: int = 250004,
+        forced_eos_token_id: int = 2,
+        d_model: int = 768,
+        encoder_layers: int = 12,
+        decoder_layers: int = 12,
+        encoder_attention_heads: int = 16,
+        decoder_attention_heads: int = 16,
+        encoder_ffn_dim: int = 4096,
+        decoder_ffn_dim: int = 4096,
+        use_cache: bool = True,
+        dropout: float = 0.1,
+        activation_function: str = "gelu",
+        attention_dropout: float = 0.0,
+        activation_dropout: float = 0.0,
+        classifier_dropout: float = 0.0,
+        max_position_embeddings: int = 1024,
+        init_std: float = 0.02,
+        is_encoder_decoder: bool = True,
+        scale_embedding: bool = True,
+        **kwargs
+    ):
         super().__init__(
             pad_token_id=pad_token_id,
             bos_token_id=bos_token_id,
@@ -316,4 +310,9 @@ class MBartConfig(PretrainedConfig):
         self.classifier_dropout = classifier_dropout
         self.use_cache = use_cache
         self.num_hidden_layers = encoder_layers
-        self.scale_embedding = scale_embedding  # scale factor will be sqrt(d_model) if True
+
+        if not scale_embedding:
+            logger.warning(
+                "scale_embedding will be forced to True sine only support embedding with scaling for MBartModel."
+            )
+        self.scale_embedding = True  # scale factor will be sqrt(d_model) if True

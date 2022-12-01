@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import paddle
 
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
@@ -89,21 +90,37 @@ class GenerationTesterMixin:
 
         if diversity_rate is not None:
             process_kwargs["diversity_rate"] = diversity_rate
-        logits_processor = LogitsProcessorList(([
-            HammingDiversityLogitsProcessor(
-                diversity_rate, num_beams=2, num_beam_groups=2),
-        ] if diversity_rate is not None else []) + ([
-            MinLengthLogitsProcessor(process_kwargs["min_length"] +
-                                     plus_length, eos_token_id),
-        ] if eos_token_id is not None else []) + ([
-            ForcedBOSTokenLogitsProcessor(forced_bos_token_id),
-        ] if forced_bos_token_id is not None else []) + ([
-            ForcedEOSTokenLogitsProcessor(max_length +
-                                          plus_length, forced_eos_token_id)
-        ] if forced_eos_token_id is not None else []) + [
-            RepetitionPenaltyLogitsProcessor(
-                process_kwargs["repetition_penalty"]),
-        ])
+        logits_processor = LogitsProcessorList(
+            (
+                [
+                    HammingDiversityLogitsProcessor(diversity_rate, num_beams=2, num_beam_groups=2),
+                ]
+                if diversity_rate is not None
+                else []
+            )
+            + (
+                [
+                    MinLengthLogitsProcessor(process_kwargs["min_length"] + plus_length, eos_token_id),
+                ]
+                if eos_token_id is not None
+                else []
+            )
+            + (
+                [
+                    ForcedBOSTokenLogitsProcessor(forced_bos_token_id),
+                ]
+                if forced_bos_token_id is not None
+                else []
+            )
+            + (
+                [ForcedEOSTokenLogitsProcessor(max_length + plus_length, forced_eos_token_id)]
+                if forced_eos_token_id is not None
+                else []
+            )
+            + [
+                RepetitionPenaltyLogitsProcessor(process_kwargs["repetition_penalty"]),
+            ]
+        )
         return process_kwargs, logits_processor
 
     @staticmethod
@@ -188,7 +205,8 @@ class GenerationTesterMixin:
             forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
             forced_eos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None),
             max_length=max_length,
-            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1])
+            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+        )
 
         kwargs = {}
 
@@ -384,8 +402,7 @@ class GenerationTesterMixin:
     def test_greedy_generate(self):
         # check `generate()` and `greedy_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
-            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
-            )
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
             paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -399,8 +416,7 @@ class GenerationTesterMixin:
     def test_sample_generate(self):
 
         for model_class in self.all_generative_model_classes.keys():
-            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
-            )
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
             paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -417,8 +433,8 @@ class GenerationTesterMixin:
                     getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None
                 ),
                 max_length=max_length,
-                plus_length=1
-                if self.is_encoder_decoder else input_ids.shape[-1])
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+            )
             logits_warper = self._get_warper_and_kwargs()
 
             # check `generate()` and `sample()` are equal
@@ -449,8 +465,7 @@ class GenerationTesterMixin:
 
     def test_beam_search_generate(self):
         for model_class in self.all_generative_model_classes.keys():
-            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config(
-            )
+            config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
             paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -462,8 +477,8 @@ class GenerationTesterMixin:
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
-                plus_length=1
-                if self.is_encoder_decoder else input_ids.shape[-1])
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+            )
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0], max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1]
             )
@@ -537,8 +552,8 @@ class GenerationTesterMixin:
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
                 diversity_rate=2.0,
-                plus_length=1
-                if self.is_encoder_decoder else input_ids.shape[-1])
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
+            )
 
             # check `generate()` and `group_beam_search()` are equal
             beam_kwargs, beam_scorer = self._get_diverse_beam_scorer_and_kwargs(

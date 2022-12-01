@@ -15,13 +15,12 @@
 from __future__ import annotations
 
 from typing import Dict
-from ...utils.log import logger
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
-__all__ = [
-    "BART_PRETRAINED_INIT_CONFIGURATION", "BartConfig",
-    "BART_PRETRAINED_RESOURCE_FILES_MAP"
-]
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
+
+from ...utils.log import logger
+
+__all__ = ["BART_PRETRAINED_INIT_CONFIGURATION", "BartConfig", "BART_PRETRAINED_RESOURCE_FILES_MAP"]
 
 BART_PRETRAINED_INIT_CONFIGURATION = {
     "bart-base": {
@@ -65,15 +64,13 @@ BART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.1,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
-    }
+    },
 }
 
 BART_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "bart-base":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
-        "bart-large":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams"
+        "bart-base": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base.pdparams",
+        "bart-large": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large.pdparams",
     }
 }
 
@@ -143,33 +140,33 @@ class BartConfig(PretrainedConfig):
     pretrained_init_configuration = BART_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
-            self,
-            vocab_size: int = 50265,
-            max_position_embeddings: int = 1024,
-            encoder_layers: int = 6,
-            encoder_ffn_dim: int = 3072,
-            encoder_attention_heads: int = 12,
-            decoder_layers: int = 6,
-            decoder_ffn_dim: int = 3072,
-            decoder_attention_heads: int = 12,
-            activation_function: str = "gelu",
-            d_model: int = 768,
-            dropout: float = 0.1,
-            attention_dropout: float = 0.1,
-            activation_dropout: float = 0.1,
-            init_std: float = 0.02,
-            classifier_dropout: float = 0.1,
-            use_cache: bool = True,
-            num_labels: int = 3,
-            pad_token_id: int = 1,
-            bos_token_id: int = 0,
-            eos_token_id: int = 2,
-            is_encoder_decoder: bool = True,
-            decoder_start_token_id: int = 2,
-            forced_eos_token_id: int = 2,
-            scale_embedding:
-        bool = False,  #TODO 将scale修改应用到modeling和test_modeling
-            **kwargs):
+        self,
+        vocab_size: int = 50265,
+        max_position_embeddings: int = 1024,
+        encoder_layers: int = 6,
+        encoder_ffn_dim: int = 3072,
+        encoder_attention_heads: int = 12,
+        decoder_layers: int = 6,
+        decoder_ffn_dim: int = 3072,
+        decoder_attention_heads: int = 12,
+        activation_function: str = "gelu",
+        d_model: int = 768,
+        dropout: float = 0.1,
+        attention_dropout: float = 0.1,
+        activation_dropout: float = 0.1,
+        init_std: float = 0.02,
+        classifier_dropout: float = 0.1,
+        use_cache: bool = True,
+        num_labels: int = 3,
+        pad_token_id: int = 1,
+        bos_token_id: int = 0,
+        eos_token_id: int = 2,
+        is_encoder_decoder: bool = True,
+        decoder_start_token_id: int = 2,
+        forced_eos_token_id: int = 2,
+        scale_embedding: bool = False,
+        **kwargs
+    ):
         super().__init__(
             num_labels=num_labels,
             pad_token_id=pad_token_id,
@@ -197,11 +194,14 @@ class BartConfig(PretrainedConfig):
         self.classifier_dropout = classifier_dropout
         self.use_cache = use_cache
         self.num_hidden_layers = encoder_layers
-        self.scale_embedding = scale_embedding
+        if scale_embedding:
+            logger.warning(
+                "scale_embedding will be forced to False sine only support embedding without scaling for BartModel."
+            )
+        self.scale_embedding = False
 
         # ensure backward compatibility for BART CNN models
-        if self.forced_bos_token_id is None and kwargs.get(
-                "force_bos_token_to_be_generated", False):
+        if self.forced_bos_token_id is None and kwargs.get("force_bos_token_to_be_generated", False):
             self.forced_bos_token_id = self.bos_token_id
             logger.warning(
                 f"Please make sure the config includes `forced_bos_token_id={self.bos_token_id}` in future versions. "
