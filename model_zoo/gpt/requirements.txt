@@ -7,3 +7,4 @@ paddlepaddle-gpu>=2.2rc
 pybind11
 lac
 zstandard
+pyyaml

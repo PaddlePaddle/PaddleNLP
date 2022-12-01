@@ -14,10 +14,11 @@
 
 import os, sys
 import json
+import yaml
 
-CURRENT_DIR = os.path.dirname(__file__)
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, CURRENT_DIR)
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
 
 def init_argv(config_file: str = None, slow_test: bool = False):
@@ -38,7 +39,7 @@ def init_argv(config_file: str = None, slow_test: bool = False):
     config_file = os.path.join(CURRENT_DIR, config_file)
 
     with open(config_file, 'r', encoding='utf-8') as f:
-        config = json.load(f)
+        config = yaml.safe_load(f)
 
     argv = ['test.py']
     for key, value in config.items():
@@ -59,7 +60,7 @@ def init_argv(config_file: str = None, slow_test: bool = False):
 
 
 def test_msra_ner():
-    init_argv("./configs/msra_ner.json", slow_test=True)
+    init_argv("./configs/msra_ner.yaml", slow_test=True)
     from run_msra_ner import do_train
     do_train()
 
