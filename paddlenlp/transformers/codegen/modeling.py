@@ -230,7 +230,7 @@ class CodeGenMLP(Layer):
 
 
 class CodeGenBlock(Layer):
-    def __init__(self, config):
+    def __init__(self, config: CodeGenConfig):
         super().__init__()
         inner_dim = config.n_inner if config.n_inner is not None else 4 * config.n_embd
         self.ln_1 = nn.LayerNorm(config.embed_dim, epsilon=config.layer_norm_epsilon)
@@ -511,7 +511,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     """
     _keys_to_ignore_on_load_missing = [r"h\.\d+\.attn\.masked_bias", r"h\.\d+\.attn\.bias"]
 
-    def __init__(self, config):
+    def __init__(self, config: CodeGenConfig):
         super().__init__(config)
         self.transformer = CodeGenModel(config)
         self.lm_head = nn.Linear(config.n_embd, config.vocab_size)
