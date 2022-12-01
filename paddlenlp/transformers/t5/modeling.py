@@ -167,7 +167,7 @@ class T5LayerFF(nn.Layer):
 
 
 class T5Attention(nn.Layer):
-    def __init__(self, config, has_relative_attention_bias=False):
+    def __init__(self, config: T5Config, has_relative_attention_bias: bool = False):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.has_relative_attention_bias = has_relative_attention_bias
@@ -370,7 +370,7 @@ class T5Attention(nn.Layer):
 
 
 class T5LayerSelfAttention(nn.Layer):
-    def __init__(self, config, has_relative_attention_bias=False):
+    def __init__(self, config: T5Config, has_relative_attention_bias: bool = False):
         super().__init__()
         self.SelfAttention = T5Attention(config, has_relative_attention_bias=has_relative_attention_bias)
         self.layer_norm = T5LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
@@ -434,7 +434,7 @@ class T5LayerCrossAttention(nn.Layer):
 
 
 class T5Block(nn.Layer):
-    def __init__(self, config, has_relative_attention_bias=False):
+    def __init__(self, config: T5Config, has_relative_attention_bias: bool = False):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.layer = nn.LayerList()
@@ -690,7 +690,7 @@ class T5PretrainedModel(PretrainedModel):
 
 
 class T5Stack(nn.Layer):
-    def __init__(self, config, embed_tokens=None):
+    def __init__(self, config: T5Config, embed_tokens: nn.Embedding = None):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.embed_tokens = embed_tokens
