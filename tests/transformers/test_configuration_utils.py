@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-from typing import Optional, Union, Dict
-from paddlenlp.transformers.configuration_utils import attribute_map, parse_config, PretrainedConfig
+from typing import Dict, Optional
+
+from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
 
 
 class FakeSimplePretrainedModelConfig(PretrainedConfig):
-    """simple fake Pretrained Model Config
-    """
+    """simple fake Pretrained Model Config"""
 
     def __init__(self, a=0, b=1, c=2):
         self.a = a
@@ -29,8 +28,8 @@ class FakeSimplePretrainedModelConfig(PretrainedConfig):
 
 
 class FakePretrainedModelConfig(PretrainedConfig):
-    """Fake Pretrained Model which is similar with actual situation
-    """
+    """Fake Pretrained Model which is similar with actual situation"""
+
     attribute_map: Dict[str, str] = {
         "num_classes": "num_labels",
     }
@@ -42,20 +41,8 @@ class FakePretrainedModelConfig(PretrainedConfig):
 
 
 class FakeLayer:
-
-    def __init__(self,
-                 config: Optional[FakeSimplePretrainedModelConfig] = None,
-                 *args,
-                 **kwargs):
+    def __init__(self, config: Optional[FakeSimplePretrainedModelConfig] = None, *args, **kwargs):
         super(FakeLayer, self).__init__()
-
-        config: FakeSimplePretrainedModelConfig = parse_config(
-            config_or_model=config,
-            config_class=FakeSimplePretrainedModelConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=["a", "b", "c"],
-        )
 
         self.a = config.a
         self.b = config.b
@@ -63,12 +50,7 @@ class FakeLayer:
 
 
 class FakeModel(PretrainedModel):
-
-    def __init__(self,
-                 config_or_model: Optional[Union[
-                     FakeLayer, FakeSimplePretrainedModelConfig]] = None,
-                 *args,
-                 **kwargs):
+    def __init__(self, config: FakeSimplePretrainedModelConfig):
         """fake `__init__`, the source of parameters is:
 
             def __init__(self, model, a, b):
@@ -81,21 +63,12 @@ class FakeModel(PretrainedModel):
         """
         super().__init__()
 
-        config, model = parse_config(
-            config_or_model=config_or_model,
-            config_class=FakeSimplePretrainedModelConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=["a", ("b", 2)],
-        )
-
-        self.model: FakeLayer = model
+        self.model: FakeLayer = FakeLayer(config)
         self.a = config.a
         self.b = config.b
 
 
-class ConfigurationUtilsTest(unittest.TestCase):
-
+class ConfigurationUtilsTest:
     def test_parse_config_with_single_config(self):
         # 1. single config
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)

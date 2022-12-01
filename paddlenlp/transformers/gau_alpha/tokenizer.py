@@ -20,9 +20,7 @@ from ..tokenizer_utils import PretrainedTokenizer
 
 __all__ = ["GAUAlphaTokenizer"]
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "chinese_GAU-alpha-char_L-24_H-768": 512
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"chinese_GAU-alpha-char_L-24_H-768": 512}
 
 
 class GAUAlphaTokenizer(PretrainedTokenizer):
@@ -79,38 +77,36 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "chinese_GAU-alpha-char_L-24_H-768":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gau_alpha/chinese_GAU-alpha-char_L-24_H-768/vocab.txt",
+            "chinese_GAU-alpha-char_L-24_H-768": "https://bj.bcebos.com/paddlenlp/models/transformers/gau_alpha/chinese_GAU-alpha-char_L-24_H-768/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "chinese_GAU-alpha-char_L-24_H-768": {
-            "do_lower_case": True
-        },
+        "chinese_GAU-alpha-char_L-24_H-768": {"do_lower_case": True},
     }
     padding_side = "right"
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = GAUAlphaTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = GAUAlphaTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -129,7 +125,7 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             list: A list of string representing converted tokens.
         """
@@ -155,7 +151,7 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import GAUAlphaTokenizer
-                
+
                 tokenizer = GAUAlphaTokenizer.from_pretrained('chinese_GAU-alpha-char_L-24_H-768')
                 tokens = tokenizer.tokenize('欢迎使用百度飞桨!')
                 '''
@@ -184,15 +180,13 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         A GAUAlpha sequence has the following format:
 
         - single sequence:      ``[CLS] X [SEP]``
@@ -213,9 +207,7 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -236,14 +228,11 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         A GAUAlpha sequence pair mask has the following format:
         ::
@@ -266,13 +255,9 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -282,7 +267,7 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
                 A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs. Defaults to None.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
@@ -295,13 +280,8 @@ class GAUAlphaTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]

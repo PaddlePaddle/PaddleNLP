@@ -22,9 +22,13 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 __all__ = [
-    'RemBertModel', 'RemBertForMaskedLM', 'RemBertForQuestionAnswering',
-    'RemBertForSequenceClassification', 'RemBertForMultipleChoice',
-    'RembertPretrainedModel', 'RemBertForTokenClassification'
+    "RemBertModel",
+    "RemBertForMaskedLM",
+    "RemBertForQuestionAnswering",
+    "RemBertForSequenceClassification",
+    "RemBertForMultipleChoice",
+    "RembertPretrainedModel",
+    "RemBertForTokenClassification",
 ]
 
 
@@ -32,8 +36,7 @@ def get_activation(activation_string):
     if activation_string in ACT2FN:
         return ACT2FN[activation_string]
     else:
-        raise KeyError("function {} not found in ACT2FN mapping {}".format(
-            activation_string, list(ACT2FN.keys())))
+        raise KeyError("function {} not found in ACT2FN mapping {}".format(activation_string, list(ACT2FN.keys())))
 
 
 def mish(x):
@@ -84,28 +87,30 @@ class RembertPretrainedModel(PretrainedModel):
             "pad_token_id": 0,
             "type_vocab_size": 2,
             "vocab_size": 250300,
-            "layer_norm_eps": 1e-12
+            "layer_norm_eps": 1e-12,
         }
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "rembert":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rembert/model_state.pdparams",
+            "rembert": "https://bj.bcebos.com/paddlenlp/models/transformers/rembert/model_state.pdparams",
         }
     }
     base_model_prefix = "rembert"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
             layer.weight.set_value(
-                paddle.tensor.normal(mean=0.0,
-                                     std=self.initializer_range if hasattr(
-                                         self, "initializer_range") else
-                                     self.rembert.config["initializer_range"],
-                                     shape=layer.weight.shape))
+                paddle.tensor.normal(
+                    mean=0.0,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range")
+                    else self.rembert.config["initializer_range"],
+                    shape=layer.weight.shape,
+                )
+            )
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -113,29 +118,26 @@ class RembertPretrainedModel(PretrainedModel):
 class RemBertEmbeddings(nn.Layer):
     """Construct the embeddings from word, position and token_type embeddings."""
 
-    def __init__(self,
-                 pad_token_id=0,
-                 vocab_size=250300,
-                 input_embedding_size=256,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 hidden_dropout_prob=0,
-                 layer_norm_eps=1e-12):
+    def __init__(
+        self,
+        pad_token_id=0,
+        vocab_size=250300,
+        input_embedding_size=256,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        hidden_dropout_prob=0,
+        layer_norm_eps=1e-12,
+    ):
         super(RemBertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, input_embedding_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                input_embedding_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size,
-                                                  input_embedding_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, input_embedding_size)
+        self.token_type_embeddings = nn.Embedding(type_vocab_size, input_embedding_size)
 
-        self.layer_norm = nn.LayerNorm(input_embedding_size,
-                                       epsilon=layer_norm_eps)
+        self.layer_norm = nn.LayerNorm(input_embedding_size, epsilon=layer_norm_eps)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
-        self.register_buffer(
-            "position_ids",
-            paddle.arange(end=max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(end=max_position_embeddings).expand((1, -1)))
 
     def forward(
         self,
@@ -151,7 +153,7 @@ class RemBertEmbeddings(nn.Layer):
             position_ids = self.position_ids[:, :seq_length]
 
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype='int64')
+            token_type_ids = paddle.zeros(input_shape, dtype="int64")
 
         inputs_embeds = self.word_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -165,7 +167,6 @@ class RemBertEmbeddings(nn.Layer):
 
 
 class RemBertPooler(nn.Layer):
-
     def __init__(self, hidden_size):
         super(RemBertPooler, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -181,9 +182,7 @@ class RemBertPooler(nn.Layer):
 
 
 class RemBertSelfAttention(nn.Layer):
-
-    def __init__(self, hidden_size, num_attention_heads,
-                 attention_probs_dropout_prob):
+    def __init__(self, hidden_size, num_attention_heads, attention_probs_dropout_prob):
         super(RemBertSelfAttention, self).__init__()
         self.num_attention_heads = num_attention_heads
         self.attention_head_size = int(hidden_size / num_attention_heads)
@@ -196,9 +195,7 @@ class RemBertSelfAttention(nn.Layer):
         self.dropout = nn.Dropout(attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + [
-            self.num_attention_heads, self.attention_head_size
-        ]
+        new_x_shape = x.shape[:-1] + [self.num_attention_heads, self.attention_head_size]
         x = x.reshape(new_x_shape)
         return x.transpose((0, 2, 1, 3))
 
@@ -211,11 +208,9 @@ class RemBertSelfAttention(nn.Layer):
         query_layer = self.transpose_for_scores(mixed_query_layer)
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = paddle.matmul(query_layer,
-                                         key_layer.transpose((0, 1, 3, 2)))
+        attention_scores = paddle.matmul(query_layer, key_layer.transpose((0, 1, 3, 2)))
 
-        attention_scores = attention_scores / math.sqrt(
-            self.attention_head_size)
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
             # Apply the attention mask is (precomputed for all layers in RemBertModel forward() function)
             attention_scores = attention_scores + attention_mask
@@ -230,9 +225,7 @@ class RemBertSelfAttention(nn.Layer):
         context_layer = paddle.matmul(attention_probs, value_layer)
 
         context_layer = context_layer.transpose((0, 2, 1, 3))
-        new_context_layer_shape = context_layer.shape[:-2] + [
-            self.all_head_size
-        ]
+        new_context_layer_shape = context_layer.shape[:-2] + [self.all_head_size]
         context_layer = context_layer.reshape(new_context_layer_shape)
 
         outputs = (context_layer, attention_probs)
@@ -240,7 +233,6 @@ class RemBertSelfAttention(nn.Layer):
 
 
 class RemBertSelfOutput(nn.Layer):
-
     def __init__(self, hidden_size, hidden_dropout_prob, layer_norm_eps=1e-12):
         super(RemBertSelfOutput, self).__init__()
         self.dense = nn.Linear(hidden_size, hidden_size)
@@ -255,18 +247,18 @@ class RemBertSelfOutput(nn.Layer):
 
 
 class RemBertAttention(nn.Layer):
-
-    def __init__(self, hidden_size, num_attention_heads,
-                 attention_probs_dropout_prob, hidden_dropout_prob,
-                 layer_norm_eps):
+    def __init__(
+        self, hidden_size, num_attention_heads, attention_probs_dropout_prob, hidden_dropout_prob, layer_norm_eps
+    ):
         super(RemBertAttention, self).__init__()
         self.self = RemBertSelfAttention(
             hidden_size=hidden_size,
             num_attention_heads=num_attention_heads,
-            attention_probs_dropout_prob=attention_probs_dropout_prob)
-        self.output = RemBertSelfOutput(hidden_size=hidden_size,
-                                        hidden_dropout_prob=hidden_dropout_prob,
-                                        layer_norm_eps=layer_norm_eps)
+            attention_probs_dropout_prob=attention_probs_dropout_prob,
+        )
+        self.output = RemBertSelfOutput(
+            hidden_size=hidden_size, hidden_dropout_prob=hidden_dropout_prob, layer_norm_eps=layer_norm_eps
+        )
 
     def forward(
         self,
@@ -279,7 +271,6 @@ class RemBertAttention(nn.Layer):
 
 
 class RemBertIntermediate(nn.Layer):
-
     def __init__(self, hidden_size, intermediate_size, hidden_act):
         super(RemBertIntermediate, self).__init__()
         self.dense = nn.Linear(hidden_size, intermediate_size)
@@ -292,12 +283,7 @@ class RemBertIntermediate(nn.Layer):
 
 
 class RemBertOutput(nn.Layer):
-
-    def __init__(self,
-                 hidden_size,
-                 hidden_dropout_prob,
-                 intermediate_size,
-                 layer_norm_eps=1e-12):
+    def __init__(self, hidden_size, hidden_dropout_prob, intermediate_size, layer_norm_eps=1e-12):
         super(RemBertOutput, self).__init__()
         self.dense = nn.Linear(intermediate_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
@@ -311,26 +297,34 @@ class RemBertOutput(nn.Layer):
 
 
 class RemBertLayer(nn.Layer):
-
-    def __init__(self, hidden_size, num_attention_heads,
-                 attention_probs_dropout_prob, hidden_dropout_prob, hidden_act,
-                 intermediate_size, layer_norm_eps):
+    def __init__(
+        self,
+        hidden_size,
+        num_attention_heads,
+        attention_probs_dropout_prob,
+        hidden_dropout_prob,
+        hidden_act,
+        intermediate_size,
+        layer_norm_eps,
+    ):
         super(RemBertLayer, self).__init__()
         self.attention = RemBertAttention(
             hidden_size=hidden_size,
             num_attention_heads=num_attention_heads,
             attention_probs_dropout_prob=attention_probs_dropout_prob,
             hidden_dropout_prob=hidden_dropout_prob,
-            layer_norm_eps=layer_norm_eps)
+            layer_norm_eps=layer_norm_eps,
+        )
 
         self.intermediate = RemBertIntermediate(
+            hidden_size=hidden_size, intermediate_size=intermediate_size, hidden_act=hidden_act
+        )
+        self.output = RemBertOutput(
             hidden_size=hidden_size,
+            hidden_dropout_prob=hidden_dropout_prob,
             intermediate_size=intermediate_size,
-            hidden_act=hidden_act)
-        self.output = RemBertOutput(hidden_size=hidden_size,
-                                    hidden_dropout_prob=hidden_dropout_prob,
-                                    intermediate_size=intermediate_size,
-                                    layer_norm_eps=layer_norm_eps)
+            layer_norm_eps=layer_norm_eps,
+        )
 
     def forward(self, hidden_states, attention_mask=None):
         self_attention_outputs = self.attention(
@@ -349,24 +343,34 @@ class RemBertLayer(nn.Layer):
 
 
 class RemBertEncoder(nn.Layer):
-
-    def __init__(self, input_embedding_size, hidden_size, hidden_act,
-                 num_hidden_layers, num_attention_heads,
-                 attention_probs_dropout_prob, hidden_dropout_prob,
-                 intermediate_size, layer_norm_eps):
+    def __init__(
+        self,
+        input_embedding_size,
+        hidden_size,
+        hidden_act,
+        num_hidden_layers,
+        num_attention_heads,
+        attention_probs_dropout_prob,
+        hidden_dropout_prob,
+        intermediate_size,
+        layer_norm_eps,
+    ):
         super(RemBertEncoder, self).__init__()
-        self.embedding_hidden_mapping_in = nn.Linear(input_embedding_size,
-                                                     hidden_size)
-        self.layer = nn.LayerList([
-            RemBertLayer(
-                hidden_size=hidden_size,
-                num_attention_heads=num_attention_heads,
-                attention_probs_dropout_prob=attention_probs_dropout_prob,
-                hidden_dropout_prob=hidden_dropout_prob,
-                intermediate_size=intermediate_size,
-                layer_norm_eps=layer_norm_eps,
-                hidden_act=hidden_act) for _ in range(num_hidden_layers)
-        ])
+        self.embedding_hidden_mapping_in = nn.Linear(input_embedding_size, hidden_size)
+        self.layer = nn.LayerList(
+            [
+                RemBertLayer(
+                    hidden_size=hidden_size,
+                    num_attention_heads=num_attention_heads,
+                    attention_probs_dropout_prob=attention_probs_dropout_prob,
+                    hidden_dropout_prob=hidden_dropout_prob,
+                    intermediate_size=intermediate_size,
+                    layer_norm_eps=layer_norm_eps,
+                    hidden_act=hidden_act,
+                )
+                for _ in range(num_hidden_layers)
+            ]
+        )
 
     def forward(self, hidden_states, attention_mask=None):
         hidden_states = self.embedding_hidden_mapping_in(hidden_states)
@@ -437,23 +441,25 @@ class RemBertModel(RembertPretrainedModel):
         pad_token_id (int, optional):
             The index of padding token in the token vocabulary.
             Defaults to `0`.
-        """
+    """
 
-    def __init__(self,
-                 vocab_size,
-                 input_embedding_size=256,
-                 hidden_size=1152,
-                 num_hidden_layers=32,
-                 num_attention_heads=18,
-                 intermediate_size=4608,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0,
-                 attention_probs_dropout_prob=0,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 layer_norm_eps=1e-12):
+    def __init__(
+        self,
+        vocab_size,
+        input_embedding_size=256,
+        hidden_size=1152,
+        num_hidden_layers=32,
+        num_attention_heads=18,
+        intermediate_size=4608,
+        hidden_act="gelu",
+        hidden_dropout_prob=0,
+        attention_probs_dropout_prob=0,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        pad_token_id=0,
+        layer_norm_eps=1e-12,
+    ):
         super(RemBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.num_hidden_layers = num_hidden_layers
@@ -466,7 +472,8 @@ class RemBertModel(RembertPretrainedModel):
             input_embedding_size=input_embedding_size,
             max_position_embeddings=max_position_embeddings,
             type_vocab_size=type_vocab_size,
-            hidden_dropout_prob=hidden_dropout_prob)
+            hidden_dropout_prob=hidden_dropout_prob,
+        )
         self.encoder = RemBertEncoder(
             input_embedding_size=input_embedding_size,
             hidden_size=hidden_size,
@@ -476,7 +483,8 @@ class RemBertModel(RembertPretrainedModel):
             hidden_dropout_prob=hidden_dropout_prob,
             intermediate_size=intermediate_size,
             hidden_act=hidden_act,
-            layer_norm_eps=layer_norm_eps)
+            layer_norm_eps=layer_norm_eps,
+        )
 
         self.pooler = RemBertPooler(hidden_size)
 
@@ -488,11 +496,7 @@ class RemBertModel(RembertPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The RemBertModel forward method, overrides the `__call__()` special method.
 
@@ -556,19 +560,18 @@ class RemBertModel(RembertPretrainedModel):
         input_shape = input_ids.shape
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+            )
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
                 attention_mask = attention_mask.unsqueeze(axis=[1, 2])
         if token_type_ids is None:
-            token_type_ids = paddle.zeros(input_shape, dtype='int64')
+            token_type_ids = paddle.zeros(input_shape, dtype="int64")
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids
+        )
         encoder_outputs = self.encoder(
             embedding_output,
             attention_mask=attention_mask,
@@ -594,15 +597,11 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
     def __init__(self, rembert, num_classes):
         super(RemBertForSequenceClassification, self).__init__()
         self.rembert = rembert
-        self.dense = nn.Linear(self.rembert.config['hidden_size'], num_classes)
-        self.dropout = nn.Dropout(self.rembert.config['hidden_dropout_prob'])
+        self.dense = nn.Linear(self.rembert.config["hidden_size"], num_classes)
+        self.dropout = nn.Dropout(self.rembert.config["hidden_dropout_prob"])
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The RemBertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -635,10 +634,12 @@ class RemBertForSequenceClassification(RembertPretrainedModel):
                 outputs = model(**inputs)
         """
 
-        pool_output = self.rembert(input_ids=input_ids,
-                                   position_ids=position_ids,
-                                   attention_mask=attention_mask,
-                                   token_type_ids=token_type_ids)[1]
+        pool_output = self.rembert(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+        )[1]
 
         pool_output = self.dropout(pool_output)
         logits = self.dense(pool_output)
@@ -658,7 +659,7 @@ class RemBertForQuestionAnswering(RembertPretrainedModel):
     def __init__(self, rembert):
         super(RemBertForQuestionAnswering, self).__init__()
         self.rembert = rembert
-        self.qa_outputs = nn.Linear(self.rembert.config['hidden_size'], 2)
+        self.qa_outputs = nn.Linear(self.rembert.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
     def forward(
@@ -712,17 +713,14 @@ class RemBertForQuestionAnswering(RembertPretrainedModel):
                 end_logits = outputs[1]
         """
 
-        outputs = self.rembert(input_ids,
-                               attention_mask=attention_mask,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids)
+        outputs = self.rembert(
+            input_ids, attention_mask=attention_mask, token_type_ids=token_type_ids, position_ids=position_ids
+        )
 
         sequence_output = outputs[0]
 
         logits = self.qa_outputs(sequence_output)
-        start_logits, end_logits = paddle.split(logits,
-                                                num_or_sections=2,
-                                                axis=-1)
+        start_logits, end_logits = paddle.split(logits, num_or_sections=2, axis=-1)
 
         return start_logits, end_logits
 
@@ -732,11 +730,7 @@ class RemBertLMPredictionHead(nn.Layer):
     RemBert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, hidden_size, vocab_size, activation, embedding_weights=None):
         super(RemBertLMPredictionHead, self).__init__()
         self.transform = nn.Linear(hidden_size, hidden_size)
         self.activation = get_activation(activation)
@@ -745,10 +739,8 @@ class RemBertLMPredictionHead(nn.Layer):
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
-            hidden_states = paddle.reshape(hidden_states,
-                                           [-1, hidden_states.shape[-1]])
-            hidden_states = paddle.tensor.gather(hidden_states,
-                                                 masked_positions)
+            hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states, masked_positions)
         # gather masked tokens might be more quick
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
@@ -758,14 +750,11 @@ class RemBertLMPredictionHead(nn.Layer):
 
 
 class RemBertOnlyMLMHead(nn.Layer):
-
     def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
         super(RemBertOnlyMLMHead, self).__init__()
         self.predictions = RemBertLMPredictionHead(
-            hidden_size=hidden_size,
-            vocab_size=vocab_size,
-            activation=activation,
-            embedding_weights=embedding_weights)
+            hidden_size=hidden_size, vocab_size=vocab_size, activation=activation, embedding_weights=embedding_weights
+        )
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -789,15 +778,12 @@ class RemBertForMaskedLM(RembertPretrainedModel):
             self.rembert.config["hidden_size"],
             self.rembert.config["vocab_size"],
             self.rembert.config["hidden_act"],
-            embedding_weights=self.rembert.embeddings.word_embeddings.weight)
+            embedding_weights=self.rembert.embeddings.word_embeddings.weight,
+        )
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
 
         Args:
@@ -829,10 +815,9 @@ class RemBertForMaskedLM(RembertPretrainedModel):
                 logits = model(**inputs)
         """
 
-        outputs = self.rembert(input_ids,
-                               token_type_ids=token_type_ids,
-                               position_ids=position_ids,
-                               attention_mask=attention_mask)
+        outputs = self.rembert(
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        )
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
         return prediction_scores
@@ -855,15 +840,10 @@ class RemBertForTokenClassification(RembertPretrainedModel):
         self.num_classes = num_classes
         self.rembert = rembert  # allow rembert to be config
         self.dropout = nn.Dropout(self.rembert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.rembert.config["hidden_size"],
-                                    num_classes)
+        self.classifier = nn.Linear(self.rembert.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The RemBertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -897,10 +877,9 @@ class RemBertForTokenClassification(RembertPretrainedModel):
                 logits = model(**inputs)
                 print(logits.shape)
         """
-        sequence_output, _ = self.rembert(input_ids,
-                                          token_type_ids=token_type_ids,
-                                          position_ids=position_ids,
-                                          attention_mask=attention_mask)
+        sequence_output, _ = self.rembert(
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        )
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -927,11 +906,7 @@ class RemBertForMultipleChoice(RembertPretrainedModel):
         self.classifier = nn.Linear(self.rembert.config["hidden_size"], 1)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -999,28 +974,22 @@ class RemBertForMultipleChoice(RembertPretrainedModel):
                 )
         """
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(
-            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if position_ids is not None:
-            position_ids = position_ids.reshape(shape=(-1,
-                                                       position_ids.shape[-1]))
+            position_ids = position_ids.reshape(shape=(-1, position_ids.shape[-1]))
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(
-                shape=(-1, token_type_ids.shape[-1]))
+            token_type_ids = token_type_ids.reshape(shape=(-1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
-            attention_mask = attention_mask.reshape(
-                shape=(-1, attention_mask.shape[-1]))
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
 
-        _, pooled_output = self.rembert(input_ids,
-                                        token_type_ids=token_type_ids,
-                                        position_ids=position_ids,
-                                        attention_mask=attention_mask)
+        _, pooled_output = self.rembert(
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        )
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
-        reshaped_logits = logits.reshape(
-            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+        reshaped_logits = logits.reshape(shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
         return reshaped_logits

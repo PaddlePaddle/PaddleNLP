@@ -95,11 +95,11 @@ usage = r"""
 
 class UIETask(Task):
     """
-    Universal Information Extraction Task. 
+    Universal Information Extraction Task.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     resource_files_names = {
@@ -107,273 +107,264 @@ class UIETask(Task):
         "model_config": "model_config.json",
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
-        "tokenizer_config": "tokenizer_config.json"
+        "tokenizer_config": "tokenizer_config.json",
     }
     # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     resource_files_urls = {
         "uie-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
-                "aeca0ed2ccf003f4e9c6160363327c9b"
+                "aeca0ed2ccf003f4e9c6160363327c9b",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-                "a36c185bfc17a83b6cfef6f98b29c909"
+                "a36c185bfc17a83b6cfef6f98b29c909",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-medium": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e"
+                "15874e4e76d05bc6de64cc69717f172e",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
-                "6f1ee399398d4f218450fbbf5f212b15"
+                "6f1ee399398d4f218450fbbf5f212b15",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-mini": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
-                "f7b493aae84be3c107a6b4ada660ce2e"
+                "f7b493aae84be3c107a6b4ada660ce2e",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
-                "9229ce0a9d599de4602c97324747682f"
+                "9229ce0a9d599de4602c97324747682f",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-micro": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
-                "80baf49c7f853ab31ac67802104f3f15"
+                "80baf49c7f853ab31ac67802104f3f15",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
-                "07ef444420c3ab474f9270a1027f6da5"
+                "07ef444420c3ab474f9270a1027f6da5",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-nano": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
-                "ba934463c5cd801f46571f2588543700"
+                "ba934463c5cd801f46571f2588543700",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
-                "e3a9842edf8329ccdd0cf6039cf0a8f8"
+                "e3a9842edf8329ccdd0cf6039cf0a8f8",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
         "uie-tiny": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e"
+                "15874e4e76d05bc6de64cc69717f172e",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
-                "6f1ee399398d4f218450fbbf5f212b15"
+                "6f1ee399398d4f218450fbbf5f212b15",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-medical-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
-                "569b4bc1abf80eedcdad5a6e774d46bf"
+                "569b4bc1abf80eedcdad5a6e774d46bf",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-                "a36c185bfc17a83b6cfef6f98b29c909"
+                "a36c185bfc17a83b6cfef6f98b29c909",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-base-en": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
-                "2baf0647774d6309e4b2be726ad4283a"
+                "2baf0647774d6309e4b2be726ad4283a",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
-                "2ca9fe0eea8ff9418725d1a24fcf5c36"
+                "2ca9fe0eea8ff9418725d1a24fcf5c36",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
-                "64800d5d8528ce344256daf115d4965e"
+                "64800d5d8528ce344256daf115d4965e",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/tokenizer_config.json",
-                "59acb0ce78e79180a2491dfd8382b28c"
-            ]
+                "59acb0ce78e79180a2491dfd8382b28c",
+            ],
         },
         "uie-m-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
-                "ed96cb17b4b3283a65ad0846ada7799e"
+                "ed96cb17b4b3283a65ad0846ada7799e",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
-                "05c4b9d050e1402a891b207e36d2e501"
+                "05c4b9d050e1402a891b207e36d2e501",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
-                "e6e1091c984592e72c4460e8eb25045e"
+                "e6e1091c984592e72c4460e8eb25045e",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/tokenizer_config.json",
-                "f144bd065ea90cc26eaa91197124bdcc"
+                "f144bd065ea90cc26eaa91197124bdcc",
             ],
             "sentencepiece_model_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/sentencepiece.bpe.model",
-                "bf25eb5120ad92ef5c7d8596b5dc4046"
+                "bf25eb5120ad92ef5c7d8596b5dc4046",
             ],
         },
         "uie-m-large": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
-                "75f3989c515f05f6842e314d3f75ee27"
+                "75f3989c515f05f6842e314d3f75ee27",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
-                "22ad69618dc3f4c3fe756e3044c3056e"
+                "22ad69618dc3f4c3fe756e3044c3056e",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
-                "e6e1091c984592e72c4460e8eb25045e"
+                "e6e1091c984592e72c4460e8eb25045e",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/tokenizer_config.json",
-                "f144bd065ea90cc26eaa91197124bdcc"
+                "f144bd065ea90cc26eaa91197124bdcc",
             ],
             "sentencepiece_model_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/sentencepiece.bpe.model",
-                "bf25eb5120ad92ef5c7d8596b5dc4046"
+                "bf25eb5120ad92ef5c7d8596b5dc4046",
             ],
         },
     }
 
     def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        if model in ['uie-m-base', 'uie-m-large']:
+        if model in ["uie-m-base", "uie-m-large"]:
             self._multilingual = True
-            self.resource_files_names[
-                'sentencepiece_model_file'] = "sentencepiece.bpe.model"
+            self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
         else:
             self._multilingual = False
-            if 'sentencepiece_model_file' in self.resource_files_names.keys():
-                del self.resource_files_names['sentencepiece_model_file']
+            if "sentencepiece_model_file" in self.resource_files_names.keys():
+                del self.resource_files_names["sentencepiece_model_file"]
         self._schema_tree = None
         self.set_schema(schema)
         self._check_task_files()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
-        self._is_en = True if model in ['uie-base-en'
-                                        ] or schema_lang == 'en' else False
-        self._max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
-        self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 64
-        self._split_sentence = self.kwargs[
-            'split_sentence'] if 'split_sentence' in self.kwargs else False
-        self._position_prob = self.kwargs[
-            'position_prob'] if 'position_prob' in self.kwargs else 0.5
-        self._lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-        self._num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        self.use_fast = self.kwargs[
-            'use_fast'] if 'use_fast' in self.kwargs else False
+        self._is_en = True if model in ["uie-base-en"] or schema_lang == "en" else False
+        self._max_seq_len = self.kwargs["max_seq_len"] if "max_seq_len" in self.kwargs else 512
+        self._batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 64
+        self._split_sentence = self.kwargs["split_sentence"] if "split_sentence" in self.kwargs else False
+        self._position_prob = self.kwargs["position_prob"] if "position_prob" in self.kwargs else 0.5
+        self._lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
+        self._num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
+        self.use_fast = self.kwargs["use_fast"] if "use_fast" in self.kwargs else False
         self._construct_tokenizer()
 
     def set_schema(self, schema):
@@ -387,27 +378,15 @@ class UIETask(Task):
         """
         if self._multilingual:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='input_ids'),
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='pos_ids'),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pos_ids"),
             ]
         else:
             self._input_spec = [
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='input_ids'),
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='token_type_ids'),
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='pos_ids'),
-                paddle.static.InputSpec(shape=[None, None],
-                                        dtype="int64",
-                                        name='att_mask'),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pos_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="att_mask"),
             ]
 
     def _construct_model(self, model):
@@ -425,8 +404,7 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path,
-                                                        use_fast=self.use_fast)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, use_fast=self.use_fast)
 
     def _preprocess(self, inputs):
         """
@@ -436,7 +414,7 @@ class UIETask(Task):
         """
         inputs = self._check_input_text(inputs)
         outputs = {}
-        outputs['text'] = inputs
+        outputs["text"] = inputs
         return outputs
 
     def _single_stage_predict(self, inputs):
@@ -449,31 +427,33 @@ class UIETask(Task):
         max_predict_len = self._max_seq_len - len(max(prompts)) - 3
 
         short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len, split_sentence=self._split_sentence)
+            input_texts, max_predict_len, split_sentence=self._split_sentence
+        )
 
         short_texts_prompts = []
         for k, v in self.input_mapping.items():
             short_texts_prompts.extend([prompts[k] for i in range(len(v))])
-        short_inputs = [{
-            "text": short_input_texts[i],
-            "prompt": short_texts_prompts[i]
-        } for i in range(len(short_input_texts))]
+        short_inputs = [
+            {"text": short_input_texts[i], "prompt": short_texts_prompts[i]} for i in range(len(short_input_texts))
+        ]
 
         def read(inputs):
             for example in inputs:
-                encoded_inputs = self._tokenizer(text=[example["prompt"]],
-                                                 text_pair=[example["text"]],
-                                                 truncation=True,
-                                                 max_seq_len=self._max_seq_len,
-                                                 pad_to_max_seq_len=True,
-                                                 return_attention_mask=True,
-                                                 return_position_ids=True,
-                                                 return_offsets_mapping=True)
+                encoded_inputs = self._tokenizer(
+                    text=[example["prompt"]],
+                    text_pair=[example["text"]],
+                    truncation=True,
+                    max_seq_len=self._max_seq_len,
+                    pad_to_max_seq_len=True,
+                    return_attention_mask=True,
+                    return_position_ids=True,
+                    return_offsets_mapping=True,
+                )
                 if self._multilingual:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
                         encoded_inputs["position_ids"][0],
-                        encoded_inputs["offset_mapping"][0]
+                        encoded_inputs["offset_mapping"][0],
                     ]
                 else:
                     tokenized_output = [
@@ -481,22 +461,17 @@ class UIETask(Task):
                         encoded_inputs["token_type_ids"][0],
                         encoded_inputs["position_ids"][0],
                         encoded_inputs["attention_mask"][0],
-                        encoded_inputs["offset_mapping"][0]
+                        encoded_inputs["offset_mapping"][0],
                     ]
-                tokenized_output = [
-                    np.array(x, dtype="int64") for x in tokenized_output
-                ]
+                tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
                 yield tuple(tokenized_output)
 
         infer_ds = load_dataset(read, inputs=short_inputs, lazy=self._lazy_load)
-        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
-                                               batch_size=self._batch_size,
-                                               shuffle=False)
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
-        infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
-                                                 batch_sampler=batch_sampler,
-                                                 num_workers=self._num_workers,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            dataset=infer_ds, batch_sampler=batch_sampler, num_workers=self._num_workers, return_list=True
+        )
 
         sentence_ids = []
         probs = []
@@ -528,29 +503,22 @@ class UIETask(Task):
                         "input_ids": input_ids.numpy(),
                         "token_type_ids": token_type_ids.numpy(),
                         "pos_ids": pos_ids.numpy(),
-                        "att_mask": att_mask.numpy()
+                        "att_mask": att_mask.numpy(),
                     }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
                 start_prob = start_prob.tolist()
                 end_prob = end_prob.tolist()
 
-            start_ids_list = get_bool_ids_greater_than(
-                start_prob, limit=self._position_prob, return_prob=True)
-            end_ids_list = get_bool_ids_greater_than(end_prob,
-                                                     limit=self._position_prob,
-                                                     return_prob=True)
+            start_ids_list = get_bool_ids_greater_than(start_prob, limit=self._position_prob, return_prob=True)
+            end_ids_list = get_bool_ids_greater_than(end_prob, limit=self._position_prob, return_prob=True)
 
-            for start_ids, end_ids, offset_map in zip(start_ids_list,
-                                                      end_ids_list,
-                                                      offset_maps.tolist()):
+            for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list, offset_maps.tolist()):
                 span_set = get_span(start_ids, end_ids, with_prob=True)
                 sentence_id, prob = get_id_and_prob(span_set, offset_map)
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
-        results = self._convert_ids_to_results(short_inputs, sentence_ids,
-                                               probs)
-        results = self._auto_joiner(results, short_input_texts,
-                                    self.input_mapping)
+        results = self._convert_ids_to_results(short_inputs, sentence_ids, probs)
+        results = self._auto_joiner(results, short_input_texts, self.input_mapping)
         return results
 
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
@@ -559,8 +527,7 @@ class UIETask(Task):
         for short_result in short_results:
             if short_result == []:
                 continue
-            elif 'start' not in short_result[0].keys(
-            ) and 'end' not in short_result[0].keys():
+            elif "start" not in short_result[0].keys() and "end" not in short_result[0].keys():
                 is_cls_task = True
                 break
             else:
@@ -572,23 +539,14 @@ class UIETask(Task):
                 for v in vs:
                     if len(short_results[v]) == 0:
                         continue
-                    if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0]['text']] = [
-                            1, short_results[v][0]['probability']
-                        ]
+                    if short_results[v][0]["text"] not in cls_options.keys():
+                        cls_options[short_results[v][0]["text"]] = [1, short_results[v][0]["probability"]]
                     else:
-                        cls_options[short_results[v][0]['text']][0] += 1
-                        cls_options[short_results[v][0]['text']][
-                            1] += short_results[v][0]['probability']
+                        cls_options[short_results[v][0]["text"]][0] += 1
+                        cls_options[short_results[v][0]["text"]][1] += short_results[v][0]["probability"]
                 if len(cls_options) != 0:
-                    cls_res, cls_info = max(cls_options.items(),
-                                            key=lambda x: x[1])
-                    concat_results.append([{
-                        'text':
-                        cls_res,
-                        'probability':
-                        cls_info[1] / cls_info[0]
-                    }])
+                    cls_res, cls_info = max(cls_options.items(), key=lambda x: x[1])
+                    concat_results.append([{"text": cls_res, "probability": cls_info[1] / cls_info[0]}])
                 else:
                     concat_results.append([])
             else:
@@ -600,20 +558,19 @@ class UIETask(Task):
                         offset += len(short_inputs[v])
                     else:
                         for i in range(len(short_results[v])):
-                            if 'start' not in short_results[v][
-                                    i] or 'end' not in short_results[v][i]:
+                            if "start" not in short_results[v][i] or "end" not in short_results[v][i]:
                                 continue
-                            short_results[v][i]['start'] += offset
-                            short_results[v][i]['end'] += offset
+                            short_results[v][i]["start"] += offset
+                            short_results[v][i]["end"] += offset
                         offset += len(short_inputs[v])
                         single_results.extend(short_results[v])
                 concat_results.append(single_results)
         return concat_results
 
     def _run_model(self, inputs):
-        raw_inputs = inputs['text']
+        raw_inputs = inputs["text"]
         results = self._multi_stage_predict(raw_inputs)
-        inputs['result'] = results
+        inputs["result"] = results
         return inputs
 
     def _multi_stage_predict(self, data):
@@ -642,10 +599,7 @@ class UIETask(Task):
             idx = 0
             if not node.prefix:
                 for one_data in data:
-                    examples.append({
-                        "text": one_data,
-                        "prompt": dbc2sbc(node.name)
-                    })
+                    examples.append({"text": one_data, "prompt": dbc2sbc(node.name)})
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
@@ -656,21 +610,16 @@ class UIETask(Task):
                     else:
                         for p in pre:
                             if self._is_en:
-                                if re.search(r'\[.*?\]$', node.name):
-                                    prompt_prefix = node.name[:node.name.find(
-                                        "[", 1)].strip()
-                                    cls_options = re.search(
-                                        r'\[.*?\]$', node.name).group()
+                                if re.search(r"\[.*?\]$", node.name):
+                                    prompt_prefix = node.name[: node.name.find("[", 1)].strip()
+                                    cls_options = re.search(r"\[.*?\]$", node.name).group()
                                     # Sentiment classification of xxx [positive, negative]
                                     prompt = prompt_prefix + p + " " + cls_options
                                 else:
                                     prompt = node.name + p
                             else:
                                 prompt = p + node.name
-                            examples.append({
-                                "text": one_data,
-                                "prompt": dbc2sbc(prompt)
-                            })
+                            examples.append({"text": one_data, "prompt": dbc2sbc(prompt)})
                         input_map[cnt] = [i + idx for i in range(len(pre))]
                         idx += len(pre)
                     cnt += 1
@@ -698,26 +647,17 @@ class UIETask(Task):
                         if len(result_list[v[i]]) == 0:
                             continue
                         if "relations" not in relations[k][i].keys():
-                            relations[k][i]["relations"] = {
-                                node.name: result_list[v[i]]
-                            }
-                        elif node.name not in relations[k][i]["relations"].keys(
-                        ):
-                            relations[k][i]["relations"][
-                                node.name] = result_list[v[i]]
+                            relations[k][i]["relations"] = {node.name: result_list[v[i]]}
+                        elif node.name not in relations[k][i]["relations"].keys():
+                            relations[k][i]["relations"][node.name] = result_list[v[i]]
                         else:
-                            relations[k][i]["relations"][node.name].extend(
-                                result_list[v[i]])
+                            relations[k][i]["relations"][node.name].extend(result_list[v[i]])
                 new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
-                        if "relations" in relations[i][j].keys(
-                        ) and node.name in relations[i][j]["relations"].keys():
-                            for k in range(
-                                    len(relations[i][j]["relations"][
-                                        node.name])):
-                                new_relations[i].append(
-                                    relations[i][j]["relations"][node.name][k])
+                        if "relations" in relations[i][j].keys() and node.name in relations[i][j]["relations"].keys():
+                            for k in range(len(relations[i][j]["relations"][node.name])):
+                                new_relations[i].append(relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]
@@ -725,8 +665,7 @@ class UIETask(Task):
                 for idx in v:
                     for i in range(len(result_list[idx])):
                         if self._is_en:
-                            prefix[k].append(" of " +
-                                             result_list[idx][i]["text"])
+                            prefix[k].append(" of " + result_list[idx][i]["text"])
                         else:
                             prefix[k].append(result_list[idx][i]["text"] + "的")
 
@@ -753,23 +692,18 @@ class UIETask(Task):
                 if start < 0 and end >= 0:
                     continue
                 if end < 0:
-                    start += (len(prompt) + 1)
-                    end += (len(prompt) + 1)
+                    start += len(prompt) + 1
+                    end += len(prompt) + 1
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
-                    result = {
-                        "text": text[start:end],
-                        "start": start,
-                        "end": end,
-                        "probability": prob[i]
-                    }
+                    result = {"text": text[start:end], "start": start, "end": end, "probability": prob[i]}
                     result_list.append(result)
             results.append(result_list)
         return results
 
     @classmethod
-    def _build_tree(cls, schema, name='root'):
+    def _build_tree(cls, schema, name="root"):
         """
         Build the schema tree.
         """
@@ -786,35 +720,35 @@ class UIETask(Task):
                     else:
                         raise TypeError(
                             "Invalid schema, value for each key:value pairs should be list or string"
-                            "but {} received".format(type(v)))
+                            "but {} received".format(type(v))
+                        )
                     schema_tree.add_child(cls._build_tree(child, name=k))
             else:
-                raise TypeError(
-                    "Invalid schema, element should be string or dict, "
-                    "but {} received".format(type(s)))
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
         return schema_tree
 
     def _postprocess(self, inputs):
         """
         This function will convert the model output to raw text.
         """
-        return inputs['result']
+        return inputs["result"]
 
 
 class GPTask(Task):
     """
-    Global Pointer for closed-domain information extraction Task. 
+    Global Pointer for closed-domain information extraction Task.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
+
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
-        "tokenizer_config": "tokenizer_config.json"
+        "tokenizer_config": "tokenizer_config.json",
     }
 
     def __init__(self, task, model, **kwargs):
@@ -823,18 +757,13 @@ class GPTask(Task):
         self._load_config()
         self._construct_tokenizer()
         self._get_inference_model()
-        self._max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 256
-        self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 64
-        self._lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-        self._num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
+        self._max_seq_len = self.kwargs["max_seq_len"] if "max_seq_len" in self.kwargs else 256
+        self._batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 64
+        self._lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
+        self._num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
 
     def _load_config(self):
-        model_config_file = os.path.join(
-            self._task_path, self.resource_files_names["model_config"])
+        model_config_file = os.path.join(self._task_path, self.resource_files_names["model_config"])
         with open(model_config_file, encoding="utf-8") as f:
             model_config = json.load(f)
         self._label_maps = model_config["label_maps"]
@@ -853,12 +782,8 @@ class GPTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='att_mask'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="att_mask"),
         ]
 
     def _construct_model(self, model):
@@ -867,11 +792,9 @@ class GPTask(Task):
         """
         encoder = AutoModel.from_pretrained(self._encoder)
         if self._task_type == "entity_extraction":
-            model_instance = GlobalPointerForEntityExtraction(
-                encoder, self._label_maps)
+            model_instance = GlobalPointerForEntityExtraction(encoder, self._label_maps)
         else:
-            model_instance = GPLinkerForRelationExtraction(
-                encoder, self._label_maps)
+            model_instance = GPLinkerForRelationExtraction(encoder, self._label_maps)
         model_path = os.path.join(self._task_path, "model_state.pdparams")
         state_dict = paddle.load(model_path)
         model_instance.set_dict(state_dict)
@@ -904,56 +827,46 @@ class GPTask(Task):
                     return_offsets_mapping=True,
                     return_token_type_ids=False,
                 )
-                tokenized_inputs['text'] = x
+                tokenized_inputs["text"] = x
                 yield tokenized_inputs
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
 
-        data_collator = DataCollatorGP(self._tokenizer,
-                                       label_maps=self._label_maps,
-                                       task_type=self._task_type)
+        data_collator = DataCollatorGP(self._tokenizer, label_maps=self._label_maps, task_type=self._task_type)
 
-        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds,
-                                               batch_size=self._batch_size,
-                                               shuffle=False)
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
-        infer_data_loader = paddle.io.DataLoader(dataset=infer_ds,
-                                                 batch_sampler=batch_sampler,
-                                                 collate_fn=data_collator,
-                                                 num_workers=self._num_workers,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            dataset=infer_ds,
+            batch_sampler=batch_sampler,
+            collate_fn=data_collator,
+            num_workers=self._num_workers,
+            return_list=True,
+        )
         outputs = {}
-        outputs['data_loader'] = infer_data_loader
-        outputs['input_texts'] = inputs
+        outputs["data_loader"] = infer_data_loader
+        outputs["input_texts"] = inputs
         return outputs
 
     def _run_model(self, inputs):
-        all_preds = ([], []) if self._task_type in [
-            "opinion_extraction", "relation_extraction"
-        ] else []
-        for batch in inputs['data_loader']:
+        all_preds = ([], []) if self._task_type in ["opinion_extraction", "relation_extraction"] else []
+        for batch in inputs["data_loader"]:
             input_ids, attention_masks, offset_mappings, texts = batch
-            self.input_handles[0].copy_from_cpu(
-                input_ids.numpy().astype('int64'))
-            self.input_handles[1].copy_from_cpu(
-                attention_masks.numpy().astype('int64'))
+            self.input_handles[0].copy_from_cpu(input_ids.numpy().astype("int64"))
+            self.input_handles[1].copy_from_cpu(attention_masks.numpy().astype("int64"))
             self.predictor.run()
-            logits = [
-                paddle.to_tensor(self.output_handle[i].copy_to_cpu())
-                for i in range(len(self.output_handle))
-            ]
-            batch_outputs = gp_decode(logits, offset_mappings, texts,
-                                      self._label_maps, self._task_type)
+            logits = [paddle.to_tensor(self.output_handle[i].copy_to_cpu()) for i in range(len(self.output_handle))]
+            batch_outputs = gp_decode(logits, offset_mappings, texts, self._label_maps, self._task_type)
             if isinstance(batch_outputs, tuple):
                 all_preds[0].extend(batch_outputs[0])  # Entity output
                 all_preds[1].extend(batch_outputs[1])  # Relation output
             else:
                 all_preds.extend(batch_outputs)
-        inputs['result'] = all_preds
+        inputs["result"] = all_preds
         return inputs
 
     @classmethod
-    def _build_tree(cls, schema, name='root'):
+    def _build_tree(cls, schema, name="root"):
         """
         Build the schema tree.
         """
@@ -970,12 +883,11 @@ class GPTask(Task):
                     else:
                         raise TypeError(
                             "Invalid schema, value for each key:value pairs should be list or string"
-                            "but {} received".format(type(v)))
+                            "but {} received".format(type(v))
+                        )
                     schema_tree.add_child(cls._build_tree(child, name=k))
             else:
-                raise TypeError(
-                    "Invalid schema, element should be string or dict, "
-                    "but {} received".format(type(s)))
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
         return schema_tree
 
     def _postprocess(self, inputs):
@@ -988,48 +900,44 @@ class GPTask(Task):
         return results
 
     def _postprocess_opinion_extraction(self, inputs):
-        all_ent_preds, all_rel_preds = inputs['result']
+        all_ent_preds, all_rel_preds = inputs["result"]
         results = []
-        for i in range(len(inputs['input_texts'])):
+        for i in range(len(inputs["input_texts"])):
             result = {}
             aspect_maps = {}
             for ent in all_ent_preds[i]:
                 ent_res = {
-                    'text': ent['text'],
-                    'start': ent['start_index'],
-                    'end': ent['start_index'] + len(ent['text']),
-                    'probability': ent['probability']
+                    "text": ent["text"],
+                    "start": ent["start_index"],
+                    "end": ent["start_index"] + len(ent["text"]),
+                    "probability": ent["probability"],
                 }
-                result.setdefault(ent['type'], []).append(ent_res)
-                if ent['type'] == "评价维度":
+                result.setdefault(ent["type"], []).append(ent_res)
+                if ent["type"] == "评价维度":
                     for r in result["评价维度"]:
-                        if ent['text'] == r['text'] and ent['start_index'] == r[
-                                'start']:
-                            aspect_maps[(ent['text'], ent['start_index'])] = r
+                        if ent["text"] == r["text"] and ent["start_index"] == r["start"]:
+                            aspect_maps[(ent["text"], ent["start_index"])] = r
                             break
 
             for rel in all_rel_preds[i]:
-                r = aspect_maps[(rel['aspect'], rel['aspect_start_index'])]
-                r['relations'] = {}
-                sentiment = {
-                    'probability': rel['probability'],
-                    'text': rel['sentiment']
-                }
+                r = aspect_maps[(rel["aspect"], rel["aspect_start_index"])]
+                r["relations"] = {}
+                sentiment = {"probability": rel["probability"], "text": rel["sentiment"]}
                 opinion = {
-                    'text': rel['opinion'],
-                    'start': rel['opinion_start_index'],
-                    'end': rel['opinion_start_index'] + len(rel['opinion']),
-                    'probability': rel['probability']
+                    "text": rel["opinion"],
+                    "start": rel["opinion_start_index"],
+                    "end": rel["opinion_start_index"] + len(rel["opinion"]),
+                    "probability": rel["probability"],
                 }
-                r['relations'].setdefault('情感倾向[正向，负向]', []).append(sentiment)
-                r['relations'].setdefault('观点词', []).append(opinion)
+                r["relations"].setdefault("情感倾向[正向，负向]", []).append(sentiment)
+                r["relations"].setdefault("观点词", []).append(opinion)
             results.append(result)
         return results
 
     def _postprocess_relation_extraction(self, inputs):
-        all_ent_preds, all_rel_preds = inputs['result']
+        all_ent_preds, all_rel_preds = inputs["result"]
         results = []
-        for input_text_idx in range(len(inputs['input_texts'])):
+        for input_text_idx in range(len(inputs["input_texts"])):
             result = {}
             schema_list = self._schema_tree.children[:]
             while len(schema_list) > 0:
@@ -1039,16 +947,16 @@ class GPTask(Task):
                     relations = [[]]
                     cnt = -1
                     for ent in all_ent_preds[input_text_idx]:
-                        if node.name == ent['type']:
+                        if node.name == ent["type"]:
                             ent_res = {
-                                'text': ent['text'],
-                                'start': ent['start_index'],
-                                'end': ent['start_index'] + len(ent['text']),
-                                'probability': ent['probability']
+                                "text": ent["text"],
+                                "start": ent["start_index"],
+                                "end": ent["start_index"] + len(ent["text"]),
+                                "probability": ent["probability"],
                             }
                             result.setdefault(node.name, []).append(ent_res)
                             cnt += 1
-                            result[node.name][cnt]['relations'] = {}
+                            result[node.name][cnt]["relations"] = {}
                             relations[0].append(result[node.name][cnt])
                 else:
                     relations = [[] for _ in range(len(node.parent_relations))]
@@ -1056,27 +964,21 @@ class GPTask(Task):
                         for r in rs:
                             cnt = -1
                             for rel in all_rel_preds[input_text_idx]:
-                                if r['text'] == rel['subject'] and r['start'] == rel[
-                                        'subject_start_index'] and node.name == rel[
-                                            'predicate']:
+                                if (
+                                    r["text"] == rel["subject"]
+                                    and r["start"] == rel["subject_start_index"]
+                                    and node.name == rel["predicate"]
+                                ):
                                     rel_res = {
-                                        'text':
-                                        rel['object'],
-                                        'start':
-                                        rel['object_start_index'],
-                                        'end':
-                                        rel['object_start_index'] +
-                                        len(rel['object']),
-                                        'probability':
-                                        rel['probability']
+                                        "text": rel["object"],
+                                        "start": rel["object_start_index"],
+                                        "end": rel["object_start_index"] + len(rel["object"]),
+                                        "probability": rel["probability"],
                                     }
-                                    r['relations'].setdefault(
-                                        node.name, []).append(rel_res)
+                                    r["relations"].setdefault(node.name, []).append(rel_res)
                                     cnt += 1
-                                    r['relations'][
-                                        node.name][cnt]['relations'] = {}
-                                    relations[i].append(
-                                        r['relations'][node.name][cnt])
+                                    r["relations"][node.name][cnt]["relations"] = {}
+                                    relations[i].append(r["relations"][node.name][cnt])
                 for child in node.children:
                     child.prefix = prefix
                     child.parent_relations = relations
@@ -1085,20 +987,20 @@ class GPTask(Task):
         return results
 
     def _postprocess_entity_extraction(self, inputs):
-        all_preds = inputs['result']
+        all_preds = inputs["result"]
         results = []
-        for input_text_idx in range(len(inputs['input_texts'])):
+        for input_text_idx in range(len(inputs["input_texts"])):
             result = {}
             schema_list = self._schema_tree.children[:]
             while len(schema_list) > 0:
                 node = schema_list.pop(0)
                 for ent in all_preds[input_text_idx]:
-                    if node.name == ent['type']:
+                    if node.name == ent["type"]:
                         ent_res = {
-                            'text': ent['text'],
-                            'start': ent['start_index'],
-                            'end': ent['start_index'] + len(ent['text']),
-                            'probability': ent['probability']
+                            "text": ent["text"],
+                            "start": ent["start_index"],
+                            "end": ent["start_index"] + len(ent["text"]),
+                            "probability": ent["probability"],
                         }
                         result.setdefault(node.name, []).append(ent_res)
             results.append(result)

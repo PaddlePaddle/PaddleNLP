@@ -70,7 +70,7 @@ usage = r"""
 
 class DDParserTask(Task):
     """
-    DDParser task to analyze the dependency relationship between words in a sentence 
+    DDParser task to analyze the dependency relationship between words in a sentence
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
@@ -79,7 +79,7 @@ class DDParserTask(Task):
         use_pos(bool): Whether to return the postag.
         batch_size(int): Numbers of examples a batch.
         return_visual(bool): If True, the result will contain the dependency visualization.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     resource_files_names = {
@@ -91,63 +91,65 @@ class DDParserTask(Task):
         "ddparser": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/model_state.pdparams",
-                "f388c91e85b5b4d0db40157a4ee28c08"
+                "f388c91e85b5b4d0db40157a4ee28c08",
             ],
             "word_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/word_vocab.json",
-                "594694033b149cbb724cac0975df07e4"
+                "594694033b149cbb724cac0975df07e4",
             ],
             "rel_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser/rel_vocab.json",
-                "0decf1363278705f885184ff8681f4cd"
+                "0decf1363278705f885184ff8681f4cd",
             ],
         },
         "ddparser-ernie-1.0": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/model_state.pdparams",
-                "78a4d5c2add642a88f6fdbee3574f617"
+                "78a4d5c2add642a88f6fdbee3574f617",
             ],
             "word_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/word_vocab.json",
-                "17ed37b5b7ebb8475d4bff1ff8dac4b7"
+                "17ed37b5b7ebb8475d4bff1ff8dac4b7",
             ],
             "rel_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-1.0/rel_vocab.json",
-                "0decf1363278705f885184ff8681f4cd"
+                "0decf1363278705f885184ff8681f4cd",
             ],
         },
         "ddparser-ernie-gram-zh": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/model_state.pdparams",
-                "9d0a49026feb97fac22c8eec3e88f5c3"
+                "9d0a49026feb97fac22c8eec3e88f5c3",
             ],
             "word_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/word_vocab.json",
-                "38120123d39876337975cc616901c8b9"
+                "38120123d39876337975cc616901c8b9",
             ],
             "rel_vocab": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/ddparser-ernie-gram-zh/rel_vocab.json",
-                "0decf1363278705f885184ff8681f4cd"
+                "0decf1363278705f885184ff8681f4cd",
             ],
         },
         "font_file": {
             "font_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/dependency_parsing/SourceHanSansCN-Regular.ttf",
-                "cecb7328bc0b9412b897fb3fc61edcdb"
+                "cecb7328bc0b9412b897fb3fc61edcdb",
             ]
-        }
+        },
     }
 
-    def __init__(self,
-                 task,
-                 model,
-                 tree=True,
-                 prob=False,
-                 use_pos=False,
-                 use_cuda=False,
-                 batch_size=1,
-                 return_visual=False,
-                 **kwargs):
+    def __init__(
+        self,
+        task,
+        model,
+        tree=True,
+        prob=False,
+        use_pos=False,
+        use_cuda=False,
+        batch_size=1,
+        return_visual=False,
+        **kwargs
+    ):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
         self.model = model
@@ -159,14 +161,18 @@ class DDParserTask(Task):
         elif self.model == "ddparser-ernie-gram-zh":
             self.encoding_model = "ernie-gram-zh"
         else:
-            raise ValueError("The encoding model should be one of \
-                ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh")
+            raise ValueError(
+                "The encoding model should be one of \
+                ddparser, ddparser-ernie-1.0 and ddoarser-ernie-gram-zh"
+            )
         self._check_task_files()
         self._construct_vocabs()
         self.font_file_path = download_file(
-            self._task_path, "SourceHanSansCN-Regular.ttf",
+            self._task_path,
+            "SourceHanSansCN-Regular.ttf",
             self.resource_files_urls["font_file"]["font_file"][0],
-            self.resource_files_urls["font_file"]["font_file"][1])
+            self.resource_files_urls["font_file"]["font_file"][1],
+        )
         self.tree = tree
         self.prob = prob
         self.use_pos = use_pos
@@ -176,13 +182,10 @@ class DDParserTask(Task):
         try:
             from LAC import LAC
         except:
-            raise ImportError(
-                "Please install the dependencies first, pip install LAC --upgrade"
-            )
+            raise ImportError("Please install the dependencies first, pip install LAC --upgrade")
 
         self.use_cuda = use_cuda
-        self.lac = LAC(mode="lac" if self.use_pos else "seg",
-                       use_cuda=self.use_cuda)
+        self.lac = LAC(mode="lac" if self.use_pos else "seg", use_cuda=self.use_cuda)
         self._get_inference_model()
 
     def _check_segmented_words(self, inputs):
@@ -196,7 +199,7 @@ class DDParserTask(Task):
         self.use_pos = False
         segmented_words = self._check_segmented_words(segmented_words)
         inputs = {}
-        inputs['words'] = segmented_words
+        inputs["words"] = segmented_words
         inputs = self._preprocess_words(inputs)
         outputs = self._run_model(inputs)
         results = self._postprocess(outputs)
@@ -247,16 +250,12 @@ class DDParserTask(Task):
 
     def _preprocess_words(self, inputs):
         examples = []
-        for text in inputs['words']:
+        for text in inputs["words"]:
             example = {"FORM": text}
-            example = convert_example(example,
-                                      vocabs=[self.word_vocab, self.rel_vocab])
+            example = convert_example(example, vocabs=[self.word_vocab, self.rel_vocab])
             examples.append(example)
 
-        batches = [
-            examples[idx:idx + self.batch_size]
-            for idx in range(0, len(examples), self.batch_size)
-        ]
+        batches = [examples[idx : idx + self.batch_size] for idx in range(0, len(examples), self.batch_size)]
 
         def batchify_fn(batch):
             raw_batch = [raw for raw in zip(*batch)]
@@ -265,7 +264,7 @@ class DDParserTask(Task):
 
         batches = [flat_words(batchify_fn(batch)[0]) for batch in batches]
 
-        inputs['data_loader'] = batches
+        inputs["data_loader"] = batches
         return inputs
 
     def _preprocess(self, inputs):
@@ -276,10 +275,8 @@ class DDParserTask(Task):
         """
 
         # Get the config from the kwargs
-        num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
+        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
+        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
 
         outputs = {}
 
@@ -288,27 +285,24 @@ class DDParserTask(Task):
 
         inputs = self._check_input_text(inputs)
         while position < len(inputs):
-            lac_results += self.lac.run(inputs[position:position +
-                                               self.batch_size])
+            lac_results += self.lac.run(inputs[position : position + self.batch_size])
             position += self.batch_size
 
         if not self.use_pos:
-            outputs['words'] = lac_results
+            outputs["words"] = lac_results
         else:
-            outputs['words'], outputs['postags'] = [
-                raw for raw in zip(*lac_results)
-            ]
+            outputs["words"], outputs["postags"] = [raw for raw in zip(*lac_results)]
 
         outputs = self._preprocess_words(outputs)
         return outputs
 
     def _run_model(self, inputs):
         """
-        Run the task model from the outputs of the `_tokenize` function. 
+        Run the task model from the outputs of the `_tokenize` function.
         """
 
         arcs, rels, probs = [], [], []
-        for batch in inputs['data_loader']:
+        for batch in inputs["data_loader"]:
             words, wp = batch
             self.input_handles[0].copy_from_cpu(words)
             self.input_handles[1].copy_from_cpu(wp)
@@ -316,27 +310,25 @@ class DDParserTask(Task):
             arc_preds = self.output_handle[0].copy_to_cpu()
             rel_preds = self.output_handle[1].copy_to_cpu()
             s_arc = self.output_handle[2].copy_to_cpu()
-            mask = self.output_handle[3].copy_to_cpu().astype('bool')
+            mask = self.output_handle[3].copy_to_cpu().astype("bool")
 
-            arc_preds, rel_preds = decode(arc_preds, rel_preds, s_arc, mask,
-                                          self.tree)
+            arc_preds, rel_preds = decode(arc_preds, rel_preds, s_arc, mask, self.tree)
 
             arcs.extend([arc_pred[m] for arc_pred, m in zip(arc_preds, mask)])
             rels.extend([rel_pred[m] for rel_pred, m in zip(rel_preds, mask)])
             if self.prob:
                 arc_probs = probability(s_arc, arc_preds)
-                probs.extend(
-                    [arc_prob[m] for arc_prob, m in zip(arc_probs, mask)])
-        inputs['arcs'] = arcs
-        inputs['rels'] = rels
-        inputs['probs'] = probs
+                probs.extend([arc_prob[m] for arc_prob, m in zip(arc_probs, mask)])
+        inputs["arcs"] = arcs
+        inputs["rels"] = rels
+        inputs["probs"] = probs
         return inputs
 
     def _postprocess(self, inputs):
 
-        arcs = inputs['arcs']
-        rels = inputs['rels']
-        words = inputs['words']
+        arcs = inputs["arcs"]
+        rels = inputs["rels"]
+        words = inputs["words"]
         arcs = [[s.item() for s in seq] for seq in arcs]
         rels = [self.rel_vocab.to_tokens(seq) for seq in rels]
 
@@ -344,26 +336,26 @@ class DDParserTask(Task):
 
         for word, arc, rel in zip(words, arcs, rels):
             result = {
-                'word': word,
-                'head': arc,
-                'deprel': rel,
+                "word": word,
+                "head": arc,
+                "deprel": rel,
             }
             results.append(result)
 
         if self.use_pos:
-            postags = inputs['postags']
+            postags = inputs["postags"]
             for result, postag in zip(results, postags):
-                result['postag'] = postag
+                result["postag"] = postag
 
         if self.prob:
-            probs = inputs['probs']
+            probs = inputs["probs"]
             probs = [[round(p, 2) for p in seq.tolist()] for seq in probs]
             for result, prob in zip(results, probs):
-                result['prob'] = prob
+                result["prob"] = prob
 
         if self.return_visual:
             for result in results:
-                result['visual'] = self._visualize(result)
+                result["visual"] = self._visualize(result)
 
         return results
 
@@ -379,15 +371,13 @@ class DDParserTask(Task):
             import matplotlib.pyplot as plt
             import matplotlib.font_manager as font_manager
         except:
-            raise ImportError(
-                "Please install the dependencies first, pip install matplotlib --upgrade"
-            )
+            raise ImportError("Please install the dependencies first, pip install matplotlib --upgrade")
 
         self.plt = plt
         self.font = font_manager.FontProperties(fname=self.font_file_path)
-        word, head, deprel = data['word'], data['head'], data['deprel']
+        word, head, deprel = data["word"], data["head"], data["deprel"]
 
-        nodes = ['ROOT'] + word
+        nodes = ["ROOT"] + word
         x = list(range(len(nodes)))
         y = [0] * (len(nodes))
         fig, ax = self.plt.subplots()
@@ -395,7 +385,7 @@ class DDParserTask(Task):
         max_span = max([abs(i + 1 - j) for i, j in enumerate(head)])
         fig.set_size_inches((len(nodes), max_span / 2))
         # Set the points
-        self.plt.scatter(x, y, c='w')
+        self.plt.scatter(x, y, c="w")
 
         for i in range(len(nodes)):
             txt = nodes[i]
@@ -405,53 +395,50 @@ class DDParserTask(Task):
                 ax.annotate(
                     txt,
                     xy=xytext,
-                    xycoords='data',
+                    xycoords="data",
                     xytext=xytext,
-                    textcoords='data',
+                    textcoords="data",
                 )
             else:
                 xy = (head[i - 1], 0)
                 rad = 0.5 if head[i - 1] < i else -0.5
                 # Set the word
-                ax.annotate(txt,
-                            xy=xy,
-                            xycoords='data',
-                            xytext=(xytext[0] - 0.1, xytext[1]),
-                            textcoords='data',
-                            fontproperties=self.font)
+                ax.annotate(
+                    txt,
+                    xy=xy,
+                    xycoords="data",
+                    xytext=(xytext[0] - 0.1, xytext[1]),
+                    textcoords="data",
+                    fontproperties=self.font,
+                )
                 # Draw the curve
                 ax.annotate(
                     "",
                     xy=xy,
-                    xycoords='data',
+                    xycoords="data",
                     xytext=xytext,
-                    textcoords='data',
+                    textcoords="data",
                     arrowprops=dict(
                         arrowstyle="<-",
                         shrinkA=12,
                         shrinkB=12,
-                        color='blue',
+                        color="blue",
                         connectionstyle="arc3,rad=%s" % rad,
                     ),
                 )
                 # Set the deprel label. Calculate its position by the radius
                 text_x = min(i, head[i - 1]) + abs((i - head[i - 1])) / 2 - 0.2
                 text_y = abs((i - head[i - 1])) / 4
-                ax.annotate(deprel[i - 1],
-                            xy=xy,
-                            xycoords='data',
-                            xytext=[text_x, text_y],
-                            textcoords='data')
+                ax.annotate(deprel[i - 1], xy=xy, xycoords="data", xytext=[text_x, text_y], textcoords="data")
 
         # Control the axis
-        self.plt.axis('equal')
-        self.plt.axis('off')
+        self.plt.axis("equal")
+        self.plt.axis("off")
 
         # Save to numpy array
         fig.canvas.draw()
         data = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        data = data.reshape(fig.canvas.get_width_height()[::-1] +
-                            (3, ))[:, :, ::-1]
+        data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))[:, :, ::-1]
         return data
 
 
@@ -477,13 +464,9 @@ def convert_example(example, vocabs, fix_len=20):
     word_bos_index = word_vocab.to_indices("[CLS]")
     word_eos_index = word_vocab.to_indices("[SEP]")
 
-    words = [[word_vocab.to_indices(char) for char in word]
-             for word in example["FORM"]]
+    words = [[word_vocab.to_indices(char) for char in word] for word in example["FORM"]]
     words = [[word_bos_index]] + words + [[word_eos_index]]
-    return [
-        pad_sequence([np.array(ids[:fix_len], dtype=np.int64) for ids in words],
-                     fix_len=fix_len)
-    ]
+    return [pad_sequence([np.array(ids[:fix_len], dtype=np.int64) for ids in words], fix_len=fix_len)]
 
 
 def flat_words(words, pad_index=0):
@@ -496,7 +479,7 @@ def flat_words(words, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(words[idx:idx + l])
+        sequences.append(words[idx : idx + l])
         idx += l
     words = Pad(pad_val=pad_index)(sequences)
 
@@ -509,13 +492,9 @@ def flat_words(words, pad_index=0):
 
 def probability(s_arc, arc_preds):
     s_arc = s_arc - s_arc.max(axis=-1).reshape(list(s_arc.shape)[:-1] + [1])
-    s_arc = np.exp(s_arc) / np.exp(s_arc).sum(
-        axis=-1).reshape(list(s_arc.shape)[:-1] + [1])
+    s_arc = np.exp(s_arc) / np.exp(s_arc).sum(axis=-1).reshape(list(s_arc.shape)[:-1] + [1])
 
-    arc_probs = [
-        s[np.arange(len(arc_pred)), arc_pred]
-        for s, arc_pred in zip(s_arc, arc_preds)
-    ]
+    arc_probs = [s[np.arange(len(arc_pred)), arc_pred] for s, arc_pred in zip(s_arc, arc_preds)]
     return arc_probs
 
 
@@ -523,13 +502,10 @@ def decode(arc_preds, rel_preds, s_arc, mask, tree):
     """decode"""
     lens = np.sum(mask, -1)
 
-    bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    bad = [not istree(seq[: i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
-    rel_preds = [
-        rel_pred[np.arange(len(arc_pred)), arc_pred]
-        for arc_pred, rel_pred in zip(arc_preds, rel_preds)
-    ]
+    rel_preds = [rel_pred[np.arange(len(arc_pred)), arc_pred] for arc_pred, rel_pred in zip(arc_preds, rel_preds)]
     return arc_preds, rel_preds
 
 
@@ -549,9 +525,9 @@ def eisner(scores, mask):
     batch_size, seq_len, _ = scores.shape
     scores = scores.transpose(2, 1, 0)
     # Score for incomplete span
-    s_i = np.full_like(scores, float('-inf'))
+    s_i = np.full_like(scores, float("-inf"))
     # Score for complete span
-    s_c = np.full_like(scores, float('-inf'))
+    s_c = np.full_like(scores, float("-inf"))
     # Incompelte span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
     # Compelte span position for backtrack
@@ -593,7 +569,7 @@ def eisner(scores, mask):
         cr = cr.transpose(2, 0, 1)
         cr_span, cr_path = cr.max(-1), cr.argmax(-1)
         s_c = fill_diagonal(s_c, cr_span, offset=w)
-        s_c[0, w][np.not_equal(lens, w)] = float('-inf')
+        s_c[0, w][np.not_equal(lens, w)] = float("-inf")
         p_c = fill_diagonal(p_c, cr_path + starts + 1, offset=w)
 
     predicts = []
@@ -609,7 +585,7 @@ def eisner(scores, mask):
 
 def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
     """
-    Fill value into the diagoanl of x that offset is ${offset} 
+    Fill value into the diagoanl of x that offset is ${offset}
     and the coordinate system is (dim1, dim2).
     """
     strides = x.strides
@@ -626,12 +602,14 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
         diagonal = np.lib.stride_tricks.as_strided(
             x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
             shape=(shape[dim3], shape[dim1] - offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+            strides=(strides[dim3], strides[dim1] + strides[dim2]),
+        )
     else:
         diagonal = np.lib.stride_tricks.as_strided(
             x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
             shape=(shape[dim3], shape[dim1] + offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+            strides=(strides[dim3], strides[dim1] + strides[dim2]),
+        )
 
     diagonal[...] = value
     return x
@@ -680,14 +658,14 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     tensor([[ 0,  5, 10],
             [ 6, 11, 16]])
     """
-    if not x.flags['C_CONTIGUOUS']:
+    if not x.flags["C_CONTIGUOUS"]:
         x = np.ascontiguousarray(x)
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=[n, w] + list(x.shape[2:]),
-                                           strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(
+        x[offset[0] :, offset[1] :], shape=[n, w] + list(x.shape[2:]), strides=[m, k] + list(strides[2:])
+    )
 
 
 class Node:
@@ -716,9 +694,7 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [
-            Node(index, p_index) for index, p_index in enumerate(self.sentence)
-        ]
+        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:
