@@ -42,11 +42,15 @@ class CompressionArguments(TrainingArguments):
         strategy (`str`):
             Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now.
     """
+
+    do_compress: bool = field(
+        default=False,
+        metadata={"help": "Whether to run compression after training."})
     strategy: Optional[str] = field(
         default="dynabert+ptq",
         metadata={
             "help":
-            "Compression strategy. It supports 'dynabert+ptq', 'dynabert' and 'ptq' now."
+            "Compression strategy. It supports 'dynabert+ptq', 'dynabert', 'ptq' and 'qat' now."
         },
     )
     # dynabert
@@ -69,6 +73,32 @@ class CompressionArguments(TrainingArguments):
         metadata={
             "help": "Linear warmup over warmup_ratio fraction of total steps."
         })
+    # quant
+    weight_quantize_type: Optional[str] = field(
+        default='channel_wise_abs_max',
+        metadata={
+        "help":
+        "Quantization type for weights. Supports 'abs_max' and 'channel_wise_abs_max'. " \
+        "This param only specifies the fake ops in saving quantized model, and " \
+        "we save the scale obtained by post training quantization in fake ops. " \
+        "Compared to 'abs_max' the model accuracy is usually higher when it is " \
+        "'channel_wise_abs_max'."
+    }, )
+    activation_quantize_type: Optional[str] = field(
+        default=None,
+        metadata={
+        "help":
+        "Support 'abs_max', 'range_abs_max' and 'moving_average_abs_max'. " \
+        "In strategy 'ptq', it defaults to 'range_abs_max' and in strategy " \
+        "'qat', it defaults to 'moving_average_abs_max'."
+    }, )
+    onnx_format: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help":
+            "Whether to export onnx format quantized model, and it defaults to True."
+        },
+    )
     # ptq:
     algo_list: Optional[List[str]] = field(
         default=None,
@@ -100,15 +130,7 @@ class CompressionArguments(TrainingArguments):
             "List of batch_size. 'batch_size' is the batch of data loader."
         },
     )
-    weight_quantize_type: Optional[str] = field(
-        default='channel_wise_abs_max',
-        metadata={
-        "help":
-        "Support 'abs_max' and 'channel_wise_abs_max'. This param only specifies " \
-        "the fake ops in saving quantized model, and we save the scale obtained " \
-        "by post training quantization in fake ops. Compared to 'abs_max', " \
-        "the model accuracy is usually higher when it is 'channel_wise_abs_max'."
-    }, )
+
     round_type: Optional[str] = field(
         default='round',
         metadata={
@@ -135,6 +157,21 @@ class CompressionArguments(TrainingArguments):
             "is None."
         },
     )
+    # qat
+    use_pact: Optional[bool] = field(
+        default=True,
+        metadata={
+            "help":
+            "Whether to use PACT(Parameterized Clipping Activation for Quantized Neural Networks) "\
+            "method in quantization aware training."
+        },
+    )
+    moving_rate: Optional[float] = field(
+        default=0.9,
+        metadata={
+            "help": "The decay coefficient of moving average. Defaults to 0.9."
+        },
+    )
 
     def print_config(self, args=None, key=""):
         """
@@ -142,9 +179,11 @@ class CompressionArguments(TrainingArguments):
         """
 
         compression_arg_name = [
-            'width_mult_list', 'batch_num_list', 'bias_correction',
+            'strategy', 'width_mult_list', 'batch_num_list', 'bias_correction',
             'round_type', 'algo_list', 'batch_size_list', 'strategy',
-            'weight_quantize_type', 'input_infer_model_path'
+            'weight_quantize_type', 'activation_quantize_type',
+            'input_infer_model_path', 'activation_preprocess_type',
+            'weight_preprocess_type', 'moving_rate', 'use_pact', 'onnx_format'
         ]
         default_arg_dict = {
             "width_mult_list": ['3/4'],
@@ -163,7 +202,9 @@ class CompressionArguments(TrainingArguments):
             "'dynabert' and 'ptq'. `width_mult_list` is needed in " \
             "`dynabert`, and `algo_list`, `batch_num_list`, `batch_size_list`," \
             " `round_type`, `bias_correction`, `weight_quantize_type`, " \
-            "`input_infer_model_path` are needed in 'ptq'. "
+            "`input_infer_model_path` are needed in 'ptq'. `activation_preprocess_type'`, " \
+            "'weight_preprocess_type', 'moving_rate', 'weight_quantize_type', " \
+            "and 'activation_quantize_type' are needed in 'qat'."
             )
         logger.info('{:30}:{}'.format("paddle commit id",
                                       paddle.version.commit))
@@ -176,6 +217,12 @@ class CompressionArguments(TrainingArguments):
                 if v is None and arg in default_arg_dict:
                     v = default_arg_dict[arg]
                     setattr(args, arg, v)
+                elif v is None and arg == 'activation_quantize_type':
+                    if key == "Compression" and 'ptq' in args.strategy:
+                        setattr(args, arg, 'range_abs_max')
+                    elif key == "Compression" and 'qat' in args.strategy:
+                        setattr(args, arg, 'moving_average_abs_max')
+
                 if not isinstance(v, types.MethodType):
                     logger.info('{:30}:{}'.format(arg, v))
 

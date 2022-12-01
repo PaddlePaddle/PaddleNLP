@@ -37,6 +37,7 @@ option(WITH_MBART       "Compile with MBART"                                    
 option(WITH_PARALLEL    "Compile with model parallel for GPT"                       OFF)
 option(WITH_ONNXRUNTIME "Compile demo with ONNXRuntime"                             OFF)
 option(WITH_GPTJ        "Compile with GPTJ"                                         ON)
+option(WITH_PEGASUS     "Compile with Pegasus"                                      ON)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 if(WITH_PARALLEL)
@@ -90,8 +91,12 @@ if(WITH_GPTJ)
   list(APPEND decoding_op_files fusion_gptj_op.cc fusion_gptj_op.cu)
 endif()
 
-if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART AND NOT WITH_MBART AND NOT WITH_GPTJ)
-  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON or/and -DWITH_MBART=ON or/and -DWITH_GPTJ=ON must be set to use FasterTransformer. ")
+if(WITH_PEGASUS)
+  list(APPEND decoding_op_files fusion_pegasus_decoding_op.cc fusion_pegasus_decoding_op.cu)
+endif()
+
+if(NOT WITH_TRANSFORMER AND NOT WITH_GPT AND NOT WITH_DECODER AND NOT WITH_ENCODER AND NOT WITH_BART AND NOT WITH_MBART AND NOT WITH_GPTJ AND NOT WITH_PEGASUS)
+  message(FATAL_ERROR "-DWITH_TRANSFORMER=ON or/and -DWITH_GPT=ON or/and -DWITH_DECODER=ON or/and -DWITH_ENCODER=ON or/and -DWITH_BART=ON or/and -DWITH_MBART=ON or/and -DWITH_GPTJ=ON or/and -DWITH_PEGASUS=ON must be set to use FasterTransformer. ")
 endif()
 
 set(CUDA_PATH ${CUDA_TOOLKIT_ROOT_DIR})

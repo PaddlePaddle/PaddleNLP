@@ -13,7 +13,16 @@
 # limitations under the License.
 
 from .model_utils import PretrainedModel, register_base_model
-from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken, normalize_chars, tokenize_special_chars, convert_to_unicode
+from .tokenizer_utils import (
+    PretrainedTokenizer,
+    BPETokenizer,
+    tokenize_chinese_chars,
+    is_chinese_char,
+    AddedToken,
+    normalize_chars,
+    tokenize_special_chars,
+    convert_to_unicode,
+)
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
@@ -21,12 +30,17 @@ from .export import export_model
 
 from .bert.modeling import *
 from .bert.tokenizer import *
+from .bert.configuration import *
+from .bert.converter import *
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
+from .roberta.configuration import *
+from .roberta.converter import *
 from .electra.modeling import *
 from .electra.tokenizer import *
+from .electra.converter import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bart.modeling import *
@@ -55,8 +69,8 @@ from .ernie_doc.tokenizer import *
 from .ernie_gen.modeling import ErnieForGeneration
 from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
-from .ernie_layoutx.modeling import *
-from .ernie_layoutx.tokenizer import *
+from .ernie_layout.modeling import *
+from .ernie_layout.tokenizer import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
@@ -85,8 +99,6 @@ from .nezha.modeling import *
 from .nezha.tokenizer import *
 from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
-from .prophetnet.modeling import *
-from .prophetnet.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
 from .rembert.modeling import *
@@ -113,6 +125,7 @@ from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
+from .xlnet.converter import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
@@ -133,12 +146,17 @@ from .clip.modeling import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
+from .clip.converter import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
+from .pegasus.modeling import *
+from .pegasus.tokenizer import *
 
 # For faster tokenizer
-from ..utils.import_utils import is_faster_tokenizer_available
-if is_faster_tokenizer_available():
-    from .bert.faster_tokenizer import *
-    from .ernie.faster_tokenizer import *
-    from .tinybert.faster_tokenizer import *
+from ..utils.import_utils import is_fast_tokenizer_available
+
+if is_fast_tokenizer_available():
+    from .bert.fast_tokenizer import *
+    from .ernie.fast_tokenizer import *
+    from .tinybert.fast_tokenizer import *
+    from .ernie_m.fast_tokenizer import *

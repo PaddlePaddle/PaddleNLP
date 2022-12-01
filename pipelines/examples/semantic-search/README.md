@@ -13,11 +13,16 @@
 车头如何放置车牌    后牌照怎么装
 ```
 
-语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。
+语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。如果需要关键字和语义检索两种结合方式请参考文档[多路召回](./Multi_Recall.md)
 
 ## 2. 产品功能介绍
 
-本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想接入自己训练的模型，可以参考[Neural Search的流程](./Neural_Search.md)。
+本项目提供了低成本搭建端到端语义检索系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的语义检索系统模型(召回模型、排序模型)快速搭建一个针对自己业务数据的问答系统，并可以提供 Web 化产品服务。以下是使用预置模型的教程，如果用户想训练并接入自己训练的模型，模型训练可以参考[Neural Search](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search),接入流程可以参考[Neural Search的流程](./Neural_Search.md)。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
 
 ### 2.1 系统特色
 
@@ -127,6 +132,12 @@ curl http://localhost:9200/dureader_robust_query_encoder/_search
 * `search_engine`: 选择的近似索引引擎elastic，milvus，默认elastic
 * `delete_index`: 是否删除现有的索引和数据，用于清空es的数据，默认为false
 
+删除索引也可以使用下面的命令：
+
+```
+curl -XDELETE http://localhost:9200/dureader_robust_query_encoder
+```
+
 #### 3.4.3 启动 RestAPI 模型服务
 ```bash
 # 指定语义检索系统的Yaml配置文件
@@ -144,6 +155,9 @@ sh examples/semantic-search/run_search_server.sh
 ```
 curl -X POST -k http://localhost:8891/query -H 'Content-Type: application/json' -d '{"query": "衡量酒水的价格的因素有哪些?","params": {"Retriever": {"top_k": 5}, "Ranker":{"top_k": 5}}}'
 ```
+
+更多API接口文档及其调用方式请参考链接[http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
 #### 3.4.4 启动 WebUI
 ```bash
 # 配置模型服务地址

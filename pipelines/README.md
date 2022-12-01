@@ -1,6 +1,6 @@
-## PaddleNLP Pipelines：智能文本产线
+## PaddleNLP Pipelines：NLP流水线系统
 
-PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
+PaddleNLP Pipelines 是一个端到端NLP流水线系统框架，面向 NLP **全场景**，帮助用户**低门槛**构建强大**产品级系统**。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
@@ -8,12 +8,12 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
 
 更多效果展示Demo请参考 [效果展示](#效果展示)
 
-## 智能文本产线特色
+## NLP流水线系统特色
 * **全场景支持**：依托灵活的插拔式组件产线化设计，支持各类 NLP 场景任务，包括：信息抽取、情感倾向分析、阅读理解、检索系统、问答系统、文本分类、文本生成等。
 
 * **低门槛开发**：依托丰富的预置组件，像搭积木一样快速构建产品级系统，预置组件覆盖文档解析、数据处理、模型组网、预测部署、Web 服务、UI 界面等全流程系统功能。
 
-* **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[智能文本产线库](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#智能文本产线库)中预置的语义检索系统、阅读理解式智能问答系统等。
+* **高精度预测**：基于前沿的预训练模型、成熟的系统方案，可构建效果领先的产品级系统，如[NLP流水线系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines#NLP流水线系统)中预置的语义检索系统、阅读理解式智能问答系统等。
 
 * **灵活可定制**：除深度兼容 PaddleNLP 模型组件外，还可嵌入飞桨生态下任意模型、[AI 开放平台算子](https://ai.baidu.com/)、其它开源项目如 Elasticsearch 等作为基础组件，快速扩展，从而实现任意复杂系统的灵活定制开发。
 
@@ -25,9 +25,9 @@ PaddleNLP Pipelines 是一个端到端智能文本产线框架，面向 NLP **�
 
 更多的Benchmarks的信息请参考文档[Benchmarks](./benchmarks/README.md)
 
-## 智能文本产线库
+## NLP流水线系统
 
-PaddleNLP Pipelines 智能文本产线库针对 NLP 部分高频场景开源了经过充分打磨的产品级系统，并会不断开放其它场景的产品级系统，用户可以基于智能文本产线库提供的系统能力快速开发出适配业务数据的产品。
+PaddleNLP Pipelines NLP流水线系统针对 NLP 部分高频场景开源了经过充分打磨的产品级系统，并会不断开放其它场景的产品级系统，用户可以基于NLP流水线系统提供的系统能力快速开发出适配业务数据的产品。
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
@@ -187,6 +187,15 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 
 对于智能问答应用，请参考Docker文档[docker文档](./docker/README.md)，只需做少量的修改，就可以完成智能问答应用的部署。
 
+#### REST API
+
+Pipelines可以服务化，通过HTTP接口的形式供其他程序进行调用，Pipelines提供了Swagger API方便用户查询接口文档，从而把Pipelines的能力接入到自己的应用系统中，只需要在启动REST API后通过浏览器访问 [http://127.0.0.1:8891/docs](http://127.0.0.1:8891/docs)
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/204282574-4a468ba5-d32f-4ead-970b-87139b613521.png" width="500px">
+</div>
+
+
 ## :man_office_worker: 用户案例
 
 ### 案例1: [寻规-工程规范搜索引擎](https://xungui365.com/)
@@ -205,7 +214,7 @@ GPU 镜像下载大概耗时 15 分钟左右，容器启动成功后，等待1�
 - Tutorial 1 - Pipelines [Windows视频安装教程](https://www.bilibili.com/video/BV1DY4y1M7HE/?zw)
 - Tutorial 2 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 3 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
-- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/frequently-asked-question/dense_faq_example.py)
+- Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/FAQ/dense_faq_example.py)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">

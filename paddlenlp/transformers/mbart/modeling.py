@@ -22,11 +22,25 @@ import paddle.tensor as tensor
 from paddle.nn import Layer, Embedding
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    ModelOutput,
+    BaseModelOutputWithPastAndCrossAttentions,
+    Seq2SeqLMOutput,
+    Seq2SeqModelOutput,
+    Seq2SeqQuestionAnsweringModelOutput,
+    Seq2SeqSequenceClassifierOutput,
+    convert_encoder_output,
+)
 
 __all__ = [
-    'MBartModel', 'MBartPretrainedModel', 'MBartEncoder', 'MBartDecoder',
-    'MBartClassificationHead', 'MBartForSequenceClassification',
-    'MBartForQuestionAnswering', 'MBartForConditionalGeneration'
+    "MBartModel",
+    "MBartPretrainedModel",
+    "MBartEncoder",
+    "MBartDecoder",
+    "MBartClassificationHead",
+    "MBartForSequenceClassification",
+    "MBartForQuestionAnswering",
+    "MBartForConditionalGeneration",
 ]
 
 
@@ -37,9 +51,8 @@ def shift_tokens_right(input_ids, pad_token_id):
     shifted_input_ids = input_ids.clone()
     input_flat = paddle.flatten(shifted_input_ids)
     batch_size, seq_length = paddle.shape(shifted_input_ids)
-    index = paddle.arange(0, batch_size, 1, dtype='int32') * seq_length
-    index_of_eos = paddle.cast(shifted_input_ids != pad_token_id,
-                               dtype='int32').sum(axis=-1) - 1
+    index = paddle.arange(0, batch_size, 1, dtype="int32") * seq_length
+    index_of_eos = paddle.cast(shifted_input_ids != pad_token_id, dtype="int32").sum(axis=-1) - 1
     decoder_start_tokens = paddle.gather(input_flat, index + index_of_eos)
     shifted_input_ids[:, 1:] = shifted_input_ids[:, :-1].clone()
     shifted_input_ids[:, 0] = decoder_start_tokens
@@ -54,6 +67,7 @@ class MBartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
+
     pretrained_init_configuration = {
         "mbart-large-cc25": {
             "vocab_size": 250027,
@@ -154,26 +168,21 @@ class MBartPretrainedModel(PretrainedModel):
             "activation_dropout": 0.0,
             "max_position_embeddings": 1024,
             "init_std": 0.02,
-        }
+        },
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "mbart-large-cc25":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
-            "mbart-large-en-ro":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
-            "mbart-large-50-one-to-many-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
-            "mbart-large-50-many-to-one-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
-            "mbart-large-50-many-to-many-mmt":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams"
+            "mbart-large-cc25": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-cc25.pdparams",
+            "mbart-large-en-ro": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart/mbart-large-en-ro.pdparams",
+            "mbart-large-50-one-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-one-to-many-mmt.pdparams",
+            "mbart-large-50-many-to-one-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-one-mmt.pdparams",
+            "mbart-large-50-many-to-many-mmt": "https://bj.bcebos.com/paddlenlp/models/transformers/mbart50/mbart-large-50-many-to-many-mmt.pdparams",
         }
     }
     base_model_prefix = "mbart"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -181,9 +190,10 @@ class MBartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else
-                        self.mbart.config["init_std"],
-                        shape=layer.weight.shape))
+                        std=self.init_std if hasattr(self, "init_std") else self.mbart.config["init_std"],
+                        shape=layer.weight.shape,
+                    )
+                )
 
 
 class MBartLearnedPositionalEmbedding(Embedding):
@@ -200,9 +210,7 @@ class MBartLearnedPositionalEmbedding(Embedding):
     def forward(self, input_ids_shape, past_key_values_length=0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
-        positions = paddle.arange(past_key_values_length,
-                                  past_key_values_length + seq_len,
-                                  dtype="int64")
+        positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
         return Embedding.forward(self, positions + self.offset)
 
 
@@ -211,20 +219,22 @@ class MBartEncoder(MBartPretrainedModel):
     The Transformer Encoder of MBartModel. The arguments of MBartEncoder can see :class:`MBartModel`.
     """
 
-    def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 encoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
+    def __init__(
+        self,
+        embed_tokens,
+        vocab_size,
+        pad_token_id=1,
+        d_model=768,
+        num_encoder_layers=6,
+        encoder_attention_heads=12,
+        encoder_ffn_dim=3072,
+        dropout=0.1,
+        activation_function="gelu",
+        attention_dropout=0.1,
+        activation_dropout=0.1,
+        max_position_embeddings=1024,
+        init_std=0.02,
+    ):
         super().__init__()
         self.d_model = d_model
         self.init_std = init_std
@@ -234,8 +244,7 @@ class MBartEncoder(MBartPretrainedModel):
         else:
             self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
-        self.encoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
+        self.encoder_embed_positions = MBartLearnedPositionalEmbedding(max_position_embeddings, d_model)
 
         self.encoder_dropout = nn.Dropout(dropout)
         self.encoder_layernorm_embedding = nn.LayerNorm(d_model)
@@ -247,12 +256,20 @@ class MBartEncoder(MBartPretrainedModel):
             activation=activation_function,
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout,
-            normalize_before=True)
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers,
-                                             nn.LayerNorm(d_model))
+            normalize_before=True,
+        )
+        self.encoder = nn.TransformerEncoder(encoder_layer, num_encoder_layers, nn.LayerNorm(d_model))
         self.apply(self.init_weights)
 
-    def forward(self, input_ids=None, attention_mask=None, **kwargs):
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+        **kwargs
+    ):
         """
         The MBartEncoder forward method, overrides the `__call__()` special method.
 
@@ -276,17 +293,22 @@ class MBartEncoder(MBartPretrainedModel):
         encoder_input = self.encoder_dropout(hidden_states)
 
         if attention_mask is None:
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            attention_mask = (
+                paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
 
-        encoder_output = self.encoder(encoder_input, src_mask=attention_mask)
+        encoder_output = self.encoder(
+            encoder_input,
+            src_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         return encoder_output
 
 
@@ -295,20 +317,22 @@ class MBartDecoder(MBartPretrainedModel):
     The Transformer Decoder of MBartModel. The arguments of MBartDecoder can see :class:`MBartModel`.
     """
 
-    def __init__(self,
-                 embed_tokens,
-                 vocab_size,
-                 pad_token_id=1,
-                 d_model=768,
-                 num_decoder_layers=6,
-                 decoder_attention_heads=12,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
+    def __init__(
+        self,
+        embed_tokens,
+        vocab_size,
+        pad_token_id=1,
+        d_model=768,
+        num_decoder_layers=6,
+        decoder_attention_heads=12,
+        decoder_ffn_dim=3072,
+        dropout=0.1,
+        activation_function="gelu",
+        attention_dropout=0.1,
+        activation_dropout=0.1,
+        max_position_embeddings=1024,
+        init_std=0.02,
+    ):
         super().__init__()
         self.d_model = d_model
         self.init_std = init_std
@@ -317,8 +341,7 @@ class MBartDecoder(MBartPretrainedModel):
         else:
             self.embed_tokens = nn.Embedding(vocab_size, d_model)
 
-        self.decoder_embed_positions = MBartLearnedPositionalEmbedding(
-            max_position_embeddings, d_model)
+        self.decoder_embed_positions = MBartLearnedPositionalEmbedding(max_position_embeddings, d_model)
         self.decoder_dropout = nn.Dropout(dropout)
         self.decoder_layernorm_embedding = nn.LayerNorm(d_model)
 
@@ -330,17 +353,22 @@ class MBartDecoder(MBartPretrainedModel):
             activation=activation_function,
             attn_dropout=attention_dropout,
             act_dropout=activation_dropout,
-            normalize_before=True)
-        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers,
-                                             nn.LayerNorm(d_model))
+            normalize_before=True,
+        )
+        self.decoder = nn.TransformerDecoder(decoder_layer, num_decoder_layers, nn.LayerNorm(d_model))
         self.apply(self.init_weights)
 
-    def forward(self,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_output=None,
-                memory_mask=None,
-                cache=None):
+    def forward(
+        self,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        memory_mask=None,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         """
         The MBartDecoder forward method, overrides the `__call__()` special method.
 
@@ -363,25 +391,26 @@ class MBartDecoder(MBartPretrainedModel):
         """
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu((paddle.full(
-                (decoder_length, decoder_length),
-                -np.inf,
-                dtype=paddle.get_default_dtype())), 1)
-        decoder_inputs_embeds = self.d_model**0.5 * self.embed_tokens(
-            decoder_input_ids)
-        past_key_values_length = paddle.shape(
-            cache[0][0].k)[2] if cache is not None else 0
-        decoder_inputs_embed_pos = self.decoder_embed_positions(
-            decoder_input_ids.shape, past_key_values_length)
+            decoder_attention_mask = paddle.tensor.triu(
+                (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
+            )
+        decoder_inputs_embeds = self.d_model**0.5 * self.embed_tokens(decoder_input_ids)
+        past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
+        decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_ids.shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
 
-        decoder_output = self.decoder(tgt=decoder_input,
-                                      memory=encoder_output,
-                                      tgt_mask=decoder_attention_mask,
-                                      memory_mask=memory_mask,
-                                      cache=cache)
+        decoder_output = self.decoder(
+            tgt=decoder_input,
+            memory=encoder_output,
+            tgt_mask=decoder_attention_mask,
+            memory_mask=memory_mask,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         return decoder_output
 
 
@@ -455,44 +484,64 @@ class MBartModel(MBartPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size,
-                 bos_token_id=0,
-                 pad_token_id=1,
-                 eos_token_id=2,
-                 decoder_start_token_id=2,
-                 forced_bos_token_id=250004,
-                 d_model=768,
-                 num_encoder_layers=6,
-                 num_decoder_layers=6,
-                 encoder_attention_heads=12,
-                 decoder_attention_heads=12,
-                 encoder_ffn_dim=3072,
-                 decoder_ffn_dim=3072,
-                 dropout=0.1,
-                 activation_function='gelu',
-                 attention_dropout=0.1,
-                 activation_dropout=0.1,
-                 max_position_embeddings=1024,
-                 init_std=0.02):
+    def __init__(
+        self,
+        vocab_size,
+        bos_token_id=0,
+        pad_token_id=1,
+        eos_token_id=2,
+        decoder_start_token_id=2,
+        forced_bos_token_id=250004,
+        d_model=768,
+        num_encoder_layers=6,
+        num_decoder_layers=6,
+        encoder_attention_heads=12,
+        decoder_attention_heads=12,
+        encoder_ffn_dim=3072,
+        decoder_ffn_dim=3072,
+        dropout=0.1,
+        activation_function="gelu",
+        attention_dropout=0.1,
+        activation_dropout=0.1,
+        max_position_embeddings=1024,
+        init_std=0.02,
+    ):
         super().__init__()
         self.init_std = init_std
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
         self.shared = nn.Embedding(vocab_size, d_model)
-        self.encoder = MBartEncoder(self.shared, vocab_size, pad_token_id,
-                                    d_model, num_encoder_layers,
-                                    encoder_attention_heads, encoder_ffn_dim,
-                                    dropout, activation_function,
-                                    attention_dropout, activation_dropout,
-                                    max_position_embeddings, init_std)
+        self.encoder = MBartEncoder(
+            self.shared,
+            vocab_size,
+            pad_token_id,
+            d_model,
+            num_encoder_layers,
+            encoder_attention_heads,
+            encoder_ffn_dim,
+            dropout,
+            activation_function,
+            attention_dropout,
+            activation_dropout,
+            max_position_embeddings,
+            init_std,
+        )
 
-        self.decoder = MBartDecoder(self.shared, vocab_size, pad_token_id,
-                                    d_model, num_decoder_layers,
-                                    decoder_attention_heads, decoder_ffn_dim,
-                                    dropout, activation_function,
-                                    attention_dropout, activation_dropout,
-                                    max_position_embeddings, init_std)
+        self.decoder = MBartDecoder(
+            self.shared,
+            vocab_size,
+            pad_token_id,
+            d_model,
+            num_decoder_layers,
+            decoder_attention_heads,
+            decoder_ffn_dim,
+            dropout,
+            activation_function,
+            attention_dropout,
+            activation_dropout,
+            max_position_embeddings,
+            init_std,
+        )
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -501,15 +550,26 @@ class MBartModel(MBartPretrainedModel):
     def get_decoder(self):
         return self.decoder
 
-    def forward(self,
-                input_ids,
-                attention_mask=None,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_output=None,
-                use_cache=False,
-                cache=None):
-        r'''
+    def get_input_embeddings(self):
+        return self.shared
+
+    def set_input_embeddings(self, value):
+        self.shared = value
+
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        r"""
         The MBartModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -551,9 +611,23 @@ class MBartModel(MBartPretrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+             output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `decoder_output`, which is the output at the last layer of the model.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False`,
+            returns tensor `decoder_output`, which is the output at the last layer of the model.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         Example:
@@ -568,39 +642,75 @@ class MBartModel(MBartPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
         # different to other models, MBart automatically creates decoder_input_ids from
         # input MBartForSequenceClassification_ids if no decoder_input_ids are provided
         if input_ids is None and encoder_output is None:
-            raise ValueError(
-                "You have to specify either input_ids or encoder_output")
+            raise ValueError("You have to specify either input_ids or encoder_output")
         if decoder_input_ids is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating decoder_input_ids"
+            assert input_ids is not None, "input_ids should be " "specified when generating decoder_input_ids"
             decoder_input_ids = shift_tokens_right(input_ids, self.pad_token_id)
         if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating attention_mask"
-            attention_mask = paddle.cast(
-                input_ids == self.pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            assert input_ids is not None, "input_ids should be " "specified when generating attention_mask"
+            attention_mask = (
+                paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
         if encoder_output is None:
-            encoder_output = self.encoder(input_ids, attention_mask)
+            encoder_output = self.encoder(
+                input_ids,
+                attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
+        # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
+        elif return_dict and not isinstance(encoder_output, ModelOutput):
+            if isinstance(encoder_output, type(decoder_input_ids)):
+                encoder_output = (encoder_output,)
+            encoder_output = convert_encoder_output(encoder_output)
+        if isinstance(encoder_output, type(decoder_input_ids)):
+            encoder_last_hidden_state = encoder_output
+        else:
+            encoder_last_hidden_state = encoder_output[0]
+
         if use_cache:
             if cache is None:
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
-        decoder_output = self.decoder(decoder_input_ids, decoder_attention_mask,
-                                      encoder_output, attention_mask, cache)
+        decoder_output = self.decoder(
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_last_hidden_state,
+            attention_mask,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
-        return decoder_output
+        if not return_dict:
+            if isinstance(decoder_output, type(decoder_input_ids)):
+                decoder_output = (decoder_output,)
+            if isinstance(encoder_output, type(decoder_input_ids)):
+                encoder_output = (encoder_output,)
+            return decoder_output + encoder_output
+
+        return Seq2SeqModelOutput(
+            last_hidden_state=decoder_output.last_hidden_state,
+            past_key_values=decoder_output.past_key_values,
+            decoder_hidden_states=decoder_output.hidden_states,
+            decoder_attentions=decoder_output.attentions,
+            cross_attentions=decoder_output.cross_attentions,
+            encoder_last_hidden_state=encoder_output.last_hidden_state,
+            encoder_hidden_states=encoder_output.hidden_states,
+            encoder_attentions=encoder_output.attentions,
+        )
 
 
 class MBartClassificationHead(Layer):
@@ -608,8 +718,7 @@ class MBartClassificationHead(Layer):
     Head for sentence-level classification tasks.
     """
 
-    def __init__(self, input_dim: int, inner_dim: int, num_classes: int,
-                 pooler_dropout: float):
+    def __init__(self, input_dim: int, inner_dim: int, num_classes: int, pooler_dropout: float):
         super().__init__()
         self.dense = nn.Linear(input_dim, inner_dim)
         self.dropout = nn.Dropout(p=pooler_dropout)
@@ -649,18 +758,27 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         super().__init__()
         self.mbart = mbart
         self.classifier = MBartClassificationHead(
-            self.mbart.config['d_model'], self.mbart.config['d_model'],
-            num_labels, dropout if dropout else self.mbart.config['dropout'])
+            self.mbart.config["d_model"],
+            self.mbart.config["d_model"],
+            num_labels,
+            dropout if dropout else self.mbart.config["dropout"],
+        )
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                attention_mask=None,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_output=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        use_cache=False,
+        cache=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The MBartForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -679,9 +797,24 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                 See :class:`MBartModel`.
             cache (Tensor, optional):
                 See :class:`MBartModel`.
+            labels (Tensor, optional):
+                Labels for computing the sequence classification/regression loss. Indices should be in `[0, ...,
+                num_labels - 1]`. If `num_labels > 1` a classification loss is computed (Cross-Entropy).
+                Default to `None`.
+            output_attentions (bool, optional):
+                See :class:`MBartModel`.
+            output_hidden_states (bool, optional):
+                See :class:`MBartModel`.
+            return_dict (bool, optional):
+                See :class:`MBartModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            `An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqSequenceClassifierOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqSequenceClassifierOutput`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and labels=None,
+            returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_labels]` and dtype as float32.
 
         Example:
@@ -697,26 +830,58 @@ class MBartForSequenceClassification(MBartPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 logits = model(**inputs)
         """
-        output = self.mbart(input_ids, attention_mask, decoder_input_ids,
-                            decoder_attention_mask, encoder_output, use_cache,
-                            cache)
-        if use_cache:
-            output = output[0]
-        eos_mask = paddle.cast(input_ids == self.mbart.config['eos_token_id'],
-                               dtype='int64')
+        outputs = self.mbart(
+            input_ids,
+            attention_mask,
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_output,
+            use_cache,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        output = outputs[0]
+        eos_mask = paddle.cast(input_ids == self.mbart.config["eos_token_id"], dtype="int64")
         if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
-            raise ValueError(
-                'All examples must have the same number of <eos> tokens.')
+            raise ValueError("All examples must have the same number of <eos> tokens.")
 
         output_shape = paddle.shape(output)
         # TODO(gongenlei): support bool tensor index
-        output = output.masked_select(
-            eos_mask.unsqueeze(-1).astype('bool').tile([1, 1,
-                                                        output_shape[-1]]))
-        sentence_representation = output.reshape(
-            [output_shape[0], -1, output_shape[-1]])[:, -1, :]
+        output = output.masked_select(eos_mask.unsqueeze(-1).astype("bool").tile([1, 1, output_shape[-1]]))
+        sentence_representation = output.reshape([output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
-        return logits
+
+        loss = None
+        if labels is not None:
+            if self.num_labels == 1:
+                loss_fct = nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+            else:
+                loss_fct = nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            if len(outputs) == 2:
+                return (loss, logits) if loss is not None else logits
+            output = (logits,) + outputs[1:]
+            return ((loss,) + output) if loss is not None else output
+
+        return Seq2SeqSequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            decoder_hidden_states=outputs.decoder_hidden_states,
+            decoder_attentions=outputs.decoder_attentions,
+            cross_attentions=outputs.cross_attentions,
+            encoder_last_hidden_state=outputs.encoder_last_hidden_state,
+            encoder_hidden_states=outputs.encoder_hidden_states,
+            encoder_attentions=outputs.encoder_attentions,
+        )
 
 
 class MBartForQuestionAnswering(MBartPretrainedModel):
@@ -732,17 +897,24 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
     def __init__(self, mbart):
         super().__init__()
         self.mbart = mbart
-        self.classifier = nn.Linear(self.mbart.config['d_model'], 2)
+        self.classifier = nn.Linear(self.mbart.config["d_model"], 2)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                attention_mask=None,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_output=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        use_cache=False,
+        cache=None,
+        start_positions=None,
+        end_positions=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The MBartForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -761,9 +933,30 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
                 See :class:`MBartModel`.
             cache (Tensor, optional):
                 See :class:`MBartModel`.
+            start_positions (Tensor, optional):
+                Labels for position (index) of the start of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (sequence_length). Position outside of the sequence
+                are not taken into account for computing the loss.
+                A tensor of shape `(batch_size, )`. Default to `None`.
+            end_positions (Tensor, optional):
+                Labels for position (index) of the end of the labelled span for computing the token classification loss.
+                Positions are clamped to the length of the sequence (sequence_length). Position outside of the sequence
+                are not taken into account for computing the loss.
+                A tensor of shape `(batch_size, )`. Default to `None`.
+            output_attentions (bool, optional):
+                See :class:`MBartModel`.
+            output_hidden_states (bool, optional):
+                See :class:`MBartModel`.
+            return_dict (bool, optional):
+                See :class:`MBartModel`.
 
         Returns:
-            tuple: Returns tuple (`start_logits`, `end_logits`).
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqQuestionAnsweringModelOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqQuestionAnsweringModelOutput`.
+            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `start_positions=end_positions=None`,
+            returns tuple (`start_logits`, `end_logits`).
 
             With the fields:
 
@@ -790,13 +983,55 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
                 start_logits = outputs[0]
                 end_logits  =outputs[1]
         """
-        output = self.mbart(input_ids, attention_mask, decoder_input_ids,
-                            decoder_attention_mask, encoder_output, use_cache,
-                            cache)
-        logits = self.classifier(output[0] if use_cache else output, )
+        outputs = self.mbart(
+            input_ids,
+            attention_mask,
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_output,
+            use_cache,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        logits = self.classifier(outputs[0])
         logits = paddle.transpose(logits, perm=[2, 0, 1])
         start_logits, end_logits = paddle.unstack(x=logits, axis=0)
-        return start_logits, end_logits
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = start_logits.shape[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
+        if not return_dict:
+            outputs = (start_logits, end_logits) + (outputs[1:] if len(outputs) > 2 else ())
+            return ((total_loss,) + outputs) if total_loss else outputs
+
+        return Seq2SeqQuestionAnsweringModelOutput(
+            loss=total_loss,
+            start_logits=start_logits,
+            end_logits=end_logits,
+            past_key_values=outputs.past_key_values,
+            decoder_hidden_states=outputs.decoder_hidden_states,
+            decoder_attentions=outputs.decoder_attentions,
+            cross_attentions=outputs.cross_attentions,
+            encoder_last_hidden_state=outputs.encoder_last_hidden_state,
+            encoder_hidden_states=outputs.encoder_hidden_states,
+            encoder_attentions=outputs.encoder_attentions,
+        )
 
 
 class MBartForConditionalGeneration(MBartPretrainedModel):
@@ -812,15 +1047,13 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         super().__init__()
         self.mbart = mbart
         self.lm_head_weight = self.create_parameter(
-            shape=[
-                self.mbart.config['vocab_size'], self.mbart.config['d_model']
-            ],
+            shape=[self.mbart.config["vocab_size"], self.mbart.config["d_model"]],
             dtype=self.mbart.shared.weight.dtype,
-            is_bias=False)
+            is_bias=False,
+        )
         self.register_buffer(
-            "final_logits_bias",
-            paddle.zeros((1, self.mbart.config['vocab_size']),
-                         dtype=paddle.get_default_dtype()))
+            "final_logits_bias", paddle.zeros((1, self.mbart.config["vocab_size"]), dtype=paddle.get_default_dtype())
+        )
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -831,34 +1064,37 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterMBART
-        decode_strategy = kwargs.get('decode_strategy')
-        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        if decode_strategy == 'sampling' and kwargs.get(
-                'top_k') != 0 and kwargs.get('top_p') != 1:
+
+        decode_strategy = kwargs.get("decode_strategy")
+        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
+        if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
-                    "Only topk sampling or topp sampling are supported. " \
-                    "Topk sampling and topp sampling cannot be both applied in the faster version.")
-        if kwargs['repetition_penalty'] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError(
-                "'repetition_penalty != 1' is not supported yet in the faster version"
+                "Only topk sampling or topp sampling are supported. "
+                "Topk sampling and topp sampling cannot be both applied in the faster version."
             )
-        if kwargs['min_length'] != 0:
+        if kwargs["repetition_penalty"] != 1.0:
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+        if kwargs["min_length"] != 0:
             # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterMBART(
-            self, use_fp16_decoding=use_fp16_decoding).forward
+            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
+        self._faster_entry = FasterMBART(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
-    def forward(self,
-                input_ids,
-                attention_mask=None,
-                decoder_input_ids=None,
-                decoder_attention_mask=None,
-                encoder_output=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self,
+        input_ids,
+        attention_mask=None,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        use_cache=False,
+        cache=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The MBartForConditionalGeneration forward method, overrides the __call__() special method.
 
@@ -877,9 +1113,25 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                 See :class:`MBartModel`.
             cache (Tensor, optional):
                 See :class:`MBartModel`.
+            abels (Tensor, optional):
+                Labels for computing the masked language modeling loss. Indices should either be in `[0, ...,
+                vocab_size]` or -100 (see `input_ids` docstring). Tokens with indices set to `-100` are ignored
+                (masked), the loss is only computed for the tokens with labels in `[0, ..., vocab_size]`.
+                A tensor of shape `(batch_size, sequence_length)`. Default to `None`.
+            output_attentions (bool, optional):
+                See :class:`MBartModel`.
+            output_hidden_states (bool, optional):
+                See :class:`MBartModel`.
+            return_dict (bool, optional):
+                See :class:`MBartModel`.
 
         Returns:
-            Tensor or tuple: Returns Tensor `lm_logits` if `use_cache` is `False`, otherwise, returns tuple (`lm_logits`, `cache`).
+            An instance of :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.Seq2SeqLMOutput`.
+            Especially, When `use_cache=return_dict=output_hidden_states=output_attentions=False` and labels=None,
+            returns tensor `logits`, a tensor of the input text classification logits.
 
             With the fields:
 
@@ -904,35 +1156,60 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
                 outputs = model(**inputs)
 
         """
-        output = self.mbart(input_ids, attention_mask, decoder_input_ids,
-                            decoder_attention_mask, encoder_output, use_cache,
-                            cache)
+        outputs = self.mbart(
+            input_ids,
+            attention_mask,
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_output,
+            use_cache,
+            cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
-        lm_logits = paddle.tensor.matmul(
-            output[0] if use_cache else output,
-            self.lm_head_weight,
-            transpose_y=True) + self.final_logits_bias
-        if use_cache:
-            cache = output[1]
-            return lm_logits, cache
-        else:
-            return lm_logits
+        lm_logits = paddle.tensor.matmul(outputs[0], self.lm_head_weight, transpose_y=True) + self.final_logits_bias
 
-    def prepare_inputs_for_generation(self,
-                                      decoder_input_ids,
-                                      attention_mask=None,
-                                      decoder_attention_mask=None,
-                                      cache=None,
-                                      use_cache=False,
-                                      encoder_output=None,
-                                      **kwargs):
+        masked_lm_loss = None
+        if labels is not None:
+            loss_fct = nn.CrossEntropyLoss()
+            masked_lm_loss = loss_fct(lm_logits.reshape((-1, self.mbart.config["vocab_size"])), labels.reshape((-1,)))
+
+        if not return_dict:
+            if len(outputs) == 2:
+                return (masked_lm_loss, lm_logits) if masked_lm_loss is not None else lm_logits
+            else:
+                outputs = (lm_logits,) + outputs[1:]
+                return ((masked_lm_loss,) + outputs) if masked_lm_loss is not None else outputs
+
+        return Seq2SeqLMOutput(
+            loss=masked_lm_loss,
+            logits=lm_logits,
+            past_key_values=outputs.past_key_values,
+            decoder_hidden_states=outputs.decoder_hidden_states,
+            decoder_attentions=outputs.decoder_attentions,
+            cross_attentions=outputs.cross_attentions,
+            encoder_last_hidden_state=outputs.encoder_last_hidden_state,
+            encoder_hidden_states=outputs.encoder_hidden_states,
+            encoder_attentions=outputs.encoder_attentions,
+        )
+
+    def prepare_inputs_for_generation(
+        self,
+        decoder_input_ids,
+        attention_mask=None,
+        decoder_attention_mask=None,
+        cache=None,
+        use_cache=False,
+        encoder_output=None,
+        **kwargs
+    ):
         # cut decoder_input_ids if past is used
         if cache is not None:
             decoder_input_ids = decoder_input_ids[:, -1].unsqueeze(-1)
             if decoder_attention_mask is not None:
-                decoder_attention_mask = decoder_attention_mask[:, :,
-                                                                -1, :].unsqueeze(
-                                                                    2)
+                decoder_attention_mask = decoder_attention_mask[:, :, -1, :].unsqueeze(2)
 
         return {
             "input_ids": None,
@@ -941,7 +1218,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
             "decoder_attention_mask": decoder_attention_mask,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
         }
 
     def __getattr__(self, name):

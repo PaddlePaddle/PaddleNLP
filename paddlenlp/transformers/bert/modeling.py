@@ -11,21 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 import warnings
 
+from typing import Optional, Tuple
 import paddle
+from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
+
 try:
     from paddle.incubate.nn import FusedTransformerEncoderLayer
 except ImportError:
     FusedTransformerEncoderLayer = None
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import List, Optional, Tuple, Union
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
     SequenceClassifierOutput,
     TokenClassifierOutput,
@@ -34,17 +37,18 @@ from ..model_outputs import (
     MaskedLMOutput,
     ModelOutput,
 )
+from .configuration import BERT_PRETRAINED_RESOURCE_FILES_MAP, BertConfig, BERT_PRETRAINED_INIT_CONFIGURATION
 
 __all__ = [
-    'BertModel',
+    "BertModel",
     "BertPretrainedModel",
-    'BertForPretraining',
-    'BertPretrainingCriterion',
-    'BertPretrainingHeads',
-    'BertForSequenceClassification',
-    'BertForTokenClassification',
-    'BertForQuestionAnswering',
-    'BertForMultipleChoice',
+    "BertForPretraining",
+    "BertPretrainingCriterion",
+    "BertPretrainingHeads",
+    "BertForSequenceClassification",
+    "BertForTokenClassification",
+    "BertForQuestionAnswering",
+    "BertForMultipleChoice",
     "BertForMaskedLM",
 ]
 
@@ -54,25 +58,23 @@ class BertEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16):
+    def __init__(self, config: BertConfig):
         super(BertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                past_key_values_length=None):
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
+
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        past_key_values_length: Optional[int] = None,
+    ):
+
         if position_ids is None:
             ones = paddle.ones_like(input_ids, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
@@ -99,11 +101,17 @@ class BertPooler(Layer):
     Pool the result of BertEncoder.
     """
 
-    def __init__(self, hidden_size, pool_act="tanh"):
+    def __init__(self, config: BertConfig):
+        """init the bert pooler with config & args/kwargs
+
+        Args:
+            config (BertConfig): BertConfig instance. Defaults to None.
+        """
         super(BertPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
-        self.pool_act = pool_act
+        self.pool_act = config.pool_act
 
     def forward(self, hidden_states):
         # We "pool" the model by simply taking the hidden state corresponding
@@ -124,316 +132,32 @@ class BertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "bert-base-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-large-uncased": {
-            "vocab_size": 30522,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-multilingual-uncased": {
-            "vocab_size": 105879,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-cased": {
-            "vocab_size": 28996,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-base-multilingual-cased": {
-            "vocab_size": 119547,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-large-cased": {
-            "vocab_size": 28996,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "bert-wwm-ext-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "macbert-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "macbert-large-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "simbert-base-chinese": {
-            "vocab_size": 13685,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-        },
-        "uer/chinese-roberta-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-medium": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 512,
-            "initializer_range": 0.02,
-            "intermediate_size": 2048,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 8,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-6l-768h": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 6,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-small": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 512,
-            "initializer_range": 0.02,
-            "intermediate_size": 2048,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 8,
-            "num_hidden_layers": 4,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-mini": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 256,
-            "initializer_range": 0.02,
-            "intermediate_size": 1024,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 4,
-            "num_hidden_layers": 4,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-        "uer/chinese-roberta-tiny": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 128,
-            "initializer_range": 0.02,
-            "intermediate_size": 512,
-            "max_position_embeddings": 512,
-            "num_attention_heads": 2,
-            "num_hidden_layers": 2,
-            "type_vocab_size": 2,
-            "vocab_size": 21128,
-            "pad_token_id": 0
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "bert-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams",
-            "bert-large-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bert-large-uncased.pdparams",
-            "bert-base-multilingual-uncased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert-base-multilingual-uncased.pdparams",
-            "bert-base-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-cased.pdparams",
-            "bert-base-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-chinese.pdparams",
-            "bert-base-multilingual-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-multilingual-cased.pdparams",
-            "bert-large-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-large-cased.pdparams",
-            "bert-wwm-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese.pdparams",
-            "bert-wwm-ext-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
-            "macbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-base-chinese.pdparams",
-            "macbert-large-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-large-chinese.pdparams",
-            "simbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-            "uer/chinese-roberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
-            "uer/chinese-roberta-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
-            "uer/chinese-roberta-6l-768h":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
-            "uer/chinese-roberta-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
-            "uer/chinese-roberta-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_mini.pdparams",
-            "uer/chinese-roberta-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_tiny.pdparams",
-        }
-    }
+    model_config_file = "model_config.json"
+    config_class = BertConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
 
+    pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
+
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(mean=0.0,
-                                         std=self.initializer_range if hasattr(
-                                             self, "initializer_range") else
-                                         self.bert.config["initializer_range"],
-                                         shape=layer.weight.shape))
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.config.initializer_range,
+                        shape=layer.weight.shape,
+                    )
+                )
+
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = 1e-12
+            layer._epsilon = self.config.layer_norm_eps
 
 
 @register_base_model
@@ -499,57 +223,45 @@ class BertModel(BertPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size=30522,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 pool_act="tanh",
-                 fuse=False):
-        super(BertModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = BertEmbeddings(vocab_size, hidden_size,
-                                         hidden_dropout_prob,
-                                         max_position_embeddings,
-                                         type_vocab_size)
-        if fuse and FusedTransformerEncoderLayer is None:
+    def __init__(self, config: BertConfig):
+        super(BertModel, self).__init__(config)
+
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = BertEmbeddings(config)
+        if config.fuse and FusedTransformerEncoderLayer is None:
             warnings.warn(
                 "FusedTransformerEncoderLayer is not supported by the running Paddle. "
                 "The flag fuse_transformer will be ignored. Try Paddle >= 2.3.0"
             )
-        self.fuse = fuse and FusedTransformerEncoderLayer is not None
+        self.fuse = config.fuse and FusedTransformerEncoderLayer is not None
         if self.fuse:
-            self.encoder = nn.LayerList([
-                FusedTransformerEncoderLayer(
-                    hidden_size,
-                    num_attention_heads,
-                    intermediate_size,
-                    dropout_rate=hidden_dropout_prob,
-                    activation=hidden_act,
-                    attn_dropout_rate=attention_probs_dropout_prob,
-                    act_dropout_rate=0.) for _ in range(num_hidden_layers)
-            ])
+            self.encoder = nn.LayerList(
+                [
+                    FusedTransformerEncoderLayer(
+                        config.hidden_size,
+                        config.num_attention_heads,
+                        config.intermediate_size,
+                        dropout_rate=config.hidden_dropout_prob,
+                        activation=config.hidden_act,
+                        attn_dropout_rate=config.attention_probs_dropout_prob,
+                        act_dropout_rate=0.0,
+                    )
+                    for _ in range(config.num_hidden_layers)
+                ]
+            )
         else:
             encoder_layer = nn.TransformerEncoderLayer(
-                hidden_size,
-                num_attention_heads,
-                intermediate_size,
-                dropout=hidden_dropout_prob,
-                activation=hidden_act,
-                attn_dropout=attention_probs_dropout_prob,
-                act_dropout=0)
-            self.encoder = nn.TransformerEncoder(encoder_layer,
-                                                 num_hidden_layers)
-        self.pooler = BertPooler(hidden_size, pool_act)
+                config.hidden_size,
+                config.num_attention_heads,
+                config.intermediate_size,
+                dropout=config.hidden_dropout_prob,
+                activation=config.hidden_act,
+                attn_dropout=config.attention_probs_dropout_prob,
+                act_dropout=0,
+            )
+            self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = BertPooler(config)
         self.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -558,17 +270,19 @@ class BertModel(BertPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                past_key_values=None,
-                use_cache=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
-        r'''
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+        use_cache: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
         The BertModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -612,13 +326,13 @@ class BertModel(BertPretrainedModel):
                 Defaults to `None`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPoolingAndCrossAttentions` if
@@ -638,36 +352,38 @@ class BertModel(BertPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         past_key_values_length = None
         if past_key_values is not None:
             past_key_values_length = past_key_values[0][0].shape[2]
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e4,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+            )
             if past_key_values is not None:
                 batch_size = past_key_values[0][0].shape[0]
-                past_mask = paddle.zeros(
-                    [batch_size, 1, 1, past_key_values_length],
-                    dtype=attention_mask.dtype)
-                attention_mask = paddle.concat([past_mask, attention_mask],
-                                               axis=-1)
+                past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)
+                attention_mask = paddle.concat([past_mask, attention_mask], axis=-1)
 
         else:
             if attention_mask.ndim == 2:
                 # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
-                    paddle.get_default_dtype())
+                attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
                 attention_mask = (1.0 - attention_mask) * -1e4
 
         embedding_output = self.embeddings(
             input_ids=input_ids,
             position_ids=position_ids,
             token_type_ids=token_type_ids,
-            past_key_values_length=past_key_values_length)
+            past_key_values_length=past_key_values_length,
+        )
         if self.fuse:
             assert not output_attentions, "Not support attentions output currently."
             assert past_key_values is None, "Not support past_key_values currently."
@@ -681,13 +397,14 @@ class BertModel(BertPretrainedModel):
 
             if return_dict:
                 return BaseModelOutputWithPoolingAndCrossAttentions(
-                    last_hidden_state=hidden_states,
-                    pooler_output=pooled_output,
-                    hidden_states=all_hidden_states)
+                    last_hidden_state=hidden_states, pooler_output=pooled_output, hidden_states=all_hidden_states
+                )
             else:
-                return (hidden_states, pooled_output,
-                        all_hidden_states) if output_hidden_states else (
-                            hidden_states, pooled_output)
+                return (
+                    (hidden_states, pooled_output, all_hidden_states)
+                    if output_hidden_states
+                    else (hidden_states, pooled_output)
+                )
         else:
             self.encoder._use_cache = use_cache  # To be consistent with HF
             encoder_outputs = self.encoder(
@@ -696,7 +413,8 @@ class BertModel(BertPretrainedModel):
                 cache=past_key_values,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
-                return_dict=return_dict)
+                return_dict=return_dict,
+            )
             if isinstance(encoder_outputs, type(embedding_output)):
                 sequence_output = encoder_outputs
                 pooled_output = self.pooler(sequence_output)
@@ -705,14 +423,14 @@ class BertModel(BertPretrainedModel):
                 sequence_output = encoder_outputs[0]
                 pooled_output = self.pooler(sequence_output)
                 if not return_dict:
-                    return (sequence_output,
-                            pooled_output) + encoder_outputs[1:]
+                    return (sequence_output, pooled_output) + encoder_outputs[1:]
                 return BaseModelOutputWithPoolingAndCrossAttentions(
                     last_hidden_state=sequence_output,
                     pooler_output=pooled_output,
                     past_key_values=encoder_outputs.past_key_values,
                     hidden_states=encoder_outputs.hidden_states,
-                    attentions=encoder_outputs.attentions)
+                    attentions=encoder_outputs.attentions,
+                )
 
 
 class BertForQuestionAnswering(BertPretrainedModel):
@@ -721,32 +439,31 @@ class BertForQuestionAnswering(BertPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to `None`.
-        """
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForQuestionAnswering.
+    """
 
-    def __init__(self, bert, dropout=None):
-        super(BertForQuestionAnswering, self).__init__()
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"], 2)
+    def __init__(self, config: BertConfig):
+        super(BertForQuestionAnswering, self).__init__(config)
+        self.bert = BertModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                start_positions=None,
-                end_positions=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The BertForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -769,13 +486,13 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 are not taken into account for computing the loss.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.QuestionAnsweringModelOutput` if `return_dict=True`.
@@ -800,13 +517,16 @@ class BertForQuestionAnswering(BertPretrainedModel):
                 end_logits = outputs[1]
         """
 
-        outputs = self.bert(input_ids,
-                            token_type_ids=token_type_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            output_attentions=output_attentions,
-                            output_hidden_states=output_hidden_states,
-                            return_dict=return_dict)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
         sequence_output = outputs[0]
 
@@ -832,8 +552,7 @@ class BertForQuestionAnswering(BertPretrainedModel):
             total_loss = (start_loss + end_loss) / 2
         if not return_dict:
             output = (start_logits, end_logits) + outputs[2:]
-            return ((total_loss, ) +
-                    output) if total_loss is not None else output
+            return ((total_loss,) + output) if total_loss is not None else output
 
         return QuestionAnsweringModelOutput(
             loss=total_loss,
@@ -850,35 +569,32 @@ class BertForSequenceClassification(BertPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForSequenceClassification.
     """
 
-    def __init__(self, bert, num_classes=2, dropout=None):
-        super(BertForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
-                                    num_classes)
+    def __init__(self, config: BertConfig):
+        super(BertForSequenceClassification, self).__init__(config)
+
+        self.bert = BertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The BertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -893,18 +609,18 @@ class BertForSequenceClassification(BertPretrainedModel):
                 See :class:`BertModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutput` if `return_dict=True`.
@@ -919,7 +635,7 @@ class BertForSequenceClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_classes=2)
+                model = BertForSequenceClassification.from_pretrained('bert-base-cased', num_labels=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
@@ -929,14 +645,17 @@ class BertForSequenceClassification(BertPretrainedModel):
                 # [1, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        outputs = self.bert(input_ids,
-                            token_type_ids=token_type_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            output_attentions=output_attentions,
-                            output_hidden_states=output_hidden_states,
-                            return_dict=return_dict)
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         pooled_output = outputs[1]
 
         pooled_output = self.dropout(pooled_output)
@@ -944,21 +663,19 @@ class BertForSequenceClassification(BertPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)),
-                                labels.reshape((-1, )))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return SequenceClassifierOutput(
             loss=loss,
@@ -974,35 +691,32 @@ class BertForTokenClassification(BertPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of BERT.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForTokenClassification.
     """
 
-    def __init__(self, bert, num_classes=2, dropout=None):
-        super(BertForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.bert = bert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"],
-                                    num_classes)
+    def __init__(self, config: BertConfig):
+        super().__init__(config)
+
+        self.bert = BertModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The BertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1016,16 +730,16 @@ class BertForTokenClassification(BertPretrainedModel):
             attention_mask (list, optional):
                 See :class:`BertModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if `return_dict=True`.
@@ -1040,23 +754,26 @@ class BertForTokenClassification(BertPretrainedModel):
                 from paddlenlp.transformers.bert.tokenizer import BertTokenizer
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-cased')
-                model = BertForTokenClassification.from_pretrained('bert-base-cased', num_classes=2)
+                model = BertForTokenClassification.from_pretrained('bert-base-cased', num_labels=2)
 
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                
+
                 logits = model(**inputs)
                 print(logits.shape)
                 # [1, 13, 2]
 
         """
-        outputs = self.bert(input_ids,
-                            token_type_ids=token_type_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            output_attentions=output_attentions,
-                            output_hidden_states=output_hidden_states,
-                            return_dict=return_dict)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
 
         sequence_output = outputs[0]
 
@@ -1066,12 +783,10 @@ class BertForTokenClassification(BertPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)),
-                            labels.reshape((-1, )))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
         if not return_dict:
-            output = (logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            output = (logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return TokenClassifierOutput(
             loss=loss,
@@ -1086,35 +801,33 @@ class BertLMPredictionHead(Layer):
     Bert Model with a `language modeling` head on top for CLM fine-tuning.
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super(BertLMPredictionHead, self).__init__()
-        self.transform = nn.Linear(hidden_size, hidden_size)
-        self.activation = getattr(nn.functional, activation)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=self.transform.weight.dtype,
-            is_bias=False) if embedding_weights is None else embedding_weights
+
+        self.transform = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = getattr(nn.functional, config.hidden_act)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.decoder_weight = (
+            self.create_parameter(
+                shape=[config.vocab_size, config.hidden_size], dtype=self.transform.weight.dtype, is_bias=False
+            )
+            if embedding_weights is None
+            else embedding_weights
+        )
+
         self.decoder_bias = self.create_parameter(
-            shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
 
     def forward(self, hidden_states, masked_positions=None):
         if masked_positions is not None:
-            hidden_states = paddle.reshape(hidden_states,
-                                           [-1, hidden_states.shape[-1]])
-            hidden_states = paddle.tensor.gather(hidden_states,
-                                                 masked_positions)
+            hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
+            hidden_states = paddle.tensor.gather(hidden_states, masked_positions)
         # gather masked tokens might be more quick
         hidden_states = self.transform(hidden_states)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.layer_norm(hidden_states)
-        hidden_states = paddle.tensor.matmul(
-            hidden_states, self.decoder_weight,
-            transpose_y=True) + self.decoder_bias
+        hidden_states = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True) + self.decoder_bias
         return hidden_states
 
 
@@ -1136,15 +849,10 @@ class BertPretrainingHeads(Layer):
 
     """
 
-    def __init__(self,
-                 hidden_size,
-                 vocab_size,
-                 activation,
-                 embedding_weights=None):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super(BertPretrainingHeads, self).__init__()
-        self.predictions = BertLMPredictionHead(hidden_size, vocab_size,
-                                                activation, embedding_weights)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = BertLMPredictionHead(config, embedding_weights)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output, masked_positions=None):
         """
@@ -1221,33 +929,31 @@ class BertForPretraining(BertPretrainedModel):
     Bert Model with pretraining tasks on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForPretraining.
 
     """
 
-    def __init__(self, bert):
-        super(BertForPretraining, self).__init__()
-        self.bert = bert
-        self.cls = BertPretrainingHeads(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
-            embedding_weights=self.bert.embeddings.word_embeddings.weight)
+    def __init__(self, config: BertConfig):
+        super(BertForPretraining, self).__init__(config)
+        self.bert = BertModel(config)
+        self.cls = BertPretrainingHeads(config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                labels=None,
-                next_sentence_label=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        masked_positions: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        next_sentence_label: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
 
         Args:
@@ -1273,13 +979,13 @@ class BertForPretraining(BertPretrainedModel):
                 - 1 indicates sequence B is a random sequence.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.bert.BertForPreTrainingOutput` if `return_dict=True`.
@@ -1288,33 +994,31 @@ class BertForPretraining(BertPretrainedModel):
 
         """
         with paddle.static.amp.fp16_guard():
-            outputs = self.bert(input_ids,
-                                token_type_ids=token_type_ids,
-                                position_ids=position_ids,
-                                attention_mask=attention_mask,
-                                output_attentions=output_attentions,
-                                output_hidden_states=output_hidden_states,
-                                return_dict=return_dict)
+            outputs = self.bert(
+                input_ids,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                output_attentions=output_attentions,
+                output_hidden_states=output_hidden_states,
+                return_dict=return_dict,
+            )
             sequence_output, pooled_output = outputs[:2]
-            prediction_scores, seq_relationship_score = self.cls(
-                sequence_output, pooled_output, masked_positions)
+            prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output, masked_positions)
 
             total_loss = None
             if labels is not None and next_sentence_label is not None:
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 masked_lm_loss = loss_fct(
-                    prediction_scores.reshape(
-                        (-1, prediction_scores.shape[-1])),
-                    labels.reshape((-1, )))
+                    prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
+                )
                 next_sentence_loss = loss_fct(
-                    seq_relationship_score.reshape((-1, 2)),
-                    next_sentence_label.reshape((-1, )))
+                    seq_relationship_score.reshape((-1, 2)), next_sentence_label.reshape((-1,))
+                )
                 total_loss = masked_lm_loss + next_sentence_loss
             if not return_dict:
-                output = (prediction_scores,
-                          seq_relationship_score) + outputs[2:]
-                return ((total_loss, ) +
-                        output) if total_loss is not None else output
+                output = (prediction_scores, seq_relationship_score) + outputs[2:]
+                return ((total_loss,) + output) if total_loss is not None else output
 
             return BertForPreTrainingOutput(
                 loss=total_loss,
@@ -1341,8 +1045,9 @@ class BertPretrainingCriterion(paddle.nn.Layer):
         self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
 
-    def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels, masked_lm_scale):
+    def forward(
+        self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale
+    ):
         """
         Args:
             prediction_scores(Tensor):
@@ -1371,14 +1076,9 @@ class BertPretrainingCriterion(paddle.nn.Layer):
 
         """
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(prediction_scores,
-                                             masked_lm_labels,
-                                             reduction='none',
-                                             ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(prediction_scores, masked_lm_labels, reduction="none", ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = F.cross_entropy(seq_relationship_score,
-                                                 next_sentence_labels,
-                                                 reduction='none')
+            next_sentence_loss = F.cross_entropy(seq_relationship_score, next_sentence_labels, reduction="none")
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)
 
 
@@ -1386,36 +1086,40 @@ class BertForMultipleChoice(BertPretrainedModel):
     """
     Bert Model with a linear layer on top of the hidden-states output layer,
     designed for multiple choice tasks like RocStories/SWAG tasks.
-    
+
     Args:
-        bert (:class:`BertModel`):
-            An instance of BertModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Bert.
-            If None, use the same value as `hidden_dropout_prob` of `BertModel`
-            instance `bert`. Defaults to None.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMultipleChoice.
+
+    Examples:
+        >>> model = BertForMultipleChoice(config, dropout=0.1)
+        >>> # or
+        >>> config.hidden_dropout_prob = 0.1
+        >>> model = BertForMultipleChoice(config)
     """
 
-    def __init__(self, bert, num_choices=2, dropout=None):
-        super(BertForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.bert = bert
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.bert.
-                                  config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.bert.config["hidden_size"], 1)
+    def __init__(self, config: BertConfig):
+        super(BertForMultipleChoice, self).__init__(config)
+
+        self.bert = BertModel(config)
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         The BertForMultipleChoice forward method, overrides the __call__() special method.
 
@@ -1434,13 +1138,13 @@ class BertForMultipleChoice(BertPretrainedModel):
                 `input_ids` above)
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MultipleChoiceModelOutput` if `return_dict=True`.
@@ -1499,43 +1203,40 @@ class BertForMultipleChoice(BertPretrainedModel):
                 # [2, 2]
 
         """
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # input_ids: [bs, num_choice, seq_l]
-        input_ids = input_ids.reshape(shape=(
-            -1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
+        input_ids = input_ids.reshape(shape=(-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
         if position_ids is not None:
-            position_ids = position_ids.reshape(shape=(-1,
-                                                       position_ids.shape[-1]))
+            position_ids = position_ids.reshape(shape=(-1, position_ids.shape[-1]))
         if token_type_ids is not None:
-            token_type_ids = token_type_ids.reshape(
-                shape=(-1, token_type_ids.shape[-1]))
+            token_type_ids = token_type_ids.reshape(shape=(-1, token_type_ids.shape[-1]))
 
         if attention_mask is not None:
-            attention_mask = attention_mask.reshape(
-                shape=(-1, attention_mask.shape[-1]))
+            attention_mask = attention_mask.reshape(shape=(-1, attention_mask.shape[-1]))
 
-        outputs = self.bert(input_ids,
-                            token_type_ids=token_type_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            output_attentions=output_attentions,
-                            output_hidden_states=output_hidden_states,
-                            return_dict=return_dict)
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
 
         logits = self.classifier(pooled_output)  # logits: (bs*num_choice,1)
-        reshaped_logits = logits.reshape(
-            shape=(-1, self.num_choices))  # logits: (bs, num_choice)
+        reshaped_logits = logits.reshape(shape=(-1, self.num_choices))  # logits: (bs, num_choice)
 
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
             loss = loss_fct(reshaped_logits, labels)
         if not return_dict:
-            output = (reshaped_logits, ) + outputs[2:]
-            return ((loss, ) + output) if loss is not None else (
-                output[0] if len(output) == 1 else output)
+            output = (reshaped_logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(
             loss=loss,
@@ -1546,14 +1247,9 @@ class BertForMultipleChoice(BertPretrainedModel):
 
 
 class BertOnlyMLMHead(nn.Layer):
-
-    def __init__(self, hidden_size, vocab_size, activation, embedding_weights):
+    def __init__(self, config: BertConfig, embedding_weights=None):
         super().__init__()
-        self.predictions = BertLMPredictionHead(
-            hidden_size=hidden_size,
-            vocab_size=vocab_size,
-            activation=activation,
-            embedding_weights=embedding_weights)
+        self.predictions = BertLMPredictionHead(config=config, embedding_weights=embedding_weights)
 
     def forward(self, sequence_output, masked_positions=None):
         prediction_scores = self.predictions(sequence_output, masked_positions)
@@ -1565,31 +1261,30 @@ class BertForMaskedLM(BertPretrainedModel):
     Bert Model with a `masked language modeling` head on top.
 
     Args:
-        bert (:class:`BertModel`):
-            An instance of :class:`BertModel`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMaskedLM.
 
     """
 
-    def __init__(self, bert):
-        super(BertForMaskedLM, self).__init__()
-        self.bert = bert
-        self.cls = BertOnlyMLMHead(
-            self.bert.config["hidden_size"],
-            self.bert.config["vocab_size"],
-            self.bert.config["hidden_act"],
-            embedding_weights=self.bert.embeddings.word_embeddings.weight)
+    def __init__(self, config: BertConfig):
+        super(BertForMaskedLM, self).__init__(config)
+        self.bert = BertModel(config)
+
+        self.cls = BertOnlyMLMHead(config=config, embedding_weights=self.bert.embeddings.word_embeddings.weight)
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
 
         Args:
@@ -1607,13 +1302,13 @@ class BertForMaskedLM(BertPretrainedModel):
                 loss is only computed for the tokens with labels in `[0, ..., vocab_size]`
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
-                Defaults to `False`.
+                Defaults to `None`.
             output_attentions (bool, optional):
                 Whether to return the attentions tensors of all attention layers.
-                Defaults to `False`.
+                Defaults to `None`.
             return_dict (bool, optional):
                 Whether to return a :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` object. If
-                `False`, the output will be a tuple of tensors. Defaults to `False`.
+                `False`, the output will be a tuple of tensors. Defaults to `None`.
 
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.MaskedLMOutput` if `return_dict=True`.
@@ -1628,7 +1323,7 @@ class BertForMaskedLM(BertPretrainedModel):
 
                 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 model = BertForMaskedLM.from_pretrained('bert-base-uncased')
-                
+
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
 
@@ -1637,29 +1332,32 @@ class BertForMaskedLM(BertPretrainedModel):
                 # [1, 13, 30522]
 
         """
-
-        outputs = self.bert(input_ids,
-                            token_type_ids=token_type_ids,
-                            position_ids=position_ids,
-                            attention_mask=attention_mask,
-                            output_attentions=output_attentions,
-                            output_hidden_states=output_hidden_states,
-                            return_dict=return_dict)
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        outputs = self.bert(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
         sequence_output = outputs[0]
         prediction_scores = self.cls(sequence_output, masked_positions=None)
 
         masked_lm_loss = None
         if labels is not None:
-            loss_fct = paddle.nn.CrossEntropyLoss(
-            )  # -100 index = padding token
+            loss_fct = paddle.nn.CrossEntropyLoss()  # -100 index = padding token
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, prediction_scores.shape[-1])),
-                labels.reshape((-1, )))
+                prediction_scores.reshape((-1, prediction_scores.shape[-1])), labels.reshape((-1,))
+            )
         if not return_dict:
-            output = (prediction_scores, ) + outputs[2:]
-            return ((masked_lm_loss, ) +
-                    output) if masked_lm_loss is not None else (
-                        output[0] if len(output) == 1 else output)
+            output = (prediction_scores,) + outputs[2:]
+            return (
+                ((masked_lm_loss,) + output)
+                if masked_lm_loss is not None
+                else (output[0] if len(output) == 1 else output)
+            )
 
         return MaskedLMOutput(
             loss=masked_lm_loss,
