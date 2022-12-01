@@ -690,7 +690,7 @@ class T5PretrainedModel(PretrainedModel):
 
 
 class T5Stack(nn.Layer):
-    def __init__(self, config: T5Config, embed_tokens: nn.Embedding = None):
+    def __init__(self, config: T5Config, embed_tokens: Optional[nn.Embedding] = None):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.embed_tokens = embed_tokens
