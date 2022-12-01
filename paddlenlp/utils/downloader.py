@@ -183,10 +183,7 @@ def get_path_from_url_with_filelock(
     lock_file_path = os.path.join(LOCK_FILE_HOME, lock_file_name)
 
     with FileLock(lock_file_path):
-        # import get_path_from_url from paddle framework
-        from paddle.utils.download import get_path_from_url as _get_path_from_url
-
-        result = _get_path_from_url(url=url, root_dir=root_dir, md5sum=md5sum, check_exist=check_exist)
+        result = get_path_from_url(url=url, root_dir=root_dir, md5sum=md5sum, check_exist=check_exist)
     return result
 
 
