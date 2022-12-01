@@ -27,7 +27,7 @@ from typing import Optional
 
 import requests
 
-from .env import DOWNLOAD_SERVER, FAILED_STATUS, LOCK_FILE_HOME, SUCCESS_STATUS
+from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
 from .file_lock import FileLock
 
 try:
@@ -180,7 +180,11 @@ def get_path_from_url_with_filelock(
 
     # create lock file, which is empty, under the `LOCK_FILE_HOME` directory.
     lock_file_name = hashlib.md5((url + root_dir).encode("utf-8")).hexdigest()
-    lock_file_path = os.path.join(LOCK_FILE_HOME, lock_file_name)
+
+    # create `.lock` private directory in the cache dir
+    lock_file_path = os.path.join(root_dir, ".lock", lock_file_name)
+
+    os.makedirs(os.path.dirname(lock_file_path), exist_ok=True)
 
     with FileLock(lock_file_path):
         result = get_path_from_url(url=url, root_dir=root_dir, md5sum=md5sum, check_exist=check_exist)
