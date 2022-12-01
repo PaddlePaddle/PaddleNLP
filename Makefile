@@ -19,7 +19,12 @@ format:
 
 .PHONY: lint
 lint:
-	pre-commit run
+	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
+	@if test -n "$(modified_py_files)"; then \
+		pre-commit run --files ${modified_py_files}
+	else \
+		echo "No library .py files were modified"; \
+	fi	
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
