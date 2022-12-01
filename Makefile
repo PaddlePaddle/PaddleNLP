@@ -19,8 +19,10 @@ format:
 
 .PHONY: lint
 lint:
-	which git
-	git --version
+	git branch -v
+	git remote -v
+	git merge-base develop HEAD
+
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
 		echo ${modified_py_files}; \
