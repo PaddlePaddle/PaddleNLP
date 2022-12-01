@@ -29,7 +29,13 @@ from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import paddle
-from huggingface_hub import HfApi, HfFolder, Repository, hf_hub_download
+from huggingface_hub import (
+    HfFolder,
+    create_repo,
+    hf_hub_download,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
 
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
@@ -1731,22 +1737,22 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
     def save_to_hf_hub(
         self,
-        repo_name: str,
-        organization: Optional[str] = None,
+        repo_id: str,
         private: Optional[bool] = None,
-        commit_message: str = "initial commit",
-        local_path: Optional[str] = None,
-        exist_ok: bool = True,
+        commit_message: Optional[bool] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
     ):
         """
         Uploads all elements of this tokenizer to a new HuggingFace Hub repository.
         Args:
-            repo_name (str): Repository name for your model/tokenizer in the Hub.
-            organization: (str, optional): Organization in which you want to push your model/tokenizer (you must be a member of this organization).
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
             private (bool, optional): Whether the model/tokenizer is set to private
-            commit_message (str, optional): Message to commit while pushing
-            local_path (str, optional): Path of the model/tokenizer locally. If set, this file path will be uploaded. Otherwise, the current model/tokenizer will be uploaded
-            exist_ok (bool): If true, saving to an existing repository is OK. If false, saving only to a new repository is possible
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
 
         Returns: The url of the commit of your model in the given repository.
         """
@@ -1756,54 +1762,26 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 "You must login to the Hugging Face hub on this computer by typing `transformers-cli login`."
             )
 
-        if "/" in repo_name:
-            splits = repo_name.split("/", maxsplit=1)
-            if organization is None or organization == splits[0]:
-                organization = splits[0]
-                repo_name = splits[1]
-            else:
-                raise ValueError("You passed and invalid repository name: {}.".format(repo_name))
+        repo_url = create_repo(repo_id, token=token, private=private, exist_ok=True)
 
-        endpoint = "https://huggingface.co"
-        repo_id = repo_name
-        if organization:
-            repo_id = f"{organization}/{repo_id}"
-        repo_url = HfApi(endpoint=endpoint).create_repo(
-            repo_id=repo_id,
-            token=token,
-            private=private,
-            repo_type=None,
-            exist_ok=exist_ok,
-        )
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+        repo_id = f"{repo_owner}/{repo_name}"
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            # First create the repo (and clone its content if it's nonempty).
-            logger.info("Create repository and clone it if it exists")
-            repo = Repository(tmp_dir, clone_from=repo_url)
-
-            # If user provides local files, copy them.
-            if local_path:
-                shutil.copytree(local_path, tmp_dir)
-            else:  # Else, save model directly into local repo.
-                self.save_pretrained(tmp_dir)
-
-            # Find files larger than 5M and track with git-lfs
-            large_files = []
-            for root, _, files in os.walk(tmp_dir):
-                for filename in files:
-                    file_path = os.path.join(root, filename)
-                    rel_path = os.path.relpath(file_path, tmp_dir)
-
-                    if os.path.getsize(file_path) > (5 * 1024 * 1024):
-                        large_files.append(rel_path)
-
-            if len(large_files) > 0:
-                logger.info("Track files with git lfs: {}".format(", ".join(large_files)))
-                repo.lfs_track(large_files)
-
-            logger.info("Pushing to the hub. This might take a while")
-            push_return = repo.push_to_hub(commit_message=commit_message)
-        return push_return
+            # save model
+            self.save_pretrained(tmp_dir)
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=tmp_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     def tokenize(self, text: str, pair: Optional[str] = None, add_special_tokens: bool = False, **kwargs) -> List[str]:
         """
