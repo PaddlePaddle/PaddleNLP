@@ -49,3 +49,11 @@ deploy-ppdiffusers:
 install-ppdiffusers:
 	cd ppdiffusers && make install
 
+.PHONY: deploy-paddle-pipelines
+deploy-ppdiffusers:
+	cd pipelines && make
+
+.PHONY: install-paddle-pipelines
+install-ppdiffusers:
+	cd pipelines && make install
+
