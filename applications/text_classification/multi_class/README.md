@@ -217,7 +217,7 @@ python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
     --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir checkpoint \
-    --device cpu \
+    --device gpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \
