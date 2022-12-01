@@ -1,8 +1,7 @@
-paddlepaddle>=2.3.0,<2.4.0
+paddlepaddle==2.4.0rc0
 pre-commit
 pytest
 isort
-GitPython
 pylint
 flake8
 black
