@@ -661,8 +661,8 @@ public:
                                    decoding_params.decoder_position_ids);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
         layer_norm(from_tensor_[1],
@@ -674,8 +674,8 @@ public:
                    decoding_params.stream);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+        cudaDeviceSynchronize();
+        check_cuda_error(cudaGetLastError());
 #endif
 
       } else if (args_.normalization_before_) {
@@ -881,8 +881,8 @@ public:
                                                 cublas_workspace_);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
 #endif
 
           // add bias decoding_params.trans_bias
@@ -894,8 +894,8 @@ public:
                                       decoding_params.stream);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
 #endif
 
           layer_norm(trans_out_buf_,
@@ -907,8 +907,8 @@ public:
                      decoding_params.stream);
 
 #ifndef NDEBUG
-            cudaDeviceSynchronize();
-            check_cuda_error(cudaGetLastError());
+          cudaDeviceSynchronize();
+          check_cuda_error(cudaGetLastError());
 #endif
 
           cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,

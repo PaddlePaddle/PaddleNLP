@@ -2296,7 +2296,6 @@ class InferMIRODecoding(nn.Layer):
                  mask_id=30000,
                  normalize_before=True,
                  hidden_act="relu"):
-        decoding_lib = "/paddle/fast_transformer/miro/PaddleNLP/paddlenlp/ops/build/lib/libdecoding_op.so"
 
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
