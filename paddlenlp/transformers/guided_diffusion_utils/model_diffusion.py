@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''
+"""
 This code is based on
 https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/script_util.py
-'''
+"""
 from .gaussian_diffusion import get_named_beta_schedule, SpacedDiffusion, space_timesteps, ModelVarType, ModelMeanType
 from .unet import UNetModel
 from .sec_diff import SecondaryDiffusionImageNet2
@@ -29,7 +29,7 @@ def create_unet_model(
     channel_mult="",
     learn_sigma=True,
     class_cond=False,
-    attention_resolutions='32, 16, 8',
+    attention_resolutions="32, 16, 8",
     num_heads=4,
     num_head_channels=64,
     num_heads_upsample=-1,
@@ -50,8 +50,7 @@ def create_unet_model(
         else:
             raise ValueError(f"unsupported image size: {image_size}")
     else:
-        channel_mult = tuple(
-            int(ch_mult) for ch_mult in channel_mult.split(","))
+        channel_mult = tuple(int(ch_mult) for ch_mult in channel_mult.split(","))
 
     attention_ds = []
     for res in attention_resolutions.split(","):
@@ -91,7 +90,7 @@ def create_gaussian_diffusion(
     rescale_timesteps=True,
 ):
     # propcess steps
-    timestep_respacing = f'ddim{steps}'
+    timestep_respacing = f"ddim{steps}"
     steps = (1000 // steps) * steps if steps < 1000 else steps
 
     betas = get_named_beta_schedule(noise_schedule, steps)
@@ -100,10 +99,11 @@ def create_gaussian_diffusion(
     return SpacedDiffusion(
         use_timesteps=space_timesteps(steps, timestep_respacing),
         betas=betas,
-        model_mean_type=(ModelMeanType.EPSILON
-                         if not predict_xstart else ModelMeanType.START_X),
-        model_var_type=((ModelVarType.FIXED_LARGE
-                         if not sigma_small else ModelVarType.FIXED_SMALL)
-                        if not learn_sigma else ModelVarType.LEARNED_RANGE),
+        model_mean_type=(ModelMeanType.EPSILON if not predict_xstart else ModelMeanType.START_X),
+        model_var_type=(
+            (ModelVarType.FIXED_LARGE if not sigma_small else ModelVarType.FIXED_SMALL)
+            if not learn_sigma
+            else ModelVarType.LEARNED_RANGE
+        ),
         rescale_timesteps=rescale_timesteps,
     )

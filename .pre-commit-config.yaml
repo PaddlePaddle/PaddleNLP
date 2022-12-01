@@ -4,7 +4,8 @@ repos:
     rev: 22.8.0
     hooks:
     -   id: black
-        files: \.py$
+        files: \.(py|pyi)$
+        additional_dependencies: [toml]
 -   repo: https://github.com/PyCQA/isort
     rev: 5.10.1
     hooks:
