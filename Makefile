@@ -19,9 +19,7 @@ format:
 
 .PHONY: lint
 lint:
-	git branch -v
-	git remote -v
-	git merge-base develop HEAD
+	git diff --numstat upstream/develop |awk '\''{print $NF}'\''
 
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
