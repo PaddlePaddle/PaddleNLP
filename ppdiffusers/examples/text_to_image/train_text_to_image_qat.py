@@ -612,17 +612,10 @@ def main():
             unet,
             os.path.join(args.output_dir, "int8"),
             input_spec=[
+                paddle.static.InputSpec(shape=[None, 4, None, None], dtype="float32", name="latent_input"),  # latent
+                paddle.static.InputSpec(shape=[1], dtype="int64", name="timestep"),  # timesteps
                 paddle.static.InputSpec(
-                    shape=[None, 4, None, None],
-                    dtype="float32",
-                ),  # latent
-                paddle.static.InputSpec(
-                    shape=[1],
-                    dtype="int64",
-                ),  # timesteps
-                paddle.static.InputSpec(
-                    shape=[None, None, 768],
-                    dtype="float32",
+                    shape=[None, None, 768], dtype="float32", name="encoder_embedding"
                 ),  # encoder_embedding
             ],
         )
