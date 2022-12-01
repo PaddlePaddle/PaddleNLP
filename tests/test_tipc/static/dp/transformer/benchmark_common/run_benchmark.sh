@@ -87,7 +87,7 @@ function _train(){
     *) echo "choose run_mode "; exit 1;
     esac
     echo "train_cmd: ${train_cmd}  log_file: ${log_file}"
-    timeout 15m ${train_cmd} > ${log_file} 2>&1
+    timeout 25m ${train_cmd} > ${log_file} 2>&1
     if [ $? -ne 0 ];then
         echo -e "${model_name}, FAIL"
     else
@@ -98,6 +98,7 @@ function _train(){
         rm ${log_file}
         cp mylog/workerlog.0 ${log_file}
     fi
+    echo ${train_cmd} >> ${log_file}
 }
 source ${BENCHMARK_ROOT}/scripts/run_model.sh   # 在该脚本中会对符合benchmark规范的log使用analysis.py 脚本进行性能数据解析;如果不联调只想要产出训练log可以注掉本行,提交时需打开
 _set_params $@
