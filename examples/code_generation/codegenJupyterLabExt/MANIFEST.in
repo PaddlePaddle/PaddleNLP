@@ -1,0 +1,27 @@
+include LICENSE
+include *.md
+include pyproject.toml
+include conftest.py
+
+include package.json
+include install.json
+include ts*.json
+include *.config.js
+include yarn.lock
+
+graft codegen_paddle/labextension
+
+# Javascript files
+graft src
+graft style
+graft ui-tests
+prune **/node_modules
+prune lib
+prune binder
+
+# Patterns to exclude from any directory
+global-exclude *~
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude .git
+global-exclude .ipynb_checkpoints

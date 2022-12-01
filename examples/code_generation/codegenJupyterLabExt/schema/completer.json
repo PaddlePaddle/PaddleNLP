@@ -1,0 +1,94 @@
+{
+  "title": "Codegen-Paddle",
+  "description": "Codegen Settings.",
+  "jupyter.lab.shortcuts": [
+    {
+      "command": "completer:invoke-notebook",
+      "keys": ["Tab"],
+      "selector": ".jp-Notebook.jp-mod-editMode .jp-mod-completer-enabled"
+    }
+  ],
+  "properties": {
+    "tip": {
+      "title": "Modify Tip",
+      "description": "Modify Tip.\n修改提示",
+      "default": "修改下方设置后需重启Jupyter才能生效",
+      "type": "string",
+      "enum": [
+        "修改下方设置后需重启Jupyter才能生效",
+        "After modification, restart Jupyter to take effect"
+      ]
+    },
+    "model": {
+      "title": "Model",
+      "description": "Select which model to use.\n选择要使用的模型。\nmono: 基于Python数据集BIGPYTHON训练\nnl: 基于自然语言数据集THEPILE训练\nmulti: 基于多编程语言数据集BIGQUERY训练",
+      "default": "Salesforce/codegen-350M-mono/",
+      "type": "string",
+      "enum": [
+        "Salesforce/codegen-350M-mono/",
+        "Salesforce/codegen-2B-mono/",
+        "Salesforce/codegen-6B-mono/",
+        "Salesforce/codegen-16B-mono/",
+        "Salesforce/codegen-350M-nl/",
+        "Salesforce/codegen-2B-nl/",
+        "Salesforce/codegen-6B-nl/",
+        "Salesforce/codegen-16B-nl/",
+        "Salesforce/codegen-350M-multi/",
+        "Salesforce/codegen-2B-multi/",
+        "Salesforce/codegen-6B-multi/",
+        "Salesforce/codegen-16B-multi/"
+      ]
+    },
+    "device": {
+      "type": "string",
+      "title": "Device",
+      "description": "Choose device: CPU or GPU.\n选择使用CPU或是GPU。",
+      "default": "cpu",
+      "enum": ["cpu", "gpu"]
+    },
+    "temperature": {
+      "title": "Temperature",
+      "description": "Decoding parameters temperature.\n解码参数temperature",
+      "type": "number",
+      "default": 0.6,
+      "enum": [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "top_k": {
+      "title": "Top_k",
+      "description": "Decoding parameters top_k.\n解码参数top_k",
+      "type": "number",
+      "default": 10,
+      "minimum": 1
+    },
+    "top_p": {
+      "title": "Top_p",
+      "description": "Decoding parameters top_p.\n解码参数top_p",
+      "type": "number",
+      "default": 1.0,
+      "enum": [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "repetition_penalty": {
+      "title": "Repetition penalty",
+      "description": "Decoding parameters repetition_penalty.\n解码参数repetition_penalty",
+      "type": "number",
+      "default": 1.0,
+      "enum": [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    },
+    "min_length": {
+      "title": "Min length",
+      "description": "Minimum length generated.\n生成的最小长度",
+      "type": "number",
+      "default": 0,
+      "minimum": 0
+    },
+    "max_length": {
+      "title": "Max length",
+      "description": "Maximum length generated.\n生成的最大长度",
+      "type": "number",
+      "default": 16,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}
