@@ -20,7 +20,7 @@ import collections
 
 from .. import BertTokenizer, BasicTokenizer, WordpieceTokenizer
 
-__all__ = ['BertJapaneseTokenizer', 'MecabTokenizer', 'CharacterTokenizer']
+__all__ = ["BertJapaneseTokenizer", "MecabTokenizer", "CharacterTokenizer"]
 
 
 class BertJapaneseTokenizer(BertTokenizer):
@@ -83,14 +83,10 @@ class BertJapaneseTokenizer(BertTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "cl-tohoku/bert-base-japanese":
-            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese/vocab.txt",
-            "cl-tohoku/bert-base-japanese-whole-word-masking":
-            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-whole-word-masking/vocab.txt",
-            "cl-tohoku/bert-base-japanese-char":
-            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char/vocab.txt",
-            "cl-tohoku/bert-base-japanese-char-whole-word-masking":
-            "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char-whole-word-masking/vocab.txt",
+            "cl-tohoku/bert-base-japanese": "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese/vocab.txt",
+            "cl-tohoku/bert-base-japanese-whole-word-masking": "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-whole-word-masking/vocab.txt",
+            "cl-tohoku/bert-base-japanese-char": "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char/vocab.txt",
+            "cl-tohoku/bert-base-japanese-char-whole-word-masking": "http://bj.bcebos.com/paddlenlp/models/community/cl-tohoku/bert-base-japanese-char-whole-word-masking/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -117,33 +113,33 @@ class BertJapaneseTokenizer(BertTokenizer):
     }
     padding_side = "right"
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=False,
-                 do_word_tokenize=True,
-                 do_subword_tokenize=True,
-                 word_tokenizer_type="mecab",
-                 subword_tokenizer_type="wordpiece",
-                 never_split=None,
-                 mecab_kwargs=None,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=False,
+        do_word_tokenize=True,
+        do_subword_tokenize=True,
+        word_tokenizer_type="mecab",
+        subword_tokenizer_type="wordpiece",
+        never_split=None,
+        mecab_kwargs=None,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BertJapaneseTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = BertJapaneseTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
 
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
-        self.ids_to_tokens = collections.OrderedDict([
-            (ids, tok) for tok, ids in self.vocab.idx_to_token.items()
-        ])
+        self.ids_to_tokens = collections.OrderedDict([(ids, tok) for tok, ids in self.vocab.idx_to_token.items()])
 
         self.do_word_tokenize = do_word_tokenize
         self.word_tokenizer_type = word_tokenizer_type
@@ -153,30 +149,24 @@ class BertJapaneseTokenizer(BertTokenizer):
         if do_word_tokenize:
             if word_tokenizer_type == "basic":
                 self.basic_tokenizer = BasicTokenizer(
-                    do_lower_case=do_lower_case, )
+                    do_lower_case=do_lower_case,
+                )
             elif word_tokenizer_type == "mecab":
                 self.basic_tokenizer = MecabTokenizer(
-                    do_lower_case=do_lower_case,
-                    never_split=never_split,
-                    **(mecab_kwargs or {}))
-            else:
-                raise ValueError(
-                    f"Invalid word_tokenizer_type '{word_tokenizer_type}' is specified."
+                    do_lower_case=do_lower_case, never_split=never_split, **(mecab_kwargs or {})
                 )
+            else:
+                raise ValueError(f"Invalid word_tokenizer_type '{word_tokenizer_type}' is specified.")
 
         self.do_subword_tokenize = do_subword_tokenize
         self.subword_tokenizer_type = subword_tokenizer_type
         if do_subword_tokenize:
             if subword_tokenizer_type == "wordpiece":
-                self.wordpiece_tokenizer = WordpieceTokenizer(
-                    vocab=self.vocab, unk_token=unk_token)
+                self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
             elif subword_tokenizer_type == "character":
-                self.wordpiece_tokenizer = CharacterTokenizer(
-                    vocab=self.vocab, unk_token=unk_token)
+                self.wordpiece_tokenizer = CharacterTokenizer(vocab=self.vocab, unk_token=unk_token)
             else:
-                raise ValueError(
-                    f"Invalid subword_tokenizer_type '{subword_tokenizer_type}' is specified."
-                )
+                raise ValueError(f"Invalid subword_tokenizer_type '{subword_tokenizer_type}' is specified.")
 
     @property
     def do_lower_case(self):
@@ -192,25 +182,20 @@ class BertJapaneseTokenizer(BertTokenizer):
         self.__dict__ = state
         if self.word_tokenizer_type == "mecab":
             self.basic_tokenizer = MecabTokenizer(
-                do_lower_case=self.do_lower_case,
-                never_split=self.never_split,
-                **(self.mecab_kwargs or {}))
+                do_lower_case=self.do_lower_case, never_split=self.never_split, **(self.mecab_kwargs or {})
+            )
 
     def _tokenize(self, text):
         if self.do_word_tokenize:
             if self.word_tokenizer_type == "basic":
                 tokens = self.basic_tokenizer.tokenize(text)
             elif self.word_tokenizer_type == "mecab":
-                tokens = self.basic_tokenizer.tokenize(
-                    text, never_split=self.all_special_tokens)
+                tokens = self.basic_tokenizer.tokenize(text, never_split=self.all_special_tokens)
         else:
             tokens = [text]
 
         if self.do_subword_tokenize:
-            split_tokens = [
-                sub_token for token in tokens
-                for sub_token in self.wordpiece_tokenizer.tokenize(token)
-            ]
+            split_tokens = [sub_token for token in tokens for sub_token in self.wordpiece_tokenizer.tokenize(token)]
         else:
             split_tokens = tokens
 
@@ -232,9 +217,9 @@ class MecabTokenizer:
         Constructs a MecabTokenizer.
 
         Args:
-            do_lower_case (bool): 
+            do_lower_case (bool):
                 Whether to lowercase the input. Defaults to`True`.
-            never_split: (list): 
+            never_split: (list):
                 Kept for backward compatibility purposes. Defaults to`None`.
             normalize_text (bool):
                 Whether to apply unicode normalization to text before tokenization.  Defaults to`True`.
@@ -253,7 +238,8 @@ class MecabTokenizer:
         except ModuleNotFoundError as error:
             raise error.__class__(
                 "You need to install fugashi to use MecabTokenizer. "
-                "See https://pypi.org/project/fugashi/ for installation.")
+                "See https://pypi.org/project/fugashi/ for installation."
+            )
 
         mecab_option = mecab_option or ""
 
@@ -308,8 +294,7 @@ class MecabTokenizer:
         if self.normalize_text:
             text = unicodedata.normalize("NFKC", text)
 
-        never_split = self.never_split + (never_split
-                                          if never_split is not None else [])
+        never_split = self.never_split + (never_split if never_split is not None else [])
         tokens = []
 
         for word in self.mecab(text):

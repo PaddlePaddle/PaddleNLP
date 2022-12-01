@@ -23,13 +23,9 @@ from paddlenlp.utils.env import MODEL_HOME
 
 from .. import BasicTokenizer, PretrainedTokenizer
 
-__all__ = ['ErnieCtmTokenizer']
+__all__ = ["ErnieCtmTokenizer"]
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "ernie-ctm": 512,
-    "wordtag": 512,
-    "nptag": 512
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"ernie-ctm": 512, "wordtag": 512, "nptag": 512}
 
 
 class ErnieCtmTokenizer(PretrainedTokenizer):
@@ -39,7 +35,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     This tokenizer inherits from :class:`~paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`
     which contains most of the main methods. For more information regarding those methods,
     please refer to this superclass.
-    
+
     Args:
         vocab_file (str):
             File path of the vocabulary.
@@ -85,47 +81,37 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-ctm":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
-            "wordtag":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
-            "nptag":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "ernie-ctm": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "wordtag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
+            "nptag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "ernie-ctm": {
-            "do_lower_case": True,
-            "cls_num": 2
-        },
-        "wordtag": {
-            "do_lower_case": True,
-            "cls_num": 2
-        },
-        "nptag": {
-            "do_lower_case": True,
-            "cls_num": 2
-        },
+        "ernie-ctm": {"do_lower_case": True, "cls_num": 2},
+        "wordtag": {"do_lower_case": True, "cls_num": 2},
+        "nptag": {"do_lower_case": True, "cls_num": 2},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 do_basic_tokenize=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token_template="[CLS{}]",
-                 cls_num=1,
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        do_basic_tokenize=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token_template="[CLS{}]",
+        cls_num=1,
+        mask_token="[MASK]",
+        **kwargs
+    ):
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = ErnieTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.do_lower_case = do_lower_case
         self.cls_token_template = cls_token_template
         self.cls_num = cls_num
@@ -187,19 +173,13 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
             List[int]: The input_id with the appropriate special tokens.
         """
         cls_token_ids = [
-            self.convert_tokens_to_ids(self.cls_token_template.format(sid))
-            for sid in range(self.cls_num)
+            self.convert_tokens_to_ids(self.cls_token_template.format(sid)) for sid in range(self.cls_num)
         ]
         if token_ids_1 is None:
             return cls_token_ids + token_ids_0 + [self.sep_token_id]
-        return cls_token_ids + token_ids_0 + [
-            self.sep_token_id
-        ] + token_ids_1 + [self.sep_token_id]
+        return cls_token_ids + token_ids_0 + [self.sep_token_id] + token_ids_1 + [self.sep_token_id]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Creates a special tokens mask from the input sequences.
         This method is called when adding special tokens using the tokenizer `encode` method.
@@ -223,20 +203,13 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Creates a token_type mask from the input sequences.
 
@@ -273,8 +246,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
         sep = [self.sep_token_id]
         if token_ids_1 is None:
             return (self.cls_num + len(token_ids_0 + sep)) * [0]
-        return (self.cls_num + len(token_ids_0 + sep)) * [0] + len(token_ids_1 +
-                                                                   sep) * [1]
+        return (self.cls_num + len(token_ids_0 + sep)) * [0] + len(token_ids_1 + sep) * [1]
 
     def num_special_tokens_to_add(self, pair=False):
         """
@@ -303,7 +275,7 @@ class ErnieCtmTokenizer(PretrainedTokenizer):
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             List[str]: A list of string representing converted tokens.
         """

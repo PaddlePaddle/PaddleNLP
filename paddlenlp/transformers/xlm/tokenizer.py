@@ -39,7 +39,7 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "xlm-clm-enfr-1024": 512,
     "xlm-clm-ende-1024": 512,
     "xlm-mlm-17-1280": 512,
-    "xlm-mlm-100-1280": 512
+    "xlm-mlm-100-1280": 512,
 }
 
 
@@ -208,86 +208,46 @@ class XLMTokenizer(PretrainedTokenizer):
 
     pretrained_resource_files_map = {
         "vocab_file": {
-            "xlm-mlm-en-2048":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-en-2048/vocab.json",
-            "xlm-mlm-ende-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-ende-1024/vocab.json",
-            "xlm-mlm-enfr-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enfr-1024/vocab.json",
-            "xlm-mlm-enro-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enro-1024/vocab.json",
-            "xlm-mlm-tlm-xnli15-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-tlm-xnli15-1024/vocab.json",
-            "xlm-mlm-xnli15-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-xnli15-1024/vocab.json",
-            "xlm-clm-enfr-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-enfr-1024/vocab.json",
-            "xlm-clm-ende-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-ende-1024/vocab.json",
-            "xlm-mlm-17-1280":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-17-1280/vocab.json",
-            "xlm-mlm-100-1280":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-100-1280/vocab.json",
+            "xlm-mlm-en-2048": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-en-2048/vocab.json",
+            "xlm-mlm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-ende-1024/vocab.json",
+            "xlm-mlm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enfr-1024/vocab.json",
+            "xlm-mlm-enro-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enro-1024/vocab.json",
+            "xlm-mlm-tlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-tlm-xnli15-1024/vocab.json",
+            "xlm-mlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-xnli15-1024/vocab.json",
+            "xlm-clm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-enfr-1024/vocab.json",
+            "xlm-clm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-ende-1024/vocab.json",
+            "xlm-mlm-17-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-17-1280/vocab.json",
+            "xlm-mlm-100-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-100-1280/vocab.json",
         },
         "merges_file": {
-            "xlm-mlm-en-2048":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-en-2048/merges.txt",
-            "xlm-mlm-ende-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-ende-1024/merges.txt",
-            "xlm-mlm-enfr-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enfr-1024/merges.txt",
-            "xlm-mlm-enro-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enro-1024/merges.txt",
-            "xlm-mlm-tlm-xnli15-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-tlm-xnli15-1024/merges.txt",
-            "xlm-mlm-xnli15-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-xnli15-1024/merges.txt",
-            "xlm-clm-enfr-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-enfr-1024/merges.txt",
-            "xlm-clm-ende-1024":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-ende-1024/merges.txt",
-            "xlm-mlm-17-1280":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-17-1280/merges.txt",
-            "xlm-mlm-100-1280":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-100-1280/merges.txt",
+            "xlm-mlm-en-2048": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-en-2048/merges.txt",
+            "xlm-mlm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-ende-1024/merges.txt",
+            "xlm-mlm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enfr-1024/merges.txt",
+            "xlm-mlm-enro-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-enro-1024/merges.txt",
+            "xlm-mlm-tlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-tlm-xnli15-1024/merges.txt",
+            "xlm-mlm-xnli15-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-xnli15-1024/merges.txt",
+            "xlm-clm-enfr-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-enfr-1024/merges.txt",
+            "xlm-clm-ende-1024": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-clm-ende-1024/merges.txt",
+            "xlm-mlm-17-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-17-1280/merges.txt",
+            "xlm-mlm-100-1280": "https://bj.bcebos.com/paddlenlp/models/transformers/xlm/xlm-mlm-100-1280/merges.txt",
         },
     }
     pretrained_init_configuration = {
-        "xlm-mlm-en-2048": {
-            "do_lowercase_and_remove_accent": True
-        },
+        "xlm-mlm-en-2048": {"do_lowercase_and_remove_accent": True},
         "xlm-mlm-ende-1024": {
             "do_lowercase_and_remove_accent": True,
-            "id2lang": {
-                0: "de",
-                1: "en"
-            },
-            "lang2id": {
-                "de": 0,
-                "en": 1
-            },
+            "id2lang": {0: "de", 1: "en"},
+            "lang2id": {"de": 0, "en": 1},
         },
         "xlm-mlm-enfr-1024": {
             "do_lowercase_and_remove_accent": True,
-            "id2lang": {
-                0: "en",
-                1: "fr"
-            },
-            "lang2id": {
-                "en": 0,
-                "fr": 1
-            },
+            "id2lang": {0: "en", 1: "fr"},
+            "lang2id": {"en": 0, "fr": 1},
         },
         "xlm-mlm-enro-1024": {
             "do_lowercase_and_remove_accent": True,
-            "id2lang": {
-                0: "en",
-                1: "ro"
-            },
-            "lang2id": {
-                "en": 0,
-                "ro": 1
-            },
+            "id2lang": {0: "en", 1: "ro"},
+            "lang2id": {"en": 0, "ro": 1},
         },
         "xlm-mlm-tlm-xnli15-1024": {
             "do_lowercase_and_remove_accent": True,
@@ -365,25 +325,13 @@ class XLMTokenizer(PretrainedTokenizer):
         },
         "xlm-clm-enfr-1024": {
             "do_lowercase_and_remove_accent": True,
-            "id2lang": {
-                0: "en",
-                1: "fr"
-            },
-            "lang2id": {
-                "en": 0,
-                "fr": 1
-            },
+            "id2lang": {0: "en", 1: "fr"},
+            "lang2id": {"en": 0, "fr": 1},
         },
         "xlm-clm-ende-1024": {
             "do_lowercase_and_remove_accent": True,
-            "id2lang": {
-                0: "de",
-                1: "en"
-            },
-            "lang2id": {
-                "de": 0,
-                "en": 1
-            },
+            "id2lang": {0: "de", 1: "en"},
+            "lang2id": {"de": 0, "en": 1},
         },
         "xlm-mlm-17-1280": {
             "do_lowercase_and_remove_accent": False,
@@ -718,7 +666,7 @@ class XLMTokenizer(PretrainedTokenizer):
         return text
 
     def ja_tokenize(self, text):
-        """ Tokenize a Japanese string. """
+        """Tokenize a Japanese string."""
         if self.ja_word_tokenizer is None:
             try:
                 import Mykytea
@@ -730,8 +678,7 @@ class XLMTokenizer(PretrainedTokenizer):
                 logger.error(
                     "Make sure you install KyTea (https://github.com/neubig/kytea) and it's python wrapper (https://github.com/chezou/Mykytea-python) with the following steps"
                 )
-                logger.error(
-                    "1. git clone git@github.com:neubig/kytea.git && cd kytea")
+                logger.error("1. git clone git@github.com:neubig/kytea.git && cd kytea")
                 logger.error("2. autoreconf -i")
                 logger.error("3. ./configure --prefix=$HOME/local")
                 logger.error("4. make && make install")
@@ -750,7 +697,7 @@ class XLMTokenizer(PretrainedTokenizer):
         return len(self.encoder)
 
     def bpe(self, token):
-        word = tuple(token[:-1]) + (token[-1] + "</w>", )
+        word = tuple(token[:-1]) + (token[-1] + "</w>",)
         if token in self.cache:
             return self.cache[token]
         pairs = get_pairs(word)
@@ -759,8 +706,7 @@ class XLMTokenizer(PretrainedTokenizer):
             return token + "</w>"
 
         while True:
-            bigram = min(
-                pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -776,8 +722,7 @@ class XLMTokenizer(PretrainedTokenizer):
                     new_word.extend(word[i:j])
                     i = j
 
-                if word[i] == first and i < len(word) - 1 and word[i +
-                                                                   1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -813,8 +758,8 @@ class XLMTokenizer(PretrainedTokenizer):
         """
         # Simple mapping string => AddedToken for special tokens with specific tokenization behaviors
         all_special_tokens_extended = dict(
-            (str(t), t) for t in self.all_special_tokens_extended
-            if isinstance(t, AddedToken))
+            (str(t), t) for t in self.all_special_tokens_extended if isinstance(t, AddedToken)
+        )
 
         text, kwargs = self.prepare_for_tokenization(text, **kwargs)
 
@@ -822,13 +767,10 @@ class XLMTokenizer(PretrainedTokenizer):
         if hasattr(self, "do_lower_case") and self.do_lower_case:
             # convert non-special tokens to lowercase
             escaped_special_toks = [
-                re.escape(s_tok) for s_tok in (self.unique_no_split_tokens +
-                                               self.all_special_tokens)
+                re.escape(s_tok) for s_tok in (self.unique_no_split_tokens + self.all_special_tokens)
             ]
             pattern = r"(" + r"|".join(escaped_special_toks) + r")|" + r"(.+?)"
-            text = re.sub(pattern,
-                          lambda m: m.groups()[0] or m.groups()[1].lower(),
-                          text)
+            text = re.sub(pattern, lambda m: m.groups()[0] or m.groups()[1].lower(), text)
 
         no_split_token = set(self.unique_no_split_tokens)
         tokens = self.tokens_trie.split(text)
@@ -863,10 +805,7 @@ class XLMTokenizer(PretrainedTokenizer):
             if token in no_split_token:
                 tokenized_text.append(token)
             else:
-                tokenized_text.extend(
-                    self._tokenize(token,
-                                   lang=lang,
-                                   bypass_tokenizer=bypass_tokenizer))
+                tokenized_text.extend(self._tokenize(token, lang=lang, bypass_tokenizer=bypass_tokenizer))
         # ["This", " is", " something", "<special_token_1>", "else"]
         return tokenized_text
 
@@ -938,9 +877,7 @@ class XLMTokenizer(PretrainedTokenizer):
                 else:
                     jieba = sys.modules["jieba"]
             except (AttributeError, ImportError):
-                logger.error(
-                    "Make sure you install Jieba (https://github.com/fxsjy/jieba) with the following steps"
-                )
+                logger.error("Make sure you install Jieba (https://github.com/fxsjy/jieba) with the following steps")
                 logger.error("1. pip install jieba")
                 raise
             text = " ".join(jieba.cut(text))
@@ -976,9 +913,8 @@ class XLMTokenizer(PretrainedTokenizer):
         return out_string
 
     def build_inputs_with_special_tokens(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. An XLM sequence has the following format:
@@ -1002,9 +938,8 @@ class XLMTokenizer(PretrainedTokenizer):
         return bos + token_ids_0 + sep + token_ids_1 + sep
 
     def create_token_type_ids_from_sequences(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. An XLM sequence
         pair mask has the following format:
@@ -1057,8 +992,7 @@ class XLMTokenizer(PretrainedTokenizer):
             )
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def save_resources(self, save_directory):
@@ -1067,7 +1001,7 @@ class XLMTokenizer(PretrainedTokenizer):
 
         Args:
             save_directory (str): Directory to save files into.
-            
+
         """
         for name, file_name in self.resource_files_names.items():
             source_path = getattr(self, "_%s" % name)

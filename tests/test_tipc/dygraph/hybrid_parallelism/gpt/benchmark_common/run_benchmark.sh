@@ -116,29 +116,34 @@ function _train(){
                 --sharding_stage ${sharding_stage}\
                 --sharding_offload ${sharding_offload}\
                 --fuse_transformer True"
-
+    if [ ${PADDLE_TRAINER_ID} ]
+    then
+        PADDLE_RANK_OPTION=" --rank ${PADDLE_TRAINER_ID}"
+    else
+        PADDLE_RANK_OPTION=""
+    fi
     # 以下为通用执行命令，无特殊可不用修改
     if [ "N1C2" = ${device_num} ]; then
         # sharding case
         echo "run run_mode: DP1-MP1-PP1 device_num: N1C2"
-        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1 \
+        train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1 ${PADDLE_RANK_OPTION}\
               run_pretrain.py ${train_cmd}" 
         workerlog_id=0
     else
         # hybrid_parallelism case
         case ${run_mode} in
         DP1-MP1-PP1) echo "run run_mode: DP1-MP1-PP1"
-            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 \
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;
         DP1-MP1-PP4|DP1-MP4-PP1) echo "run run_mode: ${run_mode}"
-            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3 \
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;
         DP1-MP2-PP4|DP1-MP4-PP2|DP2-MP2-PP2|DP2-MP8-PP2|DP4-MP8-PP1|DP1-MP8-PP4) echo "run run_mode: ${run_mode}"
-            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 \
+            train_cmd="python -m paddle.distributed.launch --log_dir=./mylog --gpus=0,1,2,3,4,5,6,7 ${PADDLE_RANK_OPTION}\
                 run_pretrain.py ${train_cmd}"
             workerlog_id=0
             ;;

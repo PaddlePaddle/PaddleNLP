@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequenc
 from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .. import PretrainedTokenizer
 
-__all__ = ['ErnieMTokenizer']
+__all__ = ["ErnieMTokenizer"]
 
 SPIECE_UNDERLINE = "▁"
 
@@ -29,29 +29,29 @@ SPIECE_UNDERLINE = "▁"
 class ErnieMTokenizer(PretrainedTokenizer):
     r"""
     Constructs a ErnieM tokenizer. It uses the `sentencepiece` tools to cut the words to sub-words.
-    
+
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             The file path of the vocabulary.
         sentencepiece_model_file (str):
             The file path of sentencepiece model.
-        do_lower_case (str, optional): 
+        do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to`True`.
-        unk_token (str, optional): 
+        unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
+        sep_token (str, optional):
             A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
+        pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
+        cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str, optional): 
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
@@ -62,48 +62,41 @@ class ErnieMTokenizer(PretrainedTokenizer):
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-m-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
-            "ernie-m-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt"
+            "ernie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
+            "ernie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
         },
         "sentencepiece_model_file": {
-            "ernie-m-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
-            "ernie-m-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model"
-        }
+            "ernie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
+            "ernie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
+        },
     }
     pretrained_init_configuration = {
-        "ernie-m-base": {
-            "do_lower_case": False
-        },
-        "ernie-m-large": {
-            "do_lower_case": False
-        }
+        "ernie-m-base": {"do_lower_case": False},
+        "ernie-m-large": {"do_lower_case": False},
     }
     max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
     # Ernie-M model doesn't have token_type embedding.
     model_input_names: List[str] = ["input_ids"]
 
-    def __init__(self,
-                 vocab_file,
-                 sentencepiece_model_file,
-                 do_lower_case=False,
-                 encoding="utf8",
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        sentencepiece_model_file,
+        do_lower_case=False,
+        encoding="utf8",
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
         self.sp_model = spm.SentencePieceProcessor()
 
         self.do_lower_case = do_lower_case
         self.encoding = encoding
         if not os.path.isfile(vocab_file):
-            raise ValueError(
-                "Can't find a vocabulary file at path '{}'.".format(vocab_file))
+            raise ValueError("Can't find a vocabulary file at path '{}'.".format(vocab_file))
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.vocab_file = vocab_file
         self.sentencepiece_model_file = sentencepiece_model_file
@@ -113,7 +106,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
         self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):
-            if ch in [ord(u'～')]:
+            if ch in [ord("～")]:
                 self.SP_CHAR_MAPPING[chr(ch)] = chr(ch)
                 continue
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
@@ -123,14 +116,14 @@ class ErnieMTokenizer(PretrainedTokenizer):
             return None
 
         split_tokens = self.tokenize(text)
-        normalized_text, char_mapping = '', []
+        normalized_text, char_mapping = "", []
 
         for i, ch in enumerate(text):
 
             if ch in self.SP_CHAR_MAPPING:
                 ch = self.SP_CHAR_MAPPING.get(ch)
             else:
-                ch = unicodedata.normalize('NFKC', ch)
+                ch = unicodedata.normalize("NFKC", ch)
             if self.is_whitespace(ch):
                 continue
             normalized_text += ch
@@ -142,13 +135,12 @@ class ErnieMTokenizer(PretrainedTokenizer):
             text = text.lower()
 
         for token in split_tokens:
-            if token[:1] == '▁':
+            if token[:1] == "▁":
                 token = token[1:]
             start = text[offset:].index(token) + offset
             end = start + len(token)
 
-            token_mapping.append(
-                (char_mapping[start], char_mapping[end - 1] + 1))
+            token_mapping.append((char_mapping[start], char_mapping[end - 1] + 1))
             offset = end
         return token_mapping
 
@@ -167,7 +159,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
 
     def clean_text(self, text):
         """Performs invalid character removal and whitespace cleanup on text."""
-        return ''.join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
+        return "".join((self.SP_CHAR_MAPPING.get(c, c) for c in text))
 
     def _tokenize(self, text, sample=False):
         """Tokenize a string."""
@@ -216,8 +208,8 @@ class ErnieMTokenizer(PretrainedTokenizer):
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         An ERNIE-M sequence has the following format:
         - single sequence:       ``[CLS] X [SEP]``
         - pair of sequences:        ``[CLS] A [SEP] [SEP] B [SEP]``
@@ -236,16 +228,14 @@ class ErnieMTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
         An ERNIE-M offset_mapping has the following format:
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) (0,0) B (0,0)``
-        
+
         Args:
             offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
@@ -258,27 +248,23 @@ class ErnieMTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         r"""
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
         Args:
-            token_ids_0 (List[int]): 
+            token_ids_0 (List[int]):
                 List of ids of the first sequence.
-            token_ids_1 (List[int], optinal): 
+            token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
-            already_has_special_tokens (str, optional): 
-                Whether or not the token list is already formatted with special tokens for the model. 
+            already_has_special_tokens (str, optional):
+                Whether or not the token list is already formatted with special tokens for the model.
                 Defaults to `False`.
         Returns:
-            List[int]: 
+            List[int]:
                 The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
         """
 
@@ -288,21 +274,15 @@ class ErnieMTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Create the token type IDs corresponding to the sequences passed. [What are token type
         IDs?](../glossary#token-type-ids)
@@ -328,7 +308,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
         """
         is_ch_char
         """
-        if u'\u4e00' <= char <= u'\u9fff':
+        if "\u4e00" <= char <= "\u9fff":
             return True
         return False
 
@@ -336,9 +316,9 @@ class ErnieMTokenizer(PretrainedTokenizer):
         """
         is_alpha
         """
-        if 'a' <= char <= 'z':
+        if "a" <= char <= "z":
             return True
-        if 'A' <= char <= 'Z':
+        if "A" <= char <= "Z":
             return True
         return False
 
@@ -346,7 +326,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
         """
         is_punct
         """
-        if char in u",;:.?!~，；：。？！《》【】":
+        if char in ",;:.?!~，；：。？！《》【】":
             return True
         return False
 

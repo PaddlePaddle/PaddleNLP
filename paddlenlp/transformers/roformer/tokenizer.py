@@ -31,7 +31,7 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "roformer-chinese-sim-char-small": 512,
     "roformer-chinese-sim-char-base": 512,
     "roformer-english-small-discriminator": 128,
-    "roformer-english-small-generator": 128
+    "roformer-english-small-generator": 128,
 }
 
 
@@ -48,17 +48,14 @@ class JiebaBasicTokenizer(BasicTokenizer):
             Defaults to `True`.
     """
 
-    def __init__(self,
-                 vocab,
-                 do_lower_case=True,
-                 never_split=None,
-                 tokenize_chinese_chars=True,
-                 strip_accents=None):
+    def __init__(self, vocab, do_lower_case=True, never_split=None, tokenize_chinese_chars=True, strip_accents=None):
         """Constructs a JiebaBasicTokenizer."""
-        super().__init__(never_split=never_split,
-                         do_lower_case=do_lower_case,
-                         tokenize_chinese_chars=tokenize_chinese_chars,
-                         strip_accents=strip_accents)
+        super().__init__(
+            never_split=never_split,
+            do_lower_case=do_lower_case,
+            tokenize_chinese_chars=tokenize_chinese_chars,
+            strip_accents=strip_accents,
+        )
         self.vocab = vocab
 
     def _tokenize_chinese_chars(self, text):
@@ -137,28 +134,18 @@ class RoFormerTokenizer(PretrainedTokenizer):
     pretrained_resource_files_map = {
         "vocab_file": {
             # chinese word level model
-            "roformer-chinese-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-small/vocab.txt",
-            "roformer-chinese-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-base/vocab.txt",
+            "roformer-chinese-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-small/vocab.txt",
+            "roformer-chinese-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-base/vocab.txt",
             # chinese char level model
-            "roformer-chinese-char-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-small/vocab.txt",
-            "roformer-chinese-char-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-base/vocab.txt",
-            "roformer-chinese-sim-char-ft-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-small/vocab.txt",
-            "roformer-chinese-sim-char-ft-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-base/vocab.txt",
-            "roformer-chinese-sim-char-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-small/vocab.txt",
-            "roformer-chinese-sim-char-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-base/vocab.txt",
+            "roformer-chinese-char-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-small/vocab.txt",
+            "roformer-chinese-char-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-char-base/vocab.txt",
+            "roformer-chinese-sim-char-ft-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-small/vocab.txt",
+            "roformer-chinese-sim-char-ft-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-ft-base/vocab.txt",
+            "roformer-chinese-sim-char-small": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-small/vocab.txt",
+            "roformer-chinese-sim-char-base": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-chinese-sim-char-base/vocab.txt",
             # english
-            "roformer-english-small-discriminator":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-discriminator/vocab.txt",
-            "roformer-english-small-generator":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/vocab.txt",
+            "roformer-english-small-discriminator": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-discriminator/vocab.txt",
+            "roformer-english-small-generator": "https://bj.bcebos.com/paddlenlp/models/transformers/roformer/roformer-english-small-generator/vocab.txt",
         }
     }
     max_model_input_sizes = {
@@ -174,75 +161,45 @@ class RoFormerTokenizer(PretrainedTokenizer):
         "roformer-english-small-generator": 128,
     }
     pretrained_init_configuration = {
-        "roformer-chinese-small": {
-            "do_lower_case": True,
-            "use_jieba": True
-        },
-        "roformer-chinese-base": {
-            "do_lower_case": True,
-            "use_jieba": True
-        },
-        "roformer-chinese-char-small": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-chinese-char-base": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-chinese-sim-char-ft-small": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-chinese-sim-char-ft-base": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-chinese-sim-char-small": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-chinese-sim-char-base": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-english-small-discriminator": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
-        "roformer-english-small-generator": {
-            "do_lower_case": True,
-            "use_jieba": False
-        },
+        "roformer-chinese-small": {"do_lower_case": True, "use_jieba": True},
+        "roformer-chinese-base": {"do_lower_case": True, "use_jieba": True},
+        "roformer-chinese-char-small": {"do_lower_case": True, "use_jieba": False},
+        "roformer-chinese-char-base": {"do_lower_case": True, "use_jieba": False},
+        "roformer-chinese-sim-char-ft-small": {"do_lower_case": True, "use_jieba": False},
+        "roformer-chinese-sim-char-ft-base": {"do_lower_case": True, "use_jieba": False},
+        "roformer-chinese-sim-char-small": {"do_lower_case": True, "use_jieba": False},
+        "roformer-chinese-sim-char-base": {"do_lower_case": True, "use_jieba": False},
+        "roformer-english-small-discriminator": {"do_lower_case": True, "use_jieba": False},
+        "roformer-english-small-generator": {"do_lower_case": True, "use_jieba": False},
     }
     padding_side = "right"
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 use_jieba=False,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        use_jieba=False,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = RoFormerTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = RoFormerTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         if use_jieba:
-            self.basic_tokenizer = JiebaBasicTokenizer(
-                vocab=self.vocab, do_lower_case=do_lower_case)
+            self.basic_tokenizer = JiebaBasicTokenizer(vocab=self.vocab, do_lower_case=do_lower_case)
         else:
             self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -309,9 +266,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -338,9 +293,7 @@ class RoFormerTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -361,12 +314,9 @@ class RoFormerTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
@@ -391,13 +341,9 @@ class RoFormerTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -422,14 +368,13 @@ class RoFormerTokenizer(PretrainedTokenizer):
                 )
             return list(
                 map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
+                    lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0,
                     token_ids_0,
-                ))
+                )
+            )
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def get_vocab(self):
