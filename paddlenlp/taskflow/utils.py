@@ -60,15 +60,15 @@ DOWNLOAD_CHECK = False
 
 def download_file(save_dir, filename, url, md5=None):
     """
-    Download the file from the url to specified directory. 
-    Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use 
+    Download the file from the url to specified directory.
+    Check md5 value when the file is exists, if the md5 value is the same as the existed file, just use
     the older file, if not, will download the file from the url.
 
     Args:
         save_dir(string): The specified directory saving the file.
         filename(string): The specified filename saving the file.
         url(string): The url downling the file.
-        md5(string, optional): The md5 value that checking the version downloaded. 
+        md5(string, optional): The md5 value that checking the version downloaded.
     """
     fullname = os.path.join(save_dir, filename)
     if os.path.exists(fullname):
@@ -89,7 +89,7 @@ def download_check(task):
     Check the resource status in the specified task.
 
     Args:
-        task(string): The name of specified task. 
+        task(string): The name of specified task.
     """
     logger.disable()
     global DOWNLOAD_CHECK
@@ -130,10 +130,10 @@ def cut_chinese_sent(para):
     """
     Cut the Chinese sentences more precisely, reference to "https://blog.csdn.net/blmoistawinde/article/details/82379256".
     """
-    para = re.sub(r'([。！？\?])([^”’])', r'\1\n\2', para)
-    para = re.sub(r'(\.{6})([^”’])', r'\1\n\2', para)
-    para = re.sub(r'(\…{2})([^”’])', r'\1\n\2', para)
-    para = re.sub(r'([。！？\?][”’])([^，。！？\?])', r'\1\n\2', para)
+    para = re.sub(r"([。！？\?])([^”’])", r"\1\n\2", para)
+    para = re.sub(r"(\.{6})([^”’])", r"\1\n\2", para)
+    para = re.sub(r"(\…{2})([^”’])", r"\1\n\2", para)
+    para = re.sub(r"([。！？\?][”’])([^，。！？\?])", r"\1\n\2", para)
     para = para.rstrip()
     return para.split("\n")
 
@@ -157,19 +157,21 @@ class TermTreeNode(object):
 
     """
 
-    def __init__(self,
-                 sid: str,
-                 term: str,
-                 base: str,
-                 node_type: str = "term",
-                 term_type: Optional[str] = None,
-                 hyper: Optional[str] = None,
-                 level: Optional[int] = None,
-                 alias: Optional[List[str]] = None,
-                 alias_ext: Optional[List[str]] = None,
-                 sub_type: Optional[List[str]] = None,
-                 sub_term: Optional[List[str]] = None,
-                 data: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        sid: str,
+        term: str,
+        base: str,
+        node_type: str = "term",
+        term_type: Optional[str] = None,
+        hyper: Optional[str] = None,
+        level: Optional[int] = None,
+        alias: Optional[List[str]] = None,
+        alias_ext: Optional[List[str]] = None,
+        sub_type: Optional[List[str]] = None,
+        sub_term: Optional[List[str]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ):
         self._sid = sid
         self._term = term
         self._base = base
@@ -197,7 +199,7 @@ class TermTreeNode(object):
                 "termtype": self._term_type,
                 "subterms": self._sub_term,
                 "subtype": self._sub_type,
-                "links": []
+                "links": [],
             }
             return json.dumps(res, ensure_ascii=False)
 
@@ -262,15 +264,17 @@ class TermTreeNode(object):
         Returns:
             [type]: TermTree node object.
         """
-        return cls(sid=data["termid"],
-                   term=data["term"],
-                   base=data["src"],
-                   term_type=data["termtype"],
-                   sub_type=data["subtype"],
-                   sub_term=data["subterms"],
-                   alias=data["alias"],
-                   alias_ext=data["alias_ext"],
-                   data=data)
+        return cls(
+            sid=data["termid"],
+            term=data["term"],
+            base=data["src"],
+            term_type=data["termtype"],
+            sub_type=data["subtype"],
+            sub_term=data["subterms"],
+            alias=data["alias"],
+            alias_ext=data["alias_ext"],
+            data=data,
+        )
 
     @classmethod
     def from_json(cls, json_str: str):
@@ -287,16 +291,11 @@ class TermTreeNode(object):
 
 
 class TermTree(object):
-    """TermTree class.
-    """
+    """TermTree class."""
 
     def __init__(self):
         self._nodes: Dict[str, TermTreeNode] = {}
-        self._root = TermTreeNode(sid="root",
-                                  term="root",
-                                  base="cb",
-                                  node_type="root",
-                                  level=0)
+        self._root = TermTreeNode(sid="root", term="root", base="cb", node_type="root", level=0)
         self._nodes["root"] = self.root
         self._index = {}
 
@@ -324,28 +323,27 @@ class TermTree(object):
                 if row["type-1"] not in self:
                     self.add_type(type_name=row["type-1"], hyper_type="root")
                 if row["type-2"] != "" and row["type-2"] not in self:
-                    self.add_type(type_name=row["type-2"],
-                                  hyper_type=row["type-1"])
+                    self.add_type(type_name=row["type-2"], hyper_type=row["type-1"])
                 if row["type-3"] != "" and row["type-3"] not in self:
-                    self.add_type(type_name=row["type-3"],
-                                  hyper_type=row["type-2"])
+                    self.add_type(type_name=row["type-3"], hyper_type=row["type-2"])
 
     def __judge_term_node(self, node: TermTreeNode) -> bool:
         if node.termtype not in self:
-            raise ValueError(
-                f"Term type of new node {node.termtype} does not exists.")
+            raise ValueError(f"Term type of new node {node.termtype} does not exists.")
         if node.sid in self:
             warnings.warn(f"{node.sid} exists, will be replaced by new node.")
 
-    def add_term(self,
-                 term: Optional[str] = None,
-                 base: Optional[str] = None,
-                 term_type: Optional[str] = None,
-                 sub_type: Optional[List[str]] = None,
-                 sub_term: Optional[List[str]] = None,
-                 alias: Optional[List[str]] = None,
-                 alias_ext: Optional[List[str]] = None,
-                 data: Optional[Dict[str, Any]] = None):
+    def add_term(
+        self,
+        term: Optional[str] = None,
+        base: Optional[str] = None,
+        term_type: Optional[str] = None,
+        sub_type: Optional[List[str]] = None,
+        sub_term: Optional[List[str]] = None,
+        alias: Optional[List[str]] = None,
+        alias_ext: Optional[List[str]] = None,
+        data: Optional[Dict[str, Any]] = None,
+    ):
         """Add a term into TermTree.
 
         Args:
@@ -361,15 +359,17 @@ class TermTree(object):
         if data is not None:
             new_node = TermTreeNode.from_dict(data)
         else:
-            new_node = TermTreeNode(sid=f"{term_type}_{base}_{term}",
-                                    term=term,
-                                    base=base,
-                                    term_type=term_type,
-                                    sub_term=sub_term,
-                                    sub_type=sub_type,
-                                    alias=alias,
-                                    alias_ext=alias_ext,
-                                    node_type="term")
+            new_node = TermTreeNode(
+                sid=f"{term_type}_{base}_{term}",
+                term=term,
+                base=base,
+                term_type=term_type,
+                sub_term=sub_term,
+                sub_type=sub_type,
+                alias=alias,
+                alias_ext=alias_ext,
+                node_type="term",
+            )
         self.__judge_term_node(new_node)
         self._nodes[new_node.sid] = new_node
         self.__build_index(new_node)
@@ -378,8 +378,7 @@ class TermTree(object):
         if type_name in self._nodes:
             raise ValueError(f"Term Type {type_name} exists.")
         if hyper_type not in self._nodes:
-            raise ValueError(
-                f"Hyper type {hyper_type} does not exist, please add it first.")
+            raise ValueError(f"Hyper type {hyper_type} does not exist, please add it first.")
         if self._nodes[hyper_type].level == 3:
             raise ValueError(
                 "Term type schema must be 3-LEVEL, 3rd level type node should not be a parent of type node."
@@ -390,7 +389,8 @@ class TermTree(object):
             base=None,
             hyper=hyper_type,
             node_type="type",
-            level=self._nodes[hyper_type].level + 1)
+            level=self._nodes[hyper_type].level + 1,
+        )
         self.__build_index(self._nodes[type_name])
 
     def __load_file(self, file_path: str):
@@ -448,11 +448,7 @@ class TermTree(object):
                     visited_node.add(next_id)
         return False
 
-    def find_term(
-            self,
-            term: str,
-            term_type: Optional[str] = None
-    ) -> Tuple[bool, Union[List[str], None]]:
+    def find_term(self, term: str, term_type: Optional[str] = None) -> Tuple[bool, Union[List[str], None]]:
         """Find a term in Term Tree. If term not exists, return None.
         If `term_type` is not None, will find term with this type.
 
@@ -503,8 +499,7 @@ class TermTree(object):
         term_tree.build_from_dir(term_schema_path, term_data_path, linking)
         return term_tree
 
-    def __dfs(self, cur_id: str, depth: int, path: Dict[str, str],
-              writer: csv.DictWriter):
+    def __dfs(self, cur_id: str, depth: int, path: Dict[str, str], writer: csv.DictWriter):
         cur_node = self._nodes[cur_id]
         if cur_node.node_type == "term":
             return
@@ -528,20 +523,12 @@ class TermTree(object):
         out_path = {}
         for i in range(1, 3):
             out_path[f"type-{i}"] = ""
-        with open(f"{save_dir}/termtree_type.csv",
-                  "wt",
-                  encoding="utf-8",
-                  newline="") as fp:
+        with open(f"{save_dir}/termtree_type.csv", "wt", encoding="utf-8", newline="") as fp:
             fieldnames = ["type-1", "type-2", "type-3"]
-            csv_writer = csv.DictWriter(fp,
-                                        delimiter="\t",
-                                        fieldnames=fieldnames)
+            csv_writer = csv.DictWriter(fp, delimiter="\t", fieldnames=fieldnames)
             csv_writer.writeheader()
             self.__dfs("root", 0, out_path, csv_writer)
-        with open(f"{save_dir}/termtree_data",
-                  "w",
-                  encoding="utf-8",
-                  newline="") as fp:
+        with open(f"{save_dir}/termtree_data", "w", encoding="utf-8", newline="") as fp:
             for nid in self:
                 node = self[nid]
                 if node.node_type == "term":
@@ -590,8 +577,7 @@ class BurkhardKellerNode(object):
 
 
 class BurkhardKellerTree(object):
-    """Implementataion of BK-Tree
-    """
+    """Implementataion of BK-Tree"""
 
     def __init__(self):
         self.root = None
@@ -622,10 +608,7 @@ class BurkhardKellerTree(object):
         """
         return self.__add(self.root, word)
 
-    def __search_similar_word(self,
-                              cur_node: BurkhardKellerNode,
-                              s: str,
-                              threshold: int = 2) -> List[str]:
+    def __search_similar_word(self, cur_node: BurkhardKellerNode, s: str, threshold: int = 2) -> List[str]:
         res = []
         if cur_node is None:
             return res
@@ -634,8 +617,7 @@ class BurkhardKellerTree(object):
             res.append((cur_node.word, dist))
         start = max(dist - threshold, 1)
         while start < dist + threshold:
-            tmp_res = self.__search_similar_word(cur_node.next.get(start, None),
-                                                 s)[:]
+            tmp_res = self.__search_similar_word(cur_node.next.get(start, None), s)[:]
             res.extend(tmp_res)
             start += 1
         return res
@@ -666,8 +648,7 @@ class BurkhardKellerTree(object):
 
 
 class TriedTree(object):
-    """Implementataion of TriedTree
-    """
+    """Implementataion of TriedTree"""
 
     def __init__(self):
         self.tree = {}
@@ -685,7 +666,7 @@ class TriedTree(object):
         Args:
             content (str): string to be searched
         Returns:
-            List[Tuple]: list of maximum matching words, each element represents 
+            List[Tuple]: list of maximum matching words, each element represents
                 the starting and ending position of the matching string.
         """
         result = []
@@ -712,7 +693,7 @@ class Customization(object):
     def load_customization(self, filename, sep=None):
         """Load the custom vocab"""
         self.ac = TriedTree()
-        with open(filename, 'r', encoding='utf8') as f:
+        with open(filename, "r", encoding="utf8") as f:
             for line in f:
                 if sep == None:
                     words = line.strip().split()
@@ -727,15 +708,15 @@ class Customization(object):
                 tags = []
                 offset = []
                 for word in words:
-                    if word.rfind('/') < 1:
+                    if word.rfind("/") < 1:
                         phrase += word
-                        tags.append('')
+                        tags.append("")
                     else:
-                        phrase += word[:word.rfind('/')]
-                        tags.append(word[word.rfind('/') + 1:])
+                        phrase += word[: word.rfind("/")]
+                        tags.append(word[word.rfind("/") + 1 :])
                     offset.append(len(phrase))
 
-                if len(phrase) < 2 and tags[0] == '':
+                if len(phrase) < 2 and tags[0] == "":
                     continue
 
                 self.dictitem[phrase] = (tags, offset)
@@ -787,7 +768,7 @@ class SchemaTree(object):
     Implementataion of SchemaTree
     """
 
-    def __init__(self, name='root', children=None):
+    def __init__(self, name="root", children=None):
         self.name = name
         self.children = []
         self.prefix = None
@@ -801,9 +782,7 @@ class SchemaTree(object):
         return self.name
 
     def add_child(self, node):
-        assert isinstance(
-            node, SchemaTree
-        ), "The children of a node should be an instacne of SchemaTree."
+        assert isinstance(node, SchemaTree), "The children of a node should be an instacne of SchemaTree."
         self.children.append(node)
 
 
@@ -887,11 +866,11 @@ def get_id_and_prob(span_set, offset_mapping):
     """
     Return text id and probability of predicted spans
 
-    Args: 
+    Args:
         span_set (set): set of predicted spans.
         offset_mapping (list[int]): list of pair preserving the
                 index of start and end char in original text pair (prompt + text) for each token.
-    Returns: 
+    Returns:
         sentence_id (list[tuple]): index of start and end char in original text.
         prob (list[float]): probabilities of predicted spans.
     """
@@ -918,8 +897,8 @@ def dbc2sbc(s):
         if code == 0x3000:
             code = 0x0020
         else:
-            code -= 0xfee0
-        if not (0x0021 <= code and code <= 0x7e):
+            code -= 0xFEE0
+        if not (0x0021 <= code and code <= 0x7E):
             rs += char
             continue
         rs += chr(code)
@@ -927,8 +906,8 @@ def dbc2sbc(s):
 
 
 class WordTagRelationExtractor(object):
-    """Implement of information extractor.
-    """
+    """Implement of information extractor."""
+
     _chain_items = {"和", "与", "兼", "及", "以及", "还有", "并"}
     _all_items = None
     _jux_buf = []
@@ -952,81 +931,62 @@ class WordTagRelationExtractor(object):
         for i, trip_config in enumerate(config_dict):
             head_role_type = trip_config["head_role"]
             if head_role_type not in res:
-                res[head_role_type] = {
-                    "trigger": {},
-                    "g_t_map": {},
-                    "rel_group": {},
-                    "trig_word": {}
-                }
+                res[head_role_type] = {"trigger": {}, "g_t_map": {}, "rel_group": {}, "trig_word": {}}
             group_name = trip_config["group"]
             if "rel_group" in trip_config:
-                res[head_role_type]["rel_group"][group_name] = trip_config[
-                    "rel_group"]
+                res[head_role_type]["rel_group"][group_name] = trip_config["rel_group"]
             if group_name not in res[head_role_type]["trig_word"]:
                 res[head_role_type]["trig_word"][group_name] = set()
             for trig_word in trip_config["trig_word"]:
                 res[head_role_type]["trigger"][trig_word] = {
                     "trigger_type": trip_config["trig_type"],
                     "group_name": group_name,
-                    "rev_flag": trip_config["reverse"]
+                    "rev_flag": trip_config["reverse"],
                 }
                 res[head_role_type]["trig_word"][group_name].add(trig_word)
-            res[head_role_type]["g_t_map"][group_name] = trip_config[
-                "tail_role"]
+            res[head_role_type]["g_t_map"][group_name] = trip_config["tail_role"]
 
         return cls(res)
 
     @classmethod
     def from_json(cls, json_str):
-        """Implement an instance from JSON str.
-        """
+        """Implement an instance from JSON str."""
         config_dict = json.loads(json_str)
         return cls.from_dict(config_dict)
 
     @classmethod
     def from_pkl(cls, pkl_path):
-        """Implement an instance from a serialized pickle package.
-        """
+        """Implement an instance from a serialized pickle package."""
         with open(pkl_path, "rb") as fp:
             schema = pickle.load(fp)
         return cls(schema)
 
     @classmethod
     def from_config(cls, config_path):
-        """Implement an instance from a configuration file.
-        """
+        """Implement an instance from a configuration file."""
         with open(config_path, encoding="utf-8") as fp:
             config_json = json.load(fp)
         return cls.from_dict(config_json)
 
     def add_schema_from_dict(self, config_dict):
-        """Add the schema from the dict.
-        """
+        """Add the schema from the dict."""
         for i, trip_config in enumerate(config_dict):
             head_role_type = trip_config["head_role"]
             if head_role_type not in self._schema:
-                self._schema[head_role_type] = {
-                    "trigger": {},
-                    "g_t_map": {},
-                    "rel_group": {},
-                    "trig_word": {}
-                }
+                self._schema[head_role_type] = {"trigger": {}, "g_t_map": {}, "rel_group": {}, "trig_word": {}}
             group_name = trip_config["group"]
             if "rel_group" in self._schema:
-                self._schema[head_role_type]["rel_group"][
-                    group_name] = trip_config["rel_group"]
+                self._schema[head_role_type]["rel_group"][group_name] = trip_config["rel_group"]
             if group_name not in self._schema[head_role_type]["trig_word"]:
                 self._schema[head_role_type]["trig_word"][group_name] = set()
             for trig_word in trip_config["trig_word"]:
                 self._schema[head_role_type]["trigger"][trig_word] = {
                     "trigger_type": trip_config["trig_type"],
                     "group_name": group_name,
-                    "rev_flag": trip_config["reverse"]
+                    "rev_flag": trip_config["reverse"],
                 }
-                self._schema[head_role_type]["trig_word"][group_name].add(
-                    trig_word)
-            self._schema[head_role_type]["g_t_map"][group_name] = trip_config[
-                "tail_role"]
+                self._schema[head_role_type]["trig_word"][group_name].add(trig_word)
+            self._schema[head_role_type]["g_t_map"][group_name] = trip_config["tail_role"]
 
     def _judge_jux(self, wordtag_item):
         """Judge whether `wordtag_item` is a relevance componet between two juxtaposed items.
@@ -1039,18 +999,11 @@ class WordTagRelationExtractor(object):
         """
         if wordtag_item["item"] in {"、", " ", "《", "》", "/"}:
             return True
-        if wordtag_item["item"] in self._chain_items and wordtag_item[
-                "wordtag_label"] == "连词":
+        if wordtag_item["item"] in self._chain_items and wordtag_item["wordtag_label"] == "连词":
             return True
         return False
 
-    def _search_jux(self,
-                    cur_item,
-                    cur_pos=0,
-                    jux_type=None,
-                    jux_word=None,
-                    status_flag=None,
-                    search_list=None):
+    def _search_jux(self, cur_item, cur_pos=0, jux_type=None, jux_word=None, status_flag=None, search_list=None):
         """Find juxtaposed items with `cur_item` at `cur_pos` in `self._all_items`.
 
         Args:
@@ -1078,12 +1031,14 @@ class WordTagRelationExtractor(object):
         next_item = search_list[cur_pos + 1]
 
         if self._judge_jux(next_item) is True:
-            return self._search_jux(cur_item=next_item,
-                                    cur_pos=cur_pos + 1,
-                                    jux_type=jux_type,
-                                    jux_word=jux_word,
-                                    status_flag=False,
-                                    search_list=search_list)
+            return self._search_jux(
+                cur_item=next_item,
+                cur_pos=cur_pos + 1,
+                jux_type=jux_type,
+                jux_word=jux_word,
+                status_flag=False,
+                search_list=search_list,
+            )
 
         next_flag = True
         if jux_type is not None:
@@ -1091,11 +1046,9 @@ class WordTagRelationExtractor(object):
         if jux_word is not None:
             next_flag = next_flag and (next_item["item"] in jux_word)
         if next_flag is True:
-            return self._search_jux(cur_item=next_item,
-                                    cur_pos=cur_pos + 1,
-                                    jux_type=jux_type,
-                                    jux_word=jux_word,
-                                    status_flag=True)
+            return self._search_jux(
+                cur_item=next_item, cur_pos=cur_pos + 1, jux_type=jux_type, jux_word=jux_word, status_flag=True
+            )
         if next_flag is not True:
             while self._judge_jux(search_list[cur_pos]) is True:
                 cur_pos -= 1
@@ -1159,19 +1112,11 @@ class WordTagRelationExtractor(object):
             item = self._all_items[i]
             if item["item"] == "，":
                 break
-            if any(item["wordtag_label"].startswith(sup_t)
-                   for sup_t in search_type):
+            if any(item["wordtag_label"].startswith(sup_t) for sup_t in search_type):
                 res.append(item)
         return res if len(res) > 0 else None
 
-    def _make_output(self,
-                     head_item,
-                     tail_item,
-                     group,
-                     source,
-                     support=None,
-                     trig_word=None,
-                     **kwargs):
+    def _make_output(self, head_item, tail_item, group, source, support=None, trig_word=None, **kwargs):
         """Make formatted outputs of mined results.
 
         Args:
@@ -1192,27 +1137,29 @@ class WordTagRelationExtractor(object):
                 "type": head_item["wordtag_label"],
                 "offset": head_item["offset"],
             },
-            "TAIL_ROLE": [{
-                "item": ti["item"],
-                "offset": ti["offset"],
-                "type": ti["wordtag_label"]
-            } for ti in tail_item],
-            "GROUP":
-            group,
-            "SRC":
-            source,
+            "TAIL_ROLE": [
+                {"item": ti["item"], "offset": ti["offset"], "type": ti["wordtag_label"]} for ti in tail_item
+            ],
+            "GROUP": group,
+            "SRC": source,
         }
         if support is not None:
-            res["SUPPORT"] = [{
-                "item": si["item"],
-                "offset": si["offset"],
-                "type": si["wordtag_label"],
-            } for si in support]
+            res["SUPPORT"] = [
+                {
+                    "item": si["item"],
+                    "offset": si["offset"],
+                    "type": si["wordtag_label"],
+                }
+                for si in support
+            ]
         if trig_word is not None:
-            res["TRIG"] = [{
-                "item": ti["item"],
-                "offset": ti["offset"],
-            } for ti in trig_word]
+            res["TRIG"] = [
+                {
+                    "item": ti["item"],
+                    "offset": ti["offset"],
+                }
+                for ti in trig_word
+            ]
         return res
 
     def _reverse(self, res, group_name=None):
@@ -1272,48 +1219,42 @@ class WordTagRelationExtractor(object):
                 cur_pos = j
                 j += 1
 
-                trig_status, trig_conf = self._trig_handler(
-                    cur_item, self._schema[head_type])
+                trig_status, trig_conf = self._trig_handler(cur_item, self._schema[head_type])
 
                 # Find a tail role, generate corresponding triple.
                 if trig_status == "trig_t":
                     trig_status = "un_trig"
                     tail_flag = True
                     for k in range(i + 1, j):
-                        if self._all_items[k]["wordtag_label"] == head_cand[
-                                "wordtag_label"]:
+                        if self._all_items[k]["wordtag_label"] == head_cand["wordtag_label"]:
                             tail_flag = False
                             break
                     if tail_flag is False:
                         continue
 
-                    group_name = head_conf["trigger"][
-                        cur_item["item"]]["group_name"]
+                    group_name = head_conf["trigger"][cur_item["item"]]["group_name"]
                     del self._jux_buf[:]
-                    idx = self._search_jux(cur_item=cur_item,
-                                           cur_pos=cur_pos,
-                                           jux_type=trig_conf["main"],
-                                           status_flag=True)
-                    supports = self._find_supp(search_range=range(j - 1, i, -1),
-                                               search_type=trig_conf["support"])
+                    idx = self._search_jux(
+                        cur_item=cur_item, cur_pos=cur_pos, jux_type=trig_conf["main"], status_flag=True
+                    )
+                    supports = self._find_supp(search_range=range(j - 1, i, -1), search_type=trig_conf["support"])
 
-                    tmp = self._make_output(head_item=head_cand,
-                                            tail_item=self._jux_buf[:],
-                                            group=group_name,
-                                            support=supports,
-                                            source="TAIL")
+                    tmp = self._make_output(
+                        head_item=head_cand,
+                        tail_item=self._jux_buf[:],
+                        group=group_name,
+                        support=supports,
+                        source="TAIL",
+                    )
 
                     # Reverse triple if group has relative.
-                    if (group_name in head_conf.get("rel_group", {}) or
-                            head_conf["trigger"][cur_item["item"]]["rev_flag"]
-                            is True):
-                        rev_tmp = self._reverse(
-                            tmp,
-                            head_conf.get("rel_group",
-                                          {}).get(group_name, None))
+                    if (
+                        group_name in head_conf.get("rel_group", {})
+                        or head_conf["trigger"][cur_item["item"]]["rev_flag"] is True
+                    ):
+                        rev_tmp = self._reverse(tmp, head_conf.get("rel_group", {}).get(group_name, None))
                         res_cand.extend(rev_tmp[:])
-                    if head_conf["trigger"][
-                            cur_item["item"]]["rev_flag"] is False:
+                    if head_conf["trigger"][cur_item["item"]]["rev_flag"] is False:
                         res_cand.append(tmp.copy())
 
                     j = idx + 1
@@ -1324,8 +1265,7 @@ class WordTagRelationExtractor(object):
                 # Searching range is items behind group trigger and items between head rold and group trigger word.
                 if trig_status == "trig_g":
                     trig_status = "un_trig"
-                    group_name = head_conf["trigger"][
-                        cur_item["item"]]["group_name"]
+                    group_name = head_conf["trigger"][cur_item["item"]]["group_name"]
 
                     del self._jux_buf[:]
                     g_start_idx = j - 1
@@ -1333,7 +1273,8 @@ class WordTagRelationExtractor(object):
                         cur_item=cur_item,
                         cur_pos=cur_pos,
                         jux_word=head_conf["trig_word"][group_name],
-                        status_flag=True)
+                        status_flag=True,
+                    )
 
                     g_trig_words = self._jux_buf[:]
                     j = g_idx + 1
@@ -1341,39 +1282,35 @@ class WordTagRelationExtractor(object):
                     # Search right.
                     if j < len(self._all_items) - 1:
                         tail_idx, tail_conf = self._find_tail(
-                            range(g_idx + 1, len(self._all_items)),
-                            head_conf["g_t_map"][group_name], head_type)
+                            range(g_idx + 1, len(self._all_items)), head_conf["g_t_map"][group_name], head_type
+                        )
 
                         if tail_idx > 0:
                             # Find a tail.
                             tail_item = self._all_items[tail_idx]
                             del self._jux_buf[:]
-                            idx = self._search_jux(cur_item=tail_item,
-                                                   cur_pos=tail_idx,
-                                                   status_flag=True,
-                                                   jux_type=tail_conf["main"])
+                            idx = self._search_jux(
+                                cur_item=tail_item, cur_pos=tail_idx, status_flag=True, jux_type=tail_conf["main"]
+                            )
                             tail_cand = self._jux_buf[:]
-                            supports = self._find_supp(
-                                range(tail_idx - 1, i, -1),
-                                tail_conf["support"])
+                            supports = self._find_supp(range(tail_idx - 1, i, -1), tail_conf["support"])
 
-                            tmp = self._make_output(head_item=head_cand,
-                                                    tail_item=tail_cand,
-                                                    group=group_name,
-                                                    source="HGT",
-                                                    support=supports,
-                                                    trig_word=g_trig_words)
+                            tmp = self._make_output(
+                                head_item=head_cand,
+                                tail_item=tail_cand,
+                                group=group_name,
+                                source="HGT",
+                                support=supports,
+                                trig_word=g_trig_words,
+                            )
 
-                            if (group_name in head_conf.get("rel_group", {})
-                                    or head_conf["trigger"][
-                                        cur_item["item"]]["rev_flag"] is True):
-                                rev_tmp = self._reverse(
-                                    tmp,
-                                    head_conf.get("rel_group",
-                                                  {}).get(group_name, None))
+                            if (
+                                group_name in head_conf.get("rel_group", {})
+                                or head_conf["trigger"][cur_item["item"]]["rev_flag"] is True
+                            ):
+                                rev_tmp = self._reverse(tmp, head_conf.get("rel_group", {}).get(group_name, None))
                                 res_cand.extend(rev_tmp[:])
-                            if head_conf["trigger"][
-                                    cur_item["item"]]["rev_flag"] is False:
+                            if head_conf["trigger"][cur_item["item"]]["rev_flag"] is False:
                                 res_cand.append(tmp.copy())
 
                             j = idx + 1
@@ -1383,8 +1320,8 @@ class WordTagRelationExtractor(object):
                     # Search left
                     if g_idx - i > len(g_trig_words):
                         tail_idx, tail_conf = self._find_tail(
-                            range(g_start_idx, last_end, -1),
-                            head_conf["g_t_map"][group_name], head_type)
+                            range(g_start_idx, last_end, -1), head_conf["g_t_map"][group_name], head_type
+                        )
                         tail_item = self._all_items[tail_idx]
                         if tail_idx > 0:
                             del self._jux_buf[:]
@@ -1393,31 +1330,28 @@ class WordTagRelationExtractor(object):
                                 cur_pos=0,
                                 jux_type=tail_conf["main"],
                                 status_flag=True,
-                                search_list=self._all_items[i +
-                                                            1:tail_idx][::-1])
+                                search_list=self._all_items[i + 1 : tail_idx][::-1],
+                            )
                             tail_cand = self._jux_buf[:]
-                            supports = self._find_supp(
-                                range(g_idx - 1, last_end, -1),
-                                tail_conf["support"])
+                            supports = self._find_supp(range(g_idx - 1, last_end, -1), tail_conf["support"])
                             last_end = g_idx
 
-                            tmp = self._make_output(head_item=head_cand,
-                                                    tail_item=tail_cand,
-                                                    group=group_name,
-                                                    trig_word=g_trig_words,
-                                                    source="HTG",
-                                                    support=supports)
+                            tmp = self._make_output(
+                                head_item=head_cand,
+                                tail_item=tail_cand,
+                                group=group_name,
+                                trig_word=g_trig_words,
+                                source="HTG",
+                                support=supports,
+                            )
 
-                            if (group_name in head_conf.get("rel_group", {})
-                                    or head_conf["trigger"][
-                                        cur_item["item"]]["rev_flag"] is True):
-                                rev_tmp = self._reverse(
-                                    tmp,
-                                    head_conf.get("rel_group",
-                                                  {}).get(group_name, None))
+                            if (
+                                group_name in head_conf.get("rel_group", {})
+                                or head_conf["trigger"][cur_item["item"]]["rev_flag"] is True
+                            ):
+                                rev_tmp = self._reverse(tmp, head_conf.get("rel_group", {}).get(group_name, None))
                                 res_cand.extend(rev_tmp[:])
-                            if head_conf["trigger"][
-                                    cur_item["item"]]["rev_flag"] is False:
+                            if head_conf["trigger"][cur_item["item"]]["rev_flag"] is False:
                                 res_cand.append(tmp.copy())
                             continue
         return res_cand
@@ -1431,13 +1365,8 @@ class DataCollatorGP:
     label_maps: Optional[dict] = None
     task_type: Optional[str] = None
 
-    def __call__(
-        self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]
-    ) -> Dict[str, paddle.Tensor]:
-        new_features = [{
-            k: v
-            for k, v in f.items() if k not in ["offset_mapping", "text"]
-        } for f in features]
+    def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
+        new_features = [{k: v for k, v in f.items() if k not in ["offset_mapping", "text"]} for f in features]
 
         batch = self.tokenizer.pad(
             new_features,
@@ -1450,28 +1379,22 @@ class DataCollatorGP:
         return batch
 
 
-def gp_decode(batch_outputs,
-              offset_mappings,
-              texts,
-              label_maps,
-              task_type="relation_extraction"):
+def gp_decode(batch_outputs, offset_mappings, texts, label_maps, task_type="relation_extraction"):
     if task_type == "entity_extraction":
         batch_ent_results = []
-        for entity_output, offset_mapping, text in zip(batch_outputs[0].numpy(),
-                                                       offset_mappings, texts):
+        for entity_output, offset_mapping, text in zip(batch_outputs[0].numpy(), offset_mappings, texts):
             entity_output[:, [0, -1]] -= np.inf
             entity_output[:, :, [0, -1]] -= np.inf
-            entity_probs = F.softmax(paddle.to_tensor(entity_output),
-                                     axis=1).numpy()
+            entity_probs = F.softmax(paddle.to_tensor(entity_output), axis=1).numpy()
             ent_list = []
-            for l, start, end in zip(*np.where(entity_output > 0.)):
+            for l, start, end in zip(*np.where(entity_output > 0.0)):
                 ent_prob = entity_probs[l, start, end]
                 start, end = (offset_mapping[start][0], offset_mapping[end][-1])
                 ent = {
                     "text": text[start:end],
-                    "type": label_maps['id2entity'][str(l)],
+                    "type": label_maps["id2entity"][str(l)],
                     "start_index": start,
-                    "probability": ent_prob
+                    "probability": ent_prob,
                 }
                 ent_list.append(ent)
             batch_ent_results.append(ent_list)
@@ -1480,32 +1403,29 @@ def gp_decode(batch_outputs,
         batch_ent_results = []
         batch_rel_results = []
         for entity_output, head_output, tail_output, offset_mapping, text in zip(
-                batch_outputs[0].numpy(),
-                batch_outputs[1].numpy(),
-                batch_outputs[2].numpy(),
-                offset_mappings,
-                texts,
+            batch_outputs[0].numpy(),
+            batch_outputs[1].numpy(),
+            batch_outputs[2].numpy(),
+            offset_mappings,
+            texts,
         ):
             entity_output[:, [0, -1]] -= np.inf
             entity_output[:, :, [0, -1]] -= np.inf
-            entity_probs = F.softmax(paddle.to_tensor(entity_output),
-                                     axis=1).numpy()
-            head_probs = F.softmax(paddle.to_tensor(head_output),
-                                   axis=1).numpy()
-            tail_probs = F.softmax(paddle.to_tensor(tail_output),
-                                   axis=1).numpy()
+            entity_probs = F.softmax(paddle.to_tensor(entity_output), axis=1).numpy()
+            head_probs = F.softmax(paddle.to_tensor(head_output), axis=1).numpy()
+            tail_probs = F.softmax(paddle.to_tensor(tail_output), axis=1).numpy()
 
             ents = set()
             ent_list = []
-            for l, start, end in zip(*np.where(entity_output > 0.)):
+            for l, start, end in zip(*np.where(entity_output > 0.0)):
                 ent_prob = entity_probs[l, start, end]
                 ents.add((start, end))
                 start, end = (offset_mapping[start][0], offset_mapping[end][-1])
                 ent = {
                     "text": text[start:end],
-                    "type": label_maps['id2entity'][str(l)],
+                    "type": label_maps["id2entity"][str(l)],
                     "start_index": start,
-                    "probability": ent_prob
+                    "probability": ent_prob,
                 }
                 ent_list.append(ent)
             batch_ent_results.append(ent_list)
@@ -1513,44 +1433,28 @@ def gp_decode(batch_outputs,
             rel_list = []
             for sh, st in ents:
                 for oh, ot in ents:
-                    p1s = np.where(head_output[:, sh, oh] > 0.)[0]
-                    p2s = np.where(tail_output[:, st, ot] > 0.)[0]
+                    p1s = np.where(head_output[:, sh, oh] > 0.0)[0]
+                    p2s = np.where(tail_output[:, st, ot] > 0.0)[0]
                     ps = set(p1s) & set(p2s)
                     for p in ps:
                         rel_prob = head_probs[p, sh, oh] * tail_probs[p, st, ot]
                         if task_type == "relation_extraction":
                             rel = {
-                                "subject":
-                                text[offset_mapping[sh][0]:offset_mapping[st]
-                                     [1]],
-                                "predicate":
-                                label_maps['id2relation'][str(p)],
-                                "object":
-                                text[offset_mapping[oh][0]:offset_mapping[ot]
-                                     [1]],
-                                "subject_start_index":
-                                offset_mapping[sh][0],
-                                "object_start_index":
-                                offset_mapping[oh][0],
-                                "probability":
-                                rel_prob,
+                                "subject": text[offset_mapping[sh][0] : offset_mapping[st][1]],
+                                "predicate": label_maps["id2relation"][str(p)],
+                                "object": text[offset_mapping[oh][0] : offset_mapping[ot][1]],
+                                "subject_start_index": offset_mapping[sh][0],
+                                "object_start_index": offset_mapping[oh][0],
+                                "probability": rel_prob,
                             }
                         else:
                             rel = {
-                                "aspect":
-                                text[offset_mapping[sh][0]:offset_mapping[st]
-                                     [1]],
-                                "sentiment":
-                                label_maps['id2relation'][str(p)],
-                                "opinion":
-                                text[offset_mapping[oh][0]:offset_mapping[ot]
-                                     [1]],
-                                "aspect_start_index":
-                                offset_mapping[sh][0],
-                                "opinion_start_index":
-                                offset_mapping[oh][0],
-                                "probability":
-                                rel_prob,
+                                "aspect": text[offset_mapping[sh][0] : offset_mapping[st][1]],
+                                "sentiment": label_maps["id2relation"][str(p)],
+                                "opinion": text[offset_mapping[oh][0] : offset_mapping[ot][1]],
+                                "aspect_start_index": offset_mapping[sh][0],
+                                "opinion_start_index": offset_mapping[oh][0],
+                                "probability": rel_prob,
                             }
                         rel_list.append(rel)
             batch_rel_results.append(rel_list)
@@ -1559,20 +1463,56 @@ def gp_decode(batch_outputs,
 
 DocSpan = namedtuple("DocSpan", ["start", "length"])
 
-Example = namedtuple('Example', [
-    "keys", "key_labels", "doc_tokens", "text", "qas_id", "model_type",
-    "seq_labels", "ori_boxes", "boxes", "segment_ids", "symbol_ids",
-    "im_base64", "image_rois"
-])
+Example = namedtuple(
+    "Example",
+    [
+        "keys",
+        "key_labels",
+        "doc_tokens",
+        "text",
+        "qas_id",
+        "model_type",
+        "seq_labels",
+        "ori_boxes",
+        "boxes",
+        "segment_ids",
+        "symbol_ids",
+        "im_base64",
+        "image_rois",
+    ],
+)
 
-Feature = namedtuple("Feature", [
-    "unique_id", "example_index", "qas_id", "doc_span_index", "tokens",
-    "token_to_orig_map", "token_is_max_context", "token_ids", "position_ids",
-    "text_type_ids", "text_symbol_ids", "overlaps", "key_labels", "seq_labels",
-    "se_seq_labels", "bio_seq_labels", "bioes_seq_labels", "keys", 'model_type',
-    'doc_tokens', 'doc_labels', 'text', "boxes", "segment_ids", "im_base64",
-    "image_rois"
-])
+Feature = namedtuple(
+    "Feature",
+    [
+        "unique_id",
+        "example_index",
+        "qas_id",
+        "doc_span_index",
+        "tokens",
+        "token_to_orig_map",
+        "token_is_max_context",
+        "token_ids",
+        "position_ids",
+        "text_type_ids",
+        "text_symbol_ids",
+        "overlaps",
+        "key_labels",
+        "seq_labels",
+        "se_seq_labels",
+        "bio_seq_labels",
+        "bioes_seq_labels",
+        "keys",
+        "model_type",
+        "doc_tokens",
+        "doc_labels",
+        "text",
+        "boxes",
+        "segment_ids",
+        "im_base64",
+        "image_rois",
+    ],
+)
 
 
 class Compose(object):
@@ -1591,21 +1531,18 @@ class Compose(object):
                 data = f(data, ctx)
             except Exception as e:
                 stack_info = traceback.format_exc()
-                logger.warning(
-                    "fail to map op [{}] with error: {} and stack:\n{}".format(
-                        f, e, str(stack_info)))
+                logger.warning("fail to map op [{}] with error: {} and stack:\n{}".format(f, e, str(stack_info)))
                 raise e
         return data
 
 
 def batch_arrange(batch_samples, fields):
-
     def _segm(samples):
         """"""
-        assert 'gt_poly' in samples
-        segms = samples['gt_poly']
-        if 'is_crowd' in samples:
-            is_crowd = samples['is_crowd']
+        assert "gt_poly" in samples
+        segms = samples["gt_poly"]
+        if "is_crowd" in samples:
+            is_crowd = samples["is_crowd"]
             if len(segms) != 0:
                 assert len(segms) == is_crowd.shape[0]
 
@@ -1614,7 +1551,7 @@ def batch_arrange(batch_samples, fields):
         for i in range(len(segms)):
             segm = segms[i]
             gt_segm = []
-            if 'is_crowd' in samples and is_crowd[i]:
+            if "is_crowd" in samples and is_crowd[i]:
                 gt_segm.append([[0, 0]])
             else:
                 for poly in segm:
@@ -1629,28 +1566,28 @@ def batch_arrange(batch_samples, fields):
 
     def im_shape(samples, dim=3):
         # hard code
-        assert 'h' in samples
-        assert 'w' in samples
+        assert "h" in samples
+        assert "w" in samples
         if dim == 3:  # RCNN, ..
-            return np.array((samples['h'], samples['w'], 1), dtype=np.float32)
+            return np.array((samples["h"], samples["w"], 1), dtype=np.float32)
         else:  # YOLOv3, ..
-            return np.array((samples['h'], samples['w']), dtype=np.int32)
+            return np.array((samples["h"], samples["w"]), dtype=np.int32)
 
     arrange_batch = []
     for samples in batch_samples:
         one_ins = ()
         for i, field in enumerate(fields):
-            if field == 'gt_mask':
-                one_ins += (_segm(samples), )
-            elif field == 'im_shape':
-                one_ins += (im_shape(samples), )
-            elif field == 'im_size':
-                one_ins += (im_shape(samples, 2), )
+            if field == "gt_mask":
+                one_ins += (_segm(samples),)
+            elif field == "im_shape":
+                one_ins += (im_shape(samples),)
+            elif field == "im_size":
+                one_ins += (im_shape(samples, 2),)
             else:
-                if field == 'is_difficult':
-                    field = 'difficult'
-                assert field in samples, '{} not in samples'.format(field)
-                one_ins += (samples[field], )
+                if field == "is_difficult":
+                    field = "difficult"
+                assert field in samples, "{} not in samples".format(field)
+                one_ins += (samples[field],)
         arrange_batch.append(one_ins)
     return arrange_batch
 
@@ -1688,38 +1625,37 @@ class ProcessReader(object):
         num_trainers (int): number of trainers. Default 1.
     """
 
-    def __init__(self,
-                 dataset=None,
-                 sample_transforms=None,
-                 batch_transforms=None,
-                 batch_size=None,
-                 shuffle=False,
-                 drop_last=False,
-                 drop_empty=True,
-                 mixup_epoch=-1,
-                 cutmix_epoch=-1,
-                 class_aware_sampling=False,
-                 use_process=False,
-                 use_fine_grained_loss=False,
-                 num_classes=80,
-                 bufsize=-1,
-                 memsize='3G',
-                 inputs_def=None,
-                 devices_num=1,
-                 num_trainers=1):
+    def __init__(
+        self,
+        dataset=None,
+        sample_transforms=None,
+        batch_transforms=None,
+        batch_size=None,
+        shuffle=False,
+        drop_last=False,
+        drop_empty=True,
+        mixup_epoch=-1,
+        cutmix_epoch=-1,
+        class_aware_sampling=False,
+        use_process=False,
+        use_fine_grained_loss=False,
+        num_classes=80,
+        bufsize=-1,
+        memsize="3G",
+        inputs_def=None,
+        devices_num=1,
+        num_trainers=1,
+    ):
         """"""
-        self._fields = copy.deepcopy(
-            inputs_def['fields']) if inputs_def else None
+        self._fields = copy.deepcopy(inputs_def["fields"]) if inputs_def else None
 
         # transform
-        self._sample_transforms = Compose(sample_transforms,
-                                          {'fields': self._fields})
+        self._sample_transforms = Compose(sample_transforms, {"fields": self._fields})
         self._batch_transforms = None
 
         if batch_transforms:
             batch_transforms = [bt for bt in batch_transforms]
-            self._batch_transforms = Compose(batch_transforms,
-                                             {'fields': self._fields})
+            self._batch_transforms = Compose(batch_transforms, {"fields": self._fields})
 
         self._batch_size = batch_size
         self._shuffle = shuffle
@@ -1737,8 +1673,7 @@ class ProcessReader(object):
         self._curr_iter = 0
 
     def process(self, dataset):
-        """process
-        """
+        """process"""
         batch = self._load_batch(dataset)
         res = self.worker(self._drop_empty, batch)
         return res
@@ -1765,25 +1700,26 @@ class ProcessReader(object):
         return batch
 
 
-def pad_batch_data(insts,
-                   pad_idx=0,
-                   max_seq_len=None,
-                   return_pos=False,
-                   return_input_mask=False,
-                   return_max_len=False,
-                   return_num_token=False,
-                   return_seq_lens=False,
-                   pad_2d_pos_ids=False,
-                   pad_segment_id=False,
-                   select=False,
-                   extract=False):
+def pad_batch_data(
+    insts,
+    pad_idx=0,
+    max_seq_len=None,
+    return_pos=False,
+    return_input_mask=False,
+    return_max_len=False,
+    return_num_token=False,
+    return_seq_lens=False,
+    pad_2d_pos_ids=False,
+    pad_segment_id=False,
+    select=False,
+    extract=False,
+):
     """
     Pad the instances to the max sequence length in batch, and generate the
     corresponding position data and attention bias.
     """
     return_list = []
-    max_len = max(len(inst)
-                  for inst in insts) if max_seq_len is None else max_seq_len
+    max_len = max(len(inst) for inst in insts) if max_seq_len is None else max_seq_len
     # Any token included in dict can be used to pad, since the paddings' loss
     # will be masked out by weights and make no effect on parameter gradients.
     if pad_2d_pos_ids:
@@ -1791,23 +1727,18 @@ def pad_batch_data(insts,
         boxes = np.array(boxes, dtype="int64")
         return boxes
 
-    inst_data = np.array(
-        [inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
+    inst_data = np.array([inst + list([pad_idx] * (max_len - len(inst))) for inst in insts])
     return_list += [inst_data.astype("int64").reshape([-1, max_len, 1])]
 
     # position data
     if return_pos:
-        inst_pos = np.array([
-            list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst))
-            for inst in insts
-        ])
+        inst_pos = np.array([list(range(0, len(inst))) + [pad_idx] * (max_len - len(inst)) for inst in insts])
 
         return_list += [inst_pos.astype("int64").reshape([-1, max_len, 1])]
 
     if return_input_mask:
         # This is used to avoid attention on paddings.
-        input_mask_data = np.array(
-            [[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
+        input_mask_data = np.array([[1] * len(inst) + [0] * (max_len - len(inst)) for inst in insts])
         input_mask_data = np.expand_dims(input_mask_data, axis=-1)
         return_list += [input_mask_data.astype("float32")]
 
@@ -1828,16 +1759,17 @@ def pad_batch_data(insts,
 
 
 class ImageReader(object):
-
-    def __init__(self,
-                 super_rel_pos,
-                 tokenizer,
-                 max_key_len=16,
-                 max_seq_len=512,
-                 image_size=1024,
-                 block_w=7,
-                 block_h=7,
-                 im_npos=224):
+    def __init__(
+        self,
+        super_rel_pos,
+        tokenizer,
+        max_key_len=16,
+        max_seq_len=512,
+        image_size=1024,
+        block_w=7,
+        block_h=7,
+        im_npos=224,
+    ):
         self.tokenizer = tokenizer
         self.vocab = self.tokenizer.get_vocab()
 
@@ -1864,12 +1796,10 @@ class ImageReader(object):
         self.block_h = block_h
         self.im_npos = im_npos
         self.image_rois = []
-        cut_width, cut_height = int(self.image_size / self.block_w), int(
-            self.image_size / self.block_h)
+        cut_width, cut_height = int(self.image_size / self.block_w), int(self.image_size / self.block_h)
         for idh in range(self.block_h):
             for idw in range(self.block_w):
-                self.image_rois.append(
-                    [idw * cut_width, idh * cut_height, cut_width, cut_height])
+                self.image_rois.append([idw * cut_width, idh * cut_height, cut_width, cut_height])
 
         sample_trans = [
             DecodeImage(),
@@ -1901,14 +1831,9 @@ class ImageReader(object):
         for rst in ocr_res:
             left = min(rst[0][0][0], rst[0][3][0])
             top = min(rst[0][0][-1], rst[0][1][-1])
-            width = max(rst[0][1][0], rst[0][2][0]) - min(
-                rst[0][0][0], rst[0][3][0])
-            height = max(rst[0][2][-1], rst[0][3][-1]) - min(
-                rst[0][0][-1], rst[0][1][-1])
-            segments.append({
-                "bbox": Bbox(*[left, top, width, height]),
-                "text": rst[-1][0]
-            })
+            width = max(rst[0][1][0], rst[0][2][0]) - min(rst[0][0][0], rst[0][3][0])
+            height = max(rst[0][2][-1], rst[0][3][-1]) - min(rst[0][0][-1], rst[0][1][-1])
+            segments.append({"bbox": Bbox(*[left, top, width, height]), "text": rst[-1][0]})
         segments.sort(key=cmp_to_key(two_dimension_sort_layout))
         # 2. im_base64
         img_base64 = img2base64(img_path)
@@ -1918,10 +1843,8 @@ class ImageReader(object):
         ori_boxes = []
         doc_segment_ids = []
 
-        im_w_box = max(
-            [seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20
-        im_h_box = max(
-            [seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
+        im_w_box = max([seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20
+        im_h_box = max([seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
         img = Image.open(img_path)
         im_w, im_h = img.size
         im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
@@ -1936,8 +1859,7 @@ class ImageReader(object):
             sc_y1 = int(max(0, min(y1 * scale_y, self.image_size - h - 1)))
             sc_x1 = int(max(0, min(x1 * scale_x, self.image_size - w - 1)))
             if w < 0:
-                raise ValueError(
-                    "Incorrect bbox, please check the input word boxes.")
+                raise ValueError("Incorrect bbox, please check the input word boxes.")
             ori_bbox = Bbox(*[x1, y1, w, h])
             sc_bbox = Bbox(*[sc_x1, sc_y1, sc_w, sc_h])
             text = segment["text"]
@@ -1966,24 +1888,37 @@ class ImageReader(object):
             sc_char_width = round(sc_bbox.width / sum(char_num), 1)
             for chr_idx in range(len(char_num)):
                 if chr_idx == 0:
-                    doc_boxes.append([
-                        Bbox(*[
-                            sc_bbox.left, sc_bbox.top,
-                            (sc_char_width * char_num[chr_idx]), sc_bbox.height
-                        ])
-                    ])
-                    ori_boxes.append([
-                        Bbox(*[
-                            ori_bbox.left, ori_bbox.top,
-                            (ori_char_width *
-                             char_num[chr_idx]), ori_bbox.height
-                        ])
-                    ])
+                    doc_boxes.append(
+                        [Bbox(*[sc_bbox.left, sc_bbox.top, (sc_char_width * char_num[chr_idx]), sc_bbox.height])]
+                    )
+                    ori_boxes.append(
+                        [Bbox(*[ori_bbox.left, ori_bbox.top, (ori_char_width * char_num[chr_idx]), ori_bbox.height])]
+                    )
                 else:
-                    doc_boxes.append([Bbox(*[sc_bbox.left + (sc_char_width * sum(char_num[:chr_idx])), \
-                        sc_bbox.top, (sc_char_width * char_num[chr_idx]), sc_bbox.height])])
-                    ori_boxes.append([Bbox(*[ori_bbox.left + (ori_char_width * sum(char_num[:chr_idx])), \
-                        ori_bbox.top, (ori_char_width * char_num[chr_idx]), ori_bbox.height])])
+                    doc_boxes.append(
+                        [
+                            Bbox(
+                                *[
+                                    sc_bbox.left + (sc_char_width * sum(char_num[:chr_idx])),
+                                    sc_bbox.top,
+                                    (sc_char_width * char_num[chr_idx]),
+                                    sc_bbox.height,
+                                ]
+                            )
+                        ]
+                    )
+                    ori_boxes.append(
+                        [
+                            Bbox(
+                                *[
+                                    ori_bbox.left + (ori_char_width * sum(char_num[:chr_idx])),
+                                    ori_bbox.top,
+                                    (ori_char_width * char_num[chr_idx]),
+                                    ori_bbox.height,
+                                ]
+                            )
+                        ]
+                    )
 
         qas_id = 0
         for query in querys:
@@ -1992,7 +1927,7 @@ class ImageReader(object):
                 key_labels=[0],
                 doc_tokens=doc_tokens,
                 seq_labels=[0 for one in doc_tokens],
-                text='',
+                text="",
                 qas_id="0_" + str(qas_id),
                 model_type=None,
                 ori_boxes=ori_boxes,
@@ -2050,7 +1985,7 @@ class ImageReader(object):
                 key_labels=[0],
                 doc_tokens=doc_tokens,
                 seq_labels=[0 for one in doc_tokens],
-                text='',
+                text="",
                 qas_id=str(qas_id),
                 model_type=None,
                 ori_boxes=ori_boxes,
@@ -2061,8 +1996,7 @@ class ImageReader(object):
                 im_base64=img_base64,
             )
 
-            if not (len(example.doc_tokens) == len(example.boxes) == len(
-                    example.segment_ids)):
+            if not (len(example.doc_tokens) == len(example.boxes) == len(example.segment_ids)):
                 raise ValueError(
                     f"Incorrect word_boxes, the format should be `List[str, Tuple[float, float, float, float]]`"
                 )
@@ -2080,22 +2014,17 @@ class ImageReader(object):
         segment_ids = []
         all_doc_labels = []
 
-        query_tokens = tokenizer.tokenize(
-            "&" + str(example.keys[0]))[1:][:self.max_key_len]
+        query_tokens = tokenizer.tokenize("&" + str(example.keys[0]))[1:][: self.max_key_len]
 
         for i, (token_list, box_list, seg_list, l) in enumerate(
-                zip(example.doc_tokens, example.boxes, example.segment_ids,
-                    example.seq_labels)):
+            zip(example.doc_tokens, example.boxes, example.segment_ids, example.seq_labels)
+        ):
             assert len(token_list) == len(box_list) == len(seg_list)
-            for idt, (token, box,
-                      seg) in enumerate(zip(token_list, box_list, seg_list)):
+            for idt, (token, box, seg) in enumerate(zip(token_list, box_list, seg_list)):
                 sub_tokens = tokenizer.tokenize("&" + token)[1:]
                 for ii, sub_token in enumerate(sub_tokens):
                     width_split = box.width / len(sub_tokens)
-                    boxes.append([
-                        box.left + ii * width_split, box.top, width_split,
-                        box.height
-                    ])
+                    boxes.append([box.left + ii * width_split, box.top, width_split, box.height])
                     segment_ids.append(seg)
                     tok_to_orig_index.append(i)
                     all_doc_tokens.append(sub_token)
@@ -2129,10 +2058,8 @@ class ImageReader(object):
 
             for i in range(doc_span.length):
                 split_token_index = doc_span.start + i
-                token_to_orig_map[len(
-                    tokens)] = tok_to_orig_index[split_token_index]
-                is_max_context = self._check_is_max_context(
-                    doc_spans, doc_span_index, split_token_index)
+                token_to_orig_map[len(tokens)] = tok_to_orig_index[split_token_index]
+                is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                 token_is_max_context[len(tokens)] = is_max_context
                 tokens.append(all_doc_tokens[split_token_index])
 
@@ -2163,32 +2090,34 @@ class ImageReader(object):
             token_ids = tokenizer.convert_tokens_to_ids(tokens)
             feature_segment_ids = [x % max_line_id for x in feature_segment_ids]
 
-            feature = Feature(unique_id=self.unique_id,
-                              example_index=0,
-                              qas_id=example.qas_id,
-                              doc_span_index=doc_span_index,
-                              tokens=tokens,
-                              token_to_orig_map=token_to_orig_map,
-                              token_is_max_context=token_is_max_context,
-                              token_ids=token_ids,
-                              position_ids=position_ids,
-                              text_type_ids=text_type_ids,
-                              text_symbol_ids=None,
-                              overlaps=None,
-                              keys=example.keys,
-                              seq_labels=labels,
-                              se_seq_labels=None,
-                              bio_seq_labels=None,
-                              bioes_seq_labels=None,
-                              key_labels=example.key_labels,
-                              model_type=example.model_type,
-                              doc_tokens=example.doc_tokens,
-                              doc_labels=example.seq_labels,
-                              text=example.text,
-                              boxes=feature_boxes,
-                              segment_ids=feature_segment_ids,
-                              im_base64=example.im_base64,
-                              image_rois=example.image_rois)
+            feature = Feature(
+                unique_id=self.unique_id,
+                example_index=0,
+                qas_id=example.qas_id,
+                doc_span_index=doc_span_index,
+                tokens=tokens,
+                token_to_orig_map=token_to_orig_map,
+                token_is_max_context=token_is_max_context,
+                token_ids=token_ids,
+                position_ids=position_ids,
+                text_type_ids=text_type_ids,
+                text_symbol_ids=None,
+                overlaps=None,
+                keys=example.keys,
+                seq_labels=labels,
+                se_seq_labels=None,
+                bio_seq_labels=None,
+                bioes_seq_labels=None,
+                key_labels=example.key_labels,
+                model_type=example.model_type,
+                doc_tokens=example.doc_tokens,
+                doc_labels=example.seq_labels,
+                text=example.text,
+                boxes=feature_boxes,
+                segment_ids=feature_segment_ids,
+                im_base64=example.im_base64,
+                image_rois=example.image_rois,
+            )
             features.append(feature)
             self.unique_id += 1
         return features
@@ -2217,38 +2146,33 @@ class ImageReader(object):
             batch_image_base64.append(batch_records[i].im_base64)
             batch_image_rois.append(batch_records[i].image_rois)
 
-        padded_token_ids, _ = pad_batch_data(batch_token_ids,
-                                             pad_idx=self.pad_id,
-                                             return_input_mask=True)
+        padded_token_ids, _ = pad_batch_data(batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
         padded_sent_ids = pad_batch_data(batch_sent_ids, pad_idx=self.pad_id)
         padded_pos_ids = pad_batch_data(batch_pos_ids, pad_idx=self.pad_id)
         new_padded_pos_ids = []
         for idp, pos_ids in enumerate(padded_pos_ids):
-            new_padded_pos_ids.append(np.concatenate((pos_ids, np.array([[x] for x in \
-                    range(self.block_w * self.block_h)])), axis=0))
+            new_padded_pos_ids.append(
+                np.concatenate((pos_ids, np.array([[x] for x in range(self.block_w * self.block_h)])), axis=0)
+            )
         padded_pos_ids = np.array(new_padded_pos_ids)
-        padded_2d_pos_ids = pad_batch_data(batch_2d_pos_ids,
-                                           pad_2d_pos_ids=True,
-                                           select=False,
-                                           extract=True)
+        padded_2d_pos_ids = pad_batch_data(batch_2d_pos_ids, pad_2d_pos_ids=True, select=False, extract=True)
         new_padded_2d_pos_ids = []
         for pos_ids_2d, batch_record in zip(padded_2d_pos_ids, batch_records):
-            new_padded_2d_pos_ids.append(
-                np.concatenate((pos_ids_2d, np.array(batch_record.image_rois)),
-                               axis=0))
+            new_padded_2d_pos_ids.append(np.concatenate((pos_ids_2d, np.array(batch_record.image_rois)), axis=0))
         padded_2d_pos_ids = np.array(new_padded_2d_pos_ids)
-        padded_segment_ids = pad_batch_data(batch_segment_ids,
-                                            pad_idx=max_line_id - 1)
+        padded_segment_ids = pad_batch_data(batch_segment_ids, pad_idx=max_line_id - 1)
 
-        input_mask_mat = self._build_input_mask(np.array([list(x) + [\
-                [-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids]))
-        super_rel_pos = self._build_rel_pos(np.array([list(x) + [\
-                [-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids]))
+        input_mask_mat = self._build_input_mask(
+            np.array([list(x) + [[-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids])
+        )
+        super_rel_pos = self._build_rel_pos(
+            np.array([list(x) + [[-1] for _ in range(self.block_w * self.block_h)] for x in padded_token_ids])
+        )
 
         unique_id = np.array(batch_unique_id).astype("float32").reshape([-1, 1])
 
         bsz, seq_len, _ = padded_token_ids.shape
-        task_ids = np.ones((bsz, seq_len, 1)).astype('int64')
+        task_ids = np.ones((bsz, seq_len, 1)).astype("int64")
         for b in range(bsz):
             if np.sum(padded_2d_pos_ids[b]) > 0:
                 task_ids[b, :, :] = 0
@@ -2269,28 +2193,27 @@ class ImageReader(object):
             len(batch_image_base64),
         )
 
-        return_list = [padded_token_ids, padded_sent_ids, padded_pos_ids, padded_2d_pos_ids, \
-                    padded_segment_ids, task_ids, input_mask_mat, super_rel_pos, \
-                    unique_id, image_data \
-                    ]
+        return_list = [
+            padded_token_ids,
+            padded_sent_ids,
+            padded_pos_ids,
+            padded_2d_pos_ids,
+            padded_segment_ids,
+            task_ids,
+            input_mask_mat,
+            super_rel_pos,
+            unique_id,
+            image_data,
+        ]
         return return_list
 
-    def data_generator(self,
-                       ocr_res,
-                       img_path,
-                       querys,
-                       batch_size,
-                       ocr_type="ppocr",
-                       phase="infer"):
+    def data_generator(self, ocr_res, img_path, querys, batch_size, ocr_type="ppocr", phase="infer"):
         if ocr_type == "ppocr":
             self.examples[phase] = self.ppocr2example(ocr_res, img_path, querys)
         elif ocr_type == "word_boxes":
             self.examples[phase] = self.box2example(ocr_res, img_path, querys)
-        self.features[phase] = sum([self.example2feature(e, self.tokenizer) \
-                                    for e in self.examples[phase]], [])
-        for batch_data in self._prepare_batch_data(self.features[phase],
-                                                   batch_size,
-                                                   phase=phase):
+        self.features[phase] = sum([self.example2feature(e, self.tokenizer) for e in self.examples[phase]], [])
+        for batch_data in self._prepare_batch_data(self.features[phase], batch_size, phase=phase):
             yield self._pad_batch_records(batch_data)
 
     def _prepare_batch_data(self, features, batch_size, phase=None):
@@ -2313,9 +2236,9 @@ class ImageReader(object):
         return np.ones((bsz, seq_len, seq_len)).astype("float32")
 
     def _build_rel_pos(self, padded_token_ids):
-        """build relative position """
+        """build relative position"""
         bsz, seq_len, _ = padded_token_ids.shape
-        rel_pos = np.zeros((bsz, seq_len, seq_len)).astype('int64')
+        rel_pos = np.zeros((bsz, seq_len, seq_len)).astype("int64")
         return rel_pos
 
     def generate_coco_data(
@@ -2326,19 +2249,19 @@ class ImageReader(object):
         batch_scaled_height,
         batch_rois,
     ):
-        """ generator coco data """
+        """generator coco data"""
 
         def transform(dataset):
             roidbs = []
             for i in dataset:
                 rvl_rec = {
-                    'im_file': i[0],
-                    'im_id': np.array([i[1]]),
-                    'h': i[2],
-                    'w': i[3],
+                    "im_file": i[0],
+                    "im_id": np.array([i[1]]),
+                    "h": i[2],
+                    "w": i[3],
                     "gt_bbox": i[4],
                     "cover_box": i[5],
-                    "im_base64": i[6]
+                    "im_base64": i[6],
                 }
 
                 roidbs.append(rvl_rec)
@@ -2346,17 +2269,17 @@ class ImageReader(object):
 
         result = []
         for image_path, im_base64, width, height, roi in zip(
-                batch_image_path,
-                batch_image_base64,
-                batch_scaled_width,
-                batch_scaled_height,
-                batch_rois,
+            batch_image_path,
+            batch_image_base64,
+            batch_scaled_width,
+            batch_scaled_height,
+            batch_rois,
         ):
             result.append((image_path, 0, height, width, roi, None, im_base64))
         return transform(result)
 
     def im_make_batch(self, dataset, image_boxes_nums, bsize):
-        """ make image batch """
+        """make image batch"""
         img_batch = np.array([i[0] for i in dataset], "float32")
         return img_batch
 
@@ -2380,8 +2303,7 @@ class ImageReader(object):
             for index, s in enumerate(seq):
                 if s == -100 or s == 0:
                     end_tmp.append(s)
-                elif s == 2 and index + 1 < len(seq) and (seq[index + 1] == 0 or
-                                                          seq[index + 1] == 2):
+                elif s == 2 and index + 1 < len(seq) and (seq[index + 1] == 0 or seq[index + 1] == 2):
                     end_tmp.append(1)
                 elif s == 2 and index + 1 < len(seq) and seq[index + 1] != 0:
                     end_tmp.append(0)
@@ -2406,17 +2328,14 @@ class ImageReader(object):
                 continue
             num_left_context = position - doc_span.start
             num_right_context = end - position
-            score = min(num_left_context,
-                        num_right_context) + 0.01 * doc_span.length
+            score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
             if best_score is None or score > best_score:
                 best_score = score
                 best_span_index = span_index
         return cur_span_index == best_span_index
 
 
-def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
-                 all_key_probs, example_index):
-
+def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case, all_key_probs, example_index):
     def _compute_softmax(scores):
         """Compute softmax probability over raw logits."""
         if len(scores) == 0:
@@ -2442,7 +2361,7 @@ def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
     preds = []
     for start_index, end_index in ans_pos:
         # process data
-        tok_tokens = feature.tokens[start_index:end_index + 1]
+        tok_tokens = feature.tokens[start_index : end_index + 1]
         tok_text = " ".join(tok_tokens)
         # De-tokenize WordPieces that have been split off.
         tok_text = tok_text.replace(" ##", "")
@@ -2452,16 +2371,14 @@ def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
 
         orig_doc_start = feature.token_to_orig_map[start_index]
         orig_doc_end = feature.token_to_orig_map[end_index]
-        orig_tokens = example.doc_tokens[orig_doc_start:orig_doc_end + 1]
+        orig_tokens = example.doc_tokens[orig_doc_start : orig_doc_end + 1]
 
         # Clean whitespace
         orig_text = "".join(["".join(x) for x in orig_tokens])
-        final_text = get_final_text(tok_text, orig_text, tokenizer,
-                                    do_lower_case)
+        final_text = get_final_text(tok_text, orig_text, tokenizer, do_lower_case)
 
         probs = []
-        for idx, logit in enumerate(result.seq_logits[start_index:end_index +
-                                                      1]):
+        for idx, logit in enumerate(result.seq_logits[start_index : end_index + 1]):
             if idx == 0:
                 # -1 is for B in  OIB or I in OI
                 probs.append(_compute_softmax(logit)[-1])
@@ -2469,12 +2386,7 @@ def get_doc_pred(result, ans_pos, example, tokenizer, feature, do_lower_case,
                 # 1 is for I in OIB or I in OI
                 probs.append(_compute_softmax(logit)[1])
         avg_prob = sum(probs) / len(probs)
-        preds.append({
-            'value': final_text,
-            'prob': round(avg_prob, 2),
-            'start': orig_doc_start,
-            'end': orig_doc_end
-        })
+        preds.append({"value": final_text, "prob": round(avg_prob, 2), "start": orig_doc_start, "end": orig_doc_end})
     return preds
 
 
@@ -2529,12 +2441,12 @@ def get_final_text(pred_text, orig_text, tokenizer, do_lower_case):
     if orig_end_position is None:
         return orig_text
 
-    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    output_text = orig_text[orig_start_position : (orig_end_position + 1)]
     return output_text
 
 
 def find_bio_pos(label):
-    """ find answer position from BIO label """
+    """find answer position from BIO label"""
     e = []
     cand_ans = []
     last_l = None
@@ -2572,8 +2484,7 @@ def viterbi_decode(logits):
     label_scheme = "OIB"
     # oib label 0:O, 1:I, 2:B
     # illegal matrix: [O, I ,B, start, end] * [O, I, B, start, end]
-    illegal = np.array([[0, -1, 0, -1, 0], [0, 0, 0, -1, 0], [0, 0, 0, 0, 0],
-                        [0, -1, 0, 0, 0], [-1, -1, -1, -1, -1]])
+    illegal = np.array([[0, -1, 0, -1, 0], [0, 0, 0, -1, 0], [0, 0, 0, 0, 0], [0, -1, 0, 0, 0], [-1, -1, -1, -1, -1]])
     illegal = illegal * 1000
 
     f[0, :] = np_logits[0, :] + illegal[3, :3]
@@ -2584,8 +2495,7 @@ def viterbi_decode(logits):
         for d in range(dim):
             cand_score = illegal[:3, d] + last_s + np_logits[step, d]
             f[step, d] = np.max(cand_score)
-            path[step][d] = path[step -
-                                 1][np.argmax(cand_score)] + label_scheme[d]
+            path[step][d] = path[step - 1][np.argmax(cand_score)] + label_scheme[d]
     final_path = path[-1][np.argmax(f[-1, :])]
     return final_path
 
@@ -2622,8 +2532,7 @@ def calEuclidean(x_list, y_list):
     if x_list is None or y_list is None:
         return None
     else:
-        dist = np.sqrt(
-            np.square(x_list[0] - y_list[0]) + np.square(x_list[1] - y_list[1]))
+        dist = np.sqrt(np.square(x_list[0] - y_list[0]) + np.square(x_list[1] - y_list[1]))
         return dist
 
 
@@ -2637,8 +2546,7 @@ def longestCommonSequence(question_tokens, context_tokens):
     dp = [[0] * (n + 1) for _ in range(m + 1)]
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if question_tokens[i - 1].lower() == context_tokens[j -
-                                                                1][0].lower():
+            if question_tokens[i - 1].lower() == context_tokens[j - 1][0].lower():
                 dp[i][j] = 1 + dp[i - 1][j - 1]
                 if dp[i][j] > max_len:
                     max_len = dp[i][j]
@@ -2654,9 +2562,7 @@ def sort_res(prompt, ans_list, context, boxes, lang="en"):
         for ans in ans_list:
             ans_val.append(ans["value"])
         if len(set(ans_val)) == len(ans_val):
-            sorted_ans_list = sorted(ans_list,
-                                     key=lambda x: x["prob"],
-                                     reverse=True)
+            sorted_ans_list = sorted(ans_list, key=lambda x: x["prob"], reverse=True)
             return sorted_ans_list
         else:
             if lang == "en":
@@ -2666,9 +2572,7 @@ def sort_res(prompt, ans_list, context, boxes, lang="en"):
 
             max_index, max_len = longestCommonSequence(clean_prompt, context)
             if max_index == -1:
-                sorted_ans_list = sorted(ans_list,
-                                         key=lambda x: x["prob"],
-                                         reverse=True)
+                sorted_ans_list = sorted(ans_list, key=lambda x: x["prob"], reverse=True)
                 return sorted_ans_list
             else:
                 prompt_center = []
@@ -2700,8 +2604,5 @@ def sort_res(prompt, ans_list, context, boxes, lang="en"):
                     ans_odist.append(odist * (-1))
 
                 ans_score = np.sum([ans_prob, ans_odist], axis=0).tolist()
-                sorted_ans_list = sorted(
-                    ans_list,
-                    key=lambda x: ans_score[ans_list.index(x)],
-                    reverse=True)
+                sorted_ans_list = sorted(ans_list, key=lambda x: ans_score[ans_list.index(x)], reverse=True)
                 return sorted_ans_list
