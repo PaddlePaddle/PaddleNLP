@@ -103,7 +103,7 @@ def custom_object_save(obj, folder, config=None):
     shutil.copy(object_file, dest_file)
 
     # Gather all relative imports recursively and make sure they are copied as well.
-    # TODO
+    # TODO(wujingjing): `get_relative_import_files` havn't supported yet.
     # for needed_file in get_relative_import_files(object_file):
     #     dest_file = Path(folder) / (Path(needed_file).name)
     #     shutil.copy(needed_file, dest_file)
@@ -989,7 +989,8 @@ class PretrainedConfig:
 
     def get(self, key, default=None):
         """
-        Return the value for key if config class has the attribute , else default. If default is not given, it defaults to None, so that this method never raises a AttributeError.
+        Return the value for key if config class has the attribute , else default.
+        If default is not given, it defaults to None, so that this method never raises a AttributeError.
         """
         try:
             value = self.__getattribute__(key)

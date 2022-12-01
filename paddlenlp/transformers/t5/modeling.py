@@ -87,7 +87,7 @@ class T5DenseReluDense(nn.Layer):
     Construct a dense-relu-dense module.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: T5Config):
         super().__init__()
         self.wi = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
         self.wo = nn.Linear(config.d_ff, config.d_model, bias_attr=False)
@@ -106,7 +106,7 @@ class T5DenseGatedGeluDense(nn.Layer):
     Construct a dense-gated_gelu-dense module.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: T5Config):
         super().__init__()
         self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
         self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
@@ -128,7 +128,7 @@ class T5DenseGatedSiluDense(nn.Layer):
     Construct a dense-gated_gelu-dense module.
     """
 
-    def __init__(self, config):
+    def __init__(self, config: T5Config):
         super().__init__()
         self.wi_0 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
         self.wi_1 = nn.Linear(config.d_model, config.d_ff, bias_attr=False)
@@ -145,7 +145,7 @@ class T5DenseGatedSiluDense(nn.Layer):
 
 
 class T5LayerFF(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: T5Config):
         super().__init__()
         if config.feed_forward_proj == "relu":
             self.DenseReluDense = T5DenseReluDense(config)
@@ -400,7 +400,7 @@ class T5LayerSelfAttention(nn.Layer):
 
 
 class T5LayerCrossAttention(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config: T5Config):
         super().__init__()
         self.EncDecAttention = T5Attention(config, has_relative_attention_bias=False)
         self.layer_norm = T5LayerNorm(config.d_model, eps=config.layer_norm_epsilon)
