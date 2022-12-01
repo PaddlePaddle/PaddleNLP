@@ -13,17 +13,18 @@
 # limitations under the License.
 
 from typing import Optional, Tuple
-from paddle import Tensor
+
 import paddle
 import paddle.nn as nn
+from paddle import Tensor
 
-from ..ernie.modeling import ErniePooler
 from .. import PretrainedModel, register_base_model
+from ..ernie.modeling import ErniePooler
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
     tuple_output,
 )
 
@@ -409,22 +410,21 @@ class ErnieGramModel(ErnieGramPretrainedModel):
         )
 
         if isinstance(encoder_outputs, type(input_ids)):
-            encoder_outputs = (encoder_outputs,)
-
-        sequence_output = encoder_outputs[0]
-
-        pooled_output = self.pooler(sequence_output)
-
-        if not return_dict:
-            return (sequence_output, pooled_output) + encoder_outputs[1:]
-
-        return BaseModelOutputWithPoolingAndCrossAttentions(
-            last_hidden_state=sequence_output,
-            pooler_output=pooled_output,
-            past_key_values=encoder_outputs.past_key_values,
-            hidden_states=encoder_outputs.hidden_states,
-            attentions=encoder_outputs.attentions,
-        )
+            sequence_output = encoder_outputs
+            pooled_output = self.pooler(sequence_output)
+            return (sequence_output, pooled_output)
+        else:
+            sequence_output = encoder_outputs[0]
+            pooled_output = self.pooler(sequence_output)
+            if not return_dict:
+                return (sequence_output, pooled_output) + encoder_outputs[1:]
+            return BaseModelOutputWithPoolingAndCrossAttentions(
+                last_hidden_state=sequence_output,
+                pooler_output=pooled_output,
+                past_key_values=encoder_outputs.past_key_values,
+                hidden_states=encoder_outputs.hidden_states,
+                attentions=encoder_outputs.attentions,
+            )
 
 
 class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
@@ -448,7 +448,6 @@ class ErnieGramForTokenClassification(ErnieGramPretrainedModel):
         self.num_classes = num_classes
         self.ernie_gram = ernie_gram  # allow ernie_gram to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_gram.config["hidden_dropout_prob"])
-        initializer = nn.initializer.TruncatedNormal(std=self.ernie_gram.config["initializer_range"])
         self.classifier = nn.Linear(
             self.ernie_gram.config["hidden_size"],
             num_classes,
