@@ -23,7 +23,7 @@ import sentencepiece as spm
 
 from .. import PretrainedTokenizer, AddedToken
 
-__all__ = ['XLNetTokenizer']
+__all__ = ["XLNetTokenizer"]
 
 SENTENCEPIECE_UNDERLINE = "▁"
 SPIECE_UNDERLINE = SENTENCEPIECE_UNDERLINE  # Kept for backward compatibility
@@ -91,34 +91,19 @@ class XLNetTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "spiece.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "xlnet-base-cased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-base-cased-spiece.model",
-            "xlnet-large-cased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-large-cased-spiece.model",
-            "chinese-xlnet-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-base-spiece.model",
-            "chinese-xlnet-mid":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-mid-spiece.model",
-            "chinese-xlnet-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-large-spiece.model",
+            "xlnet-base-cased": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-base-cased-spiece.model",
+            "xlnet-large-cased": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/xlnet-large-cased-spiece.model",
+            "chinese-xlnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-base-spiece.model",
+            "chinese-xlnet-mid": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-mid-spiece.model",
+            "chinese-xlnet-large": "https://bj.bcebos.com/paddlenlp/models/transformers/xlnet/chinese-xlnet-large-spiece.model",
         }
     }
     pretrained_init_configuration = {
-        "xlnet-base-cased": {
-            "do_lower_case": False
-        },
-        "xlnet-large-cased": {
-            "do_lower_case": False
-        },
-        "chinese-xlnet-base": {
-            "do_lower_case": False
-        },
-        "chinese-xlnet-mid": {
-            "do_lower_case": False
-        },
-        "chinese-xlnet-large": {
-            "do_lower_case": False
-        },
+        "xlnet-base-cased": {"do_lower_case": False},
+        "xlnet-large-cased": {"do_lower_case": False},
+        "chinese-xlnet-base": {"do_lower_case": False},
+        "chinese-xlnet-mid": {"do_lower_case": False},
+        "chinese-xlnet-large": {"do_lower_case": False},
     }
     pretrained_positional_embedding_sizes = {
         "xlnet-base-cased": None,
@@ -131,25 +116,25 @@ class XLNetTokenizer(PretrainedTokenizer):
     padding_side = "left"
     pad_token_type_id = 3
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=False,
-                 remove_space=True,
-                 keep_accents=False,
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 unk_token="<unk>",
-                 sep_token="<sep>",
-                 pad_token="<pad>",
-                 cls_token="<cls>",
-                 mask_token="<mask>",
-                 additional_special_tokens=["<eop>", "<eod>"],
-                 sp_model_kwargs=None,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=False,
+        remove_space=True,
+        keep_accents=False,
+        bos_token="<s>",
+        eos_token="</s>",
+        unk_token="<unk>",
+        sep_token="<sep>",
+        pad_token="<pad>",
+        cls_token="<cls>",
+        mask_token="<mask>",
+        additional_special_tokens=["<eop>", "<eod>"],
+        sp_model_kwargs=None,
+        **kwargs
+    ):
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
 
         self._pad_token_type_id = 3
@@ -168,10 +153,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         return len(self.sp_model)
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -199,8 +181,7 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         if not self.keep_accents:
             outputs = unicodedata.normalize("NFKD", outputs)
-            outputs = "".join(
-                [c for c in outputs if not unicodedata.combining(c)])
+            outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
 
@@ -213,10 +194,8 @@ class XLNetTokenizer(PretrainedTokenizer):
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
-                    SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
-                        0] == SPIECE_UNDERLINE:
+                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(SPIECE_UNDERLINE, ""))
+                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
                     if len(cur_pieces[0]) == 1:
                         cur_pieces = cur_pieces[1:]
                     else:
@@ -229,7 +208,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         return new_pieces
 
     def _convert_token_to_id(self, token):
-        """Converts a token (str) to an id using the vocab. """
+        """Converts a token (str) to an id using the vocab."""
         return self.sp_model.PieceToId(token)
 
     def _convert_id_to_token(self, index):
@@ -255,9 +234,7 @@ class XLNetTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -283,9 +260,7 @@ class XLNetTokenizer(PretrainedTokenizer):
             return token_ids_0 + sep + cls
         return token_ids_0 + sep + token_ids_1 + sep + cls
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Builds offset map from a pair of offset map by concatenating
         and adding offsets of special tokens.
@@ -308,13 +283,9 @@ class XLNetTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return offset_mapping_0 + [(0, 0)] + [(0, 0)]
 
-        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)
-                                                                 ] + [(0, 0)]
+        return offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)] + [(0, 0)]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Creates a special tokens mask from the input sequences.
         This method is called when adding special tokens using the tokenizer `encode` method.
@@ -339,20 +310,13 @@ class XLNetTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return ([0] * len(token_ids_0)) + [1] + ([0] *
-                                                     len(token_ids_1)) + [1, 1]
+            return ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1, 1]
         return ([0] * len(token_ids_0)) + [1, 1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Creates a token_type mask from the input sequences.
         If `token_ids_1` is not `None`, then a sequence pair
@@ -390,17 +354,14 @@ class XLNetTokenizer(PretrainedTokenizer):
 
         if token_ids_1 is None:
             return len(token_ids_0 + sep) * [0] + cls_segment_id
-        return len(token_ids_0 + sep) * [0] + len(token_ids_1 +
-                                                  sep) * [1] + cls_segment_id
+        return len(token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1] + cls_segment_id
 
     def save_resources(self, save_directory):
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(self.vocab_file) != os.path.abspath(
-                    save_path) and os.path.isfile(self.vocab_file):
+            if os.path.abspath(self.vocab_file) != os.path.abspath(save_path) and os.path.isfile(self.vocab_file):
                 copyfile(self.vocab_file, save_path)
             elif not os.path.isfile(self.vocab_file):
                 with open(save_path, "wb") as fi:
-                    content_spiece_model = self.sp_model.serialized_model_proto(
-                    )
+                    content_spiece_model = self.sp_model.serialized_model_proto()
                     fi.write(content_spiece_model)

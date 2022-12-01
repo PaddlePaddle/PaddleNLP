@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import unittest
-
 import paddle
 
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
@@ -541,6 +539,7 @@ class GenerationTesterMixin:
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
 
             model = self._make_model_instance(config, model_class)
+
             model.eval()
 
             if self.is_encoder_decoder:
@@ -615,7 +614,7 @@ class GenerationTesterMixin:
         self.assertTrue(flag)
 
 
-class UtilsFunctionsTest(unittest.TestCase):
+class UtilsFunctionsTest:
 
     # tests whether the top_k_top_p function behaves as expected
     def test_top_k_top_p_filtering(self):
@@ -716,7 +715,7 @@ class UtilsFunctionsTest(unittest.TestCase):
         self.assertTrue(paddle.all(paddle.eq(non_inf_expected_idx, non_inf_idx)))
 
 
-class GenerationIntegrationTests(unittest.TestCase):
+class GenerationIntegrationTests:
     @slow
     def test_diverse_beam_search(self):
         article = """Justin Timberlake and Jessica Biel, welcome to parenthood.
@@ -739,6 +738,7 @@ class GenerationIntegrationTests(unittest.TestCase):
             diversity_rate=2.0,
         )
 
+        # assigned but never used
         bart_tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
     def test_max_length_backward_compat_greedy(self):

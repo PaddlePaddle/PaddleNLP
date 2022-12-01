@@ -15,7 +15,7 @@
 
 from .. import BertTokenizer
 
-__all__ = ['MobileBertTokenizer']
+__all__ = ["MobileBertTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"mobilebert-uncased": 512}
 
@@ -31,34 +31,31 @@ class MobileBertTokenizer(BertTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "mobilebert-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mobilebert/mobilebert-uncased/vocab.txt"
+            "mobilebert-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/mobilebert/mobilebert-uncased/vocab.txt"
         }
     }
-    pretrained_init_configuration = {
-        "mobilebert-uncased": {
-            "do_lower_case": True
-        }
-    }
+    pretrained_init_configuration = {"mobilebert-uncased": {"do_lower_case": True}}
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def batch_encode(self,
-                     batch_text_or_text_pairs,
-                     max_seq_len=512,
-                     pad_to_max_seq_len=False,
-                     stride=0,
-                     is_split_into_words=False,
-                     truncation_strategy="longest_first",
-                     return_position_ids=False,
-                     return_token_type_ids=True,
-                     return_attention_mask=False,
-                     return_length=False,
-                     return_overflowing_tokens=False,
-                     return_special_tokens_mask=False):
+    def batch_encode(
+        self,
+        batch_text_or_text_pairs,
+        max_seq_len=512,
+        pad_to_max_seq_len=False,
+        stride=0,
+        is_split_into_words=False,
+        truncation_strategy="longest_first",
+        return_position_ids=False,
+        return_token_type_ids=True,
+        return_attention_mask=False,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+    ):
         """
         Performs tokenization and uses the tokenized tokens to prepare model
         inputs. It supports batch inputs of sequence or sequence pair.
-        
+
         Args:
             batch_text_or_text_pairs (list):
                 The element of list can be sequence or sequence pair, and the
@@ -113,7 +110,7 @@ class MobileBertTokenizer(BertTokenizer):
             return_special_tokens_mask (bool, optional):
                 Whether to include special tokens mask information in the returned
                 dictionary. Defaults to `False`.
-        
+
         Returns:
             dict:
                 The dict has the following optional items:
@@ -148,13 +145,9 @@ class MobileBertTokenizer(BertTokenizer):
             if isinstance(text, str):
                 tokens = self._tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], str):
+            elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], str):
                 return self.convert_tokens_to_ids(text)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], int):
+            elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], int):
                 return text
             else:
                 raise ValueError(
@@ -162,25 +155,22 @@ class MobileBertTokenizer(BertTokenizer):
                 )
 
         batch_encode_inputs = []
-        for example_id, tokens_or_pair_tokens in enumerate(
-                batch_text_or_text_pairs):
+        for example_id, tokens_or_pair_tokens in enumerate(batch_text_or_text_pairs):
             if not isinstance(tokens_or_pair_tokens, (list, tuple)):
                 text, text_pair = tokens_or_pair_tokens, None
-            elif is_split_into_words and not isinstance(
-                    tokens_or_pair_tokens[0], (list, tuple)):
+            elif is_split_into_words and not isinstance(tokens_or_pair_tokens[0], (list, tuple)):
                 text, text_pair = tokens_or_pair_tokens, None
             else:
                 text, text_pair = tokens_or_pair_tokens
 
             first_ids = get_input_ids(text)
-            second_ids = get_input_ids(
-                text_pair) if text_pair is not None else None
+            second_ids = get_input_ids(text_pair) if text_pair is not None else None
 
             if stride > 0 and second_ids is not None:
 
-                max_len_for_pair = max_seq_len - len(
-                    first_ids) - self.num_special_tokens_to_add(
-                        pair=True)  # need -4  <sep> A </sep> </sep> B <sep>
+                max_len_for_pair = (
+                    max_seq_len - len(first_ids) - self.num_special_tokens_to_add(pair=True)
+                )  # need -4  <sep> A </sep> </sep> B <sep>
 
                 token_offset_mapping = self.get_offset_mapping(text)
                 token_pair_offset_mapping = self.get_offset_mapping(text_pair)
@@ -195,100 +185,84 @@ class MobileBertTokenizer(BertTokenizer):
                         pair_mapping = token_pair_offset_mapping
                     else:
                         pair_ids = second_ids[:max_len_for_pair]
-                        pair_mapping = token_pair_offset_mapping[:
-                                                                 max_len_for_pair]
+                        pair_mapping = token_pair_offset_mapping[:max_len_for_pair]
 
-                    offset_mapping = self.build_offset_mapping_with_special_tokens(
-                        mapping, pair_mapping)
-                    sequence = self.build_inputs_with_special_tokens(
-                        ids, pair_ids)
-                    token_type_ids = self.create_token_type_ids_from_sequences(
-                        ids, pair_ids)
+                    offset_mapping = self.build_offset_mapping_with_special_tokens(mapping, pair_mapping)
+                    sequence = self.build_inputs_with_special_tokens(ids, pair_ids)
+                    token_type_ids = self.create_token_type_ids_from_sequences(ids, pair_ids)
 
                     # Build output dictionnary
                     encoded_inputs["input_ids"] = sequence
                     if return_token_type_ids:
                         encoded_inputs["token_type_ids"] = token_type_ids
                     if return_special_tokens_mask:
-                        encoded_inputs[
-                            "special_tokens_mask"] = self.get_special_tokens_mask(
-                                ids, pair_ids)
+                        encoded_inputs["special_tokens_mask"] = self.get_special_tokens_mask(ids, pair_ids)
                     if return_length:
-                        encoded_inputs["seq_len"] = len(
-                            encoded_inputs["input_ids"])
+                        encoded_inputs["seq_len"] = len(encoded_inputs["input_ids"])
 
                     # Check lengths
-                    assert max_seq_len is None or len(
-                        encoded_inputs["input_ids"]) <= max_seq_len
+                    assert max_seq_len is None or len(encoded_inputs["input_ids"]) <= max_seq_len
 
                     # Padding
-                    needs_to_be_padded = pad_to_max_seq_len and \
-                                        max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
+                    needs_to_be_padded = (
+                        pad_to_max_seq_len and max_seq_len and len(encoded_inputs["input_ids"]) < max_seq_len
+                    )
 
-                    encoded_inputs['offset_mapping'] = offset_mapping
+                    encoded_inputs["offset_mapping"] = offset_mapping
 
                     if needs_to_be_padded:
-                        difference = max_seq_len - len(
-                            encoded_inputs["input_ids"])
-                        if self.padding_side == 'right':
+                        difference = max_seq_len - len(encoded_inputs["input_ids"])
+                        if self.padding_side == "right":
                             if return_attention_mask:
-                                encoded_inputs["attention_mask"] = [1] * len(
-                                    encoded_inputs["input_ids"]
-                                ) + [0] * difference
-                            if return_token_type_ids:
-                                # 0 for padding token mask
-                                encoded_inputs["token_type_ids"] = (
-                                    encoded_inputs["token_type_ids"] +
-                                    [self.pad_token_type_id] * difference)
-                            if return_special_tokens_mask:
-                                encoded_inputs[
-                                    "special_tokens_mask"] = encoded_inputs[
-                                        "special_tokens_mask"] + [1
-                                                                  ] * difference
-                            encoded_inputs["input_ids"] = encoded_inputs[
-                                "input_ids"] + [self.pad_token_id] * difference
-                            encoded_inputs['offset_mapping'] = encoded_inputs[
-                                'offset_mapping'] + [(0, 0)] * difference
-                        elif self.padding_side == 'left':
-                            if return_attention_mask:
-                                encoded_inputs["attention_mask"] = [
+                                encoded_inputs["attention_mask"] = [1] * len(encoded_inputs["input_ids"]) + [
                                     0
-                                ] * difference + [1] * len(
-                                    encoded_inputs["input_ids"])
+                                ] * difference
                             if return_token_type_ids:
                                 # 0 for padding token mask
                                 encoded_inputs["token_type_ids"] = (
-                                    [self.pad_token_type_id] * difference +
-                                    encoded_inputs["token_type_ids"])
+                                    encoded_inputs["token_type_ids"] + [self.pad_token_type_id] * difference
+                                )
                             if return_special_tokens_mask:
-                                encoded_inputs["special_tokens_mask"] = [
-                                    1
-                                ] * difference + encoded_inputs[
-                                    "special_tokens_mask"]
-                            encoded_inputs["input_ids"] = [
-                                self.pad_token_id
-                            ] * difference + encoded_inputs["input_ids"]
-                            encoded_inputs['offset_mapping'] = [
-                                (0, 0)
-                            ] * difference + encoded_inputs['offset_mapping']
+                                encoded_inputs["special_tokens_mask"] = (
+                                    encoded_inputs["special_tokens_mask"] + [1] * difference
+                                )
+                            encoded_inputs["input_ids"] = (
+                                encoded_inputs["input_ids"] + [self.pad_token_id] * difference
+                            )
+                            encoded_inputs["offset_mapping"] = encoded_inputs["offset_mapping"] + [(0, 0)] * difference
+                        elif self.padding_side == "left":
+                            if return_attention_mask:
+                                encoded_inputs["attention_mask"] = [0] * difference + [1] * len(
+                                    encoded_inputs["input_ids"]
+                                )
+                            if return_token_type_ids:
+                                # 0 for padding token mask
+                                encoded_inputs["token_type_ids"] = [
+                                    self.pad_token_type_id
+                                ] * difference + encoded_inputs["token_type_ids"]
+                            if return_special_tokens_mask:
+                                encoded_inputs["special_tokens_mask"] = [1] * difference + encoded_inputs[
+                                    "special_tokens_mask"
+                                ]
+                            encoded_inputs["input_ids"] = [self.pad_token_id] * difference + encoded_inputs[
+                                "input_ids"
+                            ]
+                            encoded_inputs["offset_mapping"] = [(0, 0)] * difference + encoded_inputs["offset_mapping"]
                     else:
                         if return_attention_mask:
-                            encoded_inputs["attention_mask"] = [1] * len(
-                                encoded_inputs["input_ids"])
+                            encoded_inputs["attention_mask"] = [1] * len(encoded_inputs["input_ids"])
 
                     if return_position_ids:
-                        encoded_inputs["position_ids"] = list(
-                            range(len(encoded_inputs["input_ids"])))
+                        encoded_inputs["position_ids"] = list(range(len(encoded_inputs["input_ids"])))
 
-                    encoded_inputs['overflow_to_sample'] = example_id
+                    encoded_inputs["overflow_to_sample"] = example_id
                     batch_encode_inputs.append(encoded_inputs)
 
                     if len(second_ids) <= max_len_for_pair:
                         break
                     else:
-                        second_ids = second_ids[max_len_for_pair - stride:]
-                        token_pair_offset_mapping = token_pair_offset_mapping[
-                            max_len_for_pair - stride:]
+                        second_ids = second_ids[max_len_for_pair - stride :]
+                        token_pair_offset_mapping = token_pair_offset_mapping[max_len_for_pair - stride :]
 
             else:
                 batch_encode_inputs.append(
@@ -303,6 +277,8 @@ class MobileBertTokenizer(BertTokenizer):
                         return_attention_mask=return_attention_mask,
                         return_length=return_length,
                         return_overflowing_tokens=return_overflowing_tokens,
-                        return_special_tokens_mask=return_special_tokens_mask))
+                        return_special_tokens_mask=return_special_tokens_mask,
+                    )
+                )
 
         return batch_encode_inputs

@@ -20,7 +20,7 @@ from paddlenlp.utils.env import MODEL_HOME
 from .. import PretrainedTokenizer, BPETokenizer
 from ..ernie.tokenizer import ErnieTokenizer
 
-__all__ = ['ErnieDocTokenizer', 'ErnieDocBPETokenizer']
+__all__ = ["ErnieDocTokenizer", "ErnieDocBPETokenizer"]
 
 
 class ErnieDocTokenizer(ErnieTokenizer):
@@ -56,7 +56,7 @@ class ErnieDocTokenizer(ErnieTokenizer):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-    
+
     Examples:
         .. code-block::
 
@@ -68,32 +68,33 @@ class ErnieDocTokenizer(ErnieTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-doc-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/vocab.txt",
+            "ernie-doc-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "ernie-doc-base-zh": {
-            "do_lower_case": True
-        },
+        "ernie-doc-base-zh": {"do_lower_case": True},
     }
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
-        super(ErnieDocTokenizer, self).__init__(vocab_file,
-                                                do_lower_case=do_lower_case,
-                                                unk_token=unk_token,
-                                                sep_token=sep_token,
-                                                pad_token=pad_token,
-                                                cls_token=cls_token,
-                                                mask_token=mask_token)
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
+        super(ErnieDocTokenizer, self).__init__(
+            vocab_file,
+            do_lower_case=do_lower_case,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+        )
 
 
 class ErnieDocBPETokenizer(BPETokenizer):
@@ -105,7 +106,7 @@ class ErnieDocBPETokenizer(BPETokenizer):
     For more information regarding those methods, please refer to this superclass.
 
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             File path of the vocabulary.
         encoder_json_path (str, optional):
             File path of the id to vocab.
@@ -128,7 +129,7 @@ class ErnieDocBPETokenizer(BPETokenizer):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-    
+
     Examples:
         .. code-block::
 
@@ -140,47 +141,45 @@ class ErnieDocBPETokenizer(BPETokenizer):
     resource_files_names = {
         "vocab_file": "vocab.txt",
         "encoder_json_path": "encoder.json",
-        "vocab_bpe_path": "vocab.bpe"
+        "vocab_bpe_path": "vocab.bpe",
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-doc-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.txt"
+            "ernie-doc-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.txt"
         },
         "encoder_json_path": {
-            "ernie-doc-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/encoder.json"
+            "ernie-doc-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/encoder.json"
         },
         "vocab_bpe_path": {
-            "ernie-doc-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.bpe"
-        }
-    }
-    pretrained_init_configuration = {
-        "ernie-doc-base-en": {
-            "unk_token": "[UNK]"
+            "ernie-doc-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/vocab.bpe"
         },
     }
+    pretrained_init_configuration = {
+        "ernie-doc-base-en": {"unk_token": "[UNK]"},
+    }
 
-    def __init__(self,
-                 vocab_file,
-                 encoder_json_path="./configs/encoder.json",
-                 vocab_bpe_path="./configs/vocab.bpe",
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
-        super(ErnieDocBPETokenizer,
-              self).__init__(vocab_file,
-                             encoder_json_path=encoder_json_path,
-                             vocab_bpe_path=vocab_bpe_path,
-                             unk_token=unk_token,
-                             sep_token=sep_token,
-                             pad_token=pad_token,
-                             cls_token=cls_token,
-                             mask_token=mask_token)
+    def __init__(
+        self,
+        vocab_file,
+        encoder_json_path="./configs/encoder.json",
+        vocab_bpe_path="./configs/vocab.bpe",
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
+        super(ErnieDocBPETokenizer, self).__init__(
+            vocab_file,
+            encoder_json_path=encoder_json_path,
+            vocab_bpe_path=vocab_bpe_path,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+        )
 
     @property
     def vocab_size(self):

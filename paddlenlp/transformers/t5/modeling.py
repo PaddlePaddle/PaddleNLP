@@ -694,7 +694,6 @@ class T5Stack(nn.Layer):
         super().__init__()
         self.is_decoder = config.is_decoder
         self.embed_tokens = embed_tokens
-
         self.block = nn.LayerList(
             [T5Block(config, has_relative_attention_bias=bool(i == 0)) for i in range(config.num_layers)]
         )
@@ -725,6 +724,7 @@ class T5Stack(nn.Layer):
         output_hidden_states=False,
         return_dict=False,
     ):
+
         if input_ids is not None and inputs_embeds is not None:
             err_msg_prefix = "decoder_" if self.is_decoder else ""
             raise ValueError(
