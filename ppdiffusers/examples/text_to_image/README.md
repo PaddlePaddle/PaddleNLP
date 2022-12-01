@@ -15,6 +15,27 @@ ___该训练代码是实验性质的。由于这里的代码微调了整个`UNet
 ```bash
 pip install -U ppdiffusers visualdl
 ```
+**量化训练**
+
+```bash
+export MODEL_NAME="CompVis/stable-diffusion-v1-4"
+export dataset_name="lambdalabs/pokemon-blip-captions"
+
+python -u train_text_to_image_qat.py \
+  --pretrained_model_name_or_path=$MODEL_NAME \
+  --dataset_name=$dataset_name \
+  --resolution=512 --center_crop --random_flip \
+  --train_batch_size=1 \
+  --gradient_accumulation_steps=4 \
+  --gradient_checkpointing \
+  --max_train_steps=2 \
+  --learning_rate=1e-05 \
+  --max_grad_norm=1 \
+  --lr_scheduler="constant" --lr_warmup_steps=0 \
+  --output_dir="sd-pokemon-model-int8-onnx"
+```
+
+在运行 `max_train_steps` 后模型将保存在 `output_dir` 下面，`int8`文件名的是QAT导出的UNet模型
 
 ### 1.2 Pokemon训练教程
 
