@@ -46,6 +46,10 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
     ]
 
     def _info(self):
+        logger.warning(
+            "LanguagePairDataset is an experimental API which we will continue to optimize and may be changed."
+        )
+
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(
