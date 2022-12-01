@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # flake8: noqa
-__version__ = "0.3.0a0"  # Maybe dev is better
+__version__ = "0.4.0.dev"  # Maybe dev is better
 
 from types import ModuleType
 from typing import Union
