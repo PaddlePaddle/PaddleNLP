@@ -44,18 +44,18 @@ usage = r"""
 URLS = {
     "docprompt": [
         "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/docprompt/docprompt_params.tar",
-        "8eae8148981731f230b328076c5a08bf"
+        "8eae8148981731f230b328076c5a08bf",
     ],
 }
 
 
 class DocPromptTask(Task):
     """
-    The document intelligence model, give the querys and predict the answers. 
+    The document intelligence model, give the querys and predict the answers.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -63,31 +63,23 @@ class DocPromptTask(Task):
         try:
             from paddleocr import PaddleOCR
         except:
-            raise ImportError(
-                "Please install the dependencies first, pip install paddleocr --upgrade"
-            )
+            raise ImportError("Please install the dependencies first, pip install paddleocr --upgrade")
         self._batch_size = kwargs.get("batch_size", 1)
         self._topn = kwargs.get("topn", 1)
         self._lang = kwargs.get("lang", "ch")
-        self._use_gpu = False if paddle.get_device() == 'cpu' else True
-        self._ocr = PaddleOCR(use_angle_cls=True,
-                              show_log=False,
-                              use_gpu=self._use_gpu,
-                              lang=self._lang)
+        self._use_gpu = False if paddle.get_device() == "cpu" else True
+        self._ocr = PaddleOCR(use_angle_cls=True, show_log=False, use_gpu=self._use_gpu, lang=self._lang)
         self._usage = usage
-        download_file(self._task_path, "docprompt_params.tar",
-                      URLS[self.model][0], URLS[self.model][1])
+        download_file(self._task_path, "docprompt_params.tar", URLS[self.model][0], URLS[self.model][1])
         self._get_inference_model()
         self._construct_tokenizer()
-        self._reader = ImageReader(super_rel_pos=False,
-                                   tokenizer=self._tokenizer)
+        self._reader = ImageReader(super_rel_pos=False, tokenizer=self._tokenizer)
 
     def _construct_tokenizer(self):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-layoutx-base-uncased")
+        self._tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
 
     def _preprocess(self, inputs):
         """
@@ -104,14 +96,13 @@ class DocPromptTask(Task):
                 ocr_result = self._ocr.ocr(example["doc"], cls=True)
                 example["ocr_type"] = "ppocr"
                 # Compatible with paddleocr>=2.6.0.2
-                ocr_result = ocr_result[0] if len(
-                    ocr_result) == 1 else ocr_result
+                ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
             example["ocr_result"] = ocr_result
         return preprocess_results
 
     def _run_model(self, inputs):
         """
-        Run the task model from the outputs of the `_tokenize` function. 
+        Run the task model from the outputs of the `_tokenize` function.
         """
         all_predictions_list = []
         for example in inputs:
@@ -121,33 +112,21 @@ class DocPromptTask(Task):
             ocr_type = example["ocr_type"]
 
             if not ocr_result:
-                all_predictions = [{
-                    "prompt":
-                    p,
-                    "result": [{
-                        'value': '',
-                        'prob': 0.0,
-                        'start': -1,
-                        'end': -1
-                    }]
-                } for p in prompt]
+                all_predictions = [
+                    {"prompt": p, "result": [{"value": "", "prob": 0.0, "start": -1, "end": -1}]} for p in prompt
+                ]
                 all_boxes = {}
             else:
-                data_loader = self._reader.data_generator(
-                    ocr_result, doc_path, prompt, self._batch_size, ocr_type)
+                data_loader = self._reader.data_generator(ocr_result, doc_path, prompt, self._batch_size, ocr_type)
 
-                RawResult = collections.namedtuple("RawResult",
-                                                   ["unique_id", "seq_logits"])
+                RawResult = collections.namedtuple("RawResult", ["unique_id", "seq_logits"])
 
                 all_results = []
                 for data in data_loader:
                     for idx in range(len(self.input_names)):
                         self.input_handles[idx].copy_from_cpu(data[idx])
                     self.predictor.run()
-                    outputs = [
-                        output_handle.copy_to_cpu()
-                        for output_handle in self.output_handle
-                    ]
+                    outputs = [output_handle.copy_to_cpu() for output_handle in self.output_handle]
                     unique_ids, seq_logits = outputs
 
                     for idx in range(len(unique_ids)):
@@ -155,7 +134,8 @@ class DocPromptTask(Task):
                             RawResult(
                                 unique_id=int(unique_ids[idx]),
                                 seq_logits=seq_logits[idx],
-                            ))
+                            )
+                        )
 
                 all_examples = self._reader.examples["infer"]
                 all_features = self._reader.features["infer"]
@@ -191,25 +171,18 @@ class DocPromptTask(Task):
                         # find preds
                         ans_pos = find_answer_pos(result.seq_logits, feature)
                         preds.extend(
-                            get_doc_pred(result, ans_pos, example,
-                                         self._tokenizer, feature, True,
-                                         all_key_probs, example_index))
+                            get_doc_pred(
+                                result, ans_pos, example, self._tokenizer, feature, True, all_key_probs, example_index
+                            )
+                        )
 
                     if not preds:
-                        preds.append({
-                            'value': '',
-                            'prob': 0.,
-                            'start': -1,
-                            'end': -1
-                        })
+                        preds.append({"value": "", "prob": 0.0, "start": -1, "end": -1})
                     else:
-                        preds = sort_res(example_query, preds,
-                                         example_doc_tokens, all_boxes[page_id],
-                                         self._lang)[:self._topn]
-                    all_predictions.append({
-                        "prompt": example_query,
-                        "result": preds
-                    })
+                        preds = sort_res(example_query, preds, example_doc_tokens, all_boxes[page_id], self._lang)[
+                            : self._topn
+                        ]
+                    all_predictions.append({"prompt": example_query, "result": preds})
             all_predictions_list.append(all_predictions)
         return all_predictions_list
 
@@ -236,44 +209,40 @@ class DocPromptTask(Task):
                         )
                     else:
                         if isinstance(example["doc"], str):
-                            if example["doc"].startswith("http://") or example[
-                                    "doc"].startswith("https://"):
-                                download_file("./",
-                                              example["doc"].rsplit("/", 1)[-1],
-                                              example["doc"])
+                            if example["doc"].startswith("http://") or example["doc"].startswith("https://"):
+                                download_file("./", example["doc"].rsplit("/", 1)[-1], example["doc"])
                                 doc_path = example["doc"].rsplit("/", 1)[-1]
                             else:
                                 doc_path = example["doc"]
                             data["doc"] = doc_path
                         else:
-                            raise ValueError(
-                                f"Incorrect path or url, URLs must start with `http://` or `https://`"
-                            )
+                            raise ValueError(f"Incorrect path or url, URLs must start with `http://` or `https://`")
                     if "prompt" not in example.keys():
-                        raise ValueError(
-                            "Invalid inputs, the inputs should contain the prompt."
-                        )
+                        raise ValueError("Invalid inputs, the inputs should contain the prompt.")
                     else:
                         if isinstance(example["prompt"], str):
                             data["prompt"] = [example["prompt"]]
                         elif isinstance(example["prompt"], list) and all(
-                                isinstance(s, str) for s in example["prompt"]):
+                            isinstance(s, str) for s in example["prompt"]
+                        ):
                             data["prompt"] = example["prompt"]
                         else:
-                            raise TypeError(
-                                "Incorrect prompt, prompt should be string or list of string."
-                            )
+                            raise TypeError("Incorrect prompt, prompt should be string or list of string.")
                     if "word_boxes" in example.keys():
                         data["word_boxes"] = example["word_boxes"]
                     input_list.append(data)
                 else:
                     raise TypeError(
-                        "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
-                        .format(type(example)))
+                        "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!".format(
+                            type(example)
+                        )
+                    )
         else:
             raise TypeError(
-                "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
-                .format(type(inputs)))
+                "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!".format(
+                    type(inputs)
+                )
+            )
         return input_list
 
     def _construct_model(self, model):
