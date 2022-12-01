@@ -49,11 +49,11 @@ usage = r"""
 
 class TextSummarizationTask(Task):
     """
-    The text summarization model to predict the summary of an input text. 
+    The text summarization model to predict the summary of an input text.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -66,10 +66,10 @@ class TextSummarizationTask(Task):
         # Hypter-parameter during generating.
         self._max_length = kwargs.get("max_length", 128)
         self._min_length = kwargs.get("min_length", 0)
-        self._decode_strategy = kwargs.get("decode_strategy", 'beam_search')
+        self._decode_strategy = kwargs.get("decode_strategy", "beam_search")
         self._temperature = kwargs.get("temperature", 1.0)
         self._top_k = kwargs.get("top_k", 5)
-        self._top_p = kwargs.get("top_p", 1.)
+        self._top_p = kwargs.get("top_p", 1.0)
         self._num_beams = kwargs.get("num_beams", 4)
         self._length_penalty = kwargs.get("length_penalty", 0.0)
         self._num_return_sequences = kwargs.get("num_return_sequences", 1)
@@ -82,14 +82,12 @@ class TextSummarizationTask(Task):
         Construct the inference model for the predictor.
         """
         if self._custom_model:
-            self._model = AutoModelForConditionalGeneration.from_pretrained(
-                self._task_path)
+            self._model = AutoModelForConditionalGeneration.from_pretrained(self._task_path)
         else:
-            self._model = AutoModelForConditionalGeneration.from_pretrained(
-                model)
+            self._model = AutoModelForConditionalGeneration.from_pretrained(model)
         self._model.eval()
         if isinstance(self._model, UNIMOForConditionalGeneration):
-            self._model_type = 'unimo-text'
+            self._model_type = "unimo-text"
 
     def _construct_tokenizer(self, model):
         """
@@ -108,7 +106,7 @@ class TextSummarizationTask(Task):
         """
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
-        outputs = {'batches': batches, 'text': inputs}
+        outputs = {"batches": batches, "text": inputs}
         return outputs
 
     def _batchify(self, data, batch_size):
@@ -116,7 +114,7 @@ class TextSummarizationTask(Task):
         Generate input batches.
         """
         pad_right = False
-        if self._model_type != 'unimo-text':
+        if self._model_type != "unimo-text":
             pad_right = True
         examples = [self._convert_example(i) for i in data]
         # Seperates data into some batches.
@@ -124,30 +122,27 @@ class TextSummarizationTask(Task):
         for example in examples:
             one_batch.append(example)
             if len(one_batch) == batch_size:
-                yield self._parse_batch(one_batch, self._tokenizer.pad_token_id,
-                                        pad_right)
+                yield self._parse_batch(one_batch, self._tokenizer.pad_token_id, pad_right)
                 one_batch = []
         if one_batch:
-            yield self._parse_batch(one_batch, self._tokenizer.pad_token_id,
-                                    pad_right)
+            yield self._parse_batch(one_batch, self._tokenizer.pad_token_id, pad_right)
 
     def _convert_example(self, example, max_seq_len=512, return_length=True):
         """
         Convert all examples into necessary features.
         """
-        if self._model_type != 'unimo-text':
-            tokenized_example = self._tokenizer(example,
-                                                max_length=max_seq_len,
-                                                padding=False,
-                                                truncation=True,
-                                                return_attention_mask=True)
+        if self._model_type != "unimo-text":
+            tokenized_example = self._tokenizer(
+                example, max_length=max_seq_len, padding=False, truncation=True, return_attention_mask=True
+            )
         else:
             tokenized_example = self._tokenizer.gen_encode(
                 example,
                 max_seq_len=max_seq_len,
                 add_start_token_for_decoding=True,
                 return_length=True,
-                is_split_into_words=False)
+                is_split_into_words=False,
+            )
         # Use to gather the logits corresponding to the labels during training
         return tokenized_example
 
@@ -160,45 +155,35 @@ class TextSummarizationTask(Task):
             """Pad attention_mask."""
             batch_size = len(batch_attention_mask)
             max_len = max(map(len, batch_attention_mask))
-            attention_mask = np.ones(
-                (batch_size, max_len, max_len), dtype='float32') * -1e9
+            attention_mask = np.ones((batch_size, max_len, max_len), dtype="float32") * -1e9
             for i, mask_data in enumerate(attention_mask):
                 seq_len = len(batch_attention_mask[i])
                 if pad_right:
-                    mask_data[:seq_len:, :seq_len] = np.array(
-                        batch_attention_mask[i], dtype='float32')
+                    mask_data[:seq_len:, :seq_len] = np.array(batch_attention_mask[i], dtype="float32")
                 else:
-                    mask_data[-seq_len:,
-                              -seq_len:] = np.array(batch_attention_mask[i],
-                                                    dtype='float32')
+                    mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype="float32")
             # In order to ensure the correct broadcasting mechanism, expand one
             # dimension to the second dimension (n_head of Transformer).
             attention_mask = np.expand_dims(attention_mask, axis=1)
             return attention_mask
 
-        pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype='int32')
+        pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype="int32")
         batch_dict = {}
-        input_ids = pad_func(
-            [example['input_ids'] for example in batch_examples])
-        if self._model_type != 'unimo-text':
-            attention_mask = (input_ids != pad_val).astype('float32')
-            batch_dict['input_ids'] = input_ids
-            batch_dict['attention_mask'] = attention_mask
+        input_ids = pad_func([example["input_ids"] for example in batch_examples])
+        if self._model_type != "unimo-text":
+            attention_mask = (input_ids != pad_val).astype("float32")
+            batch_dict["input_ids"] = input_ids
+            batch_dict["attention_mask"] = attention_mask
         else:
-            token_type_ids = pad_func(
-                [example['token_type_ids'] for example in batch_examples])
-            position_ids = pad_func(
-                [example['position_ids'] for example in batch_examples])
-            attention_mask = pad_mask(
-                [example['attention_mask'] for example in batch_examples])
-            seq_len = np.asarray(
-                [example['seq_len'] for example in batch_examples],
-                dtype='int32')
-            batch_dict['input_ids'] = input_ids
-            batch_dict['token_type_ids'] = token_type_ids
-            batch_dict['position_ids'] = position_ids
-            batch_dict['attention_mask'] = attention_mask
-            batch_dict['seq_len'] = seq_len
+            token_type_ids = pad_func([example["token_type_ids"] for example in batch_examples])
+            position_ids = pad_func([example["position_ids"] for example in batch_examples])
+            attention_mask = pad_mask([example["attention_mask"] for example in batch_examples])
+            seq_len = np.asarray([example["seq_len"] for example in batch_examples], dtype="int32")
+            batch_dict["input_ids"] = input_ids
+            batch_dict["token_type_ids"] = token_type_ids
+            batch_dict["position_ids"] = position_ids
+            batch_dict["attention_mask"] = attention_mask
+            batch_dict["seq_len"] = seq_len
         return batch_dict
 
     def _run_model(self, inputs):
@@ -209,17 +194,13 @@ class TextSummarizationTask(Task):
         all_scores = []
 
         for batch in inputs["batches"]:
-            input_ids = paddle.to_tensor(batch['input_ids'], dtype='int64')
-            token_type_ids = paddle.to_tensor(
-                batch['token_type_ids'],
-                dtype='int64') if 'token_type_ids' in batch else None
-            position_ids = paddle.to_tensor(
-                batch['position_ids'],
-                dtype='int64') if 'position_ids' in batch else None
-            attention_mask = paddle.to_tensor(batch['attention_mask'],
-                                              dtype='float32')
-            seq_len = paddle.to_tensor(
-                batch['seq_len'], dtype='int64') if 'seq_len' in batch else None
+            input_ids = paddle.to_tensor(batch["input_ids"], dtype="int64")
+            token_type_ids = (
+                paddle.to_tensor(batch["token_type_ids"], dtype="int64") if "token_type_ids" in batch else None
+            )
+            position_ids = paddle.to_tensor(batch["position_ids"], dtype="int64") if "position_ids" in batch else None
+            attention_mask = paddle.to_tensor(batch["attention_mask"], dtype="float32")
+            seq_len = paddle.to_tensor(batch["seq_len"], dtype="int64") if "seq_len" in batch else None
             ids, scores = self._model.generate(
                 input_ids=input_ids,
                 token_type_ids=token_type_ids,
@@ -235,34 +216,32 @@ class TextSummarizationTask(Task):
                 length_penalty=self._length_penalty,
                 num_return_sequences=self._num_return_sequences,
                 repetition_penalty=self._repetition_penalty,
-                bos_token_id=None if self._model_type != 'unimo-text' else
-                self._tokenizer.cls_token_id,
-                eos_token_id=None if self._model_type != 'unimo-text' else
-                self._tokenizer.mask_token_id,
+                bos_token_id=None if self._model_type != "unimo-text" else self._tokenizer.cls_token_id,
+                eos_token_id=None if self._model_type != "unimo-text" else self._tokenizer.mask_token_id,
                 use_faster=self._use_faster,
-                use_fp16_decoding=self._use_fp16_decoding)
+                use_fp16_decoding=self._use_fp16_decoding,
+            )
             all_ids.extend(ids)
             all_scores.extend(scores)
-        inputs['ids'] = all_ids
-        inputs['scores'] = all_scores
+        inputs["ids"] = all_ids
+        inputs["scores"] = all_scores
         return inputs
 
     def _postprocess(self, inputs):
         """
         The model output is tag ids, this function will convert the model output to raw text.
         """
-        ids_list = inputs['ids']
-        scores_list = inputs['scores']
-        if self._model_type != 'unimo-text':
+        ids_list = inputs["ids"]
+        scores_list = inputs["scores"]
+        if self._model_type != "unimo-text":
             output_tokens = self._tokenizer.batch_decode(
-                ids_list,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False)
+                ids_list, skip_special_tokens=True, clean_up_tokenization_spaces=False
+            )
             output_scores = [i.numpy() for i in scores_list]
         else:
             results = self._select_from_num_return_sequences(
-                ids_list, scores_list, self._max_length,
-                self._num_return_sequences)
+                ids_list, scores_list, self._max_length, self._num_return_sequences
+            )
             output_tokens = [result[0] for result in results]
             output_scores = [result[1] for result in results]
 
@@ -270,11 +249,7 @@ class TextSummarizationTask(Task):
             return output_tokens, output_scores
         return output_tokens
 
-    def _select_from_num_return_sequences(self,
-                                          ids,
-                                          scores,
-                                          max_dec_len=None,
-                                          num_return_sequences=1):
+    def _select_from_num_return_sequences(self, ids, scores, max_dec_len=None, num_return_sequences=1):
         """
         Select generated sequence form several return sequences.
         """
@@ -285,15 +260,15 @@ class TextSummarizationTask(Task):
             ids = [i.numpy() for i in ids]
             scores = [i.numpy() for i in scores]
 
-            if len(ids) != len(scores) or (len(ids) %
-                                           num_return_sequences) != 0:
+            if len(ids) != len(scores) or (len(ids) % num_return_sequences) != 0:
                 raise ValueError(
-                    "the length of `ids` is {}, but the `num_return_sequences` is {}"
-                    .format(len(ids), num_return_sequences))
+                    "the length of `ids` is {}, but the `num_return_sequences` is {}".format(
+                        len(ids), num_return_sequences
+                    )
+                )
 
             for pred, score in zip(ids, scores):
-                pred_token_ids, pred_tokens = self._post_process_decoded_sequence(
-                    pred)
+                pred_token_ids, pred_tokens = self._post_process_decoded_sequence(pred)
                 num_token = len(pred_token_ids)
                 target = "".join(pred_tokens)
                 # not ending
@@ -309,8 +284,7 @@ class TextSummarizationTask(Task):
         else:
             ids = ids.numpy()
             for pred in ids:
-                pred_token_ids, pred_tokens = self._post_process_decoded_sequence(
-                    pred)
+                pred_token_ids, pred_tokens = self._post_process_decoded_sequence(pred)
                 num_token = len(pred_token_ids)
                 response = "".join(pred_tokens)
                 # TODO: Support return scores in FT.
@@ -333,7 +307,7 @@ class TextSummarizationTask(Task):
         token_ids = token_ids[:eos_pos]
         tokens = self._tokenizer.convert_ids_to_tokens(token_ids)
         tokens = self._tokenizer.merge_subword(tokens)
-        special_tokens = ['[UNK]']
+        special_tokens = ["[UNK]"]
         tokens = [token for token in tokens if token not in special_tokens]
         return token_ids, tokens
 
@@ -342,7 +316,5 @@ class TextSummarizationTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
         ]
