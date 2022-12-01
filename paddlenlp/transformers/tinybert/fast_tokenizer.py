@@ -20,10 +20,7 @@ from fast_tokenizer import normalizers
 from ..tokenizer_utils_faster import PretrainedFastTokenizer
 from .tokenizer import TinyBertTokenizer
 
-VOCAB_FILES_NAMES = {
-    "vocab_file": "vocab.txt",
-    "tokenizer_file": "tokenizer.json"
-}
+VOCAB_FILES_NAMES = {"vocab_file": "vocab.txt", "tokenizer_file": "tokenizer.json"}
 
 
 class TinyBertFastTokenizer(PretrainedFastTokenizer):
@@ -32,20 +29,22 @@ class TinyBertFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
-    padding_side = 'right'
+    padding_side = "right"
 
-    def __init__(self,
-                 vocab_file=None,
-                 tokenizer_file=None,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file=None,
+        tokenizer_file=None,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        **kwargs
+    ):
         super().__init__(
             vocab_file,
             tokenizer_file=tokenizer_file,
@@ -60,26 +59,20 @@ class TinyBertFastTokenizer(PretrainedFastTokenizer):
             **kwargs,
         )
 
-        normalizer_state = json.loads(
-            self.backend_tokenizer.normalizer.__getstate__())
-        if (normalizer_state.get("lowercase", do_lower_case) != do_lower_case
-                or normalizer_state.get("strip_accents", strip_accents)
-                != strip_accents or normalizer_state.get(
-                    "handle_chinese_chars",
-                    tokenize_chinese_chars) != tokenize_chinese_chars):
-            normalizer_class = getattr(normalizers,
-                                       normalizer_state.pop("type"))
+        normalizer_state = json.loads(self.backend_tokenizer.normalizer.__getstate__())
+        if (
+            normalizer_state.get("lowercase", do_lower_case) != do_lower_case
+            or normalizer_state.get("strip_accents", strip_accents) != strip_accents
+            or normalizer_state.get("handle_chinese_chars", tokenize_chinese_chars) != tokenize_chinese_chars
+        ):
+            normalizer_class = getattr(normalizers, normalizer_state.pop("type"))
             normalizer_state["lowercase"] = do_lower_case
             normalizer_state["strip_accents"] = strip_accents
             normalizer_state["handle_chinese_chars"] = tokenize_chinese_chars
-            self.backend_tokenizer.normalizer = normalizer_class(
-                **normalizer_state)
+            self.backend_tokenizer.normalizer = normalizer_class(**normalizer_state)
 
         self.do_lower_case = do_lower_case
 
-    def save_vocabulary(self,
-                        save_directory: str,
-                        filename_prefix: Optional[str] = None) -> Tuple[str]:
-        files = self._tokenizer.model.save(save_directory,
-                                           prefix=filename_prefix)
+    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
+        files = self._tokenizer.model.save(save_directory, prefix=filename_prefix)
         return tuple(files)

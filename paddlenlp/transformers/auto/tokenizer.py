@@ -22,8 +22,7 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.transformers import *
-from paddlenlp.utils.downloader import (COMMUNITY_MODEL_PREFIX,
-                                        get_path_from_url)
+from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.import_utils import is_fast_tokenizer_available
 from paddlenlp.utils.log import logger
@@ -32,71 +31,76 @@ __all__ = [
     "AutoTokenizer",
 ]
 
-TOKENIZER_MAPPING_NAMES = OrderedDict([
-    ("AlbertEnglishTokenizer", "albert"),
-    ("AlbertChineseTokenizer", "albert"),
-    ("BertJapaneseTokenizer", "bert_japanese"),
-    ("BigBirdTokenizer", "bigbird"),
-    ("BlenderbotSmallTokenizer", "blenderbot_small"),
-    ("BlenderbotTokenizer", "blenderbot"),
-    ("ChineseBertTokenizer", "chinesebert"),
-    ("ConvBertTokenizer", "convbert"),
-    ("CTRLTokenizer", "ctrl"),
-    ("DalleBartTokenizer", "dallebart"),
-    ("DistilBertTokenizer", "distilbert"),
-    ("ElectraTokenizer", "electra"),
-    ("ErnieCtmTokenizer", "ernie_ctm"),
-    ("ErnieDocTokenizer", "ernie_doc"),
-    ("ErnieDocBPETokenizer", "ernie_doc"),
-    ("ErnieGramTokenizer", "ernie_gram"),
-    ("ErnieLayoutTokenizer", "ernie_layout"),
-    ("ErnieMTokenizer", "ernie_m"),
-    ("ErnieTokenizer", "ernie"),
-    ("FNetTokenizer", "fnet"),
-    ("FunnelTokenizer", "funnel"),
-    ("LayoutXLMTokenizer", "layoutxlm"),
-    ("LayoutLMv2Tokenizer", "layoutlmv2"),
-    ("LayoutLMTokenizer", "layoutlm"),
-    ("LukeTokenizer", "luke"),
-    ("MBartTokenizer", "mbart"),
-    ("MBart50Tokenizer", "mbart"),
-    ("MegatronBertTokenizer", "megatronbert"),
-    ("MobileBertTokenizer", "mobilebert"),
-    ("MPNetTokenizer", "mpnet"),
-    ("NeZhaTokenizer", "nezha"),
-    ("PPMiniLMTokenizer", "ppminilm"),
-    ("ProphetNetTokenizer", "prophetnet"),
-    ("ReformerTokenizer", "reformer"),
-    ("RemBertTokenizer", "rembert"),
-    ("RobertaChineseTokenizer", "roberta"),
-    ("RobertaBPETokenizer", "roberta"),
-    ("RoFormerTokenizer", "roformer"),
-    ("RoFormerv2Tokenizer", "roformerv2"),
-    ("SkepTokenizer", "skep"),
-    ("SqueezeBertTokenizer", "squeezebert"),
-    ("TinyBertTokenizer", "tinybert"),
-    ("UnifiedTransformerTokenizer", "unified_transformer"),
-    ("UNIMOTokenizer", "unimo"),
-    ("XLNetTokenizer", "xlnet"),
-    ("XLMTokenizer", "xlm"),
-    ("GPTTokenizer", "gpt"),
-    ("GPTChineseTokenizer", "gpt"),
-    ("T5Tokenizer", 't5'),
-    ("BertTokenizer", "bert"),
-    ("BartTokenizer", "bart"),
-    ("GAUAlphaTokenizer", "gau_alpha"),
-    ("CodeGenTokenizer", "codegen"),
-    ("CLIPTokenizer", "clip"),
-    ("ArtistTokenizer", "artist"),
-    ("ErnieViLTokenizer", "ernie_vil"),
-    ("PegasusChineseTokenizer", 'pegasus'),
-])
+TOKENIZER_MAPPING_NAMES = OrderedDict(
+    [
+        ("AlbertEnglishTokenizer", "albert"),
+        ("AlbertChineseTokenizer", "albert"),
+        ("BertJapaneseTokenizer", "bert_japanese"),
+        ("BigBirdTokenizer", "bigbird"),
+        ("BlenderbotSmallTokenizer", "blenderbot_small"),
+        ("BlenderbotTokenizer", "blenderbot"),
+        ("ChineseBertTokenizer", "chinesebert"),
+        ("ConvBertTokenizer", "convbert"),
+        ("CTRLTokenizer", "ctrl"),
+        ("DalleBartTokenizer", "dallebart"),
+        ("DistilBertTokenizer", "distilbert"),
+        ("ElectraTokenizer", "electra"),
+        ("ErnieCtmTokenizer", "ernie_ctm"),
+        ("ErnieDocTokenizer", "ernie_doc"),
+        ("ErnieDocBPETokenizer", "ernie_doc"),
+        ("ErnieGramTokenizer", "ernie_gram"),
+        ("ErnieLayoutTokenizer", "ernie_layout"),
+        ("ErnieMTokenizer", "ernie_m"),
+        ("ErnieTokenizer", "ernie"),
+        ("FNetTokenizer", "fnet"),
+        ("FunnelTokenizer", "funnel"),
+        ("LayoutXLMTokenizer", "layoutxlm"),
+        ("LayoutLMv2Tokenizer", "layoutlmv2"),
+        ("LayoutLMTokenizer", "layoutlm"),
+        ("LukeTokenizer", "luke"),
+        ("MBartTokenizer", "mbart"),
+        ("MBart50Tokenizer", "mbart"),
+        ("MegatronBertTokenizer", "megatronbert"),
+        ("MobileBertTokenizer", "mobilebert"),
+        ("MPNetTokenizer", "mpnet"),
+        ("NeZhaTokenizer", "nezha"),
+        ("PPMiniLMTokenizer", "ppminilm"),
+        ("ProphetNetTokenizer", "prophetnet"),
+        ("ReformerTokenizer", "reformer"),
+        ("RemBertTokenizer", "rembert"),
+        ("RobertaChineseTokenizer", "roberta"),
+        ("RobertaBPETokenizer", "roberta"),
+        ("RoFormerTokenizer", "roformer"),
+        ("RoFormerv2Tokenizer", "roformerv2"),
+        ("SkepTokenizer", "skep"),
+        ("SqueezeBertTokenizer", "squeezebert"),
+        ("TinyBertTokenizer", "tinybert"),
+        ("UnifiedTransformerTokenizer", "unified_transformer"),
+        ("UNIMOTokenizer", "unimo"),
+        ("XLNetTokenizer", "xlnet"),
+        ("XLMTokenizer", "xlm"),
+        ("GPTTokenizer", "gpt"),
+        ("GPTChineseTokenizer", "gpt"),
+        ("T5Tokenizer", "t5"),
+        ("BertTokenizer", "bert"),
+        ("BartTokenizer", "bart"),
+        ("GAUAlphaTokenizer", "gau_alpha"),
+        ("CodeGenTokenizer", "codegen"),
+        ("CLIPTokenizer", "clip"),
+        ("ArtistTokenizer", "artist"),
+        ("ErnieViLTokenizer", "ernie_vil"),
+        ("PegasusChineseTokenizer", "pegasus"),
+    ]
+)
 
-FAST_TOKENIZER_MAPPING_NAMES = OrderedDict([("BertFastTokenizer", "bert"),
-                                            ("ErnieFastTokenizer", "ernie"),
-                                            ("TinyBertFastTokenizer",
-                                             "tinybert"),
-                                            ("ErnieMFastTokenizer", "ernie_m")])
+FAST_TOKENIZER_MAPPING_NAMES = OrderedDict(
+    [
+        ("BertFastTokenizer", "bert"),
+        ("ErnieFastTokenizer", "ernie"),
+        ("TinyBertFastTokenizer", "tinybert"),
+        ("ErnieMFastTokenizer", "ernie_m"),
+    ]
+)
 # For FastTokenizer
 if is_fast_tokenizer_available():
     TOKENIZER_MAPPING_NAMES.update(FAST_TOKENIZER_MAPPING_NAMES)
@@ -108,8 +112,7 @@ def get_configurations():
         fast_name = ""
         if "Fast" in key:
             fast_name = "fast_"
-        import_class = importlib.import_module(
-            f"paddlenlp.transformers.{class_name}.{fast_name}tokenizer")
+        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.{fast_name}tokenizer")
         tokenizer_name = getattr(import_class, key)
         name = tuple(tokenizer_name.pretrained_init_configuration.keys())
         # FastTokenizer will share the same config with python tokenizer
@@ -121,13 +124,14 @@ def get_configurations():
     return MAPPING_NAMES
 
 
-class AutoTokenizer():
+class AutoTokenizer:
     """
     AutoClass can help you automatically retrieve the relevant model given the provided
     pretrained weights/vocabulary.
     AutoTokenizer is a generic tokenizer class that will be instantiated as one of the
     base tokenizer classes when created with the AutoTokenizer.from_pretrained() classmethod.
     """
+
     MAPPING_NAMES = get_configurations()
     _tokenizer_mapping = MAPPING_NAMES
     _name_mapping = TOKENIZER_MAPPING_NAMES
@@ -141,8 +145,7 @@ class AutoTokenizer():
         )
 
     @classmethod
-    def _get_tokenizer_class_from_config(cls, pretrained_model_name_or_path,
-                                         config_file_path, use_fast):
+    def _get_tokenizer_class_from_config(cls, pretrained_model_name_or_path, config_file_path, use_fast):
         with io.open(config_file_path, encoding="utf-8") as f:
             init_kwargs = json.load(f)
         # class name corresponds to this configuration
@@ -152,88 +155,75 @@ class AutoTokenizer():
 
         if init_class:
             class_name = cls._name_mapping[init_class]
-            import_class = importlib.import_module(
-                f"paddlenlp.transformers.{class_name}.tokenizer")
+            import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
             tokenizer_class = getattr(import_class, init_class)
             if use_fast:
-                for faster_tokenizer_class, name in cls._faster_name_mapping.items(
-                ):
+                for faster_tokenizer_class, name in cls._faster_name_mapping.items():
                     if name == class_name:
-                        import_class = importlib.import_module(
-                            f"paddlenlp.transformers.{class_name}.faster_tokenizer"
-                        )
-                        tokenizer_class = getattr(import_class,
-                                                  faster_tokenizer_class)
+                        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.faster_tokenizer")
+                        tokenizer_class = getattr(import_class, faster_tokenizer_class)
             return tokenizer_class
         # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
         else:
             # TODO: Potential issue https://github.com/PaddlePaddle/PaddleNLP/pull/3786#discussion_r1024689810
-            logger.info(
-                'We use pattern recognition to recognize the Tokenizer class.')
+            logger.info("We use pattern recognition to recognize the Tokenizer class.")
             for key, pattern in cls._name_mapping.items():
                 if pattern in pretrained_model_name_or_path.lower():
                     init_class = key
                     class_name = cls._name_mapping[init_class]
-                    import_class = importlib.import_module(
-                        f"paddlenlp.transformers.{class_name}.tokenizer")
+                    import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
                     tokenizer_class = getattr(import_class, init_class)
             return tokenizer_class
 
     @classmethod
-    def from_pretrained(cls,
-                        pretrained_model_name_or_path,
-                        from_hf_hub=False,
-                        *model_args,
-                        **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path, from_hf_hub=False, *model_args, **kwargs):
         """
-         Creates an instance of `AutoTokenizer`. Related resources are loaded by
-         specifying name of a built-in pretrained model, or a community-contributed
-         pretrained model, or a local file directory path.
+        Creates an instance of `AutoTokenizer`. Related resources are loaded by
+        specifying name of a built-in pretrained model, or a community-contributed
+        pretrained model, or a local file directory path.
 
-         Args:
-             pretrained_model_name_or_path (str): Name of pretrained model or dir path
-                 to load from. The string can be:
+        Args:
+            pretrained_model_name_or_path (str): Name of pretrained model or dir path
+                to load from. The string can be:
 
-                 - Name of built-in pretrained model
-                 - Name of a community-contributed pretrained model.
-                 - Local directory path which contains tokenizer related resources
-                   and tokenizer config file ("tokenizer_config.json").
-             *args (tuple): position arguments for model `__init__`. If provided,
-                 use these as position argument values for tokenizer initialization.
-             **kwargs (dict): keyword arguments for model `__init__`. If provided,
-                 use these to update pre-defined keyword argument values for tokenizer
-                 initialization.
+                - Name of built-in pretrained model
+                - Name of a community-contributed pretrained model.
+                - Local directory path which contains tokenizer related resources
+                  and tokenizer config file ("tokenizer_config.json").
+            *args (tuple): position arguments for model `__init__`. If provided,
+                use these as position argument values for tokenizer initialization.
+            **kwargs (dict): keyword arguments for model `__init__`. If provided,
+                use these to update pre-defined keyword argument values for tokenizer
+                initialization.
 
-         Returns:
-             PretrainedTokenizer: An instance of `PretrainedTokenizer`.
+        Returns:
+            PretrainedTokenizer: An instance of `PretrainedTokenizer`.
 
-         Example:
-             .. code-block::
+        Example:
+            .. code-block::
 
-                 from paddlenlp.transformers import AutoTokenizer
+                from paddlenlp.transformers import AutoTokenizer
 
-                 # Name of built-in pretrained model
-                 tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
-                 print(type(tokenizer))
-                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+                # Name of built-in pretrained model
+                tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+                print(type(tokenizer))
+                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
 
-                 # Name of community-contributed pretrained model
-                 tokenizer = AutoTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
-                 print(type(tokenizer))
-                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+                # Name of community-contributed pretrained model
+                tokenizer = AutoTokenizer.from_pretrained('yingyibiao/bert-base-uncased-sst-2-finetuned')
+                print(type(tokenizer))
+                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
 
-                 # Load from local directory path
-                 tokenizer = AutoTokenizer.from_pretrained('./my_bert/')
-                 print(type(tokenizer))
-                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
-         """
+                # Load from local directory path
+                tokenizer = AutoTokenizer.from_pretrained('./my_bert/')
+                print(type(tokenizer))
+                # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
+        """
         # Default not to use faster tokenizer
         use_fast = kwargs.pop("use_fast", False)
         if "use_fast" in kwargs:
             use_fast = kwargs.pop("use_fast", False)
-            logger.warning(
-                "The keyword argument `use_fast` is deprecated in future, please use `use_fast` instead"
-            )
+            logger.warning("The keyword argument `use_fast` is deprecated in future, please use `use_fast` instead")
 
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():
@@ -241,21 +231,21 @@ class AutoTokenizer():
                 all_tokenizer_names.append(name)
         # From HF Hub
         if from_hf_hub:
-            config_file = hf_hub_download(repo_id=pretrained_model_name_or_path,
-                                          filename=cls.tokenizer_config_file,
-                                          cache_dir=HF_CACHE_HOME,
-                                          library_name="PaddleNLP",
-                                          library_version=__version__)
+            config_file = hf_hub_download(
+                repo_id=pretrained_model_name_or_path,
+                filename=cls.tokenizer_config_file,
+                cache_dir=HF_CACHE_HOME,
+                library_name="PaddleNLP",
+                library_version=__version__,
+            )
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, config_file, use_fast)
-                logger.info("We are using %s to load '%s'." %
-                            (tokenizer_class, pretrained_model_name_or_path))
+                    pretrained_model_name_or_path, config_file, use_fast
+                )
+                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
                 return tokenizer_class.from_pretrained(
-                    pretrained_model_name_or_path,
-                    from_hf_hub=from_hf_hub,
-                    *model_args,
-                    **kwargs)
+                    pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
+                )
         # From built-in pretrained models
         elif pretrained_model_name_or_path in all_tokenizer_names:
             for names, tokenizer_classes in cls._tokenizer_mapping.items():
@@ -272,8 +262,7 @@ class AutoTokenizer():
                                 is_support_fast_tokenizer = False
                                 for tokenizer_class in tokenizer_classes:
                                     if tokenizer_class[1]:
-                                        actual_tokenizer_class = tokenizer_class[
-                                            0]
+                                        actual_tokenizer_class = tokenizer_class[0]
                                         is_support_fast_tokenizer = True
                                         break
                                 if not is_support_fast_tokenizer:
@@ -289,35 +278,30 @@ class AutoTokenizer():
                                     "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
                                 )
 
-                        logger.info("We are using %s to load '%s'." %
-                                    (actual_tokenizer_class,
-                                     pretrained_model_name_or_path))
+                        logger.info(
+                            "We are using %s to load '%s'." % (actual_tokenizer_class, pretrained_model_name_or_path)
+                        )
                         return actual_tokenizer_class.from_pretrained(
-                            pretrained_model_name_or_path, *model_args,
-                            **kwargs)
+                            pretrained_model_name_or_path, *model_args, **kwargs
+                        )
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
-            config_file = os.path.join(pretrained_model_name_or_path,
-                                       cls.tokenizer_config_file)
+            config_file = os.path.join(pretrained_model_name_or_path, cls.tokenizer_config_file)
             if os.path.exists(config_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, config_file, use_fast)
-                logger.info("We are using %s to load '%s'." %
-                            (tokenizer_class, pretrained_model_name_or_path))
-                return tokenizer_class.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
+                    pretrained_model_name_or_path, config_file, use_fast
+                )
+                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = "/".join([
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.tokenizer_config_file
-            ])
+            community_config_path = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.tokenizer_config_file]
+            )
 
-            default_root = os.path.join(MODEL_HOME,
-                                        pretrained_model_name_or_path)
+            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path,
-                                                        default_root)
+                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -330,9 +314,7 @@ class AutoTokenizer():
 
             if os.path.exists(resolved_vocab_file):
                 tokenizer_class = cls._get_tokenizer_class_from_config(
-                    pretrained_model_name_or_path, resolved_vocab_file,
-                    use_fast)
-                logger.info("We are using %s to load '%s'." %
-                            (tokenizer_class, pretrained_model_name_or_path))
-                return tokenizer_class.from_pretrained(
-                    pretrained_model_name_or_path, *model_args, **kwargs)
+                    pretrained_model_name_or_path, resolved_vocab_file, use_fast
+                )
+                logger.info("We are using %s to load '%s'." % (tokenizer_class, pretrained_model_name_or_path))
+                return tokenizer_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)

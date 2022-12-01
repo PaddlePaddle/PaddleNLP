@@ -31,6 +31,9 @@
 
 ## News 📢
 
+* 🔥 **2022.11.28 发布 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
+  * 💪 框架升级：新增[**Huggingface Hub集成**](https://huggingface.co/PaddlePaddle)，后续将逐步支持Model，Tokenizer，Taskflow直接从[Huggingface Hub](https://huggingface.co/PaddlePaddle)加载；[**小样本 Prompt API**](./docs/advanced_guide/prompt.md)升级，支持PET算法实现。
+  * 💎 NLP工具：[**NLP 流水线系统 Pipelines**](./pipelines)检索能力再加强，新增交互式学习语义检索模型[Ernie-Search](./pipelines/API.md)；发布[**SimpleServing**](./docs/server.md)，支持Taskflow、预训练模型快速部署。
 * 🔥 **2022.11.17 发布 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)**
   * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE AutoPrompt 方案](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
   * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。

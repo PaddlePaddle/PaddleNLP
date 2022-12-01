@@ -24,13 +24,13 @@ from pathlib import Path
 from paddle.utils import try_import
 from ...transformers import GPTTokenizer, AddedToken
 
-__all__ = ['DalleBartTokenizer']
+__all__ = ["DalleBartTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "dalle-mini": 64,
     "dalle-mega-v16": 64,
     "dalle-mega-v26": 64,
-    "dalle-mega": 64
+    "dalle-mega": 64,
 }
 
 # based on wiki word occurrence
@@ -42,13 +42,8 @@ class HashtagProcessor:
     # Adapted from wordninja library
     # We use our wikipedia word count + a good heuristic to make it work
     def __init__(self, wiki_word_frequency):
-        self._word_cost = (l.split()[0]
-                           for l in Path(wiki_word_frequency).read_text(
-                               encoding="utf8").splitlines())
-        self._word_cost = {
-            str(k): math.log(float(i + 1))
-            for i, k in enumerate(self._word_cost)
-        }
+        self._word_cost = (l.split()[0] for l in Path(wiki_word_frequency).read_text(encoding="utf8").splitlines())
+        self._word_cost = {str(k): math.log(float(i + 1)) for i, k in enumerate(self._word_cost)}
         self._max_word = max(len(x) for x in self._word_cost.keys())
         self._SPLIT_RE = re.compile("[^a-zA-Z0-9']+")
 
@@ -62,10 +57,8 @@ class HashtagProcessor:
         # been built for the i-1 first characters.
         # Returns a pair (match_cost, match_length).
         def best_match(i):
-            candidates = enumerate(reversed(cost[max(0, i - self._max_word):i]))
-            return min(
-                (c + self._word_cost.get(s[i - k - 1:i].lower(), 9e999), k + 1)
-                for k, c in candidates)
+            candidates = enumerate(reversed(cost[max(0, i - self._max_word) : i]))
+            return min((c + self._word_cost.get(s[i - k - 1 : i].lower(), 9e999), k + 1) for k, c in candidates)
 
         # Build the cost array
         cost = [0]
@@ -80,19 +73,15 @@ class HashtagProcessor:
             c, k = best_match(i)
             assert c == cost[i]
             newToken = True
-            if not s[i - k:i] == "'":  # ignore a lone apostrophe
+            if not s[i - k : i] == "'":  # ignore a lone apostrophe
                 if len(out) > 0:
                     # re-attach split 's and split digits
-                    if out[-1] == "'s" or (s[i - 1].isdigit()
-                                           and out[-1][0].isdigit()
-                                           ):  # digit followed by digit
-                        out[-1] = (
-                            s[i - k:i] + out[-1]
-                        )  # combine current token with previous token
+                    if out[-1] == "'s" or (s[i - 1].isdigit() and out[-1][0].isdigit()):  # digit followed by digit
+                        out[-1] = s[i - k : i] + out[-1]  # combine current token with previous token
                         newToken = False
 
             if newToken:
-                out.append(s[i - k:i])
+                out.append(s[i - k : i])
 
             i -= k
 
@@ -103,8 +92,7 @@ def replace_person_token(t):
     "Used for CC12M"
     t = re.sub(r"<person>([,\s]*(and)*[,\s]*<person>)+", " people ", t)
     while "<person>" in t:
-        t = t.replace("<person>",
-                      f" {random.choices(*tuple(zip(*person_token)))[0]} ", 1)
+        t = t.replace("<person>", f" {random.choices(*tuple(zip(*person_token)))[0]} ", 1)
     return t
 
 
@@ -126,7 +114,6 @@ def merge_quotes(t):
 
 
 def remove_comma_numbers(t):
-
     def _f(t):
         return re.sub(r"(\d),(\d{3})", r"\1\2", t)
 
@@ -143,8 +130,7 @@ def post_process_dot_numbers(t):
 
 def pre_process_quotes(t):
     # allows quotes only for 's, 't, 'd, 'm, 'll, 're, 've
-    return re.sub(r"'(?=([stdm]|(ll)|(re)|(ve)|(ll))\b)",
-                  rf"{temp_token}quote{temp_token}", t)
+    return re.sub(r"'(?=([stdm]|(ll)|(re)|(ve)|(ll))\b)", rf"{temp_token}quote{temp_token}", t)
 
 
 def post_process_quotes(t):
@@ -219,7 +205,6 @@ def remove_wiki_ref(t):
 
 
 class TextNormalizer:
-
     def __init__(self, wiki_word_frequency_file):
         self._hashtag_processor = HashtagProcessor(wiki_word_frequency_file)
         self.emoji = try_import("emoji")
@@ -342,118 +327,86 @@ class DalleBartTokenizer(GPTTokenizer):
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt",
-        "wiki_word_frequency_file": "enwiki-words-frequency.txt"
+        "wiki_word_frequency_file": "enwiki-words-frequency.txt",
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/vocab.json",
-            "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/vocab.json",
-            "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/vocab.json",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/vocab.json",
+            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/vocab.json",
+            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/vocab.json",
+            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/vocab.json",
+            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/vocab.json",
         },
         "merges_file": {
-            "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/merges.txt",
-            "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/merges.txt",
-            "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/merges.txt",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/merges.txt",
+            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/merges.txt",
+            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/merges.txt",
+            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/merges.txt",
+            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/merges.txt",
         },
         "wiki_word_frequency_file": {
-            "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/enwiki-words-frequency.txt",
-            "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/enwiki-words-frequency.txt",
-            "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
+            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/enwiki-words-frequency.txt",
+            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/enwiki-words-frequency.txt",
+            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
+            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/enwiki-words-frequency.txt",
         },
     }
     pretrained_init_configuration = {
-        "dalle-mini": {
-            "normalize_text": True
-        },
-        "dalle-mega-v16": {
-            "normalize_text": True
-        },
-        "dalle-mega-v26": {
-            "normalize_text": True
-        },
-        "dalle-mega": {
-            "normalize_text": True
-        },
+        "dalle-mini": {"normalize_text": True},
+        "dalle-mega-v16": {"normalize_text": True},
+        "dalle-mega-v26": {"normalize_text": True},
+        "dalle-mega": {"normalize_text": True},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 wiki_word_frequency_file,
-                 normalize_text=True,
-                 errors='replace',
-                 max_len=None,
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 cls_token="<s>",
-                 sep_token="</s>",
-                 unk_token="<unk>",
-                 pad_token="<pad>",
-                 mask_token="<mask>",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        wiki_word_frequency_file,
+        normalize_text=True,
+        errors="replace",
+        max_len=None,
+        bos_token="<s>",
+        eos_token="</s>",
+        cls_token="<s>",
+        sep_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        mask_token="<mask>",
+        **kwargs
+    ):
 
-        bos_token = AddedToken(bos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   bos_token, str) else bos_token
-        eos_token = AddedToken(eos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   eos_token, str) else eos_token
-        sep_token = AddedToken(sep_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   sep_token, str) else sep_token
-        cls_token = AddedToken(cls_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   cls_token, str) else cls_token
-        unk_token = AddedToken(unk_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
-        self._build_special_tokens_map_extended(bos_token=bos_token,
-                                                eos_token=eos_token,
-                                                sep_token=sep_token,
-                                                cls_token=cls_token,
-                                                unk_token=unk_token,
-                                                pad_token=pad_token,
-                                                mask_token=mask_token)
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token,
+        )
         self.normalize_text = normalize_text
         # in order to save wiki_word_frequency_file, we need set this attr
         self._wiki_word_frequency_file = wiki_word_frequency_file
         if self.normalize_text:
             self.text_processor = TextNormalizer(wiki_word_frequency_file)
-        super().__init__(vocab_file, merges_file, errors, max_len, pad_token,
-                         eos_token, unk_token)
+        super().__init__(vocab_file, merges_file, errors, max_len, pad_token, eos_token, unk_token)
 
     def _bpe_encode(self, text):
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -467,27 +420,20 @@ class DalleBartTokenizer(GPTTokenizer):
             return _cls + token_ids_0 + _sep
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is
         called when adding special tokens using the tokenizer ``encode`` methods.
         """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0,
-                token_ids_1=token_ids_1,
-                already_has_special_tokens=True)
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
         """
@@ -499,27 +445,28 @@ class DalleBartTokenizer(GPTTokenizer):
         return len(cls + token_ids_0 + sep + sep + token_ids_1 + sep) * [0]
 
     def __call__(
-            self,
-            text,
-            text_pair=None,
-            max_length=64,  # default
-            stride=0,
-            is_split_into_words=False,
-            padding="max_length",  # default
-            truncation=True,  # default
-            return_position_ids=False,
-            return_token_type_ids=False,  # don't return token_type_ids 
-            return_attention_mask=True,  # default
-            return_length=False,
-            return_overflowing_tokens=False,
-            return_special_tokens_mask=False,
-            return_dict=True,
-            return_offsets_mapping=False,
-            add_special_tokens=True,
-            pad_to_multiple_of=None,
-            return_tensors=None,
-            verbose: bool = True,
-            **kwargs):
+        self,
+        text,
+        text_pair=None,
+        max_length=64,  # default
+        stride=0,
+        is_split_into_words=False,
+        padding="max_length",  # default
+        truncation=True,  # default
+        return_position_ids=False,
+        return_token_type_ids=False,  # don't return token_type_ids
+        return_attention_mask=True,  # default
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+        return_dict=True,
+        return_offsets_mapping=False,
+        add_special_tokens=True,
+        pad_to_multiple_of=None,
+        return_tensors=None,
+        verbose: bool = True,
+        **kwargs
+    ):
         if self.normalize_text:
             is_batched = isinstance(text, (list, tuple))
             if is_batched:
@@ -527,9 +474,24 @@ class DalleBartTokenizer(GPTTokenizer):
             else:
                 text = self.text_processor(text)
         return super().__call__(
-            text, text_pair, max_length, stride, is_split_into_words, padding,
-            truncation, return_position_ids, return_token_type_ids,
-            return_attention_mask, return_length, return_overflowing_tokens,
-            return_special_tokens_mask, return_dict, return_offsets_mapping,
-            add_special_tokens, pad_to_multiple_of, return_tensors, verbose,
-            **kwargs)
+            text,
+            text_pair,
+            max_length,
+            stride,
+            is_split_into_words,
+            padding,
+            truncation,
+            return_position_ids,
+            return_token_type_ids,
+            return_attention_mask,
+            return_length,
+            return_overflowing_tokens,
+            return_special_tokens_mask,
+            return_dict,
+            return_offsets_mapping,
+            add_special_tokens,
+            pad_to_multiple_of,
+            return_tensors,
+            verbose,
+            **kwargs,
+        )
