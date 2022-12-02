@@ -36,10 +36,12 @@ from huggingface_hub import (
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
+from paddle import __version__
 
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
+    url_file_exists,
 )
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
@@ -1480,7 +1482,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 continue
             if from_hf_hub:
                 resolved_vocab_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path, filename=file_path, cache_dir=HF_CACHE_HOME
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
                 )
             else:
                 path = os.path.join(default_root, file_path.split("/")[-1])
@@ -1491,6 +1497,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 else:
                     logger.info("Downloading %s and saved to %s" % (file_path, default_root))
                     try:
+                        if not url_file_exists(file_path):
+                            logger.warning(f"file<{file_path}> not exist")
+                            resolved_vocab_files[file_id] = None
+                            continue
                         resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, default_root)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
