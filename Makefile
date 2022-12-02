@@ -36,8 +36,8 @@ unit-test:
 
 .PHONY: install
 install:
-	pip install -r requirements.txt
 	pip install -r requirements-dev.txt
+	pip install -r requirements.txt
 	pre-commit install
 
 
@@ -48,4 +48,12 @@ deploy-ppdiffusers:
 .PHONY: install-ppdiffusers
 install-ppdiffusers:
 	cd ppdiffusers && make install
+
+.PHONY: deploy-paddle-pipelines
+deploy-paddle-pipelines:
+	cd pipelines && make
+
+.PHONY: install-paddle-pipelines
+install-paddle-pipelines:
+	cd pipelines && make install
 
