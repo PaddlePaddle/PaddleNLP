@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 # flake8: noqa
+from pipelines.utils.import_utils import safe_import  # isort: skip
 from pipelines.nodes.answer_extractor import (
     AnswerExtractor,
     AnswerExtractorPreprocessor,
@@ -36,4 +37,3 @@ from pipelines.nodes.ranker import BaseRanker, ErnieRanker
 from pipelines.nodes.reader import BaseReader, ErnieReader
 from pipelines.nodes.retriever import BaseRetriever, DensePassageRetriever
 from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
-from pipelines.utils.import_utils import safe_import

@@ -108,15 +108,23 @@ def semantic_search_tutorial():
     pipeline.add_node(component=ranker, name="Ranker", inputs=["JoinResults"])
     # Keywords recall results
     prediction = pipeline.run(
-        query="广播权", params={"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 3}}
+        query="广播权",
+        params={
+            "BMRetriever": {"top_k": args.bm_topk},
+            "DenseRetriever": {"top_k": args.dense_topk},
+            "Ranker": {"top_k": args.rank_topk},
+        },
     )
     print_documents(prediction)
     # Dense vector recall results
     prediction = pipeline.run(
         query="期货交易手续费指的是什么?",
-        params={"BMRetriever": {"top_k": 10}, "DenseRetriever": {"top_k": 10}, "Ranker": {"top_k": 3}},
+        params={
+            "BMRetriever": {"top_k": args.bm_topk},
+            "DenseRetriever": {"top_k": args.dense_topk},
+            "Ranker": {"top_k": args.rank_topk},
+        },
     )
-    pipeline.draw("multi_recall.png")
     print_documents(prediction)
 
 
