@@ -66,7 +66,7 @@ class SkepTestConfig(SkepTestModelConfig):
     batch_size: int = 2
     seq_length: int = 7
     is_training: bool = False
-    use_input_mask: bool = False
+    use_input_mask: bool = True
     use_token_type_ids: bool = False
 
     # used for sequence classification
@@ -198,7 +198,6 @@ class SkepModelTester:
             SkepModel(**config), num_classes=self.config.num_classes)
         model.eval()
         result = model(input_ids,
-                       attention_mask=input_mask,
                        token_type_ids=token_type_ids,
                        return_dict=self.parent.return_dict,
                        labels=token_labels)
@@ -212,6 +211,60 @@ class SkepModelTester:
             self.parent.assertEqual(
                 result[0].shape,
                 [self.config.batch_size, self.config.seq_length])
+
+    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
+                                     input_mask, sequence_labels, token_labels,
+                                     choice_labels):
+        model = SkepModel(**config)
+        model.eval()
+
+        # first forward pass
+        outputs = model(input_ids,
+                        attention_mask=input_mask,
+                        use_cache=True,
+                        return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
+            2]
+
+        # create hypothetical multiple next token and extent to next_input_ids
+        next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2)
+
+        # append to next input_ids and
+        next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
+
+        outputs = model(next_input_ids,
+                        attention_mask=next_attention_mask,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_no_past = outputs[2][0]
+
+        outputs = model(next_tokens,
+                        attention_mask=next_attention_mask,
+                        past_key_values=past_key_values,
+                        output_hidden_states=True,
+                        return_dict=self.parent.return_dict)
+
+        output_from_past = outputs[2][0]
+
+        # select random slice
+        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:,
+                                                        random_slice_idx].detach(
+                                                        )
+        output_from_past_slice = output_from_past[:, :,
+                                                  random_slice_idx].detach()
+
+        self.parent.assertTrue(
+            output_from_past_slice.shape[1] == next_tokens.shape[1])
+
+        # test that outputs are equal for slice
+        self.parent.assertTrue(
+            paddle.allclose(output_from_past_slice,
+                            output_from_no_past_slice,
+                            atol=1e-3))
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -280,6 +333,10 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
         self.model_tester.create_and_check_for_crf_token_classification(
             *config_and_inputs)
 
+    def test_for_model_cache(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_cache(*config_and_inputs)
+
     @slow
     def test_model_from_pretrained(self):
         for model_name in list(
@@ -306,7 +363,7 @@ class SkepModelIntegrationTest(unittest.TestCase):
               [0.20048048, 0.04142965, -0.2655520],
               [0.49883127, -0.15263288, 0.46780178]]])
         self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-5))
+            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
@@ -326,6 +383,44 @@ class SkepModelIntegrationTest(unittest.TestCase):
               [0.49883127, -0.15263288, 0.46780178]]])
         self.assertTrue(
             paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+    @slow
+    def test_inference_with_past_key_value(self):
+        model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
+        model.eval()
+        input_ids = paddle.to_tensor(
+            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
+        with paddle.no_grad():
+            output = model(input_ids,
+                           attention_mask=attention_mask,
+                           use_cache=True,
+                           return_dict=True)
+
+        past_key_value = output.past_key_values[0][0]
+
+        expected_shape = [1, 11, 1024]
+        self.assertEqual(output[0].shape, expected_shape)
+
+        expected_slice = paddle.to_tensor(
+            [[[0.31737363, 0.58842909, 0.43969074],
+              [0.20047806, 0.04142847, -0.26555336],
+              [0.49882850, -0.15263671, 0.46780348]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+
+        # insert the past key value into model
+        with paddle.no_grad():
+            output = model(input_ids,
+                           use_cache=True,
+                           past_key_values=output.past_key_values,
+                           return_dict=True)
+        expected_slice = paddle.to_tensor(
+            [[[0.29901379, 0.68195367, 0.62448436],
+              [0.18537062, 0.33085057, -0.04292759],
+              [0.38783669, -0.19946010, 0.24944240]]])
+        self.assertTrue(
+            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":
