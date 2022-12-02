@@ -2054,7 +2054,7 @@ class TokenizerTesterMixin:
                 text = "σπδ a no inspiration example with subtoken"
                 mappings_1 = tokenizer.get_offset_mapping(text)
 
-                text = "a no inspiration σπδ example with subtoken"
+                text = "a σπδ no inspiration example with subtoken"
                 mappings_2 = tokenizer.get_offset_mapping(text)
                 assert len(mappings_1) == len(mappings_2)
 
