@@ -317,31 +317,38 @@ class DocParser(object):
                 return flat_results[0]
             return flat_results
 
-        def _write_results(results):
+        def _write_results(results, color=None, root=True, parent_centers=None):
             for segment in results:
-                if isinstance(segment, dict):
-                    boxes = segment["bbox"]
-                else:
-                    boxes = segment[0]
+                if "bbox" not in segment.keys():
+                    continue
+                boxes = segment["bbox"]
                 if not isinstance(boxes[0], list):
                     boxes = [boxes]
-                boxes = [
-                    [
-                        (box[0], box[1]),
-                        (box[2], box[1]),
-                        (box[2], box[3]),
-                        (box[0], box[3]),
-                    ]
-                    for box in boxes
-                ]
-                while True:
-                    color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
-                    if sum(color) < 480:
-                        break
+                centers = []
+                plot_boxes = []
                 for box in boxes:
+                    x1, y1, x2, y2 = box
+                    plot_box = [
+                        (x1, y1),
+                        (x2, y1),
+                        (x2, y2),
+                        (x1, y2),
+                    ]
+                    plot_boxes.append(plot_box)
+                    centers.append(((x2 - x1) / 2 + x1, (y2 - y1) / 2 + y1))
+                if root:
+                    while True:
+                        color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                        if sum(color) < 480:
+                            break
+                if parent_centers:
+                    for p_c in parent_centers:
+                        for c in centers:
+                            draw_render.line((p_c[0], p_c[1], c[0], c[1]), fill=125, width=3)
+                for box in plot_boxes:
                     draw_render.polygon(box, fill=color)
                 if isinstance(segment, dict) and segment.get("relations"):
-                    _write_results(segment["relations"])
+                    _write_results(segment["relations"], color, root=False, parent_centers=centers)
 
         random.seed(0)
         _image = self.read_image(image)
@@ -370,7 +377,7 @@ class DocParser(object):
 
         elif results:
             results = _flatten_results(results)
-            _write_results(results)
+            _write_results(results, color=None, root=True)
 
         img_render = Image.blend(_image, img_render, 0.3)
         img_show = Image.new("RGB", (w, h), (255, 255, 255))
@@ -382,12 +389,6 @@ class DocParser(object):
             else:
                 new_size = (max_size, int(h * max_size / w))
             img_show = img_show.resize(new_size)
-
-        data = np.array(img_show)
-        r, g, b = data.T
-        data = np.array([b, g, r])
-        data = data.transpose()
-        img_show = Image.fromarray(data)
 
         if save_path:
             dir_path = os.path.dirname(save_path)
