@@ -25,12 +25,15 @@ from collections import OrderedDict
 import numpy as np
 import paddle
 import paddle.nn as nn
+
 try:
     from paddle.text import ViterbiDecoder
 except:
     raise ImportError(
-        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}"
-        .format(paddle.version.full_version))
+        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".format(
+            paddle.version.full_version
+        )
+    )
 from paddlenlp.layers.crf import LinearChainCrf
 from paddlenlp.utils.tools import compare_version
 
@@ -154,12 +157,12 @@ usage = r"""
 @add_docstrings(usage)
 class WordTagTask(Task):
     """
-    This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag` 
+    This the NER(Named Entity Recognition) task that convert the raw text to entities. And the task with the `wordtag`
     model will link the more meesage with the entity.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
@@ -169,49 +172,51 @@ class WordTagTask(Task):
         "termtree_schema": "termtree_type.csv",
         "termtree_data": "termtree_data",
         "tags": "tags.txt",
-        "spo_config": "spo_config.pkl"
+        "spo_config": "spo_config.pkl",
     }
     resource_files_urls = {
         "wordtag": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.3/model_state.pdparams",
-                "32b4ed27e99d6b2c76e50a24d1a9fd56"
+                "32b4ed27e99d6b2c76e50a24d1a9fd56",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
-                "9dcbd5d6f67792b2a2be058799a144ea"
+                "9dcbd5d6f67792b2a2be058799a144ea",
             ],
             "termtree_schema": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_type.csv",
-                "062cb9ac24f4135bf836e2a2fc5a1209"
+                "062cb9ac24f4135bf836e2a2fc5a1209",
             ],
             "termtree_data": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag/termtree_data",
-                "a0efe723f84cf90540ac727be5b62e59"
+                "a0efe723f84cf90540ac727be5b62e59",
             ],
             "tags": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/tags.txt",
-                "f33feedd01d478b03bac81be19b48d00"
+                "f33feedd01d478b03bac81be19b48d00",
             ],
             "spo_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/spo_config.pkl",
-                "07a0b8d0422198d8c4c0f70e68963275"
-            ]
+                "07a0b8d0422198d8c4c0f70e68963275",
+            ],
         }
     }
 
-    def __init__(self,
-                 model,
-                 task,
-                 params_path=None,
-                 tag_path=None,
-                 term_schema_path=None,
-                 term_data_path=None,
-                 user_dict=None,
-                 linking=True,
-                 spo_config_path=None,
-                 with_ie=False,
-                 **kwargs):
+    def __init__(
+        self,
+        model,
+        task,
+        params_path=None,
+        tag_path=None,
+        term_schema_path=None,
+        term_data_path=None,
+        user_dict=None,
+        linking=True,
+        spo_config_path=None,
+        with_ie=False,
+        **kwargs
+    ):
         super().__init__(model=model, task=task, **kwargs)
         self._tag_path = tag_path
         self._params_path = params_path
@@ -233,19 +238,13 @@ class WordTagTask(Task):
             self._custom.load_customization(self._user_dict)
         else:
             self._custom = None
-        self._num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        self._batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 1
-        self._lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
-        self._max_seq_len = self.kwargs[
-            'max_seq_len'] if 'max_seq_len' in self.kwargs else 512
-        self._split_sentence = self.kwargs[
-            'split_sentence'] if 'split_sentence' in self.kwargs else False
+        self._num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
+        self._batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
+        self._lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
+        self._max_seq_len = self.kwargs["max_seq_len"] if "max_seq_len" in self.kwargs else 512
+        self._split_sentence = self.kwargs["split_sentence"] if "split_sentence" in self.kwargs else False
         if self._with_ie:
-            self._ie_extractor = WordTagRelationExtractor.from_pkl(
-                self._spo_config_path)
+            self._ie_extractor = WordTagRelationExtractor.from_pkl(self._spo_config_path)
 
     @property
     def summary_num(self):
@@ -283,24 +282,18 @@ class WordTagTask(Task):
         """
         if self._tag_path is None:
             self._tag_path = os.path.join(self._task_path, "tags.txt")
-            self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(
-                self._tag_path)
+            self._tags_to_index, self._index_to_tags, self._all_tags = self._load_labels(self._tag_path)
 
         if self._term_schema_path is None:
-            self._term_schema_path = os.path.join(self._task_path,
-                                                  "termtree_type.csv")
+            self._term_schema_path = os.path.join(self._task_path, "termtree_type.csv")
         if self._term_data_path is None:
-            self._term_data_path = os.path.join(self._task_path,
-                                                "termtree_data")
+            self._term_data_path = os.path.join(self._task_path, "termtree_data")
 
         if self._linking is True:
-            self._termtree = TermTree.from_dir(self._term_schema_path,
-                                               self._term_data_path,
-                                               self._linking)
+            self._termtree = TermTree.from_dir(self._term_schema_path, self._term_data_path, self._linking)
 
         if self._spo_config_path is None:
-            self._spo_config_path = os.path.join(self._task_path,
-                                                 "spo_config.pkl")
+            self._spo_config_path = os.path.join(self._task_path, "spo_config.pkl")
 
     def _preprocess_text(self, input_texts):
         """
@@ -316,46 +309,41 @@ class WordTagTask(Task):
         input_texts = filter_input_texts
 
         short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len, split_sentence=self._split_sentence)
+            input_texts, max_predict_len, split_sentence=self._split_sentence
+        )
 
         def read(inputs):
             for text in inputs:
-                tokenized_output = self._tokenizer(list(text),
-                                                   return_length=True,
-                                                   is_split_into_words=True,
-                                                   max_length=self._max_seq_len)
-                yield tokenized_output['input_ids'], tokenized_output[
-                    'token_type_ids'], tokenized_output['seq_len']
+                tokenized_output = self._tokenizer(
+                    list(text), return_length=True, is_split_into_words=True, max_length=self._max_seq_len
+                )
+                yield tokenized_output["input_ids"], tokenized_output["token_type_ids"], tokenized_output["seq_len"]
 
-        infer_ds = load_dataset(read,
-                                inputs=short_input_texts,
-                                lazy=self._lazy_load)
+        infer_ds = load_dataset(read, inputs=short_input_texts, lazy=self._lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
-                ),  # input_ids
-            Pad(axis=0,
-                pad_val=self._tokenizer.pad_token_type_id,
-                dtype='int64'),  # token_type_ids
-            Stack(dtype='int64'),  # seq_len
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+            Stack(dtype="int64"),  # seq_len
         ): fn(samples)
 
-        infer_data_loader = paddle.io.DataLoader(infer_ds,
-                                                 collate_fn=batchify_fn,
-                                                 num_workers=self._num_workers,
-                                                 batch_size=self._batch_size,
-                                                 shuffle=False,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            infer_ds,
+            collate_fn=batchify_fn,
+            num_workers=self._num_workers,
+            batch_size=self._batch_size,
+            shuffle=False,
+            return_list=True,
+        )
 
         outputs = {}
-        outputs['data_loader'] = infer_data_loader
-        outputs['short_input_texts'] = short_input_texts
+        outputs["data_loader"] = infer_data_loader
+        outputs["short_input_texts"] = short_input_texts
         return outputs
 
     def _reset_offset(self, pred_words):
         for i in range(0, len(pred_words)):
             if i > 0:
-                pred_words[i]["offset"] = pred_words[i - 1]["offset"] + len(
-                    pred_words[i - 1]["item"])
+                pred_words[i]["offset"] = pred_words[i - 1]["offset"] + len(pred_words[i - 1]["item"])
             pred_words[i]["length"] = len(pred_words[i]["item"])
         return pred_words
 
@@ -363,8 +351,7 @@ class WordTagTask(Task):
         batch_results = []
         for sent_index in range(len(batch_texts)):
             sent = batch_texts[sent_index]
-            indexes = batch_pred_tags[sent_index][self.summary_num:len(sent) +
-                                                  self.summary_num]
+            indexes = batch_pred_tags[sent_index][self.summary_num : len(sent) + self.summary_num]
             tags = [self._index_to_tags[index] for index in indexes]
             if self._custom:
                 self._custom.parse_customization(sent, tags, prefix=True)
@@ -374,12 +361,11 @@ class WordTagTask(Task):
             for ind, tag in enumerate(tags):
                 if partial_word == "":
                     partial_word = sent[ind]
-                    tags_out.append(tag.split('-')[-1])
+                    tags_out.append(tag.split("-")[-1])
                     continue
-                if tag.startswith("B") or tag.startswith("S") or tag.startswith(
-                        "O"):
+                if tag.startswith("B") or tag.startswith("S") or tag.startswith("O"):
                     sent_out.append(partial_word)
-                    tags_out.append(tag.split('-')[-1])
+                    tags_out.append(tag.split("-")[-1])
                     partial_word = sent[ind]
                     continue
                 partial_word += sent[ind]
@@ -415,26 +401,23 @@ class WordTagTask(Task):
                 if len(target_type_) == 2:
                     target_src = target_type_[1]
                 target_type = target_type_[0]
-                flag, term_id = self._termtree.find_term(
-                    item["item"], target_type)
+                flag, term_id = self._termtree.find_term(item["item"], target_type)
                 if flag is False:
                     continue
-                term_id = list(
-                    filter(lambda d: self._termtree[d].node_type == "term",
-                           term_id))
+                term_id = list(filter(lambda d: self._termtree[d].node_type == "term", term_id))
                 if len(term_id) == 0:
                     continue
                 if target_src is not None:
-                    term_id = list(
-                        filter(
-                            lambda d: self._termtree[d].base.startswith(
-                                target_src.lower()), term_id))
+                    term_id = list(filter(lambda d: self._termtree[d].base.startswith(target_src.lower()), term_id))
                     if len(term_id) == 0:
                         continue
-                term_id.sort(key=lambda d: (self._termtree[
-                    d].termtype == target_type or target_type in self._termtree[
-                        d].subtype, self._termtree[d].term == item["item"]),
-                             reverse=True)
+                term_id.sort(
+                    key=lambda d: (
+                        self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype,
+                        self._termtree[d].term == item["item"],
+                    ),
+                    reverse=True,
+                )
                 item["termid"] = term_id[0]
 
     def _construct_input_spec(self):
@@ -442,22 +425,16 @@ class WordTagTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="token_type_ids"),  # token_type_ids
-            paddle.static.InputSpec(shape=[None], dtype="int64",
-                                    name="seq_len"),  # seq_len
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(shape=[None], dtype="int64", name="seq_len"),  # seq_len
         ]
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ErnieCtmWordtagModel.from_pretrained(
-            self._task_path, num_tag=len(self._tags_to_index))
+        model_instance = ErnieCtmWordtagModel.from_pretrained(self._task_path, num_tag=len(self._tags_to_index))
         if self._params_path is not None:
             state_dict = paddle.load(self._params_path)
             model_instance.set_dict(state_dict)
@@ -483,10 +460,10 @@ class WordTagTask(Task):
 
     def _run_model(self, inputs):
         """
-        Run the task model from the outputs of the `_tokenize` function. 
+        Run the task model from the outputs of the `_tokenize` function.
         """
         all_pred_tags = []
-        for batch in inputs['data_loader']:
+        for batch in inputs["data_loader"]:
             input_ids, token_type_ids, seq_len = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
@@ -494,27 +471,26 @@ class WordTagTask(Task):
             self.predictor.run()
             pred_tags = self.output_handle[0].copy_to_cpu()
             all_pred_tags.extend(pred_tags.tolist())
-        inputs['all_pred_tags'] = all_pred_tags
+        inputs["all_pred_tags"] = all_pred_tags
         return inputs
 
     def _postprocess(self, inputs):
         """
         The model output is the tag ids, this function will convert the model output to raw text.
         """
-        results = self._decode(inputs['short_input_texts'],
-                               inputs['all_pred_tags'])
+        results = self._decode(inputs["short_input_texts"], inputs["all_pred_tags"])
         results = self._auto_joiner(results, self.input_mapping, is_dict=True)
         for result in results:
-            pred_words = result['items']
+            pred_words = result["items"]
             pred_words = self._reset_offset(pred_words)
-            result['items'] = pred_words
+            result["items"] = pred_words
         if self.linking is True:
             for res in results:
                 self._term_linking(res)
         if self._with_ie:
             ie_results = []
             for result in results:
-                spo_result = self._ie_extractor.extract_spo(result['items'])
+                spo_result = self._ie_extractor.extract_spo(result["items"])
                 ie_results.append(spo_result)
             return [results, ie_results]
         return results
@@ -522,7 +498,7 @@ class WordTagTask(Task):
     def set_schema(self, schema):
         """User define the schema for the information extraction.
         Args:
-            schema (List[ Dict[str, Any]]): Dictionary data contain all k-v data. 
+            schema (List[ Dict[str, Any]]): Dictionary data contain all k-v data.
         """
         self._ie_extractor = WordTagRelationExtractor.from_dict(schema)
 
@@ -547,26 +523,20 @@ class NPTagTask(Task):
         "nptag": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_state.pdparams",
-                "05ed1906b42126d3e04b4ac5c210b010"
+                "05ed1906b42126d3e04b4ac5c210b010",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_config.json",
-                "17c9e5216abfc9bd94c7586574a3cbc4"
+                "17c9e5216abfc9bd94c7586574a3cbc4",
             ],
             "name_category_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/name_category_map.json",
-                "c60810205993d307d919a26a3b96786f"
+                "c60810205993d307d919a26a3b96786f",
             ],
         }
     }
 
-    def __init__(self,
-                 task,
-                 model,
-                 batch_size=1,
-                 max_seq_len=64,
-                 linking=False,
-                 **kwargs):
+    def __init__(self, task, model, batch_size=1, max_seq_len=64, linking=False, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._usage = usage
         self._batch_size = batch_size
@@ -605,10 +575,8 @@ class NPTagTask(Task):
                 if c not in self._cls_vocabs:
                     self._cls_vocabs[c] = len(self._cls_vocabs)
         self._cls_vocabs["[PAD]"] = len(self._cls_vocabs)
-        self._id_vocabs = dict(
-            zip(self._cls_vocabs.values(), self._cls_vocabs.keys()))
-        self._vocab_ids = self._tokenizer.vocab.to_indices(
-            list(self._cls_vocabs.keys()))
+        self._id_vocabs = dict(zip(self._cls_vocabs.values(), self._cls_vocabs.keys()))
+        self._vocab_ids = self._tokenizer.vocab.to_indices(list(self._cls_vocabs.keys()))
 
     def _decode(self, pred_ids):
         tokens = [self._id_vocabs[i] for i in pred_ids]
@@ -624,9 +592,9 @@ class NPTagTask(Task):
             return [(path, score)]
         res = []
         for i in range(len(pred_ids_can[0])):
-            tmp_res = self._search(scores_can, pred_ids_can, depth + 1,
-                                   path + [pred_ids_can[depth][i]],
-                                   score + scores_can[depth][i])
+            tmp_res = self._search(
+                scores_can, pred_ids_can, depth + 1, path + [pred_ids_can[depth][i]], score + scores_can[depth][i]
+            )
             res.extend(tmp_res)
         return res
 
@@ -648,14 +616,9 @@ class NPTagTask(Task):
         if sorted:
             sorted_indices_in_topk = np.argsort(topk_values, axis=axis)
             if largest:
-                sorted_indices_in_topk = np.flip(sorted_indices_in_topk,
-                                                 axis=axis)
-            sorted_topk_values = np.take_along_axis(topk_values,
-                                                    sorted_indices_in_topk,
-                                                    axis=axis)
-            sorted_topk_indices = np.take_along_axis(topk_indices,
-                                                     sorted_indices_in_topk,
-                                                     axis=axis)
+                sorted_indices_in_topk = np.flip(sorted_indices_in_topk, axis=axis)
+            sorted_topk_values = np.take_along_axis(topk_values, sorted_indices_in_topk, axis=axis)
+            sorted_topk_indices = np.take_along_axis(topk_indices, sorted_indices_in_topk, axis=axis)
             return sorted_topk_values, sorted_topk_indices
         return topk_values, topk_indices
 
@@ -664,12 +627,8 @@ class NPTagTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="input_ids"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name="token_type_ids"),  # token_type_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),  # token_type_ids
         ]
 
     def _construct_model(self, model):
@@ -693,106 +652,97 @@ class NPTagTask(Task):
         """
         inputs = self._check_input_text(inputs)
         self._max_cls_len = 5
-        num_workers = self.kwargs[
-            'num_workers'] if 'num_workers' in self.kwargs else 0
-        lazy_load = self.kwargs[
-            'lazy_load'] if 'lazy_load' in self.kwargs else False
+        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
+        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
 
         # Prompt template: input_text + "是" + "[MASK]" * cls_seq_length
         prompt_template = ["是"] + ["[MASK]"] * self._max_cls_len
 
         def read(inputs):
             for text in inputs:
-                if len(
-                        text
-                ) + self._max_cls_len + 1 + self._summary_num + 1 > self._max_seq_len:
-                    text = text[:(
-                        self._max_seq_len -
-                        (self._max_cls_len + 1 + self._summary_num + 1))]
+                if len(text) + self._max_cls_len + 1 + self._summary_num + 1 > self._max_seq_len:
+                    text = text[: (self._max_seq_len - (self._max_cls_len + 1 + self._summary_num + 1))]
 
                 tokens = list(text) + prompt_template
-                tokenized_output = self._tokenizer(tokens,
-                                                   return_length=True,
-                                                   is_split_into_words=True,
-                                                   max_length=self._max_seq_len)
+                tokenized_output = self._tokenizer(
+                    tokens, return_length=True, is_split_into_words=True, max_length=self._max_seq_len
+                )
                 label_indices = list(
-                    range(tokenized_output["seq_len"] - 1 - self._max_cls_len,
-                          tokenized_output["seq_len"] - 1))
+                    range(tokenized_output["seq_len"] - 1 - self._max_cls_len, tokenized_output["seq_len"] - 1)
+                )
 
-                yield tokenized_output["input_ids"], tokenized_output[
-                    "token_type_ids"], label_indices
+                yield tokenized_output["input_ids"], tokenized_output["token_type_ids"], label_indices
 
         infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype='int64'
-                ),  # input_ids
-            Pad(axis=0,
-                pad_val=self._tokenizer.pad_token_type_id,
-                dtype='int64'),  # token_type_ids
-            Stack(dtype='int64'),  # label_indices
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+            Stack(dtype="int64"),  # label_indices
         ): fn(samples)
 
-        infer_data_loader = paddle.io.DataLoader(infer_ds,
-                                                 collate_fn=batchify_fn,
-                                                 num_workers=num_workers,
-                                                 batch_size=self._batch_size,
-                                                 shuffle=False,
-                                                 return_list=True)
+        infer_data_loader = paddle.io.DataLoader(
+            infer_ds,
+            collate_fn=batchify_fn,
+            num_workers=num_workers,
+            batch_size=self._batch_size,
+            shuffle=False,
+            return_list=True,
+        )
 
         outputs = {}
-        outputs['data_loader'] = infer_data_loader
-        outputs['texts'] = inputs
+        outputs["data_loader"] = infer_data_loader
+        outputs["texts"] = inputs
         return outputs
 
     def _run_model(self, inputs):
         all_scores_can = []
         all_preds_can = []
         pred_ids = []
-        for batch in inputs['data_loader']:
+        for batch in inputs["data_loader"]:
             input_ids, token_type_ids, label_indices = batch
             self.input_handles[0].copy_from_cpu(input_ids.numpy())
             self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.predictor.run()
             logits = self.output_handle[0].copy_to_cpu()
             for i, l in zip(label_indices, logits):
-                score = l[i[0]:i[-1] + 1, self._vocab_ids]
+                score = l[i[0] : i[-1] + 1, self._vocab_ids]
                 # Find topk candidates of scores and predicted indices.
                 score_can, pred_id_can = self._find_topk(score, k=4, axis=-1)
 
                 all_scores_can.extend([score_can.tolist()])
                 all_preds_can.extend([pred_id_can.tolist()])
                 pred_ids.extend([pred_id_can[:, 0].tolist()])
-        inputs['all_scores_can'] = all_scores_can
-        inputs['all_preds_can'] = all_preds_can
-        inputs['pred_ids'] = pred_ids
+        inputs["all_scores_can"] = all_scores_can
+        inputs["all_preds_can"] = all_preds_can
+        inputs["pred_ids"] = pred_ids
         return inputs
 
     def _postprocess(self, inputs):
         results = []
 
-        for i in range(len(inputs['texts'])):
-            cls_label = self._decode(inputs['pred_ids'][i])
+        for i in range(len(inputs["texts"])):
+            cls_label = self._decode(inputs["pred_ids"][i])
             result = {
-                'text': inputs['texts'][i],
-                'label': cls_label,
+                "text": inputs["texts"][i],
+                "label": cls_label,
             }
             if cls_label not in self._name_dict:
-                scores_can = inputs['all_scores_can'][i]
-                pred_ids_can = inputs['all_preds_can'][i]
+                scores_can = inputs["all_scores_can"][i]
+                pred_ids_can = inputs["all_preds_can"][i]
                 labels_can = self._search(scores_can, pred_ids_can, 0, [], 0)
                 labels_can.sort(key=lambda d: -d[1])
                 for labels in labels_can:
                     cls_label_can = self._decode(labels[0])
                     if cls_label_can in self._name_dict:
-                        result['label'] = cls_label_can
+                        result["label"] = cls_label_can
                         break
                 else:
                     labels_can = self._tree.search_similar_word(cls_label)
                     if len(labels_can) != 0:
-                        result['label'] = labels_can[0][0]
+                        result["label"] = labels_can[0][0]
                         break
             if self._linking:
-                if result['label'] in self._name_dict:
-                    result['category'] = self._name_dict[result['label']]
+                if result["label"] in self._name_dict:
+                    result["category"] = self._name_dict[result["label"]]
             results.append(result)
         return results

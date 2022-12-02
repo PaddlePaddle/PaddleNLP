@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''
+"""
 This code is rewritten by Paddle based on
 https://github.com/openai/guided-diffusion/blob/main/guided_diffusion/unet.py
-'''
+"""
 import math
 from abc import abstractmethod
 
@@ -24,7 +24,6 @@ import paddle.nn.functional as F
 
 
 class GroupNorm32(nn.GroupNorm):
-
     def forward(self, x):
         return super().forward(x)
 
@@ -121,14 +120,11 @@ def timestep_embedding(timesteps, dim, max_period=10000):
     :return: an [N x dim] Tensor of positional embeddings.
     """
     half = dim // 2
-    freqs = paddle.exp(-math.log(max_period) *
-                       paddle.arange(start=0, end=half, dtype=paddle.float32) /
-                       half)
-    args = paddle.cast(timesteps[:, None], 'float32') * freqs[None]
+    freqs = paddle.exp(-math.log(max_period) * paddle.arange(start=0, end=half, dtype=paddle.float32) / half)
+    args = paddle.cast(timesteps[:, None], "float32") * freqs[None]
     embedding = paddle.concat([paddle.cos(args), paddle.sin(args)], axis=-1)
     if dim % 2:
-        embedding = paddle.concat(
-            [embedding, paddle.zeros_like(embedding[:, :1])], axis=-1)
+        embedding = paddle.concat([embedding, paddle.zeros_like(embedding[:, :1])], axis=-1)
     return embedding
 
 
@@ -146,7 +142,8 @@ class AttentionPool2d(nn.Layer):
     ):
         super().__init__()
         self.positional_embedding = self.create_parameter(
-            paddle.randn(embed_dim, spacial_dim**2 + 1) / embed_dim**0.5)
+            paddle.randn(embed_dim, spacial_dim**2 + 1) / embed_dim**0.5
+        )
         self.qkv_proj = conv_nd(1, embed_dim, 3 * embed_dim, 1)
         self.c_proj = conv_nd(1, embed_dim, output_dim or embed_dim, 1)
         self.num_heads = embed_dim // num_heads_channels
@@ -155,10 +152,8 @@ class AttentionPool2d(nn.Layer):
     def forward(self, x):
         b, c = x.shape[:2]
         x = paddle.reshape(x, [b, c, -1])
-        x = paddle.concat([x.mean(dim=-1, keepdim=True), x],
-                          axis=-1)  # NC(HW+1)
-        x = x + paddle.cast(self.positional_embedding[None, :, :],
-                            x.dtype)  # NC(HW+1)
+        x = paddle.concat([x.mean(dim=-1, keepdim=True), x], axis=-1)  # NC(HW+1)
+        x = x + paddle.cast(self.positional_embedding[None, :, :], x.dtype)  # NC(HW+1)
         x = self.qkv_proj(x)
         x = self.attention(x)
         x = self.c_proj(x)
@@ -209,17 +204,12 @@ class Upsample(nn.Layer):
         self.use_conv = use_conv
         self.dims = dims
         if use_conv:
-            self.conv = conv_nd(dims,
-                                self.channels,
-                                self.out_channels,
-                                3,
-                                padding=1)
+            self.conv = conv_nd(dims, self.channels, self.out_channels, 3, padding=1)
 
     def forward(self, x):
         assert x.shape[1] == self.channels
         if self.dims == 3:
-            x = F.interpolate(x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2),
-                              mode="nearest")
+            x = F.interpolate(x, (x.shape[2], x.shape[3] * 2, x.shape[4] * 2), mode="nearest")
         else:
             x = F.interpolate(x, scale_factor=2, mode="nearest")
         if self.use_conv:
@@ -245,12 +235,7 @@ class Downsample(nn.Layer):
         self.dims = dims
         stride = 2 if dims != 3 else (1, 2, 2)
         if use_conv:
-            self.op = conv_nd(dims,
-                              self.channels,
-                              self.out_channels,
-                              3,
-                              stride=stride,
-                              padding=1)
+            self.op = conv_nd(dims, self.channels, self.out_channels, 3, stride=stride, padding=1)
         else:
             assert self.channels == self.out_channels
             self.op = avg_pool_nd(dims, kernel_size=stride, stride=stride)
@@ -317,30 +302,20 @@ class ResBlock(TimestepBlock):
             nn.Silu(),
             linear(
                 emb_channels,
-                2 * self.out_channels
-                if use_scale_shift_norm else self.out_channels,
+                2 * self.out_channels if use_scale_shift_norm else self.out_channels,
             ),
         )
         self.out_layers = nn.Sequential(
             normalization(self.out_channels),
             nn.Silu(),
             nn.Dropout(p=dropout),
-            zero_module(
-                conv_nd(dims,
-                        self.out_channels,
-                        self.out_channels,
-                        3,
-                        padding=1)),
+            zero_module(conv_nd(dims, self.out_channels, self.out_channels, 3, padding=1)),
         )
 
         if self.out_channels == channels:
             self.skip_connection = nn.Identity()
         elif use_conv:
-            self.skip_connection = conv_nd(dims,
-                                           channels,
-                                           self.out_channels,
-                                           3,
-                                           padding=1)
+            self.skip_connection = conv_nd(dims, channels, self.out_channels, 3, padding=1)
         else:
             self.skip_connection = conv_nd(dims, channels, self.out_channels, 1)
 
@@ -439,14 +414,10 @@ class QKVAttentionLegacy(nn.Layer):
         bs, width, length = qkv.shape
         assert width % (3 * self.n_heads) == 0
         ch = width // (3 * self.n_heads)
-        q, k, v = paddle.reshape(
-            qkv, [bs * self.n_heads, ch * 3, length]).split(3, axis=1)
+        q, k, v = paddle.reshape(qkv, [bs * self.n_heads, ch * 3, length]).split(3, axis=1)
         scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = paddle.einsum(
-            "bct,bcs->bts", q * scale,
-            k * scale)  # More stable with f16 than dividing afterwards
-        weight = paddle.cast(F.softmax(paddle.cast(weight, 'float32'), axis=-1),
-                             weight.dtype)
+        weight = paddle.einsum("bct,bcs->bts", q * scale, k * scale)  # More stable with f16 than dividing afterwards
+        weight = paddle.cast(F.softmax(paddle.cast(weight, "float32"), axis=-1), weight.dtype)
         a = paddle.einsum("bts,bcs->bct", weight, v)
 
         return paddle.reshape(a, [bs, -1, length])
@@ -478,10 +449,8 @@ class QKVAttention(nn.Layer):
             (q * scale).view(bs * self.n_heads, ch, length),
             (k * scale).view(bs * self.n_heads, ch, length),
         )  # More stable with f16 than dividing afterwards
-        weight = paddle.cast(F.softmax(paddle.cast(weight, 'float32'), axis=-1),
-                             weight.dtype)
-        a = paddle.einsum("bts,bcs->bct", weight,
-                          v.reshape(bs * self.n_heads, ch, length))
+        weight = paddle.cast(F.softmax(paddle.cast(weight, "float32"), axis=-1), weight.dtype)
+        a = paddle.einsum("bts,bcs->bct", weight, v.reshape(bs * self.n_heads, ch, length))
         return paddle.reshape(a, [bs, -1, length])
 
 
@@ -567,10 +536,7 @@ class UNetModel(nn.Layer):
             self.label_emb = nn.Embedding(num_classes, time_embed_dim)
 
         ch = input_ch = int(channel_mult[0] * model_channels)
-        self.input_blocks = nn.LayerList([
-            TimestepEmbedSequential(conv_nd(dims, in_channels, ch, 3,
-                                            padding=1))
-        ])
+        self.input_blocks = nn.LayerList([TimestepEmbedSequential(conv_nd(dims, in_channels, ch, 3, padding=1))])
         self._feature_size = ch
         input_block_chans = [ch]
         ds = 1
@@ -594,7 +560,8 @@ class UNetModel(nn.Layer):
                             num_heads=num_heads,
                             num_head_channels=num_head_channels,
                             use_new_attention_order=use_new_attention_order,
-                        ))
+                        )
+                    )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
                 input_block_chans.append(ch)
@@ -610,8 +577,11 @@ class UNetModel(nn.Layer):
                             dims=dims,
                             use_scale_shift_norm=use_scale_shift_norm,
                             down=True,
-                        ) if resblock_updown else Downsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch)))
+                        )
+                        if resblock_updown
+                        else Downsample(ch, conv_resample, dims=dims, out_channels=out_ch)
+                    )
+                )
                 ch = out_ch
                 input_block_chans.append(ch)
                 ds *= 2
@@ -663,7 +633,8 @@ class UNetModel(nn.Layer):
                             num_heads=num_heads_upsample,
                             num_head_channels=num_head_channels,
                             use_new_attention_order=use_new_attention_order,
-                        ))
+                        )
+                    )
                 if level and i == num_res_blocks:
                     out_ch = ch
                     layers.append(
@@ -675,8 +646,10 @@ class UNetModel(nn.Layer):
                             dims=dims,
                             use_scale_shift_norm=use_scale_shift_norm,
                             up=True,
-                        ) if resblock_updown else Upsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch))
+                        )
+                        if resblock_updown
+                        else Upsample(ch, conv_resample, dims=dims, out_channels=out_ch)
+                    )
                     ds //= 2
                 self.output_blocks.append(TimestepEmbedSequential(*layers))
                 self._feature_size += ch
@@ -701,10 +674,9 @@ class UNetModel(nn.Layer):
         ), "must specify y if and only if the model is class-conditional"
 
         hs = []
-        emb = self.time_embed(timestep_embedding(timesteps,
-                                                 self.model_channels))
+        emb = self.time_embed(timestep_embedding(timesteps, self.model_channels))
         if self.num_classes is not None:
-            assert y.shape == (x.shape[0], )
+            assert y.shape == (x.shape[0],)
             emb = emb + self.label_emb(y)
 
         h = paddle.cast(x, self.dtype)
@@ -730,7 +702,6 @@ class SuperResModel(UNetModel):
 
     def forward(self, x, timesteps, low_res=None, **kwargs):
         _, _, new_height, new_width = x.shape
-        upsampled = F.interpolate(low_res, (new_height, new_width),
-                                  mode="bilinear")
+        upsampled = F.interpolate(low_res, (new_height, new_width), mode="bilinear")
         x = paddle.concat([x, upsampled], axis=1)
         return super().forward(x, timesteps, **kwargs)

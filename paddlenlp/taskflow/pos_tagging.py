@@ -46,7 +46,7 @@ class POSTaggingTask(LacTask):
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -57,16 +57,13 @@ class POSTaggingTask(LacTask):
         The model output is the tag ids, this function will convert the model output to raw text.
         """
         batch_out = []
-        lengths = inputs['lens']
-        preds = inputs['result']
-        sents = inputs['text']
+        lengths = inputs["lens"]
+        preds = inputs["result"]
+        sents = inputs["text"]
         final_results = []
         for sent_index in range(len(lengths)):
             single_result = {}
-            tags = [
-                self._id2tag_dict[str(index)]
-                for index in preds[sent_index][:lengths[sent_index]]
-            ]
+            tags = [self._id2tag_dict[str(index)] for index in preds[sent_index][: lengths[sent_index]]]
             sent = sents[sent_index]
             if self._custom:
                 self._custom.parse_customization(sent, tags)
@@ -76,11 +73,11 @@ class POSTaggingTask(LacTask):
             for ind, tag in enumerate(tags):
                 if parital_word == "":
                     parital_word = sent[ind]
-                    tags_out.append(tag.split('-')[0])
+                    tags_out.append(tag.split("-")[0])
                     continue
                 if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
                     sent_out.append(parital_word)
-                    tags_out.append(tag.split('-')[0])
+                    tags_out.append(tag.split("-")[0])
                     parital_word = sent[ind]
                     continue
                 parital_word += sent[ind]
@@ -91,6 +88,5 @@ class POSTaggingTask(LacTask):
             result = list(zip(sent_out, tags_out))
             final_results.append(result)
         final_results = self._auto_joiner(final_results, self.input_mapping)
-        final_results = final_results if len(
-            final_results) > 1 else final_results[0]
+        final_results = final_results if len(final_results) > 1 else final_results[0]
         return final_results

@@ -19,12 +19,12 @@ import paddle.nn as nn
 from .. import PretrainedModel, register_base_model
 
 __all__ = [
-    'DistilBertModel',
-    'DistilBertPretrainedModel',
-    'DistilBertForSequenceClassification',
-    'DistilBertForTokenClassification',
-    'DistilBertForQuestionAnswering',
-    'DistilBertForMaskedLM',
+    "DistilBertModel",
+    "DistilBertPretrainedModel",
+    "DistilBertForSequenceClassification",
+    "DistilBertForTokenClassification",
+    "DistilBertForQuestionAnswering",
+    "DistilBertForMaskedLM",
 ]
 
 
@@ -34,16 +34,12 @@ class BertEmbeddings(nn.Layer):
     token_type embeddings.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.0,
-                 max_position_embeddings=512,
-                 type_vocab_size=16):
+    def __init__(
+        self, vocab_size, hidden_size=768, hidden_dropout_prob=0.0, max_position_embeddings=512, type_vocab_size=16
+    ):
         super(BertEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -104,16 +100,14 @@ class DistilBertPretrainedModel(PretrainedModel):
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "distilbert-base-uncased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-uncased.pdparams",
-            "distilbert-base-cased":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-cased.pdparams",
+            "distilbert-base-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-uncased.pdparams",
+            "distilbert-base-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/distilbert/distilbert-base-cased.pdparams",
         }
     }
     base_model_prefix = "distilbert"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -121,10 +115,12 @@ class DistilBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else
-                        self.distilbert.config["initializer_range"],
-                        shape=layer.weight.shape))
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.distilbert.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -187,26 +183,27 @@ class DistilBertModel(DistilBertPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        pad_token_id=0,
+    ):
         super(DistilBertModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = BertEmbeddings(vocab_size, hidden_size,
-                                         hidden_dropout_prob,
-                                         max_position_embeddings,
-                                         type_vocab_size)
+        self.embeddings = BertEmbeddings(
+            vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size
+        )
         encoder_layer = nn.TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -214,12 +211,13 @@ class DistilBertModel(DistilBertPretrainedModel):
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
+            act_dropout=0,
+        )
         self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
-        r'''
+        r"""
         The DistilBertModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -255,13 +253,12 @@ class DistilBertModel(DistilBertPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.encoder.layers[0].norm1.weight.dtype) * -1e4,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.encoder.layers[0].norm1.weight.dtype) * -1e4, axis=[1, 2]
+            )
         embedding_output = self.embeddings(input_ids=input_ids)
         encoder_outputs = self.encoder(embedding_output, attention_mask)
 
@@ -288,13 +285,10 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
         super(DistilBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.distilbert = distilbert  # allow bert to be config
-        self.pre_classifier = nn.Linear(self.distilbert.config["hidden_size"],
-                                        self.distilbert.config["hidden_size"])
+        self.pre_classifier = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["hidden_size"])
         self.activation = nn.ReLU()
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  distilbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.distilbert.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.distilbert.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -328,8 +322,7 @@ class DistilBertForSequenceClassification(DistilBertPretrainedModel):
                 logits = outputs[0]
         """
 
-        distilbert_output = self.distilbert(input_ids=input_ids,
-                                            attention_mask=attention_mask)
+        distilbert_output = self.distilbert(input_ids=input_ids, attention_mask=attention_mask)
 
         pooled_output = distilbert_output[:, 0]
         pooled_output = self.pre_classifier(pooled_output)
@@ -358,8 +351,7 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
     def __init__(self, distilbert, dropout=None):
         super(DistilBertForQuestionAnswering, self).__init__()
         self.distilbert = distilbert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  distilbert.config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.distilbert.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
@@ -404,8 +396,7 @@ class DistilBertForQuestionAnswering(DistilBertPretrainedModel):
                 end_logits  =outputs[1]
         """
 
-        sequence_output = self.distilbert(input_ids,
-                                          attention_mask=attention_mask)
+        sequence_output = self.distilbert(input_ids, attention_mask=attention_mask)
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -433,10 +424,8 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
         super(DistilBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.distilbert = distilbert  # allow bert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  distilbert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.distilbert.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.distilbert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.distilbert.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, attention_mask=None):
@@ -470,8 +459,7 @@ class DistilBertForTokenClassification(DistilBertPretrainedModel):
                 logits = outputs[0]
         """
 
-        sequence_output = self.distilbert(input_ids,
-                                          attention_mask=attention_mask)
+        sequence_output = self.distilbert(input_ids, attention_mask=attention_mask)
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
@@ -490,18 +478,15 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
     def __init__(self, distilbert):
         super(DistilBertForMaskedLM, self).__init__()
         self.distilbert = distilbert
-        self.vocab_transform = nn.Linear(self.distilbert.config["hidden_size"],
-                                         self.distilbert.config["hidden_size"])
+        self.vocab_transform = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["hidden_size"])
         self.activation = nn.GELU()
-        self.vocab_layer_norm = nn.LayerNorm(
-            self.distilbert.config["hidden_size"])
-        self.vocab_projector = nn.Linear(self.distilbert.config["hidden_size"],
-                                         self.distilbert.config["vocab_size"])
+        self.vocab_layer_norm = nn.LayerNorm(self.distilbert.config["hidden_size"])
+        self.vocab_projector = nn.Linear(self.distilbert.config["hidden_size"], self.distilbert.config["vocab_size"])
 
         self.apply(self.init_weights)
 
     def forward(self, input_ids=None, attention_mask=None):
-        r'''
+        r"""
         The DistilBertForMaskedLM forward method, overrides the `__call__()` special method.
 
         Args:
@@ -526,10 +511,9 @@ class DistilBertForMaskedLM(DistilBertPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 prediction_logits = model(**inputs)
-        '''
+        """
 
-        distilbert_output = self.distilbert(input_ids=input_ids,
-                                            attention_mask=attention_mask)
+        distilbert_output = self.distilbert(input_ids=input_ids, attention_mask=attention_mask)
         prediction_logits = self.vocab_transform(distilbert_output)
         prediction_logits = self.activation(prediction_logits)
         prediction_logits = self.vocab_layer_norm(prediction_logits)
