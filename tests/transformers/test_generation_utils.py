@@ -403,7 +403,7 @@ class GenerationTesterMixin:
         # check `generate()` and `greedy_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-            paddle.seed(128)
+            paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
 
@@ -417,7 +417,7 @@ class GenerationTesterMixin:
 
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-            paddle.seed(128)
+            paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
 

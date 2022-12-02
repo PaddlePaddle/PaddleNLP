@@ -124,12 +124,14 @@ from .tinybert.tokenizer import *
 from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
+from .unified_transformer.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
 from .ernie_vil.procesing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
+from .unimo.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
 from .xlnet.converter import *

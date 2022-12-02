@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" BERT model configuration"""
+""" UNIMO model configuration"""
 from __future__ import annotations
 
 from typing import Dict
@@ -265,7 +265,7 @@ class UNIMOConfig(PretrainedConfig):
             Defaults to `3`.
     ```"""
     model_type = "bert"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
+    attribute_map: Dict[str, str] = {}
     pretrained_init_configuration = UNIMO_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
