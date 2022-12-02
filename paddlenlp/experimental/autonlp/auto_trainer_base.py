@@ -153,7 +153,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
             model_candidates = filter(lambda x: x["language"] == language, model_candidates)
         if preset is not None:
             model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
-        hyperopt_search_space = {"config": hp.choice("config", list(model_candidates))}
+        hyperopt_search_space = {"candidates": hp.choice("candidates", list(model_candidates))}
         return hyperopt_search_space
 
     def _get_model_result(self, trial_id=None):

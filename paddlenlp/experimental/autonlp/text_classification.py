@@ -52,7 +52,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         label_column: str,
         metric_for_best_model: str = "eval_accuracy",
         greater_is_better: bool = True,
-        problem_type: str = "multi_label",
+        problem_type: str = "multi_class",
         **kwargs
     ):
 
@@ -131,7 +131,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         def trainable(config):
-            config = config["config"]
+            config = config["candidates"]
             model_path = config["TrainingArguments.model_name_or_path"]
             max_length = config["PreprocessArguments.max_length"]
             tokenizer = AutoTokenizer.from_pretrained(model_path)
@@ -233,7 +233,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def to_taskflow(self, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
-        model_config = model_result.metrics["config"]["config"]
+        model_config = model_result.metrics["config"]["candidates"]
         saved_model_path = os.path.join(model_result.log_dir, "trained_model")
         return Taskflow(
             "text_classification",
