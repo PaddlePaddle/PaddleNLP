@@ -340,7 +340,7 @@ class MBartModel(MBartPretrainedModel):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
-        use_cache=False,
+        use_cache=None,
         cache=None,
         output_attentions=None,
         output_hidden_states=None,
@@ -463,7 +463,7 @@ class MBartModel(MBartPretrainedModel):
 
         if use_cache:
             if cache is None:
-                cache = self.decoder.decoder.gen_cache(encoder_output)
+                cache = self.decoder.decoder.gen_cache(encoder_last_hidden_state)
         else:
             cache = None
         decoder_output = self.decoder(
@@ -546,7 +546,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
-        use_cache=False,
+        use_cache=None,
         cache=None,
         labels=None,
         output_attentions=None,
@@ -682,7 +682,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
-        use_cache=False,
+        use_cache=None,
         cache=None,
         start_positions=None,
         end_positions=None,
@@ -862,7 +862,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
-        use_cache=False,
+        use_cache=None,
         cache=None,
         labels=None,
         output_attentions=None,
