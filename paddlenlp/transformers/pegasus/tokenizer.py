@@ -23,7 +23,7 @@ from .. import PretrainedTokenizer, AddedToken
 from .. import BasicTokenizer, WordpieceTokenizer
 from ..tokenizer_utils import _is_punctuation
 
-__all__ = ['PegasusChineseTokenizer']
+__all__ = ["PegasusChineseTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese": 1024,
@@ -52,13 +52,16 @@ def _is_chinese_char(cp):
     # as is Japanese Hiragana and Katakana. Those alphabets are used to write
     # space-separated words, so they are not treated specially and handled
     # like the all of the other languages.
-    if ((cp >= 0x4E00 and cp <= 0x9FFF) or (cp >= 0x3400 and cp <= 0x4DBF)
-            or (cp >= 0x20000 and cp <= 0x2A6DF)
-            or (cp >= 0x2A700 and cp <= 0x2B73F)
-            or (cp >= 0x2B740 and cp <= 0x2B81F)
-            or (cp >= 0x2B820 and cp <= 0x2CEAF)
-            or (cp >= 0xF900 and cp <= 0xFAFF)
-            or (cp >= 0x2F800 and cp <= 0x2FA1F)):
+    if (
+        (cp >= 0x4E00 and cp <= 0x9FFF)
+        or (cp >= 0x3400 and cp <= 0x4DBF)
+        or (cp >= 0x20000 and cp <= 0x2A6DF)
+        or (cp >= 0x2A700 and cp <= 0x2B73F)
+        or (cp >= 0x2B740 and cp <= 0x2B81F)
+        or (cp >= 0x2B820 and cp <= 0x2CEAF)
+        or (cp >= 0xF900 and cp <= 0xFAFF)
+        or (cp >= 0x2F800 and cp <= 0x2FA1F)
+    ):
         return True
 
     return False
@@ -122,23 +125,25 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 do_basic_tokenize=True,
-                 never_split=None,
-                 pad_token="<pad>",
-                 eos_token="</s>",
-                 unk_token="<unk>",
-                 mask_token="<mask_2>",
-                 mask_token_sent="<mask_1>",
-                 additional_special_tokens=None,
-                 sep_token="[SEP]",
-                 cls_token="[CLS]",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 offset=100,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        do_basic_tokenize=True,
+        never_split=None,
+        pad_token="<pad>",
+        eos_token="</s>",
+        unk_token="<unk>",
+        mask_token="<mask_2>",
+        mask_token_sent="<mask_1>",
+        additional_special_tokens=None,
+        sep_token="[SEP]",
+        cls_token="[CLS]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        offset=100,
+        **kwargs
+    ):
 
         self.offset = offset
 
@@ -146,30 +151,29 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
             if not isinstance(additional_special_tokens, list):
                 raise TypeError(
                     f"additional_special_tokens should be of type {type(list)}, \
-                     but is {type(additional_special_tokens)}")
+                     but is {type(additional_special_tokens)}"
+                )
 
             additional_special_tokens_extended = (
                 ([mask_token_sent] + additional_special_tokens)
-                if mask_token_sent not in additional_special_tokens
-                and mask_token_sent is not None else additional_special_tokens)
+                if mask_token_sent not in additional_special_tokens and mask_token_sent is not None
+                else additional_special_tokens
+            )
 
             # fill additional tokens with ..., <unk_token_102> in case not all additional tokens are already taken
             additional_special_tokens_extended += [
-                f"<unk_{i}>" for i in range(
-                    len(additional_special_tokens_extended), self.offset - 1)
+                f"<unk_{i}>" for i in range(len(additional_special_tokens_extended), self.offset - 1)
             ]
 
-            if len(set(additional_special_tokens_extended)) != len(
-                    additional_special_tokens_extended):
+            if len(set(additional_special_tokens_extended)) != len(additional_special_tokens_extended):
                 raise ValueError(
                     f"Please make sure that the provided additional_special_tokens \
                         do not contain an incorrectly shifted list of <unk_x> tokens. \
-                        Found {additional_special_tokens_extended}.")
+                        Found {additional_special_tokens_extended}."
+                )
             additional_special_tokens = additional_special_tokens_extended
         else:
-            additional_special_tokens = [
-                mask_token_sent
-            ] if mask_token_sent is not None else []
+            additional_special_tokens = [mask_token_sent] if mask_token_sent is not None else []
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
@@ -207,9 +211,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
             self.vocab[self.mask_token] = self.vocab.pop("[unused3]")
             self.vocab[self.mask_token_sent] = self.vocab.pop("[unused2]")
 
-        self.ids_to_tokens = collections.OrderedDict([
-            (ids, tok) for tok, ids in self.vocab.items()
-        ])
+        self.ids_to_tokens = collections.OrderedDict([(ids, tok) for tok, ids in self.vocab.items()])
         self.do_basic_tokenize = do_basic_tokenize
         if do_basic_tokenize:
             self.basic_tokenizer = BasicTokenizer(
@@ -218,8 +220,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
                 tokenize_chinese_chars=tokenize_chinese_chars,
                 strip_accents=strip_accents,
             )
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=self.unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=self.unk_token)
 
     @property
     def do_lower_case(self):
@@ -239,15 +240,13 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
                 split_tokens.append(text)
             else:
                 if self.do_basic_tokenize:
-                    for token in self.basic_tokenizer.tokenize(
-                            text, never_split=self.all_special_tokens):
+                    for token in self.basic_tokenizer.tokenize(text, never_split=self.all_special_tokens):
 
                         # If the token is part of the never_split set
                         if token in self.basic_tokenizer.never_split:
                             split_tokens.append(token)
                         else:
-                            split_tokens += self.wordpiece_tokenizer.tokenize(
-                                token)
+                            split_tokens += self.wordpiece_tokenizer.tokenize(token)
                 else:
                     split_tokens = self.wordpiece_tokenizer.tokenize(text)
         return split_tokens
@@ -262,11 +261,11 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
 
     @staticmethod
     def _cjk_punctuation():
-        return u'\uff02\uff03\uff04\uff05\uff06\uff07\uff08\uff09\uff0a\uff0b\uff0c\uff0d\uff0f\uff1a\uff1b\uff1c\uff1d\
+        return "\uff02\uff03\uff04\uff05\uff06\uff07\uff08\uff09\uff0a\uff0b\uff0c\uff0d\uff0f\uff1a\uff1b\uff1c\uff1d\
             \uff1e\uff20\uff3b\uff3c\uff3d\uff3e\uff3f\uff40\uff5b\uff5c\uff5d\uff5e\uff5f\uff60\uff62\
             \uff63\uff64\u3000\u3001\u3003\u3008\u3009\u300a\u300b\u300c\u300d\u300e\u300f\u3010\u3011\u3014\
             \u3015\u3016\u3017\u3018\u3019\u301a\u301b\u301c\u301d\u301e\u301f\u3030\u303e\u303f\u2013\u2014\
-            \u2018\u2019\u201b\u201c\u201d\u201e\u201f\u2026\u2027\ufe4f\ufe51\ufe54\u00b7\uff01\uff1f\uff61\u3002'
+            \u2018\u2019\u201b\u201c\u201d\u201e\u201f\u2026\u2027\ufe4f\ufe51\ufe54\u00b7\uff01\uff1f\uff61\u3002"
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens):
         """
@@ -302,31 +301,30 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         # tokens = tokens or self.ids_to_tokens(ids)
         # tokens = [token for token in tokens if not self._is_special(token)]
 
-        text = ''
+        text = ""
         for i, token in enumerate(tokens):
-            if token[:2] == '##':
+            if token[:2] == "##":
                 text += token[2:]
             elif len(token) == 1 and _is_chinese_char(ord(token)):
                 text += token
             elif len(token) == 1 and _is_punctuation(token):
                 text += token
-                text += ' '
+                text += " "
             elif i > 0 and _is_chinese_char(ord(text[-1])):
                 text += token
             elif tokens == "</s>":
                 continue
             else:
-                text += ' '
+                text += " "
                 text += token
 
-        text = re.sub(' +', ' ', text)
-        text = re.sub('\' (re|m|s|t|ve|d|ll) ', '\'\\1 ', text)
-        punctuation = re.sub(' +', '',
-                             self._cjk_punctuation()).strip() + '+-/={(<['
-        punctuation_regex = '|'.join([re.escape(p) for p in punctuation])
-        punctuation_regex = '(%s) ' % punctuation_regex
-        text = re.sub(punctuation_regex, '\\1', text)
-        text = re.sub(r'(\d\.) (\d)', '\\1\\2', text)
+        text = re.sub(" +", " ", text)
+        text = re.sub("' (re|m|s|t|ve|d|ll) ", "'\\1 ", text)
+        punctuation = re.sub(" +", "", self._cjk_punctuation()).strip() + "+-/={(<["
+        punctuation_regex = "|".join([re.escape(p) for p in punctuation])
+        punctuation_regex = "(%s) " % punctuation_regex
+        text = re.sub(punctuation_regex, "\\1", text)
+        text = re.sub(r"(\d\.) (\d)", "\\1\\2", text)
 
         return text.strip()
 
@@ -340,16 +338,12 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         return token_ids_0 + token_ids_1 + [self.eos_token_id]
 
     def _special_token_mask(self, seq):
-        all_special_ids = set(
-            self.all_special_ids)  # call it once instead of inside list comp
+        all_special_ids = set(self.all_special_ids)  # call it once instead of inside list comp
         # all_special_ids.remove(self.unk_token_id)  # <unk> is only sometimes special
 
         return [1 if x in all_special_ids else 0 for x in seq]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is
         called when adding special tokens using the tokenizer ``encode`` methods.
@@ -359,8 +353,7 @@ class PegasusChineseTokenizer(PretrainedTokenizer):
         elif token_ids_1 is None:
             return self._special_token_mask(token_ids_0) + [self.eos_token_id]
         else:
-            return self._special_token_mask(token_ids_0 +
-                                            token_ids_1) + [self.eos_token_id]
+            return self._special_token_mask(token_ids_0 + token_ids_1) + [self.eos_token_id]
 
     def num_special_tokens_to_add(self, pair=False):
         """Just EOS"""

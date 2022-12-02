@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''
+"""
 This code is rewritten by Paddle based on
 https://github.com/pytorch/vision/blob/main/torchvision/transforms/transforms.py
-'''
+"""
 import math
 import numbers
 import warnings
@@ -27,7 +27,6 @@ from paddle.nn.functional import grid_sample
 
 
 class Normalize(nn.Layer):
-
     def __init__(self, mean, std):
         super(Normalize, self).__init__()
         self.mean = paddle.to_tensor(mean)
@@ -56,14 +55,12 @@ class InterpolationMode(Enum):
 
 
 class Grayscale(nn.Layer):
-
     def __init__(self, num_output_channels):
         super(Grayscale, self).__init__()
         self.num_output_channels = num_output_channels
 
     def forward(self, x):
-        output = (0.2989 * x[:, 0:1, :, :] + 0.587 * x[:, 1:2, :, :] +
-                  0.114 * x[:, 2:3, :, :])
+        output = 0.2989 * x[:, 0:1, :, :] + 0.587 * x[:, 1:2, :, :] + 0.114 * x[:, 2:3, :, :]
         if self.num_output_channels == 3:
             return output.expand(x.shape)
 
@@ -71,7 +68,6 @@ class Grayscale(nn.Layer):
 
 
 class Lambda(nn.Layer):
-
     def __init__(self, func):
         super(Lambda, self).__init__()
         self.transform = func
@@ -81,7 +77,6 @@ class Lambda(nn.Layer):
 
 
 class RandomGrayscale(nn.Layer):
-
     def __init__(self, p):
         super(RandomGrayscale, self).__init__()
         self.prob = p
@@ -95,7 +90,6 @@ class RandomGrayscale(nn.Layer):
 
 
 class RandomHorizontalFlip(nn.Layer):
-
     def __init__(self, prob):
         super(RandomHorizontalFlip, self).__init__()
         self.prob = prob
@@ -157,9 +151,9 @@ def _rgb2hsv(img):
     gc = (maxc - g) / cr_divisor
     bc = (maxc - b) / cr_divisor
 
-    hr = (maxc == r).cast('float32') * (bc - gc)
-    hg = ((maxc == g) & (maxc != r)).cast('float32') * (2.0 + rc - bc)
-    hb = ((maxc != g) & (maxc != r)).cast('float32') * (4.0 + gc - rc)
+    hr = (maxc == r).cast("float32") * (bc - gc)
+    hg = ((maxc == g) & (maxc != r)).cast("float32") * (2.0 + rc - bc)
+    hb = ((maxc != g) & (maxc != r)).cast("float32") * (4.0 + gc - rc)
     h = hr + hg + hb
     h = fmod((h / 6.0 + 1.0), paddle.to_tensor(1.0))
     return paddle.stack((h, s, maxc), axis=-3)
@@ -169,7 +163,7 @@ def _hsv2rgb(img):
     h, s, v = img.unbind(axis=-3)
     i = paddle.floor(h * 6.0)
     f = (h * 6.0) - i
-    i = i.cast(dtype='int32')
+    i = i.cast(dtype="int32")
 
     p = paddle.clip((v * (1.0 - s)), 0.0, 1.0)
     q = paddle.clip((v * (1.0 - s * f)), 0.0, 1.0)
@@ -183,28 +177,24 @@ def _hsv2rgb(img):
     a3 = paddle.stack((p, p, t, v, v, q), axis=-3)
     a4 = paddle.stack((a1, a2, a3), axis=-4)
 
-    return paddle.einsum("...ijk, ...xijk -> ...xjk",
-                         mask.cast(dtype=img.dtype), a4)
+    return paddle.einsum("...ijk, ...xijk -> ...xjk", mask.cast(dtype=img.dtype), a4)
 
 
 def adjust_brightness(img, brightness_factor: float):
     if brightness_factor < 0:
-        raise ValueError(
-            f"brightness_factor ({brightness_factor}) is not non-negative.")
+        raise ValueError(f"brightness_factor ({brightness_factor}) is not non-negative.")
 
     return _blend(img, paddle.zeros_like(img), brightness_factor)
 
 
 def adjust_contrast(img, contrast_factor: float):
     if contrast_factor < 0:
-        raise ValueError(
-            f"contrast_factor ({contrast_factor}) is not non-negative.")
+        raise ValueError(f"contrast_factor ({contrast_factor}) is not non-negative.")
 
     c = img.shape[1]
 
     if c == 3:
-        output = (0.2989 * img[:, 0:1, :, :] + 0.587 * img[:, 1:2, :, :] +
-                  0.114 * img[:, 2:3, :, :])
+        output = 0.2989 * img[:, 0:1, :, :] + 0.587 * img[:, 1:2, :, :] + 0.114 * img[:, 2:3, :, :]
         mean = paddle.mean(output, axis=(-3, -2, -1), keepdim=True)
 
     else:
@@ -227,38 +217,25 @@ def adjust_hue(img, hue_factor: float):
 
 def adjust_saturation(img, saturation_factor: float):
     if saturation_factor < 0:
-        raise ValueError(
-            f"saturation_factor ({saturation_factor}) is not non-negative.")
+        raise ValueError(f"saturation_factor ({saturation_factor}) is not non-negative.")
 
-    output = (0.2989 * img[:, 0:1, :, :] + 0.587 * img[:, 1:2, :, :] +
-              0.114 * img[:, 2:3, :, :])
+    output = 0.2989 * img[:, 0:1, :, :] + 0.587 * img[:, 1:2, :, :] + 0.114 * img[:, 2:3, :, :]
 
     return _blend(img, output, saturation_factor)
 
 
 class ColorJitter(nn.Layer):
-
     def __init__(self, brightness=0, contrast=0, saturation=0, hue=0):
         super(ColorJitter, self).__init__()
         self.brightness = self._check_input(brightness, "brightness")
         self.contrast = self._check_input(contrast, "contrast")
         self.saturation = self._check_input(saturation, "saturation")
-        self.hue = self._check_input(hue,
-                                     "hue",
-                                     center=0,
-                                     bound=(-0.5, 0.5),
-                                     clip_first_on_zero=False)
+        self.hue = self._check_input(hue, "hue", center=0, bound=(-0.5, 0.5), clip_first_on_zero=False)
 
-    def _check_input(self,
-                     value,
-                     name,
-                     center=1,
-                     bound=(0, float("inf")),
-                     clip_first_on_zero=True):
+    def _check_input(self, value, name, center=1, bound=(0, float("inf")), clip_first_on_zero=True):
         if isinstance(value, numbers.Number):
             if value < 0:
-                raise ValueError(
-                    f"If {name} is a single number, it must be non negative.")
+                raise ValueError(f"If {name} is a single number, it must be non negative.")
             value = [center - float(value), center + float(value)]
             if clip_first_on_zero:
                 value[0] = max(value[0], 0.0)
@@ -266,9 +243,7 @@ class ColorJitter(nn.Layer):
             if not bound[0] <= value[0] <= value[1] <= bound[1]:
                 raise ValueError(f"{name} values should be between {bound}")
         else:
-            raise TypeError(
-                f"{name} should be a single number or a list/tuple with length 2."
-            )
+            raise TypeError(f"{name} should be a single number or a list/tuple with length 2.")
 
         # if value is 0 or (1., 1.) for brightness/contrast/saturation
         # or (0., 0.) for hue, do nothing
@@ -282,8 +257,7 @@ class ColorJitter(nn.Layer):
         contrast: Optional[List[float]],
         saturation: Optional[List[float]],
         hue: Optional[List[float]],
-    ) -> Tuple[paddle.Tensor, Optional[float], Optional[float], Optional[float],
-               Optional[float]]:
+    ) -> Tuple[paddle.Tensor, Optional[float], Optional[float], Optional[float], Optional[float]]:
         """Get the parameters for the randomized transform to be applied on image.
 
         Args:
@@ -302,12 +276,9 @@ class ColorJitter(nn.Layer):
         """
         fn_idx = paddle.randperm(4)
 
-        b = None if brightness is None else paddle.empty([1]).uniform_(
-            brightness[0], brightness[1])
-        c = None if contrast is None else paddle.empty([1]).uniform_(
-            contrast[0], contrast[1])
-        s = None if saturation is None else paddle.empty([1]).uniform_(
-            saturation[0], saturation[1])
+        b = None if brightness is None else paddle.empty([1]).uniform_(brightness[0], brightness[1])
+        c = None if contrast is None else paddle.empty([1]).uniform_(contrast[0], contrast[1])
+        s = None if saturation is None else paddle.empty([1]).uniform_(saturation[0], saturation[1])
         h = None if hue is None else paddle.empty([1]).uniform_(hue[0], hue[1])
 
         return fn_idx, b, c, s, h
@@ -321,7 +292,8 @@ class ColorJitter(nn.Layer):
             PIL Image or Tensor: Color jittered image.
         """
         fn_idx, brightness_factor, contrast_factor, saturation_factor, hue_factor = self.get_params(
-            self.brightness, self.contrast, self.saturation, self.hue)
+            self.brightness, self.contrast, self.saturation, self.hue
+        )
 
         for fn_id in fn_idx:
             if fn_id == 0 and brightness_factor is not None:
@@ -336,11 +308,13 @@ class ColorJitter(nn.Layer):
         return img
 
     def __repr__(self) -> str:
-        s = (f"{self.__class__.__name__}("
-             f"brightness={self.brightness}"
-             f", contrast={self.contrast}"
-             f", saturation={self.saturation}"
-             f", hue={self.hue})")
+        s = (
+            f"{self.__class__.__name__}("
+            f"brightness={self.brightness}"
+            f", contrast={self.contrast}"
+            f", saturation={self.saturation}"
+            f", hue={self.hue})"
+        )
         return s
 
 
@@ -348,20 +322,14 @@ def _apply_grid_transform(img, grid, mode: str, fill: Optional[List[float]]):
 
     if img.shape[0] > 1:
         # Apply same grid to a batch of images
-        grid = grid.expand(
-            [img.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]])
+        grid = grid.expand([img.shape[0], grid.shape[1], grid.shape[2], grid.shape[3]])
 
     # Append a dummy mask for customized fill colors, should be faster than grid_sample() twice
     if fill is not None:
-        dummy = paddle.ones((img.shape[0], 1, img.shape[2], img.shape[3]),
-                            dtype=img.dtype)
+        dummy = paddle.ones((img.shape[0], 1, img.shape[2], img.shape[3]), dtype=img.dtype)
         img = paddle.concat((img, dummy), axis=1)
 
-    img = grid_sample(img,
-                      grid,
-                      mode=mode,
-                      padding_mode="zeros",
-                      align_corners=False)
+    img = grid_sample(img, grid, mode=mode, padding_mode="zeros", align_corners=False)
 
     # Fill with required color
     if fill is not None:
@@ -369,8 +337,7 @@ def _apply_grid_transform(img, grid, mode: str, fill: Optional[List[float]]):
         img = img[:, :-1, :, :]  # N * C * H * W
         mask = mask.expand_as(img)
         len_fill = len(fill) if isinstance(fill, (tuple, list)) else 1
-        fill_img = paddle.to_tensor(fill, dtype=img.dtype).reshape(
-            [1, len_fill, 1, 1]).expand_as(img)
+        fill_img = paddle.to_tensor(fill, dtype=img.dtype).reshape([1, len_fill, 1, 1]).expand_as(img)
         if mode == "nearest":
             mask = mask < 0.5
             img[mask] = fill_img[mask]
@@ -395,38 +362,26 @@ def _gen_affine_grid(
     d = 0.5
     base_grid = paddle.empty([1, oh, ow, 3], dtype=theta.dtype)
     x_grid = paddle.linspace(-ow * 0.5 + d, ow * 0.5 + d - 1, num=ow)
-    base_grid[..., 0] = (x_grid)
-    y_grid = paddle.linspace(-oh * 0.5 + d, oh * 0.5 + d - 1,
-                             num=oh).unsqueeze_(-1)
-    base_grid[..., 1] = (y_grid)
+    base_grid[..., 0] = x_grid
+    y_grid = paddle.linspace(-oh * 0.5 + d, oh * 0.5 + d - 1, num=oh).unsqueeze_(-1)
+    base_grid[..., 1] = y_grid
     base_grid[..., 2] = 1.0
-    rescaled_theta = theta.transpose([0, 2, 1]) / paddle.to_tensor(
-        [0.5 * w, 0.5 * h], dtype=theta.dtype)
+    rescaled_theta = theta.transpose([0, 2, 1]) / paddle.to_tensor([0.5 * w, 0.5 * h], dtype=theta.dtype)
     output_grid = base_grid.reshape([1, oh * ow, 3]).bmm(rescaled_theta)
     return output_grid.reshape([1, oh, ow, 2])
 
 
-def affine_impl(img,
-                matrix: List[float],
-                interpolation: str = "nearest",
-                fill: Optional[List[float]] = None):
+def affine_impl(img, matrix: List[float], interpolation: str = "nearest", fill: Optional[List[float]] = None):
     theta = paddle.to_tensor(matrix, dtype=img.dtype).reshape([1, 2, 3])
     shape = img.shape
     # grid will be generated on the same device as theta and img
-    grid = _gen_affine_grid(theta,
-                            w=shape[-1],
-                            h=shape[-2],
-                            ow=shape[-1],
-                            oh=shape[-2])
+    grid = _gen_affine_grid(theta, w=shape[-1], h=shape[-2], ow=shape[-1], oh=shape[-2])
     return _apply_grid_transform(img, grid, interpolation, fill=fill)
 
 
-def _get_inverse_affine_matrix(center: List[float],
-                               angle: float,
-                               translate: List[float],
-                               scale: float,
-                               shear: List[float],
-                               inverted: bool = True) -> List[float]:
+def _get_inverse_affine_matrix(
+    center: List[float], angle: float, translate: List[float], scale: float, shear: List[float], inverted: bool = True
+) -> List[float]:
     # Helper method to compute inverse matrix for affine transformation
 
     # Pillow requires inverse affine transformation matrix:
@@ -537,13 +492,15 @@ def affine(
     if isinstance(interpolation, int):
         warnings.warn(
             "Argument 'interpolation' of type int is deprecated since 0.13 and will be removed in 0.15. "
-            "Please use InterpolationMode enum.")
+            "Please use InterpolationMode enum."
+        )
         interpolation = _interpolation_modes_from_int(interpolation)
 
     if fillcolor is not None:
         warnings.warn(
             "The parameter 'fillcolor' is deprecated since 0.12 and will be removed in 0.14. "
-            "Please use 'fill' instead.")
+            "Please use 'fill' instead."
+        )
         fill = fillcolor
 
     if not isinstance(angle, (int, float)):
@@ -559,8 +516,7 @@ def affine(
         raise ValueError("Argument scale should be positive")
 
     if not isinstance(shear, (numbers.Number, (list, tuple))):
-        raise TypeError(
-            "Shear should be either a single value or a sequence of two values")
+        raise TypeError("Shear should be either a single value or a sequence of two values")
 
     if not isinstance(interpolation, InterpolationMode):
         raise TypeError("Argument interpolation should be a InterpolationMode")
@@ -581,8 +537,7 @@ def affine(
         shear = [shear[0], shear[0]]
 
     if len(shear) != 2:
-        raise ValueError(
-            f"Shear should be a sequence containing two values. Got {shear}")
+        raise ValueError(f"Shear should be a sequence containing two values. Got {shear}")
 
     if center is not None and not isinstance(center, (list, tuple)):
         raise TypeError("Argument center should be a sequence")
@@ -590,17 +545,11 @@ def affine(
     if center is not None:
         _, height, width = img.shape[0], img.shape[1], img.shape[2]
         # Center values should be in pixel coordinates but translated such that (0, 0) corresponds to image center.
-        center_f = [
-            1.0 * (c - s * 0.5) for c, s in zip(center, [width, height])
-        ]
+        center_f = [1.0 * (c - s * 0.5) for c, s in zip(center, [width, height])]
 
     translate_f = [1.0 * t for t in translate]
-    matrix = _get_inverse_affine_matrix(center_f, angle, translate_f, scale,
-                                        shear)
-    return affine_impl(img,
-                       matrix=matrix,
-                       interpolation=interpolation.value,
-                       fill=fill)
+    matrix = _get_inverse_affine_matrix(center_f, angle, translate_f, scale, shear)
+    return affine_impl(img, matrix=matrix, interpolation=interpolation.value, fill=fill)
 
 
 def _interpolation_modes_from_int(i: int) -> InterpolationMode:
@@ -616,19 +565,17 @@ def _interpolation_modes_from_int(i: int) -> InterpolationMode:
 
 
 def _check_sequence_input(x, name, req_sizes):
-    msg = req_sizes[0] if len(req_sizes) < 2 else " or ".join(
-        [str(s) for s in req_sizes])
+    msg = req_sizes[0] if len(req_sizes) < 2 else " or ".join([str(s) for s in req_sizes])
     if not isinstance(x, Sequence):
         raise TypeError(f"{name} should be a sequence of length {msg}.")
     if len(x) not in req_sizes:
         raise ValueError(f"{name} should be sequence of length {msg}.")
 
 
-def _setup_angle(x, name, req_sizes=(2, )):
+def _setup_angle(x, name, req_sizes=(2,)):
     if isinstance(x, numbers.Number):
         if x < 0:
-            raise ValueError(
-                f"If {name} is a single number, it must be positive.")
+            raise ValueError(f"If {name} is a single number, it must be positive.")
         x = [-x, x]
     else:
         _check_sequence_input(x, name, req_sizes)
@@ -694,34 +641,36 @@ class RandomAffine(nn.Layer):
         if resample is not None:
             warnings.warn(
                 "The parameter 'resample' is deprecated since 0.12 and will be removed in 0.14. "
-                "Please use 'interpolation' instead.")
+                "Please use 'interpolation' instead."
+            )
             interpolation = _interpolation_modes_from_int(resample)
 
         # Backward compatibility with integer value
         if isinstance(interpolation, int):
             warnings.warn(
                 "Argument 'interpolation' of type int is deprecated since 0.13 and will be removed in 0.15. "
-                "Please use InterpolationMode enum.")
+                "Please use InterpolationMode enum."
+            )
             interpolation = _interpolation_modes_from_int(interpolation)
 
         if fillcolor is not None:
             warnings.warn(
                 "The parameter 'fillcolor' is deprecated since 0.12 and will be removed in 0.14. "
-                "Please use 'fill' instead.")
+                "Please use 'fill' instead."
+            )
             fill = fillcolor
 
-        self.degrees = _setup_angle(degrees, name="degrees", req_sizes=(2, ))
+        self.degrees = _setup_angle(degrees, name="degrees", req_sizes=(2,))
 
         if translate is not None:
-            _check_sequence_input(translate, "translate", req_sizes=(2, ))
+            _check_sequence_input(translate, "translate", req_sizes=(2,))
             for t in translate:
                 if not (0.0 <= t <= 1.0):
-                    raise ValueError(
-                        "translation values should be between 0 and 1")
+                    raise ValueError("translation values should be between 0 and 1")
         self.translate = translate
 
         if scale is not None:
-            _check_sequence_input(scale, "scale", req_sizes=(2, ))
+            _check_sequence_input(scale, "scale", req_sizes=(2,))
             for s in scale:
                 if s <= 0:
                     raise ValueError("scale values should be positive")
@@ -742,7 +691,7 @@ class RandomAffine(nn.Layer):
         self.fillcolor = self.fill = fill
 
         if center is not None:
-            _check_sequence_input(center, "center", req_sizes=(2, ))
+            _check_sequence_input(center, "center", req_sizes=(2,))
 
         self.center = center
 
@@ -759,8 +708,7 @@ class RandomAffine(nn.Layer):
         Returns:
             params to be passed to the affine transformation
         """
-        angle = float(
-            paddle.empty([1]).uniform_(float(degrees[0]), float(degrees[1])))
+        angle = float(paddle.empty([1]).uniform_(float(degrees[0]), float(degrees[1])))
         if translate is not None:
             max_dx = float(translate[0] * img_size[0])
             max_dy = float(translate[1] * img_size[1])
@@ -771,8 +719,7 @@ class RandomAffine(nn.Layer):
             translations = (0, 0)
 
         if scale_ranges is not None:
-            scale = float(
-                paddle.empty([1]).uniform_(scale_ranges[0], scale_ranges[1]))
+            scale = float(paddle.empty([1]).uniform_(scale_ranges[0], scale_ranges[1]))
         else:
             scale = 1.0
 
@@ -780,8 +727,7 @@ class RandomAffine(nn.Layer):
         if shears is not None:
             shear_x = float(paddle.empty([1]).uniform_(shears[0], shears[1]))
             if len(shears) == 4:
-                shear_y = float(
-                    paddle.empty([1]).uniform_(shears[2], shears[3]))
+                shear_y = float(paddle.empty([1]).uniform_(shears[2], shears[3]))
 
         shear = (shear_x, shear_y)
 
@@ -797,14 +743,9 @@ class RandomAffine(nn.Layer):
 
         img_size = [width, height]  # flip for keeping BC on get_params call
 
-        ret = self.get_params(self.degrees, self.translate, self.scale,
-                              self.shear, img_size)
+        ret = self.get_params(self.degrees, self.translate, self.scale, self.shear, img_size)
 
-        return affine(img,
-                      *ret,
-                      interpolation=self.interpolation,
-                      fill=fill,
-                      center=self.center)
+        return affine(img, *ret, interpolation=self.interpolation, fill=fill, center=self.center)
 
     def __repr__(self) -> str:
         s = f"{self.__class__.__name__}(degrees={self.degrees}"
