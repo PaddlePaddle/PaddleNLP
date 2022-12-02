@@ -118,7 +118,7 @@ python setup.py install
 
 **Stable Diffusion 1.x** 是一个**文本到图像（text-to-image）**的**潜在扩散模型(Latent Diffusion Model, LDM)**, 该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为 **512x512** 分辨率的 [LAION-5B](https://laion.ai/blog/laion-5b/) 数据集子集进行训练。该模型使用了 **Openai** 开源的 **CLIP ViT-L/14** 文本编码器（约**123M**参数）来编码提示（prompt）文本（注意该部分权重不进行训练）。该模型还使用了**UNet2d Conditional**模型（约**860M**参数）来建模扩散过程。
 
-**Stable Diffusion 2.0** 该模型由 [LAION](https://laion.ai/) 在 [Stability AI](https://stability.ai/) 的支持下开发完成的，它与早期的 V1 版本相比，大大改善了生成图像的质量。该版本中的文生图模型不仅可以生成默认分辨率为 **512x512** 像素还可以生成 **768x768** 分辨率的图像。该模型作为 **Stable Diffusion 1.x** 的升级版, 使用了全新的 [OpenCLIP-ViT/H](laion/CLIP-ViT-H-14-laion2B-s32B-b79K) 中的文本编码器（注意：该文本编码器一共**24层**，实际只使用**23层**）。LAION 团队首先使用 **V1 版的策略**在 **512x512** 像素的图片上进行训练得到了一个基础版模型 [stabilityai/stable-diffusion-2-base](https://huggingface.co/stabilityai/stable-diffusion-2-base)，然后他们还使用了 [v-objective](https://arxiv.org/abs/2202.00512) 策略，在基础模型之上进一步使用 **768x768** 分辨率的图片进行训练，得到了一个最终版的模型 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2)。
+**Stable Diffusion 2.0** 由 [LAION](https://laion.ai/) 在 [Stability AI](https://stability.ai/) 的支持下开发完成的，它与早期的 **V1** 版本相比，大大改善了生成图像的质量。该版本中的文生图模型不仅可以生成默认分辨率为 **512x512** 像素还可以生成 **768x768** 分辨率的图像。该模型作为 **Stable Diffusion 1.x** 的升级版, 使用了全新的 [OpenCLIP-ViT/H](laion/CLIP-ViT-H-14-laion2B-s32B-b79K) 中的文本编码器（注意：该文本编码器一共**24层**，实际只使用**23层**）。LAION 团队首先使用 **V1 版的策略**在 **512x512** 像素的图片上进行训练得到了一个基础版模型 [stabilityai/stable-diffusion-2-base](https://huggingface.co/stabilityai/stable-diffusion-2-base)，然后他们还使用了 [v-objective](https://arxiv.org/abs/2202.00512) 策略，在基础模型之上进一步使用 **768x768** 分辨率的图片进行训练，得到了一个最终版的模型 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2)。
 
 ___Tips___:
 ___为了方便国内用户下载使用及快速体验Stable Diffusion模型，我们在百度云(BOS)上提供了paddle版本的镜像权重。注意：为了使用该模型与权重，你必须接受该模型所要求的**License**，请访问huggingface的[runwayml/stable-diffusion-v1-5](https://huggingface.co/runwayml/stable-diffusion-v1-5) 和 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2), 仔细阅读里面的**License**，然后签署该协议。___
@@ -185,9 +185,9 @@ image
 
 image.save("shiba_dog_with_a_red_cap.png")
 ```
-
+<div align="center">
 <img width="500" alt="image" src="https://user-images.githubusercontent.com/50394665/204796701-d7911f76-8670-47d5-8d1b-8368b046c5e4.png">
-
+</div>
 
 ### 基于文本引导的图生图（Image-to-Image Text-Guided Generation）
 
@@ -218,8 +218,9 @@ negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers,
 image = pipe(prompt=prompt, negative_prompt=negative_prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
 image.save("image_Kurisu_img2img.png")
 ```
-
+<div align="center">
 <img width="500" alt="image" src="https://user-images.githubusercontent.com/50394665/204799529-cd89dcdb-eb1d-4247-91ac-b0f7bad777f8.png">
+</div>
 </details>
 
 ### 基于文本引导的图像编辑（Text-Guided Image Inpainting）
@@ -255,7 +256,9 @@ image = pipe(prompt=prompt, init_image=init_image, mask_image=mask_image, streng
 
 image.save("a_red_cat_legacy.png")
 ```
-<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/204802186-5a6d302b-83aa-4247-a5bb-ebabfcc3abc4.png">
+<div align="center">
+<img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/204802186-5a6d302b-83aa-4247-a5bb-ebabfcc3abc4.png">
+</div>
 
 </details>
 
@@ -285,7 +288,9 @@ image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
 
 image.save("a_yellow_cat.png")
 ```
-<img width="600" alt="image" src="https://user-images.githubusercontent.com/50394665/204801946-6cd043bc-f3db-42cf-82cd-6a6171484523.png">
+<div align="center">
+<img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/204801946-6cd043bc-f3db-42cf-82cd-6a6171484523.png">
+</div>
 </details>
 
 ### 基于文本引导的图像放大 & 图像超分（Text-Guided Image Upscaling & Super Superresolution）
@@ -307,9 +312,10 @@ prompt = "a white cat"
 image = pipe(prompt=prompt, image=low_res_img).images[0]
 image.save("upscaled_white_cat.png")
 ```
+<div align="center">
 <img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/204806180-b7f1b9cf-8a62-4577-b5c4-91adda08a13b.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/50394665/204806202-8c110be3-5f48-4946-95ea-21ad5a9a2340.png">
-
+</div>
 </details>
 
 <details><summary>&emsp;Super Superresolution Demo</summary>
@@ -330,9 +336,10 @@ image = pipe(image=low_res_img, num_inference_steps=100).images[0]
 
 image.save("ldm-super-resolution-image.png")
 ```
+<div align="center">
 <img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/204804426-5e28b571-aa41-4f56-ba26-68cca75fdaae.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/50394665/204804148-fe7c293b-6cd7-4942-ae9c-446369fe8410.png">
-
+</div">
 </details>
 
 ## 模型部署
@@ -406,10 +413,9 @@ image_inpaint_legacy = fd_pipe.inpaint_legacy(
 ).images[0]
 image_inpaint_legacy.save("image_inpaint_legacy.png")
 ```
-<img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/205292154-30c76b8a-ba5f-44f7-bd4f-aa88a4b40b3b.png">
-<img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/205292163-91484630-90be-41e1-b645-4c663d2af3ed.png">
-<img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/205292173-954a10a5-87d7-42da-a43d-cb8209442b15.png">
-
+<div align="center">
+<img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/205297240-46b80992-34af-40cd-91a6-ae76589d0e21.png">
+</div>
 
 ## Credits
 
