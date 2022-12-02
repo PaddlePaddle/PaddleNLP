@@ -5,6 +5,13 @@
 - cmake >= 3.10
 - NDK >= 20
 
+## 配置NDK
+```bash
+wget https://dl.google.com/android/repository/android-ndk-r20b-linux-x86_64.zip
+unzip android-ndk-r20b-linux-x86_64.zip # 会解压缩到 android-ndk-r20b 目录
+export NDK_ROOT=${PWD}/android-ndk-r20b
+```
+
 ## 编译C++库方法
 
 ```bash
