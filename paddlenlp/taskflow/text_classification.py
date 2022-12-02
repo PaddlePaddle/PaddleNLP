@@ -205,7 +205,6 @@ class TextClassificationTask(Task):
                     labels = np.argmax(logits, axis=-1)
                 for score, label in zip(scores, labels):
                     postprocessed_output = {}
-                    # postprocessed_output["text"] = inputs["text"][i]
                     postprocessed_output["predictions"] = [{"label": self.id2label[label], "score": score[label]}]
                     postprocessed_outputs.append(postprocessed_output)
             else:  # multi_label
