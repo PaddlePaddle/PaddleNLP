@@ -166,6 +166,14 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
         (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*)
         A tuple containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your model
         and a scheduler  [`LinearDecayWithWarmup`].
+
+    preprocess_logits_for_metrics (`Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]`, 可选）)：
+        一个函数, 在每次评估之前对logits进行预处理。
+
+        (`Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]`, *optional*)
+        A function that preprocess the logits right before caching them at each evaluation step. Must take two
+        tensors, the logits and the labels, and return the logits once processed as desired. The modifications made
+        by this function will be reflected in the predictions received by `compute_metrics`.
 ```
 
 
