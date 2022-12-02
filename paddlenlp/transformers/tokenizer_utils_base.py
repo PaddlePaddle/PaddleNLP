@@ -30,12 +30,14 @@ from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 import numpy as np
 import paddle
 from huggingface_hub import (
-    HfFolder,
     create_repo,
+    get_hf_file_metadata,
     hf_hub_download,
+    hf_hub_url,
     repo_type_and_id_from_hf_id,
     upload_folder,
 )
+from huggingface_hub.utils import EntryNotFoundError
 from paddle import __version__
 
 from paddlenlp.utils.downloader import (
@@ -1773,9 +1775,21 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
         _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
         repo_id = f"{repo_owner}/{repo_name}"
 
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
         with tempfile.TemporaryDirectory() as tmp_dir:
             # save model
             self.save_pretrained(tmp_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
             # Upload model and return
             logger.info(f"Pushing to the {repo_id}. This might take a while")
             return upload_folder(
