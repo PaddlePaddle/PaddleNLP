@@ -28,10 +28,13 @@ from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
+# isort: split
 from .bert.modeling import *
 from .bert.tokenizer import *
 from .bert.configuration import *
 from .bert.converter import *
+
+# isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
@@ -112,6 +115,7 @@ from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
 from .t5.modeling import *
 from .t5.tokenizer import *
+from .t5.configuration import *
 from .tinybert.modeling import *
 from .tinybert.tokenizer import *
 from .transformer.modeling import *
