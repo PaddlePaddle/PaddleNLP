@@ -52,12 +52,10 @@ class FakeLayer:
 class FakeModel(PretrainedModel):
     def __init__(self, config: FakeSimplePretrainedModelConfig):
         """fake `__init__`, the source of parameters is:
-
             def __init__(self, model, a, b):
                 self.model = model
                 self.a = a
                 self.b = b
-
         Args:
             config_or_model (Optional[Union[FakeLayer, FakeSimplePretrainedModelConfig]], optional): config or model instance. Defaults to None.
         """
@@ -128,3 +126,9 @@ class ConfigurationUtilsTest:
 
         assert model.model.a == 10
         assert model.model.b == 11
+
+    def test_get_value_with_default_from_config(self):
+        config = FakeSimplePretrainedModelConfig(a=10)
+        assert config.get("a", None) == 10
+        assert config.get("a", None) == config.a
+        assert config.get("no_name", 0) == 0

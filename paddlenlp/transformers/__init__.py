@@ -118,6 +118,7 @@ from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
 from .t5.modeling import *
 from .t5.tokenizer import *
+from .t5.configuration import *
 from .tinybert.modeling import *
 from .tinybert.tokenizer import *
 from .transformer.modeling import *
