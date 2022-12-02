@@ -23,9 +23,10 @@ import os
 import os.path as osp
 import re
 import shutil
+import sys
 import warnings
-from typing import (TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type,
-                    TypeVar, Union)
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from huggingface_hub import hf_hub_download
 
@@ -35,8 +36,7 @@ from paddlenlp.utils.env import HF_CACHE_HOME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import (COMMUNITY_MODEL_PREFIX, get_path_from_url,
-                                is_url)
+from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url, is_url
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -56,7 +56,8 @@ def custom_object_save(obj, folder, config=None):
         logger.warning(
             f"We can't save the code defining {obj} in {folder} as it's been defined in __main__. You should put "
             "this code in a separate module so we can include it in the saved folder and make it easier to share via "
-            "the Hub.")
+            "the Hub."
+        )
 
     def _set_auto_map_in_config(_config):
         module_name = obj.__class__.__module__
@@ -102,9 +103,10 @@ def custom_object_save(obj, folder, config=None):
     shutil.copy(object_file, dest_file)
 
     # Gather all relative imports recursively and make sure they are copied as well.
-    for needed_file in get_relative_import_files(object_file):
-        dest_file = Path(folder) / (Path(needed_file).name)
-        shutil.copy(needed_file, dest_file)
+    # TODO(wujingjing): `get_relative_import_files` havn't supported yet.
+    # for needed_file in get_relative_import_files(object_file):
+    #     dest_file = Path(folder) / (Path(needed_file).name)
+    #     shutil.copy(needed_file, dest_file)
 
 
 def cached_path(
@@ -132,8 +134,8 @@ def cached_path(
     if is_url(url_or_filename):
         if cache_dir is None:
             raise NotADirectoryError(
-                "when download from url<%s>, cache_dir is required, but receive None",
-                url_or_filename)
+                "when download from url<%s>, cache_dir is required, but receive None", url_or_filename
+            )
 
         if force_download:
             # remove the target file under cache_dir
@@ -150,14 +152,13 @@ def cached_path(
         output_path = url_or_filename
     else:
         raise FileNotFoundError(
-            "can't find the file<{%s}> which should be valid url or local file path",
-            url_or_filename)
+            "can't find the file<{%s}> which should be valid url or local file path", url_or_filename
+        )
 
     return output_path
 
 
-def attribute_map(config: PretrainedConfig,
-                  kwargs: Dict[str, Any]) -> Dict[str, Any]:
+def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str, Any]:
     """map the <old-attr> to <new-attr> with configuration
 
     Args:
@@ -167,9 +168,7 @@ def attribute_map(config: PretrainedConfig,
     for old_key, new_key in config.attribute_map.items():
         if old_key in kwargs:
             if new_key in kwargs:
-                logger.warning(
-                    f'receive param<{old_key}> and param<{new_key}>, but the first one will be adopt'
-                )
+                logger.warning(f"receive param<{old_key}> and param<{new_key}>, but the first one will be adopt")
             kwargs[new_key] = kwargs.pop(old_key)
     return kwargs
 
@@ -184,7 +183,7 @@ def flatten_model_config(config: dict) -> dict:
         dict: the flatten config
     """
     # 1. extract the init_args into the top level
-    init_args = config.pop('init_args', [])
+    init_args = config.pop("init_args", [])
 
     index = 0
     while index < len(init_args):
@@ -197,11 +196,11 @@ def flatten_model_config(config: dict) -> dict:
             index += 1
 
     if init_args:
-        config['init_args'] = init_args
+        config["init_args"] = init_args
 
     # 2. convert `init_class` into `architectures`
-    if 'init_class' in config:
-        config['architectures'] = [config.pop('init_class')]
+    if "init_class" in config:
+        config["architectures"] = [config.pop("init_class")]
 
     return config
 
@@ -413,8 +412,7 @@ class PretrainedConfig:
         assert hasattr(self, key)
 
     def __getattribute__(self, key):
-        if key != "attribute_map" and key in super().__getattribute__(
-                "attribute_map"):
+        if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
         return super().__getattribute__(key)
 
@@ -443,8 +441,7 @@ class PretrainedConfig:
         # Is decoder is used in encoder-decoder models to differentiate encoder from decoder
         self.is_encoder_decoder = kwargs.pop("is_encoder_decoder", False)
         self.is_decoder = kwargs.pop("is_decoder", False)
-        self.cross_attention_hidden_size = kwargs.pop(
-            "cross_attention_hidden_size", None)
+        self.cross_attention_hidden_size = kwargs.pop("cross_attention_hidden_size", None)
         self.add_cross_attention = kwargs.pop("add_cross_attention", False)
         self.tie_encoder_decoder = kwargs.pop("tie_encoder_decoder", False)
 
@@ -463,19 +460,16 @@ class PretrainedConfig:
         self.repetition_penalty = kwargs.pop("repetition_penalty", 1.0)
         self.length_penalty = kwargs.pop("length_penalty", 1.0)
         self.no_repeat_ngram_size = kwargs.pop("no_repeat_ngram_size", 0)
-        self.encoder_no_repeat_ngram_size = kwargs.pop(
-            "encoder_no_repeat_ngram_size", 0)
+        self.encoder_no_repeat_ngram_size = kwargs.pop("encoder_no_repeat_ngram_size", 0)
         self.bad_words_ids = kwargs.pop("bad_words_ids", None)
         self.num_return_sequences = kwargs.pop("num_return_sequences", 1)
         self.chunk_size_feed_forward = kwargs.pop("chunk_size_feed_forward", 0)
         self.output_scores = kwargs.pop("output_scores", False)
-        self.return_dict_in_generate = kwargs.pop("return_dict_in_generate",
-                                                  False)
+        self.return_dict_in_generate = kwargs.pop("return_dict_in_generate", False)
         self.forced_bos_token_id = kwargs.pop("forced_bos_token_id", None)
         self.forced_eos_token_id = kwargs.pop("forced_eos_token_id", None)
         self.remove_invalid_values = kwargs.pop("remove_invalid_values", False)
-        self.exponential_decay_length_penalty = kwargs.pop(
-            "exponential_decay_length_penalty", None)
+        self.exponential_decay_length_penalty = kwargs.pop("exponential_decay_length_penalty", None)
 
         # Fine-tuning task arguments
         self.architectures = kwargs.pop("architectures", None)
@@ -489,8 +483,7 @@ class PretrainedConfig:
                     f"You passed along `num_labels={num_labels}` with an incompatible id to label map: "
                     f"{self.id2label}. The number of labels wil be overwritten to {self.num_labels}."
                 )
-            self.id2label = dict(
-                (int(key), value) for key, value in self.id2label.items())
+            self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
             self.num_labels = kwargs.pop("num_labels", 2)
@@ -514,8 +507,7 @@ class PretrainedConfig:
 
         # regression / multi-label classification
         self.problem_type = kwargs.pop("problem_type", None)
-        allowed_problem_types = ("regression", "single_label_classification",
-                                 "multi_label_classification")
+        allowed_problem_types = ("regression", "single_label_classification", "multi_label_classification")
         if self.problem_type is not None and self.problem_type not in allowed_problem_types:
             raise ValueError(
                 f"The config parameter `problem_type` was not understood: received {self.problem_type} "
@@ -550,9 +542,7 @@ class PretrainedConfig:
 
     @name_or_path.setter
     def name_or_path(self, value):
-        self._name_or_path = str(
-            value
-        )  # Make sure that name_or_path is a string (for JSON encoding)
+        self._name_or_path = str(value)  # Make sure that name_or_path is a string (for JSON encoding)
 
     @property
     def use_return_dict(self) -> bool:
@@ -570,14 +560,11 @@ class PretrainedConfig:
 
     @num_labels.setter
     def num_labels(self, num_labels: int):
-        if not hasattr(self, "id2label") or self.id2label is None or len(
-                self.id2label) != num_labels:
+        if not hasattr(self, "id2label") or self.id2label is None or len(self.id2label) != num_labels:
             self.id2label = {i: f"LABEL_{i}" for i in range(num_labels)}
-            self.label2id = dict(
-                zip(self.id2label.values(), self.id2label.keys()))
+            self.label2id = dict(zip(self.id2label.values(), self.id2label.keys()))
 
-    def save_pretrained(self, save_directory: Union[str, os.PathLike],
-                        **kwargs):
+    def save_pretrained(self, save_directory: Union[str, os.PathLike], **kwargs):
         """
         Save a configuration object to the directory `save_directory`, so that it can be re-loaded using the
         [`~PretrainedConfig.from_pretrained`] class method.
@@ -589,9 +576,7 @@ class PretrainedConfig:
                 Additional key word arguments passed along to the [`~utils.PushToHubMixin.push_to_hub`] method.
         """
         if os.path.isfile(save_directory):
-            raise AssertionError(
-                f"Provided path ({save_directory}) should be a directory, not a file"
-            )
+            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
 
         os.makedirs(save_directory, exist_ok=True)
 
@@ -607,9 +592,7 @@ class PretrainedConfig:
         logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str,
-                                                                  os.PathLike],
-                        **kwargs) -> PretrainedConfig:
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
         r"""
         Instantiate a [`PretrainedConfig`] (or a derived class) from a pretrained model configuration.
 
@@ -669,13 +652,10 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
-        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path,
-                                                  **kwargs)
+        config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         config_dict = flatten_model_config(config_dict)
-        if "model_type" in config_dict and hasattr(
-                cls,
-                "model_type") and config_dict["model_type"] != cls.model_type:
+        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warning(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
                 f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
@@ -684,9 +664,9 @@ class PretrainedConfig:
         return cls.from_dict(config_dict, **kwargs)
 
     @classmethod
-    def get_config_dict(cls, pretrained_model_name_or_path: Union[str,
-                                                                  os.PathLike],
-                        **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def get_config_dict(
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         From a `pretrained_model_name_or_path`, resolve to a dictionary of parameters, to be used for instantiating a
         [`PretrainedConfig`] using `from_dict`.
@@ -701,28 +681,24 @@ class PretrainedConfig:
         """
         original_kwargs = copy.deepcopy(kwargs)
         # Get config dict associated with the base config file
-        config_dict, kwargs = cls._get_config_dict(
-            pretrained_model_name_or_path, **kwargs)
+        config_dict, kwargs = cls._get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # That config file may point us toward another config file to use.
         if "configuration_files" in config_dict:
-            configuration_file = get_configuration_file(
-                config_dict["configuration_files"])
+            configuration_file = get_configuration_file(config_dict["configuration_files"])
             config_dict, kwargs = cls._get_config_dict(
-                pretrained_model_name_or_path,
-                _configuration_file=configuration_file,
-                **original_kwargs)
+                pretrained_model_name_or_path, _configuration_file=configuration_file, **original_kwargs
+            )
 
         return config_dict, kwargs
 
     @classmethod
-    def _get_config_dict(cls, pretrained_model_name_or_path: Union[str,
-                                                                   os.PathLike],
-                         **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def _get_config_dict(
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path,
-                                      cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, cache_dir=cache_dir)
 
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -732,8 +708,7 @@ class PretrainedConfig:
         # 0. init from pretrained_init_configuration
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # which can be: dict or url
-            pretrained_model_name_or_path = cls.pretrained_init_configuration[
-                pretrained_model_name_or_path]
+            pretrained_model_name_or_path = cls.pretrained_init_configuration[pretrained_model_name_or_path]
 
             if isinstance(pretrained_model_name_or_path, dict):
                 return pretrained_model_name_or_path, kwargs
@@ -749,35 +724,30 @@ class PretrainedConfig:
                 filename=CONFIG_NAME,
                 cache_dir=HF_CACHE_HOME,
                 library_name="PaddleNLP",
-                library_version=__version__)
+                library_version=__version__,
+            )
 
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url(
-                pretrained_model_name_or_path,
-                cache_dir,
-                check_exist=not force_download)
+                pretrained_model_name_or_path, cache_dir, check_exist=not force_download
+            )
         # 4. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
-            configuration_file = os.path.join(pretrained_model_name_or_path,
-                                              configuration_file)
+            configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
             if os.path.isfile(configuration_file):
                 resolved_config_file = configuration_file
             else:
                 raise FileNotFoundError(
-                    'please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` '
-                    'param into `from_pretarined` method to specific the configuration file name'
+                    "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
+                    "param into `from_pretarined` method to specific the configuration file name"
                 )
         # 4. load it as the community resource file
         else:
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                         pretrained_model_name_or_path,
-                                         CONFIG_NAME)
+            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
             assert is_url(community_url)
-            return cls._get_config_dict(community_url,
-                                        cache_dir=cache_dir,
-                                        **kwargs)
+            return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict
@@ -790,8 +760,7 @@ class PretrainedConfig:
         return config_dict, kwargs
 
     @classmethod
-    def from_dict(cls, config_dict: Dict[str, Any],
-                  **kwargs) -> "PretrainedConfig":
+    def from_dict(cls, config_dict: Dict[str, Any], **kwargs) -> "PretrainedConfig":
         """
         Instantiates a [`PretrainedConfig`] from a Python dictionary of parameters.
 
@@ -812,19 +781,18 @@ class PretrainedConfig:
         config = cls(**config_dict)
 
         if hasattr(config, "pruned_heads"):
-            config.pruned_heads = dict(
-                (int(key), value) for key, value in config.pruned_heads.items())
+            config.pruned_heads = dict((int(key), value) for key, value in config.pruned_heads.items())
 
         # Update config with kwargs if needed
         if "num_labels" in kwargs and "id2label" in kwargs:
             num_labels = kwargs["num_labels"]
-            id2label = kwargs["id2label"] if kwargs[
-                "id2label"] is not None else []
+            id2label = kwargs["id2label"] if kwargs["id2label"] is not None else []
             if len(id2label) != num_labels:
                 raise ValueError(
                     f"You passed along `num_labels={num_labels }` with an incompatible id to label map: "
                     f"{kwargs['id2label']}. Since those arguments are inconsistent with each other, you should remove "
-                    "one of them.")
+                    "one of them."
+                )
         to_remove = []
         for key, value in kwargs.items():
             if hasattr(config, key):
@@ -841,8 +809,7 @@ class PretrainedConfig:
             return config
 
     @classmethod
-    def from_json_file(
-            cls, json_file: Union[str, os.PathLike]) -> "PretrainedConfig":
+    def from_json_file(cls, json_file: Union[str, os.PathLike]) -> "PretrainedConfig":
         """
         Instantiates a [`PretrainedConfig`] from the path to a JSON file of parameters.
 
@@ -883,16 +850,18 @@ class PretrainedConfig:
         default_config_dict = PretrainedConfig().to_dict()
 
         # get class specific config dict
-        class_config_dict = self.__class__().to_dict(
-        ) if not self.is_composition else {}
+        class_config_dict = self.__class__().to_dict() if not self.is_composition else {}
 
         serializable_config_dict = {}
 
         # only serialize values that differ from the default config
         for key, value in config_dict.items():
-            if (key not in default_config_dict or key == "paddlenlp_version"
-                    or value != default_config_dict[key] or
-                (key in class_config_dict and value != class_config_dict[key])):
+            if (
+                key not in default_config_dict
+                or key == "paddlenlp_version"
+                or value != default_config_dict[key]
+                or (key in class_config_dict and value != class_config_dict[key])
+            ):
                 serializable_config_dict[key] = value
 
         return serializable_config_dict
@@ -930,9 +899,7 @@ class PretrainedConfig:
             config_dict = self.to_dict()
         return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
 
-    def to_json_file(self,
-                     json_file_path: Union[str, os.PathLike],
-                     use_diff: bool = True):
+    def to_json_file(self, json_file_path: Union[str, os.PathLike], use_diff: bool = True):
         """
         Save this instance to a JSON file.
 
@@ -982,8 +949,7 @@ class PretrainedConfig:
                 elif v.lower() in ["false", "0", "n", "no"]:
                     v = False
                 else:
-                    raise ValueError(
-                        f"can't derive true or false from {v} (key {k})")
+                    raise ValueError(f"can't derive true or false from {v} (key {k})")
             elif isinstance(old_v, int):
                 v = int(v)
             elif isinstance(old_v, float):
@@ -1021,6 +987,18 @@ class PretrainedConfig:
 
         cls._auto_class = auto_class
 
+    def get(self, key, default=None):
+        """
+        Return the value for key if config class has the attribute , else default.
+        If default is not given, it defaults to None, so that this method never raises a AttributeError.
+        """
+        try:
+            value = self.__getattribute__(key)
+        except AttributeError:
+            return default
+        else:
+            return value
+
 
 def get_configuration_file(configuration_files: List[str]) -> str:
     """
@@ -1050,6 +1028,7 @@ def get_configuration_file(configuration_files: List[str]) -> str:
     # the version of package, also be uesed in `transfromer`.
     # **But**, we don't support version compare function now. so remove the hard dependency.
     from packaging import version
+
     paddlenlp_version = version.parse(__version__)
     for v in available_versions:
         if version.parse(v) <= paddlenlp_version:
