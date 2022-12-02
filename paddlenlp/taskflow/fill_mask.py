@@ -70,14 +70,10 @@ class FillMaskTask(Task):
         task (string): The name of task.
         task_path (string): The local file path to the model path or a pre-trained model
         top_k (string, optional): The number of predictions to return.. Defaults to 5.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    def __init__(self,
-                 task: str,
-                 model: Optional[str] = None,
-                 top_k: Optional[str] = 5,
-                 **kwargs):
+    def __init__(self, task: str, model: Optional[str] = None, top_k: Optional[str] = 5, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self.top_k = top_k
         self._construct_tokenizer(self._task_path)
@@ -87,16 +83,13 @@ class FillMaskTask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        raise NotImplementedError(
-            f"Conversion from dygraph to static graph is not supported in {self.__name__}"
-        )
+        raise NotImplementedError(f"Conversion from dygraph to static graph is not supported in {self.__name__}")
 
     def _construct_model(self, model: str):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = AutoModelForMaskedLM.from_pretrained(
-            model, from_hf_hub=self.from_hf_hub)
+        model_instance = AutoModelForMaskedLM.from_pretrained(model, from_hf_hub=self.from_hf_hub)
         model_instance.eval()
         self._model = model_instance
 
@@ -104,8 +97,7 @@ class FillMaskTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(
-            model, from_hf_hub=self.from_hf_hub)
+        self._tokenizer = AutoTokenizer.from_pretrained(model, from_hf_hub=self.from_hf_hub)
 
     def get_masked_index(self, input_ids):
         return paddle.nonzero(input_ids == self._tokenizer.mask_token_id)
@@ -113,9 +105,7 @@ class FillMaskTask(Task):
     def ensure_exactly_one_mask_token(self, input_ids: List[int]):
         num_mask_token = input_ids.count(self._tokenizer.mask_token_id)
         if num_mask_token != 1:
-            raise ValueError(
-                f"FillMaskTask expects 1 mask token for each input but found {num_mask_token}"
-            )
+            raise ValueError(f"FillMaskTask expects 1 mask token for each input but found {num_mask_token}")
 
     def _preprocess(self, inputs: Union[str, List[str]]) -> Dict[str, Any]:
         """
@@ -125,11 +115,9 @@ class FillMaskTask(Task):
         """
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
-        batch_size = self.kwargs[
-            'batch_size'] if 'batch_size' in self.kwargs else 1
+        batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 1
 
-        max_length = self.kwargs[
-            'max_length'] if 'max_length' in self.kwargs else 512
+        max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
         collator = DataCollatorWithPadding(self._tokenizer, return_tensors="pd")
         tokenized_inputs = []
         for i in inputs:
@@ -137,10 +125,7 @@ class FillMaskTask(Task):
             self.ensure_exactly_one_mask_token(tokenized_input["input_ids"])
             tokenized_inputs.append(tokenized_input)
 
-        batches = [
-            tokenized_inputs[idx:idx + batch_size]
-            for idx in range(0, len(tokenized_inputs), batch_size)
-        ]
+        batches = [tokenized_inputs[idx : idx + batch_size] for idx in range(0, len(tokenized_inputs), batch_size)]
         outputs = {}
         outputs["text"] = inputs
         outputs["batches"] = [collator(batch) for batch in batches]
@@ -149,7 +134,7 @@ class FillMaskTask(Task):
 
     def _run_model(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Run the task model from the outputs of the `_tokenize` function. 
+        Run the task model from the outputs of the `_tokenize` function.
         """
         model_outputs = []
         with dygraph_mode_guard():
@@ -158,11 +143,8 @@ class FillMaskTask(Task):
                 masked_index = self.get_masked_index(batch["input_ids"])
                 mask_token_logits = paddle.gather_nd(logits, masked_index)
                 mask_token_probs = F.softmax(mask_token_logits, axis=-1)
-                top_probs, top_pred_indices = paddle.topk(mask_token_probs,
-                                                          k=self.top_k,
-                                                          axis=-1)
-                for probs, pred_indices in zip(top_probs.tolist(),
-                                               top_pred_indices.tolist()):
+                top_probs, top_pred_indices = paddle.topk(mask_token_probs, k=self.top_k, axis=-1)
+                for probs, pred_indices in zip(top_probs.tolist(), top_pred_indices.tolist()):
                     model_output = []
                     for prob, pred in zip(probs, pred_indices):
                         model_output.append({"token": pred, "score": prob})
@@ -172,17 +154,14 @@ class FillMaskTask(Task):
         outputs["model_outputs"] = model_outputs
         return outputs
 
-    def _postprocess(self, inputs: List[Dict[str,
-                                             Any]]) -> List[Dict[str, Any]]:
+    def _postprocess(self, inputs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
         The model output is tag ids, this function will convert the model output to raw text.
         """
         for i, model_output in enumerate(inputs["model_outputs"]):
             # Same API with https://huggingface.co/tasks/fill-mask
             for token_output in model_output:
-                token_output["token_str"] = self._tokenizer.decode(
-                    token_output["token"])
+                token_output["token_str"] = self._tokenizer.decode(token_output["token"])
                 # Since we limit to 1 MASK per input, we can directly use .replace here
-                token_output["sequence"] = inputs["text"][i].replace(
-                    "[MASK]", token_output["token_str"])
+                token_output["sequence"] = inputs["text"][i].replace("[MASK]", token_output["token_str"])
         return inputs["model_outputs"]

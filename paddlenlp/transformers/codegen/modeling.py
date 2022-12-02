@@ -420,57 +420,61 @@ class CodeGenModel(CodeGenPreTrainedModel):
         return_dict=False,
     ):
         r"""
-        The CodeGenModel forward method, overrides the `__call__()` special method.
-        Args:
-            input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
-                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
-                [batch_size, num_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`, which means nothing needed to be prevented attention to.
-            use_cache (bool, optional):
-                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
-                 can be used to speed up decoding.
-            cache (list, optional):
-                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
-                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
-                It is only used for inference and should be None for training.
-                Default to `None`.
-            output_attentions (bool, optional):
-                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
-                tensors for more detail. Defaults to `False`.
-            output_hidden_states (bool, optional):
-                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
-                more detail. Defaults to `False`.
-            return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object.
-                If `False`, the output will be a tuple of tensors. Defaults to `False`.
-        Returns:
-            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
-            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
-            to ordered and not None (depending on the input arguments) fields of
-            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
-            Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`,
-            returns a tensor representing the output of :class:`CodeGenModel`.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
-        Example:
-            .. code-block::
-                import paddle
-                from paddlenlp.transformers import CodeGenModel, CodeGenTokenizer
-                tokenizer = CodeGenTokenizer.from_pretrained('Salesforce/codegen-350M-mono')
-                model = CodeGenModel.from_pretrained('Salesforce/codegen-350M-mono')
-                inputs = tokenizer("def hello_world():", return_token_type_ids=False)
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs)
+                The CodeGenModel forward method, overrides the `__call__()` special method.
+                Args:
+                    input_ids (Tensor):
+                        Indices of input sequence tokens in the vocabulary. They are
+                        numerical representations of tokens that build the input sequence.
+                        Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                    attention_mask (Tensor, optional):
+                        Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                        usually the paddings or the subsequent positions.
+                        Its data type can be int, float and bool.
+                        When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                        When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                        When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                        It is a tensor with shape broadcasted to `[batch_size, num_attention_heads, sequence_length, sequence_length]`.
+                        For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                        [batch_size, num_attention_heads, sequence_length, sequence_length].
+                        Defaults to `None`, which means nothing needed to be prevented attention to.
+                    use_cache (bool, optional):
+                         Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                         can be used to speed up decoding.
+                    cache (list, optional):
+                        It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
+                        See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+                        It is only used for inference and should be None for training.
+                        Default to `None`.
+                    output_attentions (bool, optional):
+                        Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                        tensors for more detail. Defaults to `False`.
+                    output_hidden_states (bool, optional):
+                        Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                        more detail. Defaults to `False`.
+                    return_dict (bool, optional):
+                        Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object.
+                        If `False`, the output will be a tuple of tensors. Defaults to `False`.
+                Returns:
+                    An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+                    `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+                    to ordered and not None (depending on the input arguments) fields of
+                    :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+                    Especially, When `return_dict=output_hidden_states=output_attentions=False` and `cache=None`,
+        <<<<<<< HEAD
+                    returns a tensor representing the output of :class:`CodeGenModel`.
+        =======
+                    returns a tensor representing the output of :class:`UnifiedTransformerModel`.
+        >>>>>>> 56e1ad9e7bfc89651b7c317a6aa1b68fb42d15da
+                    Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
+                Example:
+                    .. code-block::
+                        import paddle
+                        from paddlenlp.transformers import CodeGenModel, CodeGenTokenizer
+                        tokenizer = CodeGenTokenizer.from_pretrained('Salesforce/codegen-350M-mono')
+                        model = CodeGenModel.from_pretrained('Salesforce/codegen-350M-mono')
+                        inputs = tokenizer("def hello_world():", return_token_type_ids=False)
+                        inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                        output = model(**inputs)
         """
 
         if input_ids is not None:

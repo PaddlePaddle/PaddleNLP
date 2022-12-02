@@ -28,7 +28,6 @@ SPIECE_UNDERLINE = "▁"
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "layoutxlm-base-uncased": 514,
-
     # FIXME(wj-Mcat): why this model-name not in the init-configuration
     # "layoutxlm-wo-backbone-base-uncased": 514
 }
@@ -37,31 +36,24 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
 def _is_end_of_word(text):
     """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
     last_char = text[-1]
-    return bool(
-        _is_control(last_char) | _is_punctuation(last_char)
-        | _is_whitespace(last_char))
+    return bool(_is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(last_char))
 
 
 def _is_start_of_word(text):
     """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
     first_char = text[0]
-    return bool(
-        _is_control(first_char) | _is_punctuation(first_char)
-        | _is_whitespace(first_char))
+    return bool(_is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(first_char))
 
 
 class LayoutXLMTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "sentencepiece.bpe.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "layoutxlm-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/sentencepiece.bpe.model",
+            "layoutxlm-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/layoutxlm_base/sentencepiece.bpe.model",
         }
     }
     pretrained_init_configuration = {
-        "layoutxlm-base-uncased": {
-            "do_lower_case": False
-        },
+        "layoutxlm-base-uncased": {"do_lower_case": False},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
     model_input_names = ["input_ids", "attention_mask"]
@@ -77,19 +69,19 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         "additional_special_tokens",
     ]
 
-    def __init__(self,
-                 vocab_file,
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 sep_token="</s>",
-                 cls_token="<s>",
-                 unk_token="<unk>",
-                 pad_token="<pad>",
-                 mask_token="<mask>",
-                 **kwargs):
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+    def __init__(
+        self,
+        vocab_file,
+        bos_token="<s>",
+        eos_token="</s>",
+        sep_token="</s>",
+        cls_token="<s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        mask_token="<mask>",
+        **kwargs
+    ):
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
         self._bos_token = bos_token
         self._eos_token = eos_token
         self._sep_token = sep_token
@@ -110,9 +102,8 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         self.ids_to_tokens = {v: k for k, v in self.tokens_to_ids.items()}
 
     def build_inputs_with_special_tokens(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         cls = [self.cls_token_id]
@@ -120,31 +111,23 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return cls + token_ids_0 + sep + sep + token_ids_1 + sep
 
     def get_special_tokens_mask(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None,
-            already_has_special_tokens: bool = False) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False
+    ) -> List[int]:
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -157,10 +140,7 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return len(self.sp_model) + self.offset + 1  # Add the <mask> token
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -168,7 +148,7 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
         return self.sp_model.EncodeAsPieces(text)
 
     def _convert_token_to_id(self, token):
-        """ Converts a token (str) in an id using the vocab. """
+        """Converts a token (str) in an id using the vocab."""
         if token in self.tokens_to_ids:
             return self.tokens_to_ids[token]
         spm_id = self.sp_model.PieceToId(token)
@@ -190,6 +170,4 @@ class LayoutXLMTokenizer(PretrainedTokenizer):
     def num_special_tokens_to_add(self, pair=False):
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
