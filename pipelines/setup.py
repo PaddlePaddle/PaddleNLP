@@ -29,7 +29,7 @@ def read(*names, **kwargs):
 
 setuptools.setup(
     name="paddle-pipelines",
-    version="0.4.0.dev",
+    version=read("VERSION"),
     author="PaddlePaddle Speech and Language Team",
     author_email="paddlenlp@baidu.com",
     description=description,
