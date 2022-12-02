@@ -286,7 +286,7 @@ class DocParser(object):
 
     @classmethod
     def write_image_with_results(
-        self, image, layout=None, results=None, save_path=None, return_pil_image=False, format=None, max_size=None
+        self, image, layout=None, results=None, save_path=None, return_image=False, format=None, max_size=None
     ):
         """
         write image with boxes and results
@@ -382,15 +382,22 @@ class DocParser(object):
             else:
                 new_size = (max_size, int(h * max_size / w))
             img_show = img_show.resize(new_size)
+
+        data = np.array(img_show)
+        r, g, b = data.T
+        data = np.array([b, g, r])
+        data = data.transpose()
+        img_show = Image.fromarray(data)
+
         if save_path:
             dir_path = os.path.dirname(save_path)
             if dir_path and not os.path.isdir(dir_path):
                 os.makedirs(dir_path)
             img_show.save(save_path)
-            if return_pil_image:
-                return img_show
-        elif return_pil_image:
-            return img_show
+            if return_image:
+                return np.array(img_show)
+        elif return_image:
+            return np.array(img_show)
         else:
             buff = BytesIO()
             if format is None:
