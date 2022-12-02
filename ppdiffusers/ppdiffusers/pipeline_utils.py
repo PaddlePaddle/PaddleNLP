@@ -28,7 +28,7 @@ from packaging import version
 from PIL import Image
 from tqdm.auto import tqdm
 
-from . import OnnxRuntimeModel
+from . import FastDeployRuntimeModel, OnnxRuntimeModel
 from .configuration_utils import ConfigMixin
 from .utils import PPDIFFUSERS_CACHE, BaseOutput, deprecate, logging
 
@@ -45,6 +45,7 @@ LOADABLE_CLASSES = {
         "SchedulerMixin": ["save_pretrained", "from_pretrained"],
         "DiffusionPipeline": ["save_pretrained", "from_pretrained"],
         "OnnxRuntimeModel": ["save_pretrained", "from_pretrained"],
+        "FastDeployRuntimeModel": ["save_pretrained", "from_pretrained"],
     },
     "paddlenlp.transformers": {
         "PretrainedTokenizer": ["save_pretrained", "from_pretrained"],
@@ -286,8 +287,11 @@ class DiffusionPipeline(ConfigMixin):
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         # (TODO junnyu, we donot suuport this.)
         # custom_pipeline = kwargs.pop("custom_pipeline", None)
+        # for onnx model
         provider = kwargs.pop("provider", None)
         sess_options = kwargs.pop("sess_options", None)
+        # for fastdeploy model
+        runtime_options = kwargs.pop("runtime_options", None)
 
         # 1. Download the checkpoints and configs
         if not os.path.isdir(pretrained_model_name_or_path):
@@ -440,6 +444,11 @@ class DiffusionPipeline(ConfigMixin):
                     loading_kwargs["provider"] = provider
                     loading_kwargs["sess_options"] = sess_options
 
+                if issubclass(class_obj, FastDeployRuntimeModel):
+                    if isinstance(runtime_options, dict):
+                        options = runtime_options.get(name, None)
+                    loading_kwargs["runtime_options"] = options
+
                 if issubclass(class_obj, ModelMixin):
                     loading_kwargs["cache_dir"] = cache_dir
 
@@ -449,12 +458,7 @@ class DiffusionPipeline(ConfigMixin):
                     else pretrained_model_name_or_path + "/" + name
                 )
 
-                try:
-                    # if in sub dir
-                    loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
-                except RuntimeError:
-                    # if in top dir
-                    loaded_sub_model = load_method(pretrained_model_name_or_path, **loading_kwargs)
+                loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
             if isinstance(loaded_sub_model, nn.Layer):

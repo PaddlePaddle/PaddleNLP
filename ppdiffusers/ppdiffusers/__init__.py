@@ -128,6 +128,8 @@ if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_availabl
     from .pipelines import (
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionInpaintPipelineLegacy,
+        FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
     )
 else:

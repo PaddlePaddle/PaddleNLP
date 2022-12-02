@@ -126,8 +126,11 @@ if is_paddle_available():
 
     def randn_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
-        with get_rng_state_tracker().rng_state(generator):
+        if generator is None:
             return randn(shape, dtype=dtype, name=name)
+        else:
+            with get_rng_state_tracker().rng_state(generator):
+                return randn(shape, dtype=dtype, name=name)
 
     paddle.randn = randn_pt
 
@@ -135,8 +138,11 @@ if is_paddle_available():
 
     def rand_pt(shape, dtype=None, name=None, **kwargs):
         generator = kwargs.get("generator", None)
-        with get_rng_state_tracker().rng_state(generator):
-            return rand(shape, dtype=dtype, name=name)
+        if generator is None:
+            return randn(shape, dtype=dtype, name=name)
+        else:
+            with get_rng_state_tracker().rng_state(generator):
+                return rand(shape, dtype=dtype, name=name)
 
     paddle.rand = rand_pt
 

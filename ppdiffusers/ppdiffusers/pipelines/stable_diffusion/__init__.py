@@ -88,3 +88,9 @@ if is_paddlenlp_available() and is_fastdeploy_available():
     from .pipeline_fastdeploy_stable_diffusion_inpaint import (
         FastDeployStableDiffusionInpaintPipeline,
     )
+    from .pipeline_fastdeploy_stable_diffusion_inpaint_legacy import (
+        FastDeployStableDiffusionInpaintPipelineLegacy,
+    )
+    from .pipeline_fastdeploy_stable_diffusion_mega import (
+        FastDeployStableDiffusionMegaPipeline,
+    )

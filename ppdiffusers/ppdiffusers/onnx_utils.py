@@ -133,7 +133,7 @@ class OnnxRuntimeModel:
     @classmethod
     def _from_pretrained(
         cls,
-        model_id: Union[str, Path],
+        pretrained_model_name_or_path: Union[str, Path],
         cache_dir: Optional[str] = None,
         file_name: Optional[str] = None,
         provider: Optional[str] = None,
@@ -158,16 +158,18 @@ class OnnxRuntimeModel:
         """
         model_file_name = file_name if file_name is not None else ONNX_WEIGHTS_NAME
         # load model from local directory
-        if os.path.isdir(model_id):
+        if os.path.isdir(pretrained_model_name_or_path):
             model = OnnxRuntimeModel.load_model(
-                os.path.join(model_id, model_file_name), provider=provider, sess_options=sess_options
+                os.path.join(pretrained_model_name_or_path, model_file_name),
+                provider=provider,
+                sess_options=sess_options,
             )
-            kwargs["model_save_dir"] = Path(model_id)
+            kwargs["model_save_dir"] = Path(pretrained_model_name_or_path)
         # load model from hub
         else:
             # download model
             model_cache_path = ppdiffusers_bos_download(
-                pretrained_model_name_or_path=model_id,
+                pretrained_model_name_or_path=pretrained_model_name_or_path,
                 filename=model_file_name,
                 cache_dir=cache_dir,
             )
@@ -179,12 +181,12 @@ class OnnxRuntimeModel:
     @classmethod
     def from_pretrained(
         cls,
-        model_id: Union[str, Path],
+        pretrained_model_name_or_path: Union[str, Path],
         cache_dir: Optional[str] = None,
         **model_kwargs,
     ):
         return cls._from_pretrained(
-            model_id=model_id,
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
             cache_dir=cache_dir,
             **model_kwargs,
         )

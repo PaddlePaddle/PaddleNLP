@@ -318,8 +318,6 @@ class OnnxStableDiffusionPipeline(DiffusionPipeline):
                 self.numpy_to_pil(image), return_tensors="np"
             ).pixel_values.astype(image.dtype)
 
-            image, has_nsfw_concepts = self.safety_checker(clip_input=safety_checker_input, images=image)
-
             # There will throw an error if use safety_checker batchsize>1
             images, has_nsfw_concept = [], []
             for i in range(image.shape[0]):

@@ -76,5 +76,7 @@ if is_paddlenlp_available() and is_fastdeploy_available():
     from .stable_diffusion import (
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionInpaintPipelineLegacy,
+        FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
     )
