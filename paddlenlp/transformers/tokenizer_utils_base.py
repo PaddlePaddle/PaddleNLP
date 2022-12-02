@@ -1766,13 +1766,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
 
         Returns: The url of the commit of your model in the given repository.
         """
-        token = HfFolder.get_token()
-        if token is None:
-            raise ValueError(
-                "You must login to the Hugging Face hub on this computer by typing `transformers-cli login`."
-            )
-
-        repo_url = create_repo(repo_id, token=token, private=private, exist_ok=True)
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
 
         # Infer complete repo_id from repo_url
         # Can be different from the input `repo_id` if repo_owner was implicit
