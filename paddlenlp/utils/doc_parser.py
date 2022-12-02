@@ -341,12 +341,12 @@ class DocParser(object):
                         color = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
                         if sum(color) < 480:
                             break
+                for box in plot_boxes:
+                    draw_render.polygon(box, fill=color)
                 if parent_centers:
                     for p_c in parent_centers:
                         for c in centers:
                             draw_render.line((p_c[0], p_c[1], c[0], c[1]), fill=125, width=3)
-                for box in plot_boxes:
-                    draw_render.polygon(box, fill=color)
                 if isinstance(segment, dict) and segment.get("relations"):
                     _write_results(segment["relations"], color, root=False, parent_centers=centers)
 
