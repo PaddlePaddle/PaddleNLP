@@ -30,7 +30,6 @@ __version__ = VERSION
 
 from .configuration_utils import ConfigMixin
 from .fastdeploy_utils import FastDeployRuntimeModel
-from .onnx_utils import OnnxRuntimeModel
 from .utils import logging
 
 if is_paddle_available():
@@ -113,16 +112,6 @@ if is_paddle_available() and is_paddlenlp_available():
     )
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
-
-if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
-    from .pipelines import (
-        OnnxStableDiffusionImg2ImgPipeline,
-        OnnxStableDiffusionInpaintPipeline,
-        OnnxStableDiffusionInpaintPipelineLegacy,
-        OnnxStableDiffusionPipeline,
-    )
-else:
-    from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available():
     from .pipelines import (

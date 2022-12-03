@@ -30,7 +30,7 @@ import PIL.Image
 import PIL.ImageOps
 import requests
 
-from .import_utils import is_onnx_available, is_paddle_available
+from .import_utils import is_fastdeploy_available, is_paddle_available
 
 if is_paddle_available():
     import paddle
@@ -120,11 +120,11 @@ def require_paddle(test_case):
     return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
 
 
-def require_onnxruntime(test_case):
+def require_fastdeploy(test_case):
     """
-    Decorator marking a test that requires onnxruntime. These tests are skipped when onnxruntime isn't installed.
+    Decorator marking a test that requires fastdeploy. These tests are skipped when fastdeploy isn't installed.
     """
-    return unittest.skipUnless(is_onnx_available(), "test requires onnxruntime")(test_case)
+    return unittest.skipUnless(is_fastdeploy_available(), "test requires fastdeploy")(test_case)
 
 
 def load_numpy(arry: Union[str, np.ndarray]) -> np.ndarray:

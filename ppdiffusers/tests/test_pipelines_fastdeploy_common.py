@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers.utils.testing_utils import require_onnxruntime
+from ppdiffusers.utils.testing_utils import require_fastdeploy
 
 
-@require_onnxruntime
-class OnnxPipelineTesterMixin:
+@require_fastdeploy
+class FastDeployPipelineTesterMixin:
     """
     This mixin is designed to be used with unittest.TestCase classes.
-    It provides a set of common tests for each ONNXRuntime pipeline, e.g. saving and loading the pipeline,
+    It provides a set of common tests for each FastDeploy pipeline, e.g. saving and loading the pipeline,
     equivalence of dict and tuple outputs, etc.
     """
 

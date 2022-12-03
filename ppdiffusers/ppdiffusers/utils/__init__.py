@@ -57,8 +57,6 @@ default_cache_path = _get_sub_home("models")
 
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"
-ONNX_WEIGHTS_NAME = "model.onnx"
-ONNX_EXTERNAL_WEIGHTS_NAME = "weights.pb"
 FASTDEPLOY_WEIGHTS_NAME = "inference.pdiparams"
 FASTDEPLOY_MODEL_NAME = "inference.pdmodel"
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"

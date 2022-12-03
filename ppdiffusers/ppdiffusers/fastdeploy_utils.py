@@ -83,7 +83,7 @@ class FastDeployRuntimeModel:
     ):
         """
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
-        [`~optimum.onnxruntime.modeling_ort.ORTModel.from_pretrained`] class method. It will always save the
+        [`~FastDeployRuntimeModel.from_pretrained`] class method. It will always save the
         latest_model_name.
 
         Arguments:
@@ -117,7 +117,7 @@ class FastDeployRuntimeModel:
         **kwargs,
     ):
         """
-        Save a model to a directory, so that it can be re-loaded using the [`~OnnxModel.from_pretrained`] class
+        Save a model to a directory, so that it can be re-loaded using the [`~FastDeployRuntimeModel.from_pretrained`] class
         method.:
 
         Arguments:

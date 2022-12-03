@@ -97,7 +97,7 @@ class StableDiffusionSafetyChecker(CLIPPretrainedModel):
 
         return images, has_nsfw_concepts
 
-    def forward_onnx(self, clip_input: paddle.Tensor, images: paddle.Tensor):
+    def forward_fastdeploy(self, clip_input: paddle.Tensor, images: paddle.Tensor):
         pooled_output = self.clip.vision_model(clip_input)[1]  # pooled_output
         image_embeds = paddle.matmul(pooled_output, self.vision_projection)
 

@@ -28,7 +28,7 @@ from packaging import version
 from PIL import Image
 from tqdm.auto import tqdm
 
-from . import FastDeployRuntimeModel, OnnxRuntimeModel
+from . import FastDeployRuntimeModel
 from .configuration_utils import ConfigMixin
 from .utils import PPDIFFUSERS_CACHE, BaseOutput, deprecate, logging
 
@@ -44,7 +44,6 @@ LOADABLE_CLASSES = {
         "ModelMixin": ["save_pretrained", "from_pretrained"],
         "SchedulerMixin": ["save_pretrained", "from_pretrained"],
         "DiffusionPipeline": ["save_pretrained", "from_pretrained"],
-        "OnnxRuntimeModel": ["save_pretrained", "from_pretrained"],
         "FastDeployRuntimeModel": ["save_pretrained", "from_pretrained"],
     },
     "paddlenlp.transformers": {
@@ -52,9 +51,6 @@ LOADABLE_CLASSES = {
         "PretrainedModel": ["save_pretrained", "from_pretrained"],
         "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
         "ProcessorMixin": ["save_pretrained", "from_pretrained"],
-    },
-    "onnxruntime.training": {
-        "ORTModule": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -287,9 +283,6 @@ class DiffusionPipeline(ConfigMixin):
         paddle_dtype = kwargs.pop("paddle_dtype", None)
         # (TODO junnyu, we donot suuport this.)
         # custom_pipeline = kwargs.pop("custom_pipeline", None)
-        # for onnx model
-        provider = kwargs.pop("provider", None)
-        sess_options = kwargs.pop("sess_options", None)
         # for fastdeploy model
         runtime_options = kwargs.pop("runtime_options", None)
 
@@ -440,14 +433,11 @@ class DiffusionPipeline(ConfigMixin):
                 load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
 
-                if issubclass(class_obj, OnnxRuntimeModel):
-                    loading_kwargs["provider"] = provider
-                    loading_kwargs["sess_options"] = sess_options
-
                 if issubclass(class_obj, FastDeployRuntimeModel):
                     if isinstance(runtime_options, dict):
                         options = runtime_options.get(name, None)
                     loading_kwargs["runtime_options"] = options
+                    loading_kwargs["cache_dir"] = cache_dir
 
                 if issubclass(class_obj, ModelMixin):
                     loading_kwargs["cache_dir"] = cache_dir
