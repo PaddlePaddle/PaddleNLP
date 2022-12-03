@@ -18,18 +18,6 @@ from typing import Callable, List, Optional, Union
 import numpy as np
 import PIL.Image
 
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTokenizer
-
-from ...fastdeploy_utils import FastDeployRuntimeModel
-from ...pipeline_utils import DiffusionPipeline
-from ...schedulers import (
-    DDIMScheduler,
-    DPMSolverMultistepScheduler,
-    EulerAncestralDiscreteScheduler,
-    EulerDiscreteScheduler,
-    LMSDiscreteScheduler,
-    PNDMScheduler,
-)
 from ...utils import logging
 from .pipeline_fastdeploy_stable_diffusion import FastDeployStableDiffusionPipeline
 from .pipeline_fastdeploy_stable_diffusion_img2img import (
@@ -42,11 +30,11 @@ from .pipeline_fastdeploy_stable_diffusion_inpaint_legacy import (
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-class FastDeployStableDiffusionMegaPipeline(DiffusionPipeline):
+class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
     r"""
     Pipeline for generation using FastDeployStableDiffusion.
 
-    This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
+    This model inherits from [`FastDeployStableDiffusionPipeline`]. Check the superclass documentation for the generic methods the
     library implements for all the pipelines (such as downloading or saving etc.)
 
     Args:
@@ -73,53 +61,6 @@ class FastDeployStableDiffusionMegaPipeline(DiffusionPipeline):
             Model that extracts features from generated images to be used as inputs for the `safety_checker`.
     """
     _optional_components = ["safety_checker", "feature_extractor"]
-
-    def __init__(
-        self,
-        vae_encoder: FastDeployRuntimeModel,
-        vae_decoder: FastDeployRuntimeModel,
-        text_encoder: FastDeployRuntimeModel,
-        tokenizer: CLIPTokenizer,
-        unet: FastDeployRuntimeModel,
-        scheduler: Union[
-            DDIMScheduler,
-            PNDMScheduler,
-            LMSDiscreteScheduler,
-            EulerDiscreteScheduler,
-            EulerAncestralDiscreteScheduler,
-            DPMSolverMultistepScheduler,
-        ],
-        safety_checker: FastDeployRuntimeModel,
-        feature_extractor: CLIPFeatureExtractor,
-        requires_safety_checker: bool = True,
-    ):
-        super().__init__()
-        if safety_checker is None and requires_safety_checker:
-            logger.warning(
-                f"You have disabled the safety checker for {self.__class__} by passing `safety_checker=None`. Ensure"
-                " that you abide to the conditions of the Stable Diffusion license and do not expose unfiltered"
-                " results in services or applications open to the public. PaddleNLP team, diffusers team and Hugging Face"
-                " strongly recommend to keep the safety filter enabled in all public facing circumstances, disabling"
-                " it only for use-cases that involve analyzing network behavior or auditing its results. For more"
-                " information, please have a look at https://github.com/huggingface/diffusers/pull/254 ."
-            )
-        if safety_checker is not None and feature_extractor is None:
-            raise ValueError(
-                "Make sure to define a feature extractor when loading {self.__class__} if you want to use the safety"
-                " checker. If you do not want to use the safety checker, you can pass `'safety_checker=None'` instead."
-            )
-
-        self.register_modules(
-            vae_encoder=vae_encoder,
-            vae_decoder=vae_decoder,
-            text_encoder=text_encoder,
-            tokenizer=tokenizer,
-            unet=unet,
-            scheduler=scheduler,
-            safety_checker=safety_checker,
-            feature_extractor=feature_extractor,
-        )
-        self.register_to_config(requires_safety_checker=requires_safety_checker)
 
     def __call__(self, *args, **kwargs):
         return self.text2img(*args, **kwargs)
