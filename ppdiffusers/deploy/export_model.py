@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 
 import paddle
@@ -25,9 +24,6 @@ def parse_arguments():
     import argparse
 
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--inpaint", type=distutils.util.strtobool, default=False, help="Wheter to export inpaint model"
-    )
     parser.add_argument(
         "--pretrained_model_name_or_path",
         default="CompVis/stable-diffusion-v1-4",
@@ -96,14 +92,15 @@ if __name__ == "__main__":
     print(f"Save vae_encoder model in {save_path} successfully.")
 
     # Convert to static graph with specific input description
-    unet_channels = 9 if args.inpaint else 4
+    unet_channels = unet.config.in_channels  # 4 or 9
+    cross_attention_dim = unet.config.cross_attention_dim  # 768 or 1024 or 1280
     unet = paddle.jit.to_static(
         unet,
         input_spec=[
             paddle.static.InputSpec(shape=[None, unet_channels, None, None], dtype="float32", name="sample"),  # sample
             paddle.static.InputSpec(shape=[1], dtype="int64", name="timestep"),  # timesteps
             paddle.static.InputSpec(
-                shape=[None, None, 768], dtype="float32", name="encoder_hidden_states"
+                shape=[None, None, cross_attention_dim], dtype="float32", name="encoder_hidden_states"
             ),  # encoder_hidden_states
         ],
     )

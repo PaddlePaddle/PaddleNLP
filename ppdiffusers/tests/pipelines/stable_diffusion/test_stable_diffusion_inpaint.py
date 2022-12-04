@@ -159,9 +159,9 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
         bert = self.dummy_text_encoder
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
-        image = self.dummy_image.transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize((128, 128))
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((128, 128))
+        image_dummy = self.dummy_image.transpose([0, 2, 3, 1])[0]
+        init_image = Image.fromarray(np.uint8(image_dummy)).convert("RGB").resize((128, 128))
+        mask_image = Image.fromarray(np.uint8(image_dummy + 4)).convert("RGB").resize((128, 128))
 
         # make sure here that pndm scheduler skips prk
         sd_pipe = StableDiffusionInpaintPipeline(
@@ -228,9 +228,9 @@ class StableDiffusionInpaintPipelineFastTests(PipelineTesterMixin, unittest.Test
         bert = self.dummy_text_encoder
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
-        image = self.dummy_image.transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image)).convert("RGB").resize((128, 128))
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((128, 128))
+        image_dummy = self.dummy_image.transpose([0, 2, 3, 1])[0]
+        init_image = Image.fromarray(np.uint8(image_dummy)).convert("RGB").resize((128, 128))
+        mask_image = Image.fromarray(np.uint8(image_dummy + 4)).convert("RGB").resize((128, 128))
 
         # make sure here that pndm scheduler skips prk
         sd_pipe = StableDiffusionInpaintPipeline(

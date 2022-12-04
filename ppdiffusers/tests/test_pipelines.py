@@ -233,9 +233,9 @@ class PipelineFastTests(unittest.TestCase):
         bert = self.dummy_text_encoder
         tokenizer = CLIPTokenizer.from_pretrained("hf-internal-testing/tiny-random-clip")
 
-        image = self.dummy_image().cpu().transpose([0, 2, 3, 1])[0]
-        init_image = Image.fromarray(np.uint8(image)).convert("RGB")
-        mask_image = Image.fromarray(np.uint8(image + 4)).convert("RGB").resize((32, 32))
+        image_dummy = self.dummy_image().cpu().transpose([0, 2, 3, 1])[0]
+        image = Image.fromarray(np.uint8(image_dummy)).convert("RGB")
+        mask_image = Image.fromarray(np.uint8(image_dummy + 4)).convert("RGB").resize((32, 32))
 
         # make sure here that pndm scheduler skips prk
         inpaint = StableDiffusionInpaintPipelineLegacy(
@@ -259,7 +259,7 @@ class PipelineFastTests(unittest.TestCase):
             generator=generator,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=image,
             mask_image=mask_image,
         ).images
         image_img2img = img2img(
@@ -267,7 +267,7 @@ class PipelineFastTests(unittest.TestCase):
             generator=generator,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=image,
         ).images
         image_text2img = text2img(
             [prompt],
@@ -482,7 +482,7 @@ class PipelineSlowTests(unittest.TestCase):
             == "Keyword arguments {'not_used': True} are not expected by DDPMPipeline and will be ignored.\n"
         )
 
-    def test_from_pretrained_save_pretrained(self):
+    def test_from_save_pretrained(self):
         # 1. Load models
         model = UNet2DModel(
             block_out_channels=(32, 64),

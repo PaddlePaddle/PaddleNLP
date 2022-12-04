@@ -40,9 +40,11 @@ from .pil_utils import PIL_INTERPOLATION
 if is_paddle_available():
     from .testing_utils import (
         floats_tensor,
+        image_grid,
         load_hf_numpy,
         load_image,
         load_numpy,
+        load_ppnlp_numpy,
         paddle_all_close,
         parse_flag_from_env,
         slow,

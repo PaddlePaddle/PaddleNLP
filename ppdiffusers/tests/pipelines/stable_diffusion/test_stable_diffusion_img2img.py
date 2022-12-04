@@ -177,7 +177,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         )
 
         image = output.images
@@ -189,7 +189,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
             return_dict=False,
         )[0]
 
@@ -244,7 +244,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         )
         image = output.images
         image_slice = image[0, -3:, -3:, -1]
@@ -265,7 +265,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-3
 
-    def test_stable_diffusion_img2img_multiple_init_images(self):
+    def test_stable_diffusion_img2img_multiple_images(self):
         unet = self.dummy_cond_unet
         scheduler = PNDMScheduler(skip_prk_steps=True)
         vae = self.dummy_vae
@@ -294,7 +294,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         )
 
         image = output.images
@@ -347,7 +347,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         )
         image = output.images
 
@@ -358,7 +358,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             guidance_scale=6.0,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
             return_dict=False,
         )
         image_from_tuple = output[0]
@@ -411,7 +411,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             prompt,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         ).images
 
         assert images.shape == (1, 32, 32, 3)
@@ -422,7 +422,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             [prompt] * batch_size,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
         ).images
 
         assert images.shape == (batch_size, 32, 32, 3)
@@ -433,7 +433,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             prompt,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
             num_images_per_prompt=num_images_per_prompt,
         ).images
 
@@ -445,7 +445,7 @@ class StableDiffusionImg2ImgPipelineFastTests(PipelineTesterMixin, unittest.Test
             [prompt] * batch_size,
             num_inference_steps=2,
             output_type="np",
-            init_image=init_image,
+            image=init_image,
             num_images_per_prompt=num_images_per_prompt,
         ).images
 
@@ -482,7 +482,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         generator = paddle.Generator().manual_seed(0)
         output = pipe(
             prompt=prompt,
-            init_image=init_image,
+            image=init_image,
             strength=0.75,
             guidance_scale=7.5,
             generator=generator,
@@ -518,7 +518,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         generator = paddle.Generator().manual_seed(0)
         output = pipe(
             prompt=prompt,
-            init_image=init_image,
+            image=init_image,
             strength=0.75,
             guidance_scale=7.5,
             generator=generator,
@@ -553,7 +553,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         generator = paddle.Generator().manual_seed(0)
         output = pipe(
             prompt=prompt,
-            init_image=init_image,
+            image=init_image,
             strength=0.75,
             guidance_scale=7.5,
             generator=generator,
@@ -626,7 +626,7 @@ class StableDiffusionImg2ImgPipelineIntegrationTests(unittest.TestCase):
         generator = paddle.Generator().manual_seed(0)
         pipe(
             prompt=prompt,
-            init_image=init_image,
+            image=init_image,
             strength=0.75,
             num_inference_steps=50,
             guidance_scale=7.5,

@@ -524,7 +524,7 @@ class StableDiffusion2PipelineIntegrationTests(unittest.TestCase):
         prompt = "astronaut riding a horse"
 
         generator = paddle.Generator().manual_seed(0)
-        output = pipe(prompt=prompt, strength=0.75, guidance_scale=7.5, generator=generator, output_type="np")
+        output = pipe(prompt=prompt, guidance_scale=7.5, generator=generator, output_type="np")
         image = output.images[0]
 
         assert image.shape == (512, 512, 3)

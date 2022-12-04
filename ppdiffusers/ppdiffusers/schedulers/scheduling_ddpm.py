@@ -17,7 +17,7 @@
 
 import math
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -101,9 +101,10 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             `fixed_small_log`, `fixed_large`, `fixed_large_log`, `learned` or `learned_range`.
         clip_sample (`bool`, default `True`):
             option to clip predicted sample between -1 and 1 for numerical stability.
-        prediction_type (`str`, default `epsilon`):
-            indicates whether the model predicts the noise (epsilon), or the samples. One of `epsilon`, `sample`.
-            `v-prediction` is not supported for this scheduler.
+        prediction_type (`str`, default `epsilon`, optional):
+            prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
+            process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
+            https://imagen.research.google/video/paper.pdf)
     """
 
     _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
@@ -117,7 +118,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.0001,
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
-        trained_betas: Optional[np.ndarray] = None,
+        trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         variance_type: str = "fixed_small",
         clip_sample: bool = True,
         prediction_type: str = "epsilon",
@@ -131,7 +132,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         if predict_epsilon is not None:
             self.register_to_config(prediction_type="epsilon" if predict_epsilon else "sample")
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas)
+            self.betas = paddle.to_tensor(trained_betas, dtype="float32")
         elif beta_schedule == "linear":
             self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
@@ -279,10 +280,12 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
         elif self.config.prediction_type == "sample":
             pred_original_sample = model_output
+        elif self.config.prediction_type == "v_prediction":
+            pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
         else:
             raise ValueError(
-                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` "
-                " for the DDPMScheduler."
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
+                " `v_prediction`  for the DDPMScheduler."
             )
 
         # 3. Clip "predicted x_0"

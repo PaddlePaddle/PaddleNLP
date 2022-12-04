@@ -23,6 +23,7 @@ import re
 from collections import OrderedDict
 from typing import Any, Dict, Tuple, Union
 
+import numpy as np
 from requests import HTTPError
 
 from . import __version__
@@ -430,6 +431,13 @@ class ConfigMixin:
         config_dict = self._internal_dict if hasattr(self, "_internal_dict") else {}
         config_dict["_class_name"] = self.__class__.__name__
         config_dict["_ppdiffusers_version"] = __version__
+
+        def to_json_saveable(value):
+            if isinstance(value, np.ndarray):
+                value = value.tolist()
+            return value
+
+        config_dict = {k: to_json_saveable(v) for k, v in config_dict.items()}
         return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
 
     def to_json_file(self, json_file_path: Union[str, os.PathLike]):

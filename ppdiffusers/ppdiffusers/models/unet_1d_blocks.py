@@ -336,6 +336,7 @@ class SelfAttention1d(nn.Layer):
 
         self.dropout = nn.Dropout(dropout_rate)
 
+    # (TODO junnyu) refactor self attention
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
         # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)

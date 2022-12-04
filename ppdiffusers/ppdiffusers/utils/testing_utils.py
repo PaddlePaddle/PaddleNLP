@@ -38,6 +38,16 @@ if is_paddle_available():
 global_rng = random.Random()
 
 
+def image_grid(imgs, rows, cols):
+    assert len(imgs) == rows * cols
+    w, h = imgs[0].size
+    grid = PIL.Image.new("RGB", size=(cols * w, rows * h))
+
+    for i, img in enumerate(imgs):
+        grid.paste(img, box=(i % cols * w, i // cols * h))
+    return grid
+
+
 def paddle_all_close(a, b, *args, **kwargs):
     if not is_paddle_available():
         raise ValueError("Paddle needs to be installed to use this function.")

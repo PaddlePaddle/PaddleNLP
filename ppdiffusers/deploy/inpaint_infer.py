@@ -191,7 +191,7 @@ if __name__ == "__main__":
     }
 
     unet_dynamic_shape = {
-        "latent_input": {
+        "sample": {
             "min_shape": [1, 4, 64, 64],
             "max_shape": [2, 4, 64, 64],
             "opt_shape": [2, 4, 64, 64],
@@ -201,7 +201,7 @@ if __name__ == "__main__":
             "max_shape": [1],
             "opt_shape": [1],
         },
-        "encoder_embedding": {
+        "encoder_hidden_states": {
             "min_shape": [1, 77, 768],
             "max_shape": [2, 77, 768],
             "opt_shape": [2, 77, 768],
@@ -306,13 +306,13 @@ if __name__ == "__main__":
         "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
     )
 
-    init_image = download_image(img_url).resize((512, 512))
+    image = download_image(img_url).resize((512, 512))
     mask_image = download_image(mask_url).resize((512, 512))
 
     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
     images = pipe(
         prompt=prompt,
-        image=init_image,
+        image=image,
         mask_image=mask_image,
         num_inference_steps=args.inference_steps,
     ).images

@@ -162,6 +162,12 @@ def is_fastdeploy_available():
 
 
 # docstyle-ignore
+FASTDEPLOY_IMPORT_ERROR = """
+{0} requires the fastdeploy library but it was not found in your environment. You can install it with pip: `pip install
+fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html`
+"""
+
+# docstyle-ignore
 INFLECT_IMPORT_ERROR = """
 {0} requires the inflect library but it was not found in your environment. You can install it with pip: `pip install
 inflect`
@@ -199,6 +205,7 @@ Unidecode`
 
 BACKENDS_MAPPING = OrderedDict(
     [
+        ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
         ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
         ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
         ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),

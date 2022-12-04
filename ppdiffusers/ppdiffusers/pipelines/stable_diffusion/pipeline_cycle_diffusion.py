@@ -409,9 +409,9 @@ class CycleDiffusionPipeline(DiffusionPipeline):
 
         return timesteps, num_inference_steps - t_start
 
-    def prepare_latents(self, init_image, timestep, batch_size, num_images_per_prompt, dtype, generator=None):
-        init_image = init_image.cast(dtype=dtype)
-        init_latent_dist = self.vae.encode(init_image).latent_dist
+    def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator=None):
+        image = image.cast(dtype=dtype)
+        init_latent_dist = self.vae.encode(image).latent_dist
         init_latents = init_latent_dist.sample(generator=generator)
         init_latents = 0.18215 * init_latents
 
@@ -419,16 +419,16 @@ class CycleDiffusionPipeline(DiffusionPipeline):
             # expand init_latents for batch_size
             deprecation_message = (
                 f"You have passed {batch_size} text prompts (`prompt`), but only {init_latents.shape[0]} initial"
-                " images (`init_image`). Initial images are now duplicating to match the number of text prompts. Note"
+                " images (`image`). Initial images are now duplicating to match the number of text prompts. Note"
                 " that this behavior is deprecated and will be removed in a version 1.0.0. Please make sure to update"
-                " your script to pass as many init images as text prompts to suppress this warning."
+                " your script to pass as many initial images as text prompts to suppress this warning."
             )
-            deprecate("len(prompt) != len(init_image)", "1.0.0", deprecation_message, standard_warn=False)
+            deprecate("len(prompt) != len(image)", "1.0.0", deprecation_message, standard_warn=False)
             additional_image_per_prompt = batch_size // init_latents.shape[0]
             init_latents = paddle.concat([init_latents] * additional_image_per_prompt * num_images_per_prompt, axis=0)
         elif batch_size > init_latents.shape[0] and batch_size % init_latents.shape[0] != 0:
             raise ValueError(
-                f"Cannot duplicate `init_image` of batch size {init_latents.shape[0]} to {batch_size} text prompts."
+                f"Cannot duplicate `image` of batch size {init_latents.shape[0]} to {batch_size} text prompts."
             )
         else:
             init_latents = paddle.concat([init_latents] * num_images_per_prompt, axis=0)
@@ -448,7 +448,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         self,
         prompt: Union[str, List[str]],
         source_prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -467,15 +467,15 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. This parameter will be modulated by `strength`.
@@ -532,8 +532,8 @@ class CycleDiffusionPipeline(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = preprocess(init_image)
+        if isinstance(image, PIL.Image.Image):
+            image = preprocess(image)
 
         # 5. Prepare timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -542,7 +542,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
 
         # 6. Prepare latent variables
         latents, clean_latents = self.prepare_latents(
-            init_image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator
+            image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator
         )
         source_latents = latents
 
@@ -611,7 +611,7 @@ class CycleDiffusionPipeline(DiffusionPipeline):
                 ).prev_sample
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

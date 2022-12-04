@@ -55,9 +55,9 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
 
     Args:
         vae_encoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to encode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to encode images to latent representations.
         vae_decoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to decode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to decode images from latent representations.
         text_encoder ([`FastDeployRuntimeModel`]):
             Frozen text-encoder. Stable Diffusion uses the text portion of
             [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel), specifically
@@ -268,19 +268,17 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         timesteps = timesteps[t_start:]
         return timesteps, num_inference_steps - t_start
 
-    def prepare_latents(
-        self, init_image, timestep, batch_size, num_images_per_prompt, dtype, generator=None, noise=None
-    ):
+    def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator=None, noise=None):
         if generator is None:
             generator = np.random
 
-        init_image = init_image.astype(dtype)
-        init_latents = self.vae_encoder(sample=init_image)[0]
+        image = image.astype(dtype)
+        init_latents = self.vae_encoder(sample=image)[0]
         init_latents = 0.18215 * init_latents
 
         if batch_size > init_latents.shape[0] and batch_size % init_latents.shape[0] != 0:
             raise ValueError(
-                f"Cannot duplicate `init_image` of batch size {init_latents.shape[0]} to {batch_size} text prompts."
+                f"Cannot duplicate `image` of batch size {init_latents.shape[0]} to {batch_size} text prompts."
             )
         else:
             init_latents = np.concatenate([init_latents] * num_images_per_prompt, axis=0)
@@ -302,7 +300,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[np.ndarray, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -321,15 +319,15 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`np.ndarray` or `PIL.Image.Image`):
+            image (`np.ndarray` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. This parameter will be modulated by `strength`.
@@ -388,8 +386,8 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = preprocess(init_image)
+        if isinstance(image, PIL.Image.Image):
+            image = preprocess(image)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -398,7 +396,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
 
         # 6. Prepare latent variables
         latents = self.prepare_latents(
-            init_image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator, noise
+            image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator, noise
         )
 
         # 7. Prepare extra step kwargs.
@@ -433,7 +431,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(DiffusionPipeline):
                 latents = scheduler_output.prev_sample.numpy()
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

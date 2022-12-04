@@ -141,11 +141,11 @@ def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_
     #         "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
     #     )
     #     mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
-    #     init_image = load_image(img_url).resize((512, 512))
+    #     image = load_image(img_url).resize((512, 512))
     #     mask_image = load_image(mask_url).resize((512, 512))
     #     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
     #     image_inpainting = fastdeploy_pipeline(
-    #         prompt=prompt, image=init_image, mask_image=mask_image, num_inference_steps=10
+    #         prompt=prompt, image=image, mask_image=mask_image, num_inference_steps=10
     #     ).images[0]
     #     image_inpainting.save("image_inpainting_fd_test.png")
     # else:

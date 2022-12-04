@@ -54,12 +54,17 @@ def get_parameter_dtype(parameter: nn.Layer):
         return paddle.get_default_dtype()
 
 
-def load_dict(checkpoint_file: Union[str, os.PathLike], return_numpy: bool = True):
+def load_dict(checkpoint_file: Union[str, os.PathLike], map_location: str = "cpu"):
     """
     Reads a Paddle checkpoint file, returning properly formatted errors if they arise.
     """
     try:
-        return paddle.load(checkpoint_file, return_numpy=return_numpy)
+        if map_location == "cpu":
+            with paddle.device_scope("cpu"):
+                state_dict = paddle.load(checkpoint_file)
+        else:
+            state_dict = paddle.load(checkpoint_file)
+        return state_dict
     except Exception as e:
         try:
             with open(checkpoint_file) as f:
@@ -283,7 +288,22 @@ class ModelMixin(nn.Layer):
         )
         model = cls.from_config(config, **unused_kwargs)
 
-        state_dict = load_dict(model_file, return_numpy=True)
+        state_dict = load_dict(model_file, map_location="cpu")
+
+        dtype = set(v.dtype for v in state_dict.values())
+
+        if len(dtype) > 1 and paddle.float32 not in dtype:
+            raise ValueError(
+                f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
+                f" make sure that {model_file} weights have only one dtype."
+            )
+        elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        else:
+            dtype = dtype.pop()
+
+        # move model to correct dtype
+        model = model.to(dtype=dtype)
 
         model, missing_keys, unexpected_keys, mismatched_keys, error_msgs = cls._load_pretrained_model(
             model,

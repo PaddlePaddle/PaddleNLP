@@ -56,8 +56,8 @@ class UNet1DModelTests(ModelTesterMixin, unittest.TestCase):
     def test_outputs_equivalence(self):
         super().test_outputs_equivalence()
 
-    def test_from_pretrained_save_pretrained(self):
-        super().test_from_pretrained_save_pretrained()
+    def test_from_save_pretrained(self):
+        super().test_from_save_pretrained()
 
     def test_model_from_pretrained(self):
         super().test_model_from_pretrained()
@@ -177,8 +177,8 @@ class UNetRLModelTests(ModelTesterMixin, unittest.TestCase):
     def test_outputs_equivalence(self):
         super().test_outputs_equivalence()
 
-    def test_from_pretrained_save_pretrained(self):
-        super().test_from_pretrained_save_pretrained()
+    def test_from_save_pretrained(self):
+        super().test_from_save_pretrained()
 
     def test_model_from_pretrained(self):
         super().test_model_from_pretrained()

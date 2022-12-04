@@ -257,6 +257,36 @@ class LDMSuperResolutionPipeline(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class KDPM2AncestralDiscreteScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class KDPM2DiscreteScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class PNDMPipeline(metaclass=DummyObject):
     _backends = ["paddle"]
 

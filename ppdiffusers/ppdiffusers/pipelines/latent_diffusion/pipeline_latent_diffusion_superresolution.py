@@ -79,7 +79,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
     @paddle.no_grad()
     def __call__(
         self,
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         batch_size: Optional[int] = 1,
         num_inference_steps: Optional[int] = 100,
         eta: Optional[float] = 0.0,
@@ -90,7 +90,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
     ) -> Union[Tuple, ImagePipelineOutput]:
         r"""
         Args:
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             batch_size (`int`, *optional*, defaults to 1):
@@ -115,19 +115,17 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
             generated images.
         """
 
-        if isinstance(init_image, PIL.Image.Image):
+        if isinstance(image, PIL.Image.Image):
             batch_size = 1
-        elif isinstance(init_image, paddle.Tensor):
-            batch_size = init_image.shape[0]
+        elif isinstance(image, paddle.Tensor):
+            batch_size = image.shape[0]
         else:
-            raise ValueError(
-                f"`init_image` has to be of type `PIL.Image.Image` or `paddle.Tensor` but is {type(init_image)}"
-            )
+            raise ValueError(f"`image` has to be of type `PIL.Image.Image` or `paddle.Tensor` but is {type(image)}")
 
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = preprocess(init_image)
+        if isinstance(image, PIL.Image.Image):
+            image = preprocess(image)
 
-        height, width = init_image.shape[-2:]
+        height, width = image.shape[-2:]
 
         # in_channels should be 6: 3 for latents, 3 for low resolution image
         latents_shape = (batch_size, self.unet.in_channels // 2, height, width)
@@ -135,7 +133,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
 
         latents = paddle.randn(latents_shape, generator=generator, dtype=latents_dtype)
 
-        init_image = init_image.cast(latents_dtype)
+        image = image.cast(latents_dtype)
 
         self.scheduler.set_timesteps(num_inference_steps)
         timesteps_tensor = self.scheduler.timesteps
@@ -154,7 +152,7 @@ class LDMSuperResolutionPipeline(DiffusionPipeline):
 
         for t in self.progress_bar(timesteps_tensor):
             # concat latents and low resolution image in the channel dimension.
-            latents_input = paddle.concat([latents, init_image], axis=1)
+            latents_input = paddle.concat([latents, image], axis=1)
             latents_input = self.scheduler.scale_model_input(latents_input, t)
             # predict the noise residual
             noise_pred = self.unet(latents_input, t).sample

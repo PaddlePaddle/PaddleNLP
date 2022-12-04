@@ -14,8 +14,9 @@
 # limitations under the License.
 
 import math
-from typing import Tuple, Union
+from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
@@ -36,12 +37,16 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
+        trained_betas (`np.ndarray`, optional):
+            option to pass an array of betas directly to the constructor to bypass `beta_start`, `beta_end` etc.
     """
 
     order = 1
 
     @register_to_config
-    def __init__(self, num_train_timesteps: int = 1000):
+    def __init__(
+        self, num_train_timesteps: int = 1000, trained_betas: Optional[Union[np.ndarray, List[float]]] = None
+    ):
         # set `betas`, `alphas`, `timesteps`
         self.set_timesteps(num_train_timesteps)
 
@@ -68,7 +73,11 @@ class IPNDMScheduler(SchedulerMixin, ConfigMixin):
         steps = paddle.linspace(1, 0, num_inference_steps + 1)[:-1]
         steps = paddle.concat([steps, paddle.to_tensor([0.0])])
 
-        self.betas = paddle.sin(steps * math.pi / 2) ** 2
+        if self.config.trained_betas is not None:
+            self.betas = paddle.to_tensor(self.config.trained_betas, dtype="float32")
+        else:
+            self.betas = paddle.sin(steps * math.pi / 2) ** 2
+
         self.alphas = (1.0 - self.betas**2) ** 0.5
 
         self.timesteps = (paddle.atan2(self.betas, self.alphas) / math.pi * 2)[:-1]

@@ -258,7 +258,7 @@ class AttentionBlock(nn.Layer):
         super().__init__()
         self.channels = channels
         self.num_heads = channels // num_head_channels if num_head_channels is not None else 1
-        self.num_head_size = num_head_channels
+        self.head_dim = self.channels // self.num_heads
         self.scale = 1 / math.sqrt(self.channels / self.num_heads)
 
         self.group_norm = nn.GroupNorm(num_channels=channels, num_groups=norm_num_groups, epsilon=eps)
@@ -271,11 +271,15 @@ class AttentionBlock(nn.Layer):
         self.rescale_output_factor = rescale_output_factor
         self.proj_attn = nn.Linear(channels, channels)
 
-    def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
-        new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
-        # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
-        return new_projection
+    def reshape_heads_to_batch_dim(self, tensor):
+        tensor = tensor.reshape([0, 0, self.num_heads, self.head_dim])
+        tensor = tensor.transpose([0, 2, 1, 3])
+        return tensor
+
+    def reshape_batch_dim_to_heads(self, tensor):
+        tensor = tensor.transpose([0, 2, 1, 3])
+        tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])
+        return tensor
 
     def forward(self, hidden_states):
         residual = hidden_states
@@ -291,23 +295,18 @@ class AttentionBlock(nn.Layer):
         key_proj = self.key(hidden_states)
         value_proj = self.value(hidden_states)
 
-        # transpose
-        query_states = self.transpose_for_scores(query_proj)
-        key_states = self.transpose_for_scores(key_proj)
-        value_states = self.transpose_for_scores(value_proj)
+        query_proj = self.reshape_heads_to_batch_dim(query_proj)
+        key_proj = self.reshape_heads_to_batch_dim(key_proj)
+        value_proj = self.reshape_heads_to_batch_dim(value_proj)
 
         # get scores
-        attention_scores = paddle.matmul(query_states, key_states, transpose_y=True) * self.scale
+        attention_scores = paddle.matmul(query_proj, key_proj, transpose_y=True) * self.scale
         attention_probs = F.softmax(attention_scores.cast("float32"), axis=-1).cast(attention_scores.dtype)
 
         # compute attention output
-        hidden_states = paddle.matmul(attention_probs, value_states)
+        hidden_states = paddle.matmul(attention_probs, value_proj)
 
-        hidden_states = hidden_states.transpose([0, 2, 1, 3])
-        new_hidden_states_shape = hidden_states.shape[:-2] + [
-            self.channels,
-        ]
-        hidden_states = hidden_states.reshape(new_hidden_states_shape)
+        hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
 
         # compute next hidden_states
         hidden_states = self.proj_attn(hidden_states)

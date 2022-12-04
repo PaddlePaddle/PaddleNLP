@@ -67,9 +67,9 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
 
     Args:
         vae_encoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to encode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to encode images to latent representations.
         vae_decoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to decode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to decode images from latent representations.
         text_encoder ([`FastDeployRuntimeModel`]):
             Frozen text-encoder. Stable Diffusion uses the text portion of
             [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel), specifically
@@ -473,7 +473,7 @@ class FastDeployStableDiffusionInpaintPipeline(DiffusionPipeline):
                 latents = scheduler_output.prev_sample.numpy()
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

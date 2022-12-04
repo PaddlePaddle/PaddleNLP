@@ -37,7 +37,7 @@ class VersatileDiffusionMegaPipelineIntegrationTests(unittest.TestCase):
         gc.collect()
         paddle.device.cuda.empty_cache()
 
-    def test_from_pretrained_save_pretrained(self):
+    def test_from_save_pretrained(self):
         pipe = VersatileDiffusionPipeline.from_pretrained("shi-labs/versatile-diffusion")
         pipe.set_progress_bar_config(disable=None)
 

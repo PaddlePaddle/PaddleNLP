@@ -133,7 +133,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
     def inpaint(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -150,7 +150,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
         # For more information on how this function works, please see: https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion#diffusers.StableDiffusionImg2ImgPipeline
         return StableDiffusionInpaintPipelineLegacy(**self.components)(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             mask_image=mask_image,
             strength=strength,
             num_inference_steps=num_inference_steps,
@@ -168,7 +168,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
     def img2img(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -185,7 +185,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
         # For more information on how this function works, please see: https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion#diffusers.StableDiffusionImg2ImgPipeline
         return StableDiffusionImg2ImgPipeline(**self.components)(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             strength=strength,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,

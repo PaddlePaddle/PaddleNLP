@@ -39,9 +39,9 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
 
     Args:
         vae_encoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to encode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to encode images to latent representations.
         vae_decoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to decode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to decode images from latent representations.
         text_encoder ([`FastDeployRuntimeModel`]):
             Frozen text-encoder. Stable Diffusion uses the text portion of
             [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel), specifically
@@ -109,7 +109,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
     def img2img(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[np.ndarray, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -130,7 +130,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         )
         output = temp_pipeline(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             strength=strength,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
@@ -150,7 +150,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
     def inpaint_legacy(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[np.ndarray, PIL.Image.Image],
         mask_image: Union[np.ndarray, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -174,7 +174,7 @@ class FastDeployStableDiffusionMegaPipeline(FastDeployStableDiffusionPipeline):
         )
         output = temp_pipeline(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             mask_image=mask_image,
             strength=strength,
             num_inference_steps=num_inference_steps,

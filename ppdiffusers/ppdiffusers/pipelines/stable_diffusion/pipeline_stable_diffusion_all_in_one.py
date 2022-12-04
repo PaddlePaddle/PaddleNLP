@@ -684,9 +684,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         latents = latents * self.scheduler.init_noise_sigma
         return latents
 
-    def prepare_latents_img2img(self, init_image, timestep, num_images_per_prompt, dtype):
-        init_image = init_image.cast(dtype=dtype)
-        init_latent_dist = self.vae.encode(init_image).latent_dist
+    def prepare_latents_img2img(self, image, timestep, num_images_per_prompt, dtype):
+        image = image.cast(dtype=dtype)
+        init_latent_dist = self.vae.encode(image).latent_dist
         init_latents = init_latent_dist.sample()
         init_latents = 0.18215 * init_latents
 
@@ -714,9 +714,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
 
         return timesteps
 
-    def prepare_latents_inpaint(self, init_image, timestep, num_images_per_prompt, dtype):
-        init_image = init_image.cast(dtype)
-        init_latent_dist = self.vae.encode(init_image).latent_dist
+    def prepare_latents_inpaint(self, image, timestep, num_images_per_prompt, dtype):
+        image = image.cast(dtype)
+        init_latent_dist = self.vae.encode(image).latent_dist
         init_latents = init_latent_dist.sample()
         init_latents = 0.18215 * init_latents
 
@@ -908,7 +908,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
     def img2img(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         height=None,
         width=None,
@@ -935,15 +935,15 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. This parameter will be modulated by `strength`.
@@ -984,24 +984,24 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         seed = random.randint(0, 2**32) if seed is None else seed
-        init_image_str = init_image
-        if isinstance(init_image_str, str):
-            init_image = load_image(init_image_str)
+        image_str = image
+        if isinstance(image_str, str):
+            image = load_image(image_str)
 
         if height is None and width is None:
-            width = (init_image.size[0] // 8) * 8
-            height = (init_image.size[1] // 8) * 8
+            width = (image.size[0] // 8) * 8
+            height = (image.size[1] // 8) * 8
         elif height is None and width is not None:
-            height = (init_image.size[1] // 8) * 8
+            height = (image.size[1] // 8) * 8
         elif width is None and height is not None:
-            width = (init_image.size[0] // 8) * 8
+            width = (image.size[0] // 8) * 8
         else:
             height = height
             width = width
 
         argument = dict(
             prompt=prompt,
-            init_image=init_image_str,
+            image=image_str,
             negative_prompt=negative_prompt,
             height=height,
             width=width,
@@ -1042,9 +1042,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         )
 
         # 4. Preprocess image
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = init_image.resize((width, height))
-            init_image = preprocess_image(init_image)
+        if isinstance(image, PIL.Image.Image):
+            image = image.resize((width, height))
+            image = preprocess_image(image)
 
         # 5. set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -1052,9 +1052,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         latent_timestep = timesteps[:1].tile([batch_size * num_images_per_prompt])
 
         # 6. Prepare latent variables
-        latents = self.prepare_latents_img2img(
-            init_image, latent_timestep, num_images_per_prompt, text_embeddings.dtype
-        )
+        latents = self.prepare_latents_img2img(image, latent_timestep, num_images_per_prompt, text_embeddings.dtype)
 
         # 7. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(eta)
@@ -1099,7 +1097,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
     def inpaint(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         height=None,
         width=None,
@@ -1127,18 +1125,18 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process. This is the image whose masked region will be inpainted.
             mask_image (`paddle.Tensor` or `PIL.Image.Image`):
-                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
                 replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
                 PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
                 contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.
             strength (`float`, *optional*, defaults to 0.8):
                 Conceptually, indicates how much to inpaint the masked area. Must be between 0 and 1. When `strength`
                 is 1, the denoising process will be run on the masked area for the full number of iterations specified
-                in `num_inference_steps`. `init_image` will be used as a reference for the masked area, adding more
+                in `num_inference_steps`. `image` will be used as a reference for the masked area, adding more
                 noise to that region the larger the `strength`. If `strength` is 0, no inpainting will occur.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The reference number of denoising steps. More denoising steps usually lead to a higher quality image at
@@ -1180,28 +1178,28 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             (nsfw) content, according to the `safety_checker`.
         """
         seed = random.randint(0, 2**32) if seed is None else seed
-        init_image_str = init_image
+        image_str = image
         mask_image_str = mask_image
 
-        if isinstance(init_image_str, str):
-            init_image = load_image(init_image_str)
+        if isinstance(image_str, str):
+            image = load_image(image_str)
         if isinstance(mask_image_str, str):
             mask_image = load_image(mask_image_str)
 
         if height is None and width is None:
-            width = (init_image.size[0] // 8) * 8
-            height = (init_image.size[1] // 8) * 8
+            width = (image.size[0] // 8) * 8
+            height = (image.size[1] // 8) * 8
         elif height is None and width is not None:
-            height = (init_image.size[1] // 8) * 8
+            height = (image.size[1] // 8) * 8
         elif width is None and height is not None:
-            width = (init_image.size[0] // 8) * 8
+            width = (image.size[0] // 8) * 8
         else:
             height = height
             width = width
 
         argument = dict(
             prompt=prompt,
-            init_image=init_image_str,
+            image=image_str,
             mask_image=mask_image_str,
             negative_prompt=negative_prompt,
             height=height,
@@ -1242,9 +1240,9 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
             num_images_per_prompt,
         )
 
-        if not isinstance(init_image, paddle.Tensor):
-            init_image = init_image.resize((width, height))
-            init_image = preprocess_image(init_image)
+        if not isinstance(image, paddle.Tensor):
+            image = image.resize((width, height))
+            image = preprocess_image(image)
 
         if not isinstance(mask_image, paddle.Tensor):
             mask_image = mask_image.resize((width, height))
@@ -1258,7 +1256,7 @@ class StableDiffusionPipelineAllinOne(DiffusionPipeline):
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
         latents, init_latents_orig, noise = self.prepare_latents_inpaint(
-            init_image, latent_timestep, num_images_per_prompt, text_embeddings.dtype
+            image, latent_timestep, num_images_per_prompt, text_embeddings.dtype
         )
 
         # 7. Prepare mask latent

@@ -376,9 +376,9 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
         return timesteps, num_inference_steps - t_start
 
-    def prepare_latents(self, init_image, timestep, batch_size, num_images_per_prompt, dtype, generator):
-        init_image = init_image.cast(dtype)
-        init_latent_dist = self.vae.encode(init_image).latent_dist
+    def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator):
+        image = image.cast(dtype)
+        init_latent_dist = self.vae.encode(image).latent_dist
         init_latents = init_latent_dist.sample(generator=generator)
         init_latents = 0.18215 * init_latents
 
@@ -396,7 +396,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -416,18 +416,18 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process. This is the image whose masked region will be inpainted.
             mask_image (`paddle.Tensor` or `PIL.Image.Image`):
-                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
                 replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
                 PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
                 contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.
             strength (`float`, *optional*, defaults to 0.8):
                 Conceptually, indicates how much to inpaint the masked area. Must be between 0 and 1. When `strength`
                 is 1, the denoising process will be run on the masked area for the full number of iterations specified
-                in `num_inference_steps`. `init_image` will be used as a reference for the masked area, adding more
+                in `num_inference_steps`. `image` will be used as a reference for the masked area, adding more
                 noise to that region the larger the `strength`. If `strength` is 0, no inpainting will occur.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The reference number of denoising steps. More denoising steps usually lead to a higher quality image at
@@ -484,8 +484,8 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         )
 
         # 4. Preprocess image and mask
-        if not isinstance(init_image, paddle.Tensor):
-            init_image = preprocess_image(init_image)
+        if not isinstance(image, paddle.Tensor):
+            image = preprocess_image(image)
 
         if not isinstance(mask_image, paddle.Tensor):
             mask_image = preprocess_mask(mask_image, self.vae_scale_factor)
@@ -498,7 +498,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
         latents, init_latents_orig, noise = self.prepare_latents(
-            init_image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator
+            image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator
         )
 
         # 7. Prepare mask latent
@@ -532,7 +532,7 @@ class StableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

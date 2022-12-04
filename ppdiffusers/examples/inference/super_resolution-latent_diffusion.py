@@ -23,11 +23,11 @@ pipe = LDMSuperResolutionPipeline.from_pretrained("CompVis/ldm-super-resolution-
 # 下载初始图片
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 
-init_image = load_image(url).resize((128, 128))
-init_image.save("original-image.png")
+image = load_image(url).resize((128, 128))
+image.save("original-image.png")
 
 # 使用fp16加快生成速度
 with paddle.amp.auto_cast(True):
-    image = pipe(init_image, num_inference_steps=100, eta=1).images[0]
+    image = pipe(image, num_inference_steps=100, eta=1).images[0]
 
 image.save("super-resolution-image.png")

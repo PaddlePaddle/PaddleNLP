@@ -24,7 +24,7 @@ from ppdiffusers.training_utils import EMAModel
 
 
 class ModelTesterMixin:
-    def test_from_pretrained_save_pretrained(self):
+    def test_from_save_pretrained(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
 
         model = self.model_class(**init_dict)
@@ -47,6 +47,19 @@ class ModelTesterMixin:
 
         max_diff = (image - new_image).abs().sum().item()
         self.assertLessEqual(max_diff, 5e-5, "Models give different forward passes")
+
+    def test_from_save_pretrained_dtype(self):
+        init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()
+
+        model = self.model_class(**init_dict)
+        model.eval()
+
+        for dtype in [paddle.float32, paddle.float16, paddle.bfloat16]:
+            with tempfile.TemporaryDirectory() as tmpdirname:
+                model.to(dtype=dtype)
+                model.save_pretrained(tmpdirname)
+                new_model = self.model_class.from_pretrained(tmpdirname)
+                assert new_model.dtype == dtype
 
     def test_determinism(self):
         init_dict, inputs_dict = self.prepare_init_args_and_inputs_for_common()

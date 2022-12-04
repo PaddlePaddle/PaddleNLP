@@ -68,9 +68,9 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
     Args:
         vae_encoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to encode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to encode images to latent representations.
         vae_decoder ([`FastDeployRuntimeModel`]):
-            Variational Auto-Encoder (VAE) Model to decode images to and from latent representations.
+            Variational Auto-Encoder (VAE) Model to decode images from latent representations.
         text_encoder ([`FastDeployRuntimeModel`]):
             Frozen text-encoder. Stable Diffusion uses the text portion of
             [CLIP](https://huggingface.co/docs/transformers/model_doc/clip#transformers.CLIPTextModel), specifically
@@ -284,14 +284,12 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
 
         return timesteps, num_inference_steps - t_start
 
-    def prepare_latents(
-        self, init_image, timestep, batch_size, num_images_per_prompt, dtype, generator=None, noise=None
-    ):
+    def prepare_latents(self, image, timestep, batch_size, num_images_per_prompt, dtype, generator=None, noise=None):
         if generator is None:
             generator = np.random
 
-        init_image = init_image.astype(dtype)
-        init_latents = self.vae_encoder(sample=init_image)[0]
+        image = image.astype(dtype)
+        init_latents = self.vae_encoder(sample=image)[0]
         init_latents = 0.18215 * init_latents
 
         # Expand init_latents for batch_size and num_images_per_prompt
@@ -313,7 +311,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
     def __call__(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[np.ndarray, PIL.Image.Image],
+        image: Union[np.ndarray, PIL.Image.Image],
         mask_image: Union[np.ndarray, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -334,20 +332,20 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         Args:
             prompt (`str` or `List[str]`):
                 The prompt or prompts to guide the image generation.
-            init_image (`nd.ndarray` or `PIL.Image.Image`):
+            image (`nd.ndarray` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process. This is the image whose masked region will be inpainted.
             mask_image (`nd.ndarray` or `PIL.Image.Image`):
-                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
                 replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
                 PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
                 contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.uu
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. This parameter will be modulated by `strength`.
@@ -407,8 +405,8 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         )
 
         # 4. Preprocess image and mask
-        if isinstance(init_image, PIL.Image.Image):
-            init_image = preprocess_image(init_image)
+        if isinstance(image, PIL.Image.Image):
+            image = preprocess_image(image)
 
         if isinstance(mask_image, PIL.Image.Image):
             mask_image = preprocess_mask(mask_image)
@@ -421,7 +419,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
         # 6. Prepare latent variables
         # encode the init image into latents and scale the latents
         latents, init_latents_orig, noise = self.prepare_latents(
-            init_image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator, noise
+            image, latent_timestep, batch_size, num_images_per_prompt, text_embeddings.dtype, generator, noise
         )
 
         # 7. Prepare mask latent
@@ -466,7 +464,7 @@ class FastDeployStableDiffusionInpaintPipelineLegacy(DiffusionPipeline):
                 latents = (init_latents_proper * mask) + (latents * (1 - mask))
 
                 # call the callback, if provided
-                if (i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0:
+                if i == len(timesteps) - 1 or ((i + 1) > num_warmup_steps and (i + 1) % self.scheduler.order == 0):
                     progress_bar.update()
                     if callback is not None and i % callback_steps == 0:
                         callback(i, t, latents)

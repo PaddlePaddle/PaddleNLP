@@ -40,7 +40,7 @@
 from ppdiffusers import StableDiffusionPipeline, FastDeployStableDiffusionPipeline
 
 orig_pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
-fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5@fastdeploy")
 ```
 
 ### 提供丰富的Noise Scheduler
@@ -55,11 +55,13 @@ ddpm_scheduler = DDPMScheduler(
     beta_end=0.012,
     beta_schedule="scaled_linear",
     num_train_timesteps=1000,
+    steps_offset=1,
 )
 ddim_scheduler = DDIMScheduler(
     beta_start=0.00085,
     beta_end=0.012,
     beta_schedule="scaled_linear",
+    num_train_timesteps=1000,
     clip_sample=False,
     set_alpha_to_one=False,
     steps_offset=1,
@@ -69,7 +71,6 @@ dpmsolver_scheduler = DPMSolverMultistepScheduler(
     beta_end=0.012,
     beta_schedule="scaled_linear",
     num_train_timesteps=1000,
-    trained_betas=None,
     thresholding=False,
     algorithm_type="dpmsolver++",
     solver_type="midpoint",
@@ -90,7 +91,7 @@ dpmsolver_scheduler = DPMSolverMultistepScheduler(
 
 ### 环境依赖
 - paddlepaddle-gpu>=2.4.0
-- paddlenlp>=2.4.3
+- paddlenlp>=2.4.4
 - ftfy
 - regex
 - Pillow
@@ -208,14 +209,14 @@ from ppdiffusers.utils import load_image
 pipe = StableDiffusionImg2ImgPipeline.from_pretrained("Linaqruf/anything-v3.0", safety_checker=None)
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/image_Kurisu.png"
-init_image = load_image(url).resize((512, 768))
+image = load_image(url).resize((512, 768))
 
 # 设置随机种子，我们可以复现下面的结果！
 paddle.seed(42)
 prompt = "Kurisu Makise, looking at viewer, long hair, standing, 1girl, hair ornament, hair flower, cute, jacket, white flower, white dress"
 negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
 
-image = pipe(prompt=prompt, negative_prompt=negative_prompt, init_image=init_image, strength=0.75, guidance_scale=7.5).images[0]
+image = pipe(prompt=prompt, negative_prompt=negative_prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
 image.save("image_Kurisu_img2img.png")
 ```
 <div align="center">
@@ -244,7 +245,7 @@ from ppdiffusers.utils import load_image
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
-init_image = load_image(img_url).resize((512, 512))
+image = load_image(img_url).resize((512, 512))
 mask_image = load_image(mask_url).resize((512, 512))
 
 pipe = StableDiffusionInpaintPipelineLegacy.from_pretrained("stabilityai/stable-diffusion-2-base", safety_checker=None)
@@ -252,7 +253,7 @@ pipe = StableDiffusionInpaintPipelineLegacy.from_pretrained("stabilityai/stable-
 # 设置随机种子，我们可以复现下面的结果！
 paddle.seed(10245)
 prompt = "a red cat sitting on a bench"
-image = pipe(prompt=prompt, init_image=init_image, mask_image=mask_image, strength=0.75).images[0]
+image = pipe(prompt=prompt, image=image, mask_image=mask_image, strength=0.75).images[0]
 
 image.save("a_red_cat_legacy.png")
 ```
@@ -276,7 +277,7 @@ from ppdiffusers.utils import load_image
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
 
-init_image = load_image(img_url).resize((512, 512))
+image = load_image(img_url).resize((512, 512))
 mask_image = load_image(mask_url).resize((512, 512))
 
 pipe = StableDiffusionInpaintPipeline.from_pretrained("stabilityai/stable-diffusion-2-inpainting")
@@ -284,7 +285,7 @@ pipe = StableDiffusionInpaintPipeline.from_pretrained("stabilityai/stable-diffus
 # 设置随机种子，我们可以复现下面的结果！
 paddle.seed(1024)
 prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
-image = pipe(prompt=prompt, image=init_image, mask_image=mask_image).images[0]
+image = pipe(prompt=prompt, image=image, mask_image=mask_image).images[0]
 
 image.save("a_yellow_cat.png")
 ```
@@ -377,10 +378,10 @@ def create_runtime_option(device_id=-1, backend="paddle"):
     return option
 
 runtime_options = {
-    "text_encoder": create_runtime_option(-1, "onnx"),  # 使用cpu
-    "vae_encoder": create_runtime_option(-1, "paddle"),  # 使用cpu
-    "vae_decoder": create_runtime_option(-1, "paddle"),  # 使用cpu
-    "unet": create_runtime_option(0, "paddle"),  # 使用gpu
+    "text_encoder": create_runtime_option(-1, "onnx"),  # use cpu
+    "vae_encoder": create_runtime_option(-1, "paddle"),  # use cpu
+    "vae_decoder": create_runtime_option(-1, "paddle"),  # use cpu
+    "unet": create_runtime_option(0, "paddle"),  # use gpu
 }
 
 fd_pipe = FastDeployStableDiffusionMegaPipeline.from_pretrained(
@@ -394,22 +395,22 @@ image_text2img.save("image_text2img.png")
 
 # img2img
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/image_Kurisu.png"
-init_image = load_image(url).resize((512, 512))
+image = load_image(url).resize((512, 512))
 prompt = "Kurisu Makise, looking at viewer, long hair, standing, 1girl, hair ornament, hair flower, cute, jacket, white flower, white dress"
 negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
 image_img2img = fd_pipe.img2img(
-    prompt=prompt, negative_prompt=negative_prompt, init_image=init_image, strength=0.75, guidance_scale=7.5
+    prompt=prompt, negative_prompt=negative_prompt, image=image, strength=0.75, guidance_scale=7.5
 ).images[0]
 image_img2img.save("image_img2img.png")
 
 # inpaint_legacy
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
 mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
-init_image = load_image(img_url).resize((512, 512))
+image = load_image(img_url).resize((512, 512))
 mask_image = load_image(mask_url).resize((512, 512))
 prompt = "a red cat sitting on a bench"
 image_inpaint_legacy = fd_pipe.inpaint_legacy(
-    prompt=prompt, init_image=init_image, mask_image=mask_image, strength=0.75, num_inference_steps=50
+    prompt=prompt, image=image, mask_image=mask_image, strength=0.75, num_inference_steps=50
 ).images[0]
 image_inpaint_legacy.save("image_inpaint_legacy.png")
 ```
