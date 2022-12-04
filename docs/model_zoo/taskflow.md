@@ -1214,7 +1214,8 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
->>> text_similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
+>>> similarity = Taskflow("text_similarity")
+>>> similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
 [{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
 ```
 
