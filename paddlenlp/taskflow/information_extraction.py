@@ -1063,6 +1063,7 @@ class UIETask(Task):
                                 box = cur_box
                         if box:
                             boxes.append(box)
+                        boxes = [[int(b) for b in box] for box in boxes]
                         v["bbox"] = boxes
                     if v.get("relations"):
                         _add_bbox(v["relations"], char_boxes)
@@ -1078,10 +1079,15 @@ class UIETask(Task):
                     text_len = len(segment[1])
                     if text_len == 0:
                         continue
-                    char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
-                    for i in range(text_len):
-                        cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
-                        char_boxes.append((segment[1][i], cbox))
+                    if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
+                        char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
+                        for i in range(text_len):
+                            cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
+                            char_boxes.append((segment[1][i], cbox))
+                    else:
+                        cell_bbox = [(segment[1][i], sbox) for i in range(text_len)]
+                        char_boxes.extend(cell_bbox)
+
                 result = _add_bbox(result, char_boxes)
             new_results.append(result)
         return new_results

@@ -65,8 +65,16 @@ class DocParser(object):
                 layout = []
                 for segment in ocr_result:
                     box = segment[0]
-                    org_box = [box[0] - offset_x, box[1] - offset_y, box[2] - offset_x, box[3] - offset_y]
-                    layout.append((org_box, segment[1]))
+                    org_box = [
+                        max(box[0] - offset_x, 0),
+                        max(box[1] - offset_y, 0),
+                        max(box[2] - offset_x, 0),
+                        max(box[3] - offset_y, 0),
+                    ]
+                    if len(segment) == 2:
+                        layout.append((org_box, segment[1]))
+                    elif len(segment) == 3:
+                        layout.append((org_box, segment[1], segment[2]))
                 doc["layout"] = layout
             else:
                 doc["layout"] = ocr_result
@@ -121,7 +129,7 @@ class DocParser(object):
                         box = segment["text_region"]
                         box = _get_box(box)
                         text = segment["text"]
-                        layout.append((box, text))
+                        layout.append((box, text, region["type"]))
                 else:
                     bbox = region["bbox"]
                     table_result = region["res"]
@@ -132,23 +140,15 @@ class DocParser(object):
                     for line in lines:
                         table_list.extend(re.findall("<td.*?>(.*?)</td>", line))
                     for cell_box, text in zip(cell_bbox, table_list):
-                        if self.ocr_lang == "ch":
-                            box = [
-                                bbox[0] + cell_box[0],
-                                bbox[1] + cell_box[5],
-                                bbox[0] + cell_box[4],
-                                bbox[1] + cell_box[1],
-                            ]
-                        else:
-                            box = [
-                                bbox[0] + cell_box[0],
-                                bbox[1] + cell_box[1],
-                                bbox[0] + cell_box[2],
-                                bbox[1] + cell_box[3],
-                            ]
+                        box = [
+                            bbox[0] + cell_box[0],
+                            bbox[1] + cell_box[1],
+                            bbox[0] + cell_box[4],
+                            bbox[1] + cell_box[5],
+                        ]
                         if _is_ch(text):
                             text = text.replace(" ", "")
-                        layout.append((box, text))
+                        layout.append((box, text, region["type"]))
         return layout
 
     @classmethod
@@ -243,7 +243,7 @@ class DocParser(object):
                     "Need paddleocr to process image input. "
                     "Please install module by: python3 -m pip install paddleocr"
                 )
-            self.layout_analysis_engine = PPStructure(table=True, ocr=True, show_log=False, lang=self.ocr_lang)
+            self.layout_analysis_engine = PPStructure(table=True, ocr=True, show_log=False)
 
     @classmethod
     def _normalize_box(self, box, old_size, new_size, offset_x=0, offset_y=0):
