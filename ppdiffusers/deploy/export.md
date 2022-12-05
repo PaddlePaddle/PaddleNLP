@@ -18,6 +18,14 @@ python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion
 输出的模型目录结构如下：
 ```shell
 stable-diffusion-v1-5/
+├── model_index.json
+├── scheduler
+│   └── scheduler_config.json
+├── tokenizer
+│   ├── tokenizer_config.json
+│   ├── merges.txt
+│   ├── vocab.json
+│   └── special_tokens_map.json
 ├── text_encoder
 │   ├── inference.pdiparams
 │   ├── inference.pdiparams.info
@@ -38,7 +46,7 @@ stable-diffusion-v1-5/
 
 #### Inpaint任务模型导出
 
-除了支持常规StableDiffusion文生图、图生图任务的模型导出以外，还支持Inpaint任务模型的导出、如果需要导出inpaint模型，可以执行以下命令：
+除了支持常规StableDiffusion文生图、图生图任务的模型导出以外，还支持Inpaint任务模型 (注意：这个不是legacy版本的inpaint) 的导出、如果需要导出inpaint模型，可以执行以下命令：
 
 ```shell
 python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion-inpainting --output_path stable-diffusion-v1-5-inpainting
@@ -52,3 +60,4 @@ python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion
 |----------|--------------|
 |<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](https://github.com/PaddlePaddle/PaddleNLP/tree/main/ppdiffusers#ppdiffusers%E6%A8%A1%E5%9E%8B%E6%94%AF%E6%8C%81%E7%9A%84%E6%9D%83%E9%87%8D)。|
 |--output_path | 导出的模型目录。 |
+|--sample | vae encode的输出是否调整为sample模式，注意：sample模式会引入随机因素，默认是不开启！ |

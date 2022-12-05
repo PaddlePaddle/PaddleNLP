@@ -7,12 +7,6 @@
 本示例需要使用训练模型导出后的部署模型。有两种部署模型的获取方式：
 
 - 模型导出方式，可参考[模型导出文档](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)导出部署模型。
-- 下载部署模型。为了方便开发者快速测试本示例，我们已经将部分`Diffusion`模型预先导出，开发者只要下载模型就可以快速测试:
-
-| 模型 | Scheduler |
-|----------|--------------|
-| [CompVis/stable-diffusion-v1-4](https://bj.bcebos.com/fastdeploy/models/stable-diffusion/CompVis/stable-diffusion-v1-4.tgz) | PNDM |
-| [runwayml/stable-diffusion-v1-5](https://bj.bcebos.com/fastdeploy/models/stable-diffusion/runwayml/stable-diffusion-v1-5.tgz) | EulerAncestral |
 
 ## 环境依赖
 

@@ -26,7 +26,7 @@ from paddlenlp.transformers import CLIPTokenizer
 from ppdiffusers import (
     EulerAncestralDiscreteScheduler,
     FastDeployRuntimeModel,
-    FastDeployStableDiffusionInpaintPipeline,
+    FastDeployStableDiffusionInpaintPipelineLegacy,
     PNDMScheduler,
 )
 
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     scheduler = get_scheduler(args)
 
     # 2. Init tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
     vae_decoder_dynamic_shape = {
@@ -284,7 +284,7 @@ if __name__ == "__main__":
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
 
-    pipe = FastDeployStableDiffusionInpaintPipeline(
+    pipe = FastDeployStableDiffusionInpaintPipelineLegacy(
         vae_encoder=FastDeployRuntimeModel(model=vae_encoder_runtime),
         vae_decoder=FastDeployRuntimeModel(model=vae_decoder_runtime),
         text_encoder=FastDeployRuntimeModel(model=text_encoder_runtime),
@@ -306,13 +306,13 @@ if __name__ == "__main__":
         "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations-mask.png"
     )
 
-    image = download_image(img_url).resize((512, 512))
+    init_image = download_image(img_url).resize((512, 512))
     mask_image = download_image(mask_url).resize((512, 512))
 
     prompt = "Face of a yellow cat, high resolution, sitting on a park bench"
     images = pipe(
         prompt=prompt,
-        image=image,
+        image=init_image,
         mask_image=mask_image,
         num_inference_steps=args.inference_steps,
     ).images

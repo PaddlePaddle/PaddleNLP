@@ -355,6 +355,8 @@ StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型�
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
+**注意：当前导出的vae encoder带有随机因素！[随机因素代码地址](https://github.com/JunnYu/PaddleNLP/blob/1ff41e2beff55a1fd282ed574f3a6a30a0756d7e/ppdiffusers/ppdiffusers/models/vae.py#L365-L370)**
+
 - CompVis/stable-diffusion-v1-4@fastdeploy
 - runwayml/stable-diffusion-v1-5@fastdeploy
 - runwayml/stable-diffusion-inpainting@fastdeploy

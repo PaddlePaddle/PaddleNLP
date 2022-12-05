@@ -157,6 +157,7 @@ def get_scheduler(args):
             beta_start=0.00085,
             num_train_timesteps=1000,
             skip_prk_steps=True,
+            steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
         scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
@@ -171,7 +172,7 @@ if __name__ == "__main__":
     scheduler = get_scheduler(args)
 
     # 2. Init tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
     vae_decoder_dynamic_shape = {
@@ -299,10 +300,10 @@ if __name__ == "__main__":
     url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
     response = requests.get(url)
-    image = Image.open(BytesIO(response.content)).convert("RGB")
-    image = image.resize((768, 512))
+    init_image = Image.open(BytesIO(response.content)).convert("RGB")
+    init_image = init_image.resize((768, 512))
 
     prompt = "A fantasy landscape, trending on artstation"
-    images = pipe(prompt=prompt, image=image, num_inference_steps=args.inference_steps).images
+    images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
 
     images[0].save("fantasy_landscape.png")
