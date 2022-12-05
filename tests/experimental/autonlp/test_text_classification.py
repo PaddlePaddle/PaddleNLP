@@ -38,7 +38,68 @@ def read_multi_label_dataset(path):
 
 
 class TestAutoTrainerForTextClassification(unittest.TestCase):
-    def test_multiclass_end2end(self):
+    # def test_multiclass_finetune(self):
+    #     with TemporaryDirectory() as temp_dir_path:
+    #         fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
+    #         train_ds, dev_ds = load_dataset(
+    #             "clue",
+    #             "tnews",
+    #             data_files=[
+    #                 os.path.join(fixture_path, "tnews", "train.json"),
+    #                 os.path.join(fixture_path, "tnews", "dev.json"),
+    #             ],
+    #             lazy=False,
+    #         )
+    #         num_models = 2
+    #         # create auto trainer and train
+    #         auto_trainer = AutoTrainerForTextClassification(
+    #             label_column="label_desc",
+    #             text_column="sentence",
+    #             language="Chinese",
+    #             output_dir=temp_dir_path,
+    #         )
+    #         auto_trainer.train(
+    #             train_ds,
+    #             dev_ds,
+    #             preset="finetune_test",
+    #             num_cpus=1,
+    #             num_gpus=0,
+    #             max_concurrent_trials=1,
+    #             num_models=num_models,
+    #         )
+
+    #         # check is training is valid
+    #         self.assertEqual(len(auto_trainer.training_results.errors), 0)
+    #         self.assertEqual(len(auto_trainer.training_results), num_models)
+
+    #         # test show_training_results
+    #         results_df = auto_trainer.show_training_results()
+    #         self.assertIsInstance(results_df, DataFrame)
+    #         self.assertEqual(len(results_df), num_models)
+
+    #         # test export
+    #         temp_export_path = os.path.join(temp_dir_path, "test_export")
+    #         auto_trainer.export(export_path=temp_export_path)
+    #         reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
+    #         reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
+    #         input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
+    #         model_outputs = reloaded_model(**input_features)
+    #         self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
+
+    #         # test invalid export
+    #         temp_export_path = os.path.join(temp_dir_path, "invalid_export")
+    #         with self.assertRaises(LookupError):
+    #             auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
+
+    #         # test taskflow
+    #         taskflow = auto_trainer.to_taskflow()
+    #         test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
+    #         test_results = taskflow(test_inputs)
+    #         self.assertEqual(len(test_results), len(test_inputs))
+    #         for test_result in test_results:
+    #             self.assertIn(test_result["label"], auto_trainer.label2id)
+
+    def test_multiclass_prompt(self):
         with TemporaryDirectory() as temp_dir_path:
             fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
             train_ds, dev_ds = load_dataset(
@@ -61,7 +122,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             auto_trainer.train(
                 train_ds,
                 dev_ds,
-                preset="test",
+                preset="prompt_test",
                 num_cpus=1,
                 num_gpus=0,
                 max_concurrent_trials=1,
@@ -77,85 +138,63 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertIsInstance(results_df, DataFrame)
             self.assertEqual(len(results_df), num_models)
 
-            # test export
-            temp_export_path = os.path.join(temp_dir_path, "test_export")
-            auto_trainer.export(export_path=temp_export_path)
-            reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
-            reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
-            input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
-            model_outputs = reloaded_model(**input_features)
-            self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
+    # def test_multilabel_finetune(self):
+    #     with TemporaryDirectory() as temp_dir_path:
+    #         fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
+    #         train_ds = load_dataset(
+    #             read_multi_label_dataset,
+    #             path=os.path.join(fixture_path, "divorce", "train.txt"),
+    #             lazy=False,
+    #         )
+    #         dev_ds = load_dataset(
+    #             read_multi_label_dataset,
+    #             path=os.path.join(fixture_path, "divorce", "dev.txt"),
+    #             lazy=False,
+    #         )
+    #         num_models = 2
+    #         # create auto trainer and train
+    #         auto_trainer = AutoTrainerForTextClassification(
+    #             label_column="labels",
+    #             text_column="sentence",
+    #             language="Chinese",
+    #             output_dir=temp_dir_path,
+    #             problem_type="multi_label",
+    #         )
+    #         auto_trainer.train(
+    #             train_ds,
+    #             dev_ds,
+    #             preset="test",
+    #             num_cpus=1,
+    #             num_gpus=0,
+    #             max_concurrent_trials=1,
+    #             num_models=num_models,
+    #         )
 
-            # test invalid export
-            temp_export_path = os.path.join(temp_dir_path, "invalid_export")
-            with self.assertRaises(LookupError):
-                auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
+    #         # check is training is valid
+    #         self.assertEqual(len(auto_trainer.training_results.errors), 0)
+    #         self.assertEqual(len(auto_trainer.training_results), num_models)
 
-            # test taskflow
-            taskflow = auto_trainer.to_taskflow()
-            test_inputs = [dev_ds[0]["sentence"], dev_ds[1]["sentence"]]
-            test_results = taskflow(test_inputs)
-            self.assertEqual(len(test_results), len(test_inputs))
-            for test_result in test_results:
-                self.assertIn(test_result["label"], auto_trainer.label2id)
+    #         # test show_training_results
+    #         results_df = auto_trainer.show_training_results()
+    #         self.assertIsInstance(results_df, DataFrame)
+    #         self.assertEqual(len(results_df), num_models)
 
-    def test_multilabel_end2end(self):
-        with TemporaryDirectory() as temp_dir_path:
-            fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
-            train_ds = load_dataset(
-                read_multi_label_dataset,
-                path=os.path.join(fixture_path, "divorce", "train.txt"),
-                lazy=False,
-            )
-            dev_ds = load_dataset(
-                read_multi_label_dataset,
-                path=os.path.join(fixture_path, "divorce", "dev.txt"),
-                lazy=False,
-            )
-            num_models = 2
-            # create auto trainer and train
-            auto_trainer = AutoTrainerForTextClassification(
-                label_column="labels",
-                text_column="sentence",
-                language="Chinese",
-                output_dir=temp_dir_path,
-                problem_type="multi_label",
-            )
-            auto_trainer.train(
-                train_ds,
-                dev_ds,
-                preset="test",
-                num_cpus=1,
-                num_gpus=0,
-                max_concurrent_trials=1,
-                num_models=num_models,
-            )
+    #         # test export
+    #         temp_export_path = os.path.join(temp_dir_path, "test_export")
+    #         auto_trainer.export(export_path=temp_export_path)
+    #         reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
+    #         reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
+    #         input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
+    #         model_outputs = reloaded_model(**input_features)
+    #         self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
 
-            # check is training is valid
-            self.assertEqual(len(auto_trainer.training_results.errors), 0)
-            self.assertEqual(len(auto_trainer.training_results), num_models)
+    #         # test invalid export
+    #         temp_export_path = os.path.join(temp_dir_path, "invalid_export")
+    #         with self.assertRaises(LookupError):
+    #             auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
-            # test show_training_results
-            results_df = auto_trainer.show_training_results()
-            self.assertIsInstance(results_df, DataFrame)
-            self.assertEqual(len(results_df), num_models)
-
-            # test export
-            temp_export_path = os.path.join(temp_dir_path, "test_export")
-            auto_trainer.export(export_path=temp_export_path)
-            reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
-            reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
-            input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
-            model_outputs = reloaded_model(**input_features)
-            self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
-
-            # test invalid export
-            temp_export_path = os.path.join(temp_dir_path, "invalid_export")
-            with self.assertRaises(LookupError):
-                auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
-
-            # test taskflow
-            # TODO: add multi-label taskflow support
+    #         # test taskflow
+    #         # TODO: add multi-label taskflow support
 
     def test_untrained_auto_trainer(self):
         with TemporaryDirectory() as temp_dir:
