@@ -82,17 +82,14 @@ def evaluate(model, criterion, metric, data_loader):
     for batch in data_loader:
         input_ids, token_type_ids, labels = batch
         total_num += len(labels)
-        logits, _ = model(input_ids=input_ids,
-                          token_type_ids=token_type_ids,
-                          do_evaluate=True)
+        logits, _ = model(input_ids=input_ids, token_type_ids=token_type_ids, do_evaluate=True)
         loss = criterion(logits, labels)
         losses.append(loss.numpy())
         correct = metric.compute(logits, labels)
         metric.update(correct)
         accu = metric.accumulate()
 
-    print("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(
-        np.mean(losses), accu, total_num))
+    print("dev_loss: {:.5}, accuracy: {:.5}, total_num:{}".format(np.mean(losses), accu, total_num))
     model.train()
     metric.reset()
     return accu
@@ -106,40 +103,28 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_text_pair,
-                            data_path=args.train_set,
-                            is_test=False,
-                            lazy=False)
+    train_ds = load_dataset(read_text_pair, data_path=args.train_set, is_test=False, lazy=False)
 
-    dev_ds = load_dataset(read_text_pair,
-                          data_path=args.dev_set,
-                          is_test=False,
-                          lazy=False)
+    dev_ds = load_dataset(read_text_pair, data_path=args.dev_set, is_test=False, lazy=False)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_pair_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_pair_segment
-        Stack(dtype="int64")  # label
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.train_batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.train_batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.eval_batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.eval_batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     model = QuestionMatching(pretrained_model, rdrop_coef=args.rdrop_coef)
 
@@ -151,20 +136,17 @@ def do_train():
 
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
 
@@ -177,8 +159,7 @@ def do_train():
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, labels = batch
-            logits1, kl_loss = model(input_ids=input_ids,
-                                     token_type_ids=token_type_ids)
+            logits1, kl_loss = model(input_ids=input_ids, token_type_ids=token_type_ids)
             correct = metric.compute(logits1, labels)
             metric.update(correct)
             acc = metric.accumulate()
@@ -193,9 +174,8 @@ def do_train():
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.4f, ce_loss: %.4f., kl_loss: %.4f, accu: %.4f, speed: %.2f step/s"
-                    %
-                    (global_step, epoch, step, loss, ce_loss, kl_loss, acc, 10 /
-                     (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, ce_loss, kl_loss, acc, 10 / (time.time() - tic_train))
+                )
                 tic_train = time.time()
 
             loss.backward()
@@ -206,12 +186,10 @@ def do_train():
             if global_step % args.eval_step == 0 and rank == 0:
                 accuracy = evaluate(model, criterion, metric, dev_data_loader)
                 if accuracy > best_accuracy:
-                    save_dir = os.path.join(args.save_dir,
-                                            "model_%d" % global_step)
+                    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   'model_state.pdparams')
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
                     best_accuracy = accuracy

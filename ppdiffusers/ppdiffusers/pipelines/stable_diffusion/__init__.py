@@ -21,7 +21,13 @@ import numpy as np
 import PIL
 from PIL import Image
 
-from ...utils import BaseOutput, is_onnx_available, is_paddle_available, is_paddlenlp_available, is_fastdeploy_available
+from ...utils import (
+    BaseOutput,
+    is_onnx_available,
+    is_paddle_available,
+    is_paddlenlp_available,
+    is_fastdeploy_available,
+)
 
 
 @dataclass

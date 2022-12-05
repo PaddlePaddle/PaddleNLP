@@ -41,8 +41,8 @@ def get_availble(est=15, is_mrc=False):
             continue
         info = nvmlDeviceGetMemoryInfo(h)
         gb = 1024 * 1024 * 1024
-        print(f'- device_id: {device_id}')
-        print(f'- free     : {info.free/gb}')
+        print(f"- device_id: {device_id}")
+        print(f"- free     : {info.free/gb}")
         if info.free / gb >= est:
             return device_id
     return None
@@ -58,34 +58,25 @@ def get_mrc_tasks(model_name_or_path):
     tasks = []
     for lr in learning_rate_list:
         for bs in batch_size_list:
-            tasks.append(
-                f"bash run_mrc.sh {model_name_or_path} chid {bs} {lr} {cls_base_grd_acc*2}"
-            )
-            tasks.append(
-                f"bash run_mrc.sh {model_name_or_path} cmrc2018 {bs} {lr} {cls_base_grd_acc}"
-            )
-            tasks.append(
-                f"bash run_mrc.sh {model_name_or_path} c3 {bs} {lr} {bs//2}")
+            tasks.append(f"bash run_mrc.sh {model_name_or_path} chid {bs} {lr} {cls_base_grd_acc*2}")
+            tasks.append(f"bash run_mrc.sh {model_name_or_path} cmrc2018 {bs} {lr} {cls_base_grd_acc}")
+            tasks.append(f"bash run_mrc.sh {model_name_or_path} c3 {bs} {lr} {bs//2}")
     return tasks
 
 
 def get_cls_tasks(model_name_or_path):
     learning_rate_list = [1e-5, 2e-5, 3e-5, 5e-5]
     batch_size_list = [16, 32, 64]
-    datasets = [
-        'afqmc', 'tnews', 'iflytek', 'ocnli', 'cmnli', 'cluewsc2020', 'csl'
-    ]
+    datasets = ["afqmc", "tnews", "iflytek", "ocnli", "cmnli", "cluewsc2020", "csl"]
     cls_base_grd_acc = 1
     hyper_params = {
         "afqmc": [[3, 128, cls_base_grd_acc, 0.1]],
         "tnews": [[3, 128, cls_base_grd_acc, 0.1]],
-        "iflytek": [[3, 128, cls_base_grd_acc, 0.1],
-                    [3, 128, cls_base_grd_acc, 0.0]],
+        "iflytek": [[3, 128, cls_base_grd_acc, 0.1], [3, 128, cls_base_grd_acc, 0.0]],
         "ocnli": [[5, 128, cls_base_grd_acc, 0.1]],
-        "cluewsc2020": [[50, 128, cls_base_grd_acc, 0.1],
-                        [50, 128, cls_base_grd_acc, 0.0]],
+        "cluewsc2020": [[50, 128, cls_base_grd_acc, 0.1], [50, 128, cls_base_grd_acc, 0.0]],
         "csl": [[5, 256, cls_base_grd_acc * 2, 0.1]],
-        "cmnli": [[2, 128, cls_base_grd_acc, 0.1]]
+        "cmnli": [[2, 128, cls_base_grd_acc, 0.1]],
     }
     tasks = []
     for dataset in datasets:
@@ -126,10 +117,7 @@ def do_task(task):
         return None
     task_ps = f"set -x \nexport CUDA_VISIBLE_DEVICES={device_id}\n" + task
     print(f"> Send task \n{task_ps}\n")
-    ps = subprocess.Popen(task_ps,
-                          shell=True,
-                          stdout=subprocess.PIPE,
-                          stderr=subprocess.STDOUT)
+    ps = subprocess.Popen(task_ps, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if is_mrc and device_id is not None:
         mrc_device[task] = device_id
         print("mrc_device", mrc_device)
@@ -139,8 +127,7 @@ def do_task(task):
 def main():
     model_name_or_path = sys.argv[1]
     # Make sure that dataset has been downloaded first
-    status = os.system(
-        f"python warmup_dataset_and_model.py {model_name_or_path}")
+    status = os.system(f"python warmup_dataset_and_model.py {model_name_or_path}")
     assert status == 0, "Please make sure clue dataset has been downloaded successfully."
     tasks = []
     tasks = get_cls_tasks(model_name_or_path)
@@ -159,18 +146,15 @@ def main():
             if returncode is not None:
                 if returncode != 0:
                     retry[runs[i]["ts"]] += 1
-                    print(
-                        f"> {runs[i]['ts']} task failed, will retried, tryed {retry[runs[i]['ts']]} times."
-                    )
+                    print(f"> {runs[i]['ts']} task failed, will retried, tryed {retry[runs[i]['ts']]} times.")
                     output = runs[i]["ps"].communicate()[0]
-                    for line in output.decode('utf-8').split("\n"):
+                    for line in output.decode("utf-8").split("\n"):
                         print(line)
                     if retry[runs[i]["ts"]] <= 5:
                         tasks.append(runs[i]["ts"])
                 else:
-                    if "cmrc" in runs[i]["ts"] or "chid" in runs[i][
-                            "ts"] or "c3" in runs[i]["ts"]:
-                        mrc_device.pop(runs[i]['ts'])
+                    if "cmrc" in runs[i]["ts"] or "chid" in runs[i]["ts"] or "c3" in runs[i]["ts"]:
+                        mrc_device.pop(runs[i]["ts"])
                         print("mrc_device", mrc_device)
                     print(f"> Done! {runs[i]['ts']}")
                 runs.pop(i)
@@ -191,7 +175,7 @@ def main():
         print(f"> Wait for 15 seconds to start!")
         time.sleep(15)
     print("All done!")
-    status = os.system(f'bash extract_result.sh {model_name_or_path}')
+    status = os.system(f"bash extract_result.sh {model_name_or_path}")
 
 
 if __name__ == "__main__":

@@ -24,7 +24,7 @@ from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 
-sys.path.append('./')
+sys.path.append("./")
 from data import create_dataloader, transform_fn_dict
 from data import convert_example, convert_chid_example
 
@@ -55,21 +55,22 @@ args = parser.parse_args()
 
 
 class Predictor(object):
-
-    def __init__(self,
-                 model_dir,
-                 device="gpu",
-                 max_seq_length=128,
-                 batch_size=32,
-                 use_tensorrt=False,
-                 precision="fp32",
-                 cpu_threads=10,
-                 enable_mkldnn=False):
+    def __init__(
+        self,
+        model_dir,
+        device="gpu",
+        max_seq_length=128,
+        batch_size=32,
+        use_tensorrt=False,
+        precision="fp32",
+        cpu_threads=10,
+        enable_mkldnn=False,
+    ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
-        model_file = os.path.join(model_dir, 'inference.pdmodel')
-        params_file = os.path.join(model_dir, 'inference.pdiparams')
+        model_file = os.path.join(model_dir, "inference.pdmodel")
+        params_file = os.path.join(model_dir, "inference.pdiparams")
         if not os.path.exists(model_file):
             raise ValueError("not find model file path {}".format(model_file))
         if not os.path.exists(params_file):
@@ -83,14 +84,14 @@ class Predictor(object):
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "int8": inference.PrecisionType.Int8,
             }
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(max_batch_size=batch_size,
-                                              min_subgraph_size=30,
-                                              precision_mode=precision_mode)
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                )
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -106,12 +107,8 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
     def predict(self, tokenizer, data_loader, label_normalize_dict):
         """
@@ -124,15 +121,9 @@ class Predictor(object):
             results(obj:`dict`): All the predictions labels.
         """
 
-        normed_labels = [
-            normalized_lable
-            for origin_lable, normalized_lable in label_normalize_dict.items()
-        ]
+        normed_labels = [normalized_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
-        origin_labels = [
-            origin_lable
-            for origin_lable, normalized_lable in label_normalize_dict.items()
-        ]
+        origin_labels = [origin_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
         label_length = len(normed_labels[0])
 
@@ -147,13 +138,10 @@ class Predictor(object):
             for bs_index, mask_pos in enumerate(masked_positions.numpy()):
                 for pos in mask_pos:
                     new_masked_positions.append(bs_index * max_len + pos)
-            new_masked_positions = paddle.to_tensor(
-                np.array(new_masked_positions).astype('int64'))
-            self.input_handles[0].copy_from_cpu(src_ids.numpy().astype('int64'))
-            self.input_handles[1].copy_from_cpu(
-                token_type_ids.numpy().astype('int64'))
-            self.input_handles[2].copy_from_cpu(
-                new_masked_positions.numpy().astype('int64'))
+            new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype("int64"))
+            self.input_handles[0].copy_from_cpu(src_ids.numpy().astype("int64"))
+            self.input_handles[1].copy_from_cpu(token_type_ids.numpy().astype("int64"))
+            self.input_handles[2].copy_from_cpu(new_masked_positions.numpy().astype("int64"))
             self.predictor.run()
 
             logits = self.output_handle.copy_to_cpu()
@@ -162,12 +150,9 @@ class Predictor(object):
             prediction_probs = softmax_fn(logits)
             batch_size = len(src_ids)
             vocab_size = prediction_probs.shape[1]
-            prediction_probs = paddle.reshape(
-                prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
+            prediction_probs = paddle.reshape(prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
-            label_ids = np.array([
-                tokenizer(label)["input_ids"][1:-1] for label in normed_labels
-            ])
+            label_ids = np.array([tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
 
             y_pred = np.ones(shape=[batch_size, len(label_ids)])
 
@@ -186,39 +171,34 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
-    label_normalize_json = os.path.join("./label_normalized",
-                                        args.task_name + ".json")
+    label_normalize_json = os.path.join("./label_normalized", args.task_name + ".json")
     label_norm_dict = None
-    with open(label_normalize_json, 'r', encoding="utf-8") as f:
+    with open(label_normalize_json, "r", encoding="utf-8") as f:
         label_norm_dict = json.load(f)
 
     # Load test_ds for tnews leaderboard
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
 
     # Task related transform operations, eg: numbert label -> text_label, english -> chinese
-    transform_fn = partial(transform_fn_dict[args.task_name],
-                           label_normalize_dict=label_norm_dict,
-                           is_test=True,
-                           pattern_id=args.pattern_id)
+    transform_fn = partial(
+        transform_fn_dict[args.task_name],
+        label_normalize_dict=label_norm_dict,
+        is_test=True,
+        pattern_id=args.pattern_id,
+    )
     test_ds = test_ds.map(transform_fn, lazy=False)
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     batchify_test_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # src_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # token_type_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
         Stack(dtype="int64"),  # masked_positions
     ): [data for data in fn(samples)]
-    trans_test_func = partial(convert_example,
-                              tokenizer=tokenizer,
-                              max_seq_length=128,
-                              is_test=True)
+    trans_test_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=128, is_test=True)
 
-    test_data_loader = create_dataloader(test_ds,
-                                         mode='eval',
-                                         batch_size=args.batch_size,
-                                         batchify_fn=batchify_test_fn,
-                                         trans_fn=trans_test_func)
+    test_data_loader = create_dataloader(
+        test_ds, mode="eval", batch_size=args.batch_size, batchify_fn=batchify_test_fn, trans_fn=trans_test_func
+    )
     p = Predictor(args.model_dir)
     y = p.predict(tokenizer, test_data_loader, label_norm_dict)
     print(y)

@@ -19,25 +19,29 @@ from fast_tokenizer import pretokenizers
 
 
 class TestByteLevelPreTokenizer(unittest.TestCase):
-
     def setUp(self):
-        self.pretokenized = pretokenizers.PreTokenizedString(
-            "Hello my friend, how is your day going?")
+        self.pretokenized = pretokenizers.PreTokenizedString("Hello my friend, how is your day going?")
 
     def check_equals(self, add_prefix_space, use_regex, expected_result):
-        bytelevel = pretokenizers.ByteLevelPreTokenizer(
-            add_prefix_space=add_prefix_space, use_regex=use_regex)
+        bytelevel = pretokenizers.ByteLevelPreTokenizer(add_prefix_space=add_prefix_space, use_regex=use_regex)
         bytelevel(self.pretokenized)
         splits = self.pretokenized.get_splits()
         result = [(s, offset) for s, offset, tokens in splits]
         self.assertEqual(result, expected_result)
 
     def test_pretokenize_with_regex(self):
-        expected_result = [("Hello", (0, 5)), ("Ġmy", (5, 8)),
-                           ("Ġfriend", (8, 15)), (",", (15, 16)),
-                           ("Ġhow", (16, 20)), ("Ġis", (20, 23)),
-                           ("Ġyour", (23, 28)), ("Ġday", (28, 32)),
-                           ("Ġgoing", (32, 38)), ("?", (38, 39))]
+        expected_result = [
+            ("Hello", (0, 5)),
+            ("Ġmy", (5, 8)),
+            ("Ġfriend", (8, 15)),
+            (",", (15, 16)),
+            ("Ġhow", (16, 20)),
+            ("Ġis", (20, 23)),
+            ("Ġyour", (23, 28)),
+            ("Ġday", (28, 32)),
+            ("Ġgoing", (32, 38)),
+            ("?", (38, 39)),
+        ]
 
         self.check_equals(False, True, expected_result)
 
@@ -46,15 +50,21 @@ class TestByteLevelPreTokenizer(unittest.TestCase):
         self.check_equals(False, False, expected_result)
 
     def test_pretokenize_with_prefix_with_regex(self):
-        expected_result = [("ĠHello", (0, 5)), ("Ġmy", (5, 8)),
-                           ("Ġfriend", (8, 15)), (",", (15, 16)),
-                           ("Ġhow", (16, 20)), ("Ġis", (20, 23)),
-                           ("Ġyour", (23, 28)), ("Ġday", (28, 32)),
-                           ("Ġgoing", (32, 38)), ("?", (38, 39))]
+        expected_result = [
+            ("ĠHello", (0, 5)),
+            ("Ġmy", (5, 8)),
+            ("Ġfriend", (8, 15)),
+            (",", (15, 16)),
+            ("Ġhow", (16, 20)),
+            ("Ġis", (20, 23)),
+            ("Ġyour", (23, 28)),
+            ("Ġday", (28, 32)),
+            ("Ġgoing", (32, 38)),
+            ("?", (38, 39)),
+        ]
 
         self.check_equals(True, True, expected_result)
 
     def test_pretokenize_with_prefix_without_regex(self):
-        expected_result = [("ĠHelloĠmyĠfriend,ĠhowĠisĠyourĠdayĠgoing?", (0, 39))
-                           ]
+        expected_result = [("ĠHelloĠmyĠfriend,ĠhowĠisĠyourĠdayĠgoing?", (0, 39))]
         self.check_equals(True, False, expected_result)

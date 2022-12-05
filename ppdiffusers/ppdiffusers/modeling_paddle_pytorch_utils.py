@@ -32,47 +32,45 @@ def rename_key(key):
 #####################
 
 
-def rename_key_and_reshape_tensor(pt_tuple_key, pt_tensor,
-                                  random_paddle_state_dict):
+def rename_key_and_reshape_tensor(pt_tuple_key, pt_tensor, random_paddle_state_dict):
     """Rename PT weight names to corresponding Paddle weight names and reshape tensor if necessary"""
 
     # conv norm or layer norm
-    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias", )
-    if (any("norm" in str_ for str_ in pt_tuple_key)
-            and (pt_tuple_key[-1] in ["bias", "beta"])
-            and (pt_tuple_key[:-1] + ("bias", ) in random_paddle_state_dict)):
-        renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias", )
+    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias",)
+    if (
+        any("norm" in str_ for str_ in pt_tuple_key)
+        and (pt_tuple_key[-1] in ["bias", "beta"])
+        and (pt_tuple_key[:-1] + ("bias",) in random_paddle_state_dict)
+    ):
+        renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias",)
         return renamed_pt_tuple_key, pt_tensor
-    elif pt_tuple_key[-1] in [
-            "weight", "gamma"
-    ] and pt_tuple_key[:-1] + ("bias", ) in random_paddle_state_dict:
-        renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias", )
+    elif pt_tuple_key[-1] in ["weight", "gamma"] and pt_tuple_key[:-1] + ("bias",) in random_paddle_state_dict:
+        renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias",)
         return renamed_pt_tuple_key, pt_tensor
 
     # embedding
-    if pt_tuple_key[-1] == "weight" and pt_tuple_key[:-1] + (
-            "weight", ) in random_paddle_state_dict:
-        pt_tuple_key = pt_tuple_key[:-1] + ("weight", )
+    if pt_tuple_key[-1] == "weight" and pt_tuple_key[:-1] + ("weight",) in random_paddle_state_dict:
+        pt_tuple_key = pt_tuple_key[:-1] + ("weight",)
         return renamed_pt_tuple_key, pt_tensor
 
     # conv layer
-    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight", )
+    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight",)
     if pt_tuple_key[-1] == "weight" and pt_tensor.ndim == 4:
         return renamed_pt_tuple_key, pt_tensor
 
     # linear layer
-    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight", )
+    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight",)
     if pt_tuple_key[-1] == "weight":
         pt_tensor = pt_tensor.t()
         return renamed_pt_tuple_key, pt_tensor
 
     # old PyTorch layer norm weight
-    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight", )
+    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("weight",)
     if pt_tuple_key[-1] == "gamma":
         return renamed_pt_tuple_key, pt_tensor
 
     # old PyTorch layer norm bias
-    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias", )
+    renamed_pt_tuple_key = pt_tuple_key[:-1] + ("bias",)
     if pt_tuple_key[-1] == "beta":
         return renamed_pt_tuple_key, pt_tensor
 
@@ -92,12 +90,10 @@ def convert_pytorch_state_dict_to_paddle(pt_state_dict, paddle_model):
         pt_tuple_key = tuple(renamed_pt_key.split("."))
 
         # Correctly rename weight parameters
-        paddle_key, paddle_tensor = rename_key_and_reshape_tensor(
-            pt_tuple_key, pt_tensor, random_paddle_state_dict)
+        paddle_key, paddle_tensor = rename_key_and_reshape_tensor(pt_tuple_key, pt_tensor, random_paddle_state_dict)
 
         if paddle_key in random_paddle_state_dict:
-            if list(paddle_tensor.shape) != list(
-                    random_paddle_state_dict[paddle_key].shape):
+            if list(paddle_tensor.shape) != list(random_paddle_state_dict[paddle_key].shape):
                 raise ValueError(
                     f"Paddle checkpoint seems to be incorrect. Weight {pt_key} was expected to be of shape "
                     f"{random_paddle_state_dict[paddle_key].shape}, but is {paddle_tensor.shape}."

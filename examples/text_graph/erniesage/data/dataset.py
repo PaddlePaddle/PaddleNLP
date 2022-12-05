@@ -32,24 +32,19 @@ __all__ = [
 
 
 class TrainData(Dataset):
-
     def __init__(self, graph_work_path):
         trainer_id = paddle.distributed.get_rank()
         trainer_count = paddle.distributed.get_world_size()
-        print("trainer_id: %s, trainer_count: %s." %
-              (trainer_id, trainer_count))
+        print("trainer_id: %s, trainer_count: %s." % (trainer_id, trainer_count))
 
-        edges = np.load(os.path.join(graph_work_path, "train_data.npy"),
-                        allow_pickle=True)
+        edges = np.load(os.path.join(graph_work_path, "train_data.npy"), allow_pickle=True)
         # edges is bidirectional.
         train_src = edges[trainer_id::trainer_count, 0]
         train_dst = edges[trainer_id::trainer_count, 1]
         returns = {"train_data": [train_src, train_dst]}
 
         if os.path.exists(os.path.join(graph_work_path, "neg_samples.npy")):
-            neg_samples = np.load(os.path.join(graph_work_path,
-                                               "neg_samples.npy"),
-                                  allow_pickle=True)
+            neg_samples = np.load(os.path.join(graph_work_path, "neg_samples.npy"), allow_pickle=True)
             if neg_samples.size != 0:
                 train_negs = neg_samples[trainer_id::trainer_count]
                 returns["train_data"].append(train_negs)
@@ -64,7 +59,6 @@ class TrainData(Dataset):
 
 
 class PredictData(Dataset):
-
     def __init__(self, num_nodes):
         trainer_id = paddle.distributed.get_rank()
         trainer_count = paddle.distributed.get_world_size()
@@ -113,7 +107,13 @@ def batch_fn(batch_ex, samples, base_graph, term_ids):
     user_real_index = np.array(batch_src, dtype="int64")
     pos_item_real_index = np.array(batch_dst, dtype="int64")
 
-    return np.array([subgraph.num_nodes], dtype="int32"), \
-        subgraph.edges.astype("int32"), \
-        term_ids, user_index, pos_item_index, neg_item_index, \
-        user_real_index, pos_item_real_index
+    return (
+        np.array([subgraph.num_nodes], dtype="int32"),
+        subgraph.edges.astype("int32"),
+        term_ids,
+        user_index,
+        pos_item_index,
+        neg_item_index,
+        user_real_index,
+        pos_item_real_index,
+    )

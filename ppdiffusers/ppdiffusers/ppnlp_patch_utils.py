@@ -19,9 +19,9 @@ from types import FunctionType, MethodType
 
 def copy_func(f):
     "Copy a non-builtin function (NB `copy.copy` does not work for this)"
-    if not isinstance(f, FunctionType): return copy.copy(f)
-    fn = FunctionType(f.__code__, f.__globals__, f.__name__, f.__defaults__,
-                      f.__closure__)
+    if not isinstance(f, FunctionType):
+        return copy.copy(f)
+    fn = FunctionType(f.__code__, f.__globals__, f.__name__, f.__defaults__, f.__closure__)
     fn.__kwdefaults__ = f.__kwdefaults__
     fn.__dict__.update(f.__dict__)
     fn.__annotations__.update(f.__annotations__)
@@ -32,7 +32,8 @@ def copy_func(f):
 # copied from https://github.com/fastai/fastcore/blob/c9b4c088d3706569c076e7c197c724730be190ab/fastcore/basics.py#L938-L954
 def patch_to(cls, as_prop=False, cls_method=False):
     "Decorator: add `f` to `cls`"
-    if not isinstance(cls, (tuple, list)): cls = (cls, )
+    if not isinstance(cls, (tuple, list)):
+        cls = (cls,)
 
     def _inner(f):
         for c_ in cls:
@@ -55,9 +56,11 @@ def patch_to(cls, as_prop=False, cls_method=False):
 if is_paddle_available() and is_paddlenlp_available():
     import paddle
     from paddlenlp.transformers import PretrainedModel
+
     # NEG_INF = float("-inf")
     # use -1e4 as NEG_INF
     import paddlenlp.transformers.clip.modeling
+
     paddlenlp.transformers.clip.modeling.NEG_INF = -1e4
 
     @patch_to(PretrainedModel, as_prop=True)

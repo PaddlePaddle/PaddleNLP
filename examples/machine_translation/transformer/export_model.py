@@ -14,40 +14,31 @@ from paddlenlp.utils.log import logger
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="./configs/transformer.big.yaml",
-                        type=str,
-                        help="Path of the config file. ")
+    parser.add_argument(
+        "--config", default="./configs/transformer.big.yaml", type=str, help="Path of the config file. "
+    )
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help=
-        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. ",
     )
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help=
-        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help=
-        "The unknown token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. "
+        help="The unknown token. It should be provided when use custom vocab_file. ",
     )
     parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. "
+        "--bos_token", default=None, type=str, help="The bos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
     )
     args = parser.parse_args()
     return args
@@ -74,21 +65,18 @@ def do_export(args):
         max_out_len=args.max_out_len,
         beam_search_version=args.beam_search_version,
         rel_len=args.use_rel_len,
-        alpha=args.alpha)
+        alpha=args.alpha,
+    )
 
     # Load the trained model
-    assert args.init_from_params, (
-        "Please set init_from_params to load the infer model.")
+    assert args.init_from_params, "Please set init_from_params to load the infer model."
 
-    model_dict = paddle.load(
-        os.path.join(args.init_from_params, "transformer.pdparams"))
+    model_dict = paddle.load(os.path.join(args.init_from_params, "transformer.pdparams"))
 
     # To avoid a longer length than training, reset the size of position
     # encoding to max_length
-    model_dict["encoder.pos_encoder.weight"] = position_encoding_init(
-        args.max_length + 1, args.d_model)
-    model_dict["decoder.pos_encoder.weight"] = position_encoding_init(
-        args.max_length + 1, args.d_model)
+    model_dict["encoder.pos_encoder.weight"] = position_encoding_init(args.max_length + 1, args.d_model)
+    model_dict["decoder.pos_encoder.weight"] = position_encoding_init(args.max_length + 1, args.d_model)
     transformer.load_dict(model_dict)
     # Set evaluate mode
     transformer.eval()
@@ -102,19 +90,18 @@ def do_export(args):
             # trg_word
             # paddle.static.InputSpec(
             #     shape=[None, None], dtype="int64")
-        ])
+        ],
+    )
 
     # Save converted static graph model
-    paddle.jit.save(transformer,
-                    os.path.join(args.inference_model_dir, "transformer"))
-    logger.info("Transformer has been saved to {}".format(
-        args.inference_model_dir))
+    paddle.jit.save(transformer, os.path.join(args.inference_model_dir, "transformer"))
+    logger.info("Transformer has been saved to {}".format(args.inference_model_dir))
 
 
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.benchmark = ARGS.benchmark
     args.vocab_file = ARGS.vocab_file

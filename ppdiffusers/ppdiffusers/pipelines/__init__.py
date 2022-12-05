@@ -27,11 +27,13 @@ else:
 
 if is_paddle_available() and is_paddlenlp_available():
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
-    from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
-                                   StableDiffusionInpaintPipeline,
-                                   StableDiffusionPipeline,
-                                   StableDiffusionInpaintPipelineLegacy,
-                                   StableDiffusionPipelineAllinOne)
+    from .stable_diffusion import (
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipelineAllinOne,
+    )
 
 if is_paddlenlp_available() and is_onnx_available():
     from .stable_diffusion import (
@@ -41,6 +43,8 @@ if is_paddlenlp_available() and is_onnx_available():
     )
 
 if is_paddlenlp_available() and is_fastdeploy_available():
-    from .stable_diffusion import (FastDeployStableDiffusionImg2ImgPipeline,
-                                   FastDeployStableDiffusionInpaintPipeline,
-                                   FastDeployStableDiffusionPipeline)
+    from .stable_diffusion import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionPipeline,
+    )

@@ -40,9 +40,13 @@ def main():
     if args.task_type == "mrc":
         args.questions = [
             [
-                "公司的类型属于什么？", "杨小峰的住所是在哪里？", "这个公司的法定代表人叫什么？",
-                "花了多少钱进行注册的这个公司？", "公司在什么时候成立的？", "杨小峰是什么身份？",
-                "91510107749745776R代表的是什么？"
+                "公司的类型属于什么？",
+                "杨小峰的住所是在哪里？",
+                "这个公司的法定代表人叫什么？",
+                "花了多少钱进行注册的这个公司？",
+                "公司在什么时候成立的？",
+                "杨小峰是什么身份？",
+                "91510107749745776R代表的是什么？",
             ],
         ]
         docs = ["./images/mrc_sample.jpg"]
@@ -57,6 +61,7 @@ def main():
 
     outputs = predictor.predict(docs)
     import pprint
+
     pprint.sorted = lambda x, key=None: x
     pprint.pprint(outputs)
 

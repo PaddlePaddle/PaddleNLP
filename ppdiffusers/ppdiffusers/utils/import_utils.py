@@ -43,6 +43,7 @@ if USE_PADDLE in ENV_VARS_TRUE_AND_AUTO_VALUES:
     if _paddle_available:
         try:
             import paddle
+
             _paddle_version = paddle.__version__
             logger.info(f"Paddle version {_paddle_version} available.")
         except importlib_metadata.PackageNotFoundError:
@@ -54,8 +55,7 @@ else:
 _paddlenlp_available = importlib.util.find_spec("paddlenlp") is not None
 try:
     _paddlenlp_version = importlib_metadata.version("paddlenlp")
-    logger.debug(
-        f"Successfully imported paddlenlp version {_paddlenlp_version}")
+    logger.debug(f"Successfully imported paddlenlp version {_paddlenlp_version}")
 except importlib_metadata.PackageNotFoundError:
     _paddlenlp_available = False
 
@@ -69,23 +69,20 @@ except importlib_metadata.PackageNotFoundError:
 _unidecode_available = importlib.util.find_spec("unidecode") is not None
 try:
     _unidecode_version = importlib_metadata.version("unidecode")
-    logger.debug(
-        f"Successfully imported unidecode version {_unidecode_version}")
+    logger.debug(f"Successfully imported unidecode version {_unidecode_version}")
 except importlib_metadata.PackageNotFoundError:
     _unidecode_available = False
 
 _modelcards_available = importlib.util.find_spec("modelcards") is not None
 try:
     _modelcards_version = importlib_metadata.version("modelcards")
-    logger.debug(
-        f"Successfully imported modelcards version {_modelcards_version}")
+    logger.debug(f"Successfully imported modelcards version {_modelcards_version}")
 except importlib_metadata.PackageNotFoundError:
     _modelcards_available = False
 
 _onnx_available = importlib.util.find_spec("onnxruntime") is not None
 if _onnx_available:
-    candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml",
-                  "onnxruntime-openvino")
+    candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml", "onnxruntime-openvino")
     _onnxruntime_version = None
     # For the metadata, we have to look for both onnxruntime and onnxruntime-gpu
     for pkg in candidates:
@@ -96,8 +93,7 @@ if _onnx_available:
             pass
     _onnx_available = _onnxruntime_version is not None
     if _onnx_available:
-        logger.debug(
-            f"Successfully imported onnxruntime version {_onnxruntime_version}")
+        logger.debug(f"Successfully imported onnxruntime version {_onnxruntime_version}")
 
 _scipy_available = importlib.util.find_spec("scipy") is not None
 try:
@@ -119,8 +115,7 @@ if _fastdeploy_available:
             pass
     _fastdeploy_available = _fastdeploy_version is not None
     if _fastdeploy_available:
-        logger.debug(
-            f"Successfully imported fastdeploy version {_fastdeploy_version}")
+        logger.debug(f"Successfully imported fastdeploy version {_fastdeploy_version}")
 
 
 def is_paddle_available():
@@ -190,14 +185,16 @@ UNIDECODE_IMPORT_ERROR = """
 Unidecode`
 """
 
-BACKENDS_MAPPING = OrderedDict([
-    ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
-    ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
-    ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
-    ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
-    ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
-    ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
-])
+BACKENDS_MAPPING = OrderedDict(
+    [
+        ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
+        ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
+        ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
+        ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
+        ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
+        ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
+    ]
+)
 
 
 def requires_backends(obj, backends):

@@ -32,12 +32,12 @@ class Chomp1d(nn.Layer):
         self.chomp_size = chomp_size
 
     def forward(self, x):
-        return x[:, :, :-self.chomp_size]
+        return x[:, :, : -self.chomp_size]
 
 
 class TemporalBlock(nn.Layer):
     """
-    The TCN block, consists of dilated causal conv, relu and residual block. 
+    The TCN block, consists of dilated causal conv, relu and residual block.
     See the Figure 1(b) in https://arxiv.org/pdf/1803.01271.pdf for more details.
 
     Args:
@@ -57,23 +57,12 @@ class TemporalBlock(nn.Layer):
             Probability of dropout the units. Defaults to 0.2.
     """
 
-    def __init__(self,
-                 n_inputs,
-                 n_outputs,
-                 kernel_size,
-                 stride,
-                 dilation,
-                 padding,
-                 dropout=0.2):
+    def __init__(self, n_inputs, n_outputs, kernel_size, stride, dilation, padding, dropout=0.2):
 
         super(TemporalBlock, self).__init__()
         self.conv1 = weight_norm(
-            nn.Conv1D(n_inputs,
-                      n_outputs,
-                      kernel_size,
-                      stride=stride,
-                      padding=padding,
-                      dilation=dilation))
+            nn.Conv1D(n_inputs, n_outputs, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        )
         # Chomp1d is used to make sure the network is causal.
         # We pad by (k-1)*d on the two sides of the input for convolution,
         # and then use Chomp1d to remove the (k-1)*d output elements on the right.
@@ -82,32 +71,24 @@ class TemporalBlock(nn.Layer):
         self.dropout1 = nn.Dropout(dropout)
 
         self.conv2 = weight_norm(
-            nn.Conv1D(n_outputs,
-                      n_outputs,
-                      kernel_size,
-                      stride=stride,
-                      padding=padding,
-                      dilation=dilation))
+            nn.Conv1D(n_outputs, n_outputs, kernel_size, stride=stride, padding=padding, dilation=dilation)
+        )
         self.chomp2 = Chomp1d(padding)
         self.relu2 = nn.ReLU()
         self.dropout2 = nn.Dropout(dropout)
 
-        self.net = nn.Sequential(self.conv1, self.chomp1, self.relu1,
-                                 self.dropout1, self.conv2, self.chomp2,
-                                 self.relu2, self.dropout2)
-        self.downsample = nn.Conv1D(n_inputs, n_outputs,
-                                    1) if n_inputs != n_outputs else None
+        self.net = nn.Sequential(
+            self.conv1, self.chomp1, self.relu1, self.dropout1, self.conv2, self.chomp2, self.relu2, self.dropout2
+        )
+        self.downsample = nn.Conv1D(n_inputs, n_outputs, 1) if n_inputs != n_outputs else None
         self.relu = nn.ReLU()
         self.init_weights()
 
     def init_weights(self):
-        self.conv1.weight.set_value(
-            paddle.tensor.normal(0.0, 0.01, self.conv1.weight.shape))
-        self.conv2.weight.set_value(
-            paddle.tensor.normal(0.0, 0.01, self.conv2.weight.shape))
+        self.conv1.weight.set_value(paddle.tensor.normal(0.0, 0.01, self.conv1.weight.shape))
+        self.conv2.weight.set_value(paddle.tensor.normal(0.0, 0.01, self.conv2.weight.shape))
         if self.downsample is not None:
-            self.downsample.weight.set_value(
-                paddle.tensor.normal(0.0, 0.01, self.downsample.weight.shape))
+            self.downsample.weight.set_value(paddle.tensor.normal(0.0, 0.01, self.downsample.weight.shape))
 
     def forward(self, x):
         """
@@ -122,7 +103,6 @@ class TemporalBlock(nn.Layer):
 
 
 class TCN(nn.Layer):
-
     def __init__(self, input_channel, num_channels, kernel_size=2, dropout=0.2):
         """
         Temporal Convolutional Networks is a simple convolutional architecture. It outperforms canonical recurrent networks
@@ -146,13 +126,16 @@ class TCN(nn.Layer):
             in_channels = input_channel if i == 0 else num_channels[i - 1]
             out_channels = num_channels[i]
             layers.append(
-                TemporalBlock(in_channels,
-                              out_channels,
-                              kernel_size,
-                              stride=1,
-                              dilation=dilation_size,
-                              padding=(kernel_size - 1) * dilation_size,
-                              dropout=dropout))
+                TemporalBlock(
+                    in_channels,
+                    out_channels,
+                    kernel_size,
+                    stride=1,
+                    dilation=dilation_size,
+                    padding=(kernel_size - 1) * dilation_size,
+                    dropout=dropout,
+                )
+            )
 
         self.network = nn.Sequential(*layers)
 

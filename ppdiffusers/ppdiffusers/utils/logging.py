@@ -58,7 +58,8 @@ def _get_default_logging_level():
         else:
             logging.getLogger().warning(
                 f"Unknown option DIFFUSERS_VERBOSITY={env_level_str}, "
-                f"has to be one of: { ', '.join(log_levels.keys()) }")
+                f"has to be one of: { ', '.join(log_levels.keys()) }"
+            )
     return _default_log_level
 
 
@@ -212,8 +213,7 @@ def remove_handler(handler: logging.Handler) -> None:
 
     _configure_library_root_logger()
 
-    assert handler is not None and handler not in _get_library_root_logger(
-    ).handlers
+    assert handler is not None and handler not in _get_library_root_logger().handlers
     _get_library_root_logger().removeHandler(handler)
 
 
@@ -247,9 +247,7 @@ def enable_explicit_format() -> None:
     handlers = _get_library_root_logger().handlers
 
     for handler in handlers:
-        formatter = logging.Formatter(
-            "[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s >> %(message)s"
-        )
+        formatter = logging.Formatter("[%(levelname)s|%(filename)s:%(lineno)s] %(asctime)s >> %(message)s")
         handler.setFormatter(formatter)
 
 
@@ -304,7 +302,6 @@ class EmptyTqdm:
 
 
 class _tqdm_cls:
-
     def __call__(self, *args, **kwargs):
         if _tqdm_active:
             return tqdm_lib.tqdm(*args, **kwargs)

@@ -27,10 +27,9 @@ from paddlenlp.ops.ext_utils import load
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inference_model_dir",
-                        default="./infer_model/",
-                        type=str,
-                        help="Path to save inference model of BART. ")
+    parser.add_argument(
+        "--inference_model_dir", default="./infer_model/", type=str, help="Path to save inference model of BART. "
+    )
 
     args = parser.parse_args()
 
@@ -39,7 +38,7 @@ def setup_args():
 
 def prepare_input(tokenizer, sentences):
     tokenized = tokenizer(sentences, padding=True)
-    input_ids = np.asarray(tokenized['input_ids'], dtype="int32")
+    input_ids = np.asarray(tokenized["input_ids"], dtype="int32")
     return input_ids
 
 
@@ -52,15 +51,12 @@ def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
 def infer(args):
-    model_name = 'bart-base'
+    model_name = "bart-base"
     tokenizer = BartTokenizer.from_pretrained(model_name)
 
     sentences = [
@@ -77,7 +73,8 @@ def infer(args):
 
     config = paddle_infer.Config(
         os.path.join(args.inference_model_dir, "bart.pdmodel"),
-        os.path.join(args.inference_model_dir, "bart.pdiparams"))
+        os.path.join(args.inference_model_dir, "bart.pdiparams"),
+    )
 
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
@@ -99,10 +96,9 @@ def infer(args):
         for beam_idx, beam in enumerate(sample):
             if beam_idx >= len(sample) / 2:
                 break
-            generated_ids = postprocess_seq(beam, tokenizer.bos_token_id,
-                                            tokenizer.eos_token_id)
+            generated_ids = postprocess_seq(beam, tokenizer.bos_token_id, tokenizer.eos_token_id)
             seq = tokenizer.convert_ids_to_string(generated_ids)
-            print(f'{idx}-{beam_idx}: {seq}')
+            print(f"{idx}-{beam_idx}: {seq}")
 
 
 if __name__ == "__main__":

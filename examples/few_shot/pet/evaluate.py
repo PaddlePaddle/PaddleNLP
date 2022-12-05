@@ -25,10 +25,7 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
     total_num = 0
     correct_num = 0
 
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
+    normed_labels = [normalized_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
     label_length = len(normed_labels[0])
 
@@ -41,12 +38,11 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         for bs_index, mask_pos in enumerate(masked_positions.numpy()):
             for pos in mask_pos:
                 new_masked_positions.append(bs_index * max_len + pos)
-        new_masked_positions = paddle.to_tensor(
-            np.array(new_masked_positions).astype('int32'))
+        new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype("int32"))
 
-        prediction_scores = model(input_ids=src_ids,
-                                  token_type_ids=token_type_ids,
-                                  masked_positions=new_masked_positions)
+        prediction_scores = model(
+            input_ids=src_ids, token_type_ids=token_type_ids, masked_positions=new_masked_positions
+        )
         softmax_fn = paddle.nn.Softmax()
         prediction_probs = softmax_fn(prediction_scores)
 
@@ -54,13 +50,10 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(prediction_probs,
-                                          shape=[batch_size, -1,
-                                                 vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
         # [label_num, label_length]
-        label_ids = np.array(
-            [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
+        label_ids = np.array([tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
 
         y_pred = np.ones(shape=[batch_size, len(label_ids)])
 
@@ -73,8 +66,7 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
 
         y_true_index = []
         for masked_lm_label in masked_lm_labels.numpy():
-            label_text = "".join(
-                tokenizer.convert_ids_to_tokens(list(masked_lm_label)))
+            label_text = "".join(tokenizer.convert_ids_to_tokens(list(masked_lm_label)))
 
             label_index = normed_labels.index(label_text)
             y_true_index.append(label_index)
@@ -90,9 +82,9 @@ def do_evaluate(model, tokenizer, data_loader, label_normalize_dict):
 @paddle.no_grad()
 def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
     """
-        FewCLUE `chid` dataset is specical when evaluate: input slots have 
-        additional `candidate_label_ids`, so need to customize the
-        evaluate function.
+    FewCLUE `chid` dataset is specical when evaluate: input slots have
+    additional `candidate_label_ids`, so need to customize the
+    evaluate function.
     """
 
     model.eval()
@@ -100,10 +92,7 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
     total_num = 0
     correct_num = 0
 
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
+    normed_labels = [normalized_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
     label_length = len(normed_labels[0])
 
@@ -116,12 +105,11 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
         for bs_index, mask_pos in enumerate(masked_positions.numpy()):
             for pos in mask_pos:
                 new_masked_positions.append(bs_index * max_len + pos)
-        new_masked_positions = paddle.to_tensor(
-            np.array(new_masked_positions).astype('int32'))
+        new_masked_positions = paddle.to_tensor(np.array(new_masked_positions).astype("int32"))
 
-        prediction_scores = model(input_ids=src_ids,
-                                  token_type_ids=token_type_ids,
-                                  masked_positions=new_masked_positions)
+        prediction_scores = model(
+            input_ids=src_ids, token_type_ids=token_type_ids, masked_positions=new_masked_positions
+        )
         softmax_fn = paddle.nn.Softmax()
         prediction_probs = softmax_fn(prediction_scores)
 
@@ -129,9 +117,7 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(prediction_probs,
-                                          shape=[batch_size, -1,
-                                                 vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
         candidate_num = candidate_label_ids.shape[1]
 
@@ -150,8 +136,7 @@ def do_evaluate_chid(model, tokenizer, data_loader, label_normalize_dict):
                 batch_single_token_prob = []
                 for bs_index in range(batch_size):
                     # [1, 1]
-                    single_token_prob = prediction_probs[
-                        bs_index, index, slice_word_ids[bs_index]]
+                    single_token_prob = prediction_probs[bs_index, index, slice_word_ids[bs_index]]
                     batch_single_token_prob.append(single_token_prob)
 
                 y_pred[:, label_idx] *= np.array(batch_single_token_prob)

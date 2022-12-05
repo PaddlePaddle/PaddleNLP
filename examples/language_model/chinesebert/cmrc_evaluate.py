@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-'''
+"""
 Evaluation script for CMRC 2018
 version: v5 - special
 Note: 
 v5 - special: Evaluate on SQuAD-style CMRC 2018 Datasets
 v5: formatted output, add usage description
 v4: fixed segmentation issues
-'''
+"""
 
 import argparse
 import json
@@ -35,14 +35,44 @@ def mixed_segmentation(in_str, rm_punc=False):
     segs_out = []
     temp_str = ""
     sp_char = [
-        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
-        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
-        '）', '－', '～', '『', '』'
+        "-",
+        ":",
+        "_",
+        "*",
+        "^",
+        "/",
+        "\\",
+        "~",
+        "`",
+        "+",
+        "=",
+        "，",
+        "。",
+        "：",
+        "？",
+        "！",
+        "“",
+        "”",
+        "；",
+        "’",
+        "《",
+        "》",
+        "……",
+        "·",
+        "、",
+        "「",
+        "」",
+        "（",
+        "）",
+        "－",
+        "～",
+        "『",
+        "』",
     ]
     for char in in_str:
         if rm_punc and char in sp_char:
             continue
-        if re.search(r'[\u4e00-\u9fa5]', char) or char in sp_char:
+        if re.search(r"[\u4e00-\u9fa5]", char) or char in sp_char:
             if temp_str != "":
                 ss = nltk.word_tokenize(temp_str)
                 segs_out.extend(ss)
@@ -63,9 +93,39 @@ def mixed_segmentation(in_str, rm_punc=False):
 def remove_punctuation(in_str):
     in_str = str(in_str).lower().strip()
     sp_char = [
-        '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。', '：',
-        '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「', '」', '（',
-        '）', '－', '～', '『', '』'
+        "-",
+        ":",
+        "_",
+        "*",
+        "^",
+        "/",
+        "\\",
+        "~",
+        "`",
+        "+",
+        "=",
+        "，",
+        "。",
+        "：",
+        "？",
+        "！",
+        "“",
+        "”",
+        "；",
+        "’",
+        "《",
+        "》",
+        "……",
+        "·",
+        "、",
+        "「",
+        "」",
+        "（",
+        "）",
+        "－",
+        "～",
+        "『",
+        "』",
     ]
     out_segs = []
     for char in in_str:
@@ -73,7 +133,7 @@ def remove_punctuation(in_str):
             continue
         else:
             out_segs.append(char)
-    return ''.join(out_segs)
+    return "".join(out_segs)
 
 
 # find longest common string
@@ -88,7 +148,7 @@ def find_lcs(s1, s2):
                 if m[i + 1][j + 1] > mmax:
                     mmax = m[i + 1][j + 1]
                     p = i + 1
-    return s1[p - mmax:p], mmax
+    return s1[p - mmax : p], mmax
 
 
 #
@@ -101,15 +161,14 @@ def evaluate(ground_truth_file, prediction_file):
         # context_id   = instance['context_id'].strip()
         # context_text = instance['context_text'].strip()
         for para in instance["paragraphs"]:
-            for qas in para['qas']:
+            for qas in para["qas"]:
                 total_count += 1
-                query_id = qas['id'].strip()
-                query_text = qas['question'].strip()
-                answers = [x["text"] for x in qas['answers']]
+                query_id = qas["id"].strip()
+                query_text = qas["question"].strip()
+                answers = [x["text"] for x in qas["answers"]]
 
                 if query_id not in prediction_file:
-                    sys.stderr.write(
-                        'Unanswered question: {}\n'.format(query_id))
+                    sys.stderr.write("Unanswered question: {}\n".format(query_id))
                     skip_count += 1
                     continue
 
@@ -150,39 +209,34 @@ def calc_em_score(answers, prediction):
 
 
 def get_result(ground_truth_file, prediction_file):
-    ground_truth_file = json.load(open(ground_truth_file, 'rb'))
-    prediction_file = json.load(open(prediction_file, 'rb'))
+    ground_truth_file = json.load(open(ground_truth_file, "rb"))
+    prediction_file = json.load(open(prediction_file, "rb"))
     F1, EM, TOTAL, SKIP = evaluate(ground_truth_file, prediction_file)
     AVG = (EM + F1) * 0.5
     output_result = OrderedDict()
-    output_result['AVERAGE'] = '%.3f' % AVG
-    output_result['F1'] = '%.3f' % F1
-    output_result['EM'] = '%.3f' % EM
-    output_result['TOTAL'] = TOTAL
-    output_result['SKIP'] = SKIP
+    output_result["AVERAGE"] = "%.3f" % AVG
+    output_result["F1"] = "%.3f" % F1
+    output_result["EM"] = "%.3f" % EM
+    output_result["TOTAL"] = TOTAL
+    output_result["SKIP"] = SKIP
     print(json.dumps(output_result))
     return output_result
 
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(
-        description='Evaluation Script for CMRC 2018')
-    parser.add_argument('--dataset_file',
-                        default="cmrc2018_public/dev.json",
-                        help='Official dataset file')
-    parser.add_argument('--prediction_file',
-                        default="all_predictions.json",
-                        help='Your prediction File')
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluation Script for CMRC 2018")
+    parser.add_argument("--dataset_file", default="cmrc2018_public/dev.json", help="Official dataset file")
+    parser.add_argument("--prediction_file", default="all_predictions.json", help="Your prediction File")
     args = parser.parse_args()
-    ground_truth_file = json.load(open(args.dataset_file, 'rb'))
-    prediction_file = json.load(open(args.prediction_file, 'rb'))
+    ground_truth_file = json.load(open(args.dataset_file, "rb"))
+    prediction_file = json.load(open(args.prediction_file, "rb"))
     F1, EM, TOTAL, SKIP = evaluate(ground_truth_file, prediction_file)
     AVG = (EM + F1) * 0.5
     output_result = OrderedDict()
-    output_result['AVERAGE'] = '%.3f' % AVG
-    output_result['F1'] = '%.3f' % F1
-    output_result['EM'] = '%.3f' % EM
-    output_result['TOTAL'] = TOTAL
-    output_result['SKIP'] = SKIP
-    output_result['FILE'] = args.prediction_file
+    output_result["AVERAGE"] = "%.3f" % AVG
+    output_result["F1"] = "%.3f" % F1
+    output_result["EM"] = "%.3f" % EM
+    output_result["TOTAL"] = TOTAL
+    output_result["SKIP"] = SKIP
+    output_result["FILE"] = args.prediction_file
     print(json.dumps(output_result))

@@ -23,27 +23,34 @@ import streamlit as st
 from annotated_text import annotation
 from markdown import markdown
 
-from ui.utils import pipelines_is_ready, semantic_search, send_feedback, upload_doc, file_upload_qa_generate, pipelines_version, get_backlink, text_to_qa_pair_search, offline_ann
+from ui.utils import (
+    pipelines_is_ready,
+    semantic_search,
+    send_feedback,
+    upload_doc,
+    file_upload_qa_generate,
+    pipelines_version,
+    get_backlink,
+    text_to_qa_pair_search,
+    offline_ann,
+)
 
 # Adjust to a question that you would like users to see in the search bar when they load the UI:
 # DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP", "如何办理企业养老保险?")
 DEFAULT_QUESTION_AT_STARTUP = os.getenv("DEFAULT_QUESTION_AT_STARTUP", "")
 # Sliders
-DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER",
-                                            "30"))
+DEFAULT_DOCS_FROM_RETRIEVER = int(os.getenv("DEFAULT_DOCS_FROM_RETRIEVER", "30"))
 DEFAULT_NUMBER_OF_ANSWERS = int(os.getenv("DEFAULT_NUMBER_OF_ANSWERS", "3"))
 # Labels for the evaluation
-EVAL_LABELS = os.getenv("EVAL_FILE",
-                        str(Path(__file__).parent / "insurance_faq.csv"))
+EVAL_LABELS = os.getenv("EVAL_FILE", str(Path(__file__).parent / "insurance_faq.csv"))
 # Corpus dir for ANN
-CORPUS_DIR = os.getenv("CORPUS_DIR", str('data/my_data'))
+CORPUS_DIR = os.getenv("CORPUS_DIR", str("data/my_data"))
 # QA pairs file to be saved
-UPDATE_FILE = os.getenv("UPDATE_FILE", str('data/my_data/custom_qa_pairs.txt'))
+UPDATE_FILE = os.getenv("UPDATE_FILE", str("data/my_data/custom_qa_pairs.txt"))
 # Whether the file upload should be enabled or not
 DISABLE_FILE_UPLOAD = bool(os.getenv("DISABLE_FILE_UPLOAD"))
 
-DEFAULT_NUMBER_OF_FILTER_STRENGTH = int(
-    os.getenv("DEFAULT_NUMBER_OF_FILTER_STRENGTH", "10"))
+DEFAULT_NUMBER_OF_FILTER_STRENGTH = int(os.getenv("DEFAULT_NUMBER_OF_FILTER_STRENGTH", "10"))
 
 
 def set_state_if_absent(key, value):
@@ -66,23 +73,20 @@ def on_change_text_qag():
 
 
 def upload():
-    data_files = st.session_state.upload_files['files']
+    data_files = st.session_state.upload_files["files"]
     for data_file in data_files:
         # Upload file
-        if data_file and data_file.name not in st.session_state.upload_files[
-                'uploaded_files']:
+        if data_file and data_file.name not in st.session_state.upload_files["uploaded_files"]:
             # raw_json = upload_doc(data_file)
             raw_json = file_upload_qa_generate(data_file)
-            st.session_state.upload_files['uploaded_files'].append(
-                data_file.name)
+            st.session_state.upload_files["uploaded_files"].append(data_file.name)
     # Save the uploaded files
-    st.session_state.upload_files['uploaded_files'] = list(
-        set(st.session_state.upload_files['uploaded_files']))
+    st.session_state.upload_files["uploaded_files"] = list(set(st.session_state.upload_files["uploaded_files"]))
 
 
 def main():
 
-    st.set_page_config(page_title="PaddleNLP无监督智能检索问答", page_icon='🐮')
+    st.set_page_config(page_title="PaddleNLP无监督智能检索问答", page_icon="🐮")
     # page_icon="https://github.com/PaddlePaddle/Paddle/blob/develop/doc/imgs/logo.png")
 
     # Persistent state
@@ -93,7 +97,7 @@ def main():
     set_state_if_absent("raw_json", None)
     set_state_if_absent("qag_raw_json", None)
     set_state_if_absent("random_question_requested", False)
-    set_state_if_absent("upload_files", {'uploaded_files': [], 'files': []})
+    set_state_if_absent("upload_files", {"uploaded_files": [], "files": []})
 
     # Small callback to reset the interface in case the text of the question changes
     def reset_results(*args):
@@ -113,7 +117,7 @@ def main():
     st.sidebar.write("### 问答对生成:")
     is_filter = st.sidebar.selectbox(
         "是否进行自动过滤",
-        ('是', '否'),
+        ("是", "否"),
         on_change=reset_results,
     )
     st.sidebar.write("### 问答检索:")
@@ -137,13 +141,11 @@ def main():
     if not DISABLE_FILE_UPLOAD:
         st.sidebar.write("### 文件上传:")
         data_files = st.sidebar.file_uploader(
-            "",
-            type=["pdf", "txt", "docx", "png"],
-            help="选择多个文件",
-            accept_multiple_files=True)
-        st.session_state.upload_files['files'] = data_files
+            "", type=["pdf", "txt", "docx", "png"], help="选择多个文件", accept_multiple_files=True
+        )
+        st.session_state.upload_files["files"] = data_files
         st.sidebar.button("文件上传并自动生成载入问答对", on_click=upload)
-        for data_file in st.session_state.upload_files['uploaded_files']:
+        for data_file in st.session_state.upload_files["uploaded_files"]:
             st.sidebar.write(str(data_file) + " &nbsp;&nbsp; ✅ ")
 
     hs_version = ""
@@ -161,36 +163,36 @@ def main():
     ## QA pairs generation
     # Search bar
     st.write("### 问答对生成：")
-    context = st.text_input("",
-                            value=st.session_state.qag_question,
-                            key="qag_quest",
-                            on_change=on_change_text_qag,
-                            max_chars=350,
-                            placeholder='请输入要抽取问答对的文本')
+    context = st.text_input(
+        "",
+        value=st.session_state.qag_question,
+        key="qag_quest",
+        on_change=on_change_text_qag,
+        max_chars=350,
+        placeholder="请输入要抽取问答对的文本",
+    )
     qag_col1, qag_col2 = st.columns(2)
-    qag_col1.markdown("<style>.stButton button {width:100%;}</style>",
-                      unsafe_allow_html=True)
-    qag_col2.markdown("<style>.stButton button {width:100%;}</style>",
-                      unsafe_allow_html=True)
+    qag_col1.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    qag_col2.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
 
     # Run button
     qag_run_pressed = qag_col1.button("开始生成")
 
     # Get next random question from the CSV
     if qag_col2.button("存入数据库"):
-        with open(UPDATE_FILE, 'a', encoding='utf-8') as wf:
+        with open(UPDATE_FILE, "a", encoding="utf-8") as wf:
             for count, result in enumerate(st.session_state.qag_results):
                 context = result["context"]
                 synthetic_answer = result["synthetic_answer"]
                 synthetic_question = result["synthetic_question"]
-                wf.write(synthetic_question.strip() + '\t' +
-                         synthetic_answer.strip() + '\n')
-        offline_ann('my_data', CORPUS_DIR)
+                wf.write(synthetic_question.strip() + "\t" + synthetic_answer.strip() + "\n")
+        offline_ann("my_data", CORPUS_DIR)
         reset_results_qag()
 
     # st.session_state.random_question_requested = False
-    qag_run_query = (qag_run_pressed or context != st.session_state.qag_question
-                     ) and not st.session_state.random_question_requested
+    qag_run_query = (
+        qag_run_pressed or context != st.session_state.qag_question
+    ) and not st.session_state.random_question_requested
     # qag_run_query = qag_run_pressed
 
     # Check the connection
@@ -204,26 +206,22 @@ def main():
         reset_results_qag()
         st.session_state.qag_question = context
         with st.spinner(
-                "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
-                "Do you want to optimize speed or accuracy? \n"):
+            "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
+            "Do you want to optimize speed or accuracy? \n"
+        ):
             try:
                 st.session_state.qag_results, st.session_state.qag_raw_json = text_to_qa_pair_search(
-                    context, is_filter=True if is_filter == "是" else False)
-            except JSONDecodeError as je:
-                st.error(
-                    "👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?"
+                    context, is_filter=True if is_filter == "是" else False
                 )
+            except JSONDecodeError as je:
+                st.error("👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?")
                 return
             except Exception as e:
                 logging.exception(e)
-                if "The server is busy processing requests" in str(
-                        e) or "503" in str(e):
-                    st.error(
-                        "🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later."
-                    )
+                if "The server is busy processing requests" in str(e) or "503" in str(e):
+                    st.error("🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later.")
                 else:
-                    st.error(
-                        "🐞 &nbsp;&nbsp; An error occurred during the request.")
+                    st.error("🐞 &nbsp;&nbsp; An error occurred during the request.")
                 return
 
     if st.session_state.qag_results:
@@ -231,21 +229,19 @@ def main():
         for count, result in enumerate(st.session_state.qag_results):
             context = result["context"]
             synthetic_answer = result["synthetic_answer"]
-            synthetic_answer_probability = result[
-                "synthetic_answer_probability"]
+            synthetic_answer_probability = result["synthetic_answer_probability"]
             synthetic_question = result["synthetic_question"]
-            synthetic_question_probability = result[
-                "synthetic_question_probability"]
+            synthetic_question_probability = result["synthetic_question_probability"]
             st.write(
                 markdown(context),
                 unsafe_allow_html=True,
             )
             st.write(
-                markdown('**问题：**' + synthetic_question),
+                markdown("**问题：**" + synthetic_question),
                 unsafe_allow_html=True,
             )
             st.write(
-                markdown('**答案：**' + synthetic_answer),
+                markdown("**答案：**" + synthetic_answer),
                 unsafe_allow_html=True,
             )
 
@@ -254,17 +250,17 @@ def main():
     ## QA search
     # Search bar
     st.write("### 问答检索：")
-    question = st.text_input("",
-                             value=st.session_state.question,
-                             key="quest",
-                             on_change=on_change_text,
-                             max_chars=100,
-                             placeholder='请输入您的问题')
+    question = st.text_input(
+        "",
+        value=st.session_state.question,
+        key="quest",
+        on_change=on_change_text,
+        max_chars=100,
+        placeholder="请输入您的问题",
+    )
     col1, col2 = st.columns(2)
-    col1.markdown("<style>.stButton button {width:100%;}</style>",
-                  unsafe_allow_html=True)
-    col2.markdown("<style>.stButton button {width:100%;}</style>",
-                  unsafe_allow_html=True)
+    col1.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
+    col2.markdown("<style>.stButton button {width:100%;}</style>", unsafe_allow_html=True)
 
     # Run button
     run_pressed = col1.button("运行")
@@ -274,7 +270,7 @@ def main():
         reset_results()
         new_row = df.sample(1)
         while (
-                new_row["Question Text"].values[0] == st.session_state.question
+            new_row["Question Text"].values[0] == st.session_state.question
         ):  # Avoid picking the same question twice (the change is not visible on the UI)
             new_row = df.sample(1)
         st.session_state.question = new_row["Question Text"].values[0]
@@ -285,8 +281,9 @@ def main():
 
     st.session_state.random_question_requested = False
 
-    run_query = (run_pressed or question != st.session_state.question
-                 ) and not st.session_state.random_question_requested
+    run_query = (
+        run_pressed or question != st.session_state.question
+    ) and not st.session_state.random_question_requested
 
     # Check the connection
     with st.spinner("⌛️ &nbsp;&nbsp; pipelines is starting..."):
@@ -299,28 +296,22 @@ def main():
         reset_results()
         st.session_state.question = question
         with st.spinner(
-                "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
-                "Do you want to optimize speed or accuracy? \n"):
+            "🧠 &nbsp;&nbsp; Performing neural search on documents... \n "
+            "Do you want to optimize speed or accuracy? \n"
+        ):
             try:
                 st.session_state.results, st.session_state.raw_json = semantic_search(
-                    question,
-                    top_k_reader=top_k_reader,
-                    top_k_retriever=top_k_retriever)
-            except JSONDecodeError as je:
-                st.error(
-                    "👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?"
+                    question, top_k_reader=top_k_reader, top_k_retriever=top_k_retriever
                 )
+            except JSONDecodeError as je:
+                st.error("👓 &nbsp;&nbsp; An error occurred reading the results. Is the document store working?")
                 return
             except Exception as e:
                 logging.exception(e)
-                if "The server is busy processing requests" in str(
-                        e) or "503" in str(e):
-                    st.error(
-                        "🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later."
-                    )
+                if "The server is busy processing requests" in str(e) or "503" in str(e):
+                    st.error("🧑‍🌾 &nbsp;&nbsp; All our workers are busy! Try again later.")
                 else:
-                    st.error(
-                        "🐞 &nbsp;&nbsp; An error occurred during the request.")
+                    st.error("🐞 &nbsp;&nbsp; An error occurred during the request.")
                 return
 
     if st.session_state.results:
