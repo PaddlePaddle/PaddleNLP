@@ -42,8 +42,7 @@ def do_data_distill():
         fp.write(json.dumps(label_maps, ensure_ascii=False))
 
     # Load doccano file and convert to distill format
-    sample_index = json.loads(
-        open(os.path.join(args.data_path, "sample_index.json")).readline())
+    sample_index = json.loads(open(os.path.join(args.data_path, "sample_index.json")).readline())
 
     train_ids = sample_index["train_ids"]
     dev_ids = sample_index["dev_ids"]
@@ -64,29 +63,24 @@ def do_data_distill():
     test_lines = doccano2distill(test_lines, args.task_type, label_maps)
 
     # Load trained UIE model
-    uie = Taskflow("information_extraction",
-                   schema=args.schema,
-                   task_path=args.model_path)
+    uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
 
     if args.synthetic_ratio > 0:
         # Generate synthetic data
-        texts = open(os.path.join(args.data_path,
-                                  "unlabeled_data.txt")).readlines()
+        texts = open(os.path.join(args.data_path, "unlabeled_data.txt")).readlines()
 
         actual_ratio = math.ceil(len(texts) / len(train_lines))
         if actual_ratio <= args.synthetic_ratio or args.synthetic_ratio == -1:
             infer_texts = texts
         else:
-            idxs = random.sample(range(0, len(texts)),
-                                 args.synthetic_ratio * len(train_lines))
+            idxs = random.sample(range(0, len(texts)), args.synthetic_ratio * len(train_lines))
             infer_texts = [texts[i] for i in idxs]
 
         infer_results = []
         for text in tqdm(infer_texts, desc="Predicting: ", leave=False):
             infer_results.extend(uie(text))
 
-        train_synthetic_lines = synthetic2distill(infer_texts, infer_results,
-                                                  args.task_type)
+        train_synthetic_lines = synthetic2distill(infer_texts, infer_results, args.task_type)
 
         # Concat origin and synthetic data
         train_lines.extend(train_synthetic_lines)

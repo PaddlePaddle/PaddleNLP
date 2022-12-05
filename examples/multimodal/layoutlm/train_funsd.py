@@ -41,12 +41,10 @@ def set_seed(args):
 
 def train(args):
     logging.basicConfig(
-        filename=os.path.join(args.output_dir, "train.log")
-        if paddle.distributed.get_rank() == 0 else None,
+        filename=os.path.join(args.output_dir, "train.log") if paddle.distributed.get_rank() == 0 else None,
         format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s",
         datefmt="%m/%d/%Y %H:%M:%S",
-        level=logging.INFO
-        if paddle.distributed.get_rank() == 0 else logging.WARN,
+        level=logging.INFO if paddle.distributed.get_rank() == 0 else logging.WARN,
     )
 
     all_labels = get_labels(args.labels)
@@ -58,39 +56,29 @@ def train(args):
     # for training process, model is needed for the bert class
     # else it can directly loaded for the downstream task
     if not args.do_train:
-        model = LayoutLMForTokenClassification.from_pretrained(
-            args.model_name_or_path)
+        model = LayoutLMForTokenClassification.from_pretrained(args.model_name_or_path)
     else:
         model = LayoutLMModel.from_pretrained(args.model_name_or_path)
-        model = LayoutLMForTokenClassification(model,
-                                               num_classes=len(all_labels),
-                                               dropout=None)
+        model = LayoutLMForTokenClassification(model, num_classes=len(all_labels), dropout=None)
 
-    train_dataset = FunsdDataset(args,
-                                 tokenizer,
-                                 all_labels,
-                                 pad_token_label_id,
-                                 mode="train")
+    train_dataset = FunsdDataset(args, tokenizer, all_labels, pad_token_label_id, mode="train")
     train_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=True)
+        train_dataset, batch_size=args.per_gpu_train_batch_size, shuffle=True
+    )
 
-    args.train_batch_size = args.per_gpu_train_batch_size * max(
-        1, paddle.distributed.get_world_size())
+    args.train_batch_size = args.per_gpu_train_batch_size * max(1, paddle.distributed.get_world_size())
     train_dataloader = paddle.io.DataLoader(
         train_dataset,
         batch_sampler=train_sampler,
         collate_fn=None,
     )
 
-    t_total = len(train_dataloader
-                  ) // args.gradient_accumulation_steps * args.num_train_epochs
+    t_total = len(train_dataloader) // args.gradient_accumulation_steps * args.num_train_epochs
 
     # build linear decay with warmup lr sch
     lr_scheduler = paddle.optimizer.lr.PolynomialDecay(
-        learning_rate=args.learning_rate,
-        decay_steps=t_total,
-        end_lr=0.0,
-        power=1.0)
+        learning_rate=args.learning_rate, decay_steps=t_total, end_lr=0.0, power=1.0
+    )
     if args.warmup_steps > 0:
         lr_scheduler = paddle.optimizer.lr.LinearWarmup(
             lr_scheduler,
@@ -99,10 +87,12 @@ def train(args):
             end_lr=args.learning_rate,
         )
 
-    optimizer = paddle.optimizer.AdamW(learning_rate=lr_scheduler,
-                                       parameters=model.parameters(),
-                                       epsilon=args.adam_epsilon,
-                                       weight_decay=args.weight_decay)
+    optimizer = paddle.optimizer.AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        epsilon=args.adam_epsilon,
+        weight_decay=args.weight_decay,
+    )
 
     loss_fct = paddle.nn.loss.CrossEntropyLoss(ignore_index=pad_token_label_id)
 
@@ -110,27 +100,21 @@ def train(args):
     logger.info("***** Running training *****")
     logger.info("  Num examples = %d", len(train_dataset))
     logger.info("  Num Epochs = %d", args.num_train_epochs)
-    logger.info("  Instantaneous batch size per GPU = %d",
-                args.per_gpu_train_batch_size)
+    logger.info("  Instantaneous batch size per GPU = %d", args.per_gpu_train_batch_size)
     logger.info(
         "  Total train batch size (w. parallel, distributed & accumulation) = %d",
         args.train_batch_size * paddle.distributed.get_world_size(),
     )
-    logger.info("  Gradient Accumulation steps = %d",
-                args.gradient_accumulation_steps)
+    logger.info("  Gradient Accumulation steps = %d", args.gradient_accumulation_steps)
     logger.info("  Total optimization steps = %d", t_total)
 
     global_step = 0
     tr_loss, logging_loss = 0.0, 0.0
     model.clear_gradients()
-    train_iterator = trange(int(args.num_train_epochs),
-                            desc="Epoch",
-                            disable=args.local_rank not in [-1, 0])
+    train_iterator = trange(int(args.num_train_epochs), desc="Epoch", disable=args.local_rank not in [-1, 0])
     set_seed(args)
     for _ in train_iterator:
-        epoch_iterator = tqdm(train_dataloader,
-                              desc="Iteration",
-                              disable=args.local_rank not in [-1, 0])
+        epoch_iterator = tqdm(train_dataloader, desc="Iteration", disable=args.local_rank not in [-1, 0])
         for step, batch in enumerate(epoch_iterator):
             model.train()
             inputs = {
@@ -141,10 +125,14 @@ def train(args):
             }
             labels = batch[3]
             logits = model(**inputs)
-            loss = loss_fct(logits.reshape([-1, len(all_labels)]),
-                            labels.reshape([
-                                -1,
-                            ]))
+            loss = loss_fct(
+                logits.reshape([-1, len(all_labels)]),
+                labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
+            )
 
             loss = loss.mean()
             logger.info("train loss: {}".format(loss.numpy()))
@@ -157,13 +145,14 @@ def train(args):
                 model.clear_gradients()
                 global_step += 1
 
-                if (paddle.distributed.get_rank() == 0
-                        and args.logging_steps > 0
-                        and global_step % args.logging_steps == 0):
+                if (
+                    paddle.distributed.get_rank() == 0
+                    and args.logging_steps > 0
+                    and global_step % args.logging_steps == 0
+                ):
                     # Log metrics
                     if (
-                            paddle.distributed.get_rank() == 0
-                            and args.evaluate_during_training
+                        paddle.distributed.get_rank() == 0 and args.evaluate_during_training
                     ):  # Only evaluate when single GPU otherwise metrics may not average well
                         results, _ = evaluate(
                             args,
@@ -177,17 +166,14 @@ def train(args):
                         logger.info("results: {}".format(results))
                     logging_loss = tr_loss
 
-                if (args.local_rank in [-1, 0] and args.save_steps > 0
-                        and global_step % args.save_steps == 0):
+                if args.local_rank in [-1, 0] and args.save_steps > 0 and global_step % args.save_steps == 0:
                     # Save model checkpoint
-                    output_dir = os.path.join(
-                        args.output_dir, "checkpoint-{}".format(global_step))
+                    output_dir = os.path.join(args.output_dir, "checkpoint-{}".format(global_step))
                     os.makedirs(output_dir, exist_ok=True)
                     if paddle.distributed.get_rank() == 0:
                         model.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        paddle.save(
-                            args, os.path.join(output_dir, "training_args.bin"))
+                        paddle.save(args, os.path.join(output_dir, "training_args.bin"))
                         logger.info("Saving model checkpoint to %s", output_dir)
 
             if args.max_steps > 0 and global_step > args.max_steps:
@@ -200,21 +186,9 @@ def train(args):
     return global_step, tr_loss / global_step
 
 
-def evaluate(args,
-             model,
-             tokenizer,
-             all_labels,
-             loss_fct,
-             pad_token_label_id,
-             mode,
-             prefix=""):
-    eval_dataset = FunsdDataset(args,
-                                tokenizer,
-                                all_labels,
-                                pad_token_label_id,
-                                mode=mode)
-    args.eval_batch_size = args.per_gpu_eval_batch_size * max(
-        1, paddle.distributed.get_world_size())
+def evaluate(args, model, tokenizer, all_labels, loss_fct, pad_token_label_id, mode, prefix=""):
+    eval_dataset = FunsdDataset(args, tokenizer, all_labels, pad_token_label_id, mode=mode)
+    args.eval_batch_size = args.per_gpu_eval_batch_size * max(1, paddle.distributed.get_world_size())
     eval_dataloader = paddle.io.DataLoader(
         eval_dataset,
         batch_size=args.eval_batch_size,
@@ -241,10 +215,14 @@ def evaluate(args,
             labels = batch[3]
             attention_mask = batch[1]
             logits = model(**inputs)
-            tmp_eval_loss = loss_fct(logits.reshape([-1, len(all_labels)]),
-                                     labels.reshape([
-                                         -1,
-                                     ]))
+            tmp_eval_loss = loss_fct(
+                logits.reshape([-1, len(all_labels)]),
+                labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
+            )
             tmp_eval_loss = tmp_eval_loss.mean()
             eval_loss += tmp_eval_loss.item()
 

@@ -32,7 +32,13 @@ from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_
 from paddle.io import DataLoader, Dataset
 from visualdl import LogWriter
 
-from paddlenlp.transformers import ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer, ErnieForMaskedLM
+from paddlenlp.transformers import (
+    ErnieModel,
+    ErnieForPretraining,
+    ErniePretrainingCriterion,
+    ErnieTokenizer,
+    ErnieForMaskedLM,
+)
 from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
 from paddlenlp.data import Stack, Tuple, Pad
@@ -43,8 +49,7 @@ from args import parse_args
 from data_tools.dataset_utils import build_train_valid_test_datasets
 
 MODEL_CLASSES = {
-    "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion,
-              ErnieTokenizer),
+    "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
 }
 
 
@@ -63,9 +68,8 @@ def create_pretrained_dataset(
 
     train_valid_test_num_samples = [
         args.global_batch_size * args.max_steps,
-        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) *
-        args.eval_iters * data_world_size,
-        args.micro_batch_size * args.test_iters * data_world_size
+        args.micro_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+        args.micro_batch_size * args.test_iters * data_world_size,
     ]
 
     train_ds, valid_ds, test_ds = build_train_valid_test_datasets(
@@ -81,14 +85,14 @@ def create_pretrained_dataset(
         skip_warmup=True,
         binary_head=binary_head,
         max_seq_length_dec=None,
-        dataset_type='ernie')
+        dataset_type="ernie",
+    )
 
     def print_dataset(data, mode="train"):
         logger.info(f"Sample data for {mode} mode")
         input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = data
         if tokenizer.pad_token_id in input_ids:
-            input_ids = input_ids[0:list(input_ids).index(tokenizer.pad_token_id
-                                                          )]
+            input_ids = input_ids[0 : list(input_ids).index(tokenizer.pad_token_id)]
         logger.info(tokenizer._decode(input_ids))
         for pos, label in zip(masked_lm_positions, masked_lm_labels):
             input_ids[pos] = label
@@ -137,20 +141,22 @@ def create_pretrained_dataset(
             rank=data_world_rank,
             shuffle=False,
             drop_last=True,
-            consumed_samples=consumed_samples)
-        data_loader = paddle.io.DataLoader(dataset=dataset,
-                                           batch_sampler=batch_sampler,
-                                           num_workers=args.num_workers,
-                                           worker_init_fn=None,
-                                           collate_fn=_collate_data,
-                                           return_list=False)
+            consumed_samples=consumed_samples,
+        )
+        data_loader = paddle.io.DataLoader(
+            dataset=dataset,
+            batch_sampler=batch_sampler,
+            num_workers=args.num_workers,
+            worker_init_fn=None,
+            collate_fn=_collate_data,
+            return_list=False,
+        )
         return data_loader
 
     train_dl = loader(train_ds, args.global_batch_size * current_step)
     valid_dl = loader(
-        valid_ds,
-        args.micro_batch_size * ((current_step + 1) // args.eval_freq) *
-        args.eval_iters * data_world_size)
+        valid_ds, args.micro_batch_size * ((current_step + 1) // args.eval_freq) * args.eval_iters * data_world_size
+    )
     test_dl = loader(test_ds, 0)
 
     return train_dl, valid_dl, test_dl
@@ -162,9 +168,9 @@ def get_train_data_file(args):
         return args.input_dir.split()
     else:
         files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f))
-                and "_idx.npz" in str(f))
+            os.path.join(args.input_dir, f)
+            for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "_idx.npz" in str(f))
         ]
         files = [x.replace("_idx.npz", "") for x in files]
 
@@ -190,14 +196,7 @@ def all_gather(v):
 
 
 @paddle.no_grad()
-def run_evaluate(data_loader,
-                 model,
-                 criterion,
-                 iter_steps,
-                 log_writer,
-                 global_step,
-                 args,
-                 task_name="valid"):
+def run_evaluate(data_loader, model, criterion, iter_steps, log_writer, global_step, args, task_name="valid"):
     model.eval()
     all_loss, all_lm_loss, all_sop_loss = [], [], []
 
@@ -215,18 +214,19 @@ def run_evaluate(data_loader,
     local_time = time.time()
 
     for eval_step, batch in enumerate(data_loader):
-        input_ids, segment_ids, input_mask, masked_lm_positions, \
-        masked_lm_labels, next_sentence_labels = batch
-        with paddle.amp.auto_cast(args.use_amp,
-                                  custom_white_list=[
-                                      'softmax',
-                                      'layer_norm',
-                                      'gelu',
-                                  ],
-                                  custom_black_list=[
-                                      "c_softmax_with_cross_entropy",
-                                  ],
-                                  level=args.fp16_opt_level):
+        input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = batch
+        with paddle.amp.auto_cast(
+            args.use_amp,
+            custom_white_list=[
+                "softmax",
+                "layer_norm",
+                "gelu",
+            ],
+            custom_black_list=[
+                "c_softmax_with_cross_entropy",
+            ],
+            level=args.fp16_opt_level,
+        ):
 
             if args.binary_head:
                 prediction_scores, seq_relationship_score = model(
@@ -234,19 +234,21 @@ def run_evaluate(data_loader,
                     token_type_ids=segment_ids,
                     position_ids=None,
                     attention_mask=input_mask,
-                    masked_positions=masked_lm_positions)
+                    masked_positions=masked_lm_positions,
+                )
 
-                lm_loss, sop_loss = criterion(prediction_scores,
-                                              seq_relationship_score,
-                                              masked_lm_labels,
-                                              next_sentence_labels)
+                lm_loss, sop_loss = criterion(
+                    prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels
+                )
                 loss = lm_loss + sop_loss
             else:
-                prediction_scores = model(input_ids=input_ids,
-                                          token_type_ids=segment_ids,
-                                          position_ids=None,
-                                          attention_mask=input_mask,
-                                          masked_positions=masked_lm_positions)
+                prediction_scores = model(
+                    input_ids=input_ids,
+                    token_type_ids=segment_ids,
+                    position_ids=None,
+                    attention_mask=input_mask,
+                    masked_positions=masked_lm_positions,
+                )
 
                 loss = criterion(prediction_scores, None, masked_lm_labels)
 
@@ -261,21 +263,20 @@ def run_evaluate(data_loader,
                 log_info_dict[k] = all_gather(v) / iter_steps
                 v.subtract_(v)
             if dist.get_rank() == 0:
-                log_info_dict[
-                    "samples_per_second"] = iter_steps * args.micro_batch_size * dist.get_world_size(
-                    ) / (time.time() - local_time)
-                loss_info = ", ".join([
-                    "{}: {:.6f}".format(k, log_info_dict[k])
-                    for k in log_info_dict.keys() if k.endswith("loss")
-                ])
+                log_info_dict["samples_per_second"] = (
+                    iter_steps * args.micro_batch_size * dist.get_world_size() / (time.time() - local_time)
+                )
+                loss_info = ", ".join(
+                    ["{}: {:.6f}".format(k, log_info_dict[k]) for k in log_info_dict.keys() if k.endswith("loss")]
+                )
 
-                logger.info("%s step %d, batch: %d, %s, ips: %.0f seqs/s" %
-                            (task_name, global_step, iter_steps, loss_info,
-                             log_info_dict["samples_per_second"]))
+                logger.info(
+                    "%s step %d, batch: %d, %s, ips: %.0f seqs/s"
+                    % (task_name, global_step, iter_steps, loss_info, log_info_dict["samples_per_second"])
+                )
 
                 for k, v in log_info_dict.items():
-                    log_writer.add_scalar("%s/%s" % (task_name, k), v,
-                                          global_step)
+                    log_writer.add_scalar("%s/%s" % (task_name, k), v, global_step)
 
             break
 
@@ -299,11 +300,15 @@ def args_post_process(args, worker_num):
 
     bsz_per_dp = args.global_batch_size // worker_num
     micro_batch_size = args.micro_batch_size
-    assert args.global_batch_size % micro_batch_size == 0, \
-        "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
-        args.global_batch_size, micro_batch_size)
+    assert (
+        args.global_batch_size % micro_batch_size == 0
+    ), "cannot do gradient accumulate, global_batch_size: {} micro_batch_size: {}".format(
+        args.global_batch_size, micro_batch_size
+    )
     accumulate_steps = bsz_per_dp // micro_batch_size
-    assert accumulate_steps >= 1, f"Larger global_batch_size: {arg.global_batch_size} is expect, micro_batch_size is {micro_batch_size}, but only {bsz_per_dp} on each card!"
+    assert (
+        accumulate_steps >= 1
+    ), f"Larger global_batch_size: {arg.global_batch_size} is expect, micro_batch_size is {micro_batch_size}, but only {bsz_per_dp} on each card!"
 
     args.eval_iters *= accumulate_steps
     args.test_iters *= accumulate_steps
@@ -338,17 +343,12 @@ def do_train(args):
 
     args_post_process(args, worker_num)
 
-    logger.info('{:20}:{}'.format("paddle commit id", paddle.version.commit))
+    logger.info("{:20}:{}".format("paddle commit id", paddle.version.commit))
     for arg in vars(args):
-        logger.info('{:20}:{}'.format(arg, getattr(args, arg)))
+        logger.info("{:20}:{}".format(arg, getattr(args, arg)))
 
     strategy = fleet.DistributedStrategy()
-    strategy.hybrid_configs = {
-        "dp_degree": args.dp_degree,
-        "mp_degree": 1,
-        "pp_degree": 1,
-        "sharding_degree": 1
-    }
+    strategy.hybrid_configs = {"dp_degree": args.dp_degree, "mp_degree": 1, "pp_degree": 1, "sharding_degree": 1}
 
     fleet.init(is_collective=True, strategy=strategy)
     hcg = fleet.get_hybrid_communicate_group()
@@ -356,8 +356,9 @@ def do_train(args):
     # Create the random seed for the worker
     set_seed(args)
 
-    assert args.dp_degree * args.sharding_degree == worker_num, \
-        "The product of degree num should be equal to worker_num."
+    assert (
+        args.dp_degree * args.sharding_degree == worker_num
+    ), "The product of degree num should be equal to worker_num."
 
     # Create log write,
     log_writer = None
@@ -365,13 +366,11 @@ def do_train(args):
         log_writer = LogWriter(os.path.join(args.output_dir, default_logdir()))
 
     # Define the input data in the static mode
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[
-        args.model_type]
+    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     if args.binary_head is False:
         model_class = ErnieForMaskedLM
 
-    pretrained_models_list = list(
-        model_class.pretrained_init_configuration.keys())
+    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
     # load config in checkpoint
     global_step = 0
@@ -381,39 +380,33 @@ def do_train(args):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
             with open(os.path.join(checkpoint_dir, "./config.yml"), "r") as f:
                 step_config = yaml.load(f, Loader=yaml.FullLoader)
-                assert step_config[
-                    "global_batch_size"] == args.global_batch_size, "Please ensure checkpoint global batch size is the same. Folder: {}".format(
-                        checkpoint_dir)
+                assert (
+                    step_config["global_batch_size"] == args.global_batch_size
+                ), "Please ensure checkpoint global batch size is the same. Folder: {}".format(checkpoint_dir)
                 consumed_samples = step_config["consumed_samples"]
                 global_step = step_config["global_step"]
 
     if args.model_name_or_path in pretrained_models_list and not args.continue_training:
-        logger.warning(
-            f"Your model {args.model_name_or_path} is training from scratch !!!"
-        )
-        model_config = model_class.pretrained_init_configuration[
-            args.model_name_or_path]
+        logger.warning(f"Your model {args.model_name_or_path} is training from scratch !!!")
+        model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
-        model_config[
-            "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+        model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
         model_config["enable_recompute"] = args.use_recompute
         model = model_class(base_class(**model_config))
     else:
-        logger.warning(
-            f"Your model is continue training from {args.model_name_or_path}")
+        logger.warning(f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
             attention_probs_dropout_prob=args.attention_probs_dropout_prob,
-            enable_recompute=args.use_recompute)
+            enable_recompute=args.use_recompute,
+        )
 
     criterion = criterion_class(with_nsp_loss=args.binary_head)
 
     if worker_index == 0:
         # log the model config and args
-        model_config_json = json.dumps(model.get_model_config(),
-                                       ensure_ascii=False,
-                                       indent=2)
+        model_config_json = json.dumps(model.get_model_config(), ensure_ascii=False, indent=2)
         log_writer.add_text("model_config", model_config_json)
         args_dict = {"paddle commit id": str(paddle.version.commit)}
         for arg in vars(args):
@@ -426,20 +419,15 @@ def do_train(args):
     assert args.warmup_rate <= 1.0 and args.warmup_rate >= 0.0, "warmup_rate should be in [0, 1]"
     args.warmup_steps = args.warmup_rate * args.max_steps
 
-    lr_scheduler = LinearAnnealingWithWarmupDecay(args.max_lr,
-                                                  args.min_lr,
-                                                  warmup_step=args.warmup_steps,
-                                                  decay_step=args.decay_steps,
-                                                  last_epoch=global_step)
+    lr_scheduler = LinearAnnealingWithWarmupDecay(
+        args.max_lr, args.min_lr, warmup_step=args.warmup_steps, decay_step=args.decay_steps, last_epoch=global_step
+    )
 
     clip = None
     if args.grad_clip > 0:
         clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.grad_clip)
 
-    decay_param = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_param = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     logger.info("Using paddle.optimizer.AdamW.")
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
@@ -450,7 +438,8 @@ def do_train(args):
         weight_decay=args.weight_decay,
         grad_clip=clip,
         apply_decay_param_fun=lambda x: x in decay_param,
-        multi_precision=args.use_amp)
+        multi_precision=args.use_amp,
+    )
 
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
@@ -476,7 +465,8 @@ def do_train(args):
         data_world_rank=worker_index,
         max_seq_len=args.max_seq_len,
         binary_head=args.binary_head,
-        current_step=global_step)
+        current_step=global_step,
+    )
 
     # load checkpoint vars
     if os.path.exists(checkpoint_dir):
@@ -491,8 +481,7 @@ def do_train(args):
                 if args.use_amp and args.fp16_opt_level == "O2":
                     for k, v in load_dict.items():
                         if k not in model_dict:
-                            logger.warning(
-                                f"Checkpoint have too much keys: {k}")
+                            logger.warning(f"Checkpoint have too much keys: {k}")
                             continue
                         if "layer_norm" not in model_dict[k].name:
                             load_dict[k] = v.astype("float16")
@@ -500,15 +489,10 @@ def do_train(args):
                 opt_dict = paddle.load(opt_path)
                 optimizer.set_state_dict(opt_dict)
             else:
-                logger.warning("No optimizer checkpoint file found in %s." %
-                               opt_path)
-            if scaler is not None and os.path.isfile(
-                    os.path.join(checkpoint_dir, "scaler.pdparams")):
-                scaler.load_state_dict(
-                    paddle.load(os.path.join(checkpoint_dir, "scaler.pdparams"),
-                                return_numpy=True))
-            logger.info(
-                "Checkpoint loaded from global step: {}".format(global_step))
+                logger.warning("No optimizer checkpoint file found in %s." % opt_path)
+            if scaler is not None and os.path.isfile(os.path.join(checkpoint_dir, "scaler.pdparams")):
+                scaler.load_state_dict(paddle.load(os.path.join(checkpoint_dir, "scaler.pdparams"), return_numpy=True))
+            logger.info("Checkpoint loaded from global step: {}".format(global_step))
 
     if args.binary_head:
         loss_global = {
@@ -545,33 +529,31 @@ def do_train(args):
             # 4. masked_lm_labels,
             # 5. next_sentence_labels
 
-            input_ids, segment_ids, input_mask, masked_lm_positions, \
-            masked_lm_labels, next_sentence_labels = batch
+            input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels = batch
 
-            ctx_manager = contextlib.nullcontext() if sys.version_info >= (
-                3, 7) else contextlib.suppress()
+            ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
-            if worker_num > 1 and (args.use_recompute or
-                                   ((step + 1) % args.accumulate_steps != 0)):
+            if worker_num > 1 and (args.use_recompute or ((step + 1) % args.accumulate_steps != 0)):
                 # grad acc, no_sync when (step + 1) % args.accumulate_steps != 0:
                 # recompute, no_sync every where
                 # recompute + grad_acc, no_sync every where
                 ctx_manager = model.no_sync()
             else:
-                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
-                    3, 7) else contextlib.suppress()
+                ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
             with ctx_manager:
-                with paddle.amp.auto_cast(args.use_amp,
-                                          custom_white_list=[
-                                              'softmax',
-                                              'layer_norm',
-                                              'gelu',
-                                          ],
-                                          custom_black_list=[
-                                              "c_softmax_with_cross_entropy",
-                                          ],
-                                          level=args.fp16_opt_level):
+                with paddle.amp.auto_cast(
+                    args.use_amp,
+                    custom_white_list=[
+                        "softmax",
+                        "layer_norm",
+                        "gelu",
+                    ],
+                    custom_black_list=[
+                        "c_softmax_with_cross_entropy",
+                    ],
+                    level=args.fp16_opt_level,
+                ):
 
                     # Create the model for the ernie pretrain
                     if args.binary_head:
@@ -580,11 +562,11 @@ def do_train(args):
                             token_type_ids=segment_ids,
                             position_ids=None,
                             attention_mask=input_mask,
-                            masked_positions=masked_lm_positions)
-                        lm_loss, sop_loss = criterion(prediction_scores,
-                                                      seq_relationship_score,
-                                                      masked_lm_labels,
-                                                      next_sentence_labels)
+                            masked_positions=masked_lm_positions,
+                        )
+                        lm_loss, sop_loss = criterion(
+                            prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels
+                        )
                         loss = lm_loss + sop_loss
                     else:
                         prediction_scores = model(
@@ -592,10 +574,10 @@ def do_train(args):
                             token_type_ids=segment_ids,
                             position_ids=None,
                             attention_mask=input_mask,
-                            masked_positions=masked_lm_positions)
+                            masked_positions=masked_lm_positions,
+                        )
 
-                        loss = criterion(prediction_scores, None,
-                                         masked_lm_labels)
+                        loss = criterion(prediction_scores, None, masked_lm_labels)
 
                 if args.accumulate_steps >= 1:
                     tr_loss_step = loss / args.accumulate_steps
@@ -636,38 +618,40 @@ def do_train(args):
                 log_info_dict = dict()
                 log_info_dict["global_step"] = global_step
                 for k, v in loss_global.items():
-                    log_info_dict[k] = all_gather(
-                        v) / args.logging_freq / args.accumulate_steps
+                    log_info_dict[k] = all_gather(v) / args.logging_freq / args.accumulate_steps
                     v.subtract_(v)
                 if worker_index == 0:
                     speed = args.logging_freq / (time.time() - tic_train)
                     log_info_dict["learning_rate"] = lr_scheduler.get_lr()
                     log_info_dict["steps_per_second"] = speed
-                    log_info_dict[
-                        "samples_per_second"] = speed * args.global_batch_size
+                    log_info_dict["samples_per_second"] = speed * args.global_batch_size
 
                     for k, v in log_info_dict.items():
                         log_writer.add_scalar("train/%s" % k, v, global_step)
 
-                    loss_info = ", ".join([
-                        "{}: {:.6f}".format(k, log_info_dict[k])
-                        for k in log_info_dict.keys() if k.endswith("loss")
-                    ])
+                    loss_info = ", ".join(
+                        ["{}: {:.6f}".format(k, log_info_dict[k]) for k in log_info_dict.keys() if k.endswith("loss")]
+                    )
 
-                    common_loginfo = "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e" % (
-                        global_step, loss_info, speed,
-                        log_info_dict["samples_per_second"],
-                        log_info_dict["learning_rate"])
+                    common_loginfo = (
+                        "global step %d, %s, speed: %.2f steps/s, ips: %.2f seqs/s, learning rate: %.5e"
+                        % (
+                            global_step,
+                            loss_info,
+                            speed,
+                            log_info_dict["samples_per_second"],
+                            log_info_dict["learning_rate"],
+                        )
+                    )
 
                     addition_info = ""
                     if args.use_amp:
                         amp_info = {
                             "loss_scaling": scaler._scale.item(),
                             "incr_count": scaler._incr_count,
-                            "decr_count": scaler._decr_count
+                            "decr_count": scaler._decr_count,
                         }
-                        addition_info = ", ".join("%s: %.2f" % (k, v)
-                                                  for k, v in amp_info.items())
+                        addition_info = ", ".join("%s: %.2f" % (k, v) for k, v in amp_info.items())
                         for k, v in amp_info.items():
                             log_writer.add_scalar("amp/%s" % k, v, global_step)
 
@@ -681,18 +665,19 @@ def do_train(args):
             if global_step % args.eval_freq == 0:
                 # TODO, check the input data of validation
 
-                run_evaluate(valid_data_loader,
-                             model,
-                             criterion,
-                             args.eval_iters,
-                             log_writer,
-                             global_step,
-                             args,
-                             task_name="valid")
+                run_evaluate(
+                    valid_data_loader,
+                    model,
+                    criterion,
+                    args.eval_iters,
+                    log_writer,
+                    global_step,
+                    args,
+                    task_name="valid",
+                )
                 tic_train = time.time()
 
-            def save_ckpt(output_dir, model, tokenizer, optimizer, scaler, args,
-                          global_step):
+            def save_ckpt(output_dir, model, tokenizer, optimizer, scaler, args, global_step):
                 step_config = {
                     "model_name": args.model_name_or_path,
                     "global_step": global_step,
@@ -701,8 +686,7 @@ def do_train(args):
                 }
 
                 logger.debug("saving models to {}".format(output_dir))
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
+                model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
 
                 tokenizer.save_pretrained(output_dir)
                 # added token is not need for downstream finetune tasks.
@@ -713,28 +697,20 @@ def do_train(args):
                 model_to_save.save_model_config(output_dir)
                 model_dict = model_to_save.state_dict()
                 if scaler is not None:
-                    paddle.save(scaler.state_dict(),
-                                os.path.join(output_dir, "scaler.pdparams"))
+                    paddle.save(scaler.state_dict(), os.path.join(output_dir, "scaler.pdparams"))
                     for k, v in model_dict.items():
                         if v.dtype is paddle.float16:
                             model_dict[k] = v.astype("float32")
-                paddle.save(model_dict,
-                            os.path.join(output_dir, "model_state.pdparams"))
-                paddle.save(optimizer.state_dict(),
-                            os.path.join(output_dir, "model_state.pdopt"))
+                paddle.save(model_dict, os.path.join(output_dir, "model_state.pdparams"))
+                paddle.save(optimizer.state_dict(), os.path.join(output_dir, "model_state.pdopt"))
 
                 with open(os.path.join(output_dir, "config.yml"), "w") as f:
-                    yaml.dump(step_config,
-                              f,
-                              encoding='utf-8',
-                              allow_unicode=True)
+                    yaml.dump(step_config, f, encoding="utf-8", allow_unicode=True)
 
             if global_step % args.save_steps == 0 or global_step >= args.max_steps:
-                output_dir = os.path.join(args.output_dir,
-                                          "model_%d" % global_step)
+                output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                 if worker_index == 0:
-                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler,
-                              args, global_step)
+                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler, args, global_step)
 
                 if worker_num > 1:
                     paddle.distributed.barrier()
@@ -745,28 +721,28 @@ def do_train(args):
                 if worker_index == 0:
                     if not os.path.exists(output_dir):
                         os.mkdir(output_dir)
-                    output_dir_bak = os.path.join(args.output_dir,
-                                                  "model_last_bak")
+                    output_dir_bak = os.path.join(args.output_dir, "model_last_bak")
                     if os.path.exists(output_dir):
                         if os.path.exists(output_dir_bak):
                             shutil.rmtree(output_dir_bak)
                         shutil.move(output_dir, output_dir_bak)
                         os.mkdir(output_dir)
-                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler,
-                              args, global_step)
+                    save_ckpt(output_dir, model, tokenizer, optimizer, scaler, args, global_step)
 
                 if worker_num > 1:
                     paddle.distributed.barrier()
 
             if global_step >= args.max_steps:
-                run_evaluate(test_data_loader,
-                             model,
-                             criterion,
-                             args.test_iters,
-                             log_writer,
-                             global_step,
-                             args,
-                             task_name="test")
+                run_evaluate(
+                    test_data_loader,
+                    model,
+                    criterion,
+                    args.test_iters,
+                    log_writer,
+                    global_step,
+                    args,
+                    task_name="test",
+                )
                 del train_data_loader
                 del valid_data_loader
                 del test_data_loader

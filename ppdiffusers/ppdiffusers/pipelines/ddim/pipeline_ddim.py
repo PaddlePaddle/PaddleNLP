@@ -73,8 +73,7 @@ class DDIMPipeline(DiffusionPipeline):
         if seed is not None:
             paddle.seed(seed)
         # Sample gaussian noise to begin loop
-        image = paddle.randn((batch_size, self.unet.in_channels,
-                              self.unet.sample_size, self.unet.sample_size))
+        image = paddle.randn((batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size))
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps)
@@ -94,6 +93,6 @@ class DDIMPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

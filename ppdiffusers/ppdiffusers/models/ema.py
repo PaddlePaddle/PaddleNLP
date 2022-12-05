@@ -30,20 +30,19 @@ class LitEma(nn.Layer):
     def __init__(self, model, decay=0.9999, use_num_upates=True):
         super().__init__()
         if decay < 0.0 or decay > 1.0:
-            raise ValueError('Decay must be between 0 and 1')
+            raise ValueError("Decay must be between 0 and 1")
 
         self.m_name2s_name = {}
-        self.register_buffer('decay',
-                             paddle.to_tensor(decay, dtype=paddle.float32))
+        self.register_buffer("decay", paddle.to_tensor(decay, dtype=paddle.float32))
         self.register_buffer(
-            'num_updates',
-            paddle.to_tensor(0, dtype=paddle.int64)
-            if use_num_upates else paddle.to_tensor(-1, dtype=paddle.int64))
+            "num_updates",
+            paddle.to_tensor(0, dtype=paddle.int64) if use_num_upates else paddle.to_tensor(-1, dtype=paddle.int64),
+        )
 
         for name, p in model.named_parameters():
             if not p.stop_gradient:
-                #remove as '.'-character is not allowed in buffers
-                s_name = name.replace('.', '')
+                # remove as '.'-character is not allowed in buffers
+                s_name = name.replace(".", "")
                 self.m_name2s_name.update({name: s_name})
                 self.register_buffer(s_name, p.clone().detach())
 
@@ -54,8 +53,7 @@ class LitEma(nn.Layer):
 
         if self.num_updates >= 0:
             self.num_updates += 1
-            decay = min(self.decay,
-                        (1 + self.num_updates) / (10 + self.num_updates))
+            decay = min(self.decay, (1 + self.num_updates) / (10 + self.num_updates))
 
         one_minus_decay = 1.0 - decay
 

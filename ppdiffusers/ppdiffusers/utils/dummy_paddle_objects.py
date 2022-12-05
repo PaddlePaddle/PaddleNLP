@@ -107,8 +107,7 @@ def get_cosine_schedule_with_warmup(*args, **kwargs):
 
 
 def get_cosine_with_hard_restarts_schedule_with_warmup(*args, **kwargs):
-    requires_backends(get_cosine_with_hard_restarts_schedule_with_warmup,
-                      ["paddle"])
+    requires_backends(get_cosine_with_hard_restarts_schedule_with_warmup, ["paddle"])
 
 
 def get_linear_schedule_with_warmup(*args, **kwargs):

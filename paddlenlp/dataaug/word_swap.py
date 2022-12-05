@@ -15,7 +15,7 @@ import random
 
 from .base_augment import BaseAugment
 
-__all__ = ['WordSwap']
+__all__ = ["WordSwap"]
 
 
 class WordSwap(BaseAugment):
@@ -35,17 +35,8 @@ class WordSwap(BaseAugment):
             Maximum number of augmented words in sequences.
     """
 
-    def __init__(self,
-                 create_n=1,
-                 aug_n=None,
-                 aug_percent=None,
-                 aug_min=1,
-                 aug_max=10):
-        super().__init__(create_n=create_n,
-                         aug_n=aug_n,
-                         aug_percent=0.02,
-                         aug_min=aug_min,
-                         aug_max=aug_max)
+    def __init__(self, create_n=1, aug_n=None, aug_percent=None, aug_min=1, aug_max=10):
+        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=0.02, aug_min=aug_min, aug_max=aug_max)
 
     def _augment(self, sequence):
 
@@ -64,22 +55,28 @@ class WordSwap(BaseAugment):
             output_seq_tokens = seq_tokens.copy()
             for idx in range(len(seq_tokens)):
                 if idx in idxes:
-                    output_seq_tokens[idx], output_seq_tokens[
-                        idx + 1] = output_seq_tokens[idx +
-                                                     1], output_seq_tokens[idx]
-            sentence = ''.join(output_seq_tokens)
+                    output_seq_tokens[idx], output_seq_tokens[idx + 1] = (
+                        output_seq_tokens[idx + 1],
+                        output_seq_tokens[idx],
+                    )
+            sentence = "".join(output_seq_tokens)
             if sentence not in sentences:
                 sentences.append(sentence)
         return sentences
 
     def _skip_words(self, seq_tokens):
-        '''Skip words. We can rewrite function to skip specify words.'''
+        """Skip words. We can rewrite function to skip specify words."""
         indexes = []
         for i, seq_token in enumerate(seq_tokens[:-1]):
-            if seq_token not in self.stop_words and not seq_token.isdigit(
-            ) and not seq_token.encode('UTF-8').isalpha():
-                if seq_tokens[i + 1] not in self.stop_words and not seq_tokens[
-                        i + 1].isdigit() and not seq_tokens[i + 1].encode(
-                            'UTF-8').isalpha():
+            if (
+                seq_token not in self.stop_words
+                and not seq_token.isdigit()
+                and not seq_token.encode("UTF-8").isalpha()
+            ):
+                if (
+                    seq_tokens[i + 1] not in self.stop_words
+                    and not seq_tokens[i + 1].isdigit()
+                    and not seq_tokens[i + 1].encode("UTF-8").isalpha()
+                ):
                     indexes.append(i)
         return indexes

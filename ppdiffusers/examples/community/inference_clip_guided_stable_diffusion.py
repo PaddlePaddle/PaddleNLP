@@ -23,22 +23,20 @@ from ppdiffusers import LMSDiscreteScheduler, StableDiffusionPipeline
 def image_grid(imgs, rows, cols):
     assert len(imgs) == rows * cols
     w, h = imgs[0].size
-    grid = Image.new('RGB', size=(cols * w, rows * h))
+    grid = Image.new("RGB", size=(cols * w, rows * h))
 
     for i, img in enumerate(imgs):
         grid.paste(img, box=(i % cols * w, i // cols * h))
     return grid
 
 
-def create_clip_guided_pipeline(model_id="CompVis/stable-diffusion-v1-4",
-                                clip_model_id="openai/clip-vit-large-patch14",
-                                scheduler="plms"):
+def create_clip_guided_pipeline(
+    model_id="CompVis/stable-diffusion-v1-4", clip_model_id="openai/clip-vit-large-patch14", scheduler="plms"
+):
     pipeline = StableDiffusionPipeline.from_pretrained(model_id)
 
     if scheduler == "lms":
-        scheduler = LMSDiscreteScheduler(beta_start=0.00085,
-                                         beta_end=0.012,
-                                         beta_schedule="scaled_linear")
+        scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
     else:
         scheduler = pipeline.scheduler
 
@@ -58,20 +56,22 @@ def create_clip_guided_pipeline(model_id="CompVis/stable-diffusion-v1-4",
     return guided_pipeline
 
 
-def infer(prompt,
-          clip_prompt,
-          num_return_images=1,
-          num_images_per_prompt=1,
-          num_inference_steps=50,
-          clip_guidance_scale=100,
-          guidance_scale=7.5,
-          guided_pipeline=None,
-          negative_prompt="",
-          use_cutouts=True,
-          num_cutouts=4,
-          seed=None,
-          unfreeze_unet=True,
-          unfreeze_vae=True):
+def infer(
+    prompt,
+    clip_prompt,
+    num_return_images=1,
+    num_images_per_prompt=1,
+    num_inference_steps=50,
+    clip_guidance_scale=100,
+    guidance_scale=7.5,
+    guided_pipeline=None,
+    negative_prompt="",
+    use_cutouts=True,
+    num_cutouts=4,
+    seed=None,
+    unfreeze_unet=True,
+    unfreeze_vae=True,
+):
     clip_prompt = clip_prompt if clip_prompt.strip() != "" else None
     if unfreeze_unet:
         guided_pipeline.unfreeze_unet()
@@ -103,39 +103,41 @@ def infer(prompt,
 
 
 if __name__ == "__main__":
-    prompt = "fantasy book cover, full moon, fantasy forest landscape, golden vector elements, fantasy magic, dark light night, intricate, elegant, sharp focus, illustration, highly detailed, digital painting, concept art, matte, art by WLOP and Artgerm and Albert Bierstadt, masterpiece"  #@param {type: "string"}
-    #@markdown `clip_prompt` is optional, if you leave it blank the same prompt is sent to Stable Diffusion and CLIP
-    clip_prompt = ""  #@param {type: "string"}
+    prompt = "fantasy book cover, full moon, fantasy forest landscape, golden vector elements, fantasy magic, dark light night, intricate, elegant, sharp focus, illustration, highly detailed, digital painting, concept art, matte, art by WLOP and Artgerm and Albert Bierstadt, masterpiece"  # @param {type: "string"}
+    # @markdown `clip_prompt` is optional, if you leave it blank the same prompt is sent to Stable Diffusion and CLIP
+    clip_prompt = ""  # @param {type: "string"}
     negative_prompt = ""
-    num_return_images = 1  #@param {type: "number"}
-    num_images_per_prompt = 1  #@param {type: "number"}
+    num_return_images = 1  # @param {type: "number"}
+    num_images_per_prompt = 1  # @param {type: "number"}
 
-    num_inference_steps = 50  #@param {type: "number"}
-    guidance_scale = 7.5  #@param {type: "number"}
-    clip_guidance_scale = 100  #@param {type: "number"}
-    num_cutouts = 4  #@param {type: "number"}
-    use_cutouts = False  #@param ["False", "True"]
-    unfreeze_unet = True  #@param ["False", "True"]
-    unfreeze_vae = True  #@param ["False", "True"]
-    seed = 3788086447  #@param {type: "number"}
+    num_inference_steps = 50  # @param {type: "number"}
+    guidance_scale = 7.5  # @param {type: "number"}
+    clip_guidance_scale = 100  # @param {type: "number"}
+    num_cutouts = 4  # @param {type: "number"}
+    use_cutouts = False  # @param ["False", "True"]
+    unfreeze_unet = True  # @param ["False", "True"]
+    unfreeze_vae = True  # @param ["False", "True"]
+    seed = 3788086447  # @param {type: "number"}
 
     model_id = "CompVis/stable-diffusion-v1-4"
-    clip_model_id = "openai/clip-vit-large-patch14"  #@param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
-    scheduler = "plms"  #@param ['plms', 'lms']
+    clip_model_id = "openai/clip-vit-large-patch14"  # @param ["openai/clip-vit-base-patch32", "openai/clip-vit-base-patch14", "openai/clip-rn101", "openai/clip-rn50"] {allow-input: true}
+    scheduler = "plms"  # @param ['plms', 'lms']
     guided_pipeline = create_clip_guided_pipeline(model_id, clip_model_id)
-    grid_image = infer(prompt=prompt,
-                       negative_prompt=negative_prompt,
-                       clip_prompt=clip_prompt,
-                       num_return_images=num_return_images,
-                       num_images_per_prompt=num_images_per_prompt,
-                       num_inference_steps=num_inference_steps,
-                       clip_guidance_scale=clip_guidance_scale,
-                       guidance_scale=guidance_scale,
-                       guided_pipeline=guided_pipeline,
-                       use_cutouts=use_cutouts,
-                       num_cutouts=num_cutouts,
-                       seed=seed,
-                       unfreeze_unet=unfreeze_unet,
-                       unfreeze_vae=unfreeze_vae)
+    grid_image = infer(
+        prompt=prompt,
+        negative_prompt=negative_prompt,
+        clip_prompt=clip_prompt,
+        num_return_images=num_return_images,
+        num_images_per_prompt=num_images_per_prompt,
+        num_inference_steps=num_inference_steps,
+        clip_guidance_scale=clip_guidance_scale,
+        guidance_scale=guidance_scale,
+        guided_pipeline=guided_pipeline,
+        use_cutouts=use_cutouts,
+        num_cutouts=num_cutouts,
+        seed=seed,
+        unfreeze_unet=unfreeze_unet,
+        unfreeze_vae=unfreeze_vae,
+    )
 
     display(grid_image)

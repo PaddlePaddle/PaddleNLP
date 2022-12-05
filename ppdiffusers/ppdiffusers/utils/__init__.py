@@ -41,7 +41,7 @@ logger = get_logger(__name__)
 from paddlenlp.utils.env import _get_sub_home, _get_ppnlp_home
 
 ppnlp_cache_home = _get_ppnlp_home()
-default_cache_path = _get_sub_home('models')
+default_cache_path = _get_sub_home("models")
 
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"

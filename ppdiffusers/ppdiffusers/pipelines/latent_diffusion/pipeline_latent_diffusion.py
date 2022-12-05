@@ -44,24 +44,21 @@ class LDMBertPretrainedModel(PretrainedModel):
     def init_weights(self, layer):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             layer.weight.set_value(
-                paddle.normal(mean=0.0,
-                              std=self.initializer_range if hasattr(
-                                  self, "initializer_range") else
-                              self.ldmbert.config["initializer_range"],
-                              shape=layer.weight.shape))
+                paddle.normal(
+                    mean=0.0,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range")
+                    else self.ldmbert.config["initializer_range"],
+                    shape=layer.weight.shape,
+                )
+            )
 
 
 class LDMBertEmbeddings(nn.Layer):
-
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.0,
-                 max_position_embeddings=512):
+    def __init__(self, vocab_size, hidden_size=768, hidden_dropout_prob=0.0, max_position_embeddings=512):
         super().__init__()
         self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
     def forward(self, input_ids, position_ids=None):
@@ -80,63 +77,72 @@ class LDMBertEmbeddings(nn.Layer):
 
 
 class TransformerEncoderLayer(nn.TransformerEncoderLayer):
-
-    def __init__(self,
-                 d_model,
-                 nhead,
-                 dim_feedforward,
-                 dropout=0.1,
-                 activation="gelu",
-                 attn_dropout=None,
-                 act_dropout=None,
-                 normalize_before=False,
-                 weight_attr=None,
-                 bias_attr=None,
-                 head_dim=64):
-        super().__init__(d_model, nhead, dim_feedforward, dropout, activation,
-                         attn_dropout, act_dropout, normalize_before,
-                         weight_attr, bias_attr)
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        dim_feedforward,
+        dropout=0.1,
+        activation="gelu",
+        attn_dropout=None,
+        act_dropout=None,
+        normalize_before=False,
+        weight_attr=None,
+        bias_attr=None,
+        head_dim=64,
+    ):
+        super().__init__(
+            d_model,
+            nhead,
+            dim_feedforward,
+            dropout,
+            activation,
+            attn_dropout,
+            act_dropout,
+            normalize_before,
+            weight_attr,
+            bias_attr,
+        )
         # update self attn
-        self.self_attn = LDMBertAttention(d_model,
-                                          head_dim,
-                                          nhead,
-                                          dropout=attn_dropout,
-                                          weight_attr=weight_attr,
-                                          bias_attr=False)
+        self.self_attn = LDMBertAttention(
+            d_model, head_dim, nhead, dropout=attn_dropout, weight_attr=weight_attr, bias_attr=False
+        )
 
 
 @register_base_model
 class LDMBertModel(LDMBertPretrainedModel):
-
-    def __init__(self,
-                 vocab_size=30522,
-                 max_position_embeddings=77,
-                 encoder_layers=32,
-                 encoder_ffn_dim=5120,
-                 encoder_attention_heads=8,
-                 head_dim=64,
-                 activation_function="gelu",
-                 d_model=1280,
-                 dropout=0.0,
-                 attention_dropout=0.0,
-                 activation_dropout=0.0,
-                 init_std=0.02,
-                 pad_token_id=0,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size=30522,
+        max_position_embeddings=77,
+        encoder_layers=32,
+        encoder_ffn_dim=5120,
+        encoder_attention_heads=8,
+        head_dim=64,
+        activation_function="gelu",
+        d_model=1280,
+        dropout=0.0,
+        attention_dropout=0.0,
+        activation_dropout=0.0,
+        init_std=0.02,
+        pad_token_id=0,
+        **kwargs
+    ):
         super().__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = init_std
-        self.embeddings = LDMBertEmbeddings(vocab_size, d_model, dropout,
-                                            max_position_embeddings)
-        encoder_layer = TransformerEncoderLayer(d_model,
-                                                encoder_attention_heads,
-                                                encoder_ffn_dim,
-                                                dropout=dropout,
-                                                activation=activation_function,
-                                                attn_dropout=attention_dropout,
-                                                act_dropout=activation_dropout,
-                                                normalize_before=True,
-                                                head_dim=head_dim)
+        self.embeddings = LDMBertEmbeddings(vocab_size, d_model, dropout, max_position_embeddings)
+        encoder_layer = TransformerEncoderLayer(
+            d_model,
+            encoder_attention_heads,
+            encoder_ffn_dim,
+            dropout=dropout,
+            activation=activation_function,
+            attn_dropout=attention_dropout,
+            act_dropout=activation_dropout,
+            normalize_before=True,
+            head_dim=head_dim,
+        )
 
         self.encoder = nn.TransformerEncoder(encoder_layer, encoder_layers)
         self.final_layer_norm = nn.LayerNorm(d_model)
@@ -148,62 +154,62 @@ class LDMBertModel(LDMBertPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                output_hidden_states=False,
-                output_attentions=False,
-                return_dict=False):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        output_hidden_states=False,
+        output_attentions=False,
+        return_dict=False,
+    ):
 
         if attention_mask is not None and attention_mask.ndim == 2:
             # attention_mask [batch_size, sequence_length] -> [batch_size, 1, 1, sequence_length]
-            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(
-                paddle.get_default_dtype())
+            attention_mask = attention_mask.unsqueeze(axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids)
+        embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
         encoder_outputs = self.encoder(
             embedding_output,
             src_mask=attention_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
-            return_dict=return_dict)
+            return_dict=return_dict,
+        )
 
         if isinstance(encoder_outputs, type(embedding_output)):
             sequence_output = self.final_layer_norm(encoder_outputs)
-            return (sequence_output, )
+            return (sequence_output,)
         else:
             sequence_output = encoder_outputs[0]
             sequence_output = self.final_layer_norm(sequence_output)
             if not return_dict:
-                return (sequence_output, ) + encoder_outputs[1:]
+                return (sequence_output,) + encoder_outputs[1:]
             return BaseModelOutputWithPoolingAndCrossAttentions(
                 last_hidden_state=sequence_output,
                 hidden_states=encoder_outputs.hidden_states,
-                attentions=encoder_outputs.attentions)
+                attentions=encoder_outputs.attentions,
+            )
 
 
 class LDMBertAttention(nn.MultiHeadAttention):
-
-    def __init__(self,
-                 embed_dim,
-                 head_dim,
-                 num_heads,
-                 dropout=0.,
-                 kdim=None,
-                 vdim=None,
-                 need_weights=False,
-                 weight_attr=None,
-                 bias_attr=None):
-        super().__init__(embed_dim, num_heads, dropout, kdim, vdim,
-                         need_weights, weight_attr, bias_attr)
-        assert embed_dim > 0, ("Expected embed_dim to be greater than 0, "
-                               "but recieved {}".format(embed_dim))
-        assert num_heads > 0, ("Expected num_heads to be greater than 0, "
-                               "but recieved {}".format(num_heads))
+    def __init__(
+        self,
+        embed_dim,
+        head_dim,
+        num_heads,
+        dropout=0.0,
+        kdim=None,
+        vdim=None,
+        need_weights=False,
+        weight_attr=None,
+        bias_attr=None,
+    ):
+        super().__init__(embed_dim, num_heads, dropout, kdim, vdim, need_weights, weight_attr, bias_attr)
+        assert embed_dim > 0, "Expected embed_dim to be greater than 0, " "but recieved {}".format(embed_dim)
+        assert num_heads > 0, "Expected num_heads to be greater than 0, " "but recieved {}".format(num_heads)
 
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -216,28 +222,17 @@ class LDMBertAttention(nn.MultiHeadAttention):
         self.inner_dim = head_dim * num_heads
         self.scaling = self.head_dim**-0.5
 
-        self.q_proj = nn.Linear(embed_dim,
-                                self.inner_dim,
-                                weight_attr,
-                                bias_attr=bias_attr)
-        self.k_proj = nn.Linear(self.kdim,
-                                self.inner_dim,
-                                weight_attr,
-                                bias_attr=bias_attr)
-        self.v_proj = nn.Linear(self.vdim,
-                                self.inner_dim,
-                                weight_attr,
-                                bias_attr=bias_attr)
+        self.q_proj = nn.Linear(embed_dim, self.inner_dim, weight_attr, bias_attr=bias_attr)
+        self.k_proj = nn.Linear(self.kdim, self.inner_dim, weight_attr, bias_attr=bias_attr)
+        self.v_proj = nn.Linear(self.vdim, self.inner_dim, weight_attr, bias_attr=bias_attr)
         self.out_proj = nn.Linear(self.inner_dim, embed_dim, weight_attr)
 
 
 class LDMBertModelForMaskedLM(LDMBertPretrainedModel):
-
     def __init__(self, ldmbert):
         super().__init__()
         self.ldmbert = ldmbert
-        self.to_logits = nn.Linear(ldmbert.config["hidden_size"],
-                                   ldmbert.config["vocab_size"])
+        self.to_logits = nn.Linear(ldmbert.config["hidden_size"], ldmbert.config["vocab_size"])
         self.apply(self.init_weights)
 
     def forward(
@@ -288,32 +283,23 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
     ):
         super().__init__()
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
 
-        self.register_modules(vqvae=vqvae,
-                              bert=bert,
-                              tokenizer=tokenizer,
-                              unet=unet,
-                              scheduler=scheduler)
+        self.register_modules(vqvae=vqvae, bert=bert, tokenizer=tokenizer, unet=unet, scheduler=scheduler)
 
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -402,7 +388,7 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             callback_steps (`int`, *optional*, defaults to 1):
                 The frequency at which the `callback` function will be called. If not specified, the callback will be
                 called at every step.
-                
+
         Returns:
             [`~pipeline_utils.ImagePipelineOutput`] or `tuple`: [`~pipeline_utils.ImagePipelineOutput`] if
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
@@ -413,21 +399,18 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         elif isinstance(prompt, list):
             batch_size = len(prompt)
         else:
-            raise ValueError(
-                f"`prompt` has to be of type `str` or `list` but is {type(prompt)}"
-            )
+            raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-            )
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
         # get prompt text embeddings
         text_inputs = self.tokenizer(
@@ -439,19 +422,18 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         text_input_ids = text_inputs.input_ids
 
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-            removed_text = self.tokenizer.batch_decode(
-                text_input_ids[:, self.tokenizer.model_max_length:])
+            removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
-            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+            )
+            text_input_ids = text_input_ids[:, : self.tokenizer.model_max_length]
         text_embeddings = self.bert(text_input_ids)[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         bs_embed, seq_len, _ = text_embeddings.shape
         text_embeddings = text_embeddings.tile([1, num_images_per_prompt, 1])
-        text_embeddings = text_embeddings.reshape(
-            [bs_embed * num_images_per_prompt, seq_len, -1])
+        text_embeddings = text_embeddings.reshape([bs_embed * num_images_per_prompt, seq_len, -1])
 
         # here `guidance_scale` is defined analog to the guidance weight `w` of equation (2)
         # of the Imagen paper: https://arxiv.org/pdf/2205.11487.pdf . `guidance_scale = 1`
@@ -465,14 +447,16 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             elif type(prompt) is not type(negative_prompt):
                 raise TypeError(
                     f"`negative_prompt` should be the same type to `prompt`, but got {type(negative_prompt)} !="
-                    f" {type(prompt)}.")
+                    f" {type(prompt)}."
+                )
             elif isinstance(negative_prompt, str):
                 uncond_tokens = [negative_prompt]
             elif batch_size != len(negative_prompt):
                 raise ValueError(
                     f"`negative_prompt`: {negative_prompt} has batch size {len(negative_prompt)}, but `prompt`:"
                     f" {prompt} has batch size {batch_size}. Please make sure that passed `negative_prompt` matches"
-                    " the batch size of `prompt`.")
+                    " the batch size of `prompt`."
+                )
             else:
                 uncond_tokens = negative_prompt
 
@@ -488,26 +472,20 @@ class LDMTextToImagePipeline(DiffusionPipeline):
 
             # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
             seq_len = uncond_embeddings.shape[1]
-            uncond_embeddings = uncond_embeddings.tile(
-                [batch_size, num_images_per_prompt, 1])
-            uncond_embeddings = uncond_embeddings.reshape(
-                [batch_size * num_images_per_prompt, seq_len, -1])
+            uncond_embeddings = uncond_embeddings.tile([batch_size, num_images_per_prompt, 1])
+            uncond_embeddings = uncond_embeddings.reshape([batch_size * num_images_per_prompt, seq_len, -1])
 
             # For classifier free guidance, we need to do two forward passes.
             # Here we concatenate the unconditional and text embeddings into a single batch
             # to avoid doing two forward passes
-            text_embeddings = paddle.concat(
-                [uncond_embeddings, text_embeddings])
+            text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
 
         # get the initial random noise unless the user supplied it
 
         # Unlike in other pipelines, latents need to be generated in the target device
         # for 1-to-1 results reproducibility with the CompVis implementation.
         # However this currently doesn't work in `mps`.
-        latents_shape = [
-            batch_size * num_images_per_prompt, self.unet.in_channels,
-            height // 8, width // 8
-        ]
+        latents_shape = [batch_size * num_images_per_prompt, self.unet.in_channels, height // 8, width // 8]
         if latents is None:
             if seed is not None:
                 paddle.seed(seed)
@@ -515,9 +493,7 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}"
-                )
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -533,33 +509,26 @@ class LDMTextToImagePipeline(DiffusionPipeline):
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * 2) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             # predict the noise residual
-            noise_pred = self.unet(latent_model_input,
-                                   t,
-                                   encoder_hidden_states=text_embeddings).sample
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
                 noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
@@ -577,6 +546,6 @@ class LDMTextToImagePipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

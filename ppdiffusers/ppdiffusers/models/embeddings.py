@@ -38,8 +38,7 @@ def get_timestep_embedding(
     assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
 
     half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * paddle.arange(
-        start=0, end=half_dim, dtype="float32")
+    exponent = -math.log(max_period) * paddle.arange(start=0, end=half_dim, dtype="float32")
     exponent = exponent / (half_dim - downscale_freq_shift)
 
     emb = paddle.exp(exponent)
@@ -62,7 +61,6 @@ def get_timestep_embedding(
 
 
 class TimestepEmbedding(nn.Layer):
-
     def __init__(self, channel: int, time_embed_dim: int, act_fn: str = "silu"):
         super().__init__()
 
@@ -83,9 +81,7 @@ class TimestepEmbedding(nn.Layer):
 
 
 class Timesteps(nn.Layer):
-
-    def __init__(self, num_channels: int, flip_sin_to_cos: bool,
-                 downscale_freq_shift: float):
+    def __init__(self, num_channels: int, flip_sin_to_cos: bool, downscale_freq_shift: float):
         super().__init__()
         self.num_channels = num_channels
         self.flip_sin_to_cos = flip_sin_to_cos

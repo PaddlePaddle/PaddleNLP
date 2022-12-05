@@ -49,8 +49,7 @@ def get_parameter_dtype(parameter: nn.Layer):
         return paddle.get_default_dtype()
 
 
-def load_dict(checkpoint_file: Union[str, os.PathLike],
-              return_numpy: bool = True):
+def load_dict(checkpoint_file: Union[str, os.PathLike], return_numpy: bool = True):
     """
     Reads a Paddle checkpoint file, returning properly formatted errors if they arise.
     """
@@ -63,7 +62,8 @@ def load_dict(checkpoint_file: Union[str, os.PathLike],
                     raise OSError(
                         "You seem to have cloned a repository without having git-lfs installed. Please install "
                         "git-lfs and run `git lfs install` followed by `git lfs pull` in the folder "
-                        "you cloned.")
+                        "you cloned."
+                    )
                 else:
                     raise ValueError(
                         f"Unable to locate the file {checkpoint_file} which is necessary to load this pretrained "
@@ -88,9 +88,7 @@ class ModelMixin(nn.Layer):
           [`~modeling_utils.ModelMixin.save_pretrained`].
     """
     config_name = CONFIG_NAME
-    _automatically_saved_args = [
-        "_ppdiffusers_version", "_class_name", "_name_or_path"
-    ]
+    _automatically_saved_args = ["_ppdiffusers_version", "_class_name", "_name_or_path"]
     _supports_gradient_checkpointing = False
 
     def __init__(self):
@@ -104,9 +102,7 @@ class ModelMixin(nn.Layer):
         Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
         activations".
         """
-        return any(
-            hasattr(m, "gradient_checkpointing") and m.gradient_checkpointing
-            for m in self.modules())
+        return any(hasattr(m, "gradient_checkpointing") and m.gradient_checkpointing for m in self.modules())
 
     def enable_gradient_checkpointing(self):
         """
@@ -116,9 +112,7 @@ class ModelMixin(nn.Layer):
         activations".
         """
         if not self._supports_gradient_checkpointing:
-            raise ValueError(
-                f"{self.__class__.__name__} does not support gradient checkpointing."
-            )
+            raise ValueError(f"{self.__class__.__name__} does not support gradient checkpointing.")
         self.apply(partial(self._set_gradient_checkpointing, value=True))
 
     def disable_gradient_checkpointing(self):
@@ -153,9 +147,7 @@ class ModelMixin(nn.Layer):
                 need to replace `paddle.save` by another method.
         """
         if os.path.isfile(save_directory):
-            logger.error(
-                f"Provided path ({save_directory}) should be a directory, not a file"
-            )
+            logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
             return
 
         os.makedirs(save_directory, exist_ok=True)
@@ -175,22 +167,16 @@ class ModelMixin(nn.Layer):
             full_filename = os.path.join(save_directory, filename)
             # If we have a shard file that is not going to be replaced, we delete it, but only from the main process
             # in distributed settings to avoid race conditions.
-            if filename.startswith(WEIGHTS_NAME[:-4]) and os.path.isfile(
-                    full_filename) and is_main_process:
+            if filename.startswith(WEIGHTS_NAME[:-4]) and os.path.isfile(full_filename) and is_main_process:
                 os.remove(full_filename)
 
         # Save the model
         save_function(state_dict, os.path.join(save_directory, WEIGHTS_NAME))
 
-        logger.info(
-            f"Model weights saved in {os.path.join(save_directory, WEIGHTS_NAME)}"
-        )
+        logger.info(f"Model weights saved in {os.path.join(save_directory, WEIGHTS_NAME)}")
 
     @classmethod
-    def from_pretrained(
-            cls, pretrained_model_name_or_path: Optional[Union[str,
-                                                               os.PathLike]],
-            **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path: Optional[Union[str, os.PathLike]], **kwargs):
         r"""
         Instantiate a pretrained paddle model from a pre-trained model configuration.
 
@@ -240,16 +226,13 @@ class ModelMixin(nn.Layer):
         # Load model
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            if os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, WEIGHTS_NAME)):
+            if os.path.isfile(os.path.join(pretrained_model_name_or_path, WEIGHTS_NAME)):
                 # Load from a Paddle checkpoint
-                model_file = os.path.join(pretrained_model_name_or_path,
-                                          WEIGHTS_NAME)
+                model_file = os.path.join(pretrained_model_name_or_path, WEIGHTS_NAME)
             elif subfolder is not None and os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder,
-                                 WEIGHTS_NAME)):
-                model_file = os.path.join(pretrained_model_name_or_path,
-                                          subfolder, WEIGHTS_NAME)
+                os.path.join(pretrained_model_name_or_path, subfolder, WEIGHTS_NAME)
+            ):
+                model_file = os.path.join(pretrained_model_name_or_path, subfolder, WEIGHTS_NAME)
             else:
                 raise EnvironmentError(
                     f"Error no file named {WEIGHTS_NAME} found in directory {pretrained_model_name_or_path}."
@@ -265,7 +248,8 @@ class ModelMixin(nn.Layer):
             except HTTPError as err:
                 raise EnvironmentError(
                     "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}")
+                    f" {pretrained_model_name_or_path}:\n{err}"
+                )
             except ValueError:
                 raise EnvironmentError(
                     f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
@@ -279,7 +263,8 @@ class ModelMixin(nn.Layer):
                     f"Can't load the model for '{pretrained_model_name_or_path}'. If you were trying to load it from "
                     "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
                     f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a file named {WEIGHTS_NAME}")
+                    f"containing a file named {WEIGHTS_NAME}"
+                )
 
         model, unused_kwargs = cls.from_config(
             config_path,
@@ -304,8 +289,7 @@ class ModelMixin(nn.Layer):
             "error_msgs": error_msgs,
         }
 
-        if paddle_dtype is not None and not isinstance(paddle_dtype,
-                                                       paddle.dtype):
+        if paddle_dtype is not None and not isinstance(paddle_dtype, paddle.dtype):
             raise ValueError(
                 f"{paddle_dtype} needs to be of type `paddle.dtype`, e.g. `paddle.float16`, but is {type(paddle_dtype)}."
             )
@@ -355,12 +339,13 @@ class ModelMixin(nn.Layer):
                 for checkpoint_key in loaded_keys:
                     model_key = checkpoint_key
 
-                    if (model_key in model_state_dict
-                            and list(state_dict[checkpoint_key].shape) !=
-                            model_state_dict[model_key].shape):
+                    if (
+                        model_key in model_state_dict
+                        and list(state_dict[checkpoint_key].shape) != model_state_dict[model_key].shape
+                    ):
                         mismatched_keys.append(
-                            (checkpoint_key, state_dict[checkpoint_key].shape,
-                             model_state_dict[model_key].shape))
+                            (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
+                        )
                         del state_dict[checkpoint_key]
             return mismatched_keys
 
@@ -381,9 +366,7 @@ class ModelMixin(nn.Layer):
                 error_msg += (
                     "\n\tYou may consider adding `ignore_mismatched_sizes=True` in the model `from_pretrained` method."
                 )
-            raise RuntimeError(
-                f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}"
-            )
+            raise RuntimeError(f"Error(s) in loading state_dict for {model.__class__.__name__}:\n\t{error_msg}")
 
         if len(unexpected_keys) > 0:
             logger.warning(
@@ -394,11 +377,10 @@ class ModelMixin(nn.Layer):
                 " BertForPreTraining model).\n- This IS NOT expected if you are initializing"
                 f" {model.__class__.__name__} from the checkpoint of a model that you expect to be exactly"
                 " identical (initializing a BertForSequenceClassification model from a"
-                " BertForSequenceClassification model).")
-        else:
-            logger.info(
-                f"All model checkpoint weights were used when initializing {model.__class__.__name__}."
+                " BertForSequenceClassification model)."
             )
+        else:
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.")
         if len(missing_keys) > 0:
             logger.warning(
                 f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
@@ -410,17 +392,21 @@ class ModelMixin(nn.Layer):
                 f"All the weights of {model.__class__.__name__} were initialized from the model checkpoint at"
                 f" {pretrained_model_name_or_path}.\nIf your task is similar to the task the model of the"
                 f" checkpoint was trained on, you can already use {model.__class__.__name__} for predictions"
-                " without further training.")
+                " without further training."
+            )
         if len(mismatched_keys) > 0:
-            mismatched_warning = "\n".join([
-                f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
-                for key, shape1, shape2 in mismatched_keys
-            ])
+            mismatched_warning = "\n".join(
+                [
+                    f"- {key}: found shape {shape1} in the checkpoint and {shape2} in the model instantiated"
+                    for key, shape1, shape2 in mismatched_keys
+                ]
+            )
             logger.warning(
                 f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"
                 f" {pretrained_model_name_or_path} and are newly initialized because the shapes did not"
                 f" match:\n{mismatched_warning}\nYou should probably TRAIN this model on a down-stream task to be"
-                " able to use it for predictions and inference.")
+                " able to use it for predictions and inference."
+            )
 
         return model, missing_keys, unexpected_keys, mismatched_keys, error_msgs
 
@@ -439,9 +425,7 @@ class ModelMixin(nn.Layer):
         """
         return get_parameter_dtype(self)
 
-    def num_parameters(self,
-                       only_trainable: bool = False,
-                       exclude_embeddings: bool = False) -> int:
+    def num_parameters(self, only_trainable: bool = False, exclude_embeddings: bool = False) -> int:
         """
         Get number of (optionally, trainable or non-embeddings) parameters in the module.
 
@@ -463,14 +447,11 @@ class ModelMixin(nn.Layer):
                 if isinstance(module_type, nn.Embedding)
             ]
             non_embedding_parameters = [
-                parameter for name, parameter in self.named_parameters()
-                if name not in embedding_param_names
+                parameter for name, parameter in self.named_parameters() if name not in embedding_param_names
             ]
-            return sum(p.numel() for p in non_embedding_parameters
-                       if not p.stop_gradient or not only_trainable)
+            return sum(p.numel() for p in non_embedding_parameters if not p.stop_gradient or not only_trainable)
         else:
-            return sum(p.numel() for p in self.parameters()
-                       if not p.stop_gradient or not only_trainable)
+            return sum(p.numel() for p in self.parameters() if not p.stop_gradient or not only_trainable)
 
 
 def unwrap_model(model: nn.Layer) -> nn.Layer:

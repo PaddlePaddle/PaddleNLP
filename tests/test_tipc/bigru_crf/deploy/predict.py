@@ -22,6 +22,7 @@ import paddle
 from paddlenlp.utils.log import logger
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
+
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_dir", type=str, default='./output', help="The path to parameters in static graph.")
@@ -46,14 +47,10 @@ def normalize_token(token, normlize_vocab):
     return token
 
 
-def convert_tokens_to_ids(tokens,
-                          vocab,
-                          oov_replace_token=None,
-                          normlize_vocab=None):
+def convert_tokens_to_ids(tokens, vocab, oov_replace_token=None, normlize_vocab=None):
     """Convert tokens to token indexs"""
     token_ids = []
-    oov_replace_token = vocab.get(
-        oov_replace_token) if oov_replace_token else None
+    oov_replace_token = vocab.get(oov_replace_token) if oov_replace_token else None
     for token in tokens:
         token = normalize_token(token, normlize_vocab)
         token_id = vocab.get(token, oov_replace_token)
@@ -66,10 +63,7 @@ def convert_example(tokens, max_seq_len, word_vocab, normlize_vocab=None):
     """Convert tokens of sequences to token ids"""
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(tokens,
-                                      word_vocab,
-                                      oov_replace_token="OOV",
-                                      normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, oov_replace_token="OOV", normlize_vocab=normlize_vocab)
     length = len(token_ids)
     return token_ids, length
 
@@ -78,7 +72,7 @@ def load_vocab(dict_path):
     """Load vocab from file"""
     vocab = {}
     reverse = None
-    with open(dict_path, "r", encoding='utf8') as fin:
+    with open(dict_path, "r", encoding="utf8") as fin:
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
@@ -91,26 +85,19 @@ def load_vocab(dict_path):
             elif len(terms) == 1:
                 key, value = terms[0], i
             else:
-                raise ValueError("Error line: %s in file: %s" %
-                                 (line, dict_path))
+                raise ValueError("Error line: %s in file: %s" % (line, dict_path))
             vocab[key] = value
     return vocab
 
 
 def parse_result(words, preds, lengths, word_vocab, label_vocab):
-    """ Parse padding result """
+    """Parse padding result"""
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
     id2label_dict = dict(zip(label_vocab.values(), label_vocab.keys()))
     for sent_index in range(len(lengths)):
-        sent = [
-            id2word_dict[index]
-            for index in words[sent_index][:lengths[sent_index]]
-        ]
-        tags = [
-            id2label_dict.get(index, 'O')
-            for index in preds[sent_index][:lengths[sent_index]]
-        ]
+        sent = [id2word_dict[index] for index in words[sent_index][: lengths[sent_index]]]
+        tags = [id2label_dict.get(index, "O") for index in preds[sent_index][: lengths[sent_index]]]
 
         sent_out = []
         tags_out = []
@@ -119,13 +106,13 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
             # for the first word
             if parital_word == "":
                 parital_word = sent[ind]
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 continue
 
             # for the beginning of word
             if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
                 sent_out.append(parital_word)
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 parital_word = sent[ind]
                 continue
 
@@ -140,17 +127,18 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
 
 
 class Predictor(object):
-
-    def __init__(self,
-                 model_dir,
-                 device="gpu",
-                 max_seq_length=128,
-                 batch_size=200,
-                 use_tensorrt=False,
-                 precision="fp32",
-                 enable_mkldnn=False,
-                 benchmark=False,
-                 save_log_path=""):
+    def __init__(
+        self,
+        model_dir,
+        device="gpu",
+        max_seq_length=128,
+        batch_size=200,
+        use_tensorrt=False,
+        precision="fp32",
+        enable_mkldnn=False,
+        benchmark=False,
+        save_log_path="",
+    ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
         model_file = os.path.join(model_dir, "inference.pdmodel")
@@ -166,14 +154,16 @@ class Predictor(object):
             precision_map = {
                 "fp16": (inference.PrecisionType.Half, False),
                 "fp32": (inference.PrecisionType.Float32, False),
-                "int8": (inference.PrecisionType.Int8, True)
+                "int8": (inference.PrecisionType.Int8, True),
             }
             precision_mode, use_calib_mode = precision_map[precision]
             if use_tensorrt:
-                config.enable_tensorrt_engine(max_batch_size=batch_size,
-                                              min_subgraph_size=1,
-                                              precision_mode=precision_mode,
-                                              use_calib_mode=use_calib_mode)
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size,
+                    min_subgraph_size=1,
+                    precision_mode=precision_mode,
+                    use_calib_mode=use_calib_mode,
+                )
                 min_input_shape = {
                     # shape: [B, T, H]
                     "embedding_1.tmp_0": [batch_size, 1, 128],
@@ -188,9 +178,7 @@ class Predictor(object):
                     "embedding_1.tmp_0": [batch_size, 128, 128],
                     "gru_0.tmp_0": [128, batch_size, 256],
                 }
-                config.set_trt_dynamic_shape_info(min_input_shape,
-                                                  max_input_shape,
-                                                  opt_input_shape)
+                config.set_trt_dynamic_shape_info(min_input_shape, max_input_shape, opt_input_shape)
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -209,40 +197,26 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
         if args.benchmark:
             import auto_log
+
             pid = os.getpid()
             kwargs = {
-                "model_name":
-                "bigru_crf",
-                "model_precision":
-                precision,
-                "batch_size":
-                self.batch_size,
-                "data_shape":
-                "dynamic",
-                "save_path":
-                save_log_path,
-                "inference_config":
-                config,
-                "pids":
-                pid,
-                "process_name":
-                None,
-                "time_keys":
-                ['preprocess_time', 'inference_time', 'postprocess_time'],
-                "warmup":
-                0,
-                "logger":
-                logger
+                "model_name": "bigru_crf",
+                "model_precision": precision,
+                "batch_size": self.batch_size,
+                "data_shape": "dynamic",
+                "save_path": save_log_path,
+                "inference_config": config,
+                "pids": pid,
+                "process_name": None,
+                "time_keys": ["preprocess_time", "inference_time", "postprocess_time"],
+                "warmup": 0,
+                "logger": logger,
             }
             if device == "gpu":
                 kwargs["gpu_ids"] = 0
@@ -268,10 +242,9 @@ class Predictor(object):
 
         for text in data:
             tokens = list(text.strip())
-            token_ids, length = convert_example(tokens,
-                                                self.max_seq_length,
-                                                word_vocab=word_vocab,
-                                                normlize_vocab=normlize_vocab)
+            token_ids, length = convert_example(
+                tokens, self.max_seq_length, word_vocab=word_vocab, normlize_vocab=normlize_vocab
+            )
             examples.append((token_ids, length))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -279,10 +252,7 @@ class Predictor(object):
             Stack(axis=0),  # length
         ): fn(samples)
 
-        batches = [
-            examples[idx:idx + self.batch_size]
-            for idx in range(0, len(examples), self.batch_size)
-        ]
+        batches = [examples[idx : idx + self.batch_size] for idx in range(0, len(examples), self.batch_size)]
 
         results = []
         preds_list = []
@@ -307,10 +277,8 @@ class Predictor(object):
         if args.benchmark:
             self.autolog.times.stamp()
 
-        for token_ids, length, preds in zip(token_ids_list, length_list,
-                                            preds_list):
-            result = parse_result(token_ids, preds, length, word_vocab,
-                                  label_vocab)
+        for token_ids, length, preds in zip(token_ids_list, length_list, preds_list):
+            result = parse_result(token_ids, preds, length, word_vocab, label_vocab)
             results.extend(result)
         # Postprocess time
         if args.benchmark:
@@ -319,19 +287,23 @@ class Predictor(object):
 
 
 if __name__ == "__main__":
-    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
-    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
-    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+    word_vocab = load_vocab(os.path.join(args.data_dir, "word.dic"))
+    label_vocab = load_vocab(os.path.join(args.data_dir, "tag.dic"))
+    normlize_vocab = load_vocab(os.path.join(args.data_dir, "q2b.dic"))
     infer_ds = []
-    with open(os.path.join(args.data_dir, 'infer.tsv'), "r",
-              encoding="utf-8") as fp:
+    with open(os.path.join(args.data_dir, "infer.tsv"), "r", encoding="utf-8") as fp:
         for line in fp.readlines():
             infer_ds += [line.strip()]
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_len,
-                          args.batch_size, args.use_tensorrt, args.precision,
-                          args.enable_mkldnn)
-    results, preds_list, length_list = predictor.predict(
-        infer_ds, word_vocab, label_vocab, normlize_vocab)
+    predictor = Predictor(
+        args.model_dir,
+        args.device,
+        args.max_seq_len,
+        args.batch_size,
+        args.use_tensorrt,
+        args.precision,
+        args.enable_mkldnn,
+    )
+    results, preds_list, length_list = predictor.predict(infer_ds, word_vocab, label_vocab, normlize_vocab)
 
     idx = 0
     for batch_preds, batch_length in zip(preds_list, length_list):

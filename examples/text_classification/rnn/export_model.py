@@ -34,62 +34,44 @@ args = parser.parse_args()
 def main():
     # Load vocab.
     vocab = Vocab.from_json(args.vocab_path)
-    label_map = {0: 'negative', 1: 'positive'}
+    label_map = {0: "negative", 1: "positive"}
 
     # Constructs the newtork.
     network = args.network.lower()
     vocab_size = len(vocab)
     num_classes = len(label_map)
-    pad_token_id = vocab.to_indices('[PAD]')
-    if network == 'bow':
+    pad_token_id = vocab.to_indices("[PAD]")
+    if network == "bow":
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
-    elif network == 'bigru':
-        model = GRUModel(vocab_size,
-                         num_classes,
-                         direction='bidirect',
-                         padding_idx=pad_token_id)
-    elif network == 'bilstm':
-        model = LSTMModel(vocab_size,
-                          num_classes,
-                          direction='bidirect',
-                          padding_idx=pad_token_id)
-    elif network == 'bilstm_attn':
+    elif network == "bigru":
+        model = GRUModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "bilstm":
+        model = LSTMModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "bilstm_attn":
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(attention_layer=attention,
-                                     vocab_size=vocab_size,
-                                     lstm_hidden_size=lstm_hidden_size,
-                                     num_classes=num_classes,
-                                     padding_idx=pad_token_id)
-    elif network == 'birnn':
-        model = RNNModel(vocab_size,
-                         num_classes,
-                         direction='bidirect',
-                         padding_idx=pad_token_id)
-    elif network == 'cnn':
+        model = BiLSTMAttentionModel(
+            attention_layer=attention,
+            vocab_size=vocab_size,
+            lstm_hidden_size=lstm_hidden_size,
+            num_classes=num_classes,
+            padding_idx=pad_token_id,
+        )
+    elif network == "birnn":
+        model = RNNModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "cnn":
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
-    elif network == 'gru':
-        model = GRUModel(vocab_size,
-                         num_classes,
-                         direction='forward',
-                         padding_idx=pad_token_id,
-                         pooling_type='max')
-    elif network == 'lstm':
-        model = LSTMModel(vocab_size,
-                          num_classes,
-                          direction='forward',
-                          padding_idx=pad_token_id,
-                          pooling_type='max')
-    elif network == 'rnn':
-        model = RNNModel(vocab_size,
-                         num_classes,
-                         direction='forward',
-                         padding_idx=pad_token_id,
-                         pooling_type='max')
+    elif network == "gru":
+        model = GRUModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
+    elif network == "lstm":
+        model = LSTMModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
+    elif network == "rnn":
+        model = RNNModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
-            % network)
+            % network
+        )
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)
@@ -98,11 +80,8 @@ def main():
 
     inputs = [paddle.static.InputSpec(shape=[None, None], dtype="int64")]
     # Convert to static graph with specific input description
-    if args.network in [
-            "lstm", "bilstm", "gru", "bigru", "rnn", "birnn", "bilstm_attn"
-    ]:
-        inputs.append(paddle.static.InputSpec(shape=[None],
-                                              dtype="int64"))  # seq_len
+    if args.network in ["lstm", "bilstm", "gru", "bigru", "rnn", "birnn", "bilstm_attn"]:
+        inputs.append(paddle.static.InputSpec(shape=[None], dtype="int64"))  # seq_len
 
     model = paddle.jit.to_static(model, input_spec=inputs)
     # Save in static graph model.

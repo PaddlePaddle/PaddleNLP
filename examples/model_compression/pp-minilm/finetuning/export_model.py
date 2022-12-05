@@ -31,20 +31,20 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()),
+        help="The name of the task to train selected in the list: " + ", ".join(METRIC_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_path",
         default="best_clue_model",
         type=str,
-        help=
-        "The output directory where the model predictions and checkpoints will be written.",
+        help="The output directory where the model predictions and checkpoints will be written.",
     )
-    parser.add_argument("--save_inference_model_with_tokenizer",
-                        type=distutils.util.strtobool,
-                        default=True,
-                        help="Whether to save inference model with tokenizer.")
+    parser.add_argument(
+        "--save_inference_model_with_tokenizer",
+        type=distutils.util.strtobool,
+        default=True,
+        help="Whether to save inference model with tokenizer.",
+    )
 
     args = parser.parse_args()
     return args
@@ -55,20 +55,19 @@ def do_export(args):
     model = PPMiniLMForSequenceClassification.from_pretrained(args.model_path)
     is_text_pair = True
     args.task_name = args.task_name.lower()
-    if args.task_name in ('tnews', 'iflytek', 'cluewsc2020'):
+    if args.task_name in ("tnews", "iflytek", "cluewsc2020"):
         is_text_pair = False
     model.to_static(
-        save_path,
-        use_faster_tokenizer=args.save_inference_model_with_tokenizer,
-        is_text_pair=is_text_pair)
+        save_path, use_faster_tokenizer=args.save_inference_model_with_tokenizer, is_text_pair=is_text_pair
+    )
 
 
 def print_arguments(args):
     """print arguments"""
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
 
 
 if __name__ == "__main__":

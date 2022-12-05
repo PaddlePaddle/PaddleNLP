@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -61,14 +61,10 @@ def compute_prediction(
         answers along with their probability and scores, and the score_diff of each
         example.
     """
-    assert (
-        len(predictions) == 2
-    ), "`predictions` should be a tuple with two elements (start_logits, end_logits)."
+    assert len(predictions) == 2, "`predictions` should be a tuple with two elements (start_logits, end_logits)."
     all_start_logits, all_end_logits = predictions
 
-    assert len(predictions[0]) == len(
-        features
-    ), "Number of predictions should be equal to number of features."
+    assert len(predictions[0]) == len(features), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
     features_per_example = collections.defaultdict(list)
@@ -99,13 +95,11 @@ def compute_prediction(
             offset_mapping = features[feature_index]["offset_mapping"]
             # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
             # available in the current feature.
-            token_is_max_context = features[feature_index].get(
-                "token_is_max_context", None)
+            token_is_max_context = features[feature_index].get("token_is_max_context", None)
 
             # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
-            if (min_null_prediction is None
-                    or min_null_prediction["score"] > feature_null_score):
+            if min_null_prediction is None or min_null_prediction["score"] > feature_null_score:
                 min_null_prediction = {
                     "offsets": (0, 0),
                     "score": feature_null_score,
@@ -114,74 +108,61 @@ def compute_prediction(
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1:-n_best_size -
-                                                     1:-1].tolist()
-            end_indexes = np.argsort(end_logits)[-1:-n_best_size -
-                                                 1:-1].tolist()
+            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping)
-                            or end_index >= len(offset_mapping)
-                            or offset_mapping[start_index] is None
-                            or offset_mapping[end_index] is None
-                            or offset_mapping[start_index] == (0, 0)
-                            or offset_mapping[end_index] == (0, 0)):
+                    if (
+                        start_index >= len(offset_mapping)
+                        or end_index >= len(offset_mapping)
+                        or offset_mapping[start_index] is None
+                        or offset_mapping[end_index] is None
+                        or offset_mapping[start_index] == (0, 0)
+                        or offset_mapping[end_index] == (0, 0)
+                    ):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
-                    if (end_index < start_index
-                            or end_index - start_index + 1 > max_answer_length):
+                    if end_index < start_index or end_index - start_index + 1 > max_answer_length:
                         continue
                     # Don't consider answer that don't have the maximum context available (if such information is
                     # provided).
-                    if (token_is_max_context is not None
-                            and not token_is_max_context.get(
-                                str(start_index), False)):
+                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):
                         continue
-                    prelim_predictions.append({
-                        "offsets": (
-                            offset_mapping[start_index][0],
-                            offset_mapping[end_index][1],
-                        ),
-                        "score":
-                        start_logits[start_index] + end_logits[end_index],
-                        "start_logit":
-                        start_logits[start_index],
-                        "end_logit":
-                        end_logits[end_index],
-                    })
+                    prelim_predictions.append(
+                        {
+                            "offsets": (
+                                offset_mapping[start_index][0],
+                                offset_mapping[end_index][1],
+                            ),
+                            "score": start_logits[start_index] + end_logits[end_index],
+                            "start_logit": start_logits[start_index],
+                            "end_logit": end_logits[end_index],
+                        }
+                    )
         if version_2_with_negative:
             # Add the minimum null prediction
             prelim_predictions.append(min_null_prediction)
             null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(prelim_predictions,
-                             key=lambda x: x["score"],
-                             reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
-        if version_2_with_negative and not any(p["offsets"] == (0, 0)
-                                               for p in predictions):
+        if version_2_with_negative and not any(p["offsets"] == (0, 0) for p in predictions):
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
         context = example["context"]
         for pred in predictions:
             offsets = pred.pop("offsets")
-            pred["text"] = context[offsets[0]:offsets[1]]
+            pred["text"] = context[offsets[0] : offsets[1]]
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1
-                                     and predictions[0]["text"] == ""):
-            predictions.insert(0, {
-                "text": "empty",
-                "start_logit": 0.0,
-                "end_logit": 0.0,
-                "score": 0.0
-            })
+        if len(predictions) == 0 or (len(predictions) == 1 and predictions[0]["text"] == ""):
+            predictions.insert(0, {"text": "empty", "start_logit": 0.0, "end_logit": 0.0, "score": 0.0})
 
         # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
         # the LogSumExp trick).
@@ -204,21 +185,18 @@ def compute_prediction(
             best_non_null_pred = predictions[i]
 
             # Then we compare to the null prediction using the threshold.
-            score_diff = (null_score - best_non_null_pred["start_logit"] -
-                          best_non_null_pred["end_logit"])
-            scores_diff_json[example["id"]] = float(
-                score_diff)  # To be JSON-serializable.
+            score_diff = null_score - best_non_null_pred["start_logit"] - best_non_null_pred["end_logit"]
+            scores_diff_json[example["id"]] = float(score_diff)  # To be JSON-serializable.
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["id"]] = ""
             else:
                 all_predictions[example["id"]] = best_non_null_pred["text"]
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
-        all_nbest_json[example["id"]] = [{
-            k: (float(v) if isinstance(v, (np.float16, np.float32,
-                                           np.float64)) else v)
-            for k, v in pred.items()
-        } for pred in predictions]
+        all_nbest_json[example["id"]] = [
+            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
+            for pred in predictions
+        ]
 
     return all_predictions, all_nbest_json, scores_diff_json
 
@@ -282,9 +260,7 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
     f1_scores = {}
     for example in examples:
         qid = example["id"]
-        gold_answers = [
-            text for text in example["answers"] if normalize_answer(text)
-        ]
+        gold_answers = [text for text in example["answers"] if normalize_answer(text)]
         if not gold_answers:
             # For unanswerable questions, only correct answer is empty string
             gold_answers = [""]
@@ -294,8 +270,7 @@ def get_raw_scores(examples, preds, is_whitespace_splited=True):
         a_pred = preds[qid]
         # Take max over all gold answers
         exact_scores[qid] = max(compute_exact(a, a_pred) for a in gold_answers)
-        f1_scores[qid] = max(
-            compute_f1(a, a_pred, is_whitespace_splited) for a in gold_answers)
+        f1_scores[qid] = max(compute_f1(a, a_pred, is_whitespace_splited) for a in gold_answers)
 
     return exact_scores, f1_scores
 
@@ -314,18 +289,22 @@ def apply_no_ans_threshold(scores, na_probs, qid_to_has_ans, na_prob_thresh):
 def make_eval_dict(exact_scores, f1_scores, qid_list=None):
     if not qid_list:
         total = len(exact_scores)
-        return collections.OrderedDict([
-            ("exact", 100.0 * sum(exact_scores.values()) / total),
-            ("f1", 100.0 * sum(f1_scores.values()) / total),
-            ("total", total),
-        ])
+        return collections.OrderedDict(
+            [
+                ("exact", 100.0 * sum(exact_scores.values()) / total),
+                ("f1", 100.0 * sum(f1_scores.values()) / total),
+                ("total", total),
+            ]
+        )
     else:
         total = len(qid_list)
-        return collections.OrderedDict([
-            ("exact", 100.0 * sum(exact_scores[k] for k in qid_list) / total),
-            ("f1", 100.0 * sum(f1_scores[k] for k in qid_list) / total),
-            ("total", total),
-        ])
+        return collections.OrderedDict(
+            [
+                ("exact", 100.0 * sum(exact_scores[k] for k in qid_list) / total),
+                ("f1", 100.0 * sum(f1_scores[k] for k in qid_list) / total),
+                ("total", total),
+            ]
+        )
 
 
 def merge_eval(main_eval, new_eval, prefix):
@@ -356,23 +335,16 @@ def find_best_thresh(preds, scores, na_probs, qid_to_has_ans):
     return 100.0 * best_score / len(scores), best_thresh
 
 
-def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs,
-                         qid_to_has_ans):
-    best_exact, exact_thresh = find_best_thresh(preds, exact_raw, na_probs,
-                                                qid_to_has_ans)
-    best_f1, f1_thresh = find_best_thresh(preds, f1_raw, na_probs,
-                                          qid_to_has_ans)
+def find_all_best_thresh(main_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans):
+    best_exact, exact_thresh = find_best_thresh(preds, exact_raw, na_probs, qid_to_has_ans)
+    best_f1, f1_thresh = find_best_thresh(preds, f1_raw, na_probs, qid_to_has_ans)
     main_eval["best_exact"] = best_exact
     main_eval["best_exact_thresh"] = exact_thresh
     main_eval["best_f1"] = best_f1
     main_eval["best_f1_thresh"] = f1_thresh
 
 
-def squad_evaluate(examples,
-                   preds,
-                   na_probs=None,
-                   na_prob_thresh=1.0,
-                   is_whitespace_splited=True):
+def squad_evaluate(examples, preds, na_probs=None, na_prob_thresh=1.0, is_whitespace_splited=True):
     """
     Computes and prints the f1 score and em score of input prediction.
 
@@ -400,23 +372,16 @@ def squad_evaluate(examples,
     has_ans_qids = [k for k, v in qid_to_has_ans.items() if v]
     no_ans_qids = [k for k, v in qid_to_has_ans.items() if not v]
     exact_raw, f1_raw = get_raw_scores(examples, preds, is_whitespace_splited)
-    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans,
-                                          na_prob_thresh)
-    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans,
-                                       na_prob_thresh)
+    exact_thresh = apply_no_ans_threshold(exact_raw, na_probs, qid_to_has_ans, na_prob_thresh)
+    f1_thresh = apply_no_ans_threshold(f1_raw, na_probs, qid_to_has_ans, na_prob_thresh)
     out_eval = make_eval_dict(exact_thresh, f1_thresh)
     if has_ans_qids:
-        has_ans_eval = make_eval_dict(exact_thresh,
-                                      f1_thresh,
-                                      qid_list=has_ans_qids)
+        has_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=has_ans_qids)
         merge_eval(out_eval, has_ans_eval, "HasAns")
     if no_ans_qids:
-        no_ans_eval = make_eval_dict(exact_thresh,
-                                     f1_thresh,
-                                     qid_list=no_ans_qids)
+        no_ans_eval = make_eval_dict(exact_thresh, f1_thresh, qid_list=no_ans_qids)
         merge_eval(out_eval, no_ans_eval, "NoAns")
-        find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs,
-                             qid_to_has_ans)
+        find_all_best_thresh(out_eval, preds, exact_raw, f1_raw, na_probs, qid_to_has_ans)
 
     print(json.dumps(out_eval, indent=2))
     return out_eval
