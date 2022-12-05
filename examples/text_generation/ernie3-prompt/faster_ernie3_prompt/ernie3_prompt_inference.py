@@ -45,7 +45,7 @@ def setup_args():
 def infer(args):
     tokenizer = Ernie3PromptTokenizer.from_pretrained(args.model_name_or_path)
 
-    texts = ["嗜睡抑郁多梦入睡困难很", "三个月宝宝一天睡几个小时"]
+    texts = ['生成满足以\"一&乙\"开头的春联:', '生成以\"国赖女娲天再补\"为上联的下联:', '生成包含\"景物\"的春联:']
 
     encoded_inputs = tokenizer.gen_encode(texts)
 
