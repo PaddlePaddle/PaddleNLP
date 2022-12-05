@@ -27,16 +27,14 @@ class DatasetSplit:
     def __init__(self, processed_filename, raw_filename, load_function):
         if os.path.exists(processed_filename):
             print("Loading preprocessed data from " + processed_filename)
-            with open(processed_filename, 'rb') as infile:
+            with open(processed_filename, "rb") as infile:
                 self.examples = pickle.load(infile)
         else:
-            print("Loading raw data from " + raw_filename + " and writing to " +
-                  processed_filename)
+            print("Loading raw data from " + raw_filename + " and writing to " + processed_filename)
 
-            infile = open(raw_filename, 'rb')
+            infile = open(raw_filename, "rb")
             examples_from_file = pickle.load(infile)
-            assert isinstance(examples_from_file, list), raw_filename + \
-                " does not contain a list of examples"
+            assert isinstance(examples_from_file, list), raw_filename + " does not contain a list of examples"
             infile.close()
 
             self.examples = []
@@ -47,12 +45,12 @@ class DatasetSplit:
                     self.examples.append(obj)
 
             print("Loaded " + str(len(self.examples)) + " examples")
-            outfile = open(processed_filename, 'wb')
+            outfile = open(processed_filename, "wb")
             pickle.dump(self.examples, outfile)
             outfile.close()
 
     def get_ex_properties(self, function):
-        """ Applies some function to the examples in the dataset.
+        """Applies some function to the examples in the dataset.
 
         Args:
             function (`function`): Function to apply to all examples.

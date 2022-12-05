@@ -47,7 +47,15 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import (
+        DDIMPipeline,
+        DDPMPipeline,
+        KarrasVePipeline,
+        LDMPipeline,
+        LDMSuperResolutionPipeline,
+        PNDMPipeline,
+        ScoreSdeVePipeline,
+    )
     from .schedulers import (
         EulerAncestralDiscreteScheduler,
         DDIMScheduler,
@@ -68,12 +76,15 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
-                            StableDiffusionImg2ImgPipeline,
-                            StableDiffusionInpaintPipeline,
-                            StableDiffusionInpaintPipelineLegacy,
-                            StableDiffusionPipeline,
-                            StableDiffusionPipelineAllinOne)
+    from .pipelines import (
+        LDMBertModel,
+        LDMTextToImagePipeline,
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipeline,
+        StableDiffusionPipelineAllinOne,
+    )
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
@@ -86,8 +97,7 @@ if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403
 
-if is_paddle_available() and is_paddlenlp_available(
-) and is_fastdeploy_available():
+if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available():
     from .pipelines import (
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,

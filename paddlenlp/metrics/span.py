@@ -40,10 +40,11 @@ class SpanEvaluator(Metric):
         num_infer_spans = 0
         num_label_spans = 0
         for predict_start_ids, predict_end_ids, label_start_ids, label_end_ids in zip(
-                pred_start_ids, pred_end_ids, gold_start_ids, gold_end_ids):
-            [_correct, _infer,
-             _label] = self.eval_span(predict_start_ids, predict_end_ids,
-                                      label_start_ids, label_end_ids)
+            pred_start_ids, pred_end_ids, gold_start_ids, gold_end_ids
+        ):
+            [_correct, _infer, _label] = self.eval_span(
+                predict_start_ids, predict_end_ids, label_start_ids, label_end_ids
+            )
             num_correct_spans += _correct
             num_infer_spans += _infer
             num_label_spans += _label
@@ -58,8 +59,7 @@ class SpanEvaluator(Metric):
         self.num_label_spans += num_label_spans
         self.num_correct_spans += num_correct_spans
 
-    def eval_span(self, predict_start_ids, predict_end_ids, label_start_ids,
-                  label_end_ids):
+    def eval_span(self, predict_start_ids, predict_end_ids, label_start_ids, label_end_ids):
         """
         evaluate position extraction (start, end)
         return num_correct, num_infer, num_label
@@ -82,12 +82,9 @@ class SpanEvaluator(Metric):
         Returns:
             tuple: Returns tuple (`precision, recall, f1 score`).
         """
-        precision = float(self.num_correct_spans /
-                          self.num_infer_spans) if self.num_infer_spans else 0.
-        recall = float(self.num_correct_spans /
-                       self.num_label_spans) if self.num_label_spans else 0.
-        f1_score = float(2 * precision * recall /
-                         (precision + recall)) if self.num_correct_spans else 0.
+        precision = float(self.num_correct_spans / self.num_infer_spans) if self.num_infer_spans else 0.0
+        recall = float(self.num_correct_spans / self.num_label_spans) if self.num_label_spans else 0.0
+        f1_score = float(2 * precision * recall / (precision + recall)) if self.num_correct_spans else 0.0
         return precision, recall, f1_score
 
     def reset(self):

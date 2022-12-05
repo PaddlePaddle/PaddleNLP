@@ -28,43 +28,20 @@ from tqdm import tqdm
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_path',
-                        type=str,
-                        required=True,
-                        help='Path to you raw files. Folder or file path.')
-    parser.add_argument('--output_path',
-                        type=str,
-                        required=True,
-                        help='Path to save the output json files.')
-    parser.add_argument('--json_key',
-                        type=str,
-                        default='text',
-                        help='The content key of json file.')
+    parser.add_argument("--input_path", type=str, required=True, help="Path to you raw files. Folder or file path.")
+    parser.add_argument("--output_path", type=str, required=True, help="Path to save the output json files.")
+    parser.add_argument("--json_key", type=str, default="text", help="The content key of json file.")
     parser.add_argument(
-        '--doc_spliter',
+        "--doc_spliter",
         type=str,
-        default='',
-        help=
-        "Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank."
+        default="",
+        help="Spliter between documents. We will strip the line, if you use blank line to split doc, leave it blank.",
     )
-    parser.add_argument('--min_doc_length',
-                        type=int,
-                        default=10,
-                        help="Minimal char of a documment.")
-    parser.add_argument('--workers',
-                        type=int,
-                        default=1,
-                        help='Number of worker processes to launch')
-    parser.add_argument('--log_interval',
-                        type=int,
-                        default=1,
-                        help='Interval between progress updates.')
-    parser.add_argument('--no-merge',
-                        action='store_true',
-                        help='Don\'t merge the file.')
-    parser.add_argument('--no-shuffle',
-                        action='store_true',
-                        help='Don\'t shuffle the file.')
+    parser.add_argument("--min_doc_length", type=int, default=10, help="Minimal char of a documment.")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
+    parser.add_argument("--log_interval", type=int, default=1, help="Interval between progress updates.")
+    parser.add_argument("--no-merge", action="store_true", help="Don't merge the file.")
+    parser.add_argument("--no-shuffle", action="store_true", help="Don't shuffle the file.")
     args = parser.parse_args()
     return args
 
@@ -85,8 +62,7 @@ def raw_text_to_json(path, doc_spliter="", json_key="text", min_doc_length=10):
             len_files += len(line)
             if line.strip() == doc_spliter:
                 if len(doc) > min_doc_length:
-                    fout.write(
-                        json.dumps({json_key: doc}, ensure_ascii=False) + "\n")
+                    fout.write(json.dumps({json_key: doc}, ensure_ascii=False) + "\n")
                 doc = ""
             else:
                 doc += line
@@ -103,10 +79,10 @@ def merge_file(file_paths, output_path):
     if not output_path.endswith(".jsonl"):
         output_path = output_path + ".jsonl"
     print("Merging files into %s" % output_path)
-    with open(output_path, 'wb') as wfd:
+    with open(output_path, "wb") as wfd:
         for f in file_paths:
             if f is not None and os.path.exists(f):
-                with open(f, 'rb') as fd:
+                with open(f, "rb") as fd:
                     shutil.copyfileobj(fd, wfd)
                 os.remove(f)
     print("File save in %s" % output_path)
@@ -141,10 +117,9 @@ def main():
     total_bytes_processed = 0
     print("Time to startup:", startup_end - startup_start)
 
-    trans_json = partial(raw_text_to_json,
-                         doc_spliter=args.doc_spliter,
-                         json_key=args.json_key,
-                         min_doc_length=args.min_doc_length)
+    trans_json = partial(
+        raw_text_to_json, doc_spliter=args.doc_spliter, json_key=args.json_key, min_doc_length=args.min_doc_length
+    )
     encoded_files = pool.imap(trans_json, file_paths, 1)
 
     out_paths = []
@@ -157,9 +132,7 @@ def main():
             current = time.time()
             elapsed = current - proc_start
             mbs = total_bytes_processed / elapsed / 1024 / 1024
-            print(f"Processed {i} files",
-                  f"({i/elapsed} files/s, {mbs} MB/s).",
-                  file=sys.stderr)
+            print(f"Processed {i} files", f"({i/elapsed} files/s, {mbs} MB/s).", file=sys.stderr)
 
     if not args.no_merge:
         output_path = merge_file(out_paths, args.output_path)
@@ -169,4 +142,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #profile.run("main()", "testprof")
+    # profile.run("main()", "testprof")

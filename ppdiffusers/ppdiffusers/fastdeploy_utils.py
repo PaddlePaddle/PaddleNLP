@@ -32,26 +32,19 @@ logger = logging.get_logger(__name__)
 
 
 class FastDeployRuntimeModel:
-
     def __init__(self, model=None, **kwargs):
-        logger.info(
-            "`ppdiffusers.FastDeployRuntimeModel` is experimental and might change in the future."
-        )
+        logger.info("`ppdiffusers.FastDeployRuntimeModel` is experimental and might change in the future.")
         self.model = model
         self.model_save_dir = kwargs.get("model_save_dir", None)
-        self.latest_model_name = kwargs.get("latest_model_name",
-                                            "inference.pdmodel")
-        self.latest_params_name = kwargs.get("latest_params_name",
-                                             "inference.pdiparams")
+        self.latest_model_name = kwargs.get("latest_model_name", "inference.pdmodel")
+        self.latest_params_name = kwargs.get("latest_params_name", "inference.pdiparams")
 
     def __call__(self, **kwargs):
         inputs = {k: np.array(v) for k, v in kwargs.items()}
         return self.model.infer(inputs)
 
     @staticmethod
-    def load_model(model_path: Union[str, Path],
-                   params_path: Union[str, Path],
-                   runtime_option=None):
+    def load_model(model_path: Union[str, Path], params_path: Union[str, Path], runtime_option=None):
         """
         Loads an FastDeploy Inference Model with fastdeploy.RuntimeOption
 
@@ -66,20 +59,20 @@ class FastDeployRuntimeModel:
         """
         option = runtime_option
         if option is None or not isinstance(runtime_option, fd.RuntimeOption):
-            logger.info(
-                "No fastdeploy.RuntimeOption specified, using CPU device and paddle inference backend."
-            )
+            logger.info("No fastdeploy.RuntimeOption specified, using CPU device and paddle inference backend.")
             option = fd.RuntimeOption()
             option.use_paddle_backend()
             option.use_cpu()
         option.set_model_path(model_path, params_path)
         return fd.Runtime(option)
 
-    def _save_pretrained(self,
-                         save_directory: Union[str, Path],
-                         model_file_name: Optional[str] = None,
-                         params_file_name: Optional[str] = None,
-                         **kwargs):
+    def _save_pretrained(
+        self,
+        save_directory: Union[str, Path],
+        model_file_name: Optional[str] = None,
+        params_file_name: Optional[str] = None,
+        **kwargs
+    ):
         """
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
         [`~optimum.onnxruntime.modeling_ort.ORTModel.from_pretrained`] class method. It will always save the
@@ -124,9 +117,7 @@ class FastDeployRuntimeModel:
                 Directory to which to save. Will be created if it doesn't exist.
         """
         if os.path.isfile(save_directory):
-            logger.error(
-                f"Provided path ({save_directory}) should be a directory, not a file"
-            )
+            logger.error(f"Provided path ({save_directory}) should be a directory, not a file")
             return
 
         os.makedirs(save_directory, exist_ok=True)
@@ -190,9 +181,8 @@ class FastDeployRuntimeModel:
             kwargs["latest_model_name"] = Path(model_cache_path).name
             kwargs["latest_params_name"] = Path(params_cache_path).name
             model = FastDeployRuntimeModel.load_model(
-                model_cache_path,
-                params_cache_path,
-                runtime_option=runtime_option)
+                model_cache_path, params_cache_path, runtime_option=runtime_option
+            )
         return cls(model=model, **kwargs)
 
     @classmethod

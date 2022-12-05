@@ -21,37 +21,26 @@ import paddle
 from paddlenlp.utils.log import logger
 
 
-def create_dataloader(dataset_origin,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset_origin, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
         dataset = dataset_origin.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
-                                                          batch_size=batch_size,
-                                                          shuffle=shuffle)
+    shuffle = True if mode == "train" else False
+    if mode == "train":
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=shuffle)
-    return paddle.io.DataLoader(dataset=dataset,
-                                batch_sampler=batch_sampler,
-                                collate_fn=batchify_fn,
-                                return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
 
 
-#TODO
+# TODO
 def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         p_embedding_num(obj:`int`) The number of p-embedding.
     Returns:
@@ -82,41 +71,35 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
         token_type_ids = encoded_inputs["token_type_ids"]
 
         # Step2: Insert "[MASK]" to src_ids based on start_mask_position
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
+        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
+        token_type_ids = (
+            token_type_ids[0:start_mask_position] + [0] * len(mask_ids) + token_type_ids[start_mask_position:]
+        )
 
         # calculate mask_positions
-        mask_positions = [
-            index + start_mask_position for index in range(label_length)
-        ]
+        mask_positions = [index + start_mask_position for index in range(label_length)]
     else:
-        sentence2 = example['sentence2']
+        sentence2 = example["sentence2"]
         start_mask_position = sentence2.index("<unk>") + 1
         sentence2 = sentence2.replace("<unk>", "")
 
         encoded_inputs = tokenizer(text=sentence2, max_seq_len=max_seq_length)
         src_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
-        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-            start_mask_position:]
-        token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-            mask_ids) + token_type_ids[start_mask_position:]
+        src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
+        token_type_ids = (
+            token_type_ids[0:start_mask_position] + [0] * len(mask_ids) + token_type_ids[start_mask_position:]
+        )
 
         encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
         sentence1_src_ids = encoded_inputs["input_ids"][1:]
         src_ids = sentence1_src_ids + src_ids
         token_type_ids += [1] * len(src_ids)
-        mask_positions = [
-            index + start_mask_position + len(sentence1)
-            for index in range(label_length)
-        ]
+        mask_positions = [index + start_mask_position + len(sentence1) for index in range(label_length)]
 
     token_type_ids = [0] * len(src_ids)
 
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
+    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
 
     length = len(src_ids)
     if length > 512:
@@ -126,13 +109,13 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
     if is_test:
         return src_ids, token_type_ids, mask_positions
     else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
+        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
 
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
+        assert (
+            len(mask_lm_labels) == len(mask_positions) == label_length
+        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
+            mask_lm_labels, mask_positions, text_label
+        )
 
         return src_ids, token_type_ids, mask_positions, mask_lm_labels
 
@@ -141,9 +124,9 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     """
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         p_embedding_num(obj:`int`) The number of p-embedding.
     Returns:
@@ -163,9 +146,7 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
 
     sentence1 = "".join(seg_tokens)
     candidates = example["candidates"]
-    candidate_labels_ids = [
-        tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates
-    ]
+    candidate_labels_ids = [tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates]
 
     sentence1 = example["sentence1"]
 
@@ -184,20 +165,15 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
 
     # Step2: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-        start_mask_position:]
-    token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(
-        mask_ids) + token_type_ids[start_mask_position:]
+    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
+    token_type_ids = token_type_ids[0:start_mask_position] + [0] * len(mask_ids) + token_type_ids[start_mask_position:]
 
     # calculate mask_positions
-    mask_positions = [
-        index + start_mask_position for index in range(label_length)
-    ]
+    mask_positions = [index + start_mask_position for index in range(label_length)]
 
     # token_type_ids = [0] * len(src_ids)
 
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
+    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
 
     length = len(src_ids)
     if length > 512:
@@ -207,21 +183,18 @@ def convert_chid_example(example, tokenizer, max_seq_length=512, is_test=False):
     if is_test:
         return src_ids, token_type_ids, mask_positions, candidate_labels_ids
     else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
+        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
 
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
+        assert (
+            len(mask_lm_labels) == len(mask_positions) == label_length
+        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
+            mask_lm_labels, mask_positions, text_label
+        )
 
         return src_ids, token_type_ids, mask_positions, mask_lm_labels, candidate_labels_ids
 
 
-def transform_iflytek(example,
-                      label_normalize_dict=None,
-                      is_test=False,
-                      pattern_id=0):
+def transform_iflytek(example, label_normalize_dict=None, is_test=False, pattern_id=0):
 
     if is_test:
         # When do_test, set label_length field to point
@@ -229,38 +202,38 @@ def transform_iflytek(example,
         example["label_length"] = 2
 
         if pattern_id == 0:
-            example["sentence1"] = u'作为一款<unk>应用，' + example["sentence"]
+            example["sentence1"] = "作为一款<unk>应用，" + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'这是一款<unk>应用！' + example["sentence"]
+            example["sentence1"] = "这是一款<unk>应用！" + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'。 和<unk>有关'
+            example["sentence1"] = example["sentence"] + "。 和<unk>有关"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>!'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>!"
         del example["sentence"]
 
         return example
     else:
-        origin_label = example['label_des']
+        origin_label = example["label_des"]
 
         # Normalize some of the labels, eg. English -> Chinese
         if origin_label in label_normalize_dict:
-            example['label_des'] = label_normalize_dict[origin_label]
+            example["label_des"] = label_normalize_dict[origin_label]
         else:
             # Note: Ideal way is drop these examples
             # which maybe need to change MapDataset
             # Now hard code may hurt performance of `iflytek` dataset
-            example['label_des'] = "旅游"
+            example["label_des"] = "旅游"
 
         example["text_label"] = example["label_des"]
 
         if pattern_id == 0:
-            example["sentence1"] = u'作为一款<unk>应用，' + example["sentence"]
+            example["sentence1"] = "作为一款<unk>应用，" + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'这是一款<unk>应用！' + example["sentence"]
+            example["sentence1"] = "这是一款<unk>应用！" + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'。 和<unk>有关'
+            example["sentence1"] = example["sentence"] + "。 和<unk>有关"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>!'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>!"
 
         del example["sentence"]
         del example["label_des"]
@@ -268,36 +241,33 @@ def transform_iflytek(example,
         return example
 
 
-def transform_tnews(example,
-                    label_normalize_dict=None,
-                    is_test=False,
-                    pattern_id=0):
+def transform_tnews(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 2
 
         if pattern_id == 0:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>的内容！'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>的内容！"
         elif pattern_id == 1:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>！'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>！"
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'。 包含了<unk>的内容'
+            example["sentence1"] = example["sentence"] + "。 包含了<unk>的内容"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'。 综合来讲是<unk>的内容！'
+            example["sentence1"] = example["sentence"] + "。 综合来讲是<unk>的内容！"
         del example["sentence"]
         return example
     else:
-        origin_label = example['label_desc']
+        origin_label = example["label_desc"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['label_desc'] = label_normalize_dict[origin_label]
+        example["label_desc"] = label_normalize_dict[origin_label]
 
         if pattern_id == 0:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>的内容！'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>的内容！"
         elif pattern_id == 1:
-            example["sentence1"] = example["sentence"] + u'。 这是<unk>！'
+            example["sentence1"] = example["sentence"] + "。 这是<unk>！"
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'。 包含了<unk>的内容'
+            example["sentence1"] = example["sentence"] + "。 包含了<unk>的内容"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'。 综合来讲是<unk>的内容！'
+            example["sentence1"] = example["sentence"] + "。 综合来讲是<unk>的内容！"
 
         example["text_label"] = example["label_desc"]
 
@@ -307,36 +277,33 @@ def transform_tnews(example,
         return example
 
 
-def transform_eprstmt(example,
-                      label_normalize_dict=None,
-                      is_test=False,
-                      pattern_id=0):
+def transform_eprstmt(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 1
 
         if pattern_id == 0:
-            example["sentence1"] = u'感觉很<unk>！' + example["sentence"]
+            example["sentence1"] = "感觉很<unk>！" + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'综合来讲很<unk>！，' + example["sentence"]
+            example["sentence1"] = "综合来讲很<unk>！，" + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'感觉非常<unk>'
+            example["sentence1"] = example["sentence"] + "感觉非常<unk>"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'， 我感到非常<unk>'
+            example["sentence1"] = example["sentence"] + "， 我感到非常<unk>"
 
         return example
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
         if pattern_id == 0:
-            example["sentence1"] = u'感觉很<unk>！' + example["sentence"]
+            example["sentence1"] = "感觉很<unk>！" + example["sentence"]
         elif pattern_id == 1:
-            example["sentence1"] = u'综合来讲很<unk>！，' + example["sentence"]
+            example["sentence1"] = "综合来讲很<unk>！，" + example["sentence"]
         elif pattern_id == 2:
-            example["sentence1"] = example["sentence"] + u'感觉非常<unk>'
+            example["sentence1"] = example["sentence"] + "感觉非常<unk>"
         elif pattern_id == 3:
-            example["sentence1"] = example["sentence"] + u'， 我感到非常<unk>'
+            example["sentence1"] = example["sentence"] + "， 我感到非常<unk>"
 
         del example["sentence"]
         del example["label"]
@@ -344,59 +311,49 @@ def transform_eprstmt(example,
         return example
 
 
-def transform_ocnli(example,
-                    label_normalize_dict=None,
-                    is_test=False,
-                    pattern_id=0):
+def transform_ocnli(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 2
         if pattern_id == 0:
-            example['sentence1'] = example['sentence1'] + "， <unk>"
+            example["sentence1"] = example["sentence1"] + "， <unk>"
         elif pattern_id == 1:
-            example["sentence2"] = "和" + example['sentence2'] + u"？看来<unk>一句话"
+            example["sentence2"] = "和" + example["sentence2"] + "？看来<unk>一句话"
         elif pattern_id == 2:
-            example["sentence1"] = "和" + example['sentence2'] + u"？<unk>一样"
+            example["sentence1"] = "和" + example["sentence2"] + "？<unk>一样"
         elif pattern_id == 3:
-            example["sentence2"] = "和" + example['sentence2'] + u"？<unk>一句话"
+            example["sentence2"] = "和" + example["sentence2"] + "？<unk>一句话"
 
         return example
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
         if pattern_id == 0:
-            example['sentence1'] = example['sentence1'] + "， <unk>"
+            example["sentence1"] = example["sentence1"] + "， <unk>"
         elif pattern_id == 1:
-            example["sentence2"] = "和" + example['sentence2'] + u"？看来<unk>一句话"
+            example["sentence2"] = "和" + example["sentence2"] + "？看来<unk>一句话"
         elif pattern_id == 2:
-            example["sentence1"] = "和" + example['sentence2'] + u"？<unk>一样"
+            example["sentence1"] = "和" + example["sentence2"] + "？<unk>一样"
         elif pattern_id == 3:
-            example["sentence2"] = "和" + example['sentence2'] + u"？<unk>一句话"
+            example["sentence2"] = "和" + example["sentence2"] + "？<unk>一句话"
 
         del example["label"]
 
         return example
 
 
-def transform_csl(example,
-                  label_normalize_dict=None,
-                  is_test=False,
-                  pattern_id=0):
+def transform_csl(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 1
 
         if pattern_id == 0:
-            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(
-                example["keyword"]) + example["abst"]
+            example["sentence1"] = "本文的关键词<unk>是:" + "，".join(example["keyword"]) + example["abst"]
         elif pattern_id == 1:
-            example["sentence1"] = example[
-                "abst"] + u"。本文的关键词<unk>是:" + "，".join(example["keyword"])
+            example["sentence1"] = example["abst"] + "。本文的关键词<unk>是:" + "，".join(example["keyword"])
         elif pattern_id == 2:
-            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(
-                example["keyword"]) + example["abst"]
+            example["sentence1"] = "本文的内容<unk>是:" + "，".join(example["keyword"]) + example["abst"]
         elif pattern_id == 3:
-            example["sentence1"] = example[
-                "abst"] + u"。本文的内容<unk>是:" + "，".join(example["keyword"])
+            example["sentence1"] = example["abst"] + "。本文的内容<unk>是:" + "，".join(example["keyword"])
 
         del example["abst"]
         del example["keyword"]
@@ -405,20 +362,16 @@ def transform_csl(example,
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
         if pattern_id == 0:
-            example["sentence1"] = u"本文的关键词<unk>是:" + "，".join(
-                example["keyword"]) + example["abst"]
+            example["sentence1"] = "本文的关键词<unk>是:" + "，".join(example["keyword"]) + example["abst"]
         elif pattern_id == 1:
-            example["sentence1"] = example[
-                "abst"] + u"。本文的关键词<unk>是:" + "，".join(example["keyword"])
+            example["sentence1"] = example["abst"] + "。本文的关键词<unk>是:" + "，".join(example["keyword"])
         elif pattern_id == 2:
-            example["sentence1"] = u"本文的内容<unk>是:" + "，".join(
-                example["keyword"]) + example["abst"]
+            example["sentence1"] = "本文的内容<unk>是:" + "，".join(example["keyword"]) + example["abst"]
         elif pattern_id == 3:
-            example["sentence1"] = example[
-                "abst"] + u"。本文的内容<unk>是:" + "，".join(example["keyword"])
+            example["sentence1"] = example["abst"] + "。本文的内容<unk>是:" + "，".join(example["keyword"])
 
         del example["label"]
         del example["abst"]
@@ -427,21 +380,18 @@ def transform_csl(example,
         return example
 
 
-def transform_csldcp(example,
-                     label_normalize_dict=None,
-                     is_test=False,
-                     pattern_id=0):
+def transform_csldcp(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 2
 
         if pattern_id == 0:
-            example["sentence1"] = u'这篇关于<unk>的文章讲了' + example["content"]
+            example["sentence1"] = "这篇关于<unk>的文章讲了" + example["content"]
         elif pattern_id == 1:
-            example["sentence1"] = example["content"] + u'和<unk>息息相关'
+            example["sentence1"] = example["content"] + "和<unk>息息相关"
         elif pattern_id == 2:
-            example["sentence1"] = u'这是一篇和<unk>息息相关的文章' + example["content"]
+            example["sentence1"] = "这是一篇和<unk>息息相关的文章" + example["content"]
         elif pattern_id == 3:
-            example["sentence1"] = u'很多很多<unk>的文章！' + example["content"]
+            example["sentence1"] = "很多很多<unk>的文章！" + example["content"]
 
         del example["content"]
         return example
@@ -449,15 +399,15 @@ def transform_csldcp(example,
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
         normalized_label = label_normalize_dict[origin_label]
-        example['text_label'] = normalized_label
+        example["text_label"] = normalized_label
         if pattern_id == 0:
-            example["sentence1"] = u'这篇关于<unk>的文章讲了' + example["content"]
+            example["sentence1"] = "这篇关于<unk>的文章讲了" + example["content"]
         elif pattern_id == 1:
-            example["sentence1"] = example["content"] + u'和<unk>息息相关'
+            example["sentence1"] = example["content"] + "和<unk>息息相关"
         elif pattern_id == 2:
-            example["sentence1"] = u'这是一篇和<unk>息息相关的文章' + example["content"]
+            example["sentence1"] = "这是一篇和<unk>息息相关的文章" + example["content"]
         elif pattern_id == 3:
-            example["sentence1"] = u'很多很多<unk>的文章！' + example["content"]
+            example["sentence1"] = "很多很多<unk>的文章！" + example["content"]
 
         del example["label"]
         del example["content"]
@@ -465,46 +415,40 @@ def transform_csldcp(example,
         return example
 
 
-def transform_bustm(example,
-                    label_normalize_dict=None,
-                    is_test=False,
-                    pattern_id=0):
+def transform_bustm(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         # Label: ["很"， "不"]
         example["label_length"] = 1
         if pattern_id == 0:
-            example['sentence1'] = "<unk>是一句话. " + example['sentence1'] + "，"
+            example["sentence1"] = "<unk>是一句话. " + example["sentence1"] + "，"
         elif pattern_id == 1:
-            example['sentence2'] = "，" + example['sentence2'] + "。<unk>是一句话. "
+            example["sentence2"] = "，" + example["sentence2"] + "。<unk>是一句话. "
         elif pattern_id == 2:
-            example['sentence1'] = "讲的<unk>是一句话。" + example['sentence1'] + "，"
+            example["sentence1"] = "讲的<unk>是一句话。" + example["sentence1"] + "，"
         elif pattern_id == 3:
-            example['sentence1'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
+            example["sentence1"] = "，" + example["sentence2"] + "。讲的<unk>是一句话. "
 
         return example
     else:
         origin_label = str(example["label"])
 
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
         if pattern_id == 0:
-            example['sentence1'] = "<unk>是一句话. " + example['sentence1'] + "，"
+            example["sentence1"] = "<unk>是一句话. " + example["sentence1"] + "，"
         elif pattern_id == 1:
-            example['sentence2'] = "，" + example['sentence2'] + "。<unk>是一句话. "
+            example["sentence2"] = "，" + example["sentence2"] + "。<unk>是一句话. "
         elif pattern_id == 2:
-            example['sentence1'] = "讲的<unk>是一句话。" + example['sentence1'] + "，"
+            example["sentence1"] = "讲的<unk>是一句话。" + example["sentence1"] + "，"
         elif pattern_id == 3:
-            example['sentence1'] = "，" + example['sentence2'] + "。讲的<unk>是一句话. "
+            example["sentence1"] = "，" + example["sentence2"] + "。讲的<unk>是一句话. "
 
         del example["label"]
 
         return example
 
 
-def transform_chid(example,
-                   label_normalize_dict=None,
-                   is_test=False,
-                   pattern_id=0):
+def transform_chid(example, label_normalize_dict=None, is_test=False, pattern_id=0):
 
     if is_test:
         example["label_length"] = 4
@@ -513,23 +457,20 @@ def transform_chid(example,
 
         return example
     else:
-        label_index = int(example['answer'])
+        label_index = int(example["answer"])
         candidates = example["candidates"]
         example["text_label"] = candidates[label_index]
 
         # Note: `#idom#` represent a idom which must be replaced with rarely-used Chinese characters
         # to get the label's position after the text processed by tokenizer
-        #ernie
+        # ernie
         example["sentence1"] = example["content"].replace("#idiom#", "淠")
         del example["content"]
 
         return example
 
 
-def transform_cluewsc(example,
-                      label_normalize_dict=None,
-                      is_test=False,
-                      pattern_id=0):
+def transform_cluewsc(example, label_normalize_dict=None, is_test=False, pattern_id=0):
     if is_test:
         example["label_length"] = 2
         text = example["text"]
@@ -552,7 +493,7 @@ def transform_cluewsc(example,
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
         # example['text_label'] = origin_label
         text = example["text"]
         span1_text = example["target"]["span1_text"]
@@ -584,5 +525,5 @@ transform_fn_dict = {
     "csl": transform_csl,
     "csldcp": transform_csldcp,
     "cluewsc": transform_cluewsc,
-    "chid": transform_chid
+    "chid": transform_chid,
 }

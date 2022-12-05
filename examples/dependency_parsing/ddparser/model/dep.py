@@ -22,18 +22,20 @@ from model.encoder import LSTMEncoder, LSTMByWPEncoder, ErnieEncoder
 class BiAffineParser(nn.Layer):
     """DDParser"""
 
-    def __init__(self,
-                 encoding_model,
-                 feat,
-                 n_rels,
-                 n_feats,
-                 n_words,
-                 pad_index,
-                 eos_index,
-                 pretrained_model=None,
-                 n_mlp_arc=500,
-                 n_mlp_rel=100,
-                 mlp_dropout=0.33):
+    def __init__(
+        self,
+        encoding_model,
+        feat,
+        n_rels,
+        n_feats,
+        n_words,
+        pad_index,
+        eos_index,
+        pretrained_model=None,
+        n_mlp_arc=500,
+        n_mlp_rel=100,
+        mlp_dropout=0.33,
+    ):
         super(BiAffineParser, self).__init__()
         self.pad_index = pad_index
         self.eos_index = eos_index
@@ -46,31 +48,19 @@ class BiAffineParser(nn.Layer):
             self.embed = ErnieEncoder(pad_index, pretrained_model)
 
         # MLP layer
-        self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size,
-                             n_out=n_mlp_arc,
-                             dropout=mlp_dropout)
-        self.mlp_arc_d = MLP(n_in=self.embed.mlp_input_size,
-                             n_out=n_mlp_arc,
-                             dropout=mlp_dropout)
-        self.mlp_rel_h = MLP(n_in=self.embed.mlp_input_size,
-                             n_out=n_mlp_rel,
-                             dropout=mlp_dropout)
-        self.mlp_rel_d = MLP(n_in=self.embed.mlp_input_size,
-                             n_out=n_mlp_rel,
-                             dropout=mlp_dropout)
+        self.mlp_arc_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
+        self.mlp_arc_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_arc, dropout=mlp_dropout)
+        self.mlp_rel_h = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
+        self.mlp_rel_d = MLP(n_in=self.embed.mlp_input_size, n_out=n_mlp_rel, dropout=mlp_dropout)
 
         # Biaffine layer
         self.arc_attn = BiAffine(n_in=n_mlp_arc, bias_x=True, bias_y=False)
-        self.rel_attn = BiAffine(n_in=n_mlp_rel,
-                                 n_out=n_rels,
-                                 bias_x=True,
-                                 bias_y=True)
+        self.rel_attn = BiAffine(n_in=n_mlp_rel, n_out=n_rels, bias_x=True, bias_y=True)
 
     def forward(self, words, feats):
 
         words, x = self.embed(words, feats)
-        mask = paddle.logical_and(words != self.pad_index,
-                                  words != self.eos_index)
+        mask = paddle.logical_and(words != self.pad_index, words != self.eos_index)
 
         arc_h = self.mlp_arc_h(x)
         arc_d = self.mlp_arc_d(x)
@@ -84,11 +74,9 @@ class BiAffineParser(nn.Layer):
         s_rel = paddle.transpose(self.rel_attn(rel_d, rel_h), perm=[0, 2, 3, 1])
         # Set the scores that exceed the length of each sentence to -1e5
         s_arc_mask = paddle.unsqueeze(mask, 1)
-        s_arc = s_arc * s_arc_mask + paddle.scale(paddle.cast(
-            s_arc_mask, 'int32'),
-                                                  scale=1e5,
-                                                  bias=-1,
-                                                  bias_after_scale=False)
+        s_arc = s_arc * s_arc_mask + paddle.scale(
+            paddle.cast(s_arc_mask, "int32"), scale=1e5, bias=-1, bias_after_scale=False
+        )
         return s_arc, s_rel, words
 
 
@@ -124,8 +112,7 @@ class BiAffine(nn.Layer):
         self.n_out = n_out
         self.bias_x = bias_x
         self.bias_y = bias_y
-        self.weight = self.create_parameter(
-            shape=[n_out, n_in + bias_x, n_in + bias_y], dtype="float32")
+        self.weight = self.create_parameter(shape=[n_out, n_in + bias_x, n_in + bias_y], dtype="float32")
 
     def forward(self, x, y):
         if self.bias_x:
@@ -136,20 +123,17 @@ class BiAffine(nn.Layer):
         b = x.shape[0]
         o = self.weight.shape[0]
         # Shape x: (batch_size, output_size, num_tokens, input_size + bias_x)
-        x = paddle.expand(paddle.unsqueeze(x, axis=1),
-                          shape=(x.shape[0], o, x.shape[1], x.shape[2]))
+        x = paddle.expand(paddle.unsqueeze(x, axis=1), shape=(x.shape[0], o, x.shape[1], x.shape[2]))
         # Shape y: (batch_size, output_size, num_tokens, input_size + bias_y)
-        y = paddle.expand(paddle.unsqueeze(y, axis=1),
-                          shape=(y.shape[0], o, y.shape[1], y.shape[2]))
+        y = paddle.expand(paddle.unsqueeze(y, axis=1), shape=(y.shape[0], o, y.shape[1], y.shape[2]))
         # Shape weight: (batch_size, output_size, input_size + bias_x, input_size + bias_y)
-        weight = paddle.expand(paddle.unsqueeze(self.weight, axis=0),
-                               shape=(b, self.weight.shape[0],
-                                      self.weight.shape[1],
-                                      self.weight.shape[2]))
+        weight = paddle.expand(
+            paddle.unsqueeze(self.weight, axis=0),
+            shape=(b, self.weight.shape[0], self.weight.shape[1], self.weight.shape[2]),
+        )
 
         # Shape: (batch_size, output_size, num_tokens, num_tokens)
-        s = paddle.matmul(paddle.matmul(x, weight),
-                          paddle.transpose(y, perm=[0, 1, 3, 2]))
+        s = paddle.matmul(paddle.matmul(x, weight), paddle.transpose(y, perm=[0, 1, 3, 2]))
         # Remove dim 1 if n_out == 1
         if s.shape[1] == 1:
             s = paddle.squeeze(s, axis=1)

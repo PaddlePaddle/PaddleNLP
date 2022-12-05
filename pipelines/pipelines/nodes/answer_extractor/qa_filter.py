@@ -29,38 +29,39 @@ from paddle.dataset.common import md5file
 
 class QAFilter(BaseComponent):
     """
-    Question Answer Pairs Filter based on Universal Information Extraction. 
+    Question Answer Pairs Filter based on Universal Information Extraction.
     """
+
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
-        "tokenizer_config": "tokenizer_config.json"
+        "tokenizer_config": "tokenizer_config.json",
     }
 
     resource_files_urls = {
         "uie-base-qa-filter": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/model_state.pdparams",
-                "feb2d076fa2f78a0d3c3e3d20e9d5dc5"
+                "feb2d076fa2f78a0d3c3e3d20e9d5dc5",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/model_config.json",
-                "74f033ab874a1acddb3aec9b9c4d9cde"
+                "74f033ab874a1acddb3aec9b9c4d9cde",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/qa_filter/uie-base-qa-filter-v1/tokenizer_config.json",
-                "3e623b57084882fd73e17f544bdda47d"
-            ]
+                "3e623b57084882fd73e17f544bdda47d",
+            ],
         },
     }
 
@@ -71,8 +72,8 @@ class QAFilter(BaseComponent):
 
     def __init__(
         self,
-        model='uie-base-qa-filter',
-        schema=['答案'],
+        model="uie-base-qa-filter",
+        schema=["答案"],
         task_path=None,
         device="gpu",
         batch_size=64,
@@ -90,9 +91,7 @@ class QAFilter(BaseComponent):
                 self._task_path = None
                 self._from_taskflow = True
             else:
-                self._task_path = os.path.join(
-                    PPNLP_HOME, "pipelines", "unsupervised_question_answering",
-                    self.model)
+                self._task_path = os.path.join(PPNLP_HOME, "pipelines", "unsupervised_question_answering", self.model)
                 self._check_task_files()
         self.batch_size = batch_size
         self.schema = schema
@@ -102,7 +101,8 @@ class QAFilter(BaseComponent):
             schema=schema,
             task_path=self._task_path,
             batch_size=batch_size,
-            position_prob=position_prob)
+            position_prob=position_prob,
+        )
 
     def _check_task_files(self):
         """
@@ -129,13 +129,7 @@ class QAFilter(BaseComponent):
             if not downloaded:
                 download_file(self._task_path, file_name, url, md5)
 
-    def filtration(self,
-                   paragraphs,
-                   batch_size=16,
-                   model=None,
-                   schema=None,
-                   wf=None,
-                   wf_debug=None):
+    def filtration(self, paragraphs, batch_size=16, model=None, schema=None, wf=None, wf_debug=None):
         result = []
         buffer = []
         valid_num, invalid_num = 0, 0
@@ -146,80 +140,62 @@ class QAFilter(BaseComponent):
             if len(buffer) == batch_size or (i + 1) == len_paragraphs:
                 model_inputs = []
                 for d in buffer:
-                    context = d['context']
-                    synthetic_question = d['synthetic_question']
-                    prefix = '问题：' + synthetic_question + '上下文：'
+                    context = d["context"]
+                    synthetic_question = d["synthetic_question"]
+                    prefix = "问题：" + synthetic_question + "上下文："
                     content = prefix + context
                     model_inputs.append(content)
                 predicts = model(model_inputs)
                 paragraph_list = buffer
                 buffer = []
                 for predict_dict, paragraph in zip(predicts, paragraph_list):
-                    context = paragraph['context']
-                    synthetic_question = paragraph['synthetic_question']
-                    synthetic_question_probability = paragraph[
-                        'synthetic_question_probability']
-                    synthetic_answer = paragraph['synthetic_answer']
-                    synthetic_answer_probability = paragraph[
-                        'synthetic_answer_probability']
+                    context = paragraph["context"]
+                    synthetic_question = paragraph["synthetic_question"]
+                    synthetic_question_probability = paragraph["synthetic_question_probability"]
+                    synthetic_answer = paragraph["synthetic_answer"]
+                    synthetic_answer_probability = paragraph["synthetic_answer_probability"]
 
                     answers = []
                     probabilitys = []
                     for prompt in schema:
                         if prompt in predict_dict:
                             answer_dicts = predict_dict[prompt]
-                            answers += [
-                                answer_dict['text']
-                                for answer_dict in answer_dicts
-                            ]
-                            probabilitys += [
-                                answer_dict['probability']
-                                for answer_dict in answer_dicts
-                            ]
+                            answers += [answer_dict["text"] for answer_dict in answer_dicts]
+                            probabilitys += [answer_dict["probability"] for answer_dict in answer_dicts]
                         else:
                             answers += []
                             probabilitys += []
                     candidates = [
-                        an for an, pro in sorted([(
-                            a, p) for a, p in zip(answers, probabilitys)],
-                                                 key=lambda x: -x[1])
+                        an for an, pro in sorted([(a, p) for a, p in zip(answers, probabilitys)], key=lambda x: -x[1])
                     ]
                     out_dict = {
-                        'context':
-                        context,
-                        'synthetic_answer':
-                        synthetic_answer,
-                        'synthetic_answer_probability':
-                        synthetic_answer_probability,
-                        'synthetic_question':
-                        synthetic_question,
-                        'synthetic_question_probability':
-                        synthetic_question_probability,
+                        "context": context,
+                        "synthetic_answer": synthetic_answer,
+                        "synthetic_answer_probability": synthetic_answer_probability,
+                        "synthetic_question": synthetic_question,
+                        "synthetic_question_probability": synthetic_question_probability,
                     }
                     if synthetic_answer in candidates:
                         if wf:
-                            wf.write(
-                                json.dumps(out_dict, ensure_ascii=False) + "\n")
+                            wf.write(json.dumps(out_dict, ensure_ascii=False) + "\n")
                         result.append(out_dict)
                         valid_num += 1
                     else:
                         if wf_debug:
-                            wf_debug.write(
-                                json.dumps(out_dict, ensure_ascii=False) + "\n")
+                            wf_debug.write(json.dumps(out_dict, ensure_ascii=False) + "\n")
                         invalid_num += 1
             i += 1
-        print('valid synthetic question-answer pairs number:', valid_num)
-        print('invalid sythetic question-answer pairs numbewr:', invalid_num)
+        print("valid synthetic question-answer pairs number:", valid_num)
+        print("invalid sythetic question-answer pairs numbewr:", invalid_num)
         return result
 
     def run(self, cqa_triples, is_filter=True):
         if is_filter:
-            print('filtering synthetic question-answer pairs...')
-            filtered_cqa_triples = self.filtration(cqa_triples,
-                                                   batch_size=self.batch_size,
-                                                   model=self.filtration_model,
-                                                   schema=self.schema)
-            print('filter synthetic question-answer pairs successfully!')
+            print("filtering synthetic question-answer pairs...")
+            filtered_cqa_triples = self.filtration(
+                cqa_triples, batch_size=self.batch_size, model=self.filtration_model, schema=self.schema
+            )
+            print("filter synthetic question-answer pairs successfully!")
         else:
             filtered_cqa_triples = cqa_triples
 
