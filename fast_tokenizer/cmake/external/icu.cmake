@@ -16,7 +16,19 @@ include(ExternalProject)
 include (ByproductsICU)
 SET(ICU_PREFIX_DIR    ${THIRD_PARTY_PATH}/icu)
 SET(ICU_INSTALL_DIR   ${THIRD_PARTY_PATH}/install/icu)
-SET(ICU_REPOSITORY    ${GIT_URL}/unicode-org/icu.git)
+if(ANDROID)
+  set(ICU_URL_PREFIX "https://bj.bcebos.com/fastdeploy/test")
+  # check ABI, toolchain
+  if((NOT ANDROID_ABI MATCHES "armeabi-v7a") AND (NOT ANDROID_ABI MATCHES "arm64-v8a"))
+    message(FATAL_ERROR "FastTokenizer for Android only support armeabi-v7a, arm64-v8a now.")
+  endif()
+  if(NOT ANDROID_TOOLCHAIN MATCHES "clang")
+     message(FATAL_ERROR "Currently, only support clang toolchain while cross compiling FastTokenizer for Android, but found ${ANDROID_TOOLCHAIN}.")
+  endif()  
+  set(ICU_REPOSITORY ${ICU_URL_PREFIX}/icu-android-${ANDROID_ABI}.tgz)
+else()
+  SET(ICU_REPOSITORY    ${GIT_URL}/unicode-org/icu.git)
+endif()  
 SET(ICU_TAG           release-70-1)
 set(FIND_OR_BUILD_ICU_DIR ${CMAKE_CURRENT_LIST_DIR})
 
@@ -68,6 +80,23 @@ ExternalProject_Add(
         CONFIGURE_COMMAND ${HOST_ENV_CMAKE} ../extern_icu/icu4c/source/runConfigureICU "MacOSX/GCC" --enable-static --disable-shared --enable-rpath
         BUILD_COMMAND make -j4
         INSTALL_COMMAND make install prefix="" DESTDIR=${ICU_INSTALL_DIR} install
+        BUILD_BYPRODUCTS ${ICU_LIBRARIES}
+)
+elseif(ANDROID)
+ExternalProject_Add(
+        extern_icu
+        ${EXTERNAL_PROJECT_LOG_ARGS}
+        ${SHALLOW_CLONE}
+        URL               ${ICU_REPOSITORY}
+        PREFIX            ${ICU_PREFIX_DIR}
+        CONFIGURE_COMMAND ""
+        UPDATE_COMMAND    ""
+        BUILD_COMMAND     ""
+        INSTALL_COMMAND
+          ${CMAKE_COMMAND} -E remove_directory ${ICU_INSTALL_DIR} &&
+          ${CMAKE_COMMAND} -E make_directory ${ICU_INSTALL_DIR} &&  
+          ${CMAKE_COMMAND} -E rename ${ICU_PREFIX_DIR}/src/extern_icu/lib/ ${ICU_INSTALL_DIR}/lib &&
+          ${CMAKE_COMMAND} -E copy_directory ${ICU_PREFIX_DIR}/src/extern_icu/include ${ICU_INSTALL_DIR}/include
         BUILD_BYPRODUCTS ${ICU_LIBRARIES}
 )
 else()

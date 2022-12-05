@@ -22,7 +22,7 @@ import sentencepiece as spm
 
 from .. import PretrainedTokenizer, BertTokenizer, AddedToken
 
-__all__ = ['AlbertTokenizer']
+__all__ = ["AlbertTokenizer"]
 
 SPIECE_UNDERLINE = "▁"
 
@@ -40,7 +40,7 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "albert-chinese-base": 512,
     "albert-chinese-large": 512,
     "albert-chinese-xlarge": 512,
-    "albert-chinese-xxlarge": 512
+    "albert-chinese-xxlarge": 512,
 }
 
 
@@ -95,6 +95,7 @@ class AlbertTokenizer(PretrainedTokenizer):
             '''
 
     """
+
     resource_files_names = {
         "sentencepiece_model_file": "spiece.model",
         "vocab_file": "vocab.txt",
@@ -102,22 +103,14 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "albert-base-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
-            "albert-large-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
-            "albert-xlarge-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
-            "albert-xxlarge-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
-            "albert-base-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
-            "albert-large-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
-            "albert-xlarge-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
-            "albert-xxlarge-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "albert-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
+            "albert-large-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
+            "albert-xlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
+            "albert-xxlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
+            "albert-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
+            "albert-large-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
+            "albert-xlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
+            "albert-xxlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
             "albert-chinese-tiny": None,
             "albert-chinese-small": None,
             "albert-chinese-base": None,
@@ -126,35 +119,21 @@ class AlbertTokenizer(PretrainedTokenizer):
             "albert-chinese-xxlarge": None,
         },
         "vocab_file": {
-            "albert-base-v1":
-            None,
-            "albert-large-v1":
-            None,
-            "albert-xlarge-v1":
-            None,
-            "albert-xxlarge-v1":
-            None,
-            "albert-base-v2":
-            None,
-            "albert-large-v2":
-            None,
-            "albert-xlarge-v2":
-            None,
-            "albert-xxlarge-v2":
-            None,
-            "albert-chinese-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
-            "albert-chinese-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
-            "albert-chinese-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
-            "albert-chinese-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
-            "albert-chinese-xlarge":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
-            "albert-chinese-xxlarge":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
-        }
+            "albert-base-v1": None,
+            "albert-large-v1": None,
+            "albert-xlarge-v1": None,
+            "albert-xxlarge-v1": None,
+            "albert-base-v2": None,
+            "albert-large-v2": None,
+            "albert-xlarge-v2": None,
+            "albert-xxlarge-v2": None,
+            "albert-chinese-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
+            "albert-chinese-small": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
+            "albert-chinese-base": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
+            "albert-chinese-large": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
+            "albert-chinese-xlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
+            "albert-chinese-xxlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
+        },
     }
 
     pretrained_init_configuration = {
@@ -248,24 +227,24 @@ class AlbertTokenizer(PretrainedTokenizer):
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 sentencepiece_model_file,
-                 do_lower_case=True,
-                 remove_space=True,
-                 keep_accents=False,
-                 bos_token="[CLS]",
-                 eos_token="[SEP]",
-                 unk_token="<unk>",
-                 sep_token="[SEP]",
-                 pad_token="<pad>",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        sentencepiece_model_file,
+        do_lower_case=True,
+        remove_space=True,
+        keep_accents=False,
+        bos_token="[CLS]",
+        eos_token="[SEP]",
+        unk_token="<unk>",
+        sep_token="[SEP]",
+        pad_token="<pad>",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
         self._build_special_tokens_map_extended(mask_token=mask_token)
 
         self.do_lower_case = do_lower_case
@@ -275,14 +254,16 @@ class AlbertTokenizer(PretrainedTokenizer):
         self.sentencepiece_model_file = sentencepiece_model_file
 
         if vocab_file is not None:
-            self.tokenizer = AlbertChineseTokenizer(vocab_file=vocab_file,
-                                                    do_lower_case=do_lower_case,
-                                                    unk_token=unk_token,
-                                                    sep_token=sep_token,
-                                                    pad_token=pad_token,
-                                                    cls_token=cls_token,
-                                                    mask_token=mask_token,
-                                                    **kwargs)
+            self.tokenizer = AlbertChineseTokenizer(
+                vocab_file=vocab_file,
+                do_lower_case=do_lower_case,
+                unk_token=unk_token,
+                sep_token=sep_token,
+                pad_token=pad_token,
+                cls_token=cls_token,
+                mask_token=mask_token,
+                **kwargs,
+            )
         elif sentencepiece_model_file is not None:
             self.tokenizer = AlbertEnglishTokenizer(
                 sentencepiece_model_file=sentencepiece_model_file,
@@ -296,13 +277,15 @@ class AlbertTokenizer(PretrainedTokenizer):
                 pad_token=pad_token,
                 cls_token=cls_token,
                 mask_token=mask_token,
-                **kwargs)
+                **kwargs,
+            )
         else:
             raise ValueError(
                 "You should only specify either one(not both) of 'vocal_file'"
                 "and 'sentencepiece_model_file' to construct an albert tokenizer."
                 "Specify 'vocal_file' for Chinese tokenizer and "
-                "'sentencepiece_model_file' for English tokenizer")
+                "'sentencepiece_model_file' for English tokenizer"
+            )
 
     @property
     def vocab_size(self):
@@ -447,12 +430,9 @@ class AlbertTokenizer(PretrainedTokenizer):
         Returns:
             List[int]: List of input_id with the appropriate special tokens.
         """
-        return self.tokenizer.build_inputs_with_special_tokens(
-            token_ids_0, token_ids_1=token_ids_1)
+        return self.tokenizer.build_inputs_with_special_tokens(token_ids_0, token_ids_1=token_ids_1)
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -471,12 +451,10 @@ class AlbertTokenizer(PretrainedTokenizer):
             List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
         """
         return self.tokenizer.build_offset_mapping_with_special_tokens(
-            offset_mapping_0, offset_mapping_1=offset_mapping_1)
+            offset_mapping_0, offset_mapping_1=offset_mapping_1
+        )
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -493,15 +471,11 @@ class AlbertTokenizer(PretrainedTokenizer):
             List[int]: The list of integers either be 0 or 1: 1 for a special token, 0 for a sequence token.
         """
         return self.tokenizer.get_special_tokens_mask(
-            token_ids_0,
-            token_ids_1=token_ids_1,
-            already_has_special_tokens=already_has_special_tokens)
+            token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=already_has_special_tokens
+        )
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
-        return self.tokenizer.create_token_type_ids_from_sequences(
-            token_ids_0, token_ids_1=token_ids_1)
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
+        return self.tokenizer.create_token_type_ids_from_sequences(token_ids_0, token_ids_1=token_ids_1)
 
     def save_resources(self, save_directory):
         return self.tokenizer.save_resources(save_directory)
@@ -514,22 +488,14 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "albert-base-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
-            "albert-large-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
-            "albert-xlarge-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
-            "albert-xxlarge-v1":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
-            "albert-base-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
-            "albert-large-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
-            "albert-xlarge-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
-            "albert-xxlarge-v2":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
+            "albert-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v1.spiece.model",
+            "albert-large-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v1.spiece.model",
+            "albert-xlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v1.spiece.model",
+            "albert-xxlarge-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v1.spiece.model",
+            "albert-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-base-v2.spiece.model",
+            "albert-large-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-large-v2.spiece.model",
+            "albert-xlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xlarge-v2.spiece.model",
+            "albert-xxlarge-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-xxlarge-v2.spiece.model",
         },
     }
 
@@ -602,20 +568,22 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         "albert-xxlarge-v2": 512,
     }
 
-    def __init__(self,
-                 sentencepiece_model_file,
-                 do_lower_case=True,
-                 remove_space=True,
-                 keep_accents=False,
-                 bos_token="[CLS]",
-                 eos_token="[SEP]",
-                 unk_token="<unk>",
-                 sep_token="[SEP]",
-                 pad_token="<pad>",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 sp_model_kwargs=None,
-                 **kwargs):
+    def __init__(
+        self,
+        sentencepiece_model_file,
+        do_lower_case=True,
+        remove_space=True,
+        keep_accents=False,
+        bos_token="[CLS]",
+        eos_token="[SEP]",
+        unk_token="<unk>",
+        sep_token="[SEP]",
+        pad_token="<pad>",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        sp_model_kwargs=None,
+        **kwargs
+    ):
 
         self.sp_model_kwargs = {} if sp_model_kwargs is None else sp_model_kwargs
         self.do_lower_case = do_lower_case
@@ -631,10 +599,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         return len(self.sp_model)
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -660,8 +625,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
 
         if not self.keep_accents:
             outputs = unicodedata.normalize("NFKD", outputs)
-            outputs = "".join(
-                [c for c in outputs if not unicodedata.combining(c)])
+            outputs = "".join([c for c in outputs if not unicodedata.combining(c)])
         if self.do_lower_case:
             outputs = outputs.lower()
 
@@ -674,10 +638,8 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         new_pieces = []
         for piece in pieces:
             if len(piece) > 1 and piece[-1] == str(",") and piece[-2].isdigit():
-                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(
-                    SPIECE_UNDERLINE, ""))
-                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][
-                        0] == SPIECE_UNDERLINE:
+                cur_pieces = self.sp_model.EncodeAsPieces(piece[:-1].replace(SPIECE_UNDERLINE, ""))
+                if piece[0] != SPIECE_UNDERLINE and cur_pieces[0][0] == SPIECE_UNDERLINE:
                     if len(cur_pieces[0]) == 1:
                         cur_pieces = cur_pieces[1:]
                     else:
@@ -690,7 +652,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
         return new_pieces
 
     def _convert_token_to_id(self, token):
-        """Converts a token (str) to an id using the vocab. """
+        """Converts a token (str) to an id using the vocab."""
         return self.sp_model.PieceToId(token)
 
     def _convert_id_to_token(self, index):
@@ -705,9 +667,7 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def num_special_tokens_to_add(self, pair=False):
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         sep = [self.sep_token_id]
@@ -716,19 +676,13 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
             return cls + token_ids_0 + sep
         return cls + token_ids_0 + sep + token_ids_1 + sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
 
         if already_has_special_tokens:
             if token_ids_1 is not None:
@@ -736,20 +690,13 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -760,15 +707,13 @@ class AlbertEnglishTokenizer(PretrainedTokenizer):
     def save_resources(self, save_directory):
         for name, file_name in self.resource_files_names.items():
             save_path = os.path.join(save_directory, file_name)
-            if os.path.abspath(
-                    self.sentencepiece_model_file) != os.path.abspath(
-                        save_path) and os.path.isfile(
-                            self.sentencepiece_model_file):
+            if os.path.abspath(self.sentencepiece_model_file) != os.path.abspath(save_path) and os.path.isfile(
+                self.sentencepiece_model_file
+            ):
                 copyfile(self.sentencepiece_model_file, save_path)
             elif not os.path.isfile(self.sentencepiece_model_file):
                 with open(save_path, "wb") as fi:
-                    content_spiece_model = self.sp_model.serialized_model_proto(
-                    )
+                    content_spiece_model = self.sp_model.serialized_model_proto()
                     fi.write(content_spiece_model)
 
 
@@ -776,18 +721,12 @@ class AlbertChineseTokenizer(BertTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "albert-chinese-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
-            "albert-chinese-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
-            "albert-chinese-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
-            "albert-chinese-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
-            "albert-chinese-xlarge":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
-            "albert-chinese-xxlarge":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
+            "albert-chinese-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-tiny.vocab.txt",
+            "albert-chinese-small": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-small.vocab.txt",
+            "albert-chinese-base": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-base.vocab.txt",
+            "albert-chinese-large": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-large.vocab.txt",
+            "albert-chinese-xlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xlarge.vocab.txt",
+            "albert-chinese-xxlarge": "https://bj.bcebos.com/paddlenlp/models/transformers/albert/albert-chinese-xxlarge.vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -831,29 +770,32 @@ class AlbertChineseTokenizer(BertTokenizer):
         "albert-chinese-xxlarge": 512,
     }
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 do_basic_tokenize=True,
-                 never_split=None,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 **kwargs):
-        super(AlbertChineseTokenizer,
-              self).__init__(vocab_file,
-                             do_lower_case=do_lower_case,
-                             do_basic_tokenize=do_basic_tokenize,
-                             never_split=never_split,
-                             unk_token=unk_token,
-                             sep_token=sep_token,
-                             pad_token=pad_token,
-                             cls_token=cls_token,
-                             mask_token=mask_token,
-                             tokenize_chinese_chars=tokenize_chinese_chars,
-                             strip_accents=strip_accents,
-                             **kwargs)
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        do_basic_tokenize=True,
+        never_split=None,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        **kwargs
+    ):
+        super(AlbertChineseTokenizer, self).__init__(
+            vocab_file,
+            do_lower_case=do_lower_case,
+            do_basic_tokenize=do_basic_tokenize,
+            never_split=never_split,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+            tokenize_chinese_chars=tokenize_chinese_chars,
+            strip_accents=strip_accents,
+            **kwargs,
+        )

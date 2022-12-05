@@ -18,45 +18,54 @@ import unittest
 import paddle
 from parameterized import parameterized_class
 
-from paddlenlp.transformers import (ErnieForMaskedLM, ErnieForMultipleChoice,
-                                    ErnieForPretraining,
-                                    ErnieForQuestionAnswering,
-                                    ErnieForSequenceClassification,
-                                    ErnieForTokenClassification, ErnieModel,
-                                    ErniePretrainedModel)
+from paddlenlp.transformers import (
+    ErnieForMaskedLM,
+    ErnieForMultipleChoice,
+    ErnieForPretraining,
+    ErnieForQuestionAnswering,
+    ErnieForSequenceClassification,
+    ErnieForTokenClassification,
+    ErnieModel,
+    ErniePretrainedModel,
+)
 
 from ...testing_utils import slow
-from ..test_modeling_common import (ModelTesterMixin,
-                                    ModelTesterPretrainedMixin, floats_tensor,
-                                    ids_tensor, random_attention_mask)
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class ErnieModelTester:
-
-    def __init__(self,
-                 parent,
-                 batch_size=13,
-                 seq_length=7,
-                 is_training=True,
-                 use_input_mask=True,
-                 use_token_type_ids=True,
-                 vocab_size=99,
-                 hidden_size=32,
-                 num_hidden_layers=5,
-                 num_attention_heads=4,
-                 intermediate_size=37,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=2,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 type_sequence_label_size=2,
-                 num_labels=3,
-                 num_choices=4,
-                 num_classes=3,
-                 scope=None):
+    def __init__(
+        self,
+        parent,
+        batch_size=13,
+        seq_length=7,
+        is_training=True,
+        use_input_mask=True,
+        use_token_type_ids=True,
+        vocab_size=99,
+        hidden_size=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        intermediate_size=37,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=2,
+        initializer_range=0.02,
+        pad_token_id=0,
+        type_sequence_label_size=2,
+        num_labels=3,
+        num_choices=4,
+        num_classes=3,
+        scope=None,
+    ):
         self.parent = parent
         self.batch_size = batch_size
         self.seq_length = seq_length
@@ -82,28 +91,23 @@ class ErnieModelTester:
         self.scope = scope
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
 
         input_mask = None
         if self.use_input_mask:
-            input_mask = random_attention_mask(
-                [self.batch_size, self.seq_length])
+            input_mask = random_attention_mask([self.batch_size, self.seq_length])
 
         token_type_ids = None
         if self.use_token_type_ids:
-            token_type_ids = ids_tensor([self.batch_size, self.seq_length],
-                                        self.type_vocab_size)
+            token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
 
         sequence_labels = None
         token_labels = None
         choice_labels = None
 
         if self.parent.use_labels:
-            sequence_labels = ids_tensor([self.batch_size],
-                                         self.type_sequence_label_size)
-            token_labels = ids_tensor([self.batch_size, self.seq_length],
-                                      self.num_labels)
+            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels)
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         config = self.get_config()
@@ -137,19 +141,13 @@ class ErnieModelTester:
     ):
         model = ErnieModel(**config)
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
-        result = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
         result = model(input_ids, return_dict=self.parent.return_dict)
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(result[1].shape,
-                                [self.batch_size, self.hidden_size])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result[1].shape, [self.batch_size, self.hidden_size])
 
     def create_and_check_for_masked_lm(
         self,
@@ -163,20 +161,20 @@ class ErnieModelTester:
     ):
         model = ErnieForMaskedLM(ErnieModel(**config))
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=token_labels,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
+        )
 
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_for_multiple_choice(
         self,
@@ -188,27 +186,24 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForMultipleChoice(ErnieModel(**config),
-                                       num_choices=self.num_choices)
+        model = ErnieForMultipleChoice(ErnieModel(**config), num_choices=self.num_choices)
         model.eval()
-        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        multiple_choice_input_mask = input_mask.unsqueeze(1).expand(
-            [-1, self.num_choices, -1])
-        result = model(multiple_choice_inputs_ids,
-                       attention_mask=multiple_choice_input_mask,
-                       token_type_ids=multiple_choice_token_type_ids,
-                       labels=choice_labels,
-                       return_dict=self.parent.return_dict)
+        multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
+        multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
+        multiple_choice_input_mask = input_mask.unsqueeze(1).expand([-1, self.num_choices, -1])
+        result = model(
+            multiple_choice_inputs_ids,
+            attention_mask=multiple_choice_input_mask,
+            token_type_ids=multiple_choice_token_type_ids,
+            labels=choice_labels,
+            return_dict=self.parent.return_dict,
+        )
         if choice_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.num_choices])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_choices])
 
     def create_and_check_for_question_answering(
         self,
@@ -222,22 +217,22 @@ class ErnieModelTester:
     ):
         model = ErnieForQuestionAnswering(ErnieModel(**config))
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       start_positions=sequence_labels,
-                       end_positions=sequence_labels,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
 
         if sequence_labels is not None:
             start_logits, end_logits = result[1], result[2]
         else:
             start_logits, end_logits = result[0], result[1]
 
-        self.parent.assertEqual(start_logits.shape,
-                                [self.batch_size, self.seq_length])
-        self.parent.assertEqual(end_logits.shape,
-                                [self.batch_size, self.seq_length])
+        self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
 
     def create_and_check_for_sequence_classification(
         self,
@@ -249,21 +244,21 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForSequenceClassification(ErnieModel(**config),
-                                               num_classes=self.num_classes)
+        model = ErnieForSequenceClassification(ErnieModel(**config), num_classes=self.num_classes)
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=sequence_labels,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            labels=sequence_labels,
+            return_dict=self.parent.return_dict,
+        )
         if sequence_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(result[0].shape,
-                                [self.batch_size, self.num_classes])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_classes])
 
     def create_and_check_for_token_classification(
         self,
@@ -275,36 +270,31 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForTokenClassification(ErnieModel(**config),
-                                            num_classes=self.num_classes)
+        model = ErnieForTokenClassification(ErnieModel(**config), num_classes=self.num_classes)
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       labels=token_labels,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            labels=token_labels,
+            return_dict=self.parent.return_dict,
+        )
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.num_classes])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
-    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
-                                     input_mask, sequence_labels, token_labels,
-                                     choice_labels):
+    def create_and_check_model_cache(
+        self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+    ):
         model = ErnieModel(**config)
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids,
-                        attention_mask=input_mask,
-                        use_cache=True,
-                        return_dict=self.parent.return_dict)
-        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
-            2]
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
@@ -314,37 +304,34 @@ class ErnieModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        outputs = model(next_input_ids,
-                        attention_mask=next_attention_mask,
-                        output_hidden_states=True,
-                        return_dict=self.parent.return_dict)
+        outputs = model(
+            next_input_ids,
+            attention_mask=next_attention_mask,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
 
         output_from_no_past = outputs[2][0]
 
-        outputs = model(next_tokens,
-                        attention_mask=next_attention_mask,
-                        past_key_values=past_key_values,
-                        output_hidden_states=True,
-                        return_dict=self.parent.return_dict)
+        outputs = model(
+            next_tokens,
+            attention_mask=next_attention_mask,
+            past_key_values=past_key_values,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
 
         output_from_past = outputs[2][0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
-        output_from_no_past_slice = output_from_no_past[:, -3:,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, :,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
-        self.parent.assertTrue(
-            output_from_past_slice.shape[1] == next_tokens.shape[1])
+        self.parent.assertTrue(output_from_past_slice.shape[1] == next_tokens.shape[1])
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -357,20 +344,19 @@ class ErnieModelTester:
             token_labels,
             choice_labels,
         ) = config_and_inputs
-        inputs_dict = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "attention_mask": input_mask
-        }
+        inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", "use_labels"), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
-])
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = ErnieModel
     return_dict: bool = False
@@ -399,23 +385,19 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_for_multiple_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_multiple_choice(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_multiple_choice(*config_and_inputs)
 
     def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_question_answering(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_question_answering(*config_and_inputs)
 
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_sequence_classification(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_token_classification(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
     def test_for_model_cache(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -423,8 +405,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(
-                ErniePretrainedModel.pretrained_init_configuration)[:1]:
+        for model_name in list(ErniePretrainedModel.pretrained_init_configuration)[:1]:
             model = ErnieModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
@@ -438,73 +419,70 @@ class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
     def test_inference_no_attention(self):
         model = ErnieModel.from_pretrained("ernie-1.0")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         with paddle.no_grad():
             output = model(input_ids)[0]
         expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
 
-        expected_slice = paddle.to_tensor([[[-0.0664, -1.3266, -0.3922],
-                                            [-0.2440, -1.3631, -1.0745],
-                                            [-0.0986, -0.7947, -0.1932]]])
-        self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+        expected_slice = paddle.to_tensor(
+            [[[-0.0664, -1.3266, -0.3922], [-0.2440, -1.3631, -1.0745], [-0.0986, -0.7947, -0.1932]]]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
         model = ErnieModel.from_pretrained("ernie-1.0")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
         expected_shape = [1, 11, 768]
         self.assertEqual(output.shape, expected_shape)
 
-        expected_slice = paddle.to_tensor([[[-0.0664, -1.3266, -0.3922],
-                                            [-0.2440, -1.3631, -1.0745],
-                                            [-0.0986, -0.7947, -0.1932]]])
-        self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+        expected_slice = paddle.to_tensor(
+            [[[-0.0664, -1.3266, -0.3922], [-0.2440, -1.3631, -1.0745], [-0.0986, -0.7947, -0.1932]]]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_past_key_value(self):
         model = ErnieModel.from_pretrained("ernie-1.0")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
-            output = model(input_ids,
-                           attention_mask=attention_mask,
-                           use_cache=True,
-                           return_dict=True)
+            output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
         past_key_value = output.past_key_values[0][0]
         expected_shape = [1, 11, 768]
         self.assertEqual(output[0].shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[-0.06635337, -1.32662833, -0.39223742],
-              [-0.24396378, -1.36314595, -1.07446611],
-              [-0.09860237, -0.79468340, -0.19317953]]])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [-0.06635337, -1.32662833, -0.39223742],
+                    [-0.24396378, -1.36314595, -1.07446611],
+                    [-0.09860237, -0.79468340, -0.19317953],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
         # insert the past key value into model
         with paddle.no_grad():
-            output = model(input_ids,
-                           use_cache=True,
-                           past_key_values=output.past_key_values,
-                           return_dict=True)
+            output = model(input_ids, use_cache=True, past_key_values=output.past_key_values, return_dict=True)
         expected_slice = paddle.to_tensor(
-            [[[0.07865857, -1.07012558, -1.02596498],
-              [0.12576045, -1.76696026, -1.18682015],
-              [-0.08606864, -1.37880838, -0.12364164]]])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [0.07865857, -1.07012558, -1.02596498],
+                    [0.12576045, -1.76696026, -1.18682015],
+                    [-0.08606864, -1.37880838, -0.12364164],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

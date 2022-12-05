@@ -17,10 +17,7 @@ from __future__ import annotations
 from typing import Dict
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 
-__all__ = [
-    "BERT_PRETRAINED_INIT_CONFIGURATION", "BertConfig",
-    "BERT_PRETRAINED_RESOURCE_FILES_MAP"
-]
+__all__ = ["BERT_PRETRAINED_INIT_CONFIGURATION", "BertConfig", "BERT_PRETRAINED_RESOURCE_FILES_MAP"]
 
 BERT_PRETRAINED_INIT_CONFIGURATION = {
     "bert-base-uncased": {
@@ -203,7 +200,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 12,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "uer/chinese-roberta-medium": {
         "attention_probs_dropout_prob": 0.1,
@@ -217,7 +214,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 8,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "uer/chinese-roberta-6l-768h": {
         "attention_probs_dropout_prob": 0.1,
@@ -231,7 +228,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 6,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "uer/chinese-roberta-small": {
         "attention_probs_dropout_prob": 0.1,
@@ -245,7 +242,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 4,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "uer/chinese-roberta-mini": {
         "attention_probs_dropout_prob": 0.1,
@@ -259,7 +256,7 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 4,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "uer/chinese-roberta-tiny": {
         "attention_probs_dropout_prob": 0.1,
@@ -273,48 +270,30 @@ BERT_PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 2,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
 }
 
 BERT_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "bert-base-uncased":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams",
-        "bert-large-uncased":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/bert-large-uncased.pdparams",
-        "bert-base-multilingual-uncased":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert-base-multilingual-uncased.pdparams",
-        "bert-base-cased":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-cased.pdparams",
-        "bert-base-chinese":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-chinese.pdparams",
-        "bert-base-multilingual-cased":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-multilingual-cased.pdparams",
-        "bert-large-cased":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-large-cased.pdparams",
-        "bert-wwm-chinese":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese.pdparams",
-        "bert-wwm-ext-chinese":
-        "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
-        "macbert-base-chinese":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-base-chinese.pdparams",
-        "macbert-large-chinese":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-large-chinese.pdparams",
-        "simbert-base-chinese":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
-        "uer/chinese-roberta-base":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
-        "uer/chinese-roberta-medium":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
-        "uer/chinese-roberta-6l-768h":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
-        "uer/chinese-roberta-small":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
-        "uer/chinese-roberta-mini":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_mini.pdparams",
-        "uer/chinese-roberta-tiny":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_tiny.pdparams",
+        "bert-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/bert-base-uncased.pdparams",
+        "bert-large-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/bert-large-uncased.pdparams",
+        "bert-base-multilingual-uncased": "http://bj.bcebos.com/paddlenlp/models/transformers/bert-base-multilingual-uncased.pdparams",
+        "bert-base-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-cased.pdparams",
+        "bert-base-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-chinese.pdparams",
+        "bert-base-multilingual-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-base-multilingual-cased.pdparams",
+        "bert-large-cased": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-large-cased.pdparams",
+        "bert-wwm-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese.pdparams",
+        "bert-wwm-ext-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese.pdparams",
+        "macbert-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-base-chinese.pdparams",
+        "macbert-large-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/macbert/macbert-large-chinese.pdparams",
+        "simbert-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/simbert-base-chinese-v1.pdparams",
+        "uer/chinese-roberta-base": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_base.pdparams",
+        "uer/chinese-roberta-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_medium.pdparams",
+        "uer/chinese-roberta-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_6l_768h.pdparams",
+        "uer/chinese-roberta-small": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_small.pdparams",
+        "uer/chinese-roberta-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_mini.pdparams",
+        "uer/chinese-roberta-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_tiny.pdparams",
     }
 }
 
@@ -385,30 +364,29 @@ class BertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "bert"
-    attribute_map: Dict[str, str] = {
-        "num_classes": "num_labels",
-        "dropout": "classifier_dropout"
-    }
+    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
 
-    def __init__(self,
-                 vocab_size: int = 30522,
-                 hidden_size: int = 768,
-                 num_hidden_layers: int = 12,
-                 num_attention_heads: int = 12,
-                 intermediate_size: int = 3072,
-                 hidden_act: str = "gelu",
-                 hidden_dropout_prob: float = 0.1,
-                 attention_probs_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: int = 16,
-                 initializer_range: float = 0.02,
-                 pad_token_id: int = 0,
-                 pool_act: str = "tanh",
-                 fuse: bool = False,
-                 layer_norm_eps=1e-12,
-                 use_cache=False,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size: int = 30522,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "gelu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 16,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+        pool_act: str = "tanh",
+        fuse: bool = False,
+        layer_norm_eps=1e-12,
+        use_cache=False,
+        **kwargs
+    ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size

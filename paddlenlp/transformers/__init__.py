@@ -13,16 +13,28 @@
 # limitations under the License.
 
 from .model_utils import PretrainedModel, register_base_model
-from .tokenizer_utils import PretrainedTokenizer, BPETokenizer, tokenize_chinese_chars, is_chinese_char, AddedToken, normalize_chars, tokenize_special_chars, convert_to_unicode
+from .tokenizer_utils import (
+    PretrainedTokenizer,
+    BPETokenizer,
+    tokenize_chinese_chars,
+    is_chinese_char,
+    AddedToken,
+    normalize_chars,
+    tokenize_special_chars,
+    convert_to_unicode,
+)
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
+# isort: split
 from .bert.modeling import *
 from .bert.tokenizer import *
 from .bert.configuration import *
 from .bert.converter import *
+
+# isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
@@ -90,8 +102,6 @@ from .nezha.modeling import *
 from .nezha.tokenizer import *
 from .ppminilm.modeling import *
 from .ppminilm.tokenizer import *
-from .prophetnet.modeling import *
-from .prophetnet.tokenizer import *
 from .reformer.modeling import *
 from .reformer.tokenizer import *
 from .rembert.modeling import *
@@ -105,6 +115,7 @@ from .squeezebert.modeling import *
 from .squeezebert.tokenizer import *
 from .t5.modeling import *
 from .t5.tokenizer import *
+from .t5.configuration import *
 from .tinybert.modeling import *
 from .tinybert.tokenizer import *
 from .transformer.modeling import *
@@ -147,6 +158,7 @@ from .pegasus.tokenizer import *
 
 # For faster tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
+
 if is_fast_tokenizer_available():
     from .bert.fast_tokenizer import *
     from .ernie.fast_tokenizer import *

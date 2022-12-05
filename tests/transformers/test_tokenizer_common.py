@@ -28,24 +28,18 @@ from itertools import takewhile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
 
-from paddlenlp.transformers import (AlbertTokenizer, AutoTokenizer,
-                                    BertTokenizer, PretrainedTokenizer)
+from paddlenlp.transformers import AlbertTokenizer, AutoTokenizer, BertTokenizer, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from ..testing_utils import get_tests_dir, slow
 
 sys.path.append(str(Path(__file__).parent.parent / "utils"))
 
-NON_ENGLISH_TAGS = [
-    "chinese", "dutch", "french", "finnish", "german", "multilingual"
-]
+NON_ENGLISH_TAGS = ["chinese", "dutch", "french", "finnish", "german", "multilingual"]
 
 SMALL_TRAINING_CORPUS = [
     ["This is the first sentence.", "This is the second one."],
-    [
-        "This sentence (contains #) over symbols and numbers 12 3.",
-        "But not this one."
-    ],
+    ["This sentence (contains #) over symbols and numbers 12 3.", "But not this one."],
 ]
 
 
@@ -77,22 +71,21 @@ class TokenizerTesterMixin:
 
     def setUp(self) -> None:
 
-        tokenizers_list = [(
-            self.tokenizer_class,
-            pretrained_name,
-            self.from_pretrained_kwargs
-            if self.from_pretrained_kwargs is not None else {},
-        ) for pretrained_name in
-                           self.tokenizer_class.pretrained_resource_files_map[
-                               self.from_pretrained_vocab_key].keys()
-                           if self.from_pretrained_filter is None or (
-                               self.from_pretrained_filter is not None
-                               and self.from_pretrained_filter(pretrained_name))
-                           ]
+        tokenizers_list = [
+            (
+                self.tokenizer_class,
+                pretrained_name,
+                self.from_pretrained_kwargs if self.from_pretrained_kwargs is not None else {},
+            )
+            for pretrained_name in self.tokenizer_class.pretrained_resource_files_map[
+                self.from_pretrained_vocab_key
+            ].keys()
+            if self.from_pretrained_filter is None
+            or (self.from_pretrained_filter is not None and self.from_pretrained_filter(pretrained_name))
+        ]
         self.tokenizers_list = tokenizers_list[:1]
 
-        with open(f"{get_tests_dir()}/sample_text.txt",
-                  encoding="utf-8") as f_data:
+        with open(f"{get_tests_dir()}/sample_text.txt", encoding="utf-8") as f_data:
             self._data = f_data.read().replace("\n\n", "\n").strip()
 
         self.tmpdirname = tempfile.mkdtemp()
@@ -104,13 +97,8 @@ class TokenizerTesterMixin:
         input_txt = self.get_clean_sequence(tokenizer)[0]
         return input_txt, input_txt
 
-    def get_clean_sequence(self,
-                           tokenizer,
-                           with_prefix_space=False,
-                           max_length=20,
-                           min_length=5) -> Tuple[str, list]:
-        toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False))
-                for i in range(len(tokenizer))]
+    def get_clean_sequence(self, tokenizer, with_prefix_space=False, max_length=20, min_length=5) -> Tuple[str, list]:
+        toks = [(i, tokenizer.decode([i], clean_up_tokenization_spaces=False)) for i in range(len(tokenizer))]
 
         # filter the english only character
         if self.only_english_character:
@@ -118,9 +106,11 @@ class TokenizerTesterMixin:
 
         toks = list(
             filter(
-                lambda t: [t[0]] == tokenizer.encode(
-                    t[1], return_token_type_ids=None, add_special_tokens=False)[
-                        'input_ids'], toks))
+                lambda t: [t[0]]
+                == tokenizer.encode(t[1], return_token_type_ids=None, add_special_tokens=False)["input_ids"],
+                toks,
+            )
+        )
         if max_length is not None and len(toks) > max_length:
             toks = toks[:max_length]
         if min_length is not None and len(toks) < min_length and len(toks) > 0:
@@ -130,18 +120,16 @@ class TokenizerTesterMixin:
         toks_ids = [t[0] for t in toks]
 
         # Ensure consistency
-        output_txt = tokenizer.decode(toks_ids,
-                                      clean_up_tokenization_spaces=False)
+        output_txt = tokenizer.decode(toks_ids, clean_up_tokenization_spaces=False)
         if " " not in output_txt and len(toks_ids) > 1:
-            output_txt = (tokenizer.decode(
-                [toks_ids[0]], clean_up_tokenization_spaces=False) + " " +
-                          tokenizer.decode(toks_ids[1:],
-                                           clean_up_tokenization_spaces=False))
+            output_txt = (
+                tokenizer.decode([toks_ids[0]], clean_up_tokenization_spaces=False)
+                + " "
+                + tokenizer.decode(toks_ids[1:], clean_up_tokenization_spaces=False)
+            )
         if with_prefix_space:
             output_txt = " " + output_txt
-        output_ids = tokenizer.encode(output_txt,
-                                      return_token_type_ids=None,
-                                      add_special_tokens=False)['input_ids']
+        output_ids = tokenizer.encode(output_txt, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
         return output_txt, output_ids
 
     def get_tokenizers(self, **kwargs) -> List[PretrainedTokenizerBase]:
@@ -199,12 +187,9 @@ class TokenizerTesterMixin:
         for tokenizer_class in tokenizer_classes:
             tokenizer = tokenizer_class.from_pretrained(model_name)
 
-            encoding = tokenizer(sequences,
-                                 padding=padding,
-                                 return_attention_mask=True)
+            encoding = tokenizer(sequences, padding=padding, return_attention_mask=True)
             decoded_sequences = [
-                tokenizer.decode(seq, skip_special_tokens=True, **decode_kwargs)
-                for seq in encoding["input_ids"]
+                tokenizer.decode(seq, skip_special_tokens=True, **decode_kwargs) for seq in encoding["input_ids"]
             ]
 
             encoding_data = encoding.data
@@ -215,17 +200,14 @@ class TokenizerTesterMixin:
                     expected = expected.lower()
                 self.assertEqual(expected, decoded)
 
-    def assert_padded_input_match(self, input_r: list, input_p: list,
-                                  max_length: int, pad_token_id: int):
+    def assert_padded_input_match(self, input_r: list, input_p: list, max_length: int, pad_token_id: int):
         # Ensure we match max_length
         self.assertEqual(len(input_r), max_length)
         self.assertEqual(len(input_p), max_length)
 
         # Ensure the number of padded tokens is the same
-        padded_tokens_r = list(
-            takewhile(lambda i: i == pad_token_id, reversed(input_r)))
-        padded_tokens_p = list(
-            takewhile(lambda i: i == pad_token_id, reversed(input_p)))
+        padded_tokens_r = list(takewhile(lambda i: i == pad_token_id, reversed(input_r)))
+        padded_tokens_p = list(takewhile(lambda i: i == pad_token_id, reversed(input_p)))
         self.assertSequenceEqual(padded_tokens_r, padded_tokens_p)
 
     def assert_batch_padded_input_match(
@@ -237,30 +219,27 @@ class TokenizerTesterMixin:
         model_main_input_name: str = "input_ids",
     ):
         for i_r in input_r.values():
-            self.assertEqual(len(i_r), 2), self.assertEqual(
-                len(i_r[0]),
-                max_length), self.assertEqual(len(i_r[1]), max_length)
-            self.assertEqual(len(i_r), 2), self.assertEqual(
-                len(i_r[0]),
-                max_length), self.assertEqual(len(i_r[1]), max_length)
+            self.assertEqual(len(i_r), 2), self.assertEqual(len(i_r[0]), max_length), self.assertEqual(
+                len(i_r[1]), max_length
+            )
+            self.assertEqual(len(i_r), 2), self.assertEqual(len(i_r[0]), max_length), self.assertEqual(
+                len(i_r[1]), max_length
+            )
 
-        for i_r, i_p in zip(input_r[model_main_input_name],
-                            input_p[model_main_input_name]):
+        for i_r, i_p in zip(input_r[model_main_input_name], input_p[model_main_input_name]):
             self.assert_padded_input_match(i_r, i_p, max_length, pad_token_id)
 
-        for i_r, i_p in zip(input_r["attention_mask"],
-                            input_p["attention_mask"]):
+        for i_r, i_p in zip(input_r["attention_mask"], input_p["attention_mask"]):
             self.assertSequenceEqual(i_r, i_p)
 
     @staticmethod
-    def convert_batch_encode_plus_format_to_encode_plus(
-            batch_encode_plus_sequences):
+    def convert_batch_encode_plus_format_to_encode_plus(batch_encode_plus_sequences):
         # Switch from batch_encode_plus format:   {'input_ids': [[...], [...]], ...}
         # to the list of examples/ encode_plus format: [{'input_ids': [...], ...}, {'input_ids': [...], ...}]
-        return [{
-            value: batch_encode_plus_sequences[value][i]
-            for value in batch_encode_plus_sequences.keys()
-        } for i in range(len(batch_encode_plus_sequences["input_ids"]))]
+        return [
+            {value: batch_encode_plus_sequences[value][i] for value in batch_encode_plus_sequences.keys()}
+            for i in range(len(batch_encode_plus_sequences["input_ids"]))
+        ]
 
     # TODO: this test can be combined with `test_sentencepiece_tokenize_and_convert_tokens_to_string` after the latter is extended to all tokenizers.
     def test_tokenize_special_tokens(self):
@@ -279,8 +258,7 @@ class TokenizerTesterMixin:
                 tokenizer.add_tokens([SPECIAL_TOKEN_1], special_tokens=True)
                 # `add_special_tokens` method stores special tokens in `tokenizer.additional_special_tokens`,
                 # which also occur in `tokenizer.all_special_tokens`. (in tokenization_utils_base.py)
-                tokenizer.add_special_tokens(
-                    {"additional_special_tokens": [SPECIAL_TOKEN_2]})
+                tokenizer.add_special_tokens({"additional_special_tokens": [SPECIAL_TOKEN_2]})
 
                 token_1 = tokenizer.tokenize(SPECIAL_TOKEN_1)
                 token_2 = tokenizer.tokenize(SPECIAL_TOKEN_2)
@@ -319,11 +297,7 @@ class TokenizerTesterMixin:
             return
 
         # Subword regularization is only available for the slow tokenizer.
-        sp_model_kwargs = {
-            "enable_sampling": True,
-            "alpha": 0.1,
-            "nbest_size": -1
-        }
+        sp_model_kwargs = {"enable_sampling": True, "alpha": 0.1, "nbest_size": -1}
         tokenizer = self.get_tokenizer(sp_model_kwargs=sp_model_kwargs)
 
         self.assertTrue(hasattr(tokenizer, "sp_model_kwargs"))
@@ -337,11 +311,7 @@ class TokenizerTesterMixin:
             return
         """Google pickle __getstate__ __setstate__ if you are struggling with this."""
         # Subword regularization is only available for the slow tokenizer.
-        sp_model_kwargs = {
-            "enable_sampling": True,
-            "alpha": 0.1,
-            "nbest_size": -1
-        }
+        sp_model_kwargs = {"enable_sampling": True, "alpha": 0.1, "nbest_size": -1}
         tokenizer = self.get_tokenizer(sp_model_kwargs=sp_model_kwargs)
         tokenizer_bin = pickle.dumps(tokenizer)
         del tokenizer
@@ -390,8 +360,7 @@ class TokenizerTesterMixin:
         for tokenizer in tokenizers:
             # first name of model_input_names has to correspond to main model input name
             # to make sure `tokenizer.pad(...)` works correctly
-            self.assertTrue(tokenizer.model_input_names[0] in
-                            accepted_model_main_input_names)
+            self.assertTrue(tokenizer.model_input_names[0] in accepted_model_main_input_names)
 
     def test_tokenizer_slow_store_full_signature(self):
         signature = inspect.signature(self.tokenizer_class.__init__)
@@ -419,8 +388,7 @@ class TokenizerTesterMixin:
                     self.assertTrue(hasattr(tokenizer, attr + "_id"))
 
                 self.assertTrue(hasattr(tokenizer, "additional_special_tokens"))
-                self.assertTrue(
-                    hasattr(tokenizer, "additional_special_tokens_ids"))
+                self.assertTrue(hasattr(tokenizer, "additional_special_tokens_ids"))
 
                 attributes_list = [
                     "model_max_length",
@@ -452,7 +420,8 @@ class TokenizerTesterMixin:
                 vocab = tokenizer.get_vocab()
                 token_id_to_test_setters = next(iter(vocab.values()))
                 token_to_test_setters = tokenizer.convert_ids_to_tokens(
-                    token_id_to_test_setters, skip_special_tokens=False)
+                    token_id_to_test_setters, skip_special_tokens=False
+                )
 
                 for attr in attributes_list:
                     setattr(tokenizer, attr + "_id", None)
@@ -460,25 +429,16 @@ class TokenizerTesterMixin:
                     self.assertEqual(getattr(tokenizer, attr + "_id"), None)
 
                     setattr(tokenizer, attr + "_id", token_id_to_test_setters)
-                    self.assertEqual(getattr(tokenizer, attr),
-                                     token_to_test_setters)
-                    self.assertEqual(getattr(tokenizer, attr + "_id"),
-                                     token_id_to_test_setters)
+                    self.assertEqual(getattr(tokenizer, attr), token_to_test_setters)
+                    self.assertEqual(getattr(tokenizer, attr + "_id"), token_id_to_test_setters)
 
                 setattr(tokenizer, "additional_special_tokens_ids", [])
-                self.assertListEqual(
-                    getattr(tokenizer, "additional_special_tokens"), [])
-                self.assertListEqual(
-                    getattr(tokenizer, "additional_special_tokens_ids"), [])
+                self.assertListEqual(getattr(tokenizer, "additional_special_tokens"), [])
+                self.assertListEqual(getattr(tokenizer, "additional_special_tokens_ids"), [])
 
-                setattr(tokenizer, "additional_special_tokens_ids",
-                        [token_id_to_test_setters])
-                self.assertListEqual(
-                    getattr(tokenizer, "additional_special_tokens"),
-                    [token_to_test_setters])
-                self.assertListEqual(
-                    getattr(tokenizer, "additional_special_tokens_ids"),
-                    [token_id_to_test_setters])
+                setattr(tokenizer, "additional_special_tokens_ids", [token_id_to_test_setters])
+                self.assertListEqual(getattr(tokenizer, "additional_special_tokens"), [token_to_test_setters])
+                self.assertListEqual(getattr(tokenizer, "additional_special_tokens_ids"), [token_id_to_test_setters])
 
     def test_save_and_load_tokenizer(self):
         # safety check on max_len default value so we are sure the test works
@@ -495,18 +455,14 @@ class TokenizerTesterMixin:
                 tmpdirname = tempfile.mkdtemp()
 
                 sample_text = " He is very happy, UNwant\u00E9d,running"
-                before_tokens = tokenizer.encode(sample_text,
-                                                 add_special_tokens=False)
+                before_tokens = tokenizer.encode(sample_text, add_special_tokens=False)
                 before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
-                after_tokenizer = tokenizer.__class__.from_pretrained(
-                    tmpdirname)
-                after_tokens = after_tokenizer.encode(sample_text,
-                                                      add_special_tokens=False)
+                after_tokenizer = tokenizer.__class__.from_pretrained(tmpdirname)
+                after_tokens = after_tokenizer.encode(sample_text, add_special_tokens=False)
                 after_vocab = after_tokenizer.get_vocab()
-                self.assertListEqual(before_tokens["input_ids"],
-                                     after_tokens["input_ids"])
+                self.assertListEqual(before_tokens["input_ids"], after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
 
                 shutil.rmtree(tmpdirname)
@@ -521,29 +477,22 @@ class TokenizerTesterMixin:
                 tokenizer.add_tokens(["bim", "bambam"])
                 additional_special_tokens = tokenizer.additional_special_tokens
                 additional_special_tokens.append("new_additional_special_token")
-                tokenizer.add_special_tokens(
-                    {"additional_special_tokens": additional_special_tokens})
-                before_tokens = tokenizer.encode(sample_text,
-                                                 add_special_tokens=False)
+                tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
+                before_tokens = tokenizer.encode(sample_text, add_special_tokens=False)
                 before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
-                after_tokenizer = tokenizer.__class__.from_pretrained(
-                    tmpdirname)
-                after_tokens = after_tokenizer.encode(sample_text,
-                                                      add_special_tokens=False)
+                after_tokenizer = tokenizer.__class__.from_pretrained(tmpdirname)
+                after_tokens = after_tokenizer.encode(sample_text, add_special_tokens=False)
                 after_vocab = after_tokenizer.get_vocab()
-                self.assertListEqual(before_tokens["input_ids"],
-                                     after_tokens["input_ids"])
+                self.assertListEqual(before_tokens["input_ids"], after_tokens["input_ids"])
                 self.assertDictEqual(before_vocab, after_vocab)
                 self.assertIn("bim", after_vocab)
                 self.assertIn("bambam", after_vocab)
-                self.assertIn("new_additional_special_token",
-                              after_tokenizer.additional_special_tokens)
+                self.assertIn("new_additional_special_token", after_tokenizer.additional_special_tokens)
                 self.assertEqual(after_tokenizer.model_max_length, 42)
 
-                tokenizer = tokenizer.__class__.from_pretrained(
-                    tmpdirname, model_max_length=43)
+                tokenizer = tokenizer.__class__.from_pretrained(tmpdirname, model_max_length=43)
                 self.assertEqual(tokenizer.model_max_length, 43)
 
                 shutil.rmtree(tmpdirname)
@@ -561,28 +510,22 @@ class TokenizerTesterMixin:
                 tokenizer.add_tokens(["bim", "bambam"])
                 additional_special_tokens = tokenizer.additional_special_tokens
                 additional_special_tokens.append("new_additional_special_token")
-                tokenizer.add_special_tokens(
-                    {"additional_special_tokens": additional_special_tokens})
-                before_tokens = tokenizer.encode(sample_text,
-                                                 add_special_tokens=False)
+                tokenizer.add_special_tokens({"additional_special_tokens": additional_special_tokens})
+                before_tokens = tokenizer.encode(sample_text, add_special_tokens=False)
                 before_vocab = tokenizer.get_vocab()
                 tokenizer.save_pretrained(tmpdirname)
 
-                after_tokenizer = tokenizer.__class__.from_pretrained(
-                    tmpdirname)
-                after_tokens = after_tokenizer.encode(sample_text,
-                                                      add_special_tokens=False)
+                after_tokenizer = tokenizer.__class__.from_pretrained(tmpdirname)
+                after_tokens = after_tokenizer.encode(sample_text, add_special_tokens=False)
                 after_vocab = after_tokenizer.get_vocab()
                 self.assertListEqual(before_tokens, after_tokens)
                 self.assertDictEqual(before_vocab, after_vocab)
                 self.assertIn("bim", after_vocab)
                 self.assertIn("bambam", after_vocab)
-                self.assertIn("new_additional_special_token",
-                              after_tokenizer.additional_special_tokens)
+                self.assertIn("new_additional_special_token", after_tokenizer.additional_special_tokens)
                 self.assertEqual(after_tokenizer.model_max_length, 42)
 
-                tokenizer = tokenizer.__class__.from_pretrained(
-                    tmpdirname, model_max_length=43)
+                tokenizer = tokenizer.__class__.from_pretrained(tmpdirname, model_max_length=43)
                 self.assertEqual(tokenizer.model_max_length, 43)
 
                 shutil.rmtree(tmpdirname)
@@ -609,11 +552,7 @@ class TokenizerTesterMixin:
     #             self.assertListEqual(subwords, subwords_loaded)
 
     def test_pickle_added_tokens(self):
-        tok1 = AddedToken("<s>",
-                          rstrip=True,
-                          lstrip=True,
-                          normalized=False,
-                          single_word=True)
+        tok1 = AddedToken("<s>", rstrip=True, lstrip=True, normalized=False, single_word=True)
         tok2 = pickle.loads(pickle.dumps(tok1))
 
         self.assertEqual(tok1.__getstate__(), tok2.__getstate__())
@@ -622,8 +561,7 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=True)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                if not hasattr(tokenizer,
-                               "do_lower_case") or not tokenizer.do_lower_case:
+                if not hasattr(tokenizer, "do_lower_case") or not tokenizer.do_lower_case:
                     continue
 
                 special_token = tokenizer.all_special_tokens[0]
@@ -631,17 +569,10 @@ class TokenizerTesterMixin:
                 text = special_token + " aaaaa bbbbbb low cccccccccdddddddd l " + special_token
                 text2 = special_token + " AAAAA BBBBBB low CCCCCCCCCDDDDDDDD l " + special_token
 
-                toks_before_adding = tokenizer.tokenize(
-                    text)  # toks before adding new_toks
+                toks_before_adding = tokenizer.tokenize(text)  # toks before adding new_toks
 
-                new_toks = [
-                    "aaaaa bbbbbb", "cccccccccdddddddd", "AAAAA BBBBBB",
-                    "CCCCCCCCCDDDDDDDD"
-                ]
-                added = tokenizer.add_tokens([
-                    AddedToken(tok, lstrip=True, rstrip=True)
-                    for tok in new_toks
-                ])
+                new_toks = ["aaaaa bbbbbb", "cccccccccdddddddd", "AAAAA BBBBBB", "CCCCCCCCCDDDDDDDD"]
+                added = tokenizer.add_tokens([AddedToken(tok, lstrip=True, rstrip=True) for tok in new_toks])
 
                 toks_after_adding = tokenizer.tokenize(text)
                 toks_after_adding2 = tokenizer.tokenize(text2)
@@ -652,19 +583,15 @@ class TokenizerTesterMixin:
 
                 self.assertListEqual(toks_after_adding, toks_after_adding2)
                 self.assertTrue(
-                    len(toks_before_adding) >
-                    len(toks_after_adding
-                        ),  # toks_before_adding should be longer
+                    len(toks_before_adding) > len(toks_after_adding),  # toks_before_adding should be longer
                 )
 
                 # Check that none of the special tokens are lowercased
-                sequence_with_special_tokens = "A " + " yEs ".join(
-                    tokenizer.all_special_tokens) + " B"
+                sequence_with_special_tokens = "A " + " yEs ".join(tokenizer.all_special_tokens) + " B"
                 # Convert the tokenized list to str as some special tokens are tokenized like normal tokens
                 # which have a prefix spacee e.g. the mask token of Albert, and cannot match the original
                 # special tokens exactly.
-                tokenized_sequence = "".join(
-                    tokenizer.tokenize(sequence_with_special_tokens))
+                tokenized_sequence = "".join(tokenizer.tokenize(sequence_with_special_tokens))
 
                 for special_token in tokenizer.all_special_tokens:
                     self.assertTrue(special_token in tokenized_sequence)
@@ -672,8 +599,7 @@ class TokenizerTesterMixin:
         tokenizers = self.get_tokenizers(do_lower_case=True)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
-                if hasattr(tokenizer,
-                           "do_lower_case") and tokenizer.do_lower_case:
+                if hasattr(tokenizer, "do_lower_case") and tokenizer.do_lower_case:
                     continue
 
                 special_token = tokenizer.all_special_tokens[0]
@@ -681,32 +607,21 @@ class TokenizerTesterMixin:
                 text = special_token + " aaaaa bbbbbb low cccccccccdddddddd l " + special_token
                 text2 = special_token + " AAAAA BBBBBB low CCCCCCCCCDDDDDDDD l " + special_token
 
-                toks_before_adding = tokenizer.tokenize(
-                    text)  # toks before adding new_toks
+                toks_before_adding = tokenizer.tokenize(text)  # toks before adding new_toks
 
-                new_toks = [
-                    "aaaaa bbbbbb", "cccccccccdddddddd", "AAAAA BBBBBB",
-                    "CCCCCCCCCDDDDDDDD"
-                ]
-                added = tokenizer.add_tokens([
-                    AddedToken(tok, lstrip=True, rstrip=True)
-                    for tok in new_toks
-                ])
+                new_toks = ["aaaaa bbbbbb", "cccccccccdddddddd", "AAAAA BBBBBB", "CCCCCCCCCDDDDDDDD"]
+                added = tokenizer.add_tokens([AddedToken(tok, lstrip=True, rstrip=True) for tok in new_toks])
                 self.assertIn(added, [2, 4])
 
                 toks_after_adding = tokenizer.tokenize(text)
                 toks_after_adding2 = tokenizer.tokenize(text2)
 
-                self.assertEqual(
-                    len(toks_after_adding),
-                    len(toks_after_adding2))  # Length should still be the same
+                self.assertEqual(len(toks_after_adding), len(toks_after_adding2))  # Length should still be the same
                 self.assertNotEqual(
                     toks_after_adding[1], toks_after_adding2[1]
                 )  # But at least the first non-special tokens should differ
                 self.assertTrue(
-                    len(toks_before_adding) >
-                    len(toks_after_adding
-                        ),  # toks_before_adding should be longer
+                    len(toks_before_adding) > len(toks_after_adding),  # toks_before_adding should be longer
                 )
 
     def test_add_tokens_tokenizer(self):
@@ -733,17 +648,13 @@ class TokenizerTesterMixin:
                 self.assertEqual(all_size_2, all_size + len(new_toks))
 
                 tokens = tokenizer.encode(
-                    "aaaaa bbbbbb low cccccccccdddddddd l",
-                    return_token_type_ids=None,
-                    add_special_tokens=False)["input_ids"]
+                    "aaaaa bbbbbb low cccccccccdddddddd l", return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 self.assertGreaterEqual(len(tokens), 4)
                 self.assertGreater(tokens[0], tokenizer.vocab_size - 1)
                 self.assertGreater(tokens[-2], tokenizer.vocab_size - 1)
 
-                new_toks_2 = {
-                    "eos_token": ">>>>|||<||<<|<<",
-                    "pad_token": "<<<<<|||>|>>>>|>"
-                }
+                new_toks_2 = {"eos_token": ">>>>|||<||<<|<<", "pad_token": "<<<<<|||>|>>>>|>"}
                 added_toks_2 = tokenizer.add_special_tokens(new_toks_2)
                 vocab_size_3 = tokenizer.vocab_size
                 all_size_3 = len(tokenizer)
@@ -756,7 +667,8 @@ class TokenizerTesterMixin:
                 tokens = tokenizer.encode(
                     ">>>>|||<||<<|<< aaaaabbbbbb low cccccccccdddddddd <<<<<|||>|>>>>|> l",
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
 
                 self.assertGreaterEqual(len(tokens), 6)
                 self.assertGreater(tokens[0], tokenizer.vocab_size - 1)
@@ -776,25 +688,19 @@ class TokenizerTesterMixin:
 
                 tokenizer.add_special_tokens({"cls_token": special_token})
                 encoded_special_token = tokenizer.encode(
-                    special_token,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    special_token, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 self.assertEqual(len(encoded_special_token), 1)
 
-                text = tokenizer.decode(ids + encoded_special_token,
-                                        clean_up_tokenization_spaces=False)
-                encoded = tokenizer.encode(
-                    text, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                text = tokenizer.decode(ids + encoded_special_token, clean_up_tokenization_spaces=False)
+                encoded = tokenizer.encode(text, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
 
-                input_encoded = tokenizer.encode(
-                    input_text,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                input_encoded = tokenizer.encode(input_text, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 special_token_id = tokenizer.encode(
-                    special_token,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    special_token, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 self.assertEqual(encoded, input_encoded + special_token_id)
 
                 decoded = tokenizer.decode(encoded, skip_special_tokens=True)
@@ -808,9 +714,7 @@ class TokenizerTesterMixin:
 
                 tokens = tokenizer.tokenize(input_text)
                 ids = tokenizer.convert_tokens_to_ids(tokens)
-                ids_2 = tokenizer.encode(input_text,
-                                         return_token_type_ids=None,
-                                         add_special_tokens=False)['input_ids']
+                ids_2 = tokenizer.encode(input_text, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
                 self.assertListEqual(ids, ids_2)
 
                 tokens_2 = tokenizer.convert_ids_to_tokens(ids)
@@ -836,36 +740,23 @@ class TokenizerTesterMixin:
                     output = "[ABC] [DEF] [ABC] GHI IHG [DEF]"
                 else:
                     output = input
-                encoded = tokenizer.encode(
-                    input, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                decoded = tokenizer.decode(encoded,
-                                           spaces_between_special_tokens=self.
-                                           space_between_special_tokens)
+                encoded = tokenizer.encode(input, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                decoded = tokenizer.decode(encoded, spaces_between_special_tokens=self.space_between_special_tokens)
                 self.assertIn(decoded, [output, output.lower()])
 
     def test_pretrained_model_lists(self):
         # We should have at least one default checkpoint for each tokenizer
         # We should specify the max input length as well (used in some part to list the pretrained checkpoints)
-        self.assertGreaterEqual(
-            len(self.tokenizer_class.pretrained_resource_files_map), 1)
-        self.assertGreaterEqual(
-            len(
-                list(
-                    self.tokenizer_class.pretrained_resource_files_map.values())
-                [0]), 1)
+        self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
+        self.assertGreaterEqual(len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]), 1)
         self.assertEqual(
-            len(
-                list(
-                    self.tokenizer_class.pretrained_resource_files_map.values())
-                [0]),
+            len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]),
             len(self.tokenizer_class.max_model_input_sizes),
         )
 
         weights_list = list(self.tokenizer_class.max_model_input_sizes.keys())
         weights_lists_2 = []
-        for file_id, map_list in self.tokenizer_class.pretrained_resource_files_map.items(
-        ):
+        for file_id, map_list in self.tokenizer_class.pretrained_resource_files_map.items():
             weights_lists_2.append(list(map_list.keys()))
 
         weights_list.sort()
@@ -878,16 +769,14 @@ class TokenizerTesterMixin:
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
 
-                if (tokenizer.build_inputs_with_special_tokens.__qualname__.
-                        split(".")[0] != "PretrainedTokenizer"
-                        and "token_type_ids" in tokenizer.model_input_names):
+                if (
+                    tokenizer.build_inputs_with_special_tokens.__qualname__.split(".")[0] != "PretrainedTokenizer"
+                    and "token_type_ids" in tokenizer.model_input_names
+                ):
                     seq_0 = "Test this method."
                     seq_1 = "With these inputs."
-                    information = tokenizer.encode(seq_0,
-                                                   seq_1,
-                                                   add_special_tokens=True)
-                    sequences, mask = information["input_ids"], information[
-                        "token_type_ids"]
+                    information = tokenizer.encode(seq_0, seq_1, add_special_tokens=True)
+                    sequences, mask = information["input_ids"], information["token_type_ids"]
                     self.assertEqual(len(sequences), len(mask))
 
     def test_token_type_ids(self):
@@ -911,102 +800,76 @@ class TokenizerTesterMixin:
                 seq_0 = "Test this method."
                 seq_1 = "With these inputs."
 
-                sequences = tokenizer.encode(
-                    seq_0,
-                    seq_1,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                attached_sequences = tokenizer.encode(
-                    seq_0, seq_1, add_special_tokens=True)['input_ids']
+                sequences = tokenizer.encode(seq_0, seq_1, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
+                attached_sequences = tokenizer.encode(seq_0, seq_1, add_special_tokens=True)["input_ids"]
 
                 # Method is implemented (e.g. not GPT-2)
                 if len(attached_sequences) != 2:
                     self.assertEqual(
-                        tokenizer.num_special_tokens_to_add(pair=True),
-                        len(attached_sequences) - len(sequences))
+                        tokenizer.num_special_tokens_to_add(pair=True), len(attached_sequences) - len(sequences)
+                    )
 
     def test_maximum_encoding_length_single_input(self):
-        tokenizers = self.get_tokenizers(do_lower_case=False,
-                                         model_max_length=100)
+        tokenizers = self.get_tokenizers(do_lower_case=False, model_max_length=100)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 seq_0, ids = self.get_clean_sequence(tokenizer, max_length=20)
 
-                sequence = tokenizer.encode(
-                    seq_0, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                sequence = tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
                 total_length = len(sequence)
 
-                self.assertGreater(
-                    total_length, 4,
-                    "Issue with the testing sequence, please update it it's too short"
-                )
+                self.assertGreater(total_length, 4, "Issue with the testing sequence, please update it it's too short")
 
                 # Test with max model input length
                 model_max_length = tokenizer.model_max_length
                 self.assertEqual(model_max_length, 100)
                 seq_1 = seq_0 * model_max_length
 
-                sequence1 = tokenizer(seq_1,
-                                      return_token_type_ids=None,
-                                      add_special_tokens=False,
-                                      truncation=False)
+                sequence1 = tokenizer(seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False)
                 total_length1 = len(sequence1["input_ids"])
                 self.assertGreater(
-                    total_length1, model_max_length,
-                    "Issue with the testing sequence, please update it it's too short"
+                    total_length1, model_max_length, "Issue with the testing sequence, please update it it's too short"
                 )
 
                 # Simple
                 padding_strategies = (
-                    [False, True, "longest"] if tokenizer.pad_token
-                    and tokenizer.pad_token_id >= 0 else [False])
+                    [False, True, "longest"] if tokenizer.pad_token and tokenizer.pad_token_id >= 0 else [False]
+                )
                 for padding_state in padding_strategies:
                     with self.subTest(f"Padding: {padding_state}"):
-                        for truncation_state in [
-                                True, "longest_first", "only_first"
-                        ]:
-                            with self.subTest(
-                                    f"Truncation: {truncation_state}"):
-                                output = tokenizer(seq_1,
-                                                   padding=padding_state,
-                                                   truncation=truncation_state)
-                                self.assertEqual(len(output["input_ids"]),
-                                                 model_max_length)
+                        for truncation_state in [True, "longest_first", "only_first"]:
+                            with self.subTest(f"Truncation: {truncation_state}"):
+                                output = tokenizer(seq_1, padding=padding_state, truncation=truncation_state)
+                                self.assertEqual(len(output["input_ids"]), model_max_length)
 
-                                output = tokenizer([seq_1],
-                                                   padding=padding_state,
-                                                   truncation=truncation_state)
-                                self.assertEqual(len(output["input_ids"][0]),
-                                                 model_max_length)
+                                output = tokenizer([seq_1], padding=padding_state, truncation=truncation_state)
+                                self.assertEqual(len(output["input_ids"][0]), model_max_length)
 
                         # Simple with no truncation
                         # Reset warnings
                         tokenizer.deprecation_warnings = {}
-                        with self.assertLogs("PaddleNLP",
-                                             level="WARNING") as cm:
-                            output = tokenizer(seq_1,
-                                               padding=padding_state,
-                                               truncation=False)
-                            self.assertNotEqual(len(output["input_ids"]),
-                                                model_max_length)
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer(seq_1, padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
-                        self.assertTrue(cm.records[0].message.startswith(
-                            "Token indices sequence length is longer than the specified maximum sequence length for this model"
-                        ))
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
 
                         tokenizer.deprecation_warnings = {}
-                        with self.assertLogs("PaddleNLP",
-                                             level="WARNING") as cm:
-                            output = tokenizer([seq_1],
-                                               padding=padding_state,
-                                               truncation=False)
-                            self.assertNotEqual(len(output["input_ids"][0]),
-                                                model_max_length)
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer([seq_1], padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"][0]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
-                        self.assertTrue(cm.records[0].message.startswith(
-                            "Token indices sequence length is longer than the specified maximum sequence length for this model"
-                        ))
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
 
                 # Overflowing tokens
                 stride = 2
@@ -1030,11 +893,10 @@ class TokenizerTesterMixin:
                 self.assertEqual(truncated_sequence, sequence[:-2])
 
                 self.assertEqual(len(overflowing_tokens), 2 + stride)
-                self.assertEqual(overflowing_tokens, sequence[-(2 + stride):])
+                self.assertEqual(overflowing_tokens, sequence[-(2 + stride) :])
 
     def test_maximum_encoding_length_pair_input(self):
-        tokenizers = self.get_tokenizers(do_lower_case=False,
-                                         model_max_length=100)
+        tokenizers = self.get_tokenizers(do_lower_case=False, model_max_length=100)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 # Build a sequence from our model's vocabulary
@@ -1044,36 +906,31 @@ class TokenizerTesterMixin:
                     seq_0 = (seq_0 + " ") * (2 + stride)
                     ids = None
 
-                seq0_tokens = tokenizer.encode(
-                    seq_0, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                seq0_tokens = tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 self.assertGreater(len(seq0_tokens), 2 + stride)
 
                 seq_1 = "This is another sentence to be encoded."
-                seq1_tokens = tokenizer.encode(
-                    seq_1, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                seq1_tokens = tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 if abs(len(seq0_tokens) - len(seq1_tokens)) <= 2:
                     seq1_tokens = seq1_tokens + seq1_tokens
-                    seq_1 = tokenizer.decode(seq1_tokens,
-                                             clean_up_tokenization_spaces=False)
-                seq1_tokens = tokenizer.encode(
-                    seq_1, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    seq_1 = tokenizer.decode(seq1_tokens, clean_up_tokenization_spaces=False)
+                seq1_tokens = tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
 
                 self.assertGreater(len(seq1_tokens), 2 + stride)
 
-                smallest = seq1_tokens if len(seq0_tokens) > len(
-                    seq1_tokens) else seq0_tokens
+                smallest = seq1_tokens if len(seq0_tokens) > len(seq1_tokens) else seq0_tokens
 
                 # We are not using the special tokens - a bit too hard to test all the tokenizers with this
                 # TODO try this again later
-                sequence = tokenizer.encode(
-                    seq_0,
-                    seq_1,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)[
-                        'input_ids']  # , add_prefix_space=False)
+                sequence = tokenizer.encode(seq_0, seq_1, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]  # , add_prefix_space=False)
 
                 # Test with max model input length
                 model_max_length = tokenizer.model_max_length
@@ -1081,124 +938,93 @@ class TokenizerTesterMixin:
                 seq_2 = seq_0 * model_max_length
                 self.assertGreater(len(seq_2), model_max_length)
 
-                sequence1 = tokenizer(seq_1,
-                                      return_token_type_ids=None,
-                                      add_special_tokens=False,
-                                      truncation=False)
+                sequence1 = tokenizer(seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False)
                 total_length1 = len(sequence1["input_ids"])
-                sequence2 = tokenizer(seq_2,
-                                      seq_1,
-                                      return_token_type_ids=None,
-                                      add_special_tokens=False,
-                                      truncation=False)
+                sequence2 = tokenizer(
+                    seq_2, seq_1, return_token_type_ids=None, add_special_tokens=False, truncation=False
+                )
                 total_length2 = len(sequence2["input_ids"])
                 self.assertLess(
-                    total_length1, model_max_length - 10,
-                    "Issue with the testing sequence, please update it.")
+                    total_length1, model_max_length - 10, "Issue with the testing sequence, please update it."
+                )
                 self.assertGreater(
-                    total_length2, model_max_length,
-                    "Issue with the testing sequence, please update it.")
+                    total_length2, model_max_length, "Issue with the testing sequence, please update it."
+                )
 
                 # Simple
                 padding_strategies = (
-                    [False, True, "longest"] if tokenizer.pad_token
-                    and tokenizer.pad_token_id >= 0 else [False])
+                    [False, True, "longest"] if tokenizer.pad_token and tokenizer.pad_token_id >= 0 else [False]
+                )
                 for padding_state in padding_strategies:
-                    with self.subTest(
-                            f"{tokenizer.__class__.__name__} Padding: {padding_state}"
-                    ):
-                        for truncation_state in [
-                                True, "longest_first", "only_first"
-                        ]:
-                            with self.subTest(
-                                    f"{tokenizer.__class__.__name__} Truncation: {truncation_state}"
-                            ):
-                                output = tokenizer(seq_2,
-                                                   seq_1,
-                                                   padding=padding_state,
-                                                   truncation=truncation_state)
-                                self.assertEqual(len(output["input_ids"]),
-                                                 model_max_length)
+                    with self.subTest(f"{tokenizer.__class__.__name__} Padding: {padding_state}"):
+                        for truncation_state in [True, "longest_first", "only_first"]:
+                            with self.subTest(f"{tokenizer.__class__.__name__} Truncation: {truncation_state}"):
+                                output = tokenizer(seq_2, seq_1, padding=padding_state, truncation=truncation_state)
+                                self.assertEqual(len(output["input_ids"]), model_max_length)
 
-                                output = tokenizer([seq_2], [seq_1],
-                                                   padding=padding_state,
-                                                   truncation=truncation_state)
-                                self.assertEqual(len(output["input_ids"][0]),
-                                                 model_max_length)
+                                output = tokenizer(
+                                    [seq_2], [seq_1], padding=padding_state, truncation=truncation_state
+                                )
+                                self.assertEqual(len(output["input_ids"][0]), model_max_length)
 
                         # Simple
-                        output = tokenizer(seq_1,
-                                           seq_2,
-                                           padding=padding_state,
-                                           truncation="only_second")
-                        self.assertEqual(len(output["input_ids"]),
-                                         model_max_length)
+                        output = tokenizer(seq_1, seq_2, padding=padding_state, truncation="only_second")
+                        self.assertEqual(len(output["input_ids"]), model_max_length)
 
-                        output = tokenizer([seq_1], [seq_2],
-                                           padding=padding_state,
-                                           truncation="only_second")
-                        self.assertEqual(len(output["input_ids"][0]),
-                                         model_max_length)
+                        output = tokenizer([seq_1], [seq_2], padding=padding_state, truncation="only_second")
+                        self.assertEqual(len(output["input_ids"][0]), model_max_length)
 
                         # Simple with no truncation
                         # Reset warnings
                         tokenizer.deprecation_warnings = {}
-                        with self.assertLogs("PaddleNLP",
-                                             level="WARNING") as cm:
-                            output = tokenizer(seq_1,
-                                               seq_2,
-                                               padding=padding_state,
-                                               truncation=False)
-                            self.assertNotEqual(len(output["input_ids"]),
-                                                model_max_length)
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer(seq_1, seq_2, padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
-                        self.assertTrue(cm.records[0].message.startswith(
-                            "Token indices sequence length is longer than the specified maximum sequence length for this model"
-                        ))
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
 
                         tokenizer.deprecation_warnings = {}
-                        with self.assertLogs("PaddleNLP",
-                                             level="WARNING") as cm:
-                            output = tokenizer([seq_1], [seq_2],
-                                               padding=padding_state,
-                                               truncation=False)
-                            self.assertNotEqual(len(output["input_ids"][0]),
-                                                model_max_length)
+                        with self.assertLogs("PaddleNLP", level="WARNING") as cm:
+                            output = tokenizer([seq_1], [seq_2], padding=padding_state, truncation=False)
+                            self.assertNotEqual(len(output["input_ids"][0]), model_max_length)
                         self.assertEqual(len(cm.records), 1)
-                        self.assertTrue(cm.records[0].message.startswith(
-                            "Token indices sequence length is longer than the specified maximum sequence length for this model"
-                        ))
+                        self.assertTrue(
+                            cm.records[0].message.startswith(
+                                "Token indices sequence length is longer than the specified maximum sequence length for this model"
+                            )
+                        )
 
-                truncated_first_sequence = tokenizer.encode(
-                    seq_0, return_token_type_ids=None, add_special_tokens=False
-                )['input_ids'][:-2] + tokenizer.encode(
-                    seq_1, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                truncated_second_sequence = (tokenizer.encode(
-                    seq_0, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids'] + tokenizer.encode(
-                        seq_1,
-                        return_token_type_ids=None,
-                        add_special_tokens=False)['input_ids'][:-2])
+                truncated_first_sequence = (
+                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"][:-2]
+                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                )
+                truncated_second_sequence = (
+                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"][:-2]
+                )
                 truncated_longest_sequence = (
-                    truncated_first_sequence
-                    if len(seq0_tokens) > len(seq1_tokens) else
-                    truncated_second_sequence)
+                    truncated_first_sequence if len(seq0_tokens) > len(seq1_tokens) else truncated_second_sequence
+                )
 
-                overflow_first_sequence = tokenizer.encode(
-                    seq_0, return_token_type_ids=None, add_special_tokens=False
-                )['input_ids'][-(2 + stride):] + tokenizer.encode(
-                    seq_1, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                overflow_second_sequence = (tokenizer.encode(
-                    seq_0, return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids'] + tokenizer.encode(
-                        seq_1,
-                        return_token_type_ids=None,
-                        add_special_tokens=False)['input_ids'][-(2 + stride):])
-                overflow_longest_sequence = (overflow_first_sequence if
-                                             len(seq0_tokens) > len(seq1_tokens)
-                                             else overflow_second_sequence)
+                overflow_first_sequence = (
+                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
+                        -(2 + stride) :
+                    ]
+                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                )
+                overflow_second_sequence = (
+                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
+                        -(2 + stride) :
+                    ]
+                )
+                overflow_longest_sequence = (
+                    overflow_first_sequence if len(seq0_tokens) > len(seq1_tokens) else overflow_second_sequence
+                )
 
                 with self.assertRaises(ValueError) as context:
                     information = tokenizer(
@@ -1213,10 +1039,13 @@ class TokenizerTesterMixin:
                         # add_prefix_space=False,
                     )
 
-                self.assertTrue(context.exception.args[0].startswith(
-                    "Not possible to return overflowing tokens for pair of sequences with the "
-                    "`longest_first`. Please select another truncation strategy than `longest_first`, "
-                    "for instance `only_second` or `only_first`."))
+                self.assertTrue(
+                    context.exception.args[0].startswith(
+                        "Not possible to return overflowing tokens for pair of sequences with the "
+                        "`longest_first`. Please select another truncation strategy than `longest_first`, "
+                        "for instance `only_second` or `only_first`."
+                    )
+                )
 
                 # Overflowing tokens are handled quite differently in slow and fast tokenizers
 
@@ -1234,10 +1063,13 @@ class TokenizerTesterMixin:
                         # add_prefix_space=False,
                     )
 
-                self.assertTrue(context.exception.args[0].startswith(
-                    "Not possible to return overflowing tokens for pair of sequences with the "
-                    "`longest_first`. Please select another truncation strategy than `longest_first`, "
-                    "for instance `only_second` or `only_first`."))
+                self.assertTrue(
+                    context.exception.args[0].startswith(
+                        "Not possible to return overflowing tokens for pair of sequences with the "
+                        "`longest_first`. Please select another truncation strategy than `longest_first`, "
+                        "for instance `only_second` or `only_first`."
+                    )
+                )
 
                 information_first_truncated = tokenizer(
                     seq_0,
@@ -1253,15 +1085,13 @@ class TokenizerTesterMixin:
                 # Overflowing tokens are handled quite differently in slow and fast tokenizers
 
                 truncated_sequence = information_first_truncated["input_ids"]
-                overflowing_tokens = information_first_truncated[
-                    "overflowing_tokens"]
+                overflowing_tokens = information_first_truncated["overflowing_tokens"]
 
                 self.assertEqual(len(truncated_sequence), len(sequence) - 2)
                 self.assertEqual(truncated_sequence, truncated_first_sequence)
 
                 self.assertEqual(len(overflowing_tokens), 2 + stride)
-                self.assertEqual(overflowing_tokens,
-                                 seq0_tokens[-(2 + stride):])
+                self.assertEqual(overflowing_tokens, seq0_tokens[-(2 + stride) :])
 
                 information_second_truncated = tokenizer(
                     seq_0,
@@ -1277,15 +1107,13 @@ class TokenizerTesterMixin:
                 # Overflowing tokens are handled quite differently in slow and fast tokenizers
 
                 truncated_sequence = information_second_truncated["input_ids"]
-                overflowing_tokens = information_second_truncated[
-                    "overflowing_tokens"]
+                overflowing_tokens = information_second_truncated["overflowing_tokens"]
 
                 self.assertEqual(len(truncated_sequence), len(sequence) - 2)
                 self.assertEqual(truncated_sequence, truncated_second_sequence)
 
                 self.assertEqual(len(overflowing_tokens), 2 + stride)
-                self.assertEqual(overflowing_tokens,
-                                 seq1_tokens[-(2 + stride):])
+                self.assertEqual(overflowing_tokens, seq1_tokens[-(2 + stride) :])
 
     # def test_encode_input_type(self):
     #     tokenizers = self.get_tokenizers(do_lower_case=False)
@@ -1351,25 +1179,17 @@ class TokenizerTesterMixin:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 sequence_0 = "Encode this."
                 # Testing single inputs
-                encoded_sequence = tokenizer.encode(
-                    sequence_0,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence_0, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 encoded_sequence_dict = tokenizer.encode(
-                    sequence_0,
-                    add_special_tokens=True,
-                    return_special_tokens_mask=True  # , add_prefix_space=False
+                    sequence_0, add_special_tokens=True, return_special_tokens_mask=True  # , add_prefix_space=False
                 )
                 encoded_sequence_w_special = encoded_sequence_dict["input_ids"]
-                special_tokens_mask = encoded_sequence_dict[
-                    "special_tokens_mask"]
-                self.assertEqual(len(special_tokens_mask),
-                                 len(encoded_sequence_w_special))
+                special_tokens_mask = encoded_sequence_dict["special_tokens_mask"]
+                self.assertEqual(len(special_tokens_mask), len(encoded_sequence_w_special))
 
-                filtered_sequence = [
-                    x for i, x in enumerate(encoded_sequence_w_special)
-                    if not special_tokens_mask[i]
-                ]
+                filtered_sequence = [x for i, x in enumerate(encoded_sequence_w_special) if not special_tokens_mask[i]]
                 self.assertEqual(encoded_sequence, filtered_sequence)
 
     def test_special_tokens_mask_input_pairs(self):
@@ -1378,14 +1198,12 @@ class TokenizerTesterMixin:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 sequence_0 = "Encode this."
                 sequence_1 = "This one too please."
-                encoded_sequence = tokenizer.encode(
-                    sequence_0,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                encoded_sequence += tokenizer.encode(
-                    sequence_1,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence_0, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
+                encoded_sequence += tokenizer.encode(sequence_1, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 encoded_sequence_dict = tokenizer.encode(
                     sequence_0,
                     sequence_1,
@@ -1394,30 +1212,22 @@ class TokenizerTesterMixin:
                     # add_prefix_space=False,
                 )
                 encoded_sequence_w_special = encoded_sequence_dict["input_ids"]
-                special_tokens_mask = encoded_sequence_dict[
-                    "special_tokens_mask"]
-                self.assertEqual(len(special_tokens_mask),
-                                 len(encoded_sequence_w_special))
+                special_tokens_mask = encoded_sequence_dict["special_tokens_mask"]
+                self.assertEqual(len(special_tokens_mask), len(encoded_sequence_w_special))
 
                 filtered_sequence = [
-                    (x if not special_tokens_mask[i] else None)
-                    for i, x in enumerate(encoded_sequence_w_special)
+                    (x if not special_tokens_mask[i] else None) for i, x in enumerate(encoded_sequence_w_special)
                 ]
-                filtered_sequence = [
-                    x for x in filtered_sequence if x is not None
-                ]
+                filtered_sequence = [x for x in filtered_sequence if x is not None]
                 self.assertEqual(encoded_sequence, filtered_sequence)
 
     def test_padding_side_in_kwargs(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, padding_side="left", **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, padding_side="left", **kwargs)
                 self.assertEqual(tokenizer.padding_side, "left")
 
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, padding_side="right", **kwargs)
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, padding_side="right", **kwargs)
                 self.assertEqual(tokenizer.padding_side, "right")
 
                 self.assertRaises(
@@ -1430,14 +1240,11 @@ class TokenizerTesterMixin:
 
     def test_truncation_side_in_kwargs(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, truncation_side="left", **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, truncation_side="left", **kwargs)
                 self.assertEqual(tokenizer.truncation_side, "left")
 
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, truncation_side="right", **kwargs)
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, truncation_side="right", **kwargs)
                 self.assertEqual(tokenizer.truncation_side, "right")
 
                 self.assertRaises(
@@ -1462,60 +1269,50 @@ class TokenizerTesterMixin:
 
                 # RIGHT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "right"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    padding="max_length")['input_ids']
+                    sequence, max_length=sequence_length + padding_size, padding="max_length"
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual(
-                    encoded_sequence + [padding_idx] * padding_size,
-                    padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual(encoded_sequence + [padding_idx] * padding_size, padded_sequence)
 
                 # LEFT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "left"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    padding="max_length")['input_ids']
+                    sequence, max_length=sequence_length + padding_size, padding="max_length"
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual([padding_idx] * padding_size +
-                                 encoded_sequence, padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual([padding_idx] * padding_size + encoded_sequence, padded_sequence)
 
                 # RIGHT & LEFT PADDING - Check that nothing is done for 'longest' and 'no_padding'
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(
-                    sequence, padding=True)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence, padding=True)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)
 
                 tokenizer.padding_side = "left"
-                padded_sequence_left = tokenizer.encode(
-                    sequence, padding="longest")['input_ids']
+                padded_sequence_left = tokenizer.encode(sequence, padding="longest")["input_ids"]
                 padded_sequence_left_length = len(padded_sequence_left)
                 self.assertEqual(sequence_length, padded_sequence_left_length)
                 self.assertEqual(encoded_sequence, padded_sequence_left)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(sequence)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)
 
                 tokenizer.padding_side = "left"
-                padded_sequence_left = tokenizer.encode(
-                    sequence, padding=False)['input_ids']
+                padded_sequence_left = tokenizer.encode(sequence, padding=False)["input_ids"]
                 padded_sequence_left_length = len(padded_sequence_left)
                 self.assertEqual(sequence_length, padded_sequence_left_length)
                 self.assertEqual(encoded_sequence, padded_sequence_left)
@@ -1529,10 +1326,9 @@ class TokenizerTesterMixin:
                 # RIGHT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 truncation_size = 3
                 tokenizer.truncation_side = "right"
-                encoded_sequence = tokenizer.encode(
-                    sequence,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 sequence_length = len(encoded_sequence)
                 # Remove EOS/BOS tokens
                 truncated_sequence = tokenizer.encode(
@@ -1540,12 +1336,11 @@ class TokenizerTesterMixin:
                     max_length=sequence_length - truncation_size,
                     truncation=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
                 truncated_sequence_length = len(truncated_sequence)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_length + truncation_size)
-                self.assertEqual(encoded_sequence[:-truncation_size],
-                                 truncated_sequence)
+                self.assertEqual(sequence_length, truncated_sequence_length + truncation_size)
+                self.assertEqual(encoded_sequence[:-truncation_size], truncated_sequence)
 
                 # LEFT PADDING - Check that it correctly pads when a maximum length is specified along with the truncation flag set to True
                 tokenizer.truncation_side = "left"
@@ -1555,57 +1350,45 @@ class TokenizerTesterMixin:
                     max_length=sequence_length - truncation_size,
                     truncation=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
                 truncated_sequence_length = len(truncated_sequence)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_length + truncation_size)
-                self.assertEqual(encoded_sequence[truncation_size:],
-                                 truncated_sequence)
+                self.assertEqual(sequence_length, truncated_sequence_length + truncation_size)
+                self.assertEqual(encoded_sequence[truncation_size:], truncated_sequence)
 
                 # RIGHT & LEFT PADDING - Check that nothing is done for 'longest' and 'no_truncation'
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.truncation_side = "right"
                 truncated_sequence_right = tokenizer.encode(
-                    sequence,
-                    truncation=True,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation=True, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_right_length = len(truncated_sequence_right)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_right_length)
+                self.assertEqual(sequence_length, truncated_sequence_right_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_right)
 
                 tokenizer.truncation_side = "left"
                 truncated_sequence_left = tokenizer.encode(
-                    sequence,
-                    truncation="longest_first",
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation="longest_first", return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_left_length = len(truncated_sequence_left)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_left_length)
+                self.assertEqual(sequence_length, truncated_sequence_left_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_left)
 
                 tokenizer.truncation_side = "right"
                 truncated_sequence_right = tokenizer.encode(
-                    sequence,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_right_length = len(truncated_sequence_right)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_right_length)
+                self.assertEqual(sequence_length, truncated_sequence_right_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_right)
 
                 tokenizer.truncation_side = "left"
                 truncated_sequence_left = tokenizer.encode(
-                    sequence,
-                    truncation=False,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation=False, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_left_length = len(truncated_sequence_left)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_left_length)
+                self.assertEqual(sequence_length, truncated_sequence_left_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_left)
 
     def test_padding_to_max_length(self):
@@ -1623,27 +1406,22 @@ class TokenizerTesterMixin:
 
                 # Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "right"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 # FIXME: the next line should be padding(max_length) to avoid warning
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    pad_to_max_seq_len=True)['input_ids']
+                    sequence, max_length=sequence_length + padding_size, pad_to_max_seq_len=True
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual(
-                    encoded_sequence + [padding_idx] * padding_size,
-                    padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual(encoded_sequence + [padding_idx] * padding_size, padded_sequence)
 
                 # Check that nothing is done when a maximum length is not specified
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(
-                    sequence, pad_to_max_seq_len=True)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence, pad_to_max_seq_len=True)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)
@@ -1655,36 +1433,21 @@ class TokenizerTesterMixin:
                 if tokenizer.pad_token is None:
                     self.skipTest("No padding token.")
                 else:
-                    empty_tokens = tokenizer("",
-                                             padding=True,
-                                             pad_to_multiple_of=8)
-                    normal_tokens = tokenizer("This is a sample input",
-                                              padding=True,
-                                              pad_to_multiple_of=8)
+                    empty_tokens = tokenizer("", padding=True, pad_to_multiple_of=8)
+                    normal_tokens = tokenizer("This is a sample input", padding=True, pad_to_multiple_of=8)
                     for key, value in empty_tokens.items():
-                        self.assertEqual(
-                            len(value) % 8, 0,
-                            f"BatchEncoding.{key} is not multiple of 8")
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
                     for key, value in normal_tokens.items():
-                        self.assertEqual(
-                            len(value) % 8, 0,
-                            f"BatchEncoding.{key} is not multiple of 8")
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
 
                     normal_tokens = tokenizer("This", pad_to_multiple_of=8)
                     for key, value in normal_tokens.items():
-                        self.assertNotEqual(
-                            len(value) % 8, 0,
-                            f"BatchEncoding.{key} is not multiple of 8")
+                        self.assertNotEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
 
                     # Should also work with truncation
-                    normal_tokens = tokenizer("This",
-                                              padding=True,
-                                              truncation=True,
-                                              pad_to_multiple_of=8)
+                    normal_tokens = tokenizer("This", padding=True, truncation=True, pad_to_multiple_of=8)
                     for key, value in normal_tokens.items():
-                        self.assertEqual(
-                            len(value) % 8, 0,
-                            f"BatchEncoding.{key} is not multiple of 8")
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
 
                     # truncation to something which is not a multiple of pad_to_multiple_of raises an error
                     self.assertRaises(
@@ -1707,24 +1470,14 @@ class TokenizerTesterMixin:
                     self.skipTest("This model does not use attention mask.")
 
                 features = [
-                    {
-                        "input_ids": [1, 2, 3, 4, 5, 6],
-                        "attention_mask": [1, 1, 1, 1, 1, 0]
-                    },
-                    {
-                        "input_ids": [1, 2, 3],
-                        "attention_mask": [1, 1, 0]
-                    },
+                    {"input_ids": [1, 2, 3, 4, 5, 6], "attention_mask": [1, 1, 1, 1, 1, 0]},
+                    {"input_ids": [1, 2, 3], "attention_mask": [1, 1, 0]},
                 ]
                 padded_features = tokenizer.pad(features)
                 if tokenizer.padding_side == "right":
-                    self.assertListEqual(
-                        padded_features["attention_mask"],
-                        [[1, 1, 1, 1, 1, 0], [1, 1, 0, 0, 0, 0]])
+                    self.assertListEqual(padded_features["attention_mask"], [[1, 1, 1, 1, 1, 0], [1, 1, 0, 0, 0, 0]])
                 else:
-                    self.assertListEqual(
-                        padded_features["attention_mask"],
-                        [[1, 1, 1, 1, 1, 0], [0, 0, 0, 1, 1, 0]])
+                    self.assertListEqual(padded_features["attention_mask"], [[1, 1, 1, 1, 1, 0], [0, 0, 0, 1, 1, 0]])
 
     def test_encode_plus_with_padding(self):
         tokenizers = self.get_tokenizers(do_lower_case=False)
@@ -1739,8 +1492,7 @@ class TokenizerTesterMixin:
                 padding_idx = tokenizer.pad_token_id
                 token_type_padding_idx = tokenizer.pad_token_type_id
 
-                encoded_sequence = tokenizer.encode(
-                    sequence, return_special_tokens_mask=True)
+                encoded_sequence = tokenizer.encode(sequence, return_special_tokens_mask=True)
                 input_ids = encoded_sequence["input_ids"]
                 special_tokens_mask = encoded_sequence["special_tokens_mask"]
                 sequence_length = len(input_ids)
@@ -1755,14 +1507,12 @@ class TokenizerTesterMixin:
                 )
                 not_padded_input_ids = not_padded_sequence["input_ids"]
 
-                not_padded_special_tokens_mask = not_padded_sequence[
-                    "special_tokens_mask"]
+                not_padded_special_tokens_mask = not_padded_sequence["special_tokens_mask"]
                 not_padded_sequence_length = len(not_padded_input_ids)
 
                 self.assertEqual(sequence_length, not_padded_sequence_length)
                 self.assertEqual(input_ids, not_padded_input_ids)
-                self.assertEqual(special_tokens_mask,
-                                 not_padded_special_tokens_mask)
+                self.assertEqual(special_tokens_mask, not_padded_special_tokens_mask)
 
                 not_padded_sequence = tokenizer.encode(
                     sequence,
@@ -1771,14 +1521,12 @@ class TokenizerTesterMixin:
                 )
                 not_padded_input_ids = not_padded_sequence["input_ids"]
 
-                not_padded_special_tokens_mask = not_padded_sequence[
-                    "special_tokens_mask"]
+                not_padded_special_tokens_mask = not_padded_sequence["special_tokens_mask"]
                 not_padded_sequence_length = len(not_padded_input_ids)
 
                 self.assertEqual(sequence_length, not_padded_sequence_length)
                 self.assertEqual(input_ids, not_padded_input_ids)
-                self.assertEqual(special_tokens_mask,
-                                 not_padded_special_tokens_mask)
+                self.assertEqual(special_tokens_mask, not_padded_special_tokens_mask)
 
                 # Test right padding
                 tokenizer.padding_side = "right"
@@ -1791,16 +1539,12 @@ class TokenizerTesterMixin:
                 )
                 right_padded_input_ids = right_padded_sequence["input_ids"]
 
-                right_padded_special_tokens_mask = right_padded_sequence[
-                    "special_tokens_mask"]
+                right_padded_special_tokens_mask = right_padded_sequence["special_tokens_mask"]
                 right_padded_sequence_length = len(right_padded_input_ids)
 
-                self.assertEqual(sequence_length + padding_size,
-                                 right_padded_sequence_length)
-                self.assertEqual(input_ids + [padding_idx] * padding_size,
-                                 right_padded_input_ids)
-                self.assertEqual(special_tokens_mask + [1] * padding_size,
-                                 right_padded_special_tokens_mask)
+                self.assertEqual(sequence_length + padding_size, right_padded_sequence_length)
+                self.assertEqual(input_ids + [padding_idx] * padding_size, right_padded_input_ids)
+                self.assertEqual(special_tokens_mask + [1] * padding_size, right_padded_special_tokens_mask)
 
                 # Test left padding
                 tokenizer.padding_side = "left"
@@ -1811,42 +1555,32 @@ class TokenizerTesterMixin:
                     return_special_tokens_mask=True,
                 )
                 left_padded_input_ids = left_padded_sequence["input_ids"]
-                left_padded_special_tokens_mask = left_padded_sequence[
-                    "special_tokens_mask"]
+                left_padded_special_tokens_mask = left_padded_sequence["special_tokens_mask"]
                 left_padded_sequence_length = len(left_padded_input_ids)
 
-                self.assertEqual(sequence_length + padding_size,
-                                 left_padded_sequence_length)
-                self.assertEqual([padding_idx] * padding_size + input_ids,
-                                 left_padded_input_ids)
-                self.assertEqual([1] * padding_size + special_tokens_mask,
-                                 left_padded_special_tokens_mask)
+                self.assertEqual(sequence_length + padding_size, left_padded_sequence_length)
+                self.assertEqual([padding_idx] * padding_size + input_ids, left_padded_input_ids)
+                self.assertEqual([1] * padding_size + special_tokens_mask, left_padded_special_tokens_mask)
 
                 if "token_type_ids" in tokenizer.model_input_names:
                     token_type_ids = encoded_sequence["token_type_ids"]
-                    left_padded_token_type_ids = left_padded_sequence[
-                        "token_type_ids"]
-                    right_padded_token_type_ids = right_padded_sequence[
-                        "token_type_ids"]
+                    left_padded_token_type_ids = left_padded_sequence["token_type_ids"]
+                    right_padded_token_type_ids = right_padded_sequence["token_type_ids"]
 
                     self.assertEqual(
-                        token_type_ids +
-                        [token_type_padding_idx] * padding_size,
-                        right_padded_token_type_ids)
-                    self.assertEqual([token_type_padding_idx] * padding_size +
-                                     token_type_ids, left_padded_token_type_ids)
+                        token_type_ids + [token_type_padding_idx] * padding_size, right_padded_token_type_ids
+                    )
+                    self.assertEqual(
+                        [token_type_padding_idx] * padding_size + token_type_ids, left_padded_token_type_ids
+                    )
 
                 if "attention_mask" in tokenizer.model_input_names:
                     attention_mask = encoded_sequence["attention_mask"]
-                    right_padded_attention_mask = right_padded_sequence[
-                        "attention_mask"]
-                    left_padded_attention_mask = left_padded_sequence[
-                        "attention_mask"]
+                    right_padded_attention_mask = right_padded_sequence["attention_mask"]
+                    left_padded_attention_mask = left_padded_sequence["attention_mask"]
 
-                    self.assertEqual(attention_mask + [0] * padding_size,
-                                     right_padded_attention_mask)
-                    self.assertEqual([0] * padding_size + attention_mask,
-                                     left_padded_attention_mask)
+                    self.assertEqual(attention_mask + [0] * padding_size, right_padded_attention_mask)
+                    self.assertEqual([0] * padding_size + attention_mask, left_padded_attention_mask)
 
     def test_separate_tokenizers(self):
         # This tests that tokenizers don't impact others. Unfortunately the case where it fails is when
@@ -1869,17 +1603,11 @@ class TokenizerTesterMixin:
                 self.assertIsInstance(vocab_dict, dict)
                 self.assertGreaterEqual(len(tokenizer), len(vocab_dict))
 
-                vocab = [
-                    tokenizer.convert_ids_to_tokens(i)
-                    for i in range(len(tokenizer))
-                ]
+                vocab = [tokenizer.convert_ids_to_tokens(i) for i in range(len(tokenizer))]
                 self.assertEqual(len(vocab), len(tokenizer))
 
                 tokenizer.add_tokens(["asdfasdfasdfasdf"])
-                vocab = [
-                    tokenizer.convert_ids_to_tokens(i)
-                    for i in range(len(tokenizer))
-                ]
+                vocab = [tokenizer.convert_ids_to_tokens(i) for i in range(len(tokenizer))]
                 self.assertEqual(len(vocab), len(tokenizer))
 
     def test_conversion_reversible(self):
@@ -1906,45 +1634,34 @@ class TokenizerTesterMixin:
 
                 # Test not batched
                 encoded_sequences_1 = tokenizer.encode(
-                    sequences[0],
-                    return_token_type_ids=False,
-                    return_attention_mask=True)
-                encoded_sequences_2 = tokenizer(sequences[0],
-                                                return_token_type_ids=False,
-                                                return_attention_mask=True)
+                    sequences[0], return_token_type_ids=False, return_attention_mask=True
+                )
+                encoded_sequences_2 = tokenizer(sequences[0], return_token_type_ids=False, return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test not batched pairs
                 encoded_sequences_1 = tokenizer.encode(
-                    sequences[0],
-                    sequences[1],
-                    return_token_type_ids=False,
-                    return_attention_mask=True)
-                encoded_sequences_2 = tokenizer(sequences[0],
-                                                sequences[1],
-                                                return_token_type_ids=False,
-                                                return_attention_mask=True)
+                    sequences[0], sequences[1], return_token_type_ids=False, return_attention_mask=True
+                )
+                encoded_sequences_2 = tokenizer(
+                    sequences[0], sequences[1], return_token_type_ids=False, return_attention_mask=True
+                )
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test batched
                 encoded_sequences_1 = tokenizer.batch_encode(
-                    sequences,
-                    return_token_type_ids=False,
-                    return_attention_mask=True)
-                encoded_sequences_2 = tokenizer(sequences,
-                                                return_token_type_ids=False,
-                                                return_attention_mask=True)
+                    sequences, return_token_type_ids=False, return_attention_mask=True
+                )
+                encoded_sequences_2 = tokenizer(sequences, return_token_type_ids=False, return_attention_mask=True)
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
                 # Test batched pairs
                 encoded_sequences_1 = tokenizer.batch_encode(
-                    list(zip(sequences, sequences)),
-                    return_token_type_ids=False,
-                    return_attention_mask=True)
-                encoded_sequences_2 = tokenizer(sequences,
-                                                sequences,
-                                                return_token_type_ids=False,
-                                                return_attention_mask=True)
+                    list(zip(sequences, sequences)), return_token_type_ids=False, return_attention_mask=True
+                )
+                encoded_sequences_2 = tokenizer(
+                    sequences, sequences, return_token_type_ids=False, return_attention_mask=True
+                )
                 self.assertEqual(encoded_sequences_1, encoded_sequences_2)
 
     def test_batch_encode_plus_batch_sequence_length(self):
@@ -1958,48 +1675,35 @@ class TokenizerTesterMixin:
                     "Testing batch encode plus with different sequence lengths correctly pads",
                 ]
 
-                encoded_sequences = [
-                    tokenizer.encode(sequence) for sequence in sequences
-                ]
-                encoded_sequences_batch = tokenizer.batch_encode(sequences,
-                                                                 padding=False)
+                encoded_sequences = [tokenizer.encode(sequence) for sequence in sequences]
+                encoded_sequences_batch = tokenizer.batch_encode(sequences, padding=False)
                 self.assertListEqual(
-                    encoded_sequences,
-                    self.convert_batch_encode_plus_format_to_encode_plus(
-                        encoded_sequences_batch))
+                    encoded_sequences, self.convert_batch_encode_plus_format_to_encode_plus(encoded_sequences_batch)
+                )
 
                 maximum_length = len(
-                    max([
-                        encoded_sequence["input_ids"]
-                        for encoded_sequence in encoded_sequences
-                    ],
-                        key=len))
+                    max([encoded_sequence["input_ids"] for encoded_sequence in encoded_sequences], key=len)
+                )
 
                 # check correct behaviour if no pad_token_id exists and add it eventually
                 self._check_no_pad_token_padding(tokenizer, sequences)
 
                 encoded_sequences_padded = [
-                    tokenizer.encode(sequence,
-                                     max_length=maximum_length,
-                                     padding="max_length")
+                    tokenizer.encode(sequence, max_length=maximum_length, padding="max_length")
                     for sequence in sequences
                 ]
 
-                encoded_sequences_batch_padded = tokenizer.batch_encode(
-                    sequences, padding=True)
+                encoded_sequences_batch_padded = tokenizer.batch_encode(sequences, padding=True)
                 self.assertListEqual(
                     encoded_sequences_padded,
-                    self.convert_batch_encode_plus_format_to_encode_plus(
-                        encoded_sequences_batch_padded),
+                    self.convert_batch_encode_plus_format_to_encode_plus(encoded_sequences_batch_padded),
                 )
 
                 # check 'longest' is unsensitive to a max length
-                encoded_sequences_batch_padded_1 = tokenizer.batch_encode(
-                    sequences, padding=True)
+                encoded_sequences_batch_padded_1 = tokenizer.batch_encode(sequences, padding=True)
                 encoded_sequences_batch_padded_2 = tokenizer.batch_encode(
-                    sequences,
-                    max_length=maximum_length + 10,
-                    padding="longest")
+                    sequences, max_length=maximum_length + 10, padding="longest"
+                )
                 for key in encoded_sequences_batch_padded_1.keys():
                     self.assertListEqual(
                         encoded_sequences_batch_padded_1[key],
@@ -2007,10 +1711,10 @@ class TokenizerTesterMixin:
                     )
 
                 # check 'no_padding' is unsensitive to a max length
-                encoded_sequences_batch_padded_1 = tokenizer.batch_encode(
-                    sequences, padding=False)
+                encoded_sequences_batch_padded_1 = tokenizer.batch_encode(sequences, padding=False)
                 encoded_sequences_batch_padded_2 = tokenizer.batch_encode(
-                    sequences, max_length=maximum_length + 10, padding=False)
+                    sequences, max_length=maximum_length + 10, padding=False
+                )
                 for key in encoded_sequences_batch_padded_1.keys():
                     self.assertListEqual(
                         encoded_sequences_batch_padded_1[key],
@@ -2046,8 +1750,7 @@ class TokenizerTesterMixin:
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 new_token = AddedToken("new_token", lstrip=True)
-                tokenizer.add_special_tokens(
-                    {"additional_special_tokens": [new_token]})
+                tokenizer.add_special_tokens({"additional_special_tokens": [new_token]})
 
                 with tempfile.TemporaryDirectory() as tmp_dir_name:
                     tokenizer.save_pretrained(tmp_dir_name)
@@ -2072,17 +1775,14 @@ class TokenizerTesterMixin:
                 self._check_no_pad_token_padding(tokenizer, sequences)
 
                 encoded_sequences = [
-                    tokenizer.encode(sequence,
-                                     max_length=max_length,
-                                     padding="max_length")
-                    for sequence in sequences
+                    tokenizer.encode(sequence, max_length=max_length, padding="max_length") for sequence in sequences
                 ]
                 encoded_sequences_batch = tokenizer.batch_encode(
-                    sequences, max_length=max_length, padding="max_length")
+                    sequences, max_length=max_length, padding="max_length"
+                )
                 self.assertListEqual(
-                    encoded_sequences,
-                    self.convert_batch_encode_plus_format_to_encode_plus(
-                        encoded_sequences_batch))
+                    encoded_sequences, self.convert_batch_encode_plus_format_to_encode_plus(encoded_sequences_batch)
+                )
 
         # Left padding tests
         tokenizers = self.get_tokenizers(do_lower_case=False)
@@ -2101,174 +1801,145 @@ class TokenizerTesterMixin:
                 self._check_no_pad_token_padding(tokenizer, sequences)
 
                 encoded_sequences = [
-                    tokenizer.encode(sequence,
-                                     max_length=max_length,
-                                     padding="max_length")
-                    for sequence in sequences
+                    tokenizer.encode(sequence, max_length=max_length, padding="max_length") for sequence in sequences
                 ]
                 encoded_sequences_batch = tokenizer.batch_encode(
-                    sequences, max_length=max_length, padding="max_length")
+                    sequences, max_length=max_length, padding="max_length"
+                )
                 self.assertListEqual(
-                    encoded_sequences,
-                    self.convert_batch_encode_plus_format_to_encode_plus(
-                        encoded_sequences_batch))
+                    encoded_sequences, self.convert_batch_encode_plus_format_to_encode_plus(encoded_sequences_batch)
+                )
 
     def test_pretokenized_inputs(self):
         # Test when inputs are pretokenized
 
-        tokenizers = self.get_tokenizers(
-            do_lower_case=False)  # , add_prefix_space=True)
+        tokenizers = self.get_tokenizers(do_lower_case=False)  # , add_prefix_space=True)
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
 
-                if hasattr(
-                        tokenizer,
-                        "add_prefix_space") and not tokenizer.add_prefix_space:
+                if hasattr(tokenizer, "add_prefix_space") and not tokenizer.add_prefix_space:
                     continue
 
                 # Prepare a sequence from our tokenizer vocabulary
-                sequence, ids = self.get_clean_sequence(tokenizer,
-                                                        with_prefix_space=True,
-                                                        max_length=20)
+                sequence, ids = self.get_clean_sequence(tokenizer, with_prefix_space=True, max_length=20)
                 # sequence = " " + sequence  # To be sure the byte-level tokenizers are feeling good
                 token_sequence = sequence.split()
                 # sequence_no_prefix_space = sequence.strip()
 
                 # Test encode for pretokenized inputs
-                output = tokenizer.encode(token_sequence,
-                                          is_split_into_words=True,
-                                          return_token_type_ids=None,
-                                          add_special_tokens=False)['input_ids']
-                output_sequence = tokenizer.encode(
-                    sequence,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                output = tokenizer.encode(
+                    token_sequence, is_split_into_words=True, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
+                output_sequence = tokenizer.encode(sequence, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 self.assertEqual(output, output_sequence)
 
-                output = tokenizer.encode(token_sequence,
-                                          is_split_into_words=True,
-                                          add_special_tokens=True)['input_ids']
-                output_sequence = tokenizer.encode(
-                    sequence, add_special_tokens=True)['input_ids']
+                output = tokenizer.encode(token_sequence, is_split_into_words=True, add_special_tokens=True)[
+                    "input_ids"
+                ]
+                output_sequence = tokenizer.encode(sequence, add_special_tokens=True)["input_ids"]
                 self.assertEqual(output, output_sequence)
 
                 # Test encode_plus for pretokenized inputs
-                output = tokenizer.encode(token_sequence,
-                                          is_split_into_words=True,
-                                          return_token_type_ids=None,
-                                          add_special_tokens=False)
-                output_sequence = tokenizer.encode(sequence,
-                                                   return_token_type_ids=None,
-                                                   add_special_tokens=False)
+                output = tokenizer.encode(
+                    token_sequence, is_split_into_words=True, return_token_type_ids=None, add_special_tokens=False
+                )
+                output_sequence = tokenizer.encode(sequence, return_token_type_ids=None, add_special_tokens=False)
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
-                output = tokenizer.encode(token_sequence,
-                                          is_split_into_words=True,
-                                          add_special_tokens=True)
-                output_sequence = tokenizer.encode(sequence,
-                                                   add_special_tokens=True)
+                output = tokenizer.encode(token_sequence, is_split_into_words=True, add_special_tokens=True)
+                output_sequence = tokenizer.encode(sequence, add_special_tokens=True)
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
 
                 # Test batch_encode_plus for pretokenized inputs
-                sequence_batch = [sequence.strip()] * 2 + [
-                    sequence.strip() + " " + sequence.strip()
-                ]
+                sequence_batch = [sequence.strip()] * 2 + [sequence.strip() + " " + sequence.strip()]
                 token_sequence_batch = [s.split() for s in sequence_batch]
-                sequence_batch_cleaned_up_spaces = [
-                    " " + " ".join(s) for s in token_sequence_batch
-                ]
+                sequence_batch_cleaned_up_spaces = [" " + " ".join(s) for s in token_sequence_batch]
 
-                output = tokenizer.batch_encode(token_sequence_batch,
-                                                is_split_into_words=True,
-                                                return_token_type_ids=None,
-                                                add_special_tokens=False)
-                output_sequence = tokenizer.batch_encode(
-                    sequence_batch_cleaned_up_spaces,
+                output = tokenizer.batch_encode(
+                    token_sequence_batch,
+                    is_split_into_words=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)
+                    add_special_tokens=False,
+                )
+                output_sequence = tokenizer.batch_encode(
+                    sequence_batch_cleaned_up_spaces, return_token_type_ids=None, add_special_tokens=False
+                )
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
-                output = tokenizer.batch_encode(token_sequence_batch,
-                                                is_split_into_words=True,
-                                                add_special_tokens=True)
-                output_sequence = tokenizer.batch_encode(
-                    sequence_batch_cleaned_up_spaces, add_special_tokens=True)
+                output = tokenizer.batch_encode(
+                    token_sequence_batch, is_split_into_words=True, add_special_tokens=True
+                )
+                output_sequence = tokenizer.batch_encode(sequence_batch_cleaned_up_spaces, add_special_tokens=True)
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
 
                 # Test encode for pretokenized inputs pairs
-                output = tokenizer.encode(token_sequence,
-                                          token_sequence,
-                                          is_split_into_words=True,
-                                          return_token_type_ids=None,
-                                          add_special_tokens=False)['input_ids']
-                output_sequence = tokenizer.encode(
-                    sequence,
-                    sequence,
+                output = tokenizer.encode(
+                    token_sequence,
+                    token_sequence,
+                    is_split_into_words=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
-                self.assertEqual(output, output_sequence)
-                output = tokenizer.encode(token_sequence,
-                                          token_sequence,
-                                          is_split_into_words=True,
-                                          add_special_tokens=True)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
                 output_sequence = tokenizer.encode(
-                    sequence, sequence, add_special_tokens=True)['input_ids']
+                    sequence, sequence, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
+                self.assertEqual(output, output_sequence)
+                output = tokenizer.encode(
+                    token_sequence, token_sequence, is_split_into_words=True, add_special_tokens=True
+                )["input_ids"]
+                output_sequence = tokenizer.encode(sequence, sequence, add_special_tokens=True)["input_ids"]
                 self.assertEqual(output, output_sequence)
 
                 # Test encode_plus for pretokenized inputs pairs
-                output = tokenizer.encode(token_sequence,
-                                          token_sequence,
-                                          is_split_into_words=True,
-                                          return_token_type_ids=None,
-                                          add_special_tokens=False)
-                output_sequence = tokenizer.encode(sequence,
-                                                   sequence,
-                                                   return_token_type_ids=None,
-                                                   add_special_tokens=False)
+                output = tokenizer.encode(
+                    token_sequence,
+                    token_sequence,
+                    is_split_into_words=True,
+                    return_token_type_ids=None,
+                    add_special_tokens=False,
+                )
+                output_sequence = tokenizer.encode(
+                    sequence, sequence, return_token_type_ids=None, add_special_tokens=False
+                )
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
-                output = tokenizer.encode(token_sequence,
-                                          token_sequence,
-                                          is_split_into_words=True,
-                                          add_special_tokens=True)
-                output_sequence = tokenizer.encode(sequence,
-                                                   sequence,
-                                                   add_special_tokens=True)
+                output = tokenizer.encode(
+                    token_sequence, token_sequence, is_split_into_words=True, add_special_tokens=True
+                )
+                output_sequence = tokenizer.encode(sequence, sequence, add_special_tokens=True)
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
 
                 # Test batch_encode_plus for pretokenized inputs pairs
-                sequence_pair_batch = [
-                    (sequence.strip(), sequence.strip())
-                ] * 2 + [(sequence.strip() + " " + sequence.strip(),
-                          sequence.strip())]
-                token_sequence_pair_batch = [
-                    tuple(s.split() for s in pair)
-                    for pair in sequence_pair_batch
+                sequence_pair_batch = [(sequence.strip(), sequence.strip())] * 2 + [
+                    (sequence.strip() + " " + sequence.strip(), sequence.strip())
                 ]
+                token_sequence_pair_batch = [tuple(s.split() for s in pair) for pair in sequence_pair_batch]
                 sequence_pair_batch_cleaned_up_spaces = [
-                    tuple(" " + " ".join(s) for s in pair)
-                    for pair in token_sequence_pair_batch
+                    tuple(" " + " ".join(s) for s in pair) for pair in token_sequence_pair_batch
                 ]
 
-                output = tokenizer.batch_encode(token_sequence_pair_batch,
-                                                is_split_into_words=True,
-                                                return_token_type_ids=None,
-                                                add_special_tokens=False)
-                output_sequence = tokenizer.batch_encode(
-                    sequence_pair_batch_cleaned_up_spaces,
+                output = tokenizer.batch_encode(
+                    token_sequence_pair_batch,
+                    is_split_into_words=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)
+                    add_special_tokens=False,
+                )
+                output_sequence = tokenizer.batch_encode(
+                    sequence_pair_batch_cleaned_up_spaces, return_token_type_ids=None, add_special_tokens=False
+                )
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
-                output = tokenizer.batch_encode(token_sequence_pair_batch,
-                                                is_split_into_words=True,
-                                                add_special_tokens=True)
+                output = tokenizer.batch_encode(
+                    token_sequence_pair_batch, is_split_into_words=True, add_special_tokens=True
+                )
                 output_sequence = tokenizer.batch_encode(
-                    sequence_pair_batch_cleaned_up_spaces,
-                    add_special_tokens=True)
+                    sequence_pair_batch_cleaned_up_spaces, add_special_tokens=True
+                )
                 for key in output.keys():
                     self.assertEqual(output[key], output_sequence[key])
 
@@ -2277,14 +1948,12 @@ class TokenizerTesterMixin:
         for tokenizer in tokenizers:
             with self.subTest(f"{tokenizer.__class__.__name__}"):
                 string_sequence = "Testing the prepare_for_model method."
-                ids = tokenizer.encode(string_sequence,
-                                       return_token_type_ids=None,
-                                       add_special_tokens=False)['input_ids']
-                prepared_input_dict = tokenizer.prepare_for_model(
-                    ids, add_special_tokens=True)
+                ids = tokenizer.encode(string_sequence, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
+                prepared_input_dict = tokenizer.prepare_for_model(ids, add_special_tokens=True)
 
-                input_dict = tokenizer.encode(string_sequence,
-                                              add_special_tokens=True)
+                input_dict = tokenizer.encode(string_sequence, add_special_tokens=True)
 
                 self.assertEqual(input_dict, prepared_input_dict)
 
@@ -2296,11 +1965,9 @@ class TokenizerTesterMixin:
             if tokenizer.pad_token is None:
                 tokenizer.add_special_tokens({"pad_token": "[PAD]"})
 
-            tokenizer.batch_encode(string_sequences,
-                                   return_overflowing_tokens=True,
-                                   truncation=True,
-                                   padding=True,
-                                   max_length=3)
+            tokenizer.batch_encode(
+                string_sequences, return_overflowing_tokens=True, truncation=True, padding=True, max_length=3
+            )
 
     def _check_no_pad_token_padding(self, tokenizer, sequences):
         # if tokenizer does not have pad_token_id, an error should be thrown
@@ -2350,52 +2017,33 @@ class TokenizerTesterMixin:
         # check if converting back to original text works
         for tokens in tokens_list:
             if self.test_sentencepiece_ignore_case:
-                self.assertEqual(
-                    text,
-                    tokenizer.convert_tokens_to_string(tokens).lower())
+                self.assertEqual(text, tokenizer.convert_tokens_to_string(tokens).lower())
             else:
-                self.assertEqual(text,
-                                 tokenizer.convert_tokens_to_string(tokens))
+                self.assertEqual(text, tokenizer.convert_tokens_to_string(tokens))
 
     def test_add_tokens(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 vocab_size = len(tokenizer)
                 self.assertEqual(tokenizer.add_tokens(""), 0)
                 self.assertEqual(tokenizer.add_tokens("testoken"), 1)
-                self.assertEqual(
-                    tokenizer.add_tokens(["testoken1", "testtoken2"]), 2)
+                self.assertEqual(tokenizer.add_tokens(["testoken1", "testtoken2"]), 2)
                 self.assertEqual(len(tokenizer), vocab_size + 3)
 
                 self.assertEqual(tokenizer.add_special_tokens({}), 0)
+                self.assertEqual(tokenizer.add_special_tokens({"bos_token": "[BOS]", "eos_token": "[EOS]"}), 2)
+                self.assertRaises(
+                    AssertionError, tokenizer.add_special_tokens, {"additional_special_tokens": "<testtoken1>"}
+                )
+                self.assertEqual(tokenizer.add_special_tokens({"additional_special_tokens": ["<testtoken2>"]}), 1)
                 self.assertEqual(
-                    tokenizer.add_special_tokens({
-                        "bos_token": "[BOS]",
-                        "eos_token": "[EOS]"
-                    }), 2)
-                self.assertRaises(AssertionError, tokenizer.add_special_tokens,
-                                  {"additional_special_tokens": "<testtoken1>"})
-                self.assertEqual(
-                    tokenizer.add_special_tokens(
-                        {"additional_special_tokens": ["<testtoken2>"]}), 1)
-                self.assertEqual(
-                    tokenizer.add_special_tokens({
-                        "additional_special_tokens":
-                        ["<testtoken3>", "<testtoken4>"]
-                    }), 2)
-                self.assertIn(
-                    "<testtoken3>",
-                    tokenizer.special_tokens_map["additional_special_tokens"])
-                self.assertIsInstance(
-                    tokenizer.special_tokens_map["additional_special_tokens"],
-                    list)
-                self.assertGreaterEqual(
-                    len(tokenizer.
-                        special_tokens_map["additional_special_tokens"]), 2)
+                    tokenizer.add_special_tokens({"additional_special_tokens": ["<testtoken3>", "<testtoken4>"]}), 2
+                )
+                self.assertIn("<testtoken3>", tokenizer.special_tokens_map["additional_special_tokens"])
+                self.assertIsInstance(tokenizer.special_tokens_map["additional_special_tokens"], list)
+                self.assertGreaterEqual(len(tokenizer.special_tokens_map["additional_special_tokens"]), 2)
 
                 self.assertEqual(len(tokenizer), vocab_size + 8)
 
@@ -2404,118 +2052,91 @@ class TokenizerTesterMixin:
             return
 
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
 
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 text = "Wonderful no inspiration example with subtoken"
                 pair = "Along with an awesome pair"
 
                 # No pair
                 tokens_with_offsets = tokenizer.encode(
-                    text,
-                    return_special_tokens_mask=True,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True)
+                    text, return_special_tokens_mask=True, return_offsets_mapping=True, add_special_tokens=True
+                )
                 added_tokens = tokenizer.num_special_tokens_to_add(False)
                 offsets = tokens_with_offsets["offset_mapping"]
 
                 # Assert there is the same number of tokens and offsets
-                self.assertEqual(len(offsets),
-                                 len(tokens_with_offsets["input_ids"]))
+                self.assertEqual(len(offsets), len(tokens_with_offsets["input_ids"]))
 
                 # Assert there is online added_tokens special_tokens
-                self.assertEqual(
-                    sum(tokens_with_offsets["special_tokens_mask"]),
-                    added_tokens)
+                self.assertEqual(sum(tokens_with_offsets["special_tokens_mask"]), added_tokens)
 
                 # Pairs
                 tokens_with_offsets = tokenizer.encode(
-                    text,
-                    pair,
-                    return_special_tokens_mask=True,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True)
+                    text, pair, return_special_tokens_mask=True, return_offsets_mapping=True, add_special_tokens=True
+                )
                 added_tokens = tokenizer.num_special_tokens_to_add(True)
                 offsets = tokens_with_offsets["offset_mapping"]
 
                 # Assert there is the same number of tokens and offsets
-                self.assertEqual(len(offsets),
-                                 len(tokens_with_offsets["input_ids"]))
+                self.assertEqual(len(offsets), len(tokens_with_offsets["input_ids"]))
 
                 # Assert there is online added_tokens special_tokens
-                self.assertEqual(
-                    sum(tokens_with_offsets["special_tokens_mask"]),
-                    added_tokens)
+                self.assertEqual(sum(tokens_with_offsets["special_tokens_mask"]), added_tokens)
 
-    def test_special_tokens_initialization_with_non_empty_additional_special_tokens(
-            self):
+    def test_special_tokens_initialization_with_non_empty_additional_special_tokens(self):
         tokenizer_list = [(self.tokenizer_class, self.get_tokenizer())]
 
         for tokenizer_class, tokenizer_utils in tokenizer_list:
             with tempfile.TemporaryDirectory() as tmp_dir:
                 tokenizer_utils.save_pretrained(tmp_dir)
 
-                with open(os.path.join(tmp_dir, "special_tokens_map.json"),
-                          encoding="utf-8") as json_file:
+                with open(os.path.join(tmp_dir, "special_tokens_map.json"), encoding="utf-8") as json_file:
                     special_tokens_map = json.load(json_file)
 
-                with open(os.path.join(tmp_dir, "tokenizer_config.json"),
-                          encoding="utf-8") as json_file:
+                with open(os.path.join(tmp_dir, "tokenizer_config.json"), encoding="utf-8") as json_file:
                     tokenizer_config = json.load(json_file)
 
-                special_tokens_map["additional_special_tokens"] = [
-                    "an_additional_special_token"
-                ]
-                tokenizer_config["additional_special_tokens"] = [
-                    "an_additional_special_token"
-                ]
+                special_tokens_map["additional_special_tokens"] = ["an_additional_special_token"]
+                tokenizer_config["additional_special_tokens"] = ["an_additional_special_token"]
 
-                with open(os.path.join(tmp_dir, "special_tokens_map.json"),
-                          "w",
-                          encoding="utf-8") as outfile:
+                with open(os.path.join(tmp_dir, "special_tokens_map.json"), "w", encoding="utf-8") as outfile:
                     json.dump(special_tokens_map, outfile)
-                with open(os.path.join(tmp_dir, "tokenizer_config.json"),
-                          "w",
-                          encoding="utf-8") as outfile:
+                with open(os.path.join(tmp_dir, "tokenizer_config.json"), "w", encoding="utf-8") as outfile:
                     json.dump(tokenizer_config, outfile)
 
                 # the following checks allow us to verify that our test works as expected, i.e. that the tokenizer takes
                 # into account the new value of additional_special_tokens given in the "tokenizer_config.json" and
                 # "special_tokens_map.json" files
                 tokenizer_without_change_in_init = tokenizer_class.from_pretrained(
-                    tmp_dir, )
+                    tmp_dir,
+                )
                 self.assertIn(
-                    "an_additional_special_token",
-                    tokenizer_without_change_in_init.additional_special_tokens)
+                    "an_additional_special_token", tokenizer_without_change_in_init.additional_special_tokens
+                )
 
-                self.assertIn("an_additional_special_token",
-                              tokenizer_without_change_in_init.get_vocab())
+                self.assertIn("an_additional_special_token", tokenizer_without_change_in_init.get_vocab())
                 self.assertEqual(
                     ["an_additional_special_token"],
                     tokenizer_without_change_in_init.convert_ids_to_tokens(
-                        tokenizer_without_change_in_init.convert_tokens_to_ids(
-                            ["an_additional_special_token"])),
+                        tokenizer_without_change_in_init.convert_tokens_to_ids(["an_additional_special_token"])
+                    ),
                 )
 
                 # Now we test that we can change the value of additional_special_tokens in the from_pretrained
-                new_added_tokens = [
-                    AddedToken("a_new_additional_special_token", lstrip=True)
-                ]
+                new_added_tokens = [AddedToken("a_new_additional_special_token", lstrip=True)]
                 tokenizer = tokenizer_class.from_pretrained(
                     tmp_dir,
                     additional_special_tokens=new_added_tokens,
                 )
 
-                self.assertIn("a_new_additional_special_token",
-                              tokenizer.additional_special_tokens)
+                self.assertIn("a_new_additional_special_token", tokenizer.additional_special_tokens)
                 self.assertEqual(
                     ["a_new_additional_special_token"],
                     tokenizer.convert_ids_to_tokens(
-                        tokenizer.convert_tokens_to_ids(
-                            ["a_new_additional_special_token"])),
+                        tokenizer.convert_tokens_to_ids(["a_new_additional_special_token"])
+                    ),
                 )
 
     def test_convert_tokens_to_string_format(self):
@@ -2529,61 +2150,21 @@ class TokenizerTesterMixin:
 
 
 class TrieTest(unittest.TestCase):
-
     def test_trie(self):
         trie = Trie()
         trie.add("Hello 友達")
-        self.assertEqual(
-            trie.data,
-            {"H": {
-                "e": {
-                    "l": {
-                        "l": {
-                            "o": {
-                                " ": {
-                                    "友": {
-                                        "達": {
-                                            "": 1
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }})
+        self.assertEqual(trie.data, {"H": {"e": {"l": {"l": {"o": {" ": {"友": {"達": {"": 1}}}}}}}}})
         trie.add("Hello")
         trie.data
-        self.assertEqual(trie.data, {
-            "H": {
-                "e": {
-                    "l": {
-                        "l": {
-                            "o": {
-                                "": 1,
-                                " ": {
-                                    "友": {
-                                        "達": {
-                                            "": 1
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        })
+        self.assertEqual(trie.data, {"H": {"e": {"l": {"l": {"o": {"": 1, " ": {"友": {"達": {"": 1}}}}}}}}})
 
     def test_trie_split(self):
         trie = Trie()
-        self.assertEqual(trie.split("[CLS] This is a extra_id_100"),
-                         ["[CLS] This is a extra_id_100"])
+        self.assertEqual(trie.split("[CLS] This is a extra_id_100"), ["[CLS] This is a extra_id_100"])
         trie.add("[CLS]")
         trie.add("extra_id_1")
         trie.add("extra_id_100")
-        self.assertEqual(trie.split("[CLS] This is a extra_id_100"),
-                         ["[CLS]", " This is a ", "extra_id_100"])
+        self.assertEqual(trie.split("[CLS] This is a extra_id_100"), ["[CLS]", " This is a ", "extra_id_100"])
 
     def test_trie_single(self):
         trie = Trie()
@@ -2595,16 +2176,14 @@ class TrieTest(unittest.TestCase):
         trie = Trie()
         trie.add("TOKEN]")
         trie.add("[SPECIAL_TOKEN]")
-        self.assertEqual(trie.split("This is something [SPECIAL_TOKEN]"),
-                         ["This is something ", "[SPECIAL_TOKEN]"])
+        self.assertEqual(trie.split("This is something [SPECIAL_TOKEN]"), ["This is something ", "[SPECIAL_TOKEN]"])
 
     def test_trie_subtokens(self):
         trie = Trie()
         trie.add("A")
         trie.add("P")
         trie.add("[SPECIAL_TOKEN]")
-        self.assertEqual(trie.split("This is something [SPECIAL_TOKEN]"),
-                         ["This is something ", "[SPECIAL_TOKEN]"])
+        self.assertEqual(trie.split("This is something [SPECIAL_TOKEN]"), ["This is something ", "[SPECIAL_TOKEN]"])
 
     def test_trie_suffix_tokens(self):
         trie = Trie()
