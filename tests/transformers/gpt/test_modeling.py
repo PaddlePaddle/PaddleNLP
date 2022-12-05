@@ -106,6 +106,7 @@ class GPTModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
+        
         if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size, dtype="int64")
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels, dtype="int64")
@@ -203,8 +204,8 @@ class GPTModelTester:
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
-        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx]
-        output_from_past_slice = output_from_past[:, 0, random_slice_idx]
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
 
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
@@ -316,7 +317,6 @@ class GPTModelTester:
 
         if self.parent.use_labels:
             loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
-
             self.parent.assertEqual(loss.shape, [1])
             self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
             loss.backward()
@@ -400,9 +400,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     use_labels = False
     return_dict = False
 
-    # all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification,
-    #                      GPTForTokenClassification)
-    all_model_classes = (GPTModel,)
+    all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification, GPTForTokenClassification)
     all_generative_model_classes = {GPTLMHeadModel: (GPTModel, "gpt")}
     all_parallelizable_model_classes = GPTLMHeadModel
     test_missing_keys = False
