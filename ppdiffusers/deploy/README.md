@@ -24,10 +24,10 @@ pip install fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdep
 
 ### 快速体验
 
-我们经过部署模型准备，可以开始进行测试。下面将指定模型目录以及推理引擎后端，运行`infer.py`脚本，完成推理。
+我们经过部署模型准备，可以开始进行测试。下面将指定模型目录以及推理引擎后端，运行`text_to_img_infer.py`脚本，完成推理。
 
 ```
-python infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle
+python text_to_img_infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend paddle
 ```
 
 得到的图像文件为fd_astronaut_rides_horse.png。生成的图片示例如下（每次生成的图片都不相同，示例仅作参考）：
@@ -37,12 +37,12 @@ python infer.py --model_dir stable-diffusion-v1-4/ --scheduler "pndm" --backend 
 如果使用stable-diffusion-v1-5模型，则可执行以下命令完成推理：
 
 ```
-python infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle
+python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "euler_ancestral" --backend paddle
 ```
 
 #### 参数说明
 
-`infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
+`text_to_img_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
 
 | 参数 |参数说明 |
 |----------|--------------|
