@@ -46,6 +46,7 @@ if is_paddle_available() and is_paddlenlp_available():
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
         StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionMegaPipeline,
         StableDiffusionPipeline,
         StableDiffusionPipelineAllinOne,
         StableDiffusionUpscalePipeline,

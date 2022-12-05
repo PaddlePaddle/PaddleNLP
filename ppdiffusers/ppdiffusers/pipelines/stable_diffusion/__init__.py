@@ -55,6 +55,7 @@ if is_paddlenlp_available() and is_paddle_available():
     from .pipeline_stable_diffusion_inpaint_legacy import (
         StableDiffusionInpaintPipelineLegacy,
     )
+    from .pipeline_stable_diffusion_mega import StableDiffusionMegaPipeline
     from .pipeline_stable_diffusion_upscale import StableDiffusionUpscalePipeline
     from .safety_checker import StableDiffusionSafetyChecker
 
