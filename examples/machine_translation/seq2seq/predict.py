@@ -34,46 +34,43 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
 def do_predict(args):
     device = paddle.set_device(args.device)
 
-    test_loader, src_vocab_size, tgt_vocab_size, bos_id, eos_id = create_infer_loader(
-        args)
-    tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info['vi'])
+    test_loader, src_vocab_size, tgt_vocab_size, bos_id, eos_id = create_infer_loader(args)
+    tgt_vocab = Vocab.load_vocabulary(**test_loader.dataset.vocab_info["vi"])
 
     model = paddle.Model(
-        Seq2SeqAttnInferModel(src_vocab_size,
-                              tgt_vocab_size,
-                              args.hidden_size,
-                              args.hidden_size,
-                              args.num_layers,
-                              args.dropout,
-                              bos_id=bos_id,
-                              eos_id=eos_id,
-                              beam_size=args.beam_size,
-                              max_out_len=256))
+        Seq2SeqAttnInferModel(
+            src_vocab_size,
+            tgt_vocab_size,
+            args.hidden_size,
+            args.hidden_size,
+            args.num_layers,
+            args.dropout,
+            bos_id=bos_id,
+            eos_id=eos_id,
+            beam_size=args.beam_size,
+            max_out_len=256,
+        )
+    )
 
     model.prepare()
 
     # Load the trained model
-    assert args.init_from_ckpt, (
-        "Please set reload_model to load the infer model.")
+    assert args.init_from_ckpt, "Please set reload_model to load the infer model."
     model.load(args.init_from_ckpt)
 
     cand_list = []
-    with io.open(args.infer_output_file, 'w', encoding='utf-8') as f:
+    with io.open(args.infer_output_file, "w", encoding="utf-8") as f:
         for data in test_loader():
             with paddle.no_grad():
                 finished_seq = model.predict_batch(inputs=data)[0]
-            finished_seq = finished_seq[:, :, np.newaxis] if len(
-                finished_seq.shape) == 2 else finished_seq
+            finished_seq = finished_seq[:, :, np.newaxis] if len(finished_seq.shape) == 2 else finished_seq
             finished_seq = np.transpose(finished_seq, [0, 2, 1])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):
@@ -86,7 +83,7 @@ def do_predict(args):
 
     bleu = BLEU()
     for i, data in enumerate(test_loader.dataset.data):
-        ref = data['vi'].split()
+        ref = data["vi"].split()
         bleu.add_inst(cand_list[i], [ref])
     print("BLEU score is %s." % bleu.score())
 

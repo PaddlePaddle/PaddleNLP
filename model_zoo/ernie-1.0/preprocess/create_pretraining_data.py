@@ -28,6 +28,7 @@ import paddlenlp.transformers as tfs
 
 try:
     import nltk
+
     nltk_available = True
 except ImportError:
     nltk_available = False
@@ -35,77 +36,55 @@ except ImportError:
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model_name',
-                        type=str,
-                        required=True,
-                        help='What model to use.')
-    parser.add_argument('--tokenizer_name',
-                        type=str,
-                        required=True,
-                        choices=[
-                            'ErnieTokenizer', 'BertTokenizer', 'GPTTokenizer',
-                            'GPTChineseTokenizer', 'ElectraTokenizer'
-                        ],
-                        help='What type of tokenizer to use.')
-    group = parser.add_argument_group(title='data input/output')
-    group.add_argument('--input_path',
-                       type=str,
-                       required=True,
-                       help='Path to input JSON files.')
-    group.add_argument('--output_prefix',
-                       type=str,
-                       required=True,
-                       help='Output prefix to store output file.')
-    group.add_argument(
-        '--data_format',
+    parser.add_argument("--model_name", type=str, required=True, help="What model to use.")
+    parser.add_argument(
+        "--tokenizer_name",
         type=str,
-        default='text',
-        choices=['JSON'],
-        help='Only support json format for now. One document per line.')
+        required=True,
+        choices=["ErnieTokenizer", "BertTokenizer", "GPTTokenizer", "GPTChineseTokenizer", "ElectraTokenizer"],
+        help="What type of tokenizer to use.",
+    )
+    group = parser.add_argument_group(title="data input/output")
+    group.add_argument("--input_path", type=str, required=True, help="Path to input JSON files.")
+    group.add_argument("--output_prefix", type=str, required=True, help="Output prefix to store output file.")
     group.add_argument(
-        '--json_key',
+        "--data_format",
         type=str,
-        default='text',
-        help=
-        'For JSON format. Space separate listed of keys to extract from json')
-    group.add_argument('--split_sentences',
-                       action='store_true',
-                       help='Split documents into sentences.')
-
-    group = parser.add_argument_group(title='chinese words')
+        default="text",
+        choices=["JSON"],
+        help="Only support json format for now. One document per line.",
+    )
     group.add_argument(
-        '--chinese',
-        action='store_true',
-        help="Is corpus need words segmentation step for chinese words.")
-    group.add_argument(
-        '--cn_whole_word_segment',
-        action='store_true',
-        help="Is corpus need words segmentation step for chinese words WWM.")
-    group.add_argument('--cn_seg_func',
-                       type=str,
-                       default='jieba',
-                       choices=['lac', 'seg', 'jieba'],
-                       help='Words segment function for chinese words.')
-    group.add_argument('--cn_splited',
-                       action='store_true',
-                       help="Is chinese corpus is splited in to words.")
-    group.add_argument('--cn_split_dimer',
-                       type=str,
-                       default=' ',
-                       help="Split dimer between chinese words.")
+        "--json_key",
+        type=str,
+        default="text",
+        help="For JSON format. Space separate listed of keys to extract from json",
+    )
+    group.add_argument("--split_sentences", action="store_true", help="Split documents into sentences.")
 
-    group = parser.add_argument_group(title='common config')
-    group.add_argument('--append_eos',
-                       action='store_true',
-                       help='Append an <eos> token to the end of a document.')
-    group.add_argument('--log_interval',
-                       type=int,
-                       default=100,
-                       help='Interval between progress updates')
-    group.add_argument('--workers',
-                       type=int,
-                       default=1,
-                       help='Number of worker processes to launch')
+    group = parser.add_argument_group(title="chinese words")
+    group.add_argument(
+        "--chinese", action="store_true", help="Is corpus need words segmentation step for chinese words."
+    )
+    group.add_argument(
+        "--cn_whole_word_segment",
+        action="store_true",
+        help="Is corpus need words segmentation step for chinese words WWM.",
+    )
+    group.add_argument(
+        "--cn_seg_func",
+        type=str,
+        default="jieba",
+        choices=["lac", "seg", "jieba"],
+        help="Words segment function for chinese words.",
+    )
+    group.add_argument("--cn_splited", action="store_true", help="Is chinese corpus is splited in to words.")
+    group.add_argument("--cn_split_dimer", type=str, default=" ", help="Split dimer between chinese words.")
+
+    group = parser.add_argument_group(title="common config")
+    group.add_argument("--append_eos", action="store_true", help="Append an <eos> token to the end of a document.")
+    group.add_argument("--log_interval", type=int, default=100, help="Interval between progress updates")
+    group.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
 
     args = parser.parse_args()
     return args
@@ -113,6 +92,7 @@ def get_args():
 
 def lexical_analysis_fn():
     from LAC import LAC
+
     lac = LAC(mode="lac")
 
     def process(line):
@@ -124,7 +104,8 @@ def lexical_analysis_fn():
 
 def chinese_segmentation_fn():
     from LAC import LAC
-    lac_cws = LAC(mode='seg')
+
+    lac_cws = LAC(mode="seg")
 
     def process(line):
         words = lac_cws.run(line)
@@ -144,9 +125,9 @@ def jieba_segmentation_fn():
 
 
 CHINESE_SEG_FUNC = {
-    'lac': lexical_analysis_fn(),
-    'seg': chinese_segmentation_fn(),
-    'jieba': jieba_segmentation_fn(),
+    "lac": lexical_analysis_fn(),
+    "seg": chinese_segmentation_fn(),
+    "jieba": jieba_segmentation_fn(),
 }
 
 
@@ -156,26 +137,26 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
     First, we do Chinese word segmentation on the sequence of tokens, which are from the WordPiece tokenization.
     Then, we add the '##' mark on chinese characters which are in the middle of Chinese words.
     And if the tokens are not chinese characters, we just exploit the results of WordPiece tokenization as words.
-    Such as, 
+    Such as,
          - text line : 通过利用mercer核，将样本从输入空间映射到高维特征空间，使原来没有显现的特征突现出来，取得了很好的图像分割效果。
-         - the input tokens (after WordPiece): 
-            ['通', '过', '利', '用', 'me', '##rc', '##er', '核', '，', '将', '样', '本', '从', '输', '入', '空', '间', '映', 
-            '射', '到', '高', '维', '特', '征', '空', '间', '，', '使', '原', '来', '没', '有', '显', '现', '的', '特', '征', 
+         - the input tokens (after WordPiece):
+            ['通', '过', '利', '用', 'me', '##rc', '##er', '核', '，', '将', '样', '本', '从', '输', '入', '空', '间', '映',
+            '射', '到', '高', '维', '特', '征', '空', '间', '，', '使', '原', '来', '没', '有', '显', '现', '的', '特', '征',
             '突', '现', '出', '来', '，', '取', '得', '了', '很', '好', '的', '图', '像', '分', '割', '效', '果', '。']
         - the Chinese words (after Chinese word segmentation like jieba)
-            ['通过', '利用', 'mercer', '核', '，', '将', '样本', '从', '输入', '空间', '映射', '到', '高维', '特征', 
-            '空间', '，', '使', '原来', '没有', '显现', '的', '特征', '突现', '出来', '，', '取得', '了', '很', '好', 
+            ['通过', '利用', 'mercer', '核', '，', '将', '样本', '从', '输入', '空间', '映射', '到', '高维', '特征',
+            '空间', '，', '使', '原来', '没有', '显现', '的', '特征', '突现', '出来', '，', '取得', '了', '很', '好',
             '的', '图像', '分割', '效果', '。']
         - the output whole word mask tokens:
-            ['通', '##过', '利', '##用', 'me', '##rc', '##er', '核', '，', '将', '样', '##本', '从', '输', '##入', 
-            '空', '##间', '映', '##射', '到', '高', '##维', '特', '##征', '空', '##间', '，', '使', '原', '##来', 
-            '没', '##有', '显', '##现', '的', '特', '##征', '突', '##现', '出', '##来', '，', '取', '##得', '了', 
+            ['通', '##过', '利', '##用', 'me', '##rc', '##er', '核', '，', '将', '样', '##本', '从', '输', '##入',
+            '空', '##间', '映', '##射', '到', '高', '##维', '特', '##征', '空', '##间', '，', '使', '原', '##来',
+            '没', '##有', '显', '##现', '的', '特', '##征', '突', '##现', '出', '##来', '，', '取', '##得', '了',
             '很', '好', '的', '图', '##像', '分', '##割', '效', '##果', '。']
 
     Args:
         tokens(list(str)): The sequence of tokens, which are from the WordPiece tokenization.
         words(list(str)): The sequence of Chinese words.
-        max_word_length(int, optional): 
+        max_word_length(int, optional):
             The maximum chinese character in Chinese words. It avoids too long Chinese word to be masked.
             Defaults as 4.
 
@@ -190,7 +171,7 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
     i = 0
     while i < len(tokens):
         # non-chinese character, then do word piece
-        if len(re.findall('[\u4E00-\u9FA5]', tokens[i])) == 0:
+        if len(re.findall("[\u4E00-\u9FA5]", tokens[i])) == 0:
             new_tokens.append(tokens[i])
             i += 1
             continue
@@ -201,10 +182,10 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
         for length in range(max_word_length, 0, -1):
             if i + length > len(tokens):
                 continue
-            if ''.join(tokens[i:i + length]) in words_set:
+            if "".join(tokens[i : i + length]) in words_set:
                 new_tokens.append(tokens[i])
                 for l in range(1, length):
-                    new_tokens.append('##' + tokens[i + l])
+                    new_tokens.append("##" + tokens[i + l])
                 i += length
                 has_add = True
                 break
@@ -216,25 +197,21 @@ def get_whole_word_mask_tokens(tokens, words, max_word_length=6):
 
 
 class IdentitySplitter(object):
-
     def tokenize(self, *text):
         return text
 
 
-class NewlineSplitter():
-
+class NewlineSplitter:
     def tokenize(self, text):
         return text.split("\n")
 
 
 class Converter(object):
-
     def __init__(self, args):
         self.args = args
 
     def initializer(self):
-        Converter.tokenizer = getattr(
-            tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
+        Converter.tokenizer = getattr(tfs, self.args.tokenizer_name).from_pretrained(self.args.model_name)
         if self.args.cn_whole_word_segment:
             # Extend chinese char vocab for ErnieTokinzer
             Converter.tokenizer.extend_chinese_char()
@@ -255,8 +232,7 @@ class Converter(object):
         # Split sentence whole words mask for chinese
         if self.args.cn_whole_word_segment:
             if self.args.cn_splited:
-                Converter.segment_func = lambda text: text.split(self.args.
-                                                                 cn_split_dimer)
+                Converter.segment_func = lambda text: text.split(self.args.cn_split_dimer)
             else:
                 Converter.segment_func = CHINESE_SEG_FUNC[self.args.cn_seg_func]
             Converter.whole_word_mask = get_whole_word_mask_tokens
@@ -312,8 +288,7 @@ def main():
     convert = Converter(args)
 
     # Try tokenizer is availiable
-    sample_tokenizer = getattr(tfs, args.tokenizer_name).from_pretrained(
-        args.model_name)
+    sample_tokenizer = getattr(tfs, args.tokenizer_name).from_pretrained(args.model_name)
     if sample_tokenizer.vocab_size < 2**16 - 1:
         save_dtype = np.uint16
     else:
@@ -329,7 +304,7 @@ def main():
     # sent_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
     # Cunsum on document on every sentence num, type=np.int64
     doc_cumsum_stream = io.BytesIO()
-    doc_cumsum_stream.write((0).to_bytes(8, byteorder='little', signed=True))
+    doc_cumsum_stream.write((0).to_bytes(8, byteorder="little", signed=True))
 
     sent_count = 0
     # token_count = 0
@@ -342,11 +317,12 @@ def main():
     for file_path in tqdm(file_paths):
         if file_path.endswith(".zst"):
             import zstandard
+
             cctx = zstandard.ZstdDecompressor()
-            fh = open(file_path, 'rb')
+            fh = open(file_path, "rb")
             text = io.BufferedReader(cctx.stream_reader(fh))
         elif file_path.endswith(".jsonl"):
-            text = open(file_path, 'r', encoding='utf-8')
+            text = open(file_path, "r", encoding="utf-8")
         else:
             print("Unexpected data format, skiped %s" % file_path)
             continue
@@ -363,26 +339,21 @@ def main():
                 sentence_len = len(sentence)
                 if sentence_len == 0:
                     continue
-                sentlens_stream.write(
-                    sentence_len.to_bytes(4, byteorder='little', signed=True))
+                sentlens_stream.write(sentence_len.to_bytes(4, byteorder="little", signed=True))
                 # token_count += sentence_len
                 # sent_cumsum_stream.write(
                 #     token_count.to_bytes(
                 #         8, byteorder='little', signed=True))
                 sent_count += 1
-                token_ids_stream.write(
-                    np.array(sentence, dtype=save_dtype).tobytes(order='C'))
+                token_ids_stream.write(np.array(sentence, dtype=save_dtype).tobytes(order="C"))
 
-            doc_cumsum_stream.write(
-                sent_count.to_bytes(8, byteorder='little', signed=True))
+            doc_cumsum_stream.write(sent_count.to_bytes(8, byteorder="little", signed=True))
 
             if step % args.log_interval == 0:
                 current = time.time()
                 elapsed = current - startup_start
                 mbs = total_bytes_processed / elapsed / 1024 / 1024
-                print(f"Processed {step} documents",
-                      f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).",
-                      file=sys.stderr)
+                print(f"Processed {step} documents", f"({step/elapsed:.2f} docs/s, {mbs:.4f} MB/s).", file=sys.stderr)
 
     pool.close()
     print("Saving tokens to files...")
@@ -398,8 +369,7 @@ def main():
     print("Total documents num: %d" % (len(docs) - 1))
     print("Total tokens num: %d" % len(all_doc_ids))
     print("Average tokens per sentence: %.2f" % (len(all_doc_ids) / len(lens)))
-    print("Average tokens per document: %.2f" % (len(all_doc_ids) /
-                                                 (len(docs) - 1)))
+    print("Average tokens per document: %.2f" % (len(all_doc_ids) / (len(docs) - 1)))
 
 
 if __name__ == "__main__":

@@ -63,15 +63,14 @@ paddle.set_default_dtype(generate_config.default_dtype)
 
 tokenizer = CodeGenTokenizer.from_pretrained(generate_config.model_name_or_path)
 model = CodeGenForCausalLM.from_pretrained(
-    generate_config.model_name_or_path,
-    load_state_as_np=generate_config.load_state_as_np)
+    generate_config.model_name_or_path, load_state_as_np=generate_config.load_state_as_np
+)
 
 app = FastAPI()
 
 
 def random_completion_id():
-    return 'cmpl-' + ''.join(
-        random.choice(string.ascii_letters + string.digits) for _ in range(29))
+    return "cmpl-" + "".join(random.choice(string.ascii_letters + string.digits) for _ in range(29))
 
 
 @app.post("/v1/engines/codegen/completions", status_code=200)
@@ -83,14 +82,11 @@ async def gen(item: Input):
     if temperature == 0.0:
         temperature = 1.0
         top_k = 1
-    repetition_penalty = item.get('frequency_penalty',
-                                  generate_config.repetition_penalty)
+    repetition_penalty = item.get("frequency_penalty", generate_config.repetition_penalty)
 
     start_time = time.time()
     logger.info("Start generating code")
-    tokenized = tokenizer([item['prompt']],
-                          truncation=True,
-                          return_tensors='pd')
+    tokenized = tokenizer([item["prompt"]], truncation=True, return_tensors="pd")
     output, _ = model.generate(
         tokenized["input_ids"],
         max_length=16,
@@ -100,7 +96,8 @@ async def gen(item: Input):
         repetition_penalty=repetition_penalty,
         temperature=temperature,
         use_faster=generate_config.use_faster,
-        use_fp16_decoding=generate_config.use_fp16_decoding)
+        use_fp16_decoding=generate_config.use_fp16_decoding,
+    )
     logger.info("Finish generating code")
     end_time = time.time()
     logger.info(f"Time cost: {end_time - start_time}")
@@ -108,12 +105,14 @@ async def gen(item: Input):
     logger.info(f"Generated code: {output}")
     output_json = Output(
         id=random_completion_id(),
-        choices=[{
-            "text": output,
-            "index": 0,
-            "finish_reason": "stop",
-            "logprobs": None,
-        }],
+        choices=[
+            {
+                "text": output,
+                "index": 0,
+                "finish_reason": "stop",
+                "logprobs": None,
+            }
+        ],
         usage={
             "completion_tokens": None,
             "prompt_tokens": None,

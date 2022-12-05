@@ -59,6 +59,7 @@ def get_field_presence_info(ast_wrapper, node, field_infos):
 @attr.s
 class DecoderSQLItem:
     """DecoderSQLItem"""
+
     tree = attr.ib()
     orig_code = attr.ib()
     sql_query = attr.ib(default="")
@@ -67,14 +68,16 @@ class DecoderSQLItem:
 class SQLPreproc(object):
     """SQLPreproc"""
 
-    def __init__(self,
-                 base_path,
-                 grammar_class,
-                 predict_value=True,
-                 min_freq=3,
-                 max_count=5000,
-                 use_seq_elem_rules=False,
-                 is_cached=False):
+    def __init__(
+        self,
+        base_path,
+        grammar_class,
+        predict_value=True,
+        min_freq=3,
+        max_count=5000,
+        use_seq_elem_rules=False,
+        is_cached=False,
+    ):
         """
         Args:
             base_path (TYPE): if is_cached is False, base_path is the asdl grammar file.
@@ -118,12 +121,11 @@ class SQLPreproc(object):
             self.format_sql_value = self.fix_sql_value
 
     def _get_val_index(self, val, value_dict):
-
         def _float(val):
             try:
                 return True, str(int(float(val)))
             except Exception as e:
-                return False, ''
+                return False, ""
 
         val = str(val)
         if val in value_dict:
@@ -132,10 +134,10 @@ class SQLPreproc(object):
         if is_float and new_val in value_dict:
             return value_dict[new_val]
 
-        new_val = val.replace('.', '')
+        new_val = val.replace(".", "")
         candi = []
         for v, idx in value_dict.items():
-            v = v.replace('.', '')
+            v = v.replace(".", "")
             if v.startswith(new_val) or new_val.startswith(v):
                 candi.append((v, idx))
 
@@ -148,9 +150,8 @@ class SQLPreproc(object):
         return -1
 
     def transfer_sql_value(self, sql_json, value_dict):
-        """transfer value str to int index
-        """
-        if 'cond_conn_op' in sql_json:
+        """transfer value str to int index"""
+        if "cond_conn_op" in sql_json:
             self.transfer_simple_sql_value(sql_json, value_dict)
             return
 
@@ -170,44 +171,41 @@ class SQLPreproc(object):
                 val2 = self._get_val_index(val2, value_dict)
             if val1 == -1:
                 val1 = 0
-                logging.debug('lost value: %s. candidates: %s', cond[3],
-                              ', '.join(value_dict.keys()))
-                logging.debug('sql is: %s',
-                              json.dumps(sql_json, ensure_ascii=False))
+                logging.debug("lost value: %s. candidates: %s", cond[3], ", ".join(value_dict.keys()))
+                logging.debug("sql is: %s", json.dumps(sql_json, ensure_ascii=False))
             if val2 == -1:
                 val2 = 0
             cond[3] = val1
             cond[4] = val2
 
-        for table_unit in sql_json['from']['table_units']:
+        for table_unit in sql_json["from"]["table_units"]:
             if type(table_unit[1]) is dict:
                 self.transfer_sql_value(table_unit[1], value_dict)
 
-        for cond in sql_json['where'][::2]:
+        for cond in sql_json["where"][::2]:
             _trans_cond(cond)
-        for cond in sql_json['having'][::2]:
+        for cond in sql_json["having"][::2]:
             _trans_cond(cond)
 
-        if sql_json['limit'] is not None:
-            limit = str(sql_json['limit'])
+        if sql_json["limit"] is not None:
+            limit = str(sql_json["limit"])
         else:
-            limit = '0'
+            limit = "0"
         if limit in value_dict:
-            sql_json['limit'] = value_dict[limit]
+            sql_json["limit"] = value_dict[limit]
         else:
-            logging.debug('value of limit is lost: %s. candidates: %s', limit,
-                          ', '.join(value_dict.keys()))
-            sql_json['limit'] = value_dict['0']
+            logging.debug("value of limit is lost: %s. candidates: %s", limit, ", ".join(value_dict.keys()))
+            sql_json["limit"] = value_dict["0"]
 
-        if sql_json['intersect'] is not None:
-            self.transfer_sql_value(sql_json['intersect'], value_dict)
-        if sql_json['union'] is not None:
-            self.transfer_sql_value(sql_json['union'], value_dict)
-        if sql_json['except'] is not None:
-            self.transfer_sql_value(sql_json['except'], value_dict)
+        if sql_json["intersect"] is not None:
+            self.transfer_sql_value(sql_json["intersect"], value_dict)
+        if sql_json["union"] is not None:
+            self.transfer_sql_value(sql_json["union"], value_dict)
+        if sql_json["except"] is not None:
+            self.transfer_sql_value(sql_json["except"], value_dict)
 
     def transfer_simple_sql_value(self, sql_json, value_dict):
-        for cond in sql_json['conds']:
+        for cond in sql_json["conds"]:
             value = cond[2]
             new_val = self._get_val_index(value, value_dict)
             if new_val == -1:
@@ -215,8 +213,7 @@ class SQLPreproc(object):
             cond[2] = new_val
 
     def fix_sql_value(self, sql_json, value_dict):
-        """fix sql value to 'value' token
-        """
+        """fix sql value to 'value' token"""
 
         def _fix_cond_value(cond):
             """transfer condition value"""
@@ -225,46 +222,44 @@ class SQLPreproc(object):
             if type(val1) is dict:
                 self.fix_sql_value(val1, value_dict)
                 if val2 is not None:
-                    val2 = self._get_val_index('value', value_dict)
+                    val2 = self._get_val_index("value", value_dict)
                     cond[4] = val2 if val2 >= 0 else 0
                 return
 
-            val1 = self._get_val_index('value', value_dict)
+            val1 = self._get_val_index("value", value_dict)
             if val2 is not None:
-                val2 = self._get_val_index('value', value_dict)
+                val2 = self._get_val_index("value", value_dict)
             if val1 == -1:
                 val1 = 0
-                logging.info('lost value: %s. candidates: %s', cond[3],
-                             ', '.join(value_dict.keys()))
-                logging.debug('sql is: %s',
-                              json.dumps(sql_json, ensure_ascii=False))
+                logging.info("lost value: %s. candidates: %s", cond[3], ", ".join(value_dict.keys()))
+                logging.debug("sql is: %s", json.dumps(sql_json, ensure_ascii=False))
             if val2 == -1:
                 val2 = 0
             cond[3] = val1
             cond[4] = val2
 
-        for table_unit in sql_json['from']['table_units']:
+        for table_unit in sql_json["from"]["table_units"]:
             if type(table_unit[1]) is dict:
                 self.fix_sql_value(table_unit[1], value_dict)
 
-        for cond in sql_json['where'][::2]:
+        for cond in sql_json["where"][::2]:
             _fix_cond_value(cond)
-        for cond in sql_json['having'][::2]:
+        for cond in sql_json["having"][::2]:
             _fix_cond_value(cond)
 
-        if sql_json['limit'] is not None:
-            limit = 'value'
+        if sql_json["limit"] is not None:
+            limit = "value"
         else:
-            limit = 'empty'
+            limit = "empty"
         assert limit in value_dict
-        sql_json['limit'] = value_dict[limit]
+        sql_json["limit"] = value_dict[limit]
 
-        if sql_json['intersect'] is not None:
-            self.fix_sql_value(sql_json['intersect'], value_dict)
-        if sql_json['union'] is not None:
-            self.fix_sql_value(sql_json['union'], value_dict)
-        if sql_json['except'] is not None:
-            self.fix_sql_value(sql_json['except'], value_dict)
+        if sql_json["intersect"] is not None:
+            self.fix_sql_value(sql_json["intersect"], value_dict)
+        if sql_json["union"] is not None:
+            self.fix_sql_value(sql_json["union"], value_dict)
+        if sql_json["except"] is not None:
+            self.fix_sql_value(sql_json["except"], value_dict)
 
     def add_item(self, section, sql_json, value_list):
         """add an item"""
@@ -272,11 +267,10 @@ class SQLPreproc(object):
         self.format_sql_value(sql_json, value_dict)
 
         parsed = self.grammar.parse(sql_json, section)
-        self.ast_wrapper.verify_ast(
-            parsed)  # will raise AssertionError, if varify failed
+        self.ast_wrapper.verify_ast(parsed)  # will raise AssertionError, if varify failed
 
         root = parsed
-        if section == 'train':
+        if section == "train":
             for token in self._all_tokens(root):
                 self.vocab_builder.add_word(token)
             self._record_productions(root)
@@ -291,10 +285,10 @@ class SQLPreproc(object):
 
     def _construct_cache_path(self, root_path):
         root_path = Path(root_path)
-        self.vocab_path = root_path / 'dec_vocab.json'
-        self.observed_productions_path = root_path / 'observed_productions.json'
-        self.grammar_rules_path = root_path / 'grammar_rules.json'
-        self.grammar_file = root_path / 'grammar.asdl'
+        self.vocab_path = root_path / "dec_vocab.json"
+        self.observed_productions_path = root_path / "observed_productions.json"
+        self.grammar_rules_path = root_path / "grammar_rules.json"
+        self.grammar_file = root_path / "grammar.asdl"
 
     def save(self, save_path):
         """save parsed items to disk"""
@@ -304,36 +298,35 @@ class SQLPreproc(object):
         self.vocab = self.vocab_builder.finish()
         self.vocab.save(self.vocab_path)
         # observed_productions
-        self.sum_type_constructors = serialization.to_dict_with_sorted_values(
-            self.sum_type_constructors)
-        self.field_presence_infos = serialization.to_dict_with_sorted_values(
-            self.field_presence_infos, key=str)
-        self.seq_lengths = serialization.to_dict_with_sorted_values(
-            self.seq_lengths)
+        self.sum_type_constructors = serialization.to_dict_with_sorted_values(self.sum_type_constructors)
+        self.field_presence_infos = serialization.to_dict_with_sorted_values(self.field_presence_infos, key=str)
+        self.seq_lengths = serialization.to_dict_with_sorted_values(self.seq_lengths)
         self.primitive_types = sorted(self.primitive_types)
-        with open(self.observed_productions_path, 'w') as f:
+        with open(self.observed_productions_path, "w") as f:
             json.dump(
                 {
-                    'sum_type_constructors': self.sum_type_constructors,
-                    'field_presence_infos': self.field_presence_infos,
-                    'seq_lengths': self.seq_lengths,
-                    'primitive_types': self.primitive_types,
+                    "sum_type_constructors": self.sum_type_constructors,
+                    "field_presence_infos": self.field_presence_infos,
+                    "seq_lengths": self.seq_lengths,
+                    "primitive_types": self.primitive_types,
                 },
                 f,
                 indent=2,
-                sort_keys=True)
+                sort_keys=True,
+            )
 
         # grammar
         self.all_rules, self.rules_mask = self._calculate_rules()
-        with open(self.grammar_rules_path, 'w') as f:
+        with open(self.grammar_rules_path, "w") as f:
             json.dump(
                 {
-                    'all_rules': self.all_rules,
-                    'rules_mask': self.rules_mask,
+                    "all_rules": self.all_rules,
+                    "rules_mask": self.rules_mask,
                 },
                 f,
                 indent=2,
-                sort_keys=True)
+                sort_keys=True,
+            )
 
         shutil.copy2(self.base_path, self.grammar_file)
 
@@ -346,33 +339,30 @@ class SQLPreproc(object):
         self.vocab = vocab.Vocab.load(self.vocab_path)
 
         observed_productions = json.load(open(self.observed_productions_path))
-        self.sum_type_constructors = observed_productions[
-            'sum_type_constructors']
-        self.field_presence_infos = observed_productions['field_presence_infos']
-        self.seq_lengths = observed_productions['seq_lengths']
-        self.primitive_types = observed_productions['primitive_types']
+        self.sum_type_constructors = observed_productions["sum_type_constructors"]
+        self.field_presence_infos = observed_productions["field_presence_infos"]
+        self.seq_lengths = observed_productions["seq_lengths"]
+        self.primitive_types = observed_productions["primitive_types"]
 
         grammar = json.load(open(self.grammar_rules_path))
-        self.all_rules = serialization.tuplify(grammar['all_rules'])
-        self.rules_mask = grammar['rules_mask']
+        self.all_rules = serialization.tuplify(grammar["all_rules"])
+        self.rules_mask = grammar["rules_mask"]
 
     def _record_productions(self, tree):
         """_record_productions"""
         queue = [(tree, False)]
         while queue:
             node, is_seq_elem = queue.pop()
-            node_type = node['_type']
+            node_type = node["_type"]
 
             # Rules of the form:
             # expr -> Attribute | Await | BinOp | BoolOp | ...
             # expr_seq_elem -> Attribute | Await | ... | Template1 | Template2 | ...
-            for type_name in [node_type] + node.get('_extra_types', []):
+            for type_name in [node_type] + node.get("_extra_types", []):
                 if type_name in self.ast_wrapper.constructors:
-                    sum_type_name = self.ast_wrapper.constructor_to_sum_type[
-                        type_name]
+                    sum_type_name = self.ast_wrapper.constructor_to_sum_type[type_name]
                     if is_seq_elem and self.use_seq_elem_rules:
-                        self.sum_type_constructors[sum_type_name +
-                                                   '_seq_elem'].add(type_name)
+                        self.sum_type_constructors[sum_type_name + "_seq_elem"].add(type_name)
                     else:
                         self.sum_type_constructors[sum_type_name].add(type_name)
 
@@ -386,27 +376,24 @@ class SQLPreproc(object):
             # |  identifier name, arguments args, stmt* body, expr* decorator_list, expr returns
             assert node_type in self.ast_wrapper.singular_types
             field_presence_info = get_field_presence_info(
-                self.ast_wrapper, node,
-                self.ast_wrapper.singular_types[node_type].fields)
+                self.ast_wrapper, node, self.ast_wrapper.singular_types[node_type].fields
+            )
             self.field_presence_infos[node_type].add(field_presence_info)
 
             for field_info in self.ast_wrapper.singular_types[node_type].fields:
-                field_value = node.get(field_info.name,
-                                       [] if field_info.seq else None)
+                field_value = node.get(field_info.name, [] if field_info.seq else None)
                 to_enqueue = []
                 if field_info.seq:
                     # Rules of the form:
                     # stmt* -> stmt
                     #        | stmt stmt
                     #        | stmt stmt stmt
-                    self.seq_lengths[field_info.type + '*'].add(
-                        len(field_value))
+                    self.seq_lengths[field_info.type + "*"].add(len(field_value))
                     to_enqueue = field_value
                 else:
                     to_enqueue = [field_value]
                 for child in to_enqueue:
-                    if isinstance(child,
-                                  collections.abc.Mapping) and '_type' in child:
+                    if isinstance(child, collections.abc.Mapping) and "_type" in child:
                         queue.append((child, field_info.seq))
                     else:
                         self.primitive_types.add(type(child).__name__)
@@ -435,8 +422,7 @@ class SQLPreproc(object):
         # |  identifier name, arguments args, expr? returns
         # ...
         # |  identifier name, arguments args, stmt* body, expr* decorator_list, expr returns
-        for name, field_presence_infos in sorted(
-                self.field_presence_infos.items()):
+        for name, field_presence_infos in sorted(self.field_presence_infos.items()):
             assert not isinstance(field_presence_infos, set)
             rules_mask[name] = (offset, offset + len(field_presence_infos))
             offset += len(field_presence_infos)
@@ -459,7 +445,7 @@ class SQLPreproc(object):
         queue = [root]
         while queue:
             node = queue.pop()
-            type_info = self.ast_wrapper.singular_types[node['_type']]
+            type_info = self.ast_wrapper.singular_types[node["_type"]]
 
             for field_info in reversed(type_info.fields):
                 field_value = node.get(field_info.name)

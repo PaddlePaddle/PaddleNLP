@@ -75,11 +75,13 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             version=datasets.Version("1.0.0", ""),
             description="SE-ABSA16-CAME data about camera.",
         ),
-        SEABSA16Config(name="phns",
-                       data_url=_SEABSA16_URLs["phns"],
-                       data_dir="SE-ABSA16_PHNS",
-                       version=datasets.Version("1.0.0", ""),
-                       description="SE-ABSA16-PHNS data about phone."),
+        SEABSA16Config(
+            name="phns",
+            data_url=_SEABSA16_URLs["phns"],
+            data_dir="SE-ABSA16_PHNS",
+            version=datasets.Version("1.0.0", ""),
+            description="SE-ABSA16-PHNS data about phone.",
+        ),
     ]
 
     def _info(self):
@@ -87,35 +89,26 @@ class SEABSA16(datasets.GeneratorBasedBuilder):
             "id": datasets.Value("int32"),
             "text_a": datasets.Value("string"),
             "text_b": datasets.Value("string"),
-            "label": datasets.Value("int32")
+            "label": datasets.Value("int32"),
         }
 
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(features),
             homepage="https://www.luge.ai/#/luge/dataDetail?id=18",
-            citation=_CITATION)
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         downloaded_dir = dl_manager.download_and_extract(self.config.data_url)
         data_dir = os.path.join(downloaded_dir, self.config.data_dir)
 
-        train_split = datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                              gen_kwargs={
-                                                  "filepath":
-                                                  os.path.join(
-                                                      data_dir, "train.tsv"),
-                                                  "split":
-                                                  "train"
-                                              })
-        test_split = datasets.SplitGenerator(name=datasets.Split.TEST,
-                                             gen_kwargs={
-                                                 "filepath":
-                                                 os.path.join(
-                                                     data_dir, "test.tsv"),
-                                                 "split":
-                                                 "test"
-                                             })
+        train_split = datasets.SplitGenerator(
+            name=datasets.Split.TRAIN, gen_kwargs={"filepath": os.path.join(data_dir, "train.tsv"), "split": "train"}
+        )
+        test_split = datasets.SplitGenerator(
+            name=datasets.Split.TEST, gen_kwargs={"filepath": os.path.join(data_dir, "test.tsv"), "split": "test"}
+        )
 
         return [train_split, test_split]
 

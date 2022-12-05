@@ -24,8 +24,8 @@ from paddle import nn
 import paddle.nn.functional as F
 
 ACT_DICT = {
-    'relu': nn.ReLU,
-    'gelu': nn.GELU,
+    "relu": nn.ReLU,
+    "gelu": nn.GELU,
 }
 
 
@@ -33,32 +33,30 @@ def _build_linear(n_in, n_out, name=None, init=None):
     return nn.Linear(
         n_in,
         n_out,
-        weight_attr=paddle.ParamAttr(name='%s.w_0' %
-                                     name if name is not None else None,
-                                     initializer=init),
-        bias_attr='%s.b_0' % name if name is not None else None,
+        weight_attr=paddle.ParamAttr(name="%s.w_0" % name if name is not None else None, initializer=init),
+        bias_attr="%s.b_0" % name if name is not None else None,
     )
 
 
 def _build_ln(n_in, name):
     return nn.LayerNorm(
         normalized_shape=n_in,
-        weight_attr=paddle.ParamAttr(name='%s_layer_norm_scale' %
-                                     name if name is not None else None,
-                                     initializer=nn.initializer.Constant(1.)),
-        bias_attr=paddle.ParamAttr(name='%s_layer_norm_bias' %
-                                   name if name is not None else None,
-                                   initializer=nn.initializer.Constant(0.)),
+        weight_attr=paddle.ParamAttr(
+            name="%s_layer_norm_scale" % name if name is not None else None, initializer=nn.initializer.Constant(1.0)
+        ),
+        bias_attr=paddle.ParamAttr(
+            name="%s_layer_norm_bias" % name if name is not None else None, initializer=nn.initializer.Constant(0.0)
+        ),
     )
 
 
 def new_name(name, postfix):
     if name is None:
         ret = None
-    elif name == '':
+    elif name == "":
         ret = postfix
     else:
-        ret = '%s_%s' % (name, postfix)
+        ret = "%s_%s" % (name, postfix)
     return ret
 
 
@@ -156,38 +154,23 @@ def relative_attention_values(weight, value, relation):
 
 
 class RelationalAttentionLayer(nn.Layer):
-
     def __init__(self, cfg, name=None):
         super(RelationalAttentionLayer, self).__init__()
-        initializer = nn.initializer.TruncatedNormal(
-            std=cfg['initializer_range'])
-        d_model = cfg['hidden_size']
-        n_head = cfg['num_attention_heads']
+        initializer = nn.initializer.TruncatedNormal(std=cfg["initializer_range"])
+        d_model = cfg["hidden_size"]
+        n_head = cfg["num_attention_heads"]
         assert d_model % n_head == 0
-        d_model_q = cfg.get('query_hidden_size_per_head',
-                            d_model // n_head) * n_head
-        d_model_v = cfg.get('value_hidden_size_per_head',
-                            d_model // n_head) * n_head
+        d_model_q = cfg.get("query_hidden_size_per_head", d_model // n_head) * n_head
+        d_model_v = cfg.get("value_hidden_size_per_head", d_model // n_head) * n_head
         self.n_head = n_head
         self.d_key = d_model_q // n_head
-        self.q = _build_linear(d_model, d_model_q, new_name(name, 'query_fc'),
-                               initializer)
-        self.k = _build_linear(d_model, d_model_q, new_name(name, 'key_fc'),
-                               initializer)
-        self.v = _build_linear(d_model, d_model_v, new_name(name, 'value_fc'),
-                               initializer)
-        self.o = _build_linear(d_model_v, d_model, new_name(name, 'output_fc'),
-                               initializer)
-        self.dropout = nn.Dropout(p=cfg['attention_probs_dropout_prob'])
+        self.q = _build_linear(d_model, d_model_q, new_name(name, "query_fc"), initializer)
+        self.k = _build_linear(d_model, d_model_q, new_name(name, "key_fc"), initializer)
+        self.v = _build_linear(d_model, d_model_v, new_name(name, "value_fc"), initializer)
+        self.o = _build_linear(d_model_v, d_model, new_name(name, "output_fc"), initializer)
+        self.dropout = nn.Dropout(p=cfg["attention_probs_dropout_prob"])
 
-    def forward(self,
-                queries,
-                keys,
-                values,
-                relation_k,
-                relation_v,
-                attn_bias=None,
-                past_cache=None):
+    def forward(self, queries, keys, values, relation_k, relation_v, attn_bias=None, past_cache=None):
         """relational attention forward.
         seq_len in `shape` means num queries/keys/values of attention
 
@@ -205,10 +188,10 @@ class RelationalAttentionLayer(nn.Layer):
         Raises: NULL
         """
         assert len(queries.shape) == len(keys.shape) == len(values.shape) == 3
-        #bsz, q_len, q_dim = queries.shape
-        #bsz, k_len, k_dim = keys.shape
-        #bsz, v_len, v_dim = values.shape
-        #assert k_len == v_len
+        # bsz, q_len, q_dim = queries.shape
+        # bsz, k_len, k_dim = keys.shape
+        # bsz, v_len, v_dim = values.shape
+        # assert k_len == v_len
 
         q = self.q(queries)
         k = self.k(keys)
@@ -261,11 +244,9 @@ class RelationalPointerNet(nn.Layer):
         self.hidden_size = hidden_size
 
         initializer = nn.initializer.TruncatedNormal(std=init_range)
-        self.q = _build_linear(hidden_size, hidden_size,
-                               new_name(name, 'query_fc'), initializer)
-        self.k = _build_linear(hidden_size, hidden_size,
-                               new_name(name, 'key_fc'), initializer)
-        #self.dropout = nn.Dropout(p=cfg['attention_probs_dropout_prob'])
+        self.q = _build_linear(hidden_size, hidden_size, new_name(name, "query_fc"), initializer)
+        self.k = _build_linear(hidden_size, hidden_size, new_name(name, "key_fc"), initializer)
+        # self.dropout = nn.Dropout(p=cfg['attention_probs_dropout_prob'])
 
         self.relation_emb = None
         if num_relations > 0:
@@ -305,7 +286,7 @@ class RelationalPointerNet(nn.Layer):
 
         q = _transpose(q)
         k = _transpose(k)
-        #q = q.scale(self.hidden_size**-0.5)
+        # q = q.scale(self.hidden_size**-0.5)
         scores = relative_attention_logits(q, k, r)
         if attn_bias is not None:
             scores += attn_bias
@@ -315,23 +296,20 @@ class RelationalPointerNet(nn.Layer):
 
 
 class PositionwiseFeedForwardLayer(nn.Layer):
-
     def __init__(self, cfg, name=None):
         super(PositionwiseFeedForwardLayer, self).__init__()
-        initializer = nn.initializer.TruncatedNormal(
-            std=cfg['initializer_range'])
-        d_model = cfg['hidden_size']
-        d_ffn = cfg.get('intermediate_size', 4 * d_model)
-        self.act = ACT_DICT[cfg['hidden_act']]()
+        initializer = nn.initializer.TruncatedNormal(std=cfg["initializer_range"])
+        d_model = cfg["hidden_size"]
+        d_ffn = cfg.get("intermediate_size", 4 * d_model)
+        self.act = ACT_DICT[cfg["hidden_act"]]()
         self.i = _build_linear(
             d_model,
             d_ffn,
-            new_name(name, 'fc_0'),
+            new_name(name, "fc_0"),
             initializer,
         )
-        self.o = _build_linear(d_ffn, d_model, new_name(name, 'fc_1'),
-                               initializer)
-        prob = cfg.get('intermediate_dropout_prob', 0.)
+        self.o = _build_linear(d_ffn, d_model, new_name(name, "fc_1"), initializer)
+        prob = cfg.get("intermediate_dropout_prob", 0.0)
         self.dropout = nn.Dropout(p=prob)
 
     def forward(self, inputs):
@@ -346,33 +324,27 @@ class RelationalTransformerBlock(nn.Layer):
 
     def __init__(self, cfg, name=None):
         super(RelationalTransformerBlock, self).__init__()
-        d_model = cfg['hidden_size']
-        n_heads = cfg['num_attention_heads']
-        self.attn = RelationalAttentionLayer(cfg,
-                                             name=new_name(
-                                                 name, 'multi_head_att'))
-        self.ln1 = _build_ln(d_model, name=new_name(name, 'post_att'))
-        self.ffn = PositionwiseFeedForwardLayer(cfg, name=new_name(name, 'ffn'))
-        self.ln2 = _build_ln(d_model, name=new_name(name, 'post_ffn'))
-        prob = cfg.get('intermediate_dropout_prob', cfg['hidden_dropout_prob'])
+        d_model = cfg["hidden_size"]
+        n_heads = cfg["num_attention_heads"]
+        self.attn = RelationalAttentionLayer(cfg, name=new_name(name, "multi_head_att"))
+        self.ln1 = _build_ln(d_model, name=new_name(name, "post_att"))
+        self.ffn = PositionwiseFeedForwardLayer(cfg, name=new_name(name, "ffn"))
+        self.ln2 = _build_ln(d_model, name=new_name(name, "post_ffn"))
+        prob = cfg.get("intermediate_dropout_prob", cfg["hidden_dropout_prob"])
         self.dropout = nn.Dropout(p=prob)
 
         # 假设 k/v 的
         rel_hidden = d_model // n_heads
-        self.relation_k_emb = nn.Embedding(cfg['num_relations'], rel_hidden)
-        self.relation_v_emb = nn.Embedding(cfg['num_relations'], rel_hidden)
+        self.relation_k_emb = nn.Embedding(cfg["num_relations"], rel_hidden)
+        self.relation_v_emb = nn.Embedding(cfg["num_relations"], rel_hidden)
 
     def forward(self, inputs, relations, attn_bias=None, past_cache=None):
         relation_k = self.relation_k_emb(relations)
         relation_v = self.relation_k_emb(relations)
 
-        attn_out, cache = self.attn(inputs,
-                                    inputs,
-                                    inputs,
-                                    relation_k,
-                                    relation_v,
-                                    attn_bias,
-                                    past_cache=past_cache)  #self attn
+        attn_out, cache = self.attn(
+            inputs, inputs, inputs, relation_k, relation_v, attn_bias, past_cache=past_cache
+        )  # self attn
         attn_out = self.dropout(attn_out)
         hidden = attn_out + inputs
         hidden = self.ln1(hidden)  # dropout/ add/ norm
@@ -385,14 +357,12 @@ class RelationalTransformerBlock(nn.Layer):
 
 
 class RelationalTransformerEncoder(nn.Layer):
-
     def __init__(self, cfg, name=None):
         super(RelationalTransformerEncoder, self).__init__()
-        n_layers = cfg['num_hidden_layers']
-        self.block = nn.LayerList([
-            RelationalTransformerBlock(cfg, new_name(name, 'layer_%d' % i))
-            for i in range(n_layers)
-        ])
+        n_layers = cfg["num_hidden_layers"]
+        self.block = nn.LayerList(
+            [RelationalTransformerBlock(cfg, new_name(name, "layer_%d" % i)) for i in range(n_layers)]
+        )
 
     def forward(self, inputs, relations, attn_bias=None, past_cache=None):
         """relational transformer encoder, forward stage of
@@ -409,18 +379,16 @@ class RelationalTransformerEncoder(nn.Layer):
         Raises: NULL
         """
         if past_cache is not None:
-            assert isinstance(past_cache, tuple), 'unknown type of `past_cache`,' + \
-                   ' expect tuple or list. got %s' % repr(type(past_cache))
+            assert isinstance(
+                past_cache, tuple
+            ), "unknown type of `past_cache`," + " expect tuple or list. got %s" % repr(type(past_cache))
             past_cache = list(zip(*past_cache))
         else:
             past_cache = [None] * len(self.block)
         cache_list_k, cache_list_v, hidden_list = [], [], [inputs]
 
         for b, p in zip(self.block, past_cache):
-            inputs, cache = b(inputs,
-                              relations,
-                              attn_bias=attn_bias,
-                              past_cache=p)
+            inputs, cache = b(inputs, relations, attn_bias=attn_bias, past_cache=p)
             cache_k, cache_v = cache
             cache_list_k.append(cache_k)
             cache_list_v.append(cache_v)
@@ -444,9 +412,7 @@ if __name__ == "__main__":
 
     model = RelationalTransformerEncoder(cfg)
     print(model)
-    inputs = paddle.to_tensor(list(range(24)),
-                              dtype='float32').reshape([2, 3, 4])
-    relations = paddle.to_tensor(list(range(18)),
-                                 dtype='int64').reshape([2, 3, 3])
+    inputs = paddle.to_tensor(list(range(24)), dtype="float32").reshape([2, 3, 4])
+    relations = paddle.to_tensor(list(range(18)), dtype="int64").reshape([2, 3, 3])
     hidden, _, _ = model(inputs, relations)
     print(hidden)

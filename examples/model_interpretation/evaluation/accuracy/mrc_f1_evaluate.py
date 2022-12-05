@@ -42,14 +42,16 @@ def _tokenize_chinese_chars(text):
         # as is Japanese Hiragana and Katakana. Those alphabets are used to write
         # space-separated words, so they are not treated specially and handled
         # like the all of the other languages.
-        if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
-            (cp >= 0x3400 and cp <= 0x4DBF) or  #
-            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
-            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
-            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
-            (cp >= 0x2B820 and cp <= 0x2CEAF) or
-            (cp >= 0xF900 and cp <= 0xFAFF) or  #
-            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+        if (
+            (cp >= 0x4E00 and cp <= 0x9FFF)
+            or (cp >= 0x3400 and cp <= 0x4DBF)  #
+            or (cp >= 0x20000 and cp <= 0x2A6DF)  #
+            or (cp >= 0x2A700 and cp <= 0x2B73F)  #
+            or (cp >= 0x2B740 and cp <= 0x2B81F)  #
+            or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
+            or (cp >= 0xF900 and cp <= 0xFAFF)
+            or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
+        ):  #
             return True
 
         return False
@@ -78,9 +80,35 @@ def _normalize(in_str):
     """
     in_str = in_str.lower()
     sp_char = [
-        u':', u'_', u'`', u'，', u'。', u'：', u'？', u'！', u'(', u')', u'“', u'”',
-        u'；', u'’', u'《', u'》', u'……', u'·', u'、', u',', u'「', u'」', u'（', u'）',
-        u'－', u'～', u'『', u'』', '|'
+        ":",
+        "_",
+        "`",
+        "，",
+        "。",
+        "：",
+        "？",
+        "！",
+        "(",
+        ")",
+        "“",
+        "”",
+        "；",
+        "’",
+        "《",
+        "》",
+        "……",
+        "·",
+        "、",
+        ",",
+        "「",
+        "」",
+        "（",
+        "）",
+        "－",
+        "～",
+        "『",
+        "』",
+        "|",
     ]
     out_segs = []
     for char in in_str:
@@ -88,7 +116,7 @@ def _normalize(in_str):
             continue
         else:
             out_segs.append(char)
-    return ''.join(out_segs)
+    return "".join(out_segs)
 
 
 def find_lcs(s1, s2):
@@ -103,7 +131,7 @@ def find_lcs(s1, s2):
                 if m[i + 1][j + 1] > max_len:
                     max_len = m[i + 1][j + 1]
                     p = i + 1
-    return s1[p - max_len:p], max_len
+    return s1[p - max_len : p], max_len
 
 
 def evaluate_ch(ref_ans, pred_ans):
@@ -123,9 +151,9 @@ def evaluate_ch(ref_ans, pred_ans):
     for query_id in ref_ans:
         sample = ref_ans[query_id]
         total_count += 1
-        answers = sample['sent_label']
+        answers = sample["sent_label"]
         try:
-            prediction = pred_ans[query_id]['pred_label']
+            prediction = pred_ans[query_id]["pred_label"]
         except:
             skip_count += 1
             continue
@@ -174,21 +202,21 @@ def calc_em_score(answers, prediction):
 
 
 def read_dataset(file_path):
-    f = open(file_path, 'r')
+    f = open(file_path, "r")
     golden = {}
     for l in f.readlines():
         ins = json.loads(l)
-        golden[ins['sent_id']] = ins
+        golden[ins["sent_id"]] = ins
     f.close()
     return golden
 
 
 def read_model_prediction(file_path):
-    f = open(file_path, 'r')
+    f = open(file_path, "r")
     predict = {}
     for l in f.readlines():
         ins = json.loads(l)
-        predict[ins['id']] = ins
+        predict[ins["id"]] = ins
     f.close()
     return predict
 
@@ -200,28 +228,28 @@ def read_temp(file_path):
 
 
 def get_args():
-    parser = argparse.ArgumentParser('mrc baseline performance eval')
-    parser.add_argument('--golden_path', help='dataset file')
-    parser.add_argument('--pred_file', help='model prediction file')
-    parser.add_argument('--language', help='the language of the model')
-    parser.add_argument('--debug', action='store_true', help='debug mode')
+    parser = argparse.ArgumentParser("mrc baseline performance eval")
+    parser.add_argument("--golden_path", help="dataset file")
+    parser.add_argument("--pred_file", help="model prediction file")
+    parser.add_argument("--language", help="the language of the model")
+    parser.add_argument("--debug", action="store_true", help="debug mode")
     args = parser.parse_args()
     return args
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
 
-    if args.language == 'ch':
+    if args.language == "ch":
         ref_ans = read_dataset(args.golden_path)
         pred_ans = read_model_prediction(args.pred_file)
         F1, EM, TOTAL, SKIP = evaluate_ch(ref_ans, pred_ans)
 
         output_result = OrderedDict()
-        output_result['F1'] = '%.3f' % F1
-        output_result['EM'] = '%.3f' % EM
-        output_result['TOTAL'] = TOTAL
-        output_result['SKIP'] = SKIP
+        output_result["F1"] = "%.3f" % F1
+        output_result["EM"] = "%.3f" % EM
+        output_result["TOTAL"] = TOTAL
+        output_result["SKIP"] = SKIP
         print(json.dumps(output_result))
     else:
         ref_ans = read_dataset(args.golden_path)
@@ -229,11 +257,11 @@ if __name__ == '__main__':
         res = []
         for i in ref_ans:
             ins = ref_ans[i]
-            ins['id'] = str(ins['sent_id'])
-            ins['answers'] = [ins['sent_label']]
-            if ins['answers'] == [""]:
-                ins['is_impossible'] = True
+            ins["id"] = str(ins["sent_id"])
+            ins["answers"] = [ins["sent_label"]]
+            if ins["answers"] == [""]:
+                ins["is_impossible"] = True
             else:
-                ins['is_impossible'] = False
+                ins["is_impossible"] = False
             res.append(ins)
         squad_evaluate(examples=res, preds=pred_ans)

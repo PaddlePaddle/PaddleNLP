@@ -22,9 +22,9 @@ def get_eval(all_preds, raw_data, task_type):
             ex += len(pred_ent_set & gold_ent_set)
             ey += len(pred_ent_set)
             ez += len(gold_ent_set)
-        ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.
-        ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.
-        ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.
+        ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.0
+        ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.0
+        ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.0
 
         return {
             "entity_f1": ent_f1,
@@ -41,27 +41,25 @@ def get_eval(all_preds, raw_data, task_type):
             ex += len(pred_ent_set & gold_ent_set)
             ey += len(pred_ent_set)
             ez += len(gold_ent_set)
-        ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.
-        ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.
-        ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.
+        ent_f1 = round(2 * ex / (ey + ez), 5) if ex != 1e-10 else 0.0
+        ent_precision = round(ex / ey, 5) if ey != 1e-10 else 0.0
+        ent_recall = round(ex / ez, 5) if ez != 1e-10 else 0.0
 
         rx, ry, rz = 1e-10, 1e-10, 1e-10
 
         for rel_preds, raw_data in zip(all_rel_preds, raw_data):
             pred_rel_set = set([tuple(p.values()) for p in rel_preds])
             if task_type == "opinion_extraction":
-                gold_rel_set = set(
-                    [tuple(g.values()) for g in raw_data["aso_list"]])
+                gold_rel_set = set([tuple(g.values()) for g in raw_data["aso_list"]])
             else:
-                gold_rel_set = set(
-                    [tuple(g.values()) for g in raw_data["spo_list"]])
+                gold_rel_set = set([tuple(g.values()) for g in raw_data["spo_list"]])
             rx += len(pred_rel_set & gold_rel_set)
             ry += len(pred_rel_set)
             rz += len(gold_rel_set)
 
-        rel_f1 = round(2 * rx / (ry + rz), 5) if rx != 1e-10 else 0.
-        rel_precision = round(rx / ry, 5) if ry != 1e-10 else 0.
-        rel_recall = round(rx / rz, 5) if rz != 1e-10 else 0.
+        rel_f1 = round(2 * rx / (ry + rz), 5) if rx != 1e-10 else 0.0
+        rel_precision = round(rx / ry, 5) if ry != 1e-10 else 0.0
+        rel_recall = round(rx / rz, 5) if rz != 1e-10 else 0.0
 
         return {
             "entity_f1": ent_f1,
@@ -69,5 +67,5 @@ def get_eval(all_preds, raw_data, task_type):
             "entity_recall": ent_recall,
             "relation_f1": rel_f1,
             "relation_precision": rel_precision,
-            "relation_recall": rel_recall
+            "relation_recall": rel_recall,
         }

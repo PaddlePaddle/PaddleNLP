@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,56 +36,34 @@ from utils import set_seed
 parser = argparse.ArgumentParser()
 parser.add_argument(
     "--save_dir",
-    default='./outputs/chn',
+    default="./outputs/chn",
     type=str,
-    help="The output directory where the model checkpoints will be written.")
+    help="The output directory where the model checkpoints will be written.",
+)
 parser.add_argument(
     "--max_seq_length",
     default=512,
     type=int,
     help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded."
+    "Sequences longer than this will be truncated, sequences shorter will be padded.",
 )
-parser.add_argument("--batch_size",
-                    default=8,
-                    type=int,
-                    help="Batch size per GPU/CPU for training.")
-parser.add_argument("--learning_rate",
-                    default=2e-5,
-                    type=float,
-                    help="The initial learning rate for Adam.")
-parser.add_argument("--weight_decay",
-                    default=0.0001,
-                    type=float,
-                    help="Weight decay if we apply some.")
-parser.add_argument("--epochs",
-                    default=10,
-                    type=int,
-                    help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion",
-                    default=0.1,
-                    type=float,
-                    help="Linear warmup proption over the training process.")
-parser.add_argument("--init_from_ckpt",
-                    type=str,
-                    default=None,
-                    help="The path of checkpoint to be loaded.")
-parser.add_argument("--seed",
-                    type=int,
-                    default=2333,
-                    help="random seed for initialization")
-parser.add_argument("--device",
-                    choices=["cpu", "gpu", "xpu"],
-                    default="gpu",
-                    help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--data_path",
-                    type=str,
-                    default="./data",
-                    help="The path of datasets to be loaded")
-parser.add_argument("--adam_epsilon",
-                    default=1e-8,
-                    type=float,
-                    help="Epsilon for Adam optimizer.")
+parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
+parser.add_argument("--learning_rate", default=2e-5, type=float, help="The initial learning rate for Adam.")
+parser.add_argument("--weight_decay", default=0.0001, type=float, help="Weight decay if we apply some.")
+parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
+parser.add_argument(
+    "--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process."
+)
+parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
+parser.add_argument("--seed", type=int, default=2333, help="random seed for initialization")
+parser.add_argument(
+    "--device",
+    choices=["cpu", "gpu", "xpu"],
+    default="gpu",
+    help="Select which device to train model, defaults to gpu.",
+)
+parser.add_argument("--data_path", type=str, default="./data", help="The path of datasets to be loaded")
+parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
 args = parser.parse_args()
 
 paddle.set_device(args.device)
@@ -100,8 +78,7 @@ from utils import load_ds
 
 train_ds, dev_ds, test_ds = load_ds(datafiles=[train_path, dev_path, test_path])
 
-model = ChineseBertForSequenceClassification.from_pretrained(
-    "ChineseBERT-large", num_classes=2)
+model = ChineseBertForSequenceClassification.from_pretrained("ChineseBERT-large", num_classes=2)
 tokenizer = ChineseBertTokenizer.from_pretrained("ChineseBERT-large")
 
 # model = paddle.DataParallel(model)
@@ -124,9 +101,7 @@ def convert_example(example, tokenizer, max_seq_length=512, is_test=False):
 
 
 # Process the data into a data format that the model can read in.
-trans_func = partial(convert_example,
-                     tokenizer=tokenizer,
-                     max_seq_length=args.max_seq_length)
+trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
 # Form data into batch data, such as padding text sequences of different lengths into the maximum length of batch data,
 # and stack each data label together
@@ -134,40 +109,30 @@ batchify_fn = lambda samples, fn=Tuple(
     Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
     # Pad(axis=0, pad_val=tokenizer.pad_token_type_id), # token_type_ids
     Pad(axis=0, pad_val=0),  # pinyin_ids
-    Stack()  # labels
+    Stack(),  # labels
 ): [data for data in fn(samples)]
 
 from utils import create_dataloader
 
-train_data_loader = create_dataloader(train_ds,
-                                      mode='train',
-                                      batch_size=args.batch_size,
-                                      batchify_fn=batchify_fn,
-                                      trans_fn=trans_func)
-dev_data_loader = create_dataloader(dev_ds,
-                                    mode='dev',
-                                    batch_size=args.batch_size,
-                                    batchify_fn=batchify_fn,
-                                    trans_fn=trans_func)
-test_data_loader = create_dataloader(test_ds,
-                                     mode='test',
-                                     batch_size=args.batch_size,
-                                     batchify_fn=batchify_fn,
-                                     trans_fn=trans_func)
+train_data_loader = create_dataloader(
+    train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+)
+dev_data_loader = create_dataloader(
+    dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+)
+test_data_loader = create_dataloader(
+    test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+)
 
 from utils import evaluate
 
 num_training_steps = len(train_data_loader) * args.epochs
 
-lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                     args.warmup_proportion)
+lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
 # Generate parameter names needed to perform weight decay.
 # All bias and LayerNorm parameters are excluded.
-decay_params = [
-    p.name for n, p in model.named_parameters()
-    if not any(nd in n for nd in ["bias", "norm"])
-]
+decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
 optimizer = paddle.optimizer.AdamW(
     beta1=0.9,
@@ -176,7 +141,8 @@ optimizer = paddle.optimizer.AdamW(
     epsilon=args.adam_epsilon,
     parameters=model.parameters(),
     weight_decay=args.weight_decay,
-    apply_decay_param_fun=lambda x: x in decay_params)
+    apply_decay_param_fun=lambda x: x in decay_params,
+)
 
 # cross-entropy cost function
 criterion = paddle.nn.loss.CrossEntropyLoss()
@@ -203,8 +169,8 @@ for epoch in range(1, args.epochs + 1):
         if global_step % 10 == 0:
             print(
                 "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                % (global_step, epoch, step, loss, acc, 10 /
-                   (time.time() - tic_train)))
+                % (global_step, epoch, step, loss, acc, 10 / (time.time() - tic_train))
+            )
             tic_train = time.time()
 
         loss.backward()

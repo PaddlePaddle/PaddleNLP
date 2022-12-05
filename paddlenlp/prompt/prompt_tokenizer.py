@@ -34,8 +34,7 @@ class MLMPromptTokenizer(object):
     def __call__(self, inputs: List[Dict[str, Any]]):
         part_text = [part["text"] for part in inputs]
         part_do_truncate = [part["do_truncate"] for part in inputs]
-        max_lengths = self._create_max_lengths_from_do_truncate(
-            part_text, part_do_truncate)
+        max_lengths = self._create_max_lengths_from_do_truncate(part_text, part_do_truncate)
 
         encoded_inputs = defaultdict(list)
         option_length = None
@@ -44,14 +43,14 @@ class MLMPromptTokenizer(object):
         for index, part in enumerate(inputs):
             # Create input_ids.
             soft_token_ids = part.get("soft_tokens", None)
-            if soft_token_ids is None or len(
-                    soft_token_ids) == 1 and soft_token_ids[0] == 0:
+            if soft_token_ids is None or len(soft_token_ids) == 1 and soft_token_ids[0] == 0:
                 input_ids = self.tokenizer.encode(
                     part["text"],
                     add_special_tokens=False,
                     return_token_type_ids=False,
                     truncation=True,
-                    max_length=max_lengths[index])["input_ids"]
+                    max_length=max_lengths[index],
+                )["input_ids"]
                 encoded_inputs["soft_token_ids"].append([0] * len(input_ids))
             else:
                 input_ids = soft_token_ids
@@ -60,48 +59,40 @@ class MLMPromptTokenizer(object):
             part_length = len(input_ids)
 
             # Create position_ids.
-            position_ids, last_position = self._create_position_ids_from_part(
-                input_ids, part, last_position)
+            position_ids, last_position = self._create_position_ids_from_part(input_ids, part, last_position)
             encoded_inputs["position_ids"].append(position_ids)
 
             # Create token_type_ids.
             if "token_types" in part:
                 last_token_type = part["token_types"]
-            encoded_inputs["token_type_ids"].append([last_token_type] *
-                                                    part_length)
+            encoded_inputs["token_type_ids"].append([last_token_type] * part_length)
 
             # Create other features like encoder_ids.
             for name in part:
-                if name not in [
-                        "text", "soft_tokens", "positions", "token_types"
-                ]:
+                if name not in ["text", "soft_tokens", "positions", "token_types"]:
                     encoded_inputs[name].append([part[name]] * part_length)
 
             # Record the length of options if exists.
             if self.omask_token in part["text"]:
                 if option_length is not None:
                     raise ValueError(
-                        "There are more than one sequence of options, which "
-                        "will cause wrong attention masks.")
+                        "There are more than one sequence of options, which " "will cause wrong attention masks."
+                    )
                 option_length = len(input_ids)
 
         encoded_inputs.pop("do_truncate")
         encoded_inputs = self.join(encoded_inputs)
         encoded_inputs = self.add_special_tokens(encoded_inputs)
-        attention_mask = self._create_attention_mask(
-            encoded_inputs["input_ids"], option_length)
+        attention_mask = self._create_attention_mask(encoded_inputs["input_ids"], option_length)
         if attention_mask is not None:
             encoded_inputs["attention_mask"] = attention_mask
-        masked_positions = self._create_masked_positions(
-            encoded_inputs["input_ids"], encoded_inputs["soft_token_ids"])
+        masked_positions = self._create_masked_positions(encoded_inputs["input_ids"], encoded_inputs["soft_token_ids"])
         if masked_positions is not None:
             encoded_inputs["masked_positions"] = masked_positions
         return encoded_inputs
 
-    def _create_position_ids_from_part(self, input_ids: List[int],
-                                       part: Dict[str,
-                                                  Any], last_position: int):
-        """ 
+    def _create_position_ids_from_part(self, input_ids: List[int], part: Dict[str, Any], last_position: int):
+        """
         Create position ids from prompt for each part.
         """
         part_length = len(input_ids)
@@ -109,31 +100,24 @@ class MLMPromptTokenizer(object):
             last_position = part["positions"]
         if self.omask_token in part["text"]:
             omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
-            omask_index = [
-                x for x in range(part_length) if input_ids[x] == omask_id
-            ]
+            omask_index = [x for x in range(part_length) if input_ids[x] == omask_id]
             omask_index = [0] + omask_index
             position_ids = []
             max_index = 0
             for start_id, end_id in zip(omask_index[:-1], omask_index[1:]):
-                position_ids.extend(
-                    list(range(last_position,
-                               last_position + end_id - start_id)))
+                position_ids.extend(list(range(last_position, last_position + end_id - start_id)))
                 max_index = max(end_id - start_id, max_index)
             if len(position_ids) < part_length:
                 difference = part_length - len(position_ids)
-                position_ids.extend(
-                    range(last_position, last_position + difference))
+                position_ids.extend(range(last_position, last_position + difference))
                 max_index = max(difference, max_index)
             last_position += max_index
         else:
-            position_ids = list(
-                range(last_position, last_position + part_length))
+            position_ids = list(range(last_position, last_position + part_length))
             last_position += part_length
         return position_ids, last_position
 
-    def _create_max_lengths_from_do_truncate(self, part_text: List[str],
-                                             part_do_truncate: List[bool]):
+    def _create_max_lengths_from_do_truncate(self, part_text: List[str], part_do_truncate: List[bool]):
         """
         Create the max sequence length of each part.
         """
@@ -161,8 +145,7 @@ class MLMPromptTokenizer(object):
                     max_lengths.append(None)
         return max_lengths
 
-    def _create_attention_mask(self, input_ids: List[int],
-                               option_length: Union[int, None]):
+    def _create_attention_mask(self, input_ids: List[int], option_length: Union[int, None]):
         if option_length is None:
             return None
         omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
@@ -180,8 +163,7 @@ class MLMPromptTokenizer(object):
         attention_mask = (1 - attention_mask) * -1e4
         return attention_mask
 
-    def _create_masked_positions(self, input_ids: List[int],
-                                 soft_token_ids: List[int]):
+    def _create_masked_positions(self, input_ids: List[int], soft_token_ids: List[int]):
         non_soft_ids = np.array(input_ids) * (np.array(soft_token_ids) == 0)
         mask_id = self.tokenizer.mask_token_id
 
@@ -192,11 +174,9 @@ class MLMPromptTokenizer(object):
 
     def add_special_tokens(self, input_dict: Dict[str, Any]):
         for key in input_dict:
-            new_inputs = self.tokenizer.build_inputs_with_special_tokens(
-                input_dict[key])
+            new_inputs = self.tokenizer.build_inputs_with_special_tokens(input_dict[key])
             if key != "input_ids":
-                special_mask = np.array(
-                    self.tokenizer.get_special_tokens_mask(input_dict[key]))
+                special_mask = np.array(self.tokenizer.get_special_tokens_mask(input_dict[key]))
                 new_inputs = np.array(new_inputs)
                 # TODO (Huijuan): Use different ids according to specific keyword.
                 new_inputs[special_mask == 1] = 0

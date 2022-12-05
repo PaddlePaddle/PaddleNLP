@@ -32,21 +32,17 @@ args = parser.parse_args()
 def main():
     # Load vocab.
     if not os.path.exists(args.vocab_path):
-        raise RuntimeError('The vocab_path  can not be found in the path %s' %
-                           args.vocab_path)
+        raise RuntimeError("The vocab_path  can not be found in the path %s" % args.vocab_path)
 
     vocab = Vocab.load_vocabulary(args.vocab_path)
-    label_map = {0: 'negative', 1: 'neutral', 2: 'positive'}
+    label_map = {0: "negative", 1: "neutral", 2: "positive"}
 
     # Construct the newtork.
     vocab_size = len(vocab)
     num_classes = len(label_map)
-    pad_token_id = vocab.to_indices('[PAD]')
+    pad_token_id = vocab.to_indices("[PAD]")
 
-    model = TextCNNModel(vocab_size,
-                         num_classes,
-                         padding_idx=pad_token_id,
-                         ngram_filter_sizes=(1, 2, 3))
+    model = TextCNNModel(vocab_size, num_classes, padding_idx=pad_token_id, ngram_filter_sizes=(1, 2, 3))
 
     # Load model parameters.
     state_dict = paddle.load(args.params_path)

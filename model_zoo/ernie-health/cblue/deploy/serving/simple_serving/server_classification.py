@@ -16,8 +16,10 @@ from paddlenlp import SimpleServer
 from paddlenlp.server import CustomModelHandler, MultiClassificationPostHandler
 
 app = SimpleServer()
-app.register('cblue_cls',
-             model_path="../../../export",
-             tokenizer_name='ernie-health-chinese',
-             model_handler=CustomModelHandler,
-             post_handler=MultiClassificationPostHandler)
+app.register(
+    "cblue_cls",
+    model_path="../../../export",
+    tokenizer_name="ernie-health-chinese",
+    model_handler=CustomModelHandler,
+    post_handler=MultiClassificationPostHandler,
+)

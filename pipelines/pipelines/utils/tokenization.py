@@ -60,7 +60,8 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
         return_attention_mask=True,
         return_offsets_mapping=True,
         return_token_type_ids=False,
-        add_special_tokens=False)
+        add_special_tokens=False,
+    )
 
     # Extract relevant data
     tokenids_batch = tokenized_docs_batch["input_ids"]
@@ -77,19 +78,20 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
         # Tokenize questions one by one
         for i_q, q in enumerate(d["qas"]):
             question_text = q["question"]
-            tokenized_q = tokenizer.encode(question_text,
-                                           return_special_tokens_mask=True,
-                                           return_attention_mask=True,
-                                           return_offsets_mapping=True,
-                                           return_token_type_ids=False,
-                                           add_special_tokens=False)
+            tokenized_q = tokenizer.encode(
+                question_text,
+                return_special_tokens_mask=True,
+                return_attention_mask=True,
+                return_offsets_mapping=True,
+                return_token_type_ids=False,
+                add_special_tokens=False,
+            )
 
             # Extract relevant data
             question_tokenids = tokenized_q["input_ids"]
 
             # Fake offset_mapping
-            question_offsets = [(i, i + 1)
-                                for i in range(len(question_tokenids))]
+            question_offsets = [(i, i + 1) for i in range(len(question_tokenids))]
 
             # question start_of_words_batch
             # Fake question_sow
@@ -115,16 +117,10 @@ def tokenize_batch_question_answering(pre_baskets, tokenizer, indices):
             # TODO add only during debug mode (need to create debug mode)
             # raw["document_tokens_strings"] = tokenized_docs_batch.encodings[i_doc].tokens
             # raw["question_tokens_strings"] = tokenized_q.encodings[0].tokens
-            raw["document_tokens_strings"] = tokenizer.convert_ids_to_tokens(
-                tokenized_docs_batch["input_ids"][i_doc])
-            raw["question_tokens_strings"] = tokenizer.convert_ids_to_tokens(
-                question_tokenids)
+            raw["document_tokens_strings"] = tokenizer.convert_ids_to_tokens(tokenized_docs_batch["input_ids"][i_doc])
+            raw["question_tokens_strings"] = tokenizer.convert_ids_to_tokens(question_tokenids)
 
-            baskets.append(
-                SampleBasket(raw=raw,
-                             id_internal=internal_id,
-                             id_external=external_id,
-                             samples=None))
+            baskets.append(SampleBasket(raw=raw, id_internal=internal_id, id_external=external_id, samples=None))
     return baskets
 
 

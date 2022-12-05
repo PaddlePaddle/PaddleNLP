@@ -86,9 +86,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
         self.set_sigmas(num_train_timesteps, sigma_min, sigma_max, sampling_eps)
 
-    def scale_model_input(self,
-                          sample: paddle.Tensor,
-                          timestep: Optional[int] = None) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Optional[int] = None) -> paddle.Tensor:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
@@ -102,9 +100,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         """
         return sample
 
-    def set_timesteps(self,
-                      num_inference_steps: int,
-                      sampling_eps: float = None):
+    def set_timesteps(self, num_inference_steps: int, sampling_eps: float = None):
         """
         Sets the continuous timesteps used for the diffusion chain. Supporting function to be run before inference.
 
@@ -118,11 +114,9 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
         self.timesteps = paddle.linspace(1, sampling_eps, num_inference_steps)
 
-    def set_sigmas(self,
-                   num_inference_steps: int,
-                   sigma_min: float = None,
-                   sigma_max: float = None,
-                   sampling_eps: float = None):
+    def set_sigmas(
+        self, num_inference_steps: int, sigma_min: float = None, sigma_max: float = None, sampling_eps: float = None
+    ):
         """
         Sets the noise scales used for the diffusion chain. Supporting function to be run before inference.
 
@@ -143,13 +137,11 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         if self.timesteps is None:
             self.set_timesteps(num_inference_steps, sampling_eps)
 
-        self.sigmas = sigma_min * (sigma_max / sigma_min)**(self.timesteps /
-                                                            sampling_eps)
+        self.sigmas = sigma_min * (sigma_max / sigma_min) ** (self.timesteps / sampling_eps)
         self.discrete_sigmas = paddle.exp(
-            paddle.linspace(math.log(sigma_min), math.log(sigma_max),
-                            num_inference_steps))
-        self.sigmas = paddle.to_tensor(
-            [sigma_min * (sigma_max / sigma_min)**t for t in self.timesteps])
+            paddle.linspace(math.log(sigma_min), math.log(sigma_max), num_inference_steps)
+        )
+        self.sigmas = paddle.to_tensor([sigma_min * (sigma_max / sigma_min) ** t for t in self.timesteps])
 
     def get_adjacent_sigma(self, timesteps, t):
         return paddle.where(
@@ -186,13 +178,13 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
                 "`self.timesteps` is not set, you need to run 'set_timesteps' after creating the scheduler"
             )
 
-        timestep = timestep * paddle.ones((sample.shape[0], ))
+        timestep = timestep * paddle.ones((sample.shape[0],))
         timesteps = (timestep * (len(self.timesteps) - 1)).astype("int64")
 
         sigma = self.discrete_sigmas[timesteps]
         adjacent_sigma = self.get_adjacent_sigma(timesteps, timestep)
         drift = paddle.zeros_like(sample)
-        diffusion = (sigma**2 - adjacent_sigma**2)**0.5
+        diffusion = (sigma**2 - adjacent_sigma**2) ** 0.5
 
         # equation 6 in the paper: the model_output modeled by the network is grad_x log pt(x)
         # also equation 47 shows the analog from SDE models to ancestral sampling methods
@@ -210,8 +202,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         if not return_dict:
             return (prev_sample, prev_sample_mean)
 
-        return SdeVeOutput(prev_sample=prev_sample,
-                           prev_sample_mean=prev_sample_mean)
+        return SdeVeOutput(prev_sample=prev_sample, prev_sample_mean=prev_sample_mean)
 
     def step_correct(
         self,
@@ -244,13 +235,10 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         noise = paddle.randn(sample.shape)
 
         # compute step size from the model_output, the noise, and the snr
-        grad_norm = paddle.norm(model_output.reshape(
-            [model_output.shape[0], -1]),
-                                axis=-1).mean()
-        noise_norm = paddle.norm(noise.reshape([noise.shape[0], -1]),
-                                 axis=-1).mean()
-        step_size = (self.config.snr * noise_norm / grad_norm)**2 * 2
-        step_size = step_size * paddle.ones((sample.shape[0], ))
+        grad_norm = paddle.norm(model_output.reshape([model_output.shape[0], -1]), axis=-1).mean()
+        noise_norm = paddle.norm(noise.reshape([noise.shape[0], -1]), axis=-1).mean()
+        step_size = (self.config.snr * noise_norm / grad_norm) ** 2 * 2
+        step_size = step_size * paddle.ones((sample.shape[0],))
         # self.repeat_scalar(step_size, sample.shape[0])
 
         # compute corrected sample: model_output term and noise term
@@ -258,10 +246,10 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         while len(step_size.shape) < len(sample.shape):
             step_size = step_size.unsqueeze(-1)
         prev_sample_mean = sample + step_size * model_output
-        prev_sample = prev_sample_mean + ((step_size * 2)**0.5) * noise
+        prev_sample = prev_sample_mean + ((step_size * 2) ** 0.5) * noise
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
 

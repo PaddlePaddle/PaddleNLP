@@ -21,20 +21,16 @@ import types
 
 
 def add_start_docstrings(*docstr):
-
     def docstring_decorator(fn):
-        fn.__doc__ = "".join(docstr) + (fn.__doc__
-                                        if fn.__doc__ is not None else "")
+        fn.__doc__ = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
         return fn
 
     return docstring_decorator
 
 
 def add_start_docstrings_to_model_forward(*docstr):
-
     def docstring_decorator(fn):
-        docstring = "".join(docstr) + (fn.__doc__
-                                       if fn.__doc__ is not None else "")
+        docstring = "".join(docstr) + (fn.__doc__ if fn.__doc__ is not None else "")
         class_name = f"[`{fn.__qualname__.split('.')[0]}`]"
         intro = f"   The {class_name} forward method, overrides the `__call__` special method."
         note = r"""
@@ -55,10 +51,8 @@ def add_start_docstrings_to_model_forward(*docstr):
 
 
 def add_end_docstrings(*docstr):
-
     def docstring_decorator(fn):
-        fn.__doc__ = (fn.__doc__
-                      if fn.__doc__ is not None else "") + "".join(docstr)
+        fn.__doc__ = (fn.__doc__ if fn.__doc__ is not None else "") + "".join(docstr)
         return fn
 
     return docstring_decorator

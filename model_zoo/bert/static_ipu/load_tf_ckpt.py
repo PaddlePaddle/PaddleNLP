@@ -20,53 +20,34 @@ logger = getLogger(__name__)
 
 
 def get_tf_mapping(args):
-    squad_mapping = {
-        "cls/squad/output_weights": "linear_72.w_0",
-        "cls/squad/output_bias": "linear_72.b_0"
-    }
+    squad_mapping = {"cls/squad/output_weights": "linear_72.w_0", "cls/squad/output_bias": "linear_72.b_0"}
 
     tf_to_pdmodel = {
         "bert/embeddings/word_embeddings": "ipu_bert_embeddings_0.w_0",
         "bert/embeddings/position_embeddings": "embedding_0.w_0",
         "bert/embeddings/token_type_embeddings": "ipu_bert_embeddings_0.w_1",
         "bert/embeddings/LayerNorm/gamma": "layer_norm_0.w_0",
-        "bert/embeddings/LayerNorm/beta": "layer_norm_0.b_0"
+        "bert/embeddings/LayerNorm/beta": "layer_norm_0.b_0",
     }
     for i in range(args.num_hidden_layers):
         layer = {
-            f"bert/encoder/layer_{i}/attention/self/query/bias":
-            f"bert_model_0.b_{i}",
-            f"bert/encoder/layer_{i}/attention/self/key/bias":
-            f"bert_model_0.b_{i}",
-            f"bert/encoder/layer_{i}/attention/self/value/bias":
-            f"bert_model_0.b_{i}",
-            f"bert/encoder/layer_{i}/attention/output/dense/kernel":
-            f"linear_{i*6}.w_0",
-            f"bert/encoder/layer_{i}/attention/output/dense/bias":
-            f"linear_{i*6}.b_0",
-            f"bert/encoder/layer_{i}/attention/output/LayerNorm/gamma":
-            f"layer_norm_{i*4+2}.w_0",
-            f"bert/encoder/layer_{i}/attention/output/LayerNorm/beta":
-            f"layer_norm_{i*4+2}.b_0",
-            f"bert/encoder/layer_{i}/intermediate/dense/kernel":
-            f"linear_{i*6+2}.w_0",
-            f"bert/encoder/layer_{i}/intermediate/dense/bias":
-            f"linear_{i*6+2}.b_0",
-            f"bert/encoder/layer_{i}/output/dense/kernel":
-            f"linear_{i*6+3}.w_0",
-            f"bert/encoder/layer_{i}/output/dense/bias":
-            f"linear_{i*6+3}.b_0",
-            f"bert/encoder/layer_{i}/output/LayerNorm/gamma":
-            f"layer_norm_{(i+1)*4}.w_0",
-            f"bert/encoder/layer_{i}/output/LayerNorm/beta":
-            f"layer_norm_{(i+1)*4}.b_0",
+            f"bert/encoder/layer_{i}/attention/self/query/bias": f"bert_model_0.b_{i}",
+            f"bert/encoder/layer_{i}/attention/self/key/bias": f"bert_model_0.b_{i}",
+            f"bert/encoder/layer_{i}/attention/self/value/bias": f"bert_model_0.b_{i}",
+            f"bert/encoder/layer_{i}/attention/output/dense/kernel": f"linear_{i*6}.w_0",
+            f"bert/encoder/layer_{i}/attention/output/dense/bias": f"linear_{i*6}.b_0",
+            f"bert/encoder/layer_{i}/attention/output/LayerNorm/gamma": f"layer_norm_{i*4+2}.w_0",
+            f"bert/encoder/layer_{i}/attention/output/LayerNorm/beta": f"layer_norm_{i*4+2}.b_0",
+            f"bert/encoder/layer_{i}/intermediate/dense/kernel": f"linear_{i*6+2}.w_0",
+            f"bert/encoder/layer_{i}/intermediate/dense/bias": f"linear_{i*6+2}.b_0",
+            f"bert/encoder/layer_{i}/output/dense/kernel": f"linear_{i*6+3}.w_0",
+            f"bert/encoder/layer_{i}/output/dense/bias": f"linear_{i*6+3}.b_0",
+            f"bert/encoder/layer_{i}/output/LayerNorm/gamma": f"layer_norm_{(i+1)*4}.w_0",
+            f"bert/encoder/layer_{i}/output/LayerNorm/beta": f"layer_norm_{(i+1)*4}.b_0",
         }
-        layer[
-            f"bert/encoder/layer_{i}/attention/self/query/kernel"] = f"bert_model_0.w_{i*3+0}"
-        layer[
-            f"bert/encoder/layer_{i}/attention/self/key/kernel"] = f"bert_model_0.w_{i*3+1}"
-        layer[
-            f"bert/encoder/layer_{i}/attention/self/value/kernel"] = f"bert_model_0.w_{i*3+2}"
+        layer[f"bert/encoder/layer_{i}/attention/self/query/kernel"] = f"bert_model_0.w_{i*3+0}"
+        layer[f"bert/encoder/layer_{i}/attention/self/key/kernel"] = f"bert_model_0.w_{i*3+1}"
+        layer[f"bert/encoder/layer_{i}/attention/self/value/kernel"] = f"bert_model_0.w_{i*3+2}"
         tf_to_pdmodel.update(**layer)
 
     if args.task == "PRETRAINING":
@@ -89,8 +70,7 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
     }
 
     for name, array in zip(map_names, load_data):
-        logger.debug(
-            f"Initialising tensor from checkpoint {name} -> {mapping[name]}")
+        logger.debug(f"Initialising tensor from checkpoint {name} -> {mapping[name]}")
 
         # config["lamb_m_dtype"] is for setting the data type for accl1 of lamb
         # BERT can use FP16 for accl1 without lossing accuracy
@@ -112,16 +92,13 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
         if "bert_model_0.b" in mapping[name]:
             qkv_part = name.split("/")[5]
             if mapping[name] not in initializers.keys():
-                qkv_shape = (array.shape[0] * 3)
-                initializers[mapping[name]] = np.empty(qkv_shape,
-                                                       dtype=array.dtype)
+                qkv_shape = array.shape[0] * 3
+                initializers[mapping[name]] = np.empty(qkv_shape, dtype=array.dtype)
 
             start_idx = qkv_tensor_range[qkv_part][0]
             end_idx = qkv_tensor_range[qkv_part][1]
             initializers[mapping[name]][start_idx:end_idx] = array
-            logger.debug(
-                f"Initialising QKV_bias component {name}[{start_idx}:{end_idx}] from checkpoint"
-            )
+            logger.debug(f"Initialising QKV_bias component {name}[{start_idx}:{end_idx}] from checkpoint")
             continue
 
         if name in transform:
@@ -133,9 +110,7 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
             diff = padded_vocab_length - tf_vocab_length
             # Pad or Crop the vocab.
             if diff > 0:
-                logger.info(
-                    f"Padding the vocabulary. From {tf_vocab_length} to {padded_vocab_length}"
-                )
+                logger.info(f"Padding the vocabulary. From {tf_vocab_length} to {padded_vocab_length}")
                 pad = np.zeros((diff, args.hidden_size)).astype(array.dtype)
                 array = np.concatenate((array, pad), axis=0)
             else:
@@ -150,15 +125,12 @@ def generate_initializers(args, map_names, load_data, mapping, transform={}):
         if "embedding_0.w_0" in mapping[name]:
             max_pos, hidden_len = array.shape
             if max_pos > args.max_position_embeddings:
-                array = array[:args.max_position_embeddings, :]
+                array = array[: args.max_position_embeddings, :]
 
             # Otherwise just copy the positional embeddings over and over again as is done in longformer
             elif max_pos < args.max_position_embeddings:
-                logger.warning(
-                    f"Not enough positional embeddings in checkpoint, copying to match length..."
-                )
-                array = array[np.mod(np.arange(args.max_position_embeddings),
-                                     max_pos)]
+                logger.warning(f"Not enough positional embeddings in checkpoint, copying to match length...")
+                array = array[np.mod(np.arange(args.max_position_embeddings), max_pos)]
 
         initializers[mapping[name]] = array.copy()
         for k in initializers:
@@ -183,7 +155,8 @@ def load_initializers_from_tf(file_path, args):
         logger.error(
             "Loading a TensorFlow model requires TensorFlow to be installed. "
             "Please see https://www.tensorflow.org/install/ for installation "
-            "instructions.")
+            "instructions."
+        )
         raise
 
     tf_path = os.path.abspath(file_path)
@@ -197,6 +170,5 @@ def load_initializers_from_tf(file_path, args):
         logger.debug(f"Skipping load of {name} - Not in mapping")
 
     load_data = [tf.train.load_variable(tf_path, name) for name in map_names]
-    initializers, opt_params = generate_initializers(args, map_names, load_data,
-                                                     mapping)
+    initializers, opt_params = generate_initializers(args, map_names, load_data, mapping)
     return initializers, opt_params
