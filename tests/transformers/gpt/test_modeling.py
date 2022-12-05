@@ -106,7 +106,7 @@ class GPTModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-        
+
         if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size, dtype="int64")
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels, dtype="int64")
