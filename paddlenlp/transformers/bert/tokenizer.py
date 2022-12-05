@@ -18,12 +18,19 @@ import collections
 import unicodedata
 
 from ..tokenizer_utils import PretrainedTokenizer, AddedToken
-from ..tokenizer_utils import convert_to_unicode, whitespace_tokenize, _is_whitespace, _is_control, _is_punctuation, _is_symbol
+from ..tokenizer_utils import (
+    convert_to_unicode,
+    whitespace_tokenize,
+    _is_whitespace,
+    _is_control,
+    _is_punctuation,
+    _is_symbol,
+)
 
 __all__ = [
-    'BasicTokenizer',
-    'BertTokenizer',
-    'WordpieceTokenizer',
+    "BasicTokenizer",
+    "BertTokenizer",
+    "WordpieceTokenizer",
 ]
 
 
@@ -45,11 +52,7 @@ class BasicTokenizer(object):
             value for `lowercase` (as in the original BERT).
     """
 
-    def __init__(self,
-                 do_lower_case=True,
-                 never_split=None,
-                 tokenize_chinese_chars=True,
-                 strip_accents=None):
+    def __init__(self, do_lower_case=True, never_split=None, tokenize_chinese_chars=True, strip_accents=None):
         """Constructs a BasicTokenizer."""
         if never_split is None:
             never_split = []
@@ -66,7 +69,7 @@ class BasicTokenizer(object):
             text (str): A piece of text.
             never_split (List[str]): List of token not to split.
 
-        Returns: 
+        Returns:
             list(str): A list of tokens.
 
         Examples:
@@ -80,8 +83,7 @@ class BasicTokenizer(object):
                 '''
         """
         text = convert_to_unicode(text)
-        never_split = self.never_split.union(
-            set(never_split)) if never_split else self.never_split
+        never_split = self.never_split.union(set(never_split)) if never_split else self.never_split
         text = self._clean_text(text)
 
         if self.tokenize_chinese_chars:
@@ -166,14 +168,16 @@ class BasicTokenizer(object):
         # as is Japanese Hiragana and Katakana. Those alphabets are used to write
         # space-separated words, so they are not treated specially and handled
         # like the all the other languages.
-        if ((cp >= 0x4E00 and cp <= 0x9FFF) or  #
-            (cp >= 0x3400 and cp <= 0x4DBF) or  #
-            (cp >= 0x20000 and cp <= 0x2A6DF) or  #
-            (cp >= 0x2A700 and cp <= 0x2B73F) or  #
-            (cp >= 0x2B740 and cp <= 0x2B81F) or  #
-            (cp >= 0x2B820 and cp <= 0x2CEAF) or
-            (cp >= 0xF900 and cp <= 0xFAFF) or  #
-            (cp >= 0x2F800 and cp <= 0x2FA1F)):  #
+        if (
+            (cp >= 0x4E00 and cp <= 0x9FFF)
+            or (cp >= 0x3400 and cp <= 0x4DBF)  #
+            or (cp >= 0x20000 and cp <= 0x2A6DF)  #
+            or (cp >= 0x2A700 and cp <= 0x2B73F)  #
+            or (cp >= 0x2B740 and cp <= 0x2B81F)  #
+            or (cp >= 0x2B820 and cp <= 0x2CEAF)  #
+            or (cp >= 0xF900 and cp <= 0xFAFF)
+            or (cp >= 0x2F800 and cp <= 0x2FA1F)  #
+        ):  #
             return True
 
         return False
@@ -185,7 +189,7 @@ class BasicTokenizer(object):
         output = []
         for char in text:
             cp = ord(char)
-            if cp == 0 or cp == 0xfffd or _is_control(char):
+            if cp == 0 or cp == 0xFFFD or _is_control(char):
                 continue
             if _is_whitespace(char):
                 output.append(" ")
@@ -335,102 +339,49 @@ class BertTokenizer(PretrainedTokenizer):
             {'input_ids': [101, 2002, 2001, 1037, 13997, 11510, 102], 'token_type_ids': [0, 0, 0, 0, 0, 0, 0]}
             '''
     """
+
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "bert-base-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
-            "bert-large-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-uncased-vocab.txt",
-            "bert-base-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
-            "bert-large-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-cased-vocab.txt",
-            "bert-base-multilingual-uncased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-uncased-vocab.txt",
-            "bert-base-multilingual-cased":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-cased-vocab.txt",
-            "bert-base-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "bert-wwm-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese-vocab.txt",
-            "bert-wwm-ext-chinese":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
-            "macbert-large-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "macbert-base-chinese":
-            "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
-            "simbert-base-chinese":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
-            "uer/chinese-roberta-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-medium":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-6l-768h":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
-            "uer/chinese-roberta-tiny":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "bert-base-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-uncased-vocab.txt",
+            "bert-large-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-uncased-vocab.txt",
+            "bert-base-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-cased-vocab.txt",
+            "bert-large-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-large-cased-vocab.txt",
+            "bert-base-multilingual-uncased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-uncased-vocab.txt",
+            "bert-base-multilingual-cased": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-multilingual-cased-vocab.txt",
+            "bert-base-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
+            "bert-wwm-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-chinese-vocab.txt",
+            "bert-wwm-ext-chinese": "http://bj.bcebos.com/paddlenlp/models/transformers/bert/bert-wwm-ext-chinese-vocab.txt",
+            "macbert-large-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
+            "macbert-base-chinese": "https://bj.bcebos.com/paddle-hapi/models/bert/bert-base-chinese-vocab.txt",
+            "simbert-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/simbert/vocab.txt",
+            "uer/chinese-roberta-base": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-6l-768h": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-small": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
+            "uer/chinese-roberta-tiny": "https://bj.bcebos.com/paddlenlp/models/transformers/uer/chinese_roberta_vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "bert-base-uncased": {
-            "do_lower_case": True
-        },
-        "bert-large-uncased": {
-            "do_lower_case": True
-        },
-        "bert-base-cased": {
-            "do_lower_case": False
-        },
-        "bert-large-cased": {
-            "do_lower_case": False
-        },
-        "bert-base-multilingual-uncased": {
-            "do_lower_case": True
-        },
-        "bert-base-multilingual-cased": {
-            "do_lower_case": False
-        },
-        "bert-base-chinese": {
-            "do_lower_case": False
-        },
-        "bert-wwm-chinese": {
-            "do_lower_case": False
-        },
-        "bert-wwm-ext-chinese": {
-            "do_lower_case": False
-        },
-        "macbert-large-chinese": {
-            "do_lower_case": False
-        },
-        "macbert-base-chinese": {
-            "do_lower_case": False
-        },
-        "simbert-base-chinese": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-base": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-medium": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-6l-768h": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-small": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-mini": {
-            "do_lower_case": True
-        },
-        "uer/chinese-roberta-tiny": {
-            "do_lower_case": True
-        },
+        "bert-base-uncased": {"do_lower_case": True},
+        "bert-large-uncased": {"do_lower_case": True},
+        "bert-base-cased": {"do_lower_case": False},
+        "bert-large-cased": {"do_lower_case": False},
+        "bert-base-multilingual-uncased": {"do_lower_case": True},
+        "bert-base-multilingual-cased": {"do_lower_case": False},
+        "bert-base-chinese": {"do_lower_case": False},
+        "bert-wwm-chinese": {"do_lower_case": False},
+        "bert-wwm-ext-chinese": {"do_lower_case": False},
+        "macbert-large-chinese": {"do_lower_case": False},
+        "macbert-base-chinese": {"do_lower_case": False},
+        "simbert-base-chinese": {"do_lower_case": True},
+        "uer/chinese-roberta-base": {"do_lower_case": True},
+        "uer/chinese-roberta-medium": {"do_lower_case": True},
+        "uer/chinese-roberta-6l-768h": {"do_lower_case": True},
+        "uer/chinese-roberta-small": {"do_lower_case": True},
+        "uer/chinese-roberta-mini": {"do_lower_case": True},
+        "uer/chinese-roberta-tiny": {"do_lower_case": True},
     }
     max_model_input_sizes = {
         "bert-base-uncased": 512,
@@ -452,28 +403,30 @@ class BertTokenizer(PretrainedTokenizer):
         "uer/chinese-roberta-mini": 512,
         "uer/chinese-roberta-tiny": 512,
     }
-    padding_side = 'right'
+    padding_side = "right"
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 do_basic_tokenize=True,
-                 never_split=None,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        do_basic_tokenize=True,
+        never_split=None,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = BertTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.do_lower_case = do_lower_case
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.do_basic_tokenize = do_basic_tokenize
@@ -484,8 +437,7 @@ class BertTokenizer(PretrainedTokenizer):
                 tokenize_chinese_chars=tokenize_chinese_chars,
                 strip_accents=strip_accents,
             )
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -507,14 +459,13 @@ class BertTokenizer(PretrainedTokenizer):
 
         Args:
             text (str): The text to be tokenized.
-        
+
         Returns:
             list: A list of string representing converted tokens.
         """
         split_tokens = []
         if self.do_basic_tokenize:
-            for token in self.basic_tokenizer.tokenize(
-                    text, never_split=self.all_special_tokens):
+            for token in self.basic_tokenizer.tokenize(text, never_split=self.all_special_tokens):
                 # If the token is part of the never_split set
                 if token in self.basic_tokenizer.never_split:
                     split_tokens.append(token)
@@ -540,7 +491,7 @@ class BertTokenizer(PretrainedTokenizer):
             .. code-block::
 
                 from paddlenlp.transformers import BertTokenizer
-                
+
                 berttokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
                 tokens = berttokenizer.tokenize('He was a puppeteer')
                 '''
@@ -569,15 +520,13 @@ class BertTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         A BERT sequence has the following format:
 
         - single sequence:      ``[CLS] X [SEP]``
@@ -598,9 +547,7 @@ class BertTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         """
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
 
@@ -621,14 +568,11 @@ class BertTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
-        Create a mask from the two sequences passed to be used in a sequence-pair classification task. 
+        Create a mask from the two sequences passed to be used in a sequence-pair classification task.
 
         A BERT sequence pair mask has the following format:
         ::
@@ -651,13 +595,9 @@ class BertTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -667,7 +607,7 @@ class BertTokenizer(PretrainedTokenizer):
                 A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs. Defaults to None.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
@@ -680,13 +620,8 @@ class BertTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
