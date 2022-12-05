@@ -6,7 +6,7 @@ endif()
 add_definitions(-DNDEBUG)
 add_definitions(-DPADDLE_CUDA)
 # Default is 1 in standard c++ when using gcc8.2
-add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
+# add_definitions(-D_GLIBCXX_USE_CXX11_ABI=1)
 
 if(ON_INFER)
   add_definitions(-DPADDLE_ON_INFERENCE)
@@ -48,15 +48,15 @@ if(ON_INFER)
 
   include_directories("${PADDLE_LIB}/")
   set(PADDLE_LIB_THIRD_PARTY_PATH "${PADDLE_LIB}/third_party/install/")
-  include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/include")
+  # include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/include")
   include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/include")
-  include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
+  # include_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/include")
 
-  link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
+  # link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}protobuf/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}glog/lib")
   link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}gflags/lib")
-  link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
+  # link_directories("${PADDLE_LIB_THIRD_PARTY_PATH}xxhash/lib")
   link_directories("${PADDLE_LIB}/paddle/lib")
 
   if (WIN32)
@@ -141,12 +141,12 @@ if(ON_INFER)
     set(EXTERNAL_LIB "-lrt -ldl -lpthread")
     set(DEPS ${DEPS}
         ${MATH_LIB} ${MKLDNN_LIB}
-        glog gflags protobuf  xxhash
+        glog gflags
         ${EXTERNAL_LIB})
   else()
     set(DEPS ${DEPS}
         ${MATH_LIB} ${MKLDNN_LIB}
-        glog gflags_static libprotobuf xxhash ${EXTERNAL_LIB})
+        glog gflags_static ${EXTERNAL_LIB})
     set(DEPS ${DEPS} shlwapi.lib)
   endif(NOT WIN32)
 
