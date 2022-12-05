@@ -132,7 +132,7 @@ The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the wo
 
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（英文） </summary>
 
-我们只需要将下面的"xxxx"，替换成所需的权重名，即可快速使用！
+**我们只需要将下面的"xxxx"，替换成所需的权重名，即可快速使用！**
 ```python
 from ppdiffusers import *
 
@@ -146,8 +146,8 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 # pipe_mega.inpaint_legacy() 等于 pipe_inpaint_legacy()
 ```
 
-| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                   | 备注 | huggingface.co地址 |
-| :------------------------------------------ | :--------------------------------------------------------------------: | -------------- | :-----------------------------------------: |
+| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
+| :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | CompVis/stable-diffusion-v1-4           | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | Stable-Diffusion-v1-4 使用 Stable-Diffusion-v1-2 的权重进行初始化。随后在"laion-aesthetics v2 5+"数据集上以 **512x512** 分辨率微调了 **225k** 步数，对文本使用了 **10%** 的dropout（即：训练过程中文图对中的文本有 10% 的概率会变成空文本）。模型使用了[CLIP ViT-L/14](https://huggingface.co/openai/clip-vit-large-patch14)作为文本编码器。| [地址](https://huggingface.co/CompVis/stable-diffusion-v1-4) |
 | CompVis/ldm-text2im-large-256               | LDMTextToImagePipeline | [LDM论文](https://arxiv.org/pdf/2112.10752.pdf) LDM-KL-8-G* 权重。| [地址](https://huggingface.co/CompVis/ldm-text2im-large-256) |
 | CompVis/ldm-super-resolution-4x-openimages  | LDMSuperResolutionPipeline | [LDM论文](https://arxiv.org/pdf/2112.10752.pdf) LDM-VQ-4 权重，[原始权重链接](https://ommer-lab.com/files/latent-diffusion/sr_bsr.zip)。| [地址](https://huggingface.co/CompVis/ldm-super-resolution-4x-openimages) |
@@ -162,7 +162,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 
 
 | ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
-| ------------------------------------------- | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
+| :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | BAAI/AltDiffusion                           | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline | 该模型使用 [AltCLIP](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，在 Stable Diffusion 基础上训练了**双语Diffusion模型**，其中训练数据来自 [WuDao数据集](https://data.baai.ac.cn/details/WuDaoCorporaText) 和 [LAION](https://huggingface.co/datasets/ChristophSchuhmann/improved_aesthetics_6plus) 。| [地址](https://huggingface.co/BAAI/AltDiffusion) |
 | BAAI/AltDiffusion-m9                        | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline |该模型使用9种语言的 [AltCLIP-m9](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，其他同上。| [地址](https://huggingface.co/BAAI/AltDiffusion-m9) |
 | IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1 | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 他们将 [Noah-Wukong](https://wukong-dataset.github.io/wukong-dataset/) 数据集 (100M) 和 [Zero](https://zero.so.com/) 数据集 (23M) 用作预训练的数据集，先用 [IDEA-CCNL/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese](https://huggingface.co/IDEA-CCNL/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese) 对这两个数据集的图文对相似性进行打分，取 CLIP Score 大于 0.2 的图文对作为训练集。 他们使用 [IDEA-CCNL/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese](https://huggingface.co/IDEA-CCNL/Taiyi-CLIP-RoBERTa-102M-ViT-L-Chinese) 作为初始化的text encoder，冻住 [stable-diffusion-v1-4](https://huggingface.co/CompVis/stable-diffusion-v1-4) ([论文](https://arxiv.org/abs/2112.10752)) 模型的其他部分，只训练 text encoder，以便保留原始模型的生成能力且实现中文概念的对齐。该模型目前在0.2亿图文对上训练了一个 epoch。 在 32 x A100 上训练了大约100小时，该版本只是一个初步的版本。| [地址](https://huggingface.co/IDEA-CCNL/Taiyi-Stable-Diffusion-1B-Chinese-v0.1) |
