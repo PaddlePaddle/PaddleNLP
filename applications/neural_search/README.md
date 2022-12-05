@@ -16,7 +16,12 @@
 车头如何放置车牌    后牌照怎么装
 ```
 
-语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。想快速体验搜索的效果，请参考[Pipelines的实现](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines)
+语义检索系统的关键就在于，采用语义而非关键词方式进行召回，达到更精准、更广泛得召回相似结果的目的。想快速体验搜索的效果，请参考[Pipelines的语义检索实现](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/12107462/190302765-663ba441-9dd3-470a-8fee-f7a6f81da615.gif" width="500px">
+</div>
+
 
 ## 2. 产品功能介绍
 
@@ -28,6 +33,7 @@
     + 手把手搭建起检索系统
     + 无需标注数据也能构建检索系统
     + 提供 训练、预测、ANN 引擎一站式能力
+    + Pipelines 快速实现语义检索系统
 
 + 效果好
     + 针对多种数据场景的专业方案
@@ -308,7 +314,7 @@ pip install -r requirements.txt
 
 ## 4. Neural Search 快速体验实践
 
-PaddleNLP已经基于ERNIE 1.0训练了一个基线模型，如果想快速搭建Neural Search的完整系统。
+PaddleNLP已经基于ERNIE 1.0训练了一个基线模型，如果想快速搭建Neural Search的完整系统，有两种方法，第一种是请参考下面的实现，包含了服务化的完整流程，另一种是使用Pipelines加载，Pipelines已经支持Neural Search训练的模型的载入，可以使用Pipelines的快速的基于Neural Search模型实现检索系统，详情请参考文档[Pipelines-Neural-Search](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/Neural_Search.md)。
 
 ### 4.1. 召回
 

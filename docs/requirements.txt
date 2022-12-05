@@ -9,4 +9,5 @@ Markdown < 3.4
 sphinx-copybutton==0.3.1
 sphinx-markdown-tables==0.0.15
 
-paddlepaddle>=2.2.2
+# use paddlepaddle == 2.3.* according to: https://github.com/PaddlePaddle/Paddle/issues/48243
+paddlepaddle>=2.2.2,<2.4.0

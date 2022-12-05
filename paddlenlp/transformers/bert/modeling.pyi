@@ -10,12 +10,18 @@ from typing import Dict, Optional, Tuple, Union, overload
 
 class BertEmbeddings(Layer):
     word_embeddings: Embedding
-    position_embeddings: Embedding 
-    token_type_embeddings: Embedding 
+    position_embeddings: Embedding
+    token_type_embeddings: Embedding
     layer_norm: Layer
     dropout: float
     def __init__(self, config: BertConfig) -> None: ...
-    def forward(self, input_ids: Tensor, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., past_key_values_length: int = 0): ...
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        past_key_values_length: int = 0,
+    ): ...
 
 class BertPooler(Layer):
     dense: Linear
@@ -29,7 +35,7 @@ class BertPretrainedModel(PretrainedModel):
     config_class: Incomplete
     resource_files_names: Dict[str, str]
     base_model_prefix: str
-    pretrained_init_configuration: Dict[str, dict] 
+    pretrained_init_configuration: Dict[str, dict]
     pretrained_resource_files_map: Dict[str, str]
     def init_weights(self, layer) -> None: ...
 
@@ -40,27 +46,71 @@ class BertModel(BertPretrainedModel):
     fuse: bool
     encoder: nn.TransformerDecoder
     pooler: BertPooler
-    
-    def __init__(self, config: BertConfig) -> None: ...
 
+    def __init__(self, config: BertConfig) -> None: ...
     def get_input_embeddings(self): ...
     def set_input_embeddings(self, value) -> None: ...
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., past_key_values: Tensor | None = ..., use_cache: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        past_key_values: Tensor | None = ...,
+        use_cache: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertModel: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertModel: ...
 
 class BertForQuestionAnswering(BertPretrainedModel):
     bert: BertModel
     dropout: nn.Dropout
     classifier: Linear
     def __init__(self, config: BertConfig): ...
-
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., start_positions: Tensor | None = ..., end_positions: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    def __call__(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., start_positions: Tensor | None = ..., end_positions: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        start_positions: Tensor | None = ...,
+        end_positions: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
+    def __call__(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        start_positions: Tensor | None = ...,
+        end_positions: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, classifier_dropout: float | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForQuestionAnswering: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        classifier_dropout: float | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForQuestionAnswering: ...
 
 class BertForSequenceClassification(BertPretrainedModel):
     bert: BertModel
@@ -68,12 +118,39 @@ class BertForSequenceClassification(BertPretrainedModel):
     dropout: nn.Dropout
     classifier: Linear
     def __init__(self, config: BertConfig): ...
-
-    def forward(self, input_ids: Tensor, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    def __call__(self, input_ids: Tensor, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-
+    def forward(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
+    def __call__(
+        self,
+        input_ids: Tensor,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, num_labels: int | None = 2, classifier_dropout: float | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForSequenceClassification: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        num_labels: int | None = 2,
+        classifier_dropout: float | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForSequenceClassification: ...
 
 class BertForTokenClassification(BertPretrainedModel):
     bert: BertModel
@@ -81,12 +158,39 @@ class BertForTokenClassification(BertPretrainedModel):
     dropout: nn.Dropout
     classifier: Linear
     def __init__(self, config: BertConfig): ...
-
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    def __call__(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
+    def __call__(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, num_labels: int | None = 2, classifier_dropout: float | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForTokenClassification: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        num_labels: int | None = 2,
+        classifier_dropout: float | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForTokenClassification: ...
 
 class BertLMPredictionHead(Layer):
     transform: Incomplete
@@ -109,25 +213,65 @@ class BertForPreTrainingOutput(ModelOutput):
     seq_relationship_logits: paddle.Tensor
     hidden_states: Optional[Tuple[paddle.Tensor]]
     attentions: Optional[Tuple[paddle.Tensor]]
-    def __init__(self, loss: Tensor | None, prediction_logits: Tensor | None, seq_relationship_logits: Tensor | None, hidden_states: Tensor | None, attentions: Tensor | None) -> None: ...
+    def __init__(
+        self,
+        loss: Tensor | None,
+        prediction_logits: Tensor | None,
+        seq_relationship_logits: Tensor | None,
+        hidden_states: Tensor | None,
+        attentions: Tensor | None,
+    ) -> None: ...
 
 class BertForPretraining(BertPretrainedModel):
     bert: BertModel
     cls: Incomplete
     def __init__(self, config: BertConfig) -> None: ...
-
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., masked_positions: Tensor | None = ..., labels: Tensor | None = ..., next_sentence_label: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    def __call__(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., masked_positions: Tensor | None = ..., labels: Tensor | None = ..., next_sentence_label: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        masked_positions: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        next_sentence_label: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
+    def __call__(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        masked_positions: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        next_sentence_label: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForQuestionAnswering: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForQuestionAnswering: ...
 
 class BertPretrainingCriterion(paddle.nn.Layer):
     loss_fn: nn.Layer
     vocab_size: int
     def __init__(self, vocab_size) -> None: ...
-    def forward(self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale): ...
-    def __call__(self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale): ...
+    def forward(
+        self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale
+    ): ...
+    def __call__(
+        self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale
+    ): ...
 
 class BertForMultipleChoice(BertPretrainedModel):
     bert: BertModel
@@ -136,10 +280,28 @@ class BertForMultipleChoice(BertPretrainedModel):
     classifier: Linear
     @overload
     def __init__(self, config: BertConfig) -> None: ...
-
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, num_choices: int | None = 2, classifier_dropout: float | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForMultipleChoice: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        num_choices: int | None = 2,
+        classifier_dropout: float | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForMultipleChoice: ...
 
 class BertOnlyMLMHead(nn.Layer):
     predictions: BertLMPredictionHead
@@ -150,9 +312,34 @@ class BertForMaskedLM(BertPretrainedModel):
     bert: BertModel
     cls: BertOnlyMLMHead
     def __init__(self, config: BertConfig) -> None: ...
-
-    def forward(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-    def __call__(self, input_ids, token_type_ids: Tensor | None = ..., position_ids: Tensor | None = ..., attention_mask: Tensor | None = ..., labels: Tensor | None = ..., output_hidden_states: bool = ..., output_attentions: bool = ..., return_dict: bool = ...): ...
-
+    def forward(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
+    def __call__(
+        self,
+        input_ids,
+        token_type_ids: Tensor | None = ...,
+        position_ids: Tensor | None = ...,
+        attention_mask: Tensor | None = ...,
+        labels: Tensor | None = ...,
+        output_hidden_states: bool = ...,
+        output_attentions: bool = ...,
+        return_dict: bool = ...,
+    ): ...
     @staticmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: str, cache_dir: str | None = None, config: Optional[BertConfig] = None, *args, **kwargs) -> BertForMaskedLM: ...
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: str,
+        cache_dir: str | None = None,
+        config: Optional[BertConfig] = None,
+        *args,
+        **kwargs
+    ) -> BertForMaskedLM: ...

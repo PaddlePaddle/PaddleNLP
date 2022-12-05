@@ -32,17 +32,13 @@ SPIECE_UNDERLINE = "▁"
 def _is_end_of_word(text):
     """Checks whether the last character in text is one of a punctuation, control or whitespace character."""
     last_char = text[-1]
-    return bool(
-        _is_control(last_char) | _is_punctuation(last_char)
-        | _is_whitespace(last_char))
+    return bool(_is_control(last_char) | _is_punctuation(last_char) | _is_whitespace(last_char))
 
 
 def _is_start_of_word(text):
     """Checks whether the first character in text is one of a punctuation, control or whitespace character."""
     first_char = text[0]
-    return bool(
-        _is_control(first_char) | _is_punctuation(first_char)
-        | _is_whitespace(first_char))
+    return bool(_is_control(first_char) | _is_punctuation(first_char) | _is_whitespace(first_char))
 
 
 class ErnieLayoutTokenizer(PretrainedTokenizer):
@@ -52,19 +48,14 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
+            "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/vocab.txt",
         },
         "sentencepiece_model_file": {
-            "ernie-layoutx-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
-        }
+            "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/sentencepiece.bpe.model",
+        },
     }
     pretrained_init_configuration = {
-        "ernie-layoutx-base-uncased": {
-            "do_lower_case": True,
-            "do_tokenize_postprocess": False
-        },
+        "ernie-layoutx-base-uncased": {"do_lower_case": True, "do_tokenize_postprocess": False},
     }
     pretrained_positional_embedding_sizes = {
         "ernie-layoutx-base-uncased": 512,
@@ -81,19 +72,19 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         "additional_special_tokens",
     ]
 
-    def __init__(self,
-                 vocab_file,
-                 sentencepiece_model_file,
-                 do_tokenize_postprocess=False,
-                 sep_token="[SEP]",
-                 cls_token="[CLS]",
-                 unk_token="[UNK]",
-                 pad_token="[PAD]",
-                 mask_token="[MASK]",
-                 **kwargs):
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+    def __init__(
+        self,
+        vocab_file,
+        sentencepiece_model_file,
+        do_tokenize_postprocess=False,
+        sep_token="[SEP]",
+        cls_token="[CLS]",
+        unk_token="[UNK]",
+        pad_token="[PAD]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
         self._sep_token = sep_token
         self._cls_token = cls_token
         self._unk_token = unk_token
@@ -118,31 +109,28 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self.SP_CHAR_MAPPING = {}
 
         for ch in range(65281, 65375):
-            if ch in [ord(u'～')]:
+            if ch in [ord("～")]:
                 self.SP_CHAR_MAPPING[chr(ch)] = chr(ch)
                 continue
             self.SP_CHAR_MAPPING[chr(ch)] = chr(ch - 65248)
 
     def build_inputs_with_special_tokens(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         if token_ids_1 is None:
             return [self.cls_token_id] + token_ids_0 + [self.sep_token_id]
         cls = [self.cls_token_id]
         sep = [self.sep_token_id]
         return cls + token_ids_0 + sep + sep + token_ids_1 + sep
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
-        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens. 
-        
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
         An ERNIE-LayoutX offset_mapping has the following format:
         - single sequence:      ``(0,0) X (0,0)``
         - pair of sequences:        ``(0,0) A (0,0) (0,0) B (0,0)``
-        
+
         Args:
             offset_mapping_ids_0 (List[tuple]):
                 List of char offsets to which the special tokens will be added.
@@ -155,35 +143,26 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)] + offset_mapping_1 + [(0, 0)]
 
     def get_special_tokens_mask(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None,
-            already_has_special_tokens: bool = False) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False
+    ) -> List[int]:
         if already_has_special_tokens:
             if token_ids_1 is not None:
                 raise ValueError(
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         sep = [self.sep_token_id]
         cls = [self.cls_token_id]
 
@@ -193,14 +172,14 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
 
     def get_offset_mapping(self, text):
         split_tokens = self._tokenize(text)
-        normalized_text, char_mapping = '', []
+        normalized_text, char_mapping = "", []
 
         for i, ch in enumerate(text):
 
             if ch in self.SP_CHAR_MAPPING:
                 ch = self.SP_CHAR_MAPPING.get(ch)
             else:
-                ch = unicodedata.normalize('NFKC', ch)
+                ch = unicodedata.normalize("NFKC", ch)
             if self.is_whitespace(ch):
                 continue
             normalized_text += ch
@@ -208,15 +187,14 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
 
         text, token_mapping, offset = normalized_text, [], 0
         for token in split_tokens:
-            if token[:1] == '▁':
+            if token[:1] == "▁":
                 token = token[1:]
                 if not token:
                     continue
             start = text[offset:].index(token) + offset
             end = start + len(token)
 
-            token_mapping.append(
-                (char_mapping[start], char_mapping[end - 1] + 1))
+            token_mapping.append((char_mapping[start], char_mapping[end - 1] + 1))
             offset = end
         return token_mapping
 
@@ -225,10 +203,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         return len(self.sp_model) + self.offset + 1  # Add the <mask> token
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -263,7 +238,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         return pieces
 
     def _convert_token_to_id(self, token):
-        """ Converts a token (str) in an id using the vocab. """
+        """Converts a token (str) in an id using the vocab."""
         if token in self.tokens_to_ids:
             return self.tokens_to_ids[token]
         spm_id = self.sp_model.PieceToId(token)
@@ -285,15 +260,13 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
     def num_special_tokens_to_add(self, pair=False):
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def is_ch_char(self, char):
         """
         is_ch_char
         """
-        if u'\u4e00' <= char <= u'\u9fff':
+        if "\u4e00" <= char <= "\u9fff":
             return True
         return False
 
@@ -301,9 +274,9 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         """
         is_alpha
         """
-        if 'a' <= char <= 'z':
+        if "a" <= char <= "z":
             return True
-        if 'A' <= char <= 'Z':
+        if "A" <= char <= "Z":
             return True
         return False
 
@@ -311,7 +284,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         """
         is_punct
         """
-        if char in u",;:.?!~，；：。？！《》【】":
+        if char in ",;:.?!~，；：。？！《》【】":
             return True
         return False
 
