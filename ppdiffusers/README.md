@@ -345,7 +345,7 @@ image.save("ldm-super-resolution-image.png")
 
 ## 模型部署
 
-StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 上的 **StableDiffusion** 模型文生图、图生图、图像编辑等任务的部署示例，用户可以按照我们提供 [StableDiffusion模型导出教程](./deploy/export.md) 将模型导出，然后使用我们提供的`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
+StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 上的 **StableDiffusion** 模型文生图、图生图、图像编辑等任务的部署示例，用户可以按照我们提供 [StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/README.md) 将模型导出，然后使用我们提供的`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
@@ -444,4 +444,4 @@ We also want to thank @heejkoo for the very helpful overview of papers, code and
 
 ## License
 
-PPDiffusers遵循[Apache-2.0开源协议](./LICENSE)。
+PPDiffusers遵循[Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
