@@ -182,7 +182,6 @@ pipe = StableDiffusionPipeline.from_pretrained("stabilityai/stable-diffusion-2")
 paddle.seed(5232132133)
 prompt = "a portrait of shiba inu with a red cap growing on its head. intricate. lifelike. soft light. sony a 7 r iv 5 5 mm. cinematic post - processing "
 image = pipe(prompt, guidance_scale=7.5, height=768, width=768).images[0]
-image
 
 image.save("shiba_dog_with_a_red_cap.png")
 ```
@@ -311,6 +310,7 @@ low_res_img = load_image(url).resize((128, 128))
 
 prompt = "a white cat"
 image = pipe(prompt=prompt, image=low_res_img).images[0]
+
 image.save("upscaled_white_cat.png")
 ```
 <div align="center">
