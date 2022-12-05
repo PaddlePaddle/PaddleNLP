@@ -420,8 +420,9 @@ class StableDiffusionUpscalePipeline(DiffusionPipeline):
         noise_level = paddle.to_tensor([noise_level], dtype="int64")
         noise = paddle.randn(image.shape, generator=generator, dtype=text_embeddings.dtype)
         image = self.low_res_scheduler.add_noise(image, noise, noise_level)
-        image = paddle.concat([image] * 2) if do_classifier_free_guidance else image
-        noise_level = paddle.concat([noise_level] * 2) if do_classifier_free_guidance else noise_level
+        batch_multiplier = 2 if do_classifier_free_guidance else 1
+        image = paddle.concat([image] * batch_multiplier * num_images_per_prompt)
+        noise_level = paddle.concat([noise_level] * image.shape[0])
 
         # 6. Prepare latent variables
         height, width = image.shape[2:]
