@@ -21,11 +21,11 @@ pipe = AltDiffusionImg2ImgPipeline.from_pretrained("BAAI/AltDiffusion")
 
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/sketch-mountains-input.png"
 
-image = load_image(url).resize((768, 512))
+init_image = load_image(url).resize((768, 512))
 
 prompt = "奇幻的景观，以一种艺术的形式。"
 # 使用fp16加快生成速度
 with paddle.amp.auto_cast(True):
-    image = pipe(prompt=prompt, image=image, strength=0.75, guidance_scale=7.5).images[0]
+    image = pipe(prompt=prompt, image=init_image, strength=0.75, guidance_scale=7.5).images[0]
 
 image.save("alt_diffusion_fantasy_landscape.png")
