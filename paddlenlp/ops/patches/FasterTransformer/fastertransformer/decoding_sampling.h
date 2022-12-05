@@ -386,6 +386,21 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
       if (args_.normalization_before_) {
+          if(args_.is_ernie3_prompt_){
+              start_ids_embeddings_ernie3_kernel_launcher(from_tensor[0],
+                                                    decoding_params.embedding_table,
+                                                    decoding_params.position_encoding_table,
+                                                    decoding_params.pos_extra_table,
+                                                    decoding_params.pos_ids_extra,
+                                                    decoding_params.d_start_ids,
+                                                    decoding_params.memory_sequence_length,
+                                                    1,
+                                                    input_len,
+                                                    request_batch_size,
+                                                    h_1,
+                                                    decoding_params.stream,
+                                                    decoding_params.position_ids);
+        }else{
         start_ids_embeddings_kernel_launcher(from_tensor[0],
                                             decoding_params.embedding_table,
                                             decoding_params.position_encoding_table,
@@ -401,8 +416,24 @@ public:
                                             decoding_params.role_id,
                                             decoding_params.role_embedding_table,
                                             decoding_params.position_ids);
+        }
       } else {
         // Memory reuse. from_tensor[1].
+        if(args_.is_ernie3_prompt_){
+            start_ids_embeddings_ernie3_kernel_launcher(from_tensor[1],
+                                                decoding_params.embedding_table,
+                                                decoding_params.position_encoding_table,
+                                                decoding_params.pos_extra_table,
+                                                decoding_params.pos_ids_extra,
+                                                decoding_params.d_start_ids,
+                                                decoding_params.memory_sequence_length,
+                                                1,
+                                                input_len,
+                                                request_batch_size,
+                                                h_1,
+                                                decoding_params.stream,
+                                                decoding_params.position_ids);
+        }else{
         start_ids_embeddings_kernel_launcher(from_tensor[1],
                                             decoding_params.embedding_table,
                                             decoding_params.position_encoding_table,
@@ -418,6 +449,7 @@ public:
                                             decoding_params.role_id,
                                             decoding_params.role_embedding_table,
                                             decoding_params.position_ids);
+        }
 
 #ifndef NDEBUG
       cudaDeviceSynchronize();
@@ -583,6 +615,19 @@ public:
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       if (args_.normalization_before_) {
         if (args_.prefix_lm_) {
+          if(args_.is_ernie3_prompt_){
+                embeddings_ernie3_kernel_launcher(from_tensor_[0],
+                                        decoding_params.embedding_table,
+                                        decoding_params.position_encoding_table,
+                                        decoding_params.pos_extra_table, 
+                                        decoding_params.memory_sequence_length,
+                                        decoding_params.decoder_position_ids, //gongnelei add positon_ids input
+                                        word_ids_buf_,
+                                        step,
+                                        m,
+                                        args_.hidden_units_,
+                                        decoding_params.stream);
+          }else{
           embeddings_kernel_launcher(from_tensor_[0],
                                      decoding_params.embedding_table,
                                      decoding_params.position_encoding_table,
@@ -597,7 +642,7 @@ public:
                                      decoding_params.stream,
                                      decoding_params.decoder_role_id,
                                      decoding_params.role_embedding_table,
-                                     decoding_params.decoder_position_ids);
+                                     decoding_params.decoder_position_ids);}
         } else {
           if (args_.is_mbart_) {
             embedding_lookup_sine_position_encoding_kernel_launcher(
@@ -632,6 +677,19 @@ public:
         }
       } else {
         if (args_.prefix_lm_) {
+          if(args_.is_ernie3_prompt_){
+                embeddings_ernie3_kernel_launcher(embedding_buf_,
+                                        decoding_params.embedding_table,
+                                        decoding_params.position_encoding_table,
+                                        decoding_params.pos_extra_table, 
+                                        decoding_params.memory_sequence_length,
+                                        decoding_params.decoder_position_ids, //gongnelei add positon_ids input
+                                        word_ids_buf_,
+                                        step,
+                                        m,
+                                        args_.hidden_units_,
+                                        decoding_params.stream);
+          }else{
           embeddings_kernel_launcher(embedding_buf_,
                                      decoding_params.embedding_table,
                                      decoding_params.position_encoding_table,
@@ -646,7 +704,7 @@ public:
                                      decoding_params.stream,
                                      decoding_params.decoder_role_id,
                                      decoding_params.role_embedding_table,
-                                     decoding_params.decoder_position_ids);
+                                     decoding_params.decoder_position_ids);}
         } else {
           // TODO(gongenlei): Only support Bart temporarily.
           embedding_position_lookups_bart_kernel_launcher(

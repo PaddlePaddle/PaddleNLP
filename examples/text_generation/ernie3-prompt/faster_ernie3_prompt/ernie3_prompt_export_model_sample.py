@@ -109,8 +109,7 @@ def do_predict(args):
 
     ernie3_prompt = FasterErnie3Prompt(
         model=model,
-        use_fp16_decoding=args.use_fp16_decoding,
-        decoding_lib="/home/gonel/paddlenlp/ops/build/lib/libdecoding_op.so")
+        use_fp16_decoding=args.use_fp16_decoding)
     # Set evaluate mode
     ernie3_prompt.eval()
 

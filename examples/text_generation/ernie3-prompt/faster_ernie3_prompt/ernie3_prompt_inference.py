@@ -79,12 +79,23 @@ def infer(args):
     predictor.run()
 
     output = [output_handle.copy_to_cpu() for output_handle in output_handles]
-
-    for idx, sample in enumerate(output[0].tolist()):
-        for beam_idx, beam in enumerate(sample):
-            seq = tokenizer.convert_ids_to_string(beam)
-            score = output[1][idx][beam_idx]
-            print(f'{idx}-{beam_idx}: {seq}-{score}')
+    
+    if output[0].shape==3:
+        # beam search
+        for idx, sample in enumerate(output[0].tolist()):
+            print(texts[idx])
+            for beam_idx, beam in enumerate(sample):
+                seq = tokenizer.convert_ids_to_string(beam)
+                score = output[1][idx][beam_idx]
+                print(f'{idx}-{beam_idx}: {seq}: {score}')
+            print('\n')
+    else:
+        # Sampling
+        for idx, sample in enumerate(output[0].tolist()):
+            print(texts[idx])
+            seq = tokenizer.convert_ids_to_string(sample)
+            print(f'{idx}: {seq}')
+            print('\n')
 
 
 if __name__ == "__main__":

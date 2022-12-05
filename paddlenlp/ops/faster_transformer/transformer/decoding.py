@@ -2507,6 +2507,9 @@ class InferErnie3PromptDecoding(nn.Layer):
             forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy)
 
-        ids = ids.transpose([1, 2, 0])
+        if decoding_strategy.startswith('beam_search'):
+            ids = ids.transpose([1, 2, 0])
+        else:
+            ids = ids.transpose([1, 0])
 
         return ids, output_scores
