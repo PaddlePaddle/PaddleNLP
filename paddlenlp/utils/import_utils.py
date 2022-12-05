@@ -65,11 +65,13 @@ def is_fast_tokenizer_available():
     return package_spec is not None and package_spec.has_location
 
 
-def install_package(package_name: str,
-                    version: Optional[str] = None,
-                    module_name: Optional[str] = None,
-                    cache_dir: Optional[str] = None):
-    """install the specific version of package 
+def install_package(
+    package_name: str,
+    version: Optional[str] = None,
+    module_name: Optional[str] = None,
+    cache_dir: Optional[str] = None,
+):
+    """install the specific version of package
 
     Args:
         package_name (str): the name of package
@@ -84,15 +86,15 @@ def install_package(package_name: str,
 
     # 2. install the package
     if version:
-        package_name += f'=={version}'
+        package_name += f"=={version}"
 
-    arguments = ['install']
+    arguments = ["install"]
     if cache_dir:
-        arguments += ['-t', cache_dir]
+        arguments += ["-t", cache_dir]
         sys.path.insert(0, cache_dir)
 
     # 3. load the pypi mirror to speedup of installing packages
-    mirror_key = 'PYPI_MIRROR'
+    mirror_key = "PYPI_MIRROR"
     mirror_source = os.environ.get(mirror_key, None)
     if mirror_source is None:
         logger.info(
@@ -101,11 +103,9 @@ def install_package(package_name: str,
         )
         mirror_source = "https://mirror.baidu.com/pypi/simple"
     else:
-        logger.info(
-            f"loading <{mirror_source}> as the final mirror source to install package."
-        )
+        logger.info(f"loading <{mirror_source}> as the final mirror source to install package.")
 
-    arguments += ['-i', mirror_source, package_name]
+    arguments += ["-i", mirror_source, package_name]
 
     pip.main(arguments)
 
@@ -151,10 +151,10 @@ def import_module(module_name: str) -> Optional[Type]:
         module_name (str): the name of target module
     """
     # 1. prepare the name
-    assert '.' in module_name, '`.` must be in the module_name'
-    index = module_name.rindex('.')
+    assert "." in module_name, "`.` must be in the module_name"
+    index = module_name.rindex(".")
     module = module_name[:index]
-    target_module_name = module_name[index + 1:]
+    target_module_name = module_name[index + 1 :]
 
     # 2. get the target module name
     try:

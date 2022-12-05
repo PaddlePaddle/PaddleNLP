@@ -22,6 +22,7 @@ from .utils import (
     is_paddle_available,
     is_paddlenlp_available,
     is_unidecode_available,
+    is_fastdeploy_available,
 )
 from .version import VERSION
 
@@ -29,6 +30,7 @@ __version__ = VERSION
 
 from .configuration_utils import ConfigMixin
 from .onnx_utils import OnnxRuntimeModel
+from .fastdeploy_utils import FastDeployRuntimeModel
 from .utils import logging
 
 if is_paddle_available():
@@ -45,7 +47,15 @@ if is_paddle_available():
         get_scheduler,
     )
     from .pipeline_utils import DiffusionPipeline
-    from .pipelines import DDIMPipeline, DDPMPipeline, KarrasVePipeline, LDMPipeline, LDMSuperResolutionPipeline, PNDMPipeline, ScoreSdeVePipeline
+    from .pipelines import (
+        DDIMPipeline,
+        DDPMPipeline,
+        KarrasVePipeline,
+        LDMPipeline,
+        LDMSuperResolutionPipeline,
+        PNDMPipeline,
+        ScoreSdeVePipeline,
+    )
     from .schedulers import (
         EulerAncestralDiscreteScheduler,
         DDIMScheduler,
@@ -66,12 +76,15 @@ else:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
 
 if is_paddle_available() and is_paddlenlp_available():
-    from .pipelines import (LDMBertModel, LDMTextToImagePipeline,
-                            StableDiffusionImg2ImgPipeline,
-                            StableDiffusionInpaintPipeline,
-                            StableDiffusionInpaintPipelineLegacy,
-                            StableDiffusionPipeline,
-                            StableDiffusionPipelineAllinOne)
+    from .pipelines import (
+        LDMBertModel,
+        LDMTextToImagePipeline,
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipeline,
+        StableDiffusionPipelineAllinOne,
+    )
 else:
     from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
@@ -83,3 +96,12 @@ if is_paddle_available() and is_paddlenlp_available() and is_onnx_available():
     )
 else:
     from .utils.dummy_paddle_and_paddlenlp_and_onnx_objects import *  # noqa F403
+
+if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available():
+    from .pipelines import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionPipeline,
+    )
+else:
+    from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403

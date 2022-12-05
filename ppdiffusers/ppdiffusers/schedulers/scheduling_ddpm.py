@@ -65,7 +65,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
     """
 
     def alpha_bar(time_step):
-        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2)**2
+        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2) ** 2
 
     betas = []
     for i in range(num_diffusion_timesteps):
@@ -119,16 +119,10 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start,
-                                         beta_end,
-                                         num_train_timesteps,
-                                         dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = (paddle.linspace(beta_start**0.5,
-                                          beta_end**0.5,
-                                          num_train_timesteps,
-                                          dtype="float32")**2)
+            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule
             self.betas = betas_for_alpha_bar(num_train_timesteps)
@@ -137,8 +131,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             betas = paddle.linspace(-6, 6, num_train_timesteps)
             self.betas = F.sigmoid(betas) * (beta_end - beta_start) + beta_start
         else:
-            raise NotImplementedError(
-                f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
@@ -149,14 +142,11 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self.timesteps = paddle.to_tensor(
-            np.arange(0, num_train_timesteps)[::-1].copy().astype("int64"))
+        self.timesteps = paddle.to_tensor(np.arange(0, num_train_timesteps)[::-1].copy().astype("int64"))
 
         self.variance_type = variance_type
 
-    def scale_model_input(self,
-                          sample: paddle.Tensor,
-                          timestep: Optional[int] = None) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Optional[int] = None) -> paddle.Tensor:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
@@ -178,13 +168,11 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             num_inference_steps (`int`):
                 the number of diffusion steps used when generating samples with a pre-trained model.
         """
-        num_inference_steps = min(self.config.num_train_timesteps,
-                                  num_inference_steps)
+        num_inference_steps = min(self.config.num_train_timesteps, num_inference_steps)
         self.num_inference_steps = num_inference_steps
         timesteps = np.arange(
-            0, self.config.num_train_timesteps,
-            self.config.num_train_timesteps //
-            self.num_inference_steps)[::-1].copy()
+            0, self.config.num_train_timesteps, self.config.num_train_timesteps // self.num_inference_steps
+        )[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps)
 
     def _get_variance(self, t, predicted_variance=None, variance_type=None):
@@ -249,11 +237,8 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         """
         t = timestep
 
-        if model_output.shape[1] == sample.shape[
-                1] * 2 and self.variance_type in ["learned", "learned_range"]:
-            model_output, predicted_variance = paddle.split(model_output,
-                                                            sample.shape[1],
-                                                            axis=1)
+        if model_output.shape[1] == sample.shape[1] * 2 and self.variance_type in ["learned", "learned_range"]:
+            model_output, predicted_variance = paddle.split(model_output, sample.shape[1], axis=1)
         else:
             predicted_variance = None
 
@@ -266,8 +251,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         # 2. compute predicted original sample from predicted noise also called
         # "predicted x_0" of formula (15) from https://arxiv.org/pdf/2006.11239.pdf
         if predict_epsilon:
-            pred_original_sample = (sample - beta_prod_t**
-                                    (0.5) * model_output) / alpha_prod_t**(0.5)
+            pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
         else:
             pred_original_sample = model_output
 
@@ -277,10 +261,8 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
         # 4. Compute coefficients for pred_original_sample x_0 and current sample x_t
         # See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
-        pred_original_sample_coeff = (alpha_prod_t_prev**(0.5) *
-                                      self.betas[t]) / beta_prod_t
-        current_sample_coeff = self.alphas[t]**(
-            0.5) * beta_prod_t_prev / beta_prod_t
+        pred_original_sample_coeff = (alpha_prod_t_prev ** (0.5) * self.betas[t]) / beta_prod_t
+        current_sample_coeff = self.alphas[t] ** (0.5) * beta_prod_t_prev / beta_prod_t
 
         # 5. Compute predicted previous sample µ_t
         # See formula (7) from https://arxiv.org/pdf/2006.11239.pdf
@@ -290,16 +272,14 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         variance = 0
         if t > 0:
             noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
-            variance = (self._get_variance(
-                t, predicted_variance=predicted_variance)**0.5) * noise
+            variance = (self._get_variance(t, predicted_variance=predicted_variance) ** 0.5) * noise
 
         pred_prev_sample = pred_prev_sample + variance
 
         if not return_dict:
-            return (pred_prev_sample, )
+            return (pred_prev_sample,)
 
-        return DDPMSchedulerOutput(prev_sample=pred_prev_sample,
-                                   pred_original_sample=pred_original_sample)
+        return DDPMSchedulerOutput(prev_sample=pred_prev_sample, pred_original_sample=pred_original_sample)
 
     def add_noise(
         self,
@@ -310,15 +290,14 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
         self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
 
-        sqrt_alpha_prod = self.alphas_cumprod[timesteps]**0.5
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
             sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps])**0.5
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
-        while len(sqrt_one_minus_alpha_prod.shape) < len(
-                original_samples.shape):
+        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
 
         noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise

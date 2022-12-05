@@ -52,9 +52,7 @@ class ConfigMixin:
 
     def register_to_config(self, **kwargs):
         if self.config_name is None:
-            raise NotImplementedError(
-                f"Make sure that {self.__class__} has defined a class name `config_name`"
-            )
+            raise NotImplementedError(f"Make sure that {self.__class__} has defined a class name `config_name`")
         kwargs["_class_name"] = self.__class__.__name__
         kwargs["_ppdiffusers_version"] = __version__
 
@@ -74,15 +72,11 @@ class ConfigMixin:
         else:
             previous_dict = dict(self._internal_dict)
             internal_dict = {**self._internal_dict, **kwargs}
-            logger.debug(
-                f"Updating config from {previous_dict} to {internal_dict}")
+            logger.debug(f"Updating config from {previous_dict} to {internal_dict}")
 
         self._internal_dict = FrozenDict(internal_dict)
 
-    def save_config(self,
-                    save_directory: Union[str, os.PathLike],
-                    push_to_hub: bool = False,
-                    **kwargs):
+    def save_config(self, save_directory: Union[str, os.PathLike], push_to_hub: bool = False, **kwargs):
         """
         Save a configuration object to the directory `save_directory`, so that it can be re-loaded using the
         [`~ConfigMixin.from_config`] class method.
@@ -92,9 +86,7 @@ class ConfigMixin:
                 Directory where the configuration JSON file will be saved (will be created if it does not exist).
         """
         if os.path.isfile(save_directory):
-            raise AssertionError(
-                f"Provided path ({save_directory}) should be a directory, not a file"
-            )
+            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
 
         os.makedirs(save_directory, exist_ok=True)
 
@@ -105,10 +97,7 @@ class ConfigMixin:
         logger.info(f"ConfigMixinuration saved in {output_config_file}")
 
     @classmethod
-    def from_config(cls,
-                    pretrained_model_name_or_path: Union[str, os.PathLike],
-                    return_unused_kwargs=False,
-                    **kwargs):
+    def from_config(cls, pretrained_model_name_or_path: Union[str, os.PathLike], return_unused_kwargs=False, **kwargs):
         r"""
         Instantiate a Python class from a pre-defined JSON-file.
 
@@ -149,9 +138,7 @@ class ConfigMixin:
         </Tip>
 
         """
-        config_dict = cls.get_config_dict(
-            pretrained_model_name_or_path=pretrained_model_name_or_path,
-            **kwargs)
+        config_dict = cls.get_config_dict(pretrained_model_name_or_path=pretrained_model_name_or_path, **kwargs)
         init_dict, unused_kwargs = cls.extract_init_dict(config_dict, **kwargs)
 
         # Allow dtype to be specified on initialization
@@ -160,17 +147,17 @@ class ConfigMixin:
 
         # Return model and optionally state and/or unused_kwargs
         model = cls(**init_dict)
-        return_tuple = (model, )
+        return_tuple = (model,)
 
         if return_unused_kwargs:
-            return return_tuple + (unused_kwargs, )
+            return return_tuple + (unused_kwargs,)
         else:
             return return_tuple if len(return_tuple) > 1 else model
 
     @classmethod
-    def get_config_dict(cls, pretrained_model_name_or_path: Union[str,
-                                                                  os.PathLike],
-                        **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+    def get_config_dict(
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         subfolder = kwargs.pop("subfolder", None)
 
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -184,17 +171,13 @@ class ConfigMixin:
         if os.path.isfile(pretrained_model_name_or_path):
             config_file = pretrained_model_name_or_path
         elif os.path.isdir(pretrained_model_name_or_path):
-            if os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path,
-                                 cls.config_name)):
+            if os.path.isfile(os.path.join(pretrained_model_name_or_path, cls.config_name)):
                 # Load from a Paddle checkpoint
-                config_file = os.path.join(pretrained_model_name_or_path,
-                                           cls.config_name)
+                config_file = os.path.join(pretrained_model_name_or_path, cls.config_name)
             elif subfolder is not None and os.path.isfile(
-                    os.path.join(pretrained_model_name_or_path, subfolder,
-                                 cls.config_name)):
-                config_file = os.path.join(pretrained_model_name_or_path,
-                                           subfolder, cls.config_name)
+                os.path.join(pretrained_model_name_or_path, subfolder, cls.config_name)
+            ):
+                config_file = os.path.join(pretrained_model_name_or_path, subfolder, cls.config_name)
             else:
                 raise EnvironmentError(
                     f"Error no file named {cls.config_name} found in directory {pretrained_model_name_or_path}."
@@ -210,7 +193,8 @@ class ConfigMixin:
             except HTTPError as err:
                 raise EnvironmentError(
                     "There was a specific connection error when trying to load"
-                    f" {pretrained_model_name_or_path}:\n{err}")
+                    f" {pretrained_model_name_or_path}:\n{err}"
+                )
             except ValueError:
                 raise EnvironmentError(
                     f"We couldn't connect to '{DOWNLOAD_SERVER}' to load this model, couldn't find it"
@@ -224,22 +208,20 @@ class ConfigMixin:
                     f"Can't load config for '{pretrained_model_name_or_path}'. If you were trying to load it from "
                     "'https://huggingface.co/models', make sure you don't have a local directory with the same name. "
                     f"Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a directory "
-                    f"containing a {cls.config_name} file")
+                    f"containing a {cls.config_name} file"
+                )
 
         try:
             # Load config dict
             config_dict = cls._dict_from_json_file(config_file)
         except (json.JSONDecodeError, UnicodeDecodeError):
-            raise EnvironmentError(
-                f"It looks like the config file at '{config_file}' is not a valid JSON file."
-            )
+            raise EnvironmentError(f"It looks like the config file at '{config_file}' is not a valid JSON file.")
 
         return config_dict
 
     @classmethod
     def extract_init_dict(cls, config_dict, **kwargs):
-        expected_keys = set(
-            dict(inspect.signature(cls.__init__).parameters).keys())
+        expected_keys = set(dict(inspect.signature(cls.__init__).parameters).keys())
         expected_keys.remove("self")
         # remove general kwargs if present in dict
         if "kwargs" in expected_keys:
@@ -256,16 +238,14 @@ class ConfigMixin:
                 # use value from config dict
                 init_dict[key] = config_dict.pop(key)
 
-        config_dict = {
-            k: v
-            for k, v in config_dict.items() if not k.startswith("_")
-        }
+        config_dict = {k: v for k, v in config_dict.items() if not k.startswith("_")}
 
         if len(config_dict) > 0:
             logger.warning(
                 f"The config attributes {config_dict} were passed to {cls.__name__}, "
                 "but are not expected and will be ignored. Please verify your "
-                f"{cls.config_name} configuration file.")
+                f"{cls.config_name} configuration file."
+            )
 
         unused_kwargs = {**config_dict, **kwargs}
 
@@ -297,8 +277,7 @@ class ConfigMixin:
         Returns:
             `str`: String containing all the attributes that make up this configuration instance in JSON format.
         """
-        config_dict = self._internal_dict if hasattr(self,
-                                                     "_internal_dict") else {}
+        config_dict = self._internal_dict if hasattr(self, "_internal_dict") else {}
         return json.dumps(config_dict, indent=2, sort_keys=True) + "\n"
 
     def to_json_file(self, json_file_path: Union[str, os.PathLike]):
@@ -314,7 +293,6 @@ class ConfigMixin:
 
 
 class FrozenDict(OrderedDict):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -324,36 +302,25 @@ class FrozenDict(OrderedDict):
         self.__frozen = True
 
     def __delitem__(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``__delitem__`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``__delitem__`` on a {self.__class__.__name__} instance.")
 
     def setdefault(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``setdefault`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``setdefault`` on a {self.__class__.__name__} instance.")
 
     def pop(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``pop`` on a {self.__class__.__name__} instance.")
+        raise Exception(f"You cannot use ``pop`` on a {self.__class__.__name__} instance.")
 
     def update(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``update`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``update`` on a {self.__class__.__name__} instance.")
 
     def __setattr__(self, name, value):
         if hasattr(self, "__frozen") and self.__frozen:
-            raise Exception(
-                f"You cannot use ``__setattr__`` on a {self.__class__.__name__} instance."
-            )
+            raise Exception(f"You cannot use ``__setattr__`` on a {self.__class__.__name__} instance.")
         super().__setattr__(name, value)
 
     def __setitem__(self, name, value):
         if hasattr(self, "__frozen") and self.__frozen:
-            raise Exception(
-                f"You cannot use ``__setattr__`` on a {self.__class__.__name__} instance."
-            )
+            raise Exception(f"You cannot use ``__setattr__`` on a {self.__class__.__name__} instance.")
         super().__setitem__(name, value)
 
 
@@ -374,26 +341,27 @@ def register_to_config(init):
         if not isinstance(self, ConfigMixin):
             raise RuntimeError(
                 f"`@register_for_config` was applied to {self.__class__.__name__} init method, but this class does "
-                "not inherit from `ConfigMixin`.")
+                "not inherit from `ConfigMixin`."
+            )
 
         ignore = getattr(self, "ignore_for_config", [])
         # Get positional arguments aligned with kwargs
         new_kwargs = {}
         signature = inspect.signature(init)
         parameters = {
-            name: p.default
-            for i, (name, p) in enumerate(signature.parameters.items())
-            if i > 0 and name not in ignore
+            name: p.default for i, (name, p) in enumerate(signature.parameters.items()) if i > 0 and name not in ignore
         }
         for arg, name in zip(args, parameters.keys()):
             new_kwargs[name] = arg
 
         # Then add all kwargs
-        new_kwargs.update({
-            k: init_kwargs.get(k, default)
-            for k, default in parameters.items()
-            if k not in ignore and k not in new_kwargs
-        })
+        new_kwargs.update(
+            {
+                k: init_kwargs.get(k, default)
+                for k, default in parameters.items()
+                if k not in ignore and k not in new_kwargs
+            }
+        )
         getattr(self, "register_to_config")(**new_kwargs)
 
     return inner_init

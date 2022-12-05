@@ -21,7 +21,6 @@ from ..taskflow import Taskflow
 
 
 class SimpleServer(FastAPI):
-
     def __init__(self, **kwargs):
         """
         Initial function for the PaddleNLP SimpleServer.
@@ -30,30 +29,25 @@ class SimpleServer(FastAPI):
         self._router_manager = HttpRouterManager(self)
         self._taskflow_manager = None
         self._model_manager = None
-        self._service_name = 'paddlenlp'
+        self._service_name = "paddlenlp"
         self._service_type = None
 
-    def register(self,
-                 task_name,
-                 model_path,
-                 tokenizer_name,
-                 model_handler,
-                 post_handler,
-                 precision='fp32',
-                 device_id=0):
+    def register(
+        self, task_name, model_path, tokenizer_name, model_handler, post_handler, precision="fp32", device_id=0
+    ):
         """
         The register function for the SimpleServer, the main register argrument as follows:
-        
+
         Args:
-            name(str): The server name for the route. 
-            model_path (str): 
-            handler(str): 
+            name(str): The server name for the route.
+            model_path (str):
+            handler(str):
             device (int|list|str, optional):
         """
-        self._server_type = 'models'
-        model_manager = ModelManager(task_name, model_path, tokenizer_name,
-                                     model_handler, post_handler, precision,
-                                     device_id)
+        self._server_type = "models"
+        model_manager = ModelManager(
+            task_name, model_path, tokenizer_name, model_handler, post_handler, precision, device_id
+        )
         self._model_manager = model_manager
         # Register transformers model server router
         self._router_manager.register_models_router(task_name)
@@ -61,14 +55,14 @@ class SimpleServer(FastAPI):
     def register_taskflow(self, task_name, task, taskflow_handler=None):
         """
         The register function for the SimpleServer, the main register argrument as follows:
-        
+
         Args:
-            name(str): The server name for the route. 
-            model_or_path (str): 
-            handler(str): 
+            name(str): The server name for the route.
+            model_or_path (str):
+            handler(str):
             device (int|list|str, optional):
         """
-        self._server_type = 'server'
+        self._server_type = "server"
         check_flag = True
 
         # Check the task type, it must be the instance of Taskflow or List[Taskflow]
@@ -80,8 +74,8 @@ class SimpleServer(FastAPI):
                 break
         if not check_flag:
             raise TypeError(
-                "Unsupport task type {}, it must be instance of Taskflow or List[Taskflow]"
-                .format(type(task)))
+                "Unsupport task type {}, it must be instance of Taskflow or List[Taskflow]".format(type(task))
+            )
 
         # Register Taskflow server router
         taskflow_manager = TaskflowManager(task, taskflow_handler)

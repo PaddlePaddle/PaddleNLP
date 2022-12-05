@@ -22,20 +22,20 @@ import numpy as np
 
 class SamplerHelper(object):
     """
-    The class is to help construct iterable sampler used for 
-    :class:`paddle.io.DataLoader`. It wraps a dataset and uses its 
-    :meth:`__getitem__` method. Every subclass of :class:`SamplerHelper` has 
-    to provide an :meth:`__iter__` method, providing a way to iterate over 
-    indices of dataset elements, and a :meth:`__len__` method that returns the 
+    The class is to help construct iterable sampler used for
+    :class:`paddle.io.DataLoader`. It wraps a dataset and uses its
+    :meth:`__getitem__` method. Every subclass of :class:`SamplerHelper` has
+    to provide an :meth:`__iter__` method, providing a way to iterate over
+    indices of dataset elements, and a :meth:`__len__` method that returns the
     length of the returned iterators.
 
-    The class also can be used as batch iterator instead of indices iterator 
-    when `iterator` yield samples rather than indices by initializing `iterator` 
+    The class also can be used as batch iterator instead of indices iterator
+    when `iterator` yield samples rather than indices by initializing `iterator`
     with a iterable dataset.
 
-    .. note:: 
-        The :meth:`__len__` method isn't strictly required by 
-        :class:`paddle.io.DataLoader`, but is expected in any calculation 
+    .. note::
+        The :meth:`__len__` method isn't strictly required by
+        :class:`paddle.io.DataLoader`, but is expected in any calculation
         involving the length of a :class:`paddle.io.DataLoader`.
 
     Args:
@@ -59,9 +59,7 @@ class SamplerHelper(object):
         elif callable(self.iterable):
             return self.iterable()
         else:
-            raise ValueError(
-                "`iterable` should be None, instance of Iterable or callable "
-                "producing generator.")
+            raise ValueError("`iterable` should be None, instance of Iterable or callable " "producing generator.")
 
     def __len__(self):
         # Allow some samplers have different length with `len(data_source)`,
@@ -110,14 +108,14 @@ class SamplerHelper(object):
         Shuffles the dataset according to the given buffer size and random seed.
 
         Args:
-            buffer_size (int, optional): Buffer size for shuffle. If 
-                `buffer_size < 0` or more than the length of the dataset, 
-                `buffer_size` is the length of the dataset. Default: -1. 
+            buffer_size (int, optional): Buffer size for shuffle. If
+                `buffer_size < 0` or more than the length of the dataset,
+                `buffer_size` is the length of the dataset. Default: -1.
             seed (int, optional): Seed for the random. Default: None.
 
         Returns:
             SamplerHelper: A new shuffled :class:`SamplerHelper` object.
-            
+
         Example:
             .. code-block:: python
 
@@ -176,19 +174,19 @@ class SamplerHelper(object):
         Sorts the dataset according to given callable :meth:`cmp` or :meth:`key`.
 
         Args:
-            cmp (callable, optional): The function of comparison. Default: None. 
+            cmp (callable, optional): The function of comparison. Default: None.
             key (callable, optional): The function of key. Default: None.
-            reverse (bool, optional): Whether to reverse when sorting the data 
-                samples. If True, it means in descending order, and False means 
+            reverse (bool, optional): Whether to reverse when sorting the data
+                samples. If True, it means in descending order, and False means
                 in ascending order. Default: False.
-            buffer_size (int, optional): Buffer size for sort. If 
-                `buffer_size < 0` or `buffer_size` is more than the length 
-                of the data, `buffer_size` will be set to the length of the data. 
+            buffer_size (int, optional): Buffer size for sort. If
+                `buffer_size < 0` or `buffer_size` is more than the length
+                of the data, `buffer_size` will be set to the length of the data.
                 Default: -1.
 
         Returns:
             SamplerHelper: A new sorted :class:`SamplerHelper` object.
-            
+
         Example:
             .. code-block:: python
 
@@ -217,7 +215,7 @@ class SamplerHelper(object):
                 print(list(sampler))    # indices of dataset elements
                 # [0, 1, 2]
 
-                # Sorted in ascending order by the length of the first field 
+                # Sorted in ascending order by the length of the first field
                 # of the sample
                 key = (lambda x, data_source: len(data_source[x][0]))
                 sampler = sampler.sort(key=key)
@@ -225,12 +223,11 @@ class SamplerHelper(object):
                 # [2, 1, 0]
         """
         if key:
-            key_wrapper = (lambda x: key(x, self.data_source))
+            key_wrapper = lambda x: key(x, self.data_source)
         elif cmp:
-            key_wrapper = functools.cmp_to_key(
-                lambda x, y: cmp(x, y, self.data_source))
+            key_wrapper = functools.cmp_to_key(lambda x, y: cmp(x, y, self.data_source))
         else:
-            key_wrapper = (lambda x: len(self.data_source[x]))
+            key_wrapper = lambda x: len(self.data_source[x])
 
         def _impl():
             data_source = self.data_source
@@ -255,9 +252,9 @@ class SamplerHelper(object):
 
         Args:
             batch_size (int): The batch size.
-            drop_last (bool, optional): Whether to drop the last mini batch. 
+            drop_last (bool, optional): Whether to drop the last mini batch.
                 Default: False.
-            batch_size_fn (callable, optional): It accepts four arguments: 
+            batch_size_fn (callable, optional): It accepts four arguments:
                 index of data source, the length of minibatch, the size of
                 minibatch so far and data source, and it returns the size of
                 mini batch so far. Actually, the returned value can be anything
@@ -270,7 +267,7 @@ class SamplerHelper(object):
 
         Returns:
             SamplerHelper: A new batched :class:`SamplerHelper` object.
-            
+
         Example:
             .. code-block:: python
 
@@ -315,8 +312,7 @@ class SamplerHelper(object):
             minibatch, size_so_far = [], 0
             for idx in iter(self):
                 minibatch.append(idx)
-                size_so_far = batch_size_fn(idx, len(minibatch), size_so_far,
-                                            data_source)
+                size_so_far = batch_size_fn(idx, len(minibatch), size_so_far, data_source)
                 if key(size_so_far, len(minibatch)) == batch_size:
                     yield minibatch
                     minibatch, size_so_far = [], 0
@@ -326,15 +322,13 @@ class SamplerHelper(object):
                             "Please increase the value of `batch_size`, or limit the max length of batch."
                         )
                     yield minibatch[:-1]
-                    minibatch, size_so_far = minibatch[-1:], batch_size_fn(
-                        idx, 1, 0, data_source)
+                    minibatch, size_so_far = minibatch[-1:], batch_size_fn(idx, 1, 0, data_source)
             if minibatch and not drop_last:
                 yield minibatch
 
         sampler = type(self)(self.data_source, _impl)
         if ori_batch_size_fn is None and self.length is not None:
-            sampler.length = (self.length + int(not drop_last) *
-                              (batch_size - 1)) // batch_size
+            sampler.length = (self.length + int(not drop_last) * (batch_size - 1)) // batch_size
         else:
             sampler.length = None
 
@@ -345,18 +339,18 @@ class SamplerHelper(object):
         Slices the dataset for multi GPU training.
 
         Args:
-            num_replicas (int, optional): The number of training process, and 
-                is also the number of GPU cards used in training. If None, it 
-                will be set by :meth:`paddle.distributed.get_world_size` method. 
+            num_replicas (int, optional): The number of training process, and
+                is also the number of GPU cards used in training. If None, it
+                will be set by :meth:`paddle.distributed.get_world_size` method.
                 Default: None.
-            rank (int, optional): The id of current training process. Equal 
-                to the value of the environment variable PADDLE_TRAINER_ID. If 
-                None, it will be intialized by :meth:`paddle.distributed.get_rank` 
+            rank (int, optional): The id of current training process. Equal
+                to the value of the environment variable PADDLE_TRAINER_ID. If
+                None, it will be intialized by :meth:`paddle.distributed.get_rank`
                 method. Default: None.
 
         Returns:
             SamplerHelper: A new sliced :class:`SamplerHelper` object.
-            
+
         Example:
             .. code-block:: python
 

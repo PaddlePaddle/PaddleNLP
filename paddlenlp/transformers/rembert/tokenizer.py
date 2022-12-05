@@ -20,7 +20,7 @@ import sentencepiece as spm
 
 from .. import PretrainedTokenizer
 
-__all__ = ['RemBertTokenizer']
+__all__ = ["RemBertTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"rembert": 512}
 
@@ -74,28 +74,27 @@ class RemBertTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "sentencepiece.model"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "rembert":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/rembert/sentencepiece.model",
+            "rembert": "https://bj.bcebos.com/paddlenlp/models/transformers/rembert/sentencepiece.model",
         },
     }
     pretrained_init_configuration = {
-        "rembert": {
-            "do_lower_case": False
-        },
+        "rembert": {"do_lower_case": False},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=False,
-                 remove_space=True,
-                 keep_accents=True,
-                 cls_token="[CLS]",
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=False,
+        remove_space=True,
+        keep_accents=True,
+        cls_token="[CLS]",
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
@@ -109,10 +108,7 @@ class RemBertTokenizer(PretrainedTokenizer):
         return len(self.sp_model)
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         vocab.update(self.added_tokens_encoder)
         return vocab
 
@@ -144,9 +140,8 @@ class RemBertTokenizer(PretrainedTokenizer):
         return out_string
 
     def build_inputs_with_special_tokens(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
         adding special tokens. A REMBERT sequence has the following format:
@@ -170,10 +165,8 @@ class RemBertTokenizer(PretrainedTokenizer):
         return cls + token_ids_0 + sep + token_ids_1 + sep
 
     def get_special_tokens_mask(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None,
-            already_has_special_tokens: bool = False) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None, already_has_special_tokens: bool = False
+    ) -> List[int]:
         """
         Retrieve sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``prepare_for_model`` method.
@@ -196,21 +189,15 @@ class RemBertTokenizer(PretrainedTokenizer):
                     "You should not supply a second sequence if the provided sequence of "
                     "ids is already formatted with special tokens for the model."
                 )
-            return list(
-                map(
-                    lambda x: 1
-                    if x in [self.sep_token_id, self.cls_token_id] else 0,
-                    token_ids_0))
+            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
 
         if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + (
-                [0] * len(token_ids_1)) + [1]
+            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
 
     def create_token_type_ids_from_sequences(
-            self,
-            token_ids_0: List[int],
-            token_ids_1: Optional[List[int]] = None) -> List[int]:
+        self, token_ids_0: List[int], token_ids_1: Optional[List[int]] = None
+    ) -> List[int]:
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task. A RemBERT
         sequence pair mask has the following format:
@@ -239,19 +226,15 @@ class RemBertTokenizer(PretrainedTokenizer):
             return len(cls + token_ids_0 + sep) * [0]
         return len(cls + token_ids_0 + sep) * [0] + len(token_ids_1 + sep) * [1]
 
-    def save_vocabulary(self,
-                        save_directory: str,
-                        filename_prefix: Optional[str] = None):
+    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None):
         if not os.path.isdir(save_directory):
-            raise ValueError(
-                "Vocabulary path ({}) should be a directory".format(
-                    save_directory))
+            raise ValueError("Vocabulary path ({}) should be a directory".format(save_directory))
             return None
         out_vocab_file = os.path.join(
-            save_directory, (filename_prefix + "-" if filename_prefix else "") +
-            "sentencepiece.model")
+            save_directory, (filename_prefix + "-" if filename_prefix else "") + "sentencepiece.model"
+        )
 
         if os.path.abspath(self.vocab_file) != os.path.abspath(out_vocab_file):
             copyfile(self.vocab_file, out_vocab_file)
 
-        return (out_vocab_file, )
+        return (out_vocab_file,)

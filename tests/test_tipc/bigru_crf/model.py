@@ -40,14 +40,9 @@ class BiGruCrf(nn.Layer):
         crf_lr (float, optional): The scaling of the learning rate of the crf layer. Defaults to 0.2.
     """
 
-    def __init__(self,
-                 word_emb_dim,
-                 hidden_size,
-                 vocab_size,
-                 num_labels,
-                 emb_lr=2.0,
-                 crf_lr=0.2,
-                 with_start_stop_tag=True):
+    def __init__(
+        self, word_emb_dim, hidden_size, vocab_size, num_labels, emb_lr=2.0, crf_lr=0.2, with_start_stop_tag=True
+    ):
         super(BiGruCrf, self).__init__()
         self.word_emb_dim = word_emb_dim
         self.vocab_size = vocab_size
@@ -60,39 +55,39 @@ class BiGruCrf(nn.Layer):
         self.word_embedding = nn.Embedding(
             num_embeddings=self.vocab_size,
             embedding_dim=self.word_emb_dim,
-            weight_attr=paddle.ParamAttr(learning_rate=self.emb_lr,
-                                         initializer=nn.initializer.Uniform(
-                                             low=-self.init_bound,
-                                             high=self.init_bound)))
+            weight_attr=paddle.ParamAttr(
+                learning_rate=self.emb_lr,
+                initializer=nn.initializer.Uniform(low=-self.init_bound, high=self.init_bound),
+            ),
+        )
 
         self.gru = nn.GRU(
             input_size=self.word_emb_dim,
             hidden_size=self.hidden_size,
             num_layers=2,
-            direction='bidirectional',
+            direction="bidirectional",
             weight_ih_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(low=-self.init_bound,
-                                                   high=self.init_bound),
-                regularizer=paddle.regularizer.L2Decay(coeff=1e-4)),
+                initializer=nn.initializer.Uniform(low=-self.init_bound, high=self.init_bound),
+                regularizer=paddle.regularizer.L2Decay(coeff=1e-4),
+            ),
             weight_hh_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(low=-self.init_bound,
-                                                   high=self.init_bound),
-                regularizer=paddle.regularizer.L2Decay(coeff=1e-4)))
+                initializer=nn.initializer.Uniform(low=-self.init_bound, high=self.init_bound),
+                regularizer=paddle.regularizer.L2Decay(coeff=1e-4),
+            ),
+        )
 
         self.fc = nn.Linear(
             in_features=self.hidden_size * 2,
-            out_features=self.num_labels + 2 \
-                if with_start_stop_tag else self.num_labels,
+            out_features=self.num_labels + 2 if with_start_stop_tag else self.num_labels,
             weight_attr=paddle.ParamAttr(
-                initializer=nn.initializer.Uniform(
-                    low=-self.init_bound, high=self.init_bound),
-                regularizer=paddle.regularizer.L2Decay(coeff=1e-4)))
+                initializer=nn.initializer.Uniform(low=-self.init_bound, high=self.init_bound),
+                regularizer=paddle.regularizer.L2Decay(coeff=1e-4),
+            ),
+        )
 
-        self.crf = LinearChainCrf(self.num_labels, self.crf_lr,
-                                  with_start_stop_tag)
+        self.crf = LinearChainCrf(self.num_labels, self.crf_lr, with_start_stop_tag)
         self.crf_loss = LinearChainCrfLoss(self.crf)
-        self.viterbi_decoder = ViterbiDecoder(self.crf.transitions,
-                                              with_start_stop_tag)
+        self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, with_start_stop_tag)
 
     def forward(self, inputs, lengths, labels=None):
         word_embed = self.word_embedding(inputs)

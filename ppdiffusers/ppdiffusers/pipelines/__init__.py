@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available
+from ..utils import is_onnx_available, is_paddle_available, is_paddlenlp_available, is_fastdeploy_available
 
 if is_paddle_available():
     from .ddim import DDIMPipeline
@@ -27,15 +27,24 @@ else:
 
 if is_paddle_available() and is_paddlenlp_available():
     from .latent_diffusion import LDMTextToImagePipeline, LDMBertModel, LDMSuperResolutionPipeline
-    from .stable_diffusion import (StableDiffusionImg2ImgPipeline,
-                                   StableDiffusionInpaintPipeline,
-                                   StableDiffusionPipeline,
-                                   StableDiffusionInpaintPipelineLegacy,
-                                   StableDiffusionPipelineAllinOne)
+    from .stable_diffusion import (
+        StableDiffusionImg2ImgPipeline,
+        StableDiffusionInpaintPipeline,
+        StableDiffusionPipeline,
+        StableDiffusionInpaintPipelineLegacy,
+        StableDiffusionPipelineAllinOne,
+    )
 
 if is_paddlenlp_available() and is_onnx_available():
     from .stable_diffusion import (
         OnnxStableDiffusionImg2ImgPipeline,
         OnnxStableDiffusionInpaintPipeline,
         OnnxStableDiffusionPipeline,
+    )
+
+if is_paddlenlp_available() and is_fastdeploy_available():
+    from .stable_diffusion import (
+        FastDeployStableDiffusionImg2ImgPipeline,
+        FastDeployStableDiffusionInpaintPipeline,
+        FastDeployStableDiffusionPipeline,
     )

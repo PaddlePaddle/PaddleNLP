@@ -21,45 +21,37 @@ from util import get_vocab_list, create_test_data
 
 from common_test import CommonTest
 
-logger.logger.setLevel('ERROR')
+logger.logger.setLevel("ERROR")
 
 
 class TestTokenEmbedding(CommonTest):
-
     def setUp(self):
         self.test_data_file = create_test_data(__file__)
-        self.config[
-            "embedding_name"] = "w2v.sikuquanshu.target.word-word.dim300"
+        self.config["embedding_name"] = "w2v.sikuquanshu.target.word-word.dim300"
         self.config["trainable"] = True
 
 
 class TestTokenEmbeddingTrainable(TestTokenEmbedding):
-
     def test_trainable(self):
         self.embedding = TokenEmbedding(**self.config)
-        self.check_output_not_equal(self.config["trainable"],
-                                    self.embedding.weight.stop_gradient)
+        self.check_output_not_equal(self.config["trainable"], self.embedding.weight.stop_gradient)
 
 
 class TestTokenEmbeddingUNK(TestTokenEmbedding):
-
     def setUp(self):
         super().setUp()
         self.config["unknown_token"] = "[unk]"  # default [UNK], change it
-        self.config["unknown_token_vector"] = np.random.normal(
-            scale=0.02, size=300).astype(paddle.get_default_dtype())
+        self.config["unknown_token_vector"] = np.random.normal(scale=0.02, size=300).astype(paddle.get_default_dtype())
 
     def test_unk_token(self):
         self.embedding = TokenEmbedding(**self.config)
-        self.check_output_equal(self.config["unknown_token"],
-                                self.embedding.unknown_token)
+        self.check_output_equal(self.config["unknown_token"], self.embedding.unknown_token)
         self.check_output_equal(
-            self.config["unknown_token_vector"],
-            self.embedding.search(self.embedding.unknown_token)[0])
+            self.config["unknown_token_vector"], self.embedding.search(self.embedding.unknown_token)[0]
+        )
 
 
 class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
-
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
@@ -74,7 +66,6 @@ class TestTokenEmbeddingExtendedVocab(TestTokenEmbedding):
 
 
 class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
-
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
@@ -85,12 +76,10 @@ class TestTokenEmbeddingKeepExtendedVocab(TestTokenEmbedding):
         vocab_list = get_vocab_list(self.config["extended_vocab_path"])
         vocab_size = len(vocab_list)
         # +1 means considering [PAD]
-        self.check_output_equal(vocab_size + 1,
-                                len(self.embedding._word_to_idx))
+        self.check_output_equal(vocab_size + 1, len(self.embedding._word_to_idx))
 
 
 class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
-
     def setUp(self):
         super().setUp()
         self.config["extended_vocab_path"] = self.test_data_file
@@ -100,8 +89,7 @@ class TestTokenEmbeddingSimilarity(TestTokenEmbedding):
         return np.sum(vec_a * vec_b)
 
     def get_cosine(self, vec_a, vec_b):
-        return self.get_dot(vec_a, vec_b) / (np.sqrt(
-            self.get_dot(vec_a, vec_a) * self.get_dot(vec_b, vec_b)))
+        return self.get_dot(vec_a, vec_b) / (np.sqrt(self.get_dot(vec_a, vec_a) * self.get_dot(vec_b, vec_b)))
 
     def get_random_word_vec(self, vocab_list):
         vocab_size = len(vocab_list)

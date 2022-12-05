@@ -63,8 +63,7 @@ def predict(model, data_loader):
             input_ids = paddle.to_tensor(input_ids)
             token_type_ids = paddle.to_tensor(token_type_ids)
 
-            batch_logit, _ = model(input_ids=input_ids,
-                                   token_type_ids=token_type_ids)
+            batch_logit, _ = model(input_ids=input_ids, token_type_ids=token_type_ids)
 
             batch_logits.append(batch_logit.numpy())
 
@@ -76,29 +75,21 @@ def predict(model, data_loader):
 if __name__ == "__main__":
     paddle.set_device(args.device)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length,
-                         is_test=True)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_test=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
     ): [data for data in fn(samples)]
 
-    test_ds = load_dataset(read_text_pair,
-                           data_path=args.input_file,
-                           is_test=True,
-                           lazy=False)
+    test_ds = load_dataset(read_text_pair, data_path=args.input_file, is_test=True, lazy=False)
 
-    test_data_loader = create_dataloader(test_ds,
-                                         mode='predict',
-                                         batch_size=args.batch_size,
-                                         batchify_fn=batchify_fn,
-                                         trans_fn=trans_func)
+    test_data_loader = create_dataloader(
+        test_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     model = QuestionMatching(pretrained_model)
 
@@ -107,12 +98,11 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     y_probs = predict(model, test_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
 
-    with open(args.result_file, 'w', encoding="utf-8") as f:
+    with open(args.result_file, "w", encoding="utf-8") as f:
         for y_pred in y_preds:
             f.write(str(y_pred) + "\n")

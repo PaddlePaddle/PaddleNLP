@@ -50,13 +50,12 @@ def save_json(data, file_path="statistic_results.json"):
 
 def calculate_ms_given_path(path, batch_size, dims, save_path, num_workers=1):
     if not os.path.exists(path):
-        raise RuntimeError('Invalid path: %s' % path)
+        raise RuntimeError("Invalid path: %s" % path)
 
     block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
 
     model = InceptionV3([block_idx])
-    m, s = compute_statistics_of_path(path, model, batch_size, dims,
-                                      num_workers)
+    m, s = compute_statistics_of_path(path, model, batch_size, dims, num_workers)
     save_pickle(dict(m=m, s=s), save_path)
 
 
@@ -65,8 +64,8 @@ def calculate_fid_given_ms_file(ms1, dataset_name):
     ms2 = get_path_from_url(base_url + dataset_name, cache_path)
     ms2 = load_pickle(ms2)
 
-    m1, s1 = ms1['m'], ms1['s']
-    m2, s2 = ms2['m'], ms2['s']
+    m1, s1 = ms1["m"], ms1["s"]
+    m2, s2 = ms2["m"], ms2["s"]
     fid_value = calculate_frechet_distance(m1, s1, m2, s2)
 
     return fid_value
@@ -87,9 +86,9 @@ def batchify(data, batch_size=16):
 def compute_clip_score(model, processor, texts, images_path, batch_size=64):
     all_text_embeds = []
     all_image_embeds = []
-    for text, image_path in tqdm(zip(batchify(texts, batch_size),
-                                     batchify(images_path, batch_size)),
-                                 total=math.ceil(len(texts) / batch_size)):
+    for text, image_path in tqdm(
+        zip(batchify(texts, batch_size), batchify(images_path, batch_size)), total=math.ceil(len(texts) / batch_size)
+    ):
         assert len(text) == len(image_path)
         batch_inputs = processor(
             text=text,
@@ -97,32 +96,24 @@ def compute_clip_score(model, processor, texts, images_path, batch_size=64):
             return_tensors="pd",
             max_length=processor.tokenizer.model_max_length,
             padding="max_length",
-            truncation=True)
-        text_embeds = model.get_text_features(
-            input_ids=batch_inputs["input_ids"])
-        image_embeds = model.get_image_features(
-            pixel_values=batch_inputs["pixel_values"])
+            truncation=True,
+        )
+        text_embeds = model.get_text_features(input_ids=batch_inputs["input_ids"])
+        image_embeds = model.get_image_features(pixel_values=batch_inputs["pixel_values"])
         all_text_embeds.append(text_embeds)
         all_image_embeds.append(image_embeds)
 
     all_text_embeds = paddle.concat(all_text_embeds)
     all_image_embeds = paddle.concat(all_image_embeds)
-    all_text_embeds = all_text_embeds / all_text_embeds.norm(axis=-1,
-                                                             keepdim=True)
-    all_image_embeds = all_image_embeds / all_image_embeds.norm(axis=-1,
-                                                                keepdim=True)
-    clip_score = (all_image_embeds *
-                  all_text_embeds).sum(-1) * model.logit_scale.exp()
+    all_text_embeds = all_text_embeds / all_text_embeds.norm(axis=-1, keepdim=True)
+    all_image_embeds = all_image_embeds / all_image_embeds.norm(axis=-1, keepdim=True)
+    clip_score = (all_image_embeds * all_text_embeds).sum(-1) * model.logit_scale.exp()
     return clip_score.mean().item()
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--image_path",
-                        default=None,
-                        nargs="+",
-                        type=str,
-                        help="image_path")
+    parser.add_argument("--image_path", default=None, nargs="+", type=str, help="image_path")
     parser.add_argument(
         "--text_file_name",
         default="mscoco.en.1k",
@@ -130,22 +121,12 @@ if __name__ == "__main__":
         type=str,
         help="text file.",
     )
-    parser.add_argument("--clip_model_name_or_path",
-                        default="openai/clip-vit-base-patch32",
-                        type=str,
-                        help="clip_model_name_or_path")
-    parser.add_argument("--fid_batch_size",
-                        default=32,
-                        type=int,
-                        help="fid_batch_size")
-    parser.add_argument("--clip_batch_size",
-                        default=64,
-                        type=int,
-                        help="clip_batch_size")
-    parser.add_argument("--resolution",
-                        default=256,
-                        type=int,
-                        help="resolution of images")
+    parser.add_argument(
+        "--clip_model_name_or_path", default="openai/clip-vit-base-patch32", type=str, help="clip_model_name_or_path"
+    )
+    parser.add_argument("--fid_batch_size", default=32, type=int, help="fid_batch_size")
+    parser.add_argument("--clip_batch_size", default=64, type=int, help="clip_batch_size")
+    parser.add_argument("--resolution", default=256, type=int, help="resolution of images")
     parser.add_argument("--device", default="gpu", type=str, help="device")
     args = parser.parse_args()
 
@@ -170,22 +151,17 @@ if __name__ == "__main__":
         # fid score
         with tempfile.TemporaryDirectory() as tmpdirname:
             predict_ms_file = os.path.join(tmpdirname, "tmp.pkl")
-            calculate_ms_given_path(path,
-                                    batch_size=args.fid_batch_size,
-                                    dims=2048,
-                                    save_path=predict_ms_file,
-                                    num_workers=4)
-            fid_value = calculate_fid_given_ms_file(predict_ms_file,
-                                                    dataset_name)
+            calculate_ms_given_path(
+                path, batch_size=args.fid_batch_size, dims=2048, save_path=predict_ms_file, num_workers=4
+            )
+            fid_value = calculate_fid_given_ms_file(predict_ms_file, dataset_name)
         results["fid"].append(fid_value)
 
         # clip score
-        images_path = sorted([
-            image_path for ext in IMAGE_EXTENSIONS
-            for image_path in pathlib.Path(path).glob('*.{}'.format(ext))
-        ])
-        clip_score = compute_clip_score(model, processor, texts, images_path,
-                                        args.clip_batch_size)
+        images_path = sorted(
+            [image_path for ext in IMAGE_EXTENSIONS for image_path in pathlib.Path(path).glob("*.{}".format(ext))]
+        )
+        clip_score = compute_clip_score(model, processor, texts, images_path, args.clip_batch_size)
         results["clip_score"].append(clip_score)
         print(f"fid: {fid_value}, clip_score: {clip_score}")
 
@@ -194,14 +170,10 @@ if __name__ == "__main__":
 
     # plot Pareto Curves
     step = -1
-    plt.plot(results["clip_score"],
-             results["fid"],
-             label=f'pd-{step}',
-             linewidth=3,
-             marker='o')
-    plt.xlabel('CLIP Score')
-    plt.ylabel(f'FID@{text_file_name}')
-    plt.title('Pareto Curves')
+    plt.plot(results["clip_score"], results["fid"], label=f"pd-{step}", linewidth=3, marker="o")
+    plt.xlabel("CLIP Score")
+    plt.ylabel(f"FID@{text_file_name}")
+    plt.title("Pareto Curves")
     plt.legend()
     plt.savefig("pareto_curves.png")
     plt.show()

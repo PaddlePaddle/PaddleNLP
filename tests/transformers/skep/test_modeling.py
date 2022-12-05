@@ -27,15 +27,14 @@ from paddlenlp.transformers import (
     SkepForTokenClassification,
     SkepCrfForTokenClassification,
 )
-from ..test_modeling_common import (ids_tensor, floats_tensor,
-                                    random_attention_mask, ModelTesterMixin)
+from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
 
 
 @dataclass
 class SkepTestModelConfig:
-    """skep model config which keep consist with pretrained_init_configuration sub fields
-    """
+    """skep model config which keep consist with pretrained_init_configuration sub fields"""
+
     attention_probs_dropout_prob: float = 0.1
     hidden_act: str = "relu"
     hidden_dropout_prob: float = 0.1
@@ -53,16 +52,13 @@ class SkepTestModelConfig:
     def model_kwargs(self) -> dict:
         """get the model kwargs configuration to init the model"""
         model_config_fields: Tuple[Field, ...] = fields(SkepTestModelConfig)
-        return {
-            field.name: getattr(self, field.name)
-            for field in model_config_fields
-        }
+        return {field.name: getattr(self, field.name) for field in model_config_fields}
 
 
 @dataclass
 class SkepTestConfig(SkepTestModelConfig):
-    """all of Skep Test configuration
-    """
+    """all of Skep Test configuration"""
+
     batch_size: int = 2
     seq_length: int = 7
     is_training: bool = False
@@ -76,8 +72,7 @@ class SkepTestConfig(SkepTestModelConfig):
 
 
 class SkepModelTester:
-    """Base Skep Model tester which can test:
-    """
+    """Base Skep Model tester which can test:"""
 
     def __init__(self, parent, config: Optional[SkepTestConfig] = None):
         self.parent = parent
@@ -87,120 +82,131 @@ class SkepModelTester:
 
     def __getattr__(self, key: str):
         if not hasattr(self.config, key):
-            raise AttributeError(f'attribute <{key}> not exist')
+            raise AttributeError(f"attribute <{key}> not exist")
         return getattr(self.config, key)
 
-    def prepare_config_and_inputs(
-            self) -> Tuple[Dict[str, Any], Tensor, Tensor, Tensor]:
+    def prepare_config_and_inputs(self) -> Tuple[Dict[str, Any], Tensor, Tensor, Tensor]:
         config = self.config
-        input_ids = ids_tensor([config.batch_size, config.seq_length],
-                               config.vocab_size)
+        input_ids = ids_tensor([config.batch_size, config.seq_length], config.vocab_size)
 
         input_mask = None
         if config.use_input_mask:
-            input_mask = random_attention_mask(
-                [config.batch_size, config.seq_length])
+            input_mask = random_attention_mask([config.batch_size, config.seq_length])
 
         token_type_ids = None
         if config.use_token_type_ids:
-            token_type_ids = ids_tensor([config.batch_size, config.seq_length],
-                                        config.type_vocab_size)
+            token_type_ids = ids_tensor([config.batch_size, config.seq_length], config.type_vocab_size)
 
         sequence_labels = None
         token_labels = None
         choice_labels = None
 
         if self.parent.use_labels:
-            sequence_labels = ids_tensor([self.batch_size],
-                                         self.type_sequence_label_size)
-            token_labels = ids_tensor([self.batch_size, self.seq_length],
-                                      self.num_classes)
+            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size)
+            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_classes)
             choice_labels = ids_tensor([self.batch_size], self.num_choices)
 
         config = self.get_config()
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
-    def create_and_check_model(self, config, input_ids: Tensor,
-                               token_type_ids: Tensor, input_mask: Tensor,
-                               sequence_labels: Tensor, token_labels: Tensor,
-                               choice_labels: Tensor):
+    def create_and_check_model(
+        self,
+        config,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        input_mask: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        choice_labels: Tensor,
+    ):
         model = SkepModel(**config)
         model.eval()
 
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
-        result = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict)
+        result = model(
+            input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
+        )
+        result = model(input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict)
         result = model(input_ids, return_dict=self.parent.return_dict)
 
-        self.parent.assertEqual(result[0].shape, [
-            self.config.batch_size, self.config.seq_length,
-            self.config.hidden_size
-        ])
         self.parent.assertEqual(
-            result[1].shape, [self.config.batch_size, self.config.hidden_size])
+            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.hidden_size]
+        )
+        self.parent.assertEqual(result[1].shape, [self.config.batch_size, self.config.hidden_size])
 
     def create_and_check_for_sequence_classification(
-            self, config, input_ids: Tensor, token_type_ids: Tensor,
-            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
-            choice_labels: Tensor):
-        model = SkepForSequenceClassification(
-            SkepModel(**config), num_classes=self.config.num_classes)
+        self,
+        config,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        input_mask: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        choice_labels: Tensor,
+    ):
+        model = SkepForSequenceClassification(SkepModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=sequence_labels)
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            return_dict=self.parent.return_dict,
+            labels=sequence_labels,
+        )
         if not self.parent.return_dict and token_labels is None:
             self.parent.assertTrue(paddle.is_tensor(result))
 
+        if token_labels is not None:
+            result = result[1:]
+        elif paddle.is_tensor(result):
+            result = [result]
+
+        self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.num_classes])
+
+    def create_and_check_for_token_classification(
+        self,
+        config,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        input_mask: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        choice_labels: Tensor,
+    ):
+        model = SkepForTokenClassification(SkepModel(**config), num_classes=self.config.num_classes)
+        model.eval()
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            token_type_ids=token_type_ids,
+            return_dict=self.parent.return_dict,
+            labels=token_labels,
+        )
+        if not self.parent.return_dict and token_labels is None:
+            self.parent.assertTrue(paddle.is_tensor(result))
         if token_labels is not None:
             result = result[1:]
         elif paddle.is_tensor(result):
             result = [result]
 
         self.parent.assertEqual(
-            result[0].shape, [self.config.batch_size, self.config.num_classes])
-
-    def create_and_check_for_token_classification(
-            self, config, input_ids: Tensor, token_type_ids: Tensor,
-            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
-            choice_labels: Tensor):
-        model = SkepForTokenClassification(SkepModel(**config),
-                                           num_classes=self.config.num_classes)
-        model.eval()
-        result = model(input_ids,
-                       attention_mask=input_mask,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=token_labels)
-        if not self.parent.return_dict and token_labels is None:
-            self.parent.assertTrue(paddle.is_tensor(result))
-        if token_labels is not None:
-            result = result[1:]
-        elif paddle.is_tensor(result):
-            result = [result]
-
-        self.parent.assertEqual(result[0].shape, [
-            self.config.batch_size, self.config.seq_length,
-            self.config.num_classes
-        ])
+            result[0].shape, [self.config.batch_size, self.config.seq_length, self.config.num_classes]
+        )
 
     def create_and_check_for_crf_token_classification(
-            self, config, input_ids: Tensor, token_type_ids: Tensor,
-            input_mask: Tensor, sequence_labels: Tensor, token_labels: Tensor,
-            choice_labels: Tensor):
-        model = SkepCrfForTokenClassification(
-            SkepModel(**config), num_classes=self.config.num_classes)
+        self,
+        config,
+        input_ids: Tensor,
+        token_type_ids: Tensor,
+        input_mask: Tensor,
+        sequence_labels: Tensor,
+        token_labels: Tensor,
+        choice_labels: Tensor,
+    ):
+        model = SkepCrfForTokenClassification(SkepModel(**config), num_classes=self.config.num_classes)
         model.eval()
-        result = model(input_ids,
-                       token_type_ids=token_type_ids,
-                       return_dict=self.parent.return_dict,
-                       labels=token_labels)
+        result = model(
+            input_ids, token_type_ids=token_type_ids, return_dict=self.parent.return_dict, labels=token_labels
+        )
         # TODO(wj-Mcat): the output of SkepCrfForTokenClassification is wrong
         if paddle.is_tensor(result):
             result = [result]
@@ -208,23 +214,17 @@ class SkepModelTester:
         if token_labels is not None:
             self.parent.assertEqual(result[0].shape, [self.config.batch_size])
         else:
-            self.parent.assertEqual(
-                result[0].shape,
-                [self.config.batch_size, self.config.seq_length])
+            self.parent.assertEqual(result[0].shape, [self.config.batch_size, self.config.seq_length])
 
-    def create_and_check_model_cache(self, config, input_ids, token_type_ids,
-                                     input_mask, sequence_labels, token_labels,
-                                     choice_labels):
+    def create_and_check_model_cache(
+        self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+    ):
         model = SkepModel(**config)
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids,
-                        attention_mask=input_mask,
-                        use_cache=True,
-                        return_dict=self.parent.return_dict)
-        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[
-            2]
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
+        past_key_values = outputs.past_key_values if self.parent.return_dict else outputs[2]
 
         # create hypothetical multiple next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), self.vocab_size)
@@ -234,37 +234,34 @@ class SkepModelTester:
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        outputs = model(next_input_ids,
-                        attention_mask=next_attention_mask,
-                        output_hidden_states=True,
-                        return_dict=self.parent.return_dict)
+        outputs = model(
+            next_input_ids,
+            attention_mask=next_attention_mask,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
 
         output_from_no_past = outputs[2][0]
 
-        outputs = model(next_tokens,
-                        attention_mask=next_attention_mask,
-                        past_key_values=past_key_values,
-                        output_hidden_states=True,
-                        return_dict=self.parent.return_dict)
+        outputs = model(
+            next_tokens,
+            attention_mask=next_attention_mask,
+            past_key_values=past_key_values,
+            output_hidden_states=True,
+            return_dict=self.parent.return_dict,
+        )
 
         output_from_past = outputs[2][0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ), output_from_past.shape[-1]).item()
-        output_from_no_past_slice = output_from_no_past[:, -3:,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, :,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
+        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
-        self.parent.assertTrue(
-            output_from_past_slice.shape[1] == next_tokens.shape[1])
+        self.parent.assertTrue(output_from_past_slice.shape[1] == next_tokens.shape[1])
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -293,12 +290,15 @@ class SkepModelTester:
         return self.config.model_kwargs
 
 
-@parameterized_class(("return_dict", "use_labels"), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
-])
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class SkepModelTest(ModelTesterMixin, unittest.TestCase):
     base_model_class = SkepModel
     return_dict = False
@@ -320,18 +320,15 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_for_sequence_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_sequence_classification(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_sequence_classification(*config_and_inputs)
 
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_token_classification(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
 
     def test_for_crf_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_for_crf_token_classification(
-            *config_and_inputs)
+        self.model_tester.create_and_check_for_crf_token_classification(*config_and_inputs)
 
     def test_for_model_cache(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -339,38 +336,38 @@ class SkepModelTest(ModelTesterMixin, unittest.TestCase):
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in list(
-                SkepPretrainedModel.pretrained_init_configuration)[:1]:
+        for model_name in list(SkepPretrainedModel.pretrained_init_configuration)[:1]:
             model = SkepModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
 
 class SkepModelIntegrationTest(unittest.TestCase):
-
     @slow
     def test_inference_no_attention(self):
         model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         with paddle.no_grad():
             output = model(input_ids)[0]
         expected_shape = [1, 11, 1024]
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[0.31737554, 0.58842468, 0.43969756],
-              [0.20048048, 0.04142965, -0.2655520],
-              [0.49883127, -0.15263288, 0.46780178]]])
-        self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [0.31737554, 0.58842468, 0.43969756],
+                    [0.20048048, 0.04142965, -0.2655520],
+                    [0.49883127, -0.15263288, 0.46780178],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_attention(self):
         model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask)[0]
@@ -378,24 +375,24 @@ class SkepModelIntegrationTest(unittest.TestCase):
         self.assertEqual(output.shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[0.31737554, 0.58842468, 0.43969756],
-              [0.20048048, 0.04142965, -0.2655520],
-              [0.49883127, -0.15263288, 0.46780178]]])
-        self.assertTrue(
-            paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [0.31737554, 0.58842468, 0.43969756],
+                    [0.20048048, 0.04142965, -0.2655520],
+                    [0.49883127, -0.15263288, 0.46780178],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[:, 1:4, 1:4], expected_slice, atol=1e-4))
 
     @slow
     def test_inference_with_past_key_value(self):
         model = SkepModel.from_pretrained("skep_ernie_1.0_large_ch")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
+        input_ids = paddle.to_tensor([[0, 345, 232, 328, 740, 140, 1695, 69, 6078, 1588, 2]])
         attention_mask = paddle.to_tensor([[0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]])
         with paddle.no_grad():
-            output = model(input_ids,
-                           attention_mask=attention_mask,
-                           use_cache=True,
-                           return_dict=True)
+            output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
         past_key_value = output.past_key_values[0][0]
 
@@ -403,24 +400,29 @@ class SkepModelIntegrationTest(unittest.TestCase):
         self.assertEqual(output[0].shape, expected_shape)
 
         expected_slice = paddle.to_tensor(
-            [[[0.31737363, 0.58842909, 0.43969074],
-              [0.20047806, 0.04142847, -0.26555336],
-              [0.49882850, -0.15263671, 0.46780348]]])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [0.31737363, 0.58842909, 0.43969074],
+                    [0.20047806, 0.04142847, -0.26555336],
+                    [0.49882850, -0.15263671, 0.46780348],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
         # insert the past key value into model
         with paddle.no_grad():
-            output = model(input_ids,
-                           use_cache=True,
-                           past_key_values=output.past_key_values,
-                           return_dict=True)
+            output = model(input_ids, use_cache=True, past_key_values=output.past_key_values, return_dict=True)
         expected_slice = paddle.to_tensor(
-            [[[0.29901379, 0.68195367, 0.62448436],
-              [0.18537062, 0.33085057, -0.04292759],
-              [0.38783669, -0.19946010, 0.24944240]]])
-        self.assertTrue(
-            paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
+            [
+                [
+                    [0.29901379, 0.68195367, 0.62448436],
+                    [0.18537062, 0.33085057, -0.04292759],
+                    [0.38783669, -0.19946010, 0.24944240],
+                ]
+            ]
+        )
+        self.assertTrue(paddle.allclose(output[0][:, 1:4, 1:4], expected_slice, atol=1e-4))
 
 
 if __name__ == "__main__":

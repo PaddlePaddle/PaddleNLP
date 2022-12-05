@@ -41,7 +41,7 @@ _CITATION = """\
 }
 """
 
-_DOWNLOAD_URL = 'https://bj.bcebos.com/dataset/imdb%2FaclImdb_v1.tar.gz'
+_DOWNLOAD_URL = "https://bj.bcebos.com/dataset/imdb%2FaclImdb_v1.tar.gz"
 
 
 class IMDBReviewsConfig(datasets.BuilderConfig):
@@ -52,8 +52,7 @@ class IMDBReviewsConfig(datasets.BuilderConfig):
         Args:
           **kwargs: keyword arguments forwarded to super.
         """
-        super(IMDBReviewsConfig,
-              self).__init__(version=datasets.Version("1.0.0", ""), **kwargs)
+        super(IMDBReviewsConfig, self).__init__(version=datasets.Version("1.0.0", ""), **kwargs)
 
 
 class Imdb(datasets.GeneratorBasedBuilder):
@@ -69,42 +68,27 @@ class Imdb(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "text":
-                datasets.Value("string"),
-                "label":
-                datasets.features.ClassLabel(names=["neg", "pos"])
-            }),
+            features=datasets.Features(
+                {"text": datasets.Value("string"), "label": datasets.features.ClassLabel(names=["neg", "pos"])}
+            ),
             supervised_keys=None,
             homepage="http://ai.stanford.edu/~amaas/data/sentiment/",
             citation=_CITATION,
-            task_templates=[
-                TextClassification(text_column="text", label_column="label")
-            ],
+            task_templates=[TextClassification(text_column="text", label_column="label")],
         )
 
     def _split_generators(self, dl_manager):
         archive = dl_manager.download(_DOWNLOAD_URL)
         return [
-            datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                    gen_kwargs={
-                                        "files":
-                                        dl_manager.iter_archive(archive),
-                                        "split": "train"
-                                    }),
-            datasets.SplitGenerator(name=datasets.Split.TEST,
-                                    gen_kwargs={
-                                        "files":
-                                        dl_manager.iter_archive(archive),
-                                        "split": "test"
-                                    }),
+            datasets.SplitGenerator(
+                name=datasets.Split.TRAIN, gen_kwargs={"files": dl_manager.iter_archive(archive), "split": "train"}
+            ),
+            datasets.SplitGenerator(
+                name=datasets.Split.TEST, gen_kwargs={"files": dl_manager.iter_archive(archive), "split": "test"}
+            ),
             datasets.SplitGenerator(
                 name=datasets.Split("unsupervised"),
-                gen_kwargs={
-                    "files": dl_manager.iter_archive(archive),
-                    "split": "train",
-                    "labeled": False
-                },
+                gen_kwargs={"files": dl_manager.iter_archive(archive), "split": "train", "labeled": False},
             ),
         ]
 
@@ -117,15 +101,9 @@ class Imdb(datasets.GeneratorBasedBuilder):
                 if path.startswith(f"aclImdb/{split}"):
                     label = label_mapping.get(path.split("/")[2])
                     if label is not None:
-                        yield path, {
-                            "text": f.read().decode("utf-8"),
-                            "label": label
-                        }
+                        yield path, {"text": f.read().decode("utf-8"), "label": label}
         else:
             for path, f in files:
                 if path.startswith(f"aclImdb/{split}"):
                     if path.split("/")[2] == "unsup":
-                        yield path, {
-                            "text": f.read().decode("utf-8"),
-                            "label": -1
-                        }
+                        yield path, {"text": f.read().decode("utf-8"), "label": -1}

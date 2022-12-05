@@ -24,21 +24,13 @@ from custom_ernie import ErnieModel as CustomErnie
 
 
 class ProjectionMLP(nn.Layer):
-
     def __init__(self, in_dim):
         super(ProjectionMLP, self).__init__()
         hidden_dim = in_dim * 2
         out_dim = in_dim
         affine = False
-        list_layers = [
-            nn.Linear(in_dim, hidden_dim, bias_attr=False),
-            nn.BatchNorm1D(hidden_dim),
-            nn.ReLU()
-        ]
-        list_layers += [
-            nn.Linear(hidden_dim, out_dim, bias_attr=False),
-            nn.BatchNorm1D(out_dim)
-        ]
+        list_layers = [nn.Linear(in_dim, hidden_dim, bias_attr=False), nn.BatchNorm1D(hidden_dim), nn.ReLU()]
+        list_layers += [nn.Linear(hidden_dim, out_dim, bias_attr=False), nn.BatchNorm1D(out_dim)]
         self.net = nn.Sequential(*list_layers)
 
     def forward(self, x):
@@ -70,36 +62,29 @@ class Similarity(nn.Layer):
         min_size = min(self.record.shape[0], self.record.shape[1])
         num_item = self.record.shape[0] * self.record.shape[1]
         self.pos_avg = paddle.diag(self.record).sum().item() / min_size
-        self.neg_avg = (self.record.sum().item() - paddle.diag(
-            self.record).sum().item()) / (num_item - min_size)
+        self.neg_avg = (self.record.sum().item() - paddle.diag(self.record).sum().item()) / (num_item - min_size)
         return sim / self.temp
 
 
 class Encoder(nn.Layer):
-
     def __init__(self, pretrained_model_name, temp=0.05, output_emb_size=None):
         super(Encoder, self).__init__()
         self.ptm = AutoModel.from_pretrained(pretrained_model_name)
         # if output_emb_size is greater than 0, then add Linear layer to reduce embedding_size
         self.output_emb_size = output_emb_size
-        self.mlp = ProjectionMLP(self.ptm.config['hidden_size'])
+        self.mlp = ProjectionMLP(self.ptm.config["hidden_size"])
 
         if output_emb_size is not None:
-            self.emb_reduce_linear = nn.Linear(self.ptm.config['hidden_size'],
-                                               output_emb_size)
+            self.emb_reduce_linear = nn.Linear(self.ptm.config["hidden_size"], output_emb_size)
 
         self.temp = temp
         self.sim = Similarity(temp)
 
-    def get_pooled_embedding(self,
-                             input_ids,
-                             token_type_ids=None,
-                             position_ids=None,
-                             attention_mask=None,
-                             with_pooler=False):
+    def get_pooled_embedding(
+        self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, with_pooler=False
+    ):
         # Note: cls_embedding is poolerd embedding with act tanh
-        sequence_output, cls_embedding = self.ptm(input_ids, token_type_ids,
-                                                  position_ids, attention_mask)
+        sequence_output, cls_embedding = self.ptm(input_ids, token_type_ids, position_ids, attention_mask)
         if not with_pooler:
             ori_cls_embedding = sequence_output[:, 0, :]
         else:
@@ -111,56 +96,46 @@ class Encoder(nn.Layer):
 
         return cls_embedding, mlp_cls_embedding
 
-    def cosine_sim(self,
-                   query_input_ids,
-                   key_input_ids,
-                   query_token_type_ids=None,
-                   query_position_ids=None,
-                   query_attention_mask=None,
-                   key_token_type_ids=None,
-                   key_position_ids=None,
-                   key_attention_mask=None,
-                   with_pooler=False):
+    def cosine_sim(
+        self,
+        query_input_ids,
+        key_input_ids,
+        query_token_type_ids=None,
+        query_position_ids=None,
+        query_attention_mask=None,
+        key_token_type_ids=None,
+        key_position_ids=None,
+        key_attention_mask=None,
+        with_pooler=False,
+    ):
         query_cls_embedding, _ = self.get_pooled_embedding(
-            query_input_ids,
-            query_token_type_ids,
-            query_position_ids,
-            query_attention_mask,
-            with_pooler=with_pooler)
+            query_input_ids, query_token_type_ids, query_position_ids, query_attention_mask, with_pooler=with_pooler
+        )
         key_cls_embedding, _ = self.get_pooled_embedding(
-            key_input_ids,
-            key_token_type_ids,
-            key_position_ids,
-            key_attention_mask,
-            with_pooler=with_pooler)
+            key_input_ids, key_token_type_ids, key_position_ids, key_attention_mask, with_pooler=with_pooler
+        )
 
-        cosine_sim = self.sim(query_cls_embedding,
-                              key_cls_embedding,
-                              one_vs_one=True)
+        cosine_sim = self.sim(query_cls_embedding, key_cls_embedding, one_vs_one=True)
         return cosine_sim
 
-    def forward(self,
-                query_input_ids,
-                key_input_ids,
-                query_token_type_ids=None,
-                query_position_ids=None,
-                query_attention_mask=None,
-                key_token_type_ids=None,
-                key_position_ids=None,
-                key_attention_mask=None,
-                with_pooler=False):
+    def forward(
+        self,
+        query_input_ids,
+        key_input_ids,
+        query_token_type_ids=None,
+        query_position_ids=None,
+        query_attention_mask=None,
+        key_token_type_ids=None,
+        key_position_ids=None,
+        key_attention_mask=None,
+        with_pooler=False,
+    ):
         query_cls_embedding, mlp_query_cls_embedding = self.get_pooled_embedding(
-            query_input_ids,
-            query_token_type_ids,
-            query_position_ids,
-            query_attention_mask,
-            with_pooler=with_pooler)
+            query_input_ids, query_token_type_ids, query_position_ids, query_attention_mask, with_pooler=with_pooler
+        )
         key_cls_embedding, mlp_key_cls_embedding = self.get_pooled_embedding(
-            key_input_ids,
-            key_token_type_ids,
-            key_position_ids,
-            key_attention_mask,
-            with_pooler=with_pooler)
+            key_input_ids, key_token_type_ids, key_position_ids, key_attention_mask, with_pooler=with_pooler
+        )
 
         cosine_sim = self.sim(query_cls_embedding, key_cls_embedding)
 
@@ -168,28 +143,20 @@ class Encoder(nn.Layer):
         labels = paddle.reshape(labels, shape=[-1, 1])
         loss = F.cross_entropy(input=cosine_sim, label=labels)
 
-        mlp_cls_embedding = paddle.concat(
-            [mlp_query_cls_embedding, mlp_key_cls_embedding], axis=0)
+        mlp_cls_embedding = paddle.concat([mlp_query_cls_embedding, mlp_key_cls_embedding], axis=0)
         return loss, mlp_cls_embedding
 
 
 class Discriminator(nn.Layer):
-
     def __init__(self, ptm_model_name):
         super(Discriminator, self).__init__()
         self.ptm = CustomErnie.from_pretrained(ptm_model_name)
         self.classifier = nn.Linear(self.ptm.config["hidden_size"], 2)
 
-    def forward(self,
-                input_ids,
-                labels,
-                cls_input,
-                token_type_ids=None,
-                attention_mask=None):
-        sequence_output, _ = self.ptm(input_ids,
-                                      token_type_ids=token_type_ids,
-                                      attention_mask=attention_mask,
-                                      cls_input=cls_input)
+    def forward(self, input_ids, labels, cls_input, token_type_ids=None, attention_mask=None):
+        sequence_output, _ = self.ptm(
+            input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask, cls_input=cls_input
+        )
         pred_scores = self.classifier(sequence_output)
         loss = F.cross_entropy(input=pred_scores, label=labels)
 
@@ -197,18 +164,19 @@ class Discriminator(nn.Layer):
 
 
 class DiffCSE(nn.Layer):
-
-    def __init__(self,
-                 encoder_name,
-                 generator_name,
-                 discriminator_name,
-                 enc_tokenizer,
-                 gen_tokenizer,
-                 dis_tokenizer,
-                 temp=0.05,
-                 output_emb_size=32,
-                 mlm_probability=0.15,
-                 lambda_weight=0.15):
+    def __init__(
+        self,
+        encoder_name,
+        generator_name,
+        discriminator_name,
+        enc_tokenizer,
+        gen_tokenizer,
+        dis_tokenizer,
+        temp=0.05,
+        output_emb_size=32,
+        mlm_probability=0.15,
+        lambda_weight=0.15,
+    ):
         super(DiffCSE, self).__init__()
         self.encoder_name = encoder_name
         self.generator_name = generator_name
@@ -221,9 +189,7 @@ class DiffCSE(nn.Layer):
         self.mlm_probability = mlm_probability
         self.lambda_weight = lambda_weight
 
-        self.encoder = Encoder(encoder_name,
-                               temp=temp,
-                               output_emb_size=output_emb_size)
+        self.encoder = Encoder(encoder_name, temp=temp, output_emb_size=output_emb_size)
         self.generator = ErnieForMaskedLM.from_pretrained(generator_name)
         self.discriminator = Discriminator(discriminator_name)
 
@@ -231,13 +197,15 @@ class DiffCSE(nn.Layer):
         self.rtd_rep_acc = 0.0
         self.rtd_fix_acc = 0.0
 
-    def train_forward(self,
-                      query_input_ids,
-                      key_input_ids,
-                      query_token_type_ids=None,
-                      key_token_type_ids=None,
-                      query_attention_mask=None,
-                      key_attention_mask=None):
+    def train_forward(
+        self,
+        query_input_ids,
+        key_input_ids,
+        query_token_type_ids=None,
+        key_token_type_ids=None,
+        query_attention_mask=None,
+        key_attention_mask=None,
+    ):
 
         # extract senmantic vector with encoder and then comput CL loss
         loss, mlp_cls_embedding = self.encoder(
@@ -246,21 +214,18 @@ class DiffCSE(nn.Layer):
             query_token_type_ids=query_token_type_ids,
             key_token_type_ids=key_token_type_ids,
             query_attention_mask=query_attention_mask,
-            key_attention_mask=key_attention_mask)
+            key_attention_mask=key_attention_mask,
+        )
 
         with paddle.no_grad():
             # mask tokens for query and key input_ids and then predict mask token with generator
             input_ids = paddle.concat([query_input_ids, key_input_ids], axis=0)
             if self.encoder_name != self.generator_name:
                 input_ids = self.encode_by_generator(input_ids)
-            attention_mask = paddle.concat(
-                [query_attention_mask, key_attention_mask], axis=0)
-            mlm_input_ids, _ = mask_tokens(input_ids,
-                                           self.gen_tokenizer,
-                                           mlm_probability=self.mlm_probability)
+            attention_mask = paddle.concat([query_attention_mask, key_attention_mask], axis=0)
+            mlm_input_ids, _ = mask_tokens(input_ids, self.gen_tokenizer, mlm_probability=self.mlm_probability)
             # predict tokens using generator
-            pred_tokens = self.generator(
-                mlm_input_ids, attention_mask=attention_mask).argmax(axis=-1)
+            pred_tokens = self.generator(mlm_input_ids, attention_mask=attention_mask).argmax(axis=-1)
 
         pred_tokens = pred_tokens.detach()
 
@@ -272,47 +237,42 @@ class DiffCSE(nn.Layer):
         e_inputs = pred_tokens * attention_mask
         replaced = pred_tokens != input_ids
         e_labels = paddle.cast(replaced, dtype="int64") * attention_mask
-        rtd_loss, prediction = self.discriminator(e_inputs,
-                                                  e_labels,
-                                                  cls_input=mlp_cls_embedding)
+        rtd_loss, prediction = self.discriminator(e_inputs, e_labels, cls_input=mlp_cls_embedding)
         loss = loss + self.lambda_weight * rtd_loss
 
         rep = (e_labels == 1) * attention_mask
         fix = (e_labels == 0) * attention_mask
         self.rtd_rep_acc = float((prediction * rep).sum() / rep.sum())
         self.rtd_fix_acc = float(1.0 - (prediction * fix).sum() / fix.sum())
-        self.rtd_acc = float(((prediction == e_labels) * attention_mask).sum() /
-                             attention_mask.sum())
+        self.rtd_acc = float(((prediction == e_labels) * attention_mask).sum() / attention_mask.sum())
 
         return loss, rtd_loss
 
     def encode_by_generator(self, batch_tokens):
         new_tokens = []
         for one_tokens in batch_tokens:
-            one_gen_tokens = self.enc_tokenizer.convert_ids_to_tokens(
-                one_tokens.tolist())
-            new_tokens.append(
-                self.gen_tokenizer.convert_tokens_to_ids(one_gen_tokens))
+            one_gen_tokens = self.enc_tokenizer.convert_ids_to_tokens(one_tokens.tolist())
+            new_tokens.append(self.gen_tokenizer.convert_tokens_to_ids(one_gen_tokens))
 
         return paddle.to_tensor(new_tokens)
 
     def encode_by_discriminator(self, batch_tokens):
         new_tokens = []
         for one_tokens in batch_tokens:
-            one_gen_tokens = self.gen_tokenizer.convert_ids_to_tokens(
-                one_tokens.tolist())
-            new_tokens.append(
-                self.dis_tokenizer.convert_tokens_to_ids(one_gen_tokens))
+            one_gen_tokens = self.gen_tokenizer.convert_ids_to_tokens(one_tokens.tolist())
+            new_tokens.append(self.dis_tokenizer.convert_tokens_to_ids(one_gen_tokens))
 
         return paddle.to_tensor(new_tokens)
 
-    def test_forward(self,
-                     query_input_ids,
-                     key_input_ids,
-                     query_token_type_ids=None,
-                     key_token_type_ids=None,
-                     query_attention_mask=None,
-                     key_attention_mask=None):
+    def test_forward(
+        self,
+        query_input_ids,
+        key_input_ids,
+        query_token_type_ids=None,
+        key_token_type_ids=None,
+        query_attention_mask=None,
+        key_attention_mask=None,
+    ):
 
         # compute cosine similarity for query and key text
         cos_sim = self.encoder.cosine_sim(
@@ -321,29 +281,36 @@ class DiffCSE(nn.Layer):
             query_token_type_ids=query_token_type_ids,
             key_token_type_ids=key_token_type_ids,
             query_attention_mask=query_attention_mask,
-            key_attention_mask=key_attention_mask)
+            key_attention_mask=key_attention_mask,
+        )
 
         return cos_sim
 
-    def forward(self,
+    def forward(
+        self,
+        query_input_ids,
+        key_input_ids,
+        query_token_type_ids=None,
+        key_token_type_ids=None,
+        query_attention_mask=None,
+        key_attention_mask=None,
+        mode="train",
+    ):
+        if mode == "train":
+            return self.train_forward(
                 query_input_ids,
                 key_input_ids,
-                query_token_type_ids=None,
-                key_token_type_ids=None,
-                query_attention_mask=None,
-                key_attention_mask=None,
-                mode="train"):
-        if mode == "train":
-            return self.train_forward(query_input_ids,
-                                      key_input_ids,
-                                      query_token_type_ids=query_token_type_ids,
-                                      key_token_type_ids=key_token_type_ids,
-                                      query_attention_mask=query_attention_mask,
-                                      key_attention_mask=key_attention_mask)
+                query_token_type_ids=query_token_type_ids,
+                key_token_type_ids=key_token_type_ids,
+                query_attention_mask=query_attention_mask,
+                key_attention_mask=key_attention_mask,
+            )
         else:
-            return self.test_forward(query_input_ids,
-                                     key_input_ids,
-                                     query_token_type_ids=query_token_type_ids,
-                                     key_token_type_ids=key_token_type_ids,
-                                     query_attention_mask=query_attention_mask,
-                                     key_attention_mask=key_attention_mask)
+            return self.test_forward(
+                query_input_ids,
+                key_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                key_token_type_ids=key_token_type_ids,
+                query_attention_mask=query_attention_mask,
+                key_attention_mask=key_attention_mask,
+            )

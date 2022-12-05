@@ -20,8 +20,7 @@ from io import BytesIO
 from ppdiffusers import LDMSuperResolutionPipeline
 
 # 加载pipeline
-pipe = LDMSuperResolutionPipeline.from_pretrained(
-    'CompVis/ldm-super-resolution-4x-openimages')
+pipe = LDMSuperResolutionPipeline.from_pretrained("CompVis/ldm-super-resolution-4x-openimages")
 
 # 下载初始图片
 url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diffusion-v1-4/overture-creations.png"
