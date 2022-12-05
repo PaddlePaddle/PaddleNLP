@@ -29,38 +29,39 @@ from paddle.dataset.common import md5file
 
 class AnswerExtractor(BaseComponent):
     """
-    Answer Extractor based on Universal Information Extraction. 
+    Answer Extractor based on Universal Information Extraction.
     """
+
     resource_files_names = {
         "model_state": "model_state.pdparams",
         "model_config": "model_config.json",
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
-        "tokenizer_config": "tokenizer_config.json"
+        "tokenizer_config": "tokenizer_config.json",
     }
 
     resource_files_urls = {
         "uie-base-answer-extractor": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/model_state.pdparams",
-                "c8619f631a0c20434199840d34bb8b8c"
+                "c8619f631a0c20434199840d34bb8b8c",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/model_config.json",
-                "74f033ab874a1acddb3aec9b9c4d9cde"
+                "74f033ab874a1acddb3aec9b9c4d9cde",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/vocab.txt",
-                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+                "1c1c1f4fd93c5bed3b4eebec4de976a8",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/special_tokens_map.json",
-                "8b3fb1023167bb4ab9d70708eb05f6ec"
+                "8b3fb1023167bb4ab9d70708eb05f6ec",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/pipelines/answer_generator/uie-base-answer-extractor/uie-base-answer-extractor-v1/tokenizer_config.json",
-                "3e623b57084882fd73e17f544bdda47d"
-            ]
+                "3e623b57084882fd73e17f544bdda47d",
+            ],
         },
     }
 
@@ -69,14 +70,16 @@ class AnswerExtractor(BaseComponent):
     query_count = 0
     query_time = 0
 
-    def __init__(self,
-                 model='uie-base-answer-extractor',
-                 schema=['答案'],
-                 task_path=None,
-                 device="gpu",
-                 batch_size=64,
-                 position_prob=0.01,
-                 max_answer_candidates=5):
+    def __init__(
+        self,
+        model="uie-base-answer-extractor",
+        schema=["答案"],
+        task_path=None,
+        device="gpu",
+        batch_size=64,
+        position_prob=0.01,
+        max_answer_candidates=5,
+    ):
         paddle.set_device(device)
         self.model = model
         self._from_taskflow = False
@@ -89,9 +92,7 @@ class AnswerExtractor(BaseComponent):
                 self._task_path = None
                 self._from_taskflow = True
             else:
-                self._task_path = os.path.join(
-                    PPNLP_HOME, "pipelines", "unsupervised_question_answering",
-                    self.model)
+                self._task_path = os.path.join(PPNLP_HOME, "pipelines", "unsupervised_question_answering", self.model)
                 self._check_task_files()
         self.batch_size = batch_size
         self.max_answer_candidates = max_answer_candidates
@@ -102,7 +103,8 @@ class AnswerExtractor(BaseComponent):
             schema=schema,
             task_path=self._task_path,
             batch_size=batch_size,
-            position_prob=position_prob)
+            position_prob=position_prob,
+        )
 
     def _check_task_files(self):
         """
@@ -129,13 +131,9 @@ class AnswerExtractor(BaseComponent):
             if not downloaded:
                 download_file(self._task_path, file_name, url, md5)
 
-    def answer_generation_from_paragraphs(self,
-                                          paragraphs,
-                                          batch_size=16,
-                                          model=None,
-                                          max_answer_candidates=5,
-                                          schema=None,
-                                          wf=None):
+    def answer_generation_from_paragraphs(
+        self, paragraphs, batch_size=16, model=None, max_answer_candidates=5, schema=None, wf=None
+    ):
         """Generate answer from given paragraphs."""
         result = []
         buffer = []
@@ -153,25 +151,19 @@ class AnswerExtractor(BaseComponent):
                     for prompt in schema:
                         if prompt in predict_dict:
                             answer_dicts = predict_dict[prompt]
-                            answers += [
-                                answer_dict['text']
-                                for answer_dict in answer_dicts
-                            ]
-                            probabilitys += [
-                                answer_dict['probability']
-                                for answer_dict in answer_dicts
-                            ]
+                            answers += [answer_dict["text"] for answer_dict in answer_dicts]
+                            probabilitys += [answer_dict["probability"] for answer_dict in answer_dicts]
                         else:
                             answers += []
                             probabilitys += []
-                    candidates = sorted(list(
-                        set([(a, p) for a, p in zip(answers, probabilitys)])),
-                                        key=lambda x: -x[1])
+                    candidates = sorted(
+                        list(set([(a, p) for a, p in zip(answers, probabilitys)])), key=lambda x: -x[1]
+                    )
                     if len(candidates) > max_answer_candidates:
                         candidates = candidates[:max_answer_candidates]
                     outdict = {
-                        'context': paragraph,
-                        'answer_candidates': candidates,
+                        "context": paragraph,
+                        "answer_candidates": candidates,
                     }
                     if wf:
                         wf.write(json.dumps(outdict, ensure_ascii=False) + "\n")
@@ -180,13 +172,14 @@ class AnswerExtractor(BaseComponent):
         return result
 
     def run(self, meta):
-        print('createing synthetic answers...')
+        print("createing synthetic answers...")
         synthetic_context_answer_pairs = self.answer_generation_from_paragraphs(
             meta,
             batch_size=self.batch_size,
             model=self.answer_generator,
             max_answer_candidates=self.max_answer_candidates,
             schema=self.schema,
-            wf=None)
+            wf=None,
+        )
         results = {"ca_pairs": synthetic_context_answer_pairs}
         return results, "output_1"

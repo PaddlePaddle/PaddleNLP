@@ -19,7 +19,6 @@ from paddlenlp.transformers.ernie.modeling import ErniePretrainedModel, ErniePre
 
 
 class ErnieForPretraining(ErniePretrainedModel):
-
     def __init__(self, ernie):
         super(ErnieForPretraining, self).__init__()
         self.ernie = ernie
@@ -27,51 +26,41 @@ class ErnieForPretraining(ErniePretrainedModel):
             self.ernie.config["hidden_size"],
             self.ernie.config["vocab_size"],
             self.ernie.config["hidden_act"],
-            embedding_weights=self.ernie.embeddings.word_embeddings.weight)
+            embedding_weights=self.ernie.embeddings.word_embeddings.weight,
+        )
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, masked_positions=None):
         with paddle.static.amp.fp16_guard():
-            outputs = self.ernie(input_ids,
-                                 token_type_ids=token_type_ids,
-                                 position_ids=position_ids,
-                                 attention_mask=attention_mask)
+            outputs = self.ernie(
+                input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+            )
 
             sequence_output, pooled_output = outputs[:2]
 
             max_len = input_ids.shape[1]
             new_masked_positions = masked_positions
 
-            prediction_scores, seq_relationship_score = self.cls(
-                sequence_output, pooled_output, new_masked_positions)
+            prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output, new_masked_positions)
 
             return prediction_scores
 
-    def predict(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None):
+    def predict(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, masked_positions=None):
 
-        prediction_logits = self.forward(input_ids=input_ids,
-                                         token_type_ids=token_type_ids,
-                                         position_ids=position_ids,
-                                         attention_mask=attention_mask,
-                                         masked_positions=masked_positions)
+        prediction_logits = self.forward(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            masked_positions=masked_positions,
+        )
 
         softmax_fn = paddle.nn.Softmax()
         return softmax_fn(prediction_logits)
 
 
 class ErnieMLMCriterion(paddle.nn.Layer):
-
     def __init__(self):
         super(ErnieMLMCriterion, self).__init__()
 
@@ -80,6 +69,7 @@ class ErnieMLMCriterion(paddle.nn.Layer):
 
         with paddle.static.amp.fp16_guard():
             masked_lm_loss = paddle.nn.functional.softmax_with_cross_entropy(
-                prediction_scores, masked_lm_labels, ignore_index=-1)
+                prediction_scores, masked_lm_labels, ignore_index=-1
+            )
             masked_lm_loss = masked_lm_loss / masked_lm_scale
             return paddle.mean(masked_lm_loss)

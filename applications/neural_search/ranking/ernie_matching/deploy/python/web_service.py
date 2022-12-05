@@ -22,9 +22,7 @@ from paddle_serving_server.web_service import WebService, Op
 def convert_example(example, tokenizer, max_seq_length=512):
 
     query, title = example["query"], example["title"]
-    encoded_inputs = tokenizer(text=query,
-                               text_pair=title,
-                               max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=query, text_pair=title, max_seq_len=max_seq_length)
 
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
@@ -33,32 +31,30 @@ def convert_example(example, tokenizer, max_seq_length=512):
 
 
 class ErnieOp(Op):
-
     def init_op(self):
         from paddlenlp.transformers import AutoTokenizer
-        self.tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     def preprocess(self, input_dicts, data_id, log_id):
         from paddlenlp.data import Stack, Tuple, Pad
 
-        (_, input_dict), = input_dicts.items()
+        ((_, input_dict),) = input_dicts.items()
         print("input dict", input_dict)
         batch_size = len(input_dict.keys())
         examples = []
         for i in range(batch_size):
-            example = json.loads(input_dict[str(i)].replace("\'", "\""))
+            example = json.loads(input_dict[str(i)].replace("'", '"'))
             input_ids, segment_ids = convert_example(example, self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
-                ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
         feed_dict = {}
-        feed_dict['input_ids'] = input_ids
-        feed_dict['token_type_ids'] = segment_ids
+        feed_dict["input_ids"] = input_ids
+        feed_dict["token_type_ids"] = segment_ids
         return feed_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
@@ -68,7 +64,6 @@ class ErnieOp(Op):
 
 
 class ErnieService(WebService):
-
     def get_pipeline_response(self, read_op):
         ernie_op = ErnieOp(name="ernie", input_ops=[read_op])
         return ernie_op

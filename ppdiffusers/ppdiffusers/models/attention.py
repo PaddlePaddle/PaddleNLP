@@ -50,9 +50,7 @@ class AttentionBlock(nn.Layer):
 
         self.num_heads = channels // num_head_channels if num_head_channels is not None else 1
         self.num_head_size = num_head_channels
-        self.group_norm = nn.GroupNorm(num_channels=channels,
-                                       num_groups=num_groups,
-                                       epsilon=eps)
+        self.group_norm = nn.GroupNorm(num_channels=channels, num_groups=num_groups, epsilon=eps)
 
         # define q,k,v as linear layers
         self.query = nn.Linear(channels, channels)
@@ -65,8 +63,7 @@ class AttentionBlock(nn.Layer):
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
         # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose(
-            [0, 2, 1, 3])
+        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
         return new_projection
 
     def forward(self, hidden_states):
@@ -76,8 +73,7 @@ class AttentionBlock(nn.Layer):
         # norm
         hidden_states = self.group_norm(hidden_states)
 
-        hidden_states = hidden_states.reshape([batch, channel, height * width
-                                               ]).transpose([0, 2, 1])
+        hidden_states = hidden_states.reshape([batch, channel, height * width]).transpose([0, 2, 1])
 
         # proj to q, k, v
         query_proj = self.query(hidden_states)
@@ -91,11 +87,10 @@ class AttentionBlock(nn.Layer):
 
         # get scores
         scale = 1 / math.sqrt(math.sqrt(self.channels / self.num_heads))
-        attention_scores = paddle.matmul(query_states * scale,
-                                         key_states * scale,
-                                         transpose_y=True)  # TODO: use baddmm
-        attention_probs = F.softmax(attention_scores.astype("float32"),
-                                    axis=-1).astype(attention_scores.dtype)
+        attention_scores = paddle.matmul(
+            query_states * scale, key_states * scale, transpose_y=True
+        )  # TODO: use baddmm
+        attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1).astype(attention_scores.dtype)
 
         # compute attention output
         hidden_states = paddle.matmul(attention_probs, value_states)
@@ -108,8 +103,7 @@ class AttentionBlock(nn.Layer):
 
         # compute next hidden_states
         hidden_states = self.proj_attn(hidden_states)
-        hidden_states = hidden_states.transpose([0, 2, 1]).reshape(
-            [batch, channel, height, width])
+        hidden_states = hidden_states.transpose([0, 2, 1]).reshape([batch, channel, height, width])
 
         # res connect and rescale
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
@@ -145,29 +139,18 @@ class SpatialTransformer(nn.Layer):
         self.d_head = d_head
         self.in_channels = in_channels
         inner_dim = n_heads * d_head
-        self.norm = nn.GroupNorm(num_groups=num_groups,
-                                 num_channels=in_channels,
-                                 epsilon=1e-6)
+        self.norm = nn.GroupNorm(num_groups=num_groups, num_channels=in_channels, epsilon=1e-6)
 
-        self.proj_in = nn.Conv2D(in_channels,
-                                 inner_dim,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
+        self.proj_in = nn.Conv2D(in_channels, inner_dim, kernel_size=1, stride=1, padding=0)
 
-        self.transformer_blocks = nn.LayerList([
-            BasicTransformerBlock(inner_dim,
-                                  n_heads,
-                                  d_head,
-                                  dropout=dropout,
-                                  context_dim=context_dim) for d in range(depth)
-        ])
+        self.transformer_blocks = nn.LayerList(
+            [
+                BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim)
+                for d in range(depth)
+            ]
+        )
 
-        self.proj_out = nn.Conv2D(inner_dim,
-                                  in_channels,
-                                  kernel_size=1,
-                                  stride=1,
-                                  padding=0)
+        self.proj_out = nn.Conv2D(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
 
     def _set_attention_slice(self, slice_size):
         for block in self.transformer_blocks:
@@ -180,12 +163,10 @@ class SpatialTransformer(nn.Layer):
         hidden_states = self.norm(hidden_states)
         hidden_states = self.proj_in(hidden_states)
         inner_dim = hidden_states.shape[1]
-        hidden_states = hidden_states.transpose([0, 2, 3, 1]).reshape(
-            [batch, height * weight, inner_dim])
+        hidden_states = hidden_states.transpose([0, 2, 3, 1]).reshape([batch, height * weight, inner_dim])
         for block in self.transformer_blocks:
             hidden_states = block(hidden_states, context=context)
-        hidden_states = hidden_states.reshape(
-            [batch, height, weight, inner_dim]).transpose([0, 3, 1, 2])
+        hidden_states = hidden_states.reshape([batch, height, weight, inner_dim]).transpose([0, 3, 1, 2])
         hidden_states = self.proj_out(hidden_states)
         return hidden_states + residual
 
@@ -215,17 +196,13 @@ class BasicTransformerBlock(nn.Layer):
         checkpoint: bool = True,
     ):
         super().__init__()
-        self.attn1 = CrossAttention(query_dim=dim,
-                                    heads=n_heads,
-                                    dim_head=d_head,
-                                    dropout=dropout)  # is a self-attention
+        self.attn1 = CrossAttention(
+            query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout
+        )  # is a self-attention
         self.ff = FeedForward(dim, dropout=dropout, glu=gated_ff)
         self.attn2 = CrossAttention(
-            query_dim=dim,
-            context_dim=context_dim,
-            heads=n_heads,
-            dim_head=d_head,
-            dropout=dropout)  # is self-attn if context is none
+            query_dim=dim, context_dim=context_dim, heads=n_heads, dim_head=d_head, dropout=dropout
+        )  # is self-attn if context is none
         self.norm1 = nn.LayerNorm(dim)
         self.norm2 = nn.LayerNorm(dim)
         self.norm3 = nn.LayerNorm(dim)
@@ -237,8 +214,7 @@ class BasicTransformerBlock(nn.Layer):
 
     def forward(self, hidden_states, context=None):
         hidden_states = self.attn1(self.norm1(hidden_states)) + hidden_states
-        hidden_states = self.attn2(self.norm2(hidden_states),
-                                   context=context) + hidden_states
+        hidden_states = self.attn2(self.norm2(hidden_states), context=context) + hidden_states
         hidden_states = self.ff(self.norm3(hidden_states)) + hidden_states
         return hidden_states
 
@@ -256,12 +232,9 @@ class CrossAttention(nn.Layer):
         dropout (:obj:`float`, *optional*, defaults to 0.0): The dropout probability to use.
     """
 
-    def __init__(self,
-                 query_dim: int,
-                 context_dim: Optional[int] = None,
-                 heads: int = 8,
-                 dim_head: int = 64,
-                 dropout: int = 0.0):
+    def __init__(
+        self, query_dim: int, context_dim: Optional[int] = None, heads: int = 8, dim_head: int = 64, dropout: int = 0.0
+    ):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = context_dim if context_dim is not None else query_dim
@@ -278,8 +251,7 @@ class CrossAttention(nn.Layer):
         self.to_k = nn.Linear(context_dim, inner_dim, bias_attr=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias_attr=False)
 
-        self.to_out = nn.Sequential(nn.Linear(inner_dim, query_dim),
-                                    nn.Dropout(dropout))
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, query_dim), nn.Dropout(dropout))
 
     def reshape_heads_to_batch_dim(self, tensor):
         tensor = tensor.reshape([0, 0, self.num_heads, self.head_dim])
@@ -313,8 +285,7 @@ class CrossAttention(nn.Layer):
 
     def _attention(self, query, key, value):
         # TODO: use baddbmm for better performance
-        attention_scores = paddle.matmul(query, key,
-                                         transpose_y=True) * self.scale
+        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
         attention_probs = F.softmax(attention_scores, axis=-1)
         # compute attention output
         hidden_states = paddle.matmul(attention_probs, value)
@@ -329,26 +300,22 @@ class CrossAttention(nn.Layer):
         value = value.flatten(0, 1)
 
         batch_size_attention, sequence_length = query.shape[0], query.shape[1]
-        hidden_states = paddle.zeros(
-            (batch_size_attention, sequence_length, self.head_dim),
-            dtype=query.dtype)
+        hidden_states = paddle.zeros((batch_size_attention, sequence_length, self.head_dim), dtype=query.dtype)
         slice_size = self._slice_size if self._slice_size is not None else batch_size_attention
 
         for i in range(batch_size_attention // slice_size):
             start_idx = i * slice_size
             end_idx = (i + 1) * slice_size
-            attn_slice = (paddle.matmul(query[start_idx:end_idx],
-                                        key[start_idx:end_idx],
-                                        transpose_y=True) * self.scale
-                          )  # TODO: use baddbmm for better performance
+            attn_slice = (
+                paddle.matmul(query[start_idx:end_idx], key[start_idx:end_idx], transpose_y=True) * self.scale
+            )  # TODO: use baddbmm for better performance
             attn_slice = F.softmax(attn_slice, axis=-1)
             attn_slice = paddle.matmul(attn_slice, value[start_idx:end_idx])
 
             hidden_states[start_idx:end_idx] = attn_slice
 
         # reshape back to [bs, num_heads, seqlen, head_dim]
-        hidden_states = hidden_states.reshape(
-            [-1, self.num_heads, sequence_length, self.head_dim])
+        hidden_states = hidden_states.reshape([-1, self.num_heads, sequence_length, self.head_dim])
         # reshape hidden_states
         hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
         return hidden_states
@@ -366,19 +333,15 @@ class FeedForward(nn.Layer):
         dropout (:obj:`float`, *optional*, defaults to 0.0): The dropout probability to use.
     """
 
-    def __init__(self,
-                 dim: int,
-                 dim_out: Optional[int] = None,
-                 mult: int = 4,
-                 glu: bool = False,
-                 dropout: float = 0.0):
+    def __init__(
+        self, dim: int, dim_out: Optional[int] = None, mult: int = 4, glu: bool = False, dropout: float = 0.0
+    ):
         super().__init__()
         inner_dim = int(dim * mult)
         dim_out = dim_out if dim_out is not None else dim
         project_in = GEGLU(dim, inner_dim)
 
-        self.net = nn.Sequential(project_in, nn.Dropout(dropout),
-                                 nn.Linear(inner_dim, dim_out))
+        self.net = nn.Sequential(project_in, nn.Dropout(dropout), nn.Linear(inner_dim, dim_out))
 
     def forward(self, hidden_states):
         return self.net(hidden_states)

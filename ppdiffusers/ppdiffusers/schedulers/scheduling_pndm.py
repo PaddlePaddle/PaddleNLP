@@ -45,7 +45,7 @@ def betas_for_alpha_bar(num_diffusion_timesteps, max_beta=0.999):
     """
 
     def alpha_bar(time_step):
-        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2)**2
+        return math.cos((time_step + 0.008) / 1.008 * math.pi / 2) ** 2
 
     betas = []
     for i in range(num_diffusion_timesteps):
@@ -105,28 +105,20 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         if trained_betas is not None:
             self.betas = paddle.to_tensor(trained_betas)
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start,
-                                         beta_end,
-                                         num_train_timesteps,
-                                         dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = (paddle.linspace(beta_start**0.5,
-                                          beta_end**0.5,
-                                          num_train_timesteps,
-                                          dtype="float32")**2)
+            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
         elif beta_schedule == "squaredcos_cap_v2":
             # Glide cosine schedule
             self.betas = betas_for_alpha_bar(num_train_timesteps)
         else:
-            raise NotImplementedError(
-                f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
 
-        self.final_alpha_cumprod = paddle.to_tensor(
-            1.0) if set_alpha_to_one else self.alphas_cumprod[0]
+        self.final_alpha_cumprod = paddle.to_tensor(1.0) if set_alpha_to_one else self.alphas_cumprod[0]
 
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = 1.0
@@ -144,8 +136,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self._timesteps = np.arange(
-            0, num_train_timesteps)[::-1].copy().astype("int64")
+        self._timesteps = np.arange(0, num_train_timesteps)[::-1].copy().astype("int64")
         self.prk_timesteps = None
         self.plms_timesteps = None
         self.timesteps = None
@@ -163,8 +154,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         step_ratio = self.config.num_train_timesteps // self.num_inference_steps
         # creates integer timesteps by multiplying by ratio
         # casting to int to avoid issues when num_inference_step is power of 3
-        self._timesteps = (np.arange(0, num_inference_steps) *
-                           step_ratio).round()
+        self._timesteps = (np.arange(0, num_inference_steps) * step_ratio).round()
         self._timesteps += self.config.steps_offset
 
         if self.config.skip_prk_steps:
@@ -172,24 +162,19 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
             # produce better results. When using PNDM with `self.config.skip_prk_steps` the implementation
             # is based on crowsonkb's PLMS sampler implementation: https://github.com/CompVis/latent-diffusion/pull/51
             self.prk_timesteps = np.array([])
-            self.plms_timesteps = np.concatenate([
-                self._timesteps[:-1], self._timesteps[-2:-1],
-                self._timesteps[-1:]
-            ])[::-1].copy()
+            self.plms_timesteps = np.concatenate([self._timesteps[:-1], self._timesteps[-2:-1], self._timesteps[-1:]])[
+                ::-1
+            ].copy()
         else:
-            prk_timesteps = np.array(
-                self._timesteps[-self.pndm_order:]).repeat(2) + np.tile(
-                    np.array([
-                        0, self.config.num_train_timesteps //
-                        num_inference_steps // 2
-                    ]), self.pndm_order)
-            self.prk_timesteps = (
-                prk_timesteps[:-1].repeat(2)[1:-1])[::-1].copy()
-            self.plms_timesteps = self._timesteps[:-3][::-1].copy(
-            )  # we copy to avoid having negative strides which are not supported by paddle
+            prk_timesteps = np.array(self._timesteps[-self.pndm_order :]).repeat(2) + np.tile(
+                np.array([0, self.config.num_train_timesteps // num_inference_steps // 2]), self.pndm_order
+            )
+            self.prk_timesteps = (prk_timesteps[:-1].repeat(2)[1:-1])[::-1].copy()
+            self.plms_timesteps = self._timesteps[:-3][
+                ::-1
+            ].copy()  # we copy to avoid having negative strides which are not supported by paddle
 
-        timesteps = np.concatenate([self.prk_timesteps,
-                                    self.plms_timesteps]).astype(np.int64)
+        timesteps = np.concatenate([self.prk_timesteps, self.plms_timesteps]).astype(np.int64)
         self.timesteps = paddle.to_tensor(timesteps)
 
         self.ets = []
@@ -221,17 +206,10 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
             returning a tuple, the first element is the sample tensor.
 
         """
-        if self.counter < len(
-                self.prk_timesteps) and not self.config.skip_prk_steps:
-            return self.step_prk(model_output=model_output,
-                                 timestep=timestep,
-                                 sample=sample,
-                                 return_dict=return_dict)
+        if self.counter < len(self.prk_timesteps) and not self.config.skip_prk_steps:
+            return self.step_prk(model_output=model_output, timestep=timestep, sample=sample, return_dict=return_dict)
         else:
-            return self.step_plms(model_output=model_output,
-                                  timestep=timestep,
-                                  sample=sample,
-                                  return_dict=return_dict)
+            return self.step_plms(model_output=model_output, timestep=timestep, sample=sample, return_dict=return_dict)
 
     def step_prk(
         self,
@@ -280,12 +258,11 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         # cur_sample should not be `None`
         cur_sample = self.cur_sample if self.cur_sample is not None else sample
 
-        prev_sample = self._get_prev_sample(cur_sample, timestep, prev_timestep,
-                                            model_output)
+        prev_sample = self._get_prev_sample(cur_sample, timestep, prev_timestep, model_output)
         self.counter += 1
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
 
@@ -322,7 +299,8 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
                 f"{self.__class__} can only be run AFTER scheduler has been run "
                 "in 'prk' mode for at least 12 iterations "
                 "See: https://github.com/huggingface/diffusers/blob/main/src/diffusers/pipelines/pipeline_pndm.py "
-                "for more information.")
+                "for more information."
+            )
 
         prev_timestep = timestep - self.config.num_train_timesteps // self.num_inference_steps
 
@@ -343,23 +321,19 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         elif len(self.ets) == 2:
             model_output = (3 * self.ets[-1] - self.ets[-2]) / 2
         elif len(self.ets) == 3:
-            model_output = (23 * self.ets[-1] - 16 * self.ets[-2] +
-                            5 * self.ets[-3]) / 12
+            model_output = (23 * self.ets[-1] - 16 * self.ets[-2] + 5 * self.ets[-3]) / 12
         else:
-            model_output = (1 / 24) * (55 * self.ets[-1] - 59 * self.ets[-2] +
-                                       37 * self.ets[-3] - 9 * self.ets[-4])
+            model_output = (1 / 24) * (55 * self.ets[-1] - 59 * self.ets[-2] + 37 * self.ets[-3] - 9 * self.ets[-4])
 
-        prev_sample = self._get_prev_sample(sample, timestep, prev_timestep,
-                                            model_output)
+        prev_sample = self._get_prev_sample(sample, timestep, prev_timestep, model_output)
         self.counter += 1
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
         return SchedulerOutput(prev_sample=prev_sample)
 
-    def scale_model_input(self, sample: paddle.Tensor, *args,
-                          **kwargs) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, *args, **kwargs) -> paddle.Tensor:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
@@ -386,8 +360,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         # model_output -> e_θ(x_t, t)
         # prev_sample -> x_(t−δ)
         alpha_prod_t = self.alphas_cumprod[timestep]
-        alpha_prod_t_prev = self.alphas_cumprod[
-            prev_timestep] if prev_timestep >= 0 else self.final_alpha_cumprod
+        alpha_prod_t_prev = self.alphas_cumprod[prev_timestep] if prev_timestep >= 0 else self.final_alpha_cumprod
         beta_prod_t = 1 - alpha_prod_t
         beta_prod_t_prev = 1 - alpha_prod_t_prev
 
@@ -395,16 +368,17 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         # denominator of x_t in formula (9) and plus 1
         # Note: (α_(t−δ) - α_t) / (sqrt(α_t) * (sqrt(α_(t−δ)) + sqr(α_t))) =
         # sqrt(α_(t−δ)) / sqrt(α_t))
-        sample_coeff = (alpha_prod_t_prev / alpha_prod_t)**(0.5)
+        sample_coeff = (alpha_prod_t_prev / alpha_prod_t) ** (0.5)
 
         # corresponds to denominator of e_θ(x_t, t) in formula (9)
-        model_output_denom_coeff = alpha_prod_t * beta_prod_t_prev**(0.5) + (
-            alpha_prod_t * beta_prod_t * alpha_prod_t_prev)**(0.5)
+        model_output_denom_coeff = alpha_prod_t * beta_prod_t_prev ** (0.5) + (
+            alpha_prod_t * beta_prod_t * alpha_prod_t_prev
+        ) ** (0.5)
 
         # full formula (9)
-        prev_sample = (sample_coeff * sample -
-                       (alpha_prod_t_prev - alpha_prod_t) * model_output /
-                       model_output_denom_coeff)
+        prev_sample = (
+            sample_coeff * sample - (alpha_prod_t_prev - alpha_prod_t) * model_output / model_output_denom_coeff
+        )
 
         return prev_sample
 
@@ -417,15 +391,14 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
         self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
 
-        sqrt_alpha_prod = self.alphas_cumprod[timesteps]**0.5
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
         while len(sqrt_alpha_prod.shape) < len(original_samples.shape):
             sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
 
-        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps])**0.5
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
         sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
-        while len(sqrt_one_minus_alpha_prod.shape) < len(
-                original_samples.shape):
+        while len(sqrt_one_minus_alpha_prod.shape) < len(original_samples.shape):
             sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
 
         noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise

@@ -68,19 +68,16 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
@@ -105,9 +102,7 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
             feature_extractor=feature_extractor,
         )
 
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
 
@@ -157,7 +152,7 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
     ):
         r"""
         Function invoked when calling the pipeline for generation.
-        
+
         Args:
             prompt (`str``):
                 The prompt or prompts to guide the image generation.
@@ -213,24 +208,20 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
         if isinstance(prompt, str):
             batch_size = 1
         else:
-            raise ValueError(
-                f"`prompt` has to be of type `str`but is {type(prompt)}")
+            raise ValueError(f"`prompt` has to be of type `str`but is {type(prompt)}")
         if negative_prompt is not None and not isinstance(negative_prompt, str):
-            raise ValueError(
-                f"`negative_prompt` has to be of type `str`but is {type(prompt)}"
-            )
+            raise ValueError(f"`negative_prompt` has to be of type `str`but is {type(prompt)}")
 
         if height % 8 != 0 or width % 8 != 0:
-            raise ValueError(
-                f"`height` and `width` have to be divisible by 8 but are {height} and {width}."
-            )
+            raise ValueError(f"`height` and `width` have to be divisible by 8 but are {height} and {width}.")
 
-        if (callback_steps is None) or (callback_steps is not None and
-                                        (not isinstance(callback_steps, int)
-                                         or callback_steps <= 0)):
+        if (callback_steps is None) or (
+            callback_steps is not None and (not isinstance(callback_steps, int) or callback_steps <= 0)
+        ):
             raise ValueError(
                 f"`callback_steps` has to be a positive integer but is {callback_steps} of type"
-                f" {type(callback_steps)}.")
+                f" {type(callback_steps)}."
+            )
 
         if "|" in prompt:
             prompt = [x.strip() for x in prompt.split("|")]
@@ -247,15 +238,14 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
         text_input_ids = text_inputs.input_ids
 
         if text_input_ids.shape[-1] > self.tokenizer.model_max_length:
-            removed_text = self.tokenizer.batch_decode(
-                text_input_ids[:, self.tokenizer.model_max_length:])
+            removed_text = self.tokenizer.batch_decode(text_input_ids[:, self.tokenizer.model_max_length :])
             logger.warning(
                 "The following part of your input was truncated because CLIP can only handle sequences up to"
-                f" {self.tokenizer.model_max_length} tokens: {removed_text}")
-            text_input_ids = text_input_ids[:, :self.tokenizer.model_max_length]
+                f" {self.tokenizer.model_max_length} tokens: {removed_text}"
+            )
+            text_input_ids = text_input_ids[:, : self.tokenizer.model_max_length]
         attention_mask = paddle.ones_like(text_input_ids)
-        text_embeddings = self.text_encoder(text_input_ids,
-                                            attention_mask=attention_mask)[0]
+        text_embeddings = self.text_encoder(text_input_ids, attention_mask=attention_mask)[0]
 
         # duplicate text embeddings for each generation per prompt, using mps friendly method
         # bs_embed, seq_len, _ = text_embeddings.shape
@@ -267,19 +257,17 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
             # specify weights for prompts (excluding the unconditional score)
             print("using equal weights for all prompts...")
             pos_weights = paddle.to_tensor(
-                [1 / (text_embeddings.shape[0] - 1)] *
-                (text_embeddings.shape[0] - 1)).reshape([-1, 1, 1, 1])
+                [1 / (text_embeddings.shape[0] - 1)] * (text_embeddings.shape[0] - 1)
+            ).reshape([-1, 1, 1, 1])
             neg_weights = paddle.to_tensor([1.0]).reshape([-1, 1, 1, 1])
-            mask = paddle.to_tensor([False] + [True] * pos_weights.shape[0],
-                                    dtype=paddle.bool)
+            mask = paddle.to_tensor([False] + [True] * pos_weights.shape[0], dtype=paddle.bool)
         else:
             # set prompt weight for each
             num_prompts = len(prompt) if isinstance(prompt, list) else 1
             weights = [float(w.strip()) for w in weights.split("|")]
             if len(weights) < num_prompts:
                 weights.append(1.0)
-            assert len(weights) == text_embeddings.shape[
-                0], "weights specified are not equal to the number of prompts"
+            assert len(weights) == text_embeddings.shape[0], "weights specified are not equal to the number of prompts"
             pos_weights = []
             neg_weights = []
             mask = []  # first one is unconditional score
@@ -294,8 +282,7 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
             pos_weights = paddle.to_tensor(pos_weights).reshape([-1, 1, 1, 1])
             pos_weights = pos_weights / pos_weights.sum()
             if neg_weights:
-                neg_weights = paddle.to_tensor(neg_weights).reshape(
-                    [-1, 1, 1, 1])
+                neg_weights = paddle.to_tensor(neg_weights).reshape([-1, 1, 1, 1])
                 neg_weights = neg_weights / neg_weights.sum()
             mask = paddle.to_tensor(mask, dtype=paddle.bool)
 
@@ -321,8 +308,7 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
                     return_tensors="pd",
                 )
                 attention_mask = paddle.ones_like(uncond_input.input_ids)
-                uncond_embeddings = self.text_encoder(
-                    uncond_input.input_ids, attention_mask=attention_mask)[0]
+                uncond_embeddings = self.text_encoder(uncond_input.input_ids, attention_mask=attention_mask)[0]
 
                 # duplicate unconditional embeddings for each generation per prompt, using mps friendly method
                 # seq_len = uncond_embeddings.shape[1]
@@ -334,31 +320,25 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
                 # For classifier free guidance, we need to do two forward passes.
                 # Here we concatenate the unconditional and text embeddings into a single batch
                 # to avoid doing two forward passes
-                text_embeddings = paddle.concat(
-                    [uncond_embeddings, text_embeddings])
+                text_embeddings = paddle.concat([uncond_embeddings, text_embeddings])
 
                 # update negative weights
                 neg_weights = paddle.to_tensor([1.0]).reshape([-1, 1, 1, 1])
-                mask = paddle.to_tensor([False] + mask.tolist(),
-                                        dtype=paddle.bool)
+                mask = paddle.to_tensor([False] + mask.tolist(), dtype=paddle.bool)
 
         # get the initial random noise unless the user supplied it
 
         # Unlike in other pipelines, latents need to be generated in the target device
         # for 1-to-1 results reproducibility with the CompVis implementation.
         # However this currently doesn't work in `mps`.
-        latents_shape = [
-            batch_size, self.unet.in_channels, height // 8, width // 8
-        ]
+        latents_shape = [batch_size, self.unet.in_channels, height // 8, width // 8]
         if latents is None:
             if seed is not None:
                 paddle.seed(seed)
             latents = paddle.randn(latents_shape, dtype=text_embeddings.dtype)
         else:
             if latents.shape != latents_shape:
-                raise ValueError(
-                    f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}"
-                )
+                raise ValueError(f"Unexpected latents shape, got {latents.shape}, expected {latents_shape}")
 
         # set timesteps
         self.scheduler.set_timesteps(num_inference_steps)
@@ -374,54 +354,40 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
         # eta (η) is only used with the DDIMScheduler, it will be ignored for other schedulers.
         # eta corresponds to η in DDIM paper: https://arxiv.org/abs/2010.02502
         # and should be between [0, 1]
-        accepts_eta = "eta" in set(
-            inspect.signature(self.scheduler.step).parameters.keys())
+        accepts_eta = "eta" in set(inspect.signature(self.scheduler.step).parameters.keys())
         extra_step_kwargs = {}
         if accepts_eta:
             extra_step_kwargs["eta"] = eta
 
         for i, t in enumerate(self.progress_bar(timesteps_tensor)):
             # expand the latents if we are doing classifier free guidance
-            latent_model_input = paddle.concat(
-                [latents] * text_embeddings.shape[0]
-            ) if do_classifier_free_guidance else latents
-            latent_model_input = self.scheduler.scale_model_input(
-                latent_model_input, t)
+            latent_model_input = (
+                paddle.concat([latents] * text_embeddings.shape[0]) if do_classifier_free_guidance else latents
+            )
+            latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
             if reduce_memory:
                 # reduce memory by predicting each score sequentially
                 noise_preds = []
                 # predict the noise residual
                 for latent_in, text_embedding_in in zip(
-                        latent_model_input.chunk(latent_model_input.shape[0],
-                                                 axis=0),
-                        text_embeddings.chunk(text_embeddings.shape[0], axis=0),
+                    latent_model_input.chunk(latent_model_input.shape[0], axis=0),
+                    text_embeddings.chunk(text_embeddings.shape[0], axis=0),
                 ):
-                    noise_preds.append(
-                        self.unet(
-                            latent_in,
-                            t,
-                            encoder_hidden_states=text_embedding_in).sample)
+                    noise_preds.append(self.unet(latent_in, t, encoder_hidden_states=text_embedding_in).sample)
                 noise_preds = paddle.concat(noise_preds, axis=0)
             else:
                 # predict the noise residual
-                noise_pred = self.unet(
-                    latent_model_input,
-                    t,
-                    encoder_hidden_states=text_embeddings).sample
+                noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
 
             # perform guidance
             if do_classifier_free_guidance:
-                noise_pred_uncond = (noise_preds[~mask] * neg_weights).sum(
-                    axis=0, keepdim=True)
-                noise_pred_text = (noise_preds[mask] * pos_weights).sum(
-                    axis=0, keepdim=True)
-                noise_pred = noise_pred_uncond + guidance_scale * (
-                    noise_pred_text - noise_pred_uncond)
+                noise_pred_uncond = (noise_preds[~mask] * neg_weights).sum(axis=0, keepdim=True)
+                noise_pred_text = (noise_preds[mask] * pos_weights).sum(axis=0, keepdim=True)
+                noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
             # compute the previous noisy sample x_t -> x_t-1
-            latents = self.scheduler.step(noise_pred, t, latents,
-                                          **extra_step_kwargs).prev_sample
+            latents = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs).prev_sample
 
             # call the callback, if provided
             if callback is not None and i % callback_steps == 0:
@@ -438,12 +404,10 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
 
         # run safety checker
         if self.safety_checker is not None:
-            safety_checker_input = self.feature_extractor(
-                self.numpy_to_pil(image), return_tensors="pd")
+            safety_checker_input = self.feature_extractor(self.numpy_to_pil(image), return_tensors="pd")
             image, has_nsfw_concept = self.safety_checker(
-                images=image,
-                clip_input=safety_checker_input.pixel_values.astype(
-                    text_embeddings.dtype))
+                images=image, clip_input=safety_checker_input.pixel_values.astype(text_embeddings.dtype)
+            )
         else:
             has_nsfw_concept = None
 
@@ -453,5 +417,4 @@ class ComposableStableDiffusionPipeline(DiffusionPipeline):
         if not return_dict:
             return (image, has_nsfw_concept)
 
-        return StableDiffusionPipelineOutput(
-            images=image, nsfw_content_detected=has_nsfw_concept)
+        return StableDiffusionPipelineOutput(images=image, nsfw_content_detected=has_nsfw_concept)

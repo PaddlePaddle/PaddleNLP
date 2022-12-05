@@ -75,8 +75,9 @@ class PNDMPipeline(DiffusionPipeline):
         # the official paper: https://arxiv.org/pdf/2202.09778.pdf
 
         # Sample gaussian noise to begin loop
-        image = paddle.randn((batch_size, self.unet.in_channels,
-                              self.unet.sample_size, self.unet.sample_size), )
+        image = paddle.randn(
+            (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
+        )
 
         self.scheduler.set_timesteps(num_inference_steps)
         for t in self.progress_bar(self.scheduler.timesteps):
@@ -90,6 +91,6 @@ class PNDMPipeline(DiffusionPipeline):
             image = self.numpy_to_pil(image)
 
         if not return_dict:
-            return (image, )
+            return (image,)
 
         return ImagePipelineOutput(images=image)

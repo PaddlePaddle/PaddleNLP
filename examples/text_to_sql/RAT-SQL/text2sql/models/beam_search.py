@@ -29,8 +29,7 @@ class Hypothesis:
 
 
 def beam_search(model, orig_item, preproc_item, beam_size, max_steps):
-    inference_state, next_choices = model.begin_inference(
-        orig_item, preproc_item)
+    inference_state, next_choices = model.begin_inference(orig_item, preproc_item)
     beam = [Hypothesis(inference_state, next_choices)]
     finished = []
 
@@ -44,13 +43,14 @@ def beam_search(model, orig_item, preproc_item, beam_size, max_steps):
         # For each hypothesis, get possible expansions
         # Score each expansion
         for hyp in beam:
-            candidates += [(hyp, choice, choice_score.item(),
-                            hyp.score + choice_score.item())
-                           for choice, choice_score in hyp.next_choices]
+            candidates += [
+                (hyp, choice, choice_score.item(), hyp.score + choice_score.item())
+                for choice, choice_score in hyp.next_choices
+            ]
 
         # Keep the top K expansions
         candidates.sort(key=operator.itemgetter(3), reverse=True)
-        candidates = candidates[:beam_size - len(finished)]
+        candidates = candidates[: beam_size - len(finished)]
 
         # Create the new hypotheses from the expansions
         beam = []
@@ -59,14 +59,24 @@ def beam_search(model, orig_item, preproc_item, beam_size, max_steps):
             next_choices = inference_state.step(choice)
             if next_choices is None:
                 finished.append(
-                    Hypothesis(inference_state, None, cum_score,
-                               hyp.choice_history + [choice],
-                               hyp.score_history + [choice_score]))
+                    Hypothesis(
+                        inference_state,
+                        None,
+                        cum_score,
+                        hyp.choice_history + [choice],
+                        hyp.score_history + [choice_score],
+                    )
+                )
             else:
                 beam.append(
-                    Hypothesis(inference_state, next_choices, cum_score,
-                               hyp.choice_history + [choice],
-                               hyp.score_history + [choice_score]))
+                    Hypothesis(
+                        inference_state,
+                        next_choices,
+                        cum_score,
+                        hyp.choice_history + [choice],
+                        hyp.score_history + [choice_score],
+                    )
+                )
 
-    finished.sort(key=operator.attrgetter('score'), reverse=True)
+    finished.sort(key=operator.attrgetter("score"), reverse=True)
     return finished

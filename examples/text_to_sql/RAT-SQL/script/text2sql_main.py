@@ -44,98 +44,77 @@ g_label_encoder = None
 
 def preprocess(config):
     dataset_config = {
-        'db_file': config.data.db,
-        'input_encoder': g_input_encoder,
-        'label_encoder': g_label_encoder,
-        'is_cached': False,
+        "db_file": config.data.db,
+        "input_encoder": g_input_encoder,
+        "label_encoder": g_label_encoder,
+        "is_cached": False,
     }
 
     output_base = config.data.output
     if config.data.train_set is not None:
-        dataset = DatasetClass(name='train',
-                               data_file=config.data.train_set,
-                               **dataset_config)
+        dataset = DatasetClass(name="train", data_file=config.data.train_set, **dataset_config)
         dataset.save(output_base, save_db=True)
-        g_label_encoder.save(Path(output_base) / 'label_vocabs')
+        g_label_encoder.save(Path(output_base) / "label_vocabs")
 
     if config.data.dev_set is not None:
-        dataset = DatasetClass(name='dev',
-                               data_file=config.data.dev_set,
-                               **dataset_config)
+        dataset = DatasetClass(name="dev", data_file=config.data.dev_set, **dataset_config)
         dataset.save(output_base, save_db=False)
 
     if config.data.test_set is not None:
-        dataset = DatasetClass(name='test',
-                               data_file=config.data.test_set,
-                               **dataset_config)
+        dataset = DatasetClass(name="test", data_file=config.data.test_set, **dataset_config)
         dataset.save(output_base, save_db=False)
 
 
 def train(config):
-    logging.info('training arguments: %s', config)
+    logging.info("training arguments: %s", config)
     if config.train.use_data_parallel:
         logging.info("parallel mode. init env...")
         dist.init_parallel_env()
 
     dataset_config = {
-        'db_file': config.data.db,
-        'input_encoder': g_input_encoder,
-        'label_encoder': g_label_encoder,
-        'is_cached': True
+        "db_file": config.data.db,
+        "input_encoder": g_input_encoder,
+        "label_encoder": g_label_encoder,
+        "is_cached": True,
     }
-    train_set = DatasetClass(name='train',
-                             data_file=config.data.train_set,
-                             **dataset_config)
-    dev_set = DatasetClass(name='dev',
-                           data_file=config.data.dev_set,
-                           **dataset_config)
+    train_set = DatasetClass(name="train", data_file=config.data.train_set, **dataset_config)
+    dev_set = DatasetClass(name="dev", data_file=config.data.dev_set, **dataset_config)
 
     shuf_train = True if not config.general.is_debug else False
-    train_reader = DataLoaderClass(config,
-                                   train_set,
-                                   batch_size=config.general.batch_size,
-                                   shuffle=shuf_train)
-    #dev_reader = dataproc.DataLoader(config, dev_set, batch_size=config.general.batch_size, shuffle=False)
+    train_reader = DataLoaderClass(config, train_set, batch_size=config.general.batch_size, shuffle=shuf_train)
+    # dev_reader = dataproc.DataLoader(config, dev_set, batch_size=config.general.batch_size, shuffle=False)
     dev_reader = DataLoaderClass(config, dev_set, batch_size=1, shuffle=False)
-    max_train_steps = config.train.epochs * (
-        len(train_set) // config.general.batch_size // config.train.trainer_num)
+    max_train_steps = config.train.epochs * (len(train_set) // config.general.batch_size // config.train.trainer_num)
 
     model = ModelClass(config.model, g_label_encoder)
     if config.model.init_model_params is not None:
-        logging.info("loading model param from %s",
-                     config.model.init_model_params)
+        logging.info("loading model param from %s", config.model.init_model_params)
         model.set_state_dict(paddle.load(config.model.init_model_params))
     if config.train.use_data_parallel:
         logging.info("parallel mode. init model...")
         model = paddle.DataParallel(model)
 
-    optimizer = text2sql.optim.init_optimizer(model, config.train,
-                                              max_train_steps)
+    optimizer = text2sql.optim.init_optimizer(model, config.train, max_train_steps)
     if config.model.init_model_optim is not None:
-        logging.info("loading model optim from %s",
-                     config.model.init_model_optim)
+        logging.info("loading model optim from %s", config.model.init_model_optim)
         optimizer.set_state_dict(paddle.load(config.model.init_model_optim))
 
     logging.info("start of training...")
-    launch.trainer.train(config, model, optimizer, config.train.epochs,
-                         train_reader, dev_reader)
+    launch.trainer.train(config, model, optimizer, config.train.epochs, train_reader, dev_reader)
     logging.info("end of training...")
 
 
 def inference(config):
     if config.model.init_model_params is None:
-        raise RuntimeError(
-            "config.init_model_params should be a valid model path")
+        raise RuntimeError("config.init_model_params should be a valid model path")
 
     dataset_config = {
-        'db_file': config.data.db,
-        'input_encoder': g_input_encoder,
-        'label_encoder': g_label_encoder,
-        'is_cached': True
+        "db_file": config.data.db,
+        "input_encoder": g_input_encoder,
+        "label_encoder": g_label_encoder,
+        "is_cached": True,
     }
-    test_set = DatasetClass(name='test',
-                            data_file=config.data.test_set,
-                            **dataset_config)
+    test_set = DatasetClass(name="test", data_file=config.data.test_set, **dataset_config)
     test_reader = DataLoaderClass(config, test_set, batch_size=1, shuffle=False)
 
     model = ModelClass(config.model, g_label_encoder)
@@ -144,41 +123,33 @@ def inference(config):
     model.set_state_dict(state_dict)
 
     logging.info("start of inference...")
-    launch.infer.inference(model,
-                           test_reader,
-                           config.data.output,
-                           beam_size=config.general.beam_size,
-                           model_name=config.model.model_name)
+    launch.infer.inference(
+        model, test_reader, config.data.output, beam_size=config.general.beam_size, model_name=config.model.model_name
+    )
     logging.info("end of inference...")
 
 
 def evaluate(config):
     dataset_config = {
-        'db_file': config.data.db,
-        'input_encoder': g_input_encoder,
-        'label_encoder': g_label_encoder,
-        'is_cached': True,
-        'schema_file': config.data.db_schema
+        "db_file": config.data.db,
+        "input_encoder": g_input_encoder,
+        "label_encoder": g_label_encoder,
+        "is_cached": True,
+        "schema_file": config.data.db_schema,
     }
-    test_set = DatasetClass(name='test',
-                            data_file=config.data.test_set,
-                            **dataset_config)
+    test_set = DatasetClass(name="test", data_file=config.data.test_set, **dataset_config)
     with open(config.data.eval_file) as ifs:
         infer_results = list(ifs)
     model = None
 
     logging.info("start of evaluating...")
-    launch.eval.evaluate(model,
-                         test_set,
-                         infer_results,
-                         eval_value=config.general.is_eval_value)
+    launch.eval.evaluate(model, test_set, infer_results, eval_value=config.general.is_eval_value)
     logging.info("end of evaluating....")
 
 
 def init_env(config):
     log_level = logging.INFO if not config.general.is_debug else logging.DEBUG
-    formater = logging.Formatter(
-        '%(levelname)s %(asctime)s %(filename)s:%(lineno)03d * %(message)s')
+    formater = logging.Formatter("%(levelname)s %(asctime)s %(filename)s:%(lineno)03d * %(message)s")
     logger = logging.getLogger()
     logger.setLevel(log_level)
     handler = logger.handlers[0]
@@ -198,28 +169,26 @@ def init_env(config):
     global g_input_encoder
     global g_label_encoder
 
-    if config.model.grammar_type == 'dusql_v2':
+    if config.model.grammar_type == "dusql_v2":
         GrammarClass = DuSQLLanguageV2
-    elif config.model.grammar_type == 'nl2sql':
+    elif config.model.grammar_type == "nl2sql":
         GrammarClass = NL2SQLLanguage
-    elif config.model.grammar_type == 'cspider_v2':
+    elif config.model.grammar_type == "cspider_v2":
         GrammarClass = CSpiderLanguageV2
     else:
-        raise ValueError('grammar type is not supported: %s' %
-                         (config.model.grammar_type))
+        raise ValueError("grammar type is not supported: %s" % (config.model.grammar_type))
     g_label_encoder = dataproc.SQLPreproc(
         config.data.grammar,
         GrammarClass,
         predict_value=config.model.predict_value,
-        is_cached=config.general.mode != 'preproc')
+        is_cached=config.general.mode != "preproc",
+    )
 
-    assert config.model.model_name == 'seq2tree_v2', 'only seq2tree_v2 is supported'
+    assert config.model.model_name == "seq2tree_v2", "only seq2tree_v2 is supported"
     g_input_encoder = dataproc.ErnieInputEncoderV2(config.model)
-    ModelClass = lambda x1, x2: text2sql.models.EncDecModel(x1, x2, 'v2')
+    ModelClass = lambda x1, x2: text2sql.models.EncDecModel(x1, x2, "v2")
     DatasetClass = dataproc.DuSQLDatasetV2
-    DataLoaderClass = partial(
-        dataproc.DataLoader,
-        collate_fn=dataproc.dataloader.collate_batch_data_v2)
+    DataLoaderClass = partial(dataproc.DataLoader, collate_fn=dataproc.dataloader.collate_batch_data_v2)
 
 
 def _set_proc_name(config, tag_base):
@@ -228,11 +197,11 @@ def _set_proc_name(config, tag_base):
     """
     if config.general.is_cloud:
         return
-    if tag_base.startswith('train'):
-        tag_base = 'train'
+    if tag_base.startswith("train"):
+        tag_base = "train"
     import setproctitle
-    setproctitle.setproctitle(tag_base + '_' +
-                              config.data.output.rstrip('/').split('/')[-1])
+
+    setproctitle.setproctitle(tag_base + "_" + config.data.output.rstrip("/").split("/")[-1])
 
 
 if __name__ == "__main__":
@@ -240,17 +209,17 @@ if __name__ == "__main__":
     init_env(config)
 
     run_mode = config.general.mode
-    if run_mode == 'preproc':
+    if run_mode == "preproc":
         preprocess(config)
         sys.exit(0)
 
     _set_proc_name(config, run_mode)
-    if run_mode == 'test':
+    if run_mode == "test":
         evaluate(config)
-    elif run_mode == 'infer':
+    elif run_mode == "infer":
         inference(config)
-    elif run_mode.startswith('train'):
+    elif run_mode.startswith("train"):
         if config.train.use_data_parallel:
-            dist.spawn(train, args=(config, ))
+            dist.spawn(train, args=(config,))
         else:
             train(config)

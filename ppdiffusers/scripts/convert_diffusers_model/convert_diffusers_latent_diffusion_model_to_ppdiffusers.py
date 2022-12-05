@@ -19,7 +19,15 @@ import argparse
 import torch
 from collections import OrderedDict
 from diffusers import LDMTextToImagePipeline as DiffusersLDMTextToImagePipeline
-from ppdiffusers import LDMTextToImagePipeline as PPDiffusersLDMTextToImagePipeline, LDMBertModel, AutoencoderKL, UNet2DConditionModel, PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler
+from ppdiffusers import (
+    LDMTextToImagePipeline as PPDiffusersLDMTextToImagePipeline,
+    LDMBertModel,
+    AutoencoderKL,
+    UNet2DConditionModel,
+    PNDMScheduler,
+    LMSDiscreteScheduler,
+    DDIMScheduler,
+)
 from paddlenlp.transformers import BertTokenizer
 
 
@@ -76,20 +84,19 @@ def convert_hf_ldmbert_to_ppnlp_ldmbert(ldmbert, dtype="float32"):
         "attention_dropout": ldmbert.config.attention_dropout,
         "activation_dropout": ldmbert.config.activation_dropout,
         "init_std": ldmbert.config.init_std,
-        "pad_token_id": ldmbert.config.pad_token_id
+        "pad_token_id": ldmbert.config.pad_token_id,
     }
     return new_model_state, new_config
 
 
-def convert_diffusers_stable_diffusion_to_ppdiffusers(
-        pretrained_model_name_or_path, output_path=None):
+def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_path, output_path=None):
     # 0. load diffusers pipe and convert to ppdiffusers weights format
     diffusers_pipe = DiffusersLDMTextToImagePipeline.from_pretrained(
-        pretrained_model_name_or_path, use_auth_token=True)
+        pretrained_model_name_or_path, use_auth_token=True
+    )
     vqvae_state_dict = convert_to_ppdiffusers(diffusers_pipe.vqvae)
     unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.unet)
-    bert_state_dict, bert_config = convert_hf_ldmbert_to_ppnlp_ldmbert(
-        diffusers_pipe.bert)
+    bert_state_dict, bert_config = convert_hf_ldmbert_to_ppnlp_ldmbert(diffusers_pipe.bert)
 
     # 1. vqvae
     pp_vqvae = AutoencoderKL(**diffusers_pipe.vqvae.config)
@@ -117,9 +124,7 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
             skip_prk_steps=True,
         )
     elif "lms" in scheduler_type:
-        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start,
-                                            beta_end=beta_end,
-                                            beta_schedule="scaled_linear")
+        pp_scheduler = LMSDiscreteScheduler(beta_start=beta_start, beta_end=beta_end, beta_schedule="scaled_linear")
     elif "ddim" in scheduler_type:
         pp_scheduler = DDIMScheduler(
             beta_start=beta_start,
@@ -134,15 +139,12 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
     with tempfile.TemporaryDirectory() as tmpdirname:
         # 5. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)
-        pp_tokenizer = BertTokenizer.from_pretrained(tmpdirname,
-                                                     model_max_length=77)
+        pp_tokenizer = BertTokenizer.from_pretrained(tmpdirname, model_max_length=77)
 
         # 6. create ppdiffusers pipe
-        paddle_pipe = PPDiffusersLDMTextToImagePipeline(vqvae=pp_vqvae,
-                                                        bert=pp_bert,
-                                                        tokenizer=pp_tokenizer,
-                                                        unet=pp_unet,
-                                                        scheduler=pp_scheduler)
+        paddle_pipe = PPDiffusersLDMTextToImagePipeline(
+            vqvae=pp_vqvae, bert=pp_bert, tokenizer=pp_tokenizer, unet=pp_unet, scheduler=pp_scheduler
+        )
 
         # 7. save_pretrained
         paddle_pipe.save_pretrained(output_path)
@@ -150,14 +152,12 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Pytorch model weights to Paddle model weights.")
+    parser = argparse.ArgumentParser(description="Pytorch model weights to Paddle model weights.")
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
         default="CompVis/ldm-text2im-large-256",
-        help=
-        "Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
         "--output_path",
@@ -167,4 +167,5 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     ppdiffusers_pipe = convert_diffusers_stable_diffusion_to_ppdiffusers(
-        args.pretrained_model_name_or_path, args.output_path)
+        args.pretrained_model_name_or_path, args.output_path
+    )

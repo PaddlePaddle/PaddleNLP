@@ -15,23 +15,20 @@
 import paddle
 from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
 
-model_name = 'Salesforce/codegen-350M-mono'
+model_name = "Salesforce/codegen-350M-mono"
 
 tokenizer = CodeGenTokenizer.from_pretrained(model_name)
 model = CodeGenForCausalLM.from_pretrained(model_name)
 model.eval()
 
-inputs = 'def hello'
-input_ids = tokenizer([inputs], return_tensors='pd')['input_ids']
+inputs = "def hello"
+input_ids = tokenizer([inputs], return_tensors="pd")["input_ids"]
 
-outputs, _ = model.generate(input_ids=input_ids,
-                            max_length=128,
-                            decode_strategy='greedy_search',
-                            use_fp16_decoding=True,
-                            use_faster=True)
+outputs, _ = model.generate(
+    input_ids=input_ids, max_length=128, decode_strategy="greedy_search", use_fp16_decoding=True, use_faster=True
+)
 
-result = tokenizer.decode(outputs[0],
-                          truncate_before_pattern=[r"\n\n^#", "^'''", "\n\n\n"])
+result = tokenizer.decode(outputs[0], truncate_before_pattern=[r"\n\n^#", "^'''", "\n\n\n"])
 
 print("Model input:", inputs)
 print("Result:", result)
