@@ -390,7 +390,7 @@ class BartTokenizer(PretrainedTokenizer):
                 Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
 
         Returns:
-        List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
         """
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
