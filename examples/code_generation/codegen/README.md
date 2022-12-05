@@ -75,6 +75,10 @@ print(codegen(prompt))
 </p>
 
 
+## Jupyter Lab插件配置
+
+请参考[codegenJupyterLabExt](https://github.com/chenqianhe/codegenJupyterLabExt), 感谢生态开发者[@chenqianhe](https://github.com/chenqianhe)的贡献！👏👏
+
 ## GithubCopilot插件配置
 
 **以VS Code的插件为例**

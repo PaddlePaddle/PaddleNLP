@@ -51,10 +51,8 @@ class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         token = "<s>"
         token_id = 1
 
-        self.assertEqual(self.get_tokenizer()._convert_token_to_id(token),
-                         token_id)
-        self.assertEqual(self.get_tokenizer()._convert_id_to_token(token_id),
-                         token)
+        self.assertEqual(self.get_tokenizer()._convert_token_to_id(token), token_id)
+        self.assertEqual(self.get_tokenizer()._convert_id_to_token(token_id), token)
 
     def test_get_vocab(self):
         vocab_keys = list(self.get_tokenizer().get_vocab().keys())
@@ -73,8 +71,7 @@ class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         tokens = tokenizer.tokenize("This is a test")
         self.assertListEqual(tokens, ["▁This", "▁is", "▁a", "▁t", "est"])
 
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [285, 46, 10, 170, 382])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [285, 46, 10, 170, 382])
 
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
         self.assertListEqual(
@@ -104,10 +101,7 @@ class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
             ],
         )
         ids = tokenizer.convert_tokens_to_ids(tokens)
-        self.assertListEqual(ids, [
-            8, 21, 84, 55, 24, 19, 7, 0, 602, 347, 347, 347, 3, 12, 66, 46, 72,
-            80, 6, 0, 4
-        ])
+        self.assertListEqual(ids, [8, 21, 84, 55, 24, 19, 7, 0, 602, 347, 347, 347, 3, 12, 66, 46, 72, 80, 6, 0, 4])
 
         back_tokens = tokenizer.convert_ids_to_tokens(ids)
         self.assertListEqual(
@@ -166,8 +160,7 @@ class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 ".",
             ],
         )
-        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"),
-                             ["▁he", "ll", "o"])
+        self.assertListEqual(tokenizer.tokenize("H\u00E9llo"), ["▁he", "ll", "o"])
 
     def test_tokenizer_no_lower(self):
         tokenizer = XLNetTokenizer(SAMPLE_VOCAB, do_lower_case=False)
@@ -202,10 +195,8 @@ class XLNetTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
     def test_sequence_builders(self):
         tokenizer = XLNetTokenizer.from_pretrained("xlnet-base-cased")
 
-        text = tokenizer.encode("sequence builders",
-                                add_special_tokens=False)["input_ids"]
-        text_2 = tokenizer.encode("multi-sequence build",
-                                  add_special_tokens=False)["input_ids"]
+        text = tokenizer.encode("sequence builders", add_special_tokens=False)["input_ids"]
+        text_2 = tokenizer.encode("multi-sequence build", add_special_tokens=False)["input_ids"]
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
