@@ -169,7 +169,7 @@ if __name__ == "__main__":
 
     # 3. Set dynamic shape for trt backend
     vae_dynamic_shape = {
-        "sample": {
+        "latent_sample": {
             "min_shape": [1, 4, 64, 64],
             "max_shape": [2, 4, 64, 64],
             "opt_shape": [2, 4, 64, 64],
