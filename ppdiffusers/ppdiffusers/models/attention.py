@@ -98,7 +98,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         self.use_linear_projection = use_linear_projection
         self.num_attention_heads = num_attention_heads
         self.attention_head_dim = attention_head_dim
-        inner_dim = num_attention_heads * attention_head_dim
+        self.inner_dim = inner_dim = num_attention_heads * attention_head_dim
 
         # 1. Transformer2DModel can process both standard continous images of shape `(batch_size, num_channels, width, height)` as well as quantized image embeddings of shape `(batch_size, num_image_vectors)`
         # Define whether input is continuous or discrete depending on configuration
@@ -191,13 +191,12 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         """
         # 1. Input
         if self.is_input_continuous:
-            batch, channel, height, weight = hidden_states.shape
+            _, _, height, weight = hidden_states.shape
             residual = hidden_states
             hidden_states = self.norm(hidden_states)
             if not self.use_linear_projection:
                 hidden_states = self.proj_in(hidden_states)
-            inner_dim = hidden_states.shape[1]
-            hidden_states = hidden_states.transpose([0, 2, 3, 1]).reshape([batch, height * weight, inner_dim])
+            hidden_states = hidden_states.transpose([0, 2, 3, 1]).flatten(1, 2)
             if self.use_linear_projection:
                 hidden_states = self.proj_in(hidden_states)
 
@@ -212,7 +211,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         if self.is_input_continuous:
             if self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
-            hidden_states = hidden_states.reshape([batch, height, weight, inner_dim]).transpose([0, 3, 1, 2])
+            hidden_states = hidden_states.reshape([-1, height, weight, self.inner_dim]).transpose([0, 3, 1, 2])
             if not self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
             output = hidden_states + residual

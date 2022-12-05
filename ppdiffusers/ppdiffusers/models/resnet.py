@@ -582,7 +582,10 @@ def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
         kernel = paddle.outer(kernel, kernel)
     kernel /= paddle.sum(kernel)
 
-    kernel = kernel * (gain * (factor**2))
+    if gain != 1:
+        kernel = kernel * (gain * (factor**2))
+    else:
+        kernel = kernel * (factor**2)
     pad_value = kernel.shape[0] - factor
     output = upfirdn2d_native(
         hidden_states,
