@@ -350,7 +350,7 @@ class UIETask(Task):
         "uie-x-base": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v1.0/model_state.pdparams",
-                "f378d5572d23dffc1659280fed90b17a",
+                "a953b55f7639ae73d1df6c2c5f7667dd",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
