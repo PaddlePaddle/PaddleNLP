@@ -39,9 +39,7 @@ args = parser.parse_args()
 
 
 class Predictor(object):
-
-    def __init__(self, model_file, params_file, device, max_seq_length,
-                 tokenizer, pinyin_vocab):
+    def __init__(self, model_file, params_file, device, max_seq_length, tokenizer, pinyin_vocab):
         self.max_seq_length = max_seq_length
 
         config = paddle.inference.Config(model_file, params_file)
@@ -55,15 +53,10 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.det_error_probs_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
-        self.corr_logits_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[1])
+        self.det_error_probs_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
+        self.corr_logits_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[1])
         self.tokenizer = tokenizer
         self.pinyin_vocab = pinyin_vocab
 
@@ -81,22 +74,19 @@ class Predictor(object):
         """
         examples = []
         texts = []
-        trans_func = partial(convert_example,
-                             tokenizer=self.tokenizer,
-                             pinyin_vocab=self.pinyin_vocab,
-                             max_seq_length=self.max_seq_length,
-                             is_test=True)
+        trans_func = partial(
+            convert_example,
+            tokenizer=self.tokenizer,
+            pinyin_vocab=self.pinyin_vocab,
+            max_seq_length=self.max_seq_length,
+            is_test=True,
+        )
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype='int64'
-                ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype='int64'
-                ),  # segment
-            Pad(axis=0,
-                pad_val=self.pinyin_vocab.token_to_idx[self.pinyin_vocab.
-                                                       pad_token],
-                dtype='int64'),  # pinyin
-            Stack(axis=0, dtype='int64'),  # length
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),  # segment
+            Pad(axis=0, pad_val=self.pinyin_vocab.token_to_idx[self.pinyin_vocab.pad_token], dtype="int64"),  # pinyin
+            Stack(axis=0, dtype="int64"),  # length
         ): [data for data in fn(samples)]
 
         for text in data:
@@ -105,19 +95,12 @@ class Predictor(object):
             examples.append((input_ids, token_type_ids, pinyin_ids, length))
             texts.append(example["source"])
 
-        batch_examples = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
-        batch_texts = [
-            texts[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
+        batch_examples = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
+        batch_texts = [texts[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
         results = []
 
         for examples, texts in zip(batch_examples, batch_texts):
-            token_ids, token_type_ids, pinyin_ids, length = batchify_fn(
-                examples)
+            token_ids, token_type_ids, pinyin_ids, length = batchify_fn(examples)
             self.input_handles[0].copy_from_cpu(token_ids)
             self.input_handles[1].copy_from_cpu(pinyin_ids)
             self.predictor.run()
@@ -128,25 +111,22 @@ class Predictor(object):
             char_preds = corr_logits.argmax(axis=-1)
 
             for i in range(len(length)):
-                pred_result = parse_decode(texts[i], char_preds[i], det_pred[i],
-                                           length[i], self.tokenizer,
-                                           self.max_seq_length)
+                pred_result = parse_decode(
+                    texts[i], char_preds[i], det_pred[i], length[i], self.tokenizer, self.max_seq_length
+                )
 
-                results.append(''.join(pred_result))
+                results.append("".join(pred_result))
         return results
 
 
 if __name__ == "__main__":
     tokenizer = ErnieTokenizer.from_pretrained("ernie-1.0")
-    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
-                                         unk_token='[UNK]',
-                                         pad_token='[PAD]')
-    predictor = Predictor(args.model_file, args.params_file, args.device,
-                          args.max_seq_len, tokenizer, pinyin_vocab)
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path, unk_token="[UNK]", pad_token="[PAD]")
+    predictor = Predictor(args.model_file, args.params_file, args.device, args.max_seq_len, tokenizer, pinyin_vocab)
 
     samples = [
-        '遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。',
-        '人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。',
+        "遇到逆竟时，我们必须勇于面对，而且要愈挫愈勇，这样我们才能朝著成功之路前进。",
+        "人生就是如此，经过磨练才能让自己更加拙壮，才能使自己更加乐观。",
     ]
 
     results = predictor.predict(samples, batch_size=args.batch_size)

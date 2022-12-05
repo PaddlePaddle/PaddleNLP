@@ -34,12 +34,12 @@ def eval(model: MemN2N, data, config, mode="Test"):
         data: evaluation data
         config: model and eval configs
         mode: Valid or Test
-    
+
     Returns:
         average loss
     """
     model.eval()
-    lossfn = nn.CrossEntropyLoss(reduction='sum')
+    lossfn = nn.CrossEntropyLoss(reduction="sum")
     N = int(math.ceil(len(data) / config.batch_size))
     total_loss = 0
 
@@ -47,7 +47,7 @@ def eval(model: MemN2N, data, config, mode="Test"):
     target = np.ndarray([config.batch_size], dtype=np.int64)
 
     if config.show:
-        ProgressBar = getattr(import_module('utils'), 'ProgressBar')
+        ProgressBar = getattr(import_module("utils"), "ProgressBar")
         bar = ProgressBar(mode, max=N - 1)
 
     m = config.mem_size
@@ -59,7 +59,7 @@ def eval(model: MemN2N, data, config, mode="Test"):
             if m >= len(data):
                 break
             target[i] = data[m]
-            context[i, :] = data[m - config.mem_size:m]
+            context[i, :] = data[m - config.mem_size : m]
             m += 1
         if m >= len(data):
             break
@@ -87,7 +87,7 @@ def test(model: MemN2N, test_data, config):
     print("Perplexity on Test: %f" % test_perplexity)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     config = Config("config.yaml")
 
     if not os.path.exists(config.checkpoint_dir):

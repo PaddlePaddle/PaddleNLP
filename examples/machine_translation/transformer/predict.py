@@ -28,56 +28,43 @@ import reader
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="./configs/transformer.big.yaml",
-                        type=str,
-                        help="Path of the config file. ")
+    parser.add_argument(
+        "--config", default="./configs/transformer.big.yaml", type=str, help="Path of the config file. "
+    )
     parser.add_argument(
         "--benchmark",
         action="store_true",
-        help=
-        "Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. "
+        help="Whether to print logs on each cards and use benchmark vocab. Normally, not necessary to set --benchmark. ",
     )
     parser.add_argument(
         "--test_file",
-        nargs='+',
+        nargs="+",
         default=None,
         type=str,
-        help=
-        "The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing."
+        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing.",
     )
-    parser.add_argument("--without_ft",
-                        action="store_true",
-                        help="Whether to use FasterTransformer to do predict. ")
+    parser.add_argument("--without_ft", action="store_true", help="Whether to use FasterTransformer to do predict. ")
     parser.add_argument(
         "--vocab_file",
         default=None,
         type=str,
-        help=
-        "The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used."
+        help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
-        help=
-        "The unknown token. It should be provided when use custom vocab_file. ")
-    parser.add_argument(
-        "--bos_token",
-        default=None,
-        type=str,
-        help="The bos token. It should be provided when use custom vocab_file. "
+        help="The unknown token. It should be provided when use custom vocab_file. ",
     )
     parser.add_argument(
-        "--eos_token",
-        default=None,
-        type=str,
-        help="The eos token. It should be provided when use custom vocab_file. "
+        "--bos_token", default=None, type=str, help="The bos token. It should be provided when use custom vocab_file. "
     )
-    parser.add_argument("--device",
-                        default="gpu",
-                        choices=["gpu", "cpu", "xpu", "npu", "mlu"],
-                        help="Device selected for inference.")
+    parser.add_argument(
+        "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--device", default="gpu", choices=["gpu", "cpu", "xpu", "npu", "mlu"], help="Device selected for inference."
+    )
 
     args = parser.parse_args()
     return args
@@ -92,10 +79,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
@@ -139,14 +123,13 @@ def do_predict(args):
         rel_len=args.use_rel_len,  # only works when using FT or beam search v2
         alpha=args.alpha,  # only works when using beam search v2
         diversity_rate=args.diversity_rate,  # only works when using FT
-        use_fp16_decoding=False)  # only works when using FT
+        use_fp16_decoding=False,
+    )  # only works when using FT
 
     # Load the trained model
-    assert args.init_from_params, (
-        "Please set init_from_params to load the infer model.")
+    assert args.init_from_params, "Please set init_from_params to load the infer model."
 
-    transformer.load(os.path.join(args.init_from_params,
-                                  "transformer.pdparams"))
+    transformer.load(os.path.join(args.init_from_params, "transformer.pdparams"))
 
     # Providing model_dict still works.
     # state_dict = paddle.load(os.path.join(args.init_from_params,
@@ -158,7 +141,7 @@ def do_predict(args):
 
     f = open(args.output_file, "w", encoding="utf-8")
     with paddle.no_grad():
-        for (src_word, ) in test_loader:
+        for (src_word,) in test_loader:
             # When `output_time_major` argument is `True` for TransformerGenerator,
             # the shape of finished_seq is `[seq_len, batch_size, beam_size]`
             # for beam search v1 or `[seq_len, batch_size, beam_size * 2]` for
@@ -178,7 +161,7 @@ def do_predict(args):
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.benchmark = ARGS.benchmark
     args.test_file = ARGS.test_file

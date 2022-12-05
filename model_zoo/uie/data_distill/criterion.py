@@ -18,15 +18,12 @@ import paddle.nn as nn
 
 
 class Criterion(nn.Layer):
-    '''Criterion for GPNet'''
+    """Criterion for GPNet"""
 
     def __init__(self, mask_zero=True):
         self.mask_zero = mask_zero
 
-    def _sparse_multilabel_categorical_crossentropy(self,
-                                                    y_true,
-                                                    y_pred,
-                                                    mask_zero=False):
+    def _sparse_multilabel_categorical_crossentropy(self, y_true, y_pred, mask_zero=False):
         """Sparse multi-label categorical cross entropy
         reference to "https://kexue.fm/archives/7359".
         """
@@ -52,10 +49,7 @@ class Criterion(nn.Layer):
         shape = y_pred.shape
         y_true = y_true[..., 0] * shape[2] + y_true[..., 1]
         # bs, nclass, seqlen * seqlen
-        y_pred = paddle.reshape(y_pred,
-                                shape=[shape[0], -1,
-                                       np.prod(shape[2:])])
+        y_pred = paddle.reshape(y_pred, shape=[shape[0], -1, np.prod(shape[2:])])
 
-        loss = self._sparse_multilabel_categorical_crossentropy(
-            y_true, y_pred, self.mask_zero)
+        loss = self._sparse_multilabel_categorical_crossentropy(y_true, y_pred, self.mask_zero)
         return loss.sum(axis=1).mean()

@@ -67,13 +67,12 @@ class AutoencoderKLOutput(BaseOutput):
 
 
 class Encoder(nn.Layer):
-
     def __init__(
         self,
         in_channels=3,
         out_channels=3,
-        down_block_types=("DownEncoderBlock2D", ),
-        block_out_channels=(64, ),
+        down_block_types=("DownEncoderBlock2D",),
+        block_out_channels=(64,),
         layers_per_block=2,
         norm_num_groups=32,
         act_fn="silu",
@@ -82,11 +81,7 @@ class Encoder(nn.Layer):
         super().__init__()
         self.layers_per_block = layers_per_block
 
-        self.conv_in = nn.Conv2D(in_channels,
-                                 block_out_channels[0],
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1)
+        self.conv_in = nn.Conv2D(in_channels, block_out_channels[0], kernel_size=3, stride=1, padding=1)
 
         self.mid_block = None
         self.down_blocks = nn.LayerList([])
@@ -126,16 +121,13 @@ class Encoder(nn.Layer):
         )
 
         # out
-        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[-1],
-                                          num_groups=norm_num_groups,
-                                          epsilon=1e-6)
+        self.conv_norm_out = nn.GroupNorm(
+            num_channels=block_out_channels[-1], num_groups=norm_num_groups, epsilon=1e-6
+        )
         self.conv_act = nn.Silu()
 
         conv_out_channels = 2 * out_channels if double_z else out_channels
-        self.conv_out = nn.Conv2D(block_out_channels[-1],
-                                  conv_out_channels,
-                                  3,
-                                  padding=1)
+        self.conv_out = nn.Conv2D(block_out_channels[-1], conv_out_channels, 3, padding=1)
 
     def forward(self, x):
         sample = x
@@ -157,13 +149,12 @@ class Encoder(nn.Layer):
 
 
 class Decoder(nn.Layer):
-
     def __init__(
         self,
         in_channels=3,
         out_channels=3,
-        up_block_types=("UpDecoderBlock2D", ),
-        block_out_channels=(64, ),
+        up_block_types=("UpDecoderBlock2D",),
+        block_out_channels=(64,),
         layers_per_block=2,
         norm_num_groups=32,
         act_fn="silu",
@@ -171,11 +162,7 @@ class Decoder(nn.Layer):
         super().__init__()
         self.layers_per_block = layers_per_block
 
-        self.conv_in = nn.Conv2D(in_channels,
-                                 block_out_channels[-1],
-                                 kernel_size=3,
-                                 stride=1,
-                                 padding=1)
+        self.conv_in = nn.Conv2D(in_channels, block_out_channels[-1], kernel_size=3, stride=1, padding=1)
 
         self.mid_block = None
         self.up_blocks = nn.LayerList([])
@@ -218,14 +205,9 @@ class Decoder(nn.Layer):
             prev_output_channel = output_channel
 
         # out
-        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[0],
-                                          num_groups=norm_num_groups,
-                                          epsilon=1e-6)
+        self.conv_norm_out = nn.GroupNorm(num_channels=block_out_channels[0], num_groups=norm_num_groups, epsilon=1e-6)
         self.conv_act = nn.Silu()
-        self.conv_out = nn.Conv2D(block_out_channels[0],
-                                  out_channels,
-                                  3,
-                                  padding=1)
+        self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, 3, padding=1)
 
     def forward(self, z):
         sample = z
@@ -255,24 +237,16 @@ class VectorQuantizer(nn.Layer):
     # NOTE: due to a bug the beta term was applied to the wrong term. for
     # backwards compatibility we use the buggy version by default, but you can
     # specify legacy=False to fix it.
-    def __init__(self,
-                 n_e,
-                 e_dim,
-                 beta,
-                 remap=None,
-                 unknown_index="random",
-                 sane_index_shape=False,
-                 legacy=True):
+    def __init__(self, n_e, e_dim, beta, remap=None, unknown_index="random", sane_index_shape=False, legacy=True):
         super().__init__()
         self.n_e = n_e
         self.e_dim = e_dim
         self.beta = beta
         self.legacy = legacy
 
-        self.embedding = nn.Embedding(self.n_e,
-                                      self.e_dim,
-                                      weight_attr=nn.initializer.Uniform(
-                                          -1.0 / self.n_e, 1.0 / self.n_e))
+        self.embedding = nn.Embedding(
+            self.n_e, self.e_dim, weight_attr=nn.initializer.Uniform(-1.0 / self.n_e, 1.0 / self.n_e)
+        )
 
         self.remap = remap
         if self.remap is not None:
@@ -282,8 +256,10 @@ class VectorQuantizer(nn.Layer):
             if self.unknown_index == "extra":
                 self.unknown_index = self.re_embed
                 self.re_embed = self.re_embed + 1
-            print(f"Remapping {self.n_e} indices to {self.re_embed} indices. "
-                  f"Using {self.unknown_index} for unknown indices.")
+            print(
+                f"Remapping {self.n_e} indices to {self.re_embed} indices. "
+                f"Using {self.unknown_index} for unknown indices."
+            )
         else:
             self.re_embed = n_e
 
@@ -298,9 +274,7 @@ class VectorQuantizer(nn.Layer):
         new = match.argmax(-1)
         unknown = match.sum(2) < 1
         if self.unknown_index == "random":
-            new[unknown] = paddle.randint(0,
-                                          self.re_embed,
-                                          shape=new[unknown].shape)
+            new[unknown] = paddle.randint(0, self.re_embed, shape=new[unknown].shape)
         else:
             new[unknown] = self.unknown_index
         return new.reshape(ishape)
@@ -312,9 +286,7 @@ class VectorQuantizer(nn.Layer):
         used = self.used.astype(inds.dtype)
         if self.re_embed > self.used.shape[0]:  # extra token
             inds[inds >= self.used.shape[0]] = 0  # simply set to zero
-        back = paddle.gather(used[None, :][inds.shape[0] * [0], :],
-                             inds,
-                             axis=1)
+        back = paddle.gather(used[None, :][inds.shape[0] * [0], :], inds, axis=1)
         return back.reshape(ishape)
 
     def forward(self, z):
@@ -324,9 +296,10 @@ class VectorQuantizer(nn.Layer):
         # distances from z to embeddings e_j (z - e)^2 = z^2 + e^2 - 2 e * z
 
         d = (
-            paddle.sum(z_flattened**2, axis=1, keepdim=True) +
-            paddle.sum(self.embedding.weight**2, axis=1) - 2 *
-            paddle.matmul(z_flattened, self.embedding.weight, transpose_y=True))
+            paddle.sum(z_flattened**2, axis=1, keepdim=True)
+            + paddle.sum(self.embedding.weight**2, axis=1)
+            - 2 * paddle.matmul(z_flattened, self.embedding.weight, transpose_y=True)
+        )
 
         min_encoding_indices = paddle.argmin(d, axis=1)
         z_q = self.embedding(min_encoding_indices).reshape(z.shape)
@@ -335,11 +308,9 @@ class VectorQuantizer(nn.Layer):
 
         # compute loss for embedding
         if not self.legacy:
-            loss = self.beta * paddle.mean((z_q.detach() - z)**2) + paddle.mean(
-                (z_q - z.detach())**2)
+            loss = self.beta * paddle.mean((z_q.detach() - z) ** 2) + paddle.mean((z_q - z.detach()) ** 2)
         else:
-            loss = paddle.mean((z_q.detach() - z)**2) + self.beta * paddle.mean(
-                (z_q - z.detach())**2)
+            loss = paddle.mean((z_q.detach() - z) ** 2) + self.beta * paddle.mean((z_q - z.detach()) ** 2)
 
         # preserve gradients
         z_q = z + (z_q - z).detach()
@@ -348,15 +319,12 @@ class VectorQuantizer(nn.Layer):
         z_q = z_q.transpose([0, 3, 1, 2])
 
         if self.remap is not None:
-            min_encoding_indices = min_encoding_indices.reshape(
-                [z.shape[0], -1])  # add batch axis
+            min_encoding_indices = min_encoding_indices.reshape([z.shape[0], -1])  # add batch axis
             min_encoding_indices = self.remap_to_used(min_encoding_indices)
-            min_encoding_indices = min_encoding_indices.reshape([-1,
-                                                                 1])  # flatten
+            min_encoding_indices = min_encoding_indices.reshape([-1, 1])  # flatten
 
         if self.sane_index_shape:
-            min_encoding_indices = min_encoding_indices.reshape(
-                [z_q.shape[0], z_q.shape[2], z_q.shape[3]])
+            min_encoding_indices = min_encoding_indices.reshape([z_q.shape[0], z_q.shape[2], z_q.shape[3]])
 
         return z_q, loss, (perplexity, min_encodings, min_encoding_indices)
 
@@ -365,9 +333,11 @@ class VectorQuantizer(nn.Layer):
         if self.remap is not None:
             indices = indices.reshape([shape[0], -1])  # add batch axis
             indices = self.unmap_to_all(indices)
-            indices = indices.reshape([
-                -1,
-            ])  # flatten again
+            indices = indices.reshape(
+                [
+                    -1,
+                ]
+            )  # flatten again
 
         # get quantized latent vectors
         z_q = self.embedding(indices)
@@ -381,7 +351,6 @@ class VectorQuantizer(nn.Layer):
 
 
 class DiagonalGaussianDistribution(object):
-
     def __init__(self, parameters, deterministic=False):
         self.parameters = parameters
         self.mean, self.logvar = paddle.chunk(parameters, 2, axis=1)
@@ -390,8 +359,7 @@ class DiagonalGaussianDistribution(object):
         self.std = paddle.exp(0.5 * self.logvar)
         self.var = paddle.exp(self.logvar)
         if self.deterministic:
-            self.var = self.std = paddle.zeros_like(self.mean,
-                                                    dtype=self.parameters.dtype)
+            self.var = self.std = paddle.zeros_like(self.mean, dtype=self.parameters.dtype)
 
     def sample(self) -> paddle.Tensor:
         sample = paddle.randn(self.mean.shape)
@@ -403,13 +371,14 @@ class DiagonalGaussianDistribution(object):
             return paddle.to_tensor([0.0])
         else:
             if other is None:
-                return 0.5 * paddle.sum(
-                    paddle.pow(self.mean, 2) + self.var - 1.0 - self.logvar,
-                    axis=[1, 2, 3])
+                return 0.5 * paddle.sum(paddle.pow(self.mean, 2) + self.var - 1.0 - self.logvar, axis=[1, 2, 3])
             else:
                 return 0.5 * paddle.sum(
-                    paddle.pow(self.mean - other.mean, 2) / other.var +
-                    self.var / other.var - 1.0 - self.logvar + other.logvar,
+                    paddle.pow(self.mean - other.mean, 2) / other.var
+                    + self.var / other.var
+                    - 1.0
+                    - self.logvar
+                    + other.logvar,
                     axis=[1, 2, 3],
                 )
 
@@ -417,9 +386,7 @@ class DiagonalGaussianDistribution(object):
         if self.deterministic:
             return paddle.to_tensor([0.0])
         logtwopi = np.log(2.0 * np.pi)
-        return 0.5 * paddle.sum(logtwopi + self.logvar +
-                                paddle.pow(sample - self.mean, 2) / self.var,
-                                axis=axis)
+        return 0.5 * paddle.sum(logtwopi + self.logvar + paddle.pow(sample - self.mean, 2) / self.var, axis=axis)
 
     def mode(self):
         return self.mean
@@ -452,9 +419,9 @@ class VQModel(ModelMixin, ConfigMixin):
         self,
         in_channels: int = 3,
         out_channels: int = 3,
-        down_block_types: Tuple[str] = ("DownEncoderBlock2D", ),
-        up_block_types: Tuple[str] = ("UpDecoderBlock2D", ),
-        block_out_channels: Tuple[int] = (64, ),
+        down_block_types: Tuple[str] = ("DownEncoderBlock2D",),
+        up_block_types: Tuple[str] = ("UpDecoderBlock2D",),
+        block_out_channels: Tuple[int] = (64,),
         layers_per_block: int = 1,
         act_fn: str = "silu",
         latent_channels: int = 3,
@@ -477,11 +444,9 @@ class VQModel(ModelMixin, ConfigMixin):
         )
 
         self.quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
-        self.quantize = VectorQuantizer(num_vq_embeddings,
-                                        latent_channels,
-                                        beta=0.25,
-                                        remap=None,
-                                        sane_index_shape=False)
+        self.quantize = VectorQuantizer(
+            num_vq_embeddings, latent_channels, beta=0.25, remap=None, sane_index_shape=False
+        )
         self.post_quant_conv = nn.Conv2D(latent_channels, latent_channels, 1)
 
         # pass init params to Decoder
@@ -500,14 +465,11 @@ class VQModel(ModelMixin, ConfigMixin):
         h = self.quant_conv(h)
 
         if not return_dict:
-            return (h, )
+            return (h,)
 
         return VQEncoderOutput(latents=h)
 
-    def decode(self,
-               h: paddle.Tensor,
-               force_not_quantize: bool = False,
-               return_dict: bool = True):
+    def decode(self, h: paddle.Tensor, force_not_quantize: bool = False, return_dict: bool = True):
         # also go through quantization layer
         if not force_not_quantize:
             quant, emb_loss, info = self.quantize(h)
@@ -517,7 +479,7 @@ class VQModel(ModelMixin, ConfigMixin):
         dec = self.decoder(quant)
 
         if not return_dict:
-            return (dec, )
+            return (dec,)
 
         return DecoderOutput(sample=dec)
 
@@ -533,7 +495,7 @@ class VQModel(ModelMixin, ConfigMixin):
         dec = self.decode(h).sample
 
         if not return_dict:
-            return (dec, )
+            return (dec,)
 
         return DecoderOutput(sample=dec)
 
@@ -564,9 +526,9 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         self,
         in_channels: int = 3,
         out_channels: int = 3,
-        down_block_types: Tuple[str] = ("DownEncoderBlock2D", ),
-        up_block_types: Tuple[str] = ("UpDecoderBlock2D", ),
-        block_out_channels: Tuple[int] = (64, ),
+        down_block_types: Tuple[str] = ("DownEncoderBlock2D",),
+        up_block_types: Tuple[str] = ("UpDecoderBlock2D",),
+        block_out_channels: Tuple[int] = (64,),
         layers_per_block: int = 1,
         act_fn: str = "silu",
         latent_channels: int = 4,
@@ -607,7 +569,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         posterior = DiagonalGaussianDistribution(moments)
 
         if not return_dict:
-            return (posterior, )
+            return (posterior,)
 
         return AutoencoderKLOutput(latent_dist=posterior)
 
@@ -616,7 +578,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         dec = self.decoder(z)
 
         if not return_dict:
-            return (dec, )
+            return (dec,)
 
         return DecoderOutput(sample=dec)
 
@@ -643,6 +605,6 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         dec = self.decode(z).sample
 
         if not return_dict:
-            return (dec, )
+            return (dec,)
 
         return DecoderOutput(sample=dec)

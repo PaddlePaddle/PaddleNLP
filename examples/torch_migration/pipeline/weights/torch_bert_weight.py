@@ -17,5 +17,5 @@ import torch
 
 hf_model = BertModel.from_pretrained("bert-base-uncased")
 hf_model.eval()
-PATH = './torch_weight.bin'
+PATH = "./torch_weight.bin"
 torch.save(hf_model.state_dict(), PATH)

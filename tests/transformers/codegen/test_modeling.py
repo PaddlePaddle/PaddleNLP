@@ -19,9 +19,13 @@ import numpy as np
 import random
 
 import paddle
-from paddlenlp.transformers import (CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
-                                    AutoTokenizer, CodeGenForCausalLM,
-                                    CodeGenModel, CodeGenTokenizer)
+from paddlenlp.transformers import (
+    CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
+    AutoTokenizer,
+    CodeGenForCausalLM,
+    CodeGenModel,
+    CodeGenTokenizer,
+)
 from ...testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
@@ -87,34 +91,23 @@ class CodeGenModelTester:
         random.seed(128)
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size,
-                               dtype="int64")
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         input_mask = None
         if self.use_input_mask:
-            input_mask = random_attention_mask(
-                [self.batch_size, self.seq_length], dtype="int64")
+            input_mask = random_attention_mask([self.batch_size, self.seq_length], dtype="int64")
 
         mc_token_ids = None
         if self.use_mc_token_ids:
-            mc_token_ids = ids_tensor([self.batch_size, self.num_choices],
-                                      self.seq_length,
-                                      dtype="int64")
+            mc_token_ids = ids_tensor([self.batch_size, self.num_choices], self.seq_length, dtype="int64")
 
         sequence_labels = None
         token_labels = None
         choice_labels = None
         if self.use_labels:
-            sequence_labels = ids_tensor([self.batch_size],
-                                         self.type_sequence_label_size,
-                                         dtype="int64")
-            token_labels = ids_tensor([self.batch_size, self.seq_length],
-                                      self.num_labels,
-                                      dtype="int64")
-            choice_labels = ids_tensor([self.batch_size],
-                                       self.num_choices,
-                                       dtype="int64")
+            sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size, dtype="int64")
+            token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels, dtype="int64")
+            choice_labels = ids_tensor([self.batch_size], self.num_choices, dtype="int64")
 
         config = self.get_config()
 
@@ -157,11 +150,8 @@ class CodeGenModelTester:
             choice_labels,
         ) = self.prepare_config_and_inputs()
 
-        encoder_hidden_states = floats_tensor(
-            [self.batch_size, self.seq_length, self.hidden_size])
-        encoder_attention_mask = ids_tensor([self.batch_size, self.seq_length],
-                                            vocab_size=2,
-                                            dtype="int64")
+        encoder_hidden_states = floats_tensor([self.batch_size, self.seq_length, self.hidden_size])
+        encoder_attention_mask = ids_tensor([self.batch_size, self.seq_length], vocab_size=2, dtype="int64")
 
         return (
             config,
@@ -174,69 +164,45 @@ class CodeGenModelTester:
             encoder_attention_mask,
         )
 
-    def create_and_check_codegen_model(self, config, input_ids, input_mask,
-                                       *args):
+    def create_and_check_codegen_model(self, config, input_ids, input_mask, *args):
         model = CodeGenModel(**config)
         model.eval()
 
-        result = model(input_ids,
-                       use_cache=True,
-                       return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
-        self.parent.assertEqual(
-            result[0].shape,
-            [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(len(result[1]), config["n_layer"])
 
-    def create_and_check_codegen_model_past(self, config, input_ids, input_mask,
-                                            *args):
+    def create_and_check_codegen_model_past(self, config, input_ids, input_mask, *args):
         model = CodeGenModel(**config)
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids,
-                        use_cache=True,
-                        return_dict=self.parent.return_dict)
-        outputs_no_past = model(input_ids,
-                                use_cache=False,
-                                return_dict=self.parent.return_dict)
+        outputs = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        outputs_no_past = model(input_ids, use_cache=False, return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_no_past) + 1)
 
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1),
-                                 config["vocab_size"],
-                                 dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids,
-                                    return_dict=self.parent.return_dict)[0]
-        output_from_past = model(next_tokens,
-                                 cache=past,
-                                 return_dict=self.parent.return_dict)[0]
+        output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)[0]
+        output_from_past = model(next_tokens, cache=past, return_dict=self.parent.return_dict)[0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ),
-                                      output_from_past.shape[-1],
-                                      dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -1,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, 0,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_codegen_model_attention_mask_past(
-            self, config, input_ids, input_mask, *args):
+    def create_and_check_codegen_model_attention_mask_past(self, config, input_ids, input_mask, *args):
         model = CodeGenModel(**config)
         model.eval()
 
@@ -246,135 +212,93 @@ class CodeGenModelTester:
         attn_mask[:, half_seq_length:] = 0
 
         # first forward pass
-        output, past = model(input_ids,
-                             attention_mask=attn_mask,
-                             use_cache=True,
-                             return_dict=self.parent.return_dict)[:2]
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
+            :2
+        ]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1),
-                                 config["vocab_size"],
-                                 dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
 
         # change a random masked slice from input_ids
-        random_seq_idx_to_change = ids_tensor(
-            (1, ), half_seq_length, dtype="int64").item() + 1
-        random_other_next_tokens = ids_tensor((self.batch_size, 1),
-                                              config["vocab_size"],
-                                              dtype="int64").squeeze(-1)
+        random_seq_idx_to_change = ids_tensor((1,), half_seq_length, dtype="int64").item() + 1
+        random_other_next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64").squeeze(-1)
         input_ids[:, -random_seq_idx_to_change] = random_other_next_tokens
 
         # append to next input_ids and attn_mask
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         attn_mask = paddle.concat(
-            [attn_mask,
-             paddle.ones((attn_mask.shape[0], 1), dtype="int64")],
+            [attn_mask, paddle.ones((attn_mask.shape[0], 1), dtype="int64")],
             axis=1,
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids,
-                                    attention_mask=attn_mask,
-                                    return_dict=self.parent.return_dict)[0]
-        output_from_past = model(next_tokens,
-                                 cache=past,
-                                 attention_mask=attn_mask,
-                                 return_dict=self.parent.return_dict)[0]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)[0]
+        output_from_past = model(
+            next_tokens, cache=past, attention_mask=attn_mask, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ),
-                                      output_from_past.shape[-1],
-                                      dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -1,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, 0,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_codegen_model_past_large_inputs(
-            self, config, input_ids, input_mask, *args):
+    def create_and_check_codegen_model_past_large_inputs(self, config, input_ids, input_mask, *args):
         model = CodeGenModel(**config)
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids,
-                        attention_mask=input_mask,
-                        use_cache=True,
-                        return_dict=self.parent.return_dict)
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
 
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3),
-                                 config["vocab_size"],
-                                 dtype="int64")
-        next_mask = ids_tensor((self.batch_size, 3),
-                               vocab_size=2,
-                               dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_mask = ids_tensor((self.batch_size, 3), vocab_size=2, dtype="int64")
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids,
-                                    attention_mask=next_attention_mask,
-                                    return_dict=self.parent.return_dict)[0]
-        output_from_past = model(next_tokens,
-                                 attention_mask=next_attention_mask,
-                                 cache=past,
-                                 return_dict=self.parent.return_dict)[0]
-        self.parent.assertTrue(
-            output_from_past.shape[1] == next_tokens.shape[1])
+        output_from_no_past = model(
+            next_input_ids, attention_mask=next_attention_mask, return_dict=self.parent.return_dict
+        )[0]
+        output_from_past = model(
+            next_tokens, attention_mask=next_attention_mask, cache=past, return_dict=self.parent.return_dict
+        )[0]
+        self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ),
-                                      output_from_past.shape[-1],
-                                      dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -3:,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, :,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
+        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
-    def create_and_check_lm_head_model(self, config, input_ids, input_mask,
-                                       *args):
+    def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
         base_model = CodeGenModel(**config)
         model = CodeGenForCausalLM(base_model)
 
-        outputs = model(input_ids,
-                        labels=input_ids if self.parent.use_labels else None,
-                        return_dict=self.parent.return_dict)
+        outputs = model(
+            input_ids, labels=input_ids if self.parent.use_labels else None, return_dict=self.parent.return_dict
+        )
         if self.parent.use_labels:
             loss, logits = outputs[:2]
             self.parent.assertEqual(loss.shape, [1])
         else:
             logits = outputs[0]
-        self.parent.assertEqual(
-            logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
-    def create_and_check_forward_and_backwards(self, config, input_ids,
-                                               input_mask, *args):
+    def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
         base_model = CodeGenModel(**config)
         model = CodeGenForCausalLM(base_model)
 
-        loss, logits = model(input_ids,
-                             return_dict=self.parent.return_dict,
-                             labels=input_ids)[:2]
+        loss, logits = model(input_ids, return_dict=self.parent.return_dict, labels=input_ids)[:2]
         self.parent.assertEqual(loss.shape, [1])
-        self.parent.assertEqual(
-            logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
         result.loss.backward()
 
     def prepare_config_and_inputs_for_common(self):
@@ -395,20 +319,20 @@ class CodeGenModelTester:
         return config, inputs_dict
 
 
-@parameterized_class(("return_dict", ), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
-])
-class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
-                       unittest.TestCase):
+@parameterized_class(
+    ("return_dict",),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
+class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = CodeGenModel
 
     all_model_classes = (CodeGenModel, CodeGenForCausalLM)
-    all_generative_model_classes = {
-        CodeGenForCausalLM: (CodeGenModel, "transformer")
-    }
+    all_generative_model_classes = {CodeGenForCausalLM: (CodeGenModel, "transformer")}
     fx_compatible = False
     test_pruning = False
     test_missing_keys = False
@@ -420,8 +344,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
 
     # attention mask issue
     def _get_input_ids_and_config(self):
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
         input_ids = inputs_dict[self.input_name]
         attention_mask = paddle.zeros_like(input_ids, dtype=paddle.float32)
@@ -429,15 +352,12 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
         max_batch_size = 2
         sequence_length = input_ids.shape[-1] // 2
         input_ids = input_ids[:max_batch_size, :sequence_length]
-        attention_mask = attention_mask[:max_batch_size, :
-                                        sequence_length].unsqueeze([1, 2])
+        attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
         # generate max 3 tokens
         max_length = 3
 
-        if config.get(
-                "eos_token_id",
-                None) is not None and config.get("pad_token_id", None) is None:
+        if config.get("eos_token_id", None) is not None and config.get("pad_token_id", None) is None:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
 
@@ -457,18 +377,15 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
 
     def test_codegen_model_past(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_codegen_model_past(
-            *config_and_inputs)
+        self.model_tester.create_and_check_codegen_model_past(*config_and_inputs)
 
     def test_codegen_model_att_mask_past(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_codegen_model_attention_mask_past(
-            *config_and_inputs)
+        self.model_tester.create_and_check_codegen_model_attention_mask_past(*config_and_inputs)
 
     def test_codegen_model_past_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_codegen_model_past_large_inputs(
-            *config_and_inputs)
+        self.model_tester.create_and_check_codegen_model_past_large_inputs(*config_and_inputs)
 
     def test_codegen_lm_head_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -476,26 +393,20 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
 
     @slow
     def test_batch_generation(self):
-        tokenizer = AutoTokenizer.from_pretrained(
-            "Salesforce/codegen-350M-mono")
-        model = CodeGenForCausalLM.from_pretrained(
-            "Salesforce/codegen-350M-mono")
+        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
+        model = CodeGenForCausalLM.from_pretrained("Salesforce/codegen-350M-mono")
         model.eval()
 
         tokenizer.padding_side = "left"
 
         # Define PAD Token = EOS Token = 50256
         tokenizer.pad_token = tokenizer.eos_token
-        model.transformer.config["pad_token_id"] = model.transformer.config[
-            "eos_token_id"]
+        model.transformer.config["pad_token_id"] = model.transformer.config["eos_token_id"]
 
         # use different length sentences to test batching
         sentences = ["def hellow_world():", "def greet(name):"]
 
-        inputs = tokenizer(sentences,
-                           return_tensors="pd",
-                           padding=True,
-                           return_attention_mask=True)
+        inputs = tokenizer(sentences, return_tensors="pd", padding=True, return_attention_mask=True)
         input_ids = inputs["input_ids"]
 
         outputs, _ = model.generate(
@@ -503,21 +414,16 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
             attention_mask=inputs["attention_mask"],
         )
 
-        inputs_non_padded = tokenizer(sentences[0],
-                                      return_tensors="pd")["input_ids"]
+        inputs_non_padded = tokenizer(sentences[0], return_tensors="pd")["input_ids"]
         output_non_padded, _ = model.generate(input_ids=inputs_non_padded)
 
-        inputs_padded = tokenizer(sentences[1],
-                                  return_tensors="pd")["input_ids"]
+        inputs_padded = tokenizer(sentences[1], return_tensors="pd")["input_ids"]
         output_padded, _ = model.generate(input_ids=inputs_padded)
 
-        batch_out_sentence = tokenizer.batch_decode(outputs,
-                                                    skip_special_tokens=True)
+        batch_out_sentence = tokenizer.batch_decode(outputs, skip_special_tokens=True)
 
-        non_padded_sentence = tokenizer.decode(output_non_padded[0],
-                                               skip_special_tokens=True)
-        padded_sentence = tokenizer.decode(output_padded[0],
-                                           skip_special_tokens=True)
+        non_padded_sentence = tokenizer.decode(output_non_padded[0], skip_special_tokens=True)
+        padded_sentence = tokenizer.decode(output_padded[0], skip_special_tokens=True)
 
         expected_output_sentence = [
             '\n      print("Hello World")\n\nhellow_world()\n\n#',
@@ -525,8 +431,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
         ]
         self.assertListEqual(expected_output_sentence, batch_out_sentence)
 
-        self.assertListEqual(expected_output_sentence,
-                             [non_padded_sentence, padded_sentence])
+        self.assertListEqual(expected_output_sentence, [non_padded_sentence, padded_sentence])
 
     @slow
     def test_model_from_pretrained(self):
@@ -545,66 +450,52 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin,
 
 
 class CodeGenModelLanguageGenerationTest(unittest.TestCase):
-
     @slow
     def test_lm_generate_codegen(self):
-        tokenizer = AutoTokenizer.from_pretrained(
-            "Salesforce/codegen-350M-mono")
-        model = CodeGenForCausalLM.from_pretrained(
-            "Salesforce/codegen-350M-mono")
+        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
+        model = CodeGenForCausalLM.from_pretrained("Salesforce/codegen-350M-mono")
         model.eval()
 
-        inputs = tokenizer("def hello_world():",
-                           return_tensors="pd",
-                           return_attention_mask=True,
-                           return_token_type_ids=False)
+        inputs = tokenizer(
+            "def hello_world():", return_tensors="pd", return_attention_mask=True, return_token_type_ids=False
+        )
         expected_output = '\n      print("Hello World")\n\nhello_world()\n\n#'
 
-        output_ids, _ = model.generate(**inputs,
-                                       decode_strategy="sampling",
-                                       top_k=1)
+        output_ids, _ = model.generate(**inputs, decode_strategy="sampling", top_k=1)
         output_str = tokenizer.batch_decode(output_ids)[0]
 
         self.assertEqual(output_str, expected_output)
 
     @slow
     def test_codegen_sample(self):
-        tokenizer = AutoTokenizer.from_pretrained(
-            "Salesforce/codegen-350M-mono")
-        model = CodeGenForCausalLM.from_pretrained(
-            "Salesforce/codegen-350M-mono")
+        tokenizer = AutoTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
+        model = CodeGenForCausalLM.from_pretrained("Salesforce/codegen-350M-mono")
         model.eval()
 
-        tokenized = tokenizer("def hello_world():",
-                              return_tensors="pd",
-                              return_token_type_ids=True,
-                              return_attention_mask=True)
+        tokenized = tokenizer(
+            "def hello_world():", return_tensors="pd", return_token_type_ids=True, return_attention_mask=True
+        )
         input_ids = tokenized["input_ids"]
-        output_ids, _ = model.generate(input_ids,
-                                       decode_strategy="sampling",
-                                       top_k=1)
+        output_ids, _ = model.generate(input_ids, decode_strategy="sampling", top_k=1)
         output_str = tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
         token_type_ids = tokenized.token_type_ids
-        output_seq, _ = model.generate(input_ids=input_ids,
-                                       decode_strategy="sampling",
-                                       top_k=1,
-                                       num_return_sequences=5)
-        output_seq_tt, _ = model.generate(input_ids=input_ids,
-                                          token_type_ids=token_type_ids,
-                                          decode_strategy="sampling",
-                                          top_k=1,
-                                          num_return_sequences=5)
-        output_seq_strs = tokenizer.batch_decode(output_seq,
-                                                 skip_special_tokens=True)
-        output_seq_tt_strs = tokenizer.batch_decode(output_seq_tt,
-                                                    skip_special_tokens=True)
+        output_seq, _ = model.generate(
+            input_ids=input_ids, decode_strategy="sampling", top_k=1, num_return_sequences=5
+        )
+        output_seq_tt, _ = model.generate(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            decode_strategy="sampling",
+            top_k=1,
+            num_return_sequences=5,
+        )
+        output_seq_strs = tokenizer.batch_decode(output_seq, skip_special_tokens=True)
+        output_seq_tt_strs = tokenizer.batch_decode(output_seq_tt, skip_special_tokens=True)
 
         EXPECTED_OUTPUT_STR = '\n      print("Hello World")\n\nhello_world()\n\n#'
 
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
         self.assertTrue(
-            all([
-                output_seq_strs[idx] != output_seq_tt_strs[idx]
-                for idx in range(len(output_seq_tt_strs))
-            ]))  # token_type_ids should change output
+            all([output_seq_strs[idx] != output_seq_tt_strs[idx] for idx in range(len(output_seq_tt_strs))])
+        )  # token_type_ids should change output

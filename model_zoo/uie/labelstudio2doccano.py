@@ -24,23 +24,27 @@ def append_attrs(data, item, label_id, relation_id):
     for anno in data["annotations"][0]["result"]:
         if anno["type"] == "labels":
             label_id += 1
-            item["entities"].append({
-                "id": label_id,
-                "label": anno["value"]["labels"][0],
-                "start_offset": anno["value"]["start"],
-                "end_offset": anno["value"]["end"]
-            })
+            item["entities"].append(
+                {
+                    "id": label_id,
+                    "label": anno["value"]["labels"][0],
+                    "start_offset": anno["value"]["start"],
+                    "end_offset": anno["value"]["end"],
+                }
+            )
             mapp[anno["id"]] = label_id
 
     for anno in data["annotations"][0]["result"]:
         if anno["type"] == "relation":
             relation_id += 1
-            item["relations"].append({
-                "id": relation_id,
-                "from_id": mapp[anno["from_id"]],
-                "to_id": mapp[anno["to_id"]],
-                "type": anno["labels"][0]
-            })
+            item["relations"].append(
+                {
+                    "id": relation_id,
+                    "from_id": mapp[anno["from_id"]],
+                    "to_id": mapp[anno["to_id"]],
+                    "type": anno["labels"][0],
+                }
+            )
 
     return item, label_id, relation_id
 
@@ -53,27 +57,20 @@ def convert(dataset, task_type):
         relation_id = 0
         for data in dataset:
             outer_id += 1
-            item = {
-                "id": outer_id,
-                "text": data["data"]["text"],
-                "entities": [],
-                "relations": []
-            }
-            item, label_id, relation_id = append_attrs(data, item, label_id,
-                                                       relation_id)
+            item = {"id": outer_id, "text": data["data"]["text"], "entities": [], "relations": []}
+            item, label_id, relation_id = append_attrs(data, item, label_id, relation_id)
             results.append(item)
     # for the classification task
     else:
         for data in dataset:
             outer_id += 1
-            results.append({
-                "id":
-                outer_id,
-                "text":
-                data["data"]["text"],
-                "label":
-                data["annotations"][0]["result"][0]["value"]["choices"]
-            })
+            results.append(
+                {
+                    "id": outer_id,
+                    "text": data["data"]["text"],
+                    "label": data["annotations"][0]["result"][0]["value"]["choices"],
+                }
+            )
     return results
 
 
@@ -98,21 +95,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        '--labelstudio_file',
-        type=str,
-        help=
-        'The export file path of label studio, only support the JSON format.')
-    parser.add_argument('--doccano_file',
-                        type=str,
-                        default='doccano_ext.jsonl',
-                        help='Saving path in doccano format.')
+        "--labelstudio_file", type=str, help="The export file path of label studio, only support the JSON format."
+    )
+    parser.add_argument("--doccano_file", type=str, default="doccano_ext.jsonl", help="Saving path in doccano format.")
     parser.add_argument(
-        '--task_type',
+        "--task_type",
         type=str,
-        choices=['ext', 'cls'],
-        default='ext',
-        help=
-        'Select task type, ext for the extraction task and cls for the classification task, defaults to ext.'
+        choices=["ext", "cls"],
+        default="ext",
+        help="Select task type, ext for the extraction task and cls for the classification task, defaults to ext.",
     )
 
     args = parser.parse_args()

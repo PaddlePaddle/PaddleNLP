@@ -40,12 +40,8 @@ evaluating, and analyzing natural language understanding systems.
 """
 
 _MRPC_DEV_IDS = "https://dl.fbaipublicfiles.com/glue/data/mrpc_dev_ids.tsv"
-_MRPC_TRAIN = (
-    "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_train.txt"
-)
-_MRPC_TEST = (
-    "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_test.txt"
-)
+_MRPC_TRAIN = "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_train.txt"
+_MRPC_TEST = "https://dl.fbaipublicfiles.com/senteval/senteval_data/msr_paraphrase_test.txt"
 
 _MNLI_BASE_KWARGS = dict(
     text_features={
@@ -56,7 +52,8 @@ _MNLI_BASE_KWARGS = dict(
     label_column="gold_label",
     data_url="https://dl.fbaipublicfiles.com/glue/data/MNLI.zip",
     data_dir="MNLI",
-    citation=textwrap.dedent("""\
+    citation=textwrap.dedent(
+        """\
       @InProceedings{N18-1101,
         author = "Williams, Adina
                   and Nangia, Nikita
@@ -79,7 +76,8 @@ _MNLI_BASE_KWARGS = dict(
         author={Bowman, Samuel R and Angeli, Gabor and Potts, Christopher and Manning, Christopher D},
         journal={arXiv preprint arXiv:1508.05326},
         year={2015}
-      }"""),
+      }"""
+    ),
     url="http://www.nyu.edu/projects/bowman/multinli/",
 )
 
@@ -118,8 +116,7 @@ class GlueConfig(datasets.BuilderConfig):
             of the label and processing it to the form required by the label feature
           **kwargs: keyword arguments forwarded to super.
         """
-        super(GlueConfig, self).__init__(version=datasets.Version("1.0.0", ""),
-                                         **kwargs)
+        super(GlueConfig, self).__init__(version=datasets.Version("1.0.0", ""), **kwargs)
         self.text_features = text_features
         self.label_column = label_column
         self.label_classes = label_classes
@@ -136,77 +133,87 @@ class Glue(datasets.GeneratorBasedBuilder):
     BUILDER_CONFIGS = [
         GlueConfig(
             name="cola",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Corpus of Linguistic Acceptability consists of English
             acceptability judgments drawn from books and journal articles on
             linguistic theory. Each example is a sequence of words annotated
-            with whether it is a grammatical English sentence."""),
+            with whether it is a grammatical English sentence."""
+            ),
             text_features={"sentence": "sentence"},
             label_classes=["unacceptable", "acceptable"],
             label_column="is_acceptable",
             data_url="https://dl.fbaipublicfiles.com/glue/data/CoLA.zip",
             data_dir="CoLA",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @article{warstadt2018neural,
               title={Neural Network Acceptability Judgments},
               author={Warstadt, Alex and Singh, Amanpreet and Bowman, Samuel R},
               journal={arXiv preprint arXiv:1805.12471},
               year={2018}
-            }"""),
+            }"""
+            ),
             url="https://nyu-mll.github.io/CoLA/",
         ),
         GlueConfig(
             name="sst2",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Stanford Sentiment Treebank consists of sentences from movie reviews and
             human annotations of their sentiment. The task is to predict the sentiment of a
             given sentence. We use the two-way (positive/negative) class split, and use only
-            sentence-level labels."""),
+            sentence-level labels."""
+            ),
             text_features={"sentence": "sentence"},
             label_classes=["negative", "positive"],
             label_column="label",
             data_url="https://dl.fbaipublicfiles.com/glue/data/SST-2.zip",
             data_dir="SST-2",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @inproceedings{socher2013recursive,
               title={Recursive deep models for semantic compositionality over a sentiment treebank},
               author={Socher, Richard and Perelygin, Alex and Wu, Jean and Chuang, Jason and Manning, Christopher D and Ng, Andrew and Potts, Christopher},
               booktitle={Proceedings of the 2013 conference on empirical methods in natural language processing},
               pages={1631--1642},
               year={2013}
-            }"""),
+            }"""
+            ),
             url="https://datasets.stanford.edu/sentiment/index.html",
         ),
         GlueConfig(
             name="mrpc",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Microsoft Research Paraphrase Corpus (Dolan & Brockett, 2005) is a corpus of
             sentence pairs automatically extracted from online news sources, with human annotations
             for whether the sentences in the pair are semantically equivalent."""
-                                        ),  # pylint: disable=line-too-long
-            text_features={
-                "sentence1": "",
-                "sentence2": ""
-            },
+            ),  # pylint: disable=line-too-long
+            text_features={"sentence1": "", "sentence2": ""},
             label_classes=["not_equivalent", "equivalent"],
             label_column="Quality",
             data_url="",  # MRPC isn't hosted by GLUE.
             data_dir="MRPC",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @inproceedings{dolan2005automatically,
               title={Automatically constructing a corpus of sentential paraphrases},
               author={Dolan, William B and Brockett, Chris},
               booktitle={Proceedings of the Third International Workshop on Paraphrasing (IWP2005)},
               year={2005}
-            }"""),
+            }"""
+            ),
             url="https://www.microsoft.com/en-us/download/details.aspx?id=52398",
         ),
         GlueConfig(
             name="qqp",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Quora Question Pairs2 dataset is a collection of question pairs from the
             community question-answering website Quora. The task is to determine whether a
-            pair of questions are semantically equivalent."""),
+            pair of questions are semantically equivalent."""
+            ),
             text_features={
                 "question1": "question1",
                 "question2": "question2",
@@ -215,24 +222,27 @@ class Glue(datasets.GeneratorBasedBuilder):
             label_column="is_duplicate",
             data_url="https://dl.fbaipublicfiles.com/glue/data/QQP-clean.zip",
             data_dir="QQP",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
           @online{WinNT,
             author = {Iyer, Shankar and Dandekar, Nikhil and Csernai, Kornel},
             title = {First Quora Dataset Release: Question Pairs},
             year = {2017},
             url = {https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs},
             urldate = {2019-04-03}
-          }"""),
-            url=
-            "https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs",
+          }"""
+            ),
+            url="https://data.quora.com/First-Quora-Dataset-Release-Question-Pairs",
         ),
         GlueConfig(
             name="stsb",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Semantic Textual Similarity Benchmark (Cer et al., 2017) is a collection of
             sentence pairs drawn from news headlines, video and image captions, and natural
             language inference data. Each pair is human-annotated with a similarity score
-            from 1 to 5."""),
+            from 1 to 5."""
+            ),
             text_features={
                 "sentence1": "sentence1",
                 "sentence2": "sentence2",
@@ -240,19 +250,22 @@ class Glue(datasets.GeneratorBasedBuilder):
             label_column="score",
             data_url="https://dl.fbaipublicfiles.com/glue/data/STS-B.zip",
             data_dir="STS-B",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @article{cer2017semeval,
               title={Semeval-2017 task 1: Semantic textual similarity-multilingual and cross-lingual focused evaluation},
               author={Cer, Daniel and Diab, Mona and Agirre, Eneko and Lopez-Gazpio, Inigo and Specia, Lucia},
               journal={arXiv preprint arXiv:1708.00055},
               year={2017}
-            }"""),
+            }"""
+            ),
             url="http://ixa2.si.ehu.es/stswiki/index.php/STSbenchmark",
             process_label=np.float32,
         ),
         GlueConfig(
             name="mnli",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Multi-Genre Natural Language Inference Corpus is a crowdsourced
             collection of sentence pairs with textual entailment annotations. Given a premise sentence
             and a hypothesis sentence, the task is to predict whether the premise entails the hypothesis
@@ -260,26 +273,32 @@ class Glue(datasets.GeneratorBasedBuilder):
             gathered from ten different sources, including transcribed speech, fiction, and government reports.
             We use the standard test set, for which we obtained private labels from the authors, and evaluate
             on both the matched (in-domain) and mismatched (cross-domain) section. We also use and recommend
-            the SNLI corpus as 550k examples of auxiliary training data."""),
+            the SNLI corpus as 550k examples of auxiliary training data."""
+            ),
             **_MNLI_BASE_KWARGS,
         ),
         GlueConfig(
             name="mnli_mismatched",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
           The mismatched validation and test splits from MNLI.
-          See the "mnli" BuilderConfig for additional information."""),
+          See the "mnli" BuilderConfig for additional information."""
+            ),
             **_MNLI_BASE_KWARGS,
         ),
         GlueConfig(
             name="mnli_matched",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
           The matched validation and test splits from MNLI.
-          See the "mnli" BuilderConfig for additional information."""),
+          See the "mnli" BuilderConfig for additional information."""
+            ),
             **_MNLI_BASE_KWARGS,
         ),
         GlueConfig(
             name="qnli",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Stanford Question Answering Dataset is a question-answering
             dataset consisting of question-paragraph pairs, where one of the sentences in the paragraph (drawn
             from Wikipedia) contains the answer to the corresponding question (written by an annotator). We
@@ -289,7 +308,7 @@ class Glue(datasets.GeneratorBasedBuilder):
             the answer to the question. This modified version of the original task removes the requirement that
             the model select the exact answer, but also removes the simplifying assumptions that the answer
             is always present in the input and that lexical overlap is a reliable cue."""
-                                        ),  # pylint: disable=line-too-long
+            ),  # pylint: disable=line-too-long
             text_features={
                 "question": "question",
                 "sentence": "sentence",
@@ -298,24 +317,27 @@ class Glue(datasets.GeneratorBasedBuilder):
             label_column="label",
             data_url="https://dl.fbaipublicfiles.com/glue/data/QNLIv2.zip",
             data_dir="QNLI",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @article{rajpurkar2016squad,
               title={Squad: 100,000+ questions for machine comprehension of text},
               author={Rajpurkar, Pranav and Zhang, Jian and Lopyrev, Konstantin and Liang, Percy},
               journal={arXiv preprint arXiv:1606.05250},
               year={2016}
-            }"""),
+            }"""
+            ),
             url="https://rajpurkar.github.io/SQuAD-explorer/",
         ),
         GlueConfig(
             name="rte",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Recognizing Textual Entailment (RTE) datasets come from a series of annual textual
             entailment challenges. We combine the data from RTE1 (Dagan et al., 2006), RTE2 (Bar Haim
             et al., 2006), RTE3 (Giampiccolo et al., 2007), and RTE5 (Bentivogli et al., 2009).4 Examples are
             constructed based on news and Wikipedia text. We convert all datasets to a two-class split, where
             for three-class datasets we collapse neutral and contradiction into not entailment, for consistency."""
-                                        ),  # pylint: disable=line-too-long
+            ),  # pylint: disable=line-too-long
             text_features={
                 "sentence1": "sentence1",
                 "sentence2": "sentence2",
@@ -324,7 +346,8 @@ class Glue(datasets.GeneratorBasedBuilder):
             label_column="label",
             data_url="https://dl.fbaipublicfiles.com/glue/data/RTE.zip",
             data_dir="RTE",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @inproceedings{dagan2005pascal,
               title={The PASCAL recognising textual entailment challenge},
               author={Dagan, Ido and Glickman, Oren and Magnini, Bernardo},
@@ -356,12 +379,14 @@ class Glue(datasets.GeneratorBasedBuilder):
               author={Bentivogli, Luisa and Clark, Peter and Dagan, Ido and Giampiccolo, Danilo},
               booktitle={TAC},
               year={2009}
-            }"""),
+            }"""
+            ),
             url="https://aclweb.org/aclwiki/Recognizing_Textual_Entailment",
         ),
         GlueConfig(
             name="wnli",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             The Winograd Schema Challenge (Levesque et al., 2011) is a reading comprehension task
             in which a system must read a sentence with a pronoun and select the referent of that pronoun from
             a list of choices. The examples are manually constructed to foil simple statistical methods: Each
@@ -376,7 +401,8 @@ class Glue(datasets.GeneratorBasedBuilder):
             training examples, they will predict the wrong label on corresponding development set
             example. As with QNLI, each example is evaluated separately, so there is not a systematic correspondence
             between a model's score on this task and its score on the unconverted original task. We
-            call converted dataset WNLI (Winograd NLI)."""),
+            call converted dataset WNLI (Winograd NLI)."""
+            ),
             text_features={
                 "sentence1": "sentence1",
                 "sentence2": "sentence2",
@@ -385,24 +411,27 @@ class Glue(datasets.GeneratorBasedBuilder):
             label_column="label",
             data_url="https://dl.fbaipublicfiles.com/glue/data/WNLI.zip",
             data_dir="WNLI",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
             @inproceedings{levesque2012winograd,
               title={The winograd schema challenge},
               author={Levesque, Hector and Davis, Ernest and Morgenstern, Leora},
               booktitle={Thirteenth International Conference on the Principles of Knowledge Representation and Reasoning},
               year={2012}
-            }"""),
-            url=
-            "https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html",
+            }"""
+            ),
+            url="https://cs.nyu.edu/faculty/davise/papers/WinogradSchemas/WS.html",
         ),
         GlueConfig(
             name="ax",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             A manually-curated evaluation dataset for fine-grained analysis of
             system performance on a broad range of linguistic phenomena. This
             dataset evaluates sentence understanding through Natural Language
             Inference (NLI) problems. Use a model trained on MulitNLI to produce
-            predictions for this dataset."""),
+            predictions for this dataset."""
+            ),
             text_features={
                 "premise": "sentence1",
                 "hypothesis": "sentence2",
@@ -419,13 +448,9 @@ class Glue(datasets.GeneratorBasedBuilder):
     ]
 
     def _info(self):
-        features = {
-            text_feature: datasets.Value("string")
-            for text_feature in self.config.text_features.keys()
-        }
+        features = {text_feature: datasets.Value("string") for text_feature in self.config.text_features.keys()}
         if self.config.label_classes:
-            features["label"] = datasets.features.ClassLabel(
-                names=self.config.label_classes)
+            features["label"] = datasets.features.ClassLabel(names=self.config.label_classes)
         else:
             features["label"] = datasets.Value("float32")
         features["idx"] = datasets.Value("int32")
@@ -451,11 +476,13 @@ class Glue(datasets.GeneratorBasedBuilder):
 
         if self.config.name == "mrpc":
             data_dir = None
-            mrpc_files = dl_manager.download({
-                "dev_ids": _MRPC_DEV_IDS,
-                "train": _MRPC_TRAIN,
-                "test": _MRPC_TEST,
-            })
+            mrpc_files = dl_manager.download(
+                {
+                    "dev_ids": _MRPC_DEV_IDS,
+                    "train": _MRPC_TRAIN,
+                    "test": _MRPC_TEST,
+                }
+            )
         else:
             dl_dir = dl_manager.download_and_extract(self.config.data_url)
             data_dir = os.path.join(dl_dir, self.config.data_dir)
@@ -471,37 +498,19 @@ class Glue(datasets.GeneratorBasedBuilder):
         if self.config.name == "mnli":
             return [
                 train_split,
-                _mnli_split_generator("validation_matched",
-                                      data_dir,
-                                      "dev",
-                                      matched=True),
-                _mnli_split_generator("validation_mismatched",
-                                      data_dir,
-                                      "dev",
-                                      matched=False),
-                _mnli_split_generator("test_matched",
-                                      data_dir,
-                                      "test",
-                                      matched=True),
-                _mnli_split_generator("test_mismatched",
-                                      data_dir,
-                                      "test",
-                                      matched=False),
+                _mnli_split_generator("validation_matched", data_dir, "dev", matched=True),
+                _mnli_split_generator("validation_mismatched", data_dir, "dev", matched=False),
+                _mnli_split_generator("test_matched", data_dir, "test", matched=True),
+                _mnli_split_generator("test_mismatched", data_dir, "test", matched=False),
             ]
         elif self.config.name == "mnli_matched":
             return [
-                _mnli_split_generator("validation",
-                                      data_dir,
-                                      "dev",
-                                      matched=True),
+                _mnli_split_generator("validation", data_dir, "dev", matched=True),
                 _mnli_split_generator("test", data_dir, "test", matched=True),
             ]
         elif self.config.name == "mnli_mismatched":
             return [
-                _mnli_split_generator("validation",
-                                      data_dir,
-                                      "dev",
-                                      matched=False),
+                _mnli_split_generator("validation", data_dir, "dev", matched=False),
                 _mnli_split_generator("test", data_dir, "test", matched=False),
             ]
         else:
@@ -528,8 +537,7 @@ class Glue(datasets.GeneratorBasedBuilder):
     def _generate_examples(self, data_file, split, mrpc_files=None):
         if self.config.name == "mrpc":
             # We have to prepare the MRPC dataset from the original sources ourselves.
-            examples = self._generate_example_mrpc_files(mrpc_files=mrpc_files,
-                                                         split=split)
+            examples = self._generate_example_mrpc_files(mrpc_files=mrpc_files, split=split)
             for example in examples:
                 yield example["idx"], example
         else:
@@ -541,13 +549,9 @@ class Glue(datasets.GeneratorBasedBuilder):
             is_cola_non_test = self.config.name == "cola" and split != "test"
 
             with open(data_file, encoding="utf8") as f:
-                reader = csv.DictReader(f,
-                                        delimiter="\t",
-                                        quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
                 if is_cola_non_test:
-                    reader = csv.reader(f,
-                                        delimiter="\t",
-                                        quoting=csv.QUOTE_NONE)
+                    reader = csv.reader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
 
                 for n, row in enumerate(reader):
                     if is_cola_non_test:
@@ -556,10 +560,7 @@ class Glue(datasets.GeneratorBasedBuilder):
                             "is_acceptable": row[1],
                         }
 
-                    example = {
-                        feat: row[col]
-                        for feat, col in self.config.text_features.items()
-                    }
+                    example = {feat: row[col] for feat, col in self.config.text_features.items()}
                     example["idx"] = n
 
                     if self.config.label_column in row:
@@ -585,9 +586,7 @@ class Glue(datasets.GeneratorBasedBuilder):
                 # The first 3 bytes are the utf-8 BOM \xef\xbb\xbf, which messes with
                 # the Quality key.
                 f.seek(3)
-                reader = csv.DictReader(f,
-                                        delimiter="\t",
-                                        quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
                 for n, row in enumerate(reader):
                     yield {
                         "sentence1": row["#1 String"],
@@ -603,9 +602,7 @@ class Glue(datasets.GeneratorBasedBuilder):
                 # The first 3 bytes are the utf-8 BOM \xef\xbb\xbf, which messes with
                 # the Quality key.
                 f.seek(3)
-                reader = csv.DictReader(f,
-                                        delimiter="\t",
-                                        quoting=csv.QUOTE_NONE)
+                reader = csv.DictReader(f, delimiter="\t", quoting=csv.QUOTE_NONE)
                 for n, row in enumerate(reader):
                     is_row_in_dev = [row["#1 ID"], row["#2 ID"]] in dev_ids
                     if is_row_in_dev == (split == "dev"):
@@ -621,13 +618,8 @@ def _mnli_split_generator(name, data_dir, split, matched):
     return datasets.SplitGenerator(
         name=name,
         gen_kwargs={
-            "data_file":
-            os.path.join(
-                data_dir,
-                "%s_%s.tsv" % (split, "matched" if matched else "mismatched")),
-            "split":
-            split,
-            "mrpc_files":
-            None,
+            "data_file": os.path.join(data_dir, "%s_%s.tsv" % (split, "matched" if matched else "mismatched")),
+            "split": split,
+            "mrpc_files": None,
         },
     )

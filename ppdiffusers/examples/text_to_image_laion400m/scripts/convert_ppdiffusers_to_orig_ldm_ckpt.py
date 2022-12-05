@@ -62,15 +62,13 @@ for i in range(4):
         # loop over resnets/attentions for downblocks
         hf_down_res_prefix = f"down_blocks.{i}.resnets.{j}."
         sd_down_res_prefix = f"input_blocks.{3*i + j + 1}.0."
-        unet_conversion_map_layer.append(
-            (sd_down_res_prefix, hf_down_res_prefix))
+        unet_conversion_map_layer.append((sd_down_res_prefix, hf_down_res_prefix))
 
         if i < 3:
             # no attention layers in down_blocks.3
             hf_down_atn_prefix = f"down_blocks.{i}.attentions.{j}."
             sd_down_atn_prefix = f"input_blocks.{3*i + j + 1}.1."
-            unet_conversion_map_layer.append(
-                (sd_down_atn_prefix, hf_down_atn_prefix))
+            unet_conversion_map_layer.append((sd_down_atn_prefix, hf_down_atn_prefix))
 
     for j in range(3):
         # loop over resnets/attentions for upblocks
@@ -82,21 +80,18 @@ for i in range(4):
             # no attention layers in up_blocks.0
             hf_up_atn_prefix = f"up_blocks.{i}.attentions.{j}."
             sd_up_atn_prefix = f"output_blocks.{3*i + j}.1."
-            unet_conversion_map_layer.append(
-                (sd_up_atn_prefix, hf_up_atn_prefix))
+            unet_conversion_map_layer.append((sd_up_atn_prefix, hf_up_atn_prefix))
 
     if i < 3:
         # no downsample in down_blocks.3
         hf_downsample_prefix = f"down_blocks.{i}.downsamplers.0.conv."
         sd_downsample_prefix = f"input_blocks.{3*(i+1)}.0.op."
-        unet_conversion_map_layer.append(
-            (sd_downsample_prefix, hf_downsample_prefix))
+        unet_conversion_map_layer.append((sd_downsample_prefix, hf_downsample_prefix))
 
         # no upsample in up_blocks.3
         hf_upsample_prefix = f"up_blocks.{i}.upsamplers.0."
         sd_upsample_prefix = f"output_blocks.{3*i + 2}.{1 if i == 0 else 2}."
-        unet_conversion_map_layer.append(
-            (sd_upsample_prefix, hf_upsample_prefix))
+        unet_conversion_map_layer.append((sd_upsample_prefix, hf_upsample_prefix))
 
 hf_mid_atn_prefix = "mid_block.attentions.0."
 sd_mid_atn_prefix = "middle_block.1."
@@ -210,8 +205,7 @@ def convert_vae_state_dict(vae_state_dict):
 # pretty much a no-op
 
 
-def convert_ppdiffusers_vae_unet_to_diffusers(vae_or_unet,
-                                              ppdiffusers_vae_unet_checkpoint):
+def convert_ppdiffusers_vae_unet_to_diffusers(vae_or_unet, ppdiffusers_vae_unet_checkpoint):
     need_transpose = []
     for k, v in vae_or_unet.named_sublayers(include_self=True):
         if isinstance(v, paddle.nn.Linear):
@@ -227,46 +221,63 @@ def convert_ppdiffusers_vae_unet_to_diffusers(vae_or_unet,
 
 def convert_ldmbert_state_dict(ldmbert_state_dict, num_layers=32):
     ppdiffusers_mapping_to_orig = {}
+    ppdiffusers_mapping_to_orig["embeddings.word_embeddings.weight"] = "cond_stage_model.transformer.token_emb.weight"
     ppdiffusers_mapping_to_orig[
-        "embeddings.word_embeddings.weight"] = "cond_stage_model.transformer.token_emb.weight"
-    ppdiffusers_mapping_to_orig[
-        "embeddings.position_embeddings.weight"] = "cond_stage_model.transformer.pos_emb.emb.weight"
+        "embeddings.position_embeddings.weight"
+    ] = "cond_stage_model.transformer.pos_emb.emb.weight"
     for i in range(num_layers):
         double_i = 2 * i
         double_i_plus1 = 2 * i + 1
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.norm1.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.0.weight"
+            f"encoder.layers.{i}.norm1.weight"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.0.weight"
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.norm1.bias"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.0.bias"
+            f"encoder.layers.{i}.norm1.bias"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.0.bias"
+
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.self_attn.q_proj.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_q.weight",
+            "transpose",
+        )
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.self_attn.k_proj.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_k.weight",
+            "transpose",
+        )
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.self_attn.v_proj.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_v.weight",
+            "transpose",
+        )
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.self_attn.out_proj.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_out.weight",
+            "transpose",
+        )
+        ppdiffusers_mapping_to_orig[
+            f"encoder.layers.{i}.self_attn.out_proj.bias"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_out.bias"
 
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.self_attn.q_proj.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_q.weight", "transpose"
+            f"encoder.layers.{i}.norm2.weight"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.0.weight"
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.self_attn.k_proj.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_k.weight", "transpose"
+            f"encoder.layers.{i}.norm2.bias"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.0.bias"
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.linear1.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.weight",
+            "transpose",
+        )
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.self_attn.v_proj.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_v.weight", "transpose"
+            f"encoder.layers.{i}.linear1.bias"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.bias"
+        ppdiffusers_mapping_to_orig[f"encoder.layers.{i}.linear2.weight"] = (
+            f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.2.weight",
+            "transpose",
+        )
         ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.self_attn.out_proj.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_out.weight", "transpose"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.self_attn.out_proj.bias"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i}.1.to_out.bias"
+            f"encoder.layers.{i}.linear2.bias"
+        ] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.2.bias"
 
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.norm2.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.0.weight"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.norm2.bias"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.0.bias"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.linear1.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.weight", "transpose"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.linear1.bias"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.0.0.bias"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.linear2.weight"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.2.weight", "transpose"
-        ppdiffusers_mapping_to_orig[
-            f"encoder.layers.{i}.linear2.bias"] = f"cond_stage_model.transformer.attn_layers.layers.{double_i_plus1}.1.net.2.bias"
-
-    ppdiffusers_mapping_to_orig[
-        "final_layer_norm.weight"] = "cond_stage_model.transformer.norm.weight"
-    ppdiffusers_mapping_to_orig[
-        "final_layer_norm.bias"] = "cond_stage_model.transformer.norm.bias"
+    ppdiffusers_mapping_to_orig["final_layer_norm.weight"] = "cond_stage_model.transformer.norm.weight"
+    ppdiffusers_mapping_to_orig["final_layer_norm.bias"] = "cond_stage_model.transformer.norm.bias"
 
     new_state_dict = {}
     for k, v in ldmbert_state_dict.items():
@@ -275,14 +286,12 @@ def convert_ldmbert_state_dict(ldmbert_state_dict, num_layers=32):
         if isinstance(new_name, (list, tuple)):
             need_transpose = True
             new_name = new_name[0]
-        new_state_dict[new_name] = torch.from_numpy(
-            v.t().numpy()) if need_transpose else torch.from_numpy(v.numpy())
+        new_state_dict[new_name] = torch.from_numpy(v.t().numpy()) if need_transpose else torch.from_numpy(v.numpy())
 
     # dummpy weights, we donot use this!
-    new_state_dict[
-        "cond_stage_model.transformer.to_logits.weight"] = torch.zeros(
-            new_state_dict["cond_stage_model.transformer.token_emb.weight"].
-            shape)
+    new_state_dict["cond_stage_model.transformer.to_logits.weight"] = torch.zeros(
+        new_state_dict["cond_stage_model.transformer.token_emb.weight"].shape
+    )
     new_state_dict["cond_stage_model.transformer.to_logits.bias"] = torch.zeros(
         new_state_dict["cond_stage_model.transformer.token_emb.weight"].shape[0]
     )
@@ -291,44 +300,27 @@ def convert_ldmbert_state_dict(ldmbert_state_dict, num_layers=32):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="Path to the model to convert.")
-    parser.add_argument("--dump_path",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="Path to the output model.")
-    parser.add_argument("--half",
-                        action="store_true",
-                        help="Save weights in half precision.")
+    parser.add_argument(
+        "--model_name_or_path", default=None, type=str, required=True, help="Path to the model to convert."
+    )
+    parser.add_argument("--dump_path", default=None, type=str, required=True, help="Path to the output model.")
+    parser.add_argument("--half", action="store_true", help="Save weights in half precision.")
 
     args = parser.parse_args()
     pipe = LDMTextToImagePipeline.from_pretrained(args.model_name_or_path)
 
     # Convert the UNet model
-    unet_state_dict = convert_ppdiffusers_vae_unet_to_diffusers(
-        pipe.unet, pipe.unet.state_dict())
+    unet_state_dict = convert_ppdiffusers_vae_unet_to_diffusers(pipe.unet, pipe.unet.state_dict())
     unet_state_dict = convert_unet_state_dict(unet_state_dict)
-    unet_state_dict = {
-        "model.diffusion_model." + k: v
-        for k, v in unet_state_dict.items()
-    }
+    unet_state_dict = {"model.diffusion_model." + k: v for k, v in unet_state_dict.items()}
 
     # Convert the VAE model
-    vae_state_dict = convert_ppdiffusers_vae_unet_to_diffusers(
-        pipe.vqvae, pipe.vqvae.state_dict())
+    vae_state_dict = convert_ppdiffusers_vae_unet_to_diffusers(pipe.vqvae, pipe.vqvae.state_dict())
     vae_state_dict = convert_vae_state_dict(vae_state_dict)
-    vae_state_dict = {
-        "first_stage_model." + k: v
-        for k, v in vae_state_dict.items()
-    }
+    vae_state_dict = {"first_stage_model." + k: v for k, v in vae_state_dict.items()}
 
     # Convert the ldmbert model
-    text_enc_dict = convert_ldmbert_state_dict(
-        pipe.bert.state_dict(), num_layers=pipe.bert.config["encoder_layers"])
+    text_enc_dict = convert_ldmbert_state_dict(pipe.bert.state_dict(), num_layers=pipe.bert.config["encoder_layers"])
 
     # Put together new checkpoint
     state_dict = {**unet_state_dict, **vae_state_dict, **text_enc_dict}

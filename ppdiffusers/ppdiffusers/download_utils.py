@@ -17,12 +17,12 @@ from paddlenlp.utils.downloader import get_path_from_url, download_check
 from .utils import PPDIFFUSERS_CACHE, DOWNLOAD_SERVER
 
 
-def ppdiffusers_bos_download(pretrained_model_name_or_path,
-                             filename=None,
-                             subfolder=None):
-    cache_dir = pretrained_model_name_or_path if os.path.isdir(
-        pretrained_model_name_or_path) else os.path.join(
-            PPDIFFUSERS_CACHE, pretrained_model_name_or_path)
+def ppdiffusers_bos_download(pretrained_model_name_or_path, filename=None, subfolder=None):
+    cache_dir = (
+        pretrained_model_name_or_path
+        if os.path.isdir(pretrained_model_name_or_path)
+        else os.path.join(PPDIFFUSERS_CACHE, pretrained_model_name_or_path)
+    )
     url = DOWNLOAD_SERVER + "/" + pretrained_model_name_or_path
     if subfolder is not None:
         url = url + "/" + subfolder

@@ -19,7 +19,6 @@ from .. import C
 
 
 class NormalizedString:
-
     def __init__(self, raw_str: str):
         self._normalized = C.normalizers.NormalizedString(raw_str)
 
@@ -28,7 +27,6 @@ class NormalizedString:
 
 
 class Normalizer(ABC):
-
     def normalize_str(self, sequence: str):
         return self._normalizer.normalize_str(sequence)
 
@@ -40,83 +38,67 @@ class Normalizer(ABC):
 
 
 class BertNormalizer(Normalizer):
-
-    def __init__(self,
-                 clean_text: bool = True,
-                 handle_chinese_chars: bool = True,
-                 strip_accents: bool = True,
-                 lowercase: bool = True):
-        self._normalizer = C.normalizers.BertNormalizer(clean_text,
-                                                        handle_chinese_chars,
-                                                        strip_accents,
-                                                        lowercase)
+    def __init__(
+        self,
+        clean_text: bool = True,
+        handle_chinese_chars: bool = True,
+        strip_accents: bool = True,
+        lowercase: bool = True,
+    ):
+        self._normalizer = C.normalizers.BertNormalizer(clean_text, handle_chinese_chars, strip_accents, lowercase)
 
 
 class ReplaceNormalizer(Normalizer):
-
     def __init__(self, pattern: str, content: str):
         self._normalizer = C.normalizers.ReplaceNormalizer(pattern, content)
 
 
 class StripNormalizer(Normalizer):
-
     def __init__(self, left: bool = True, right: bool = True):
         self._normalizer = C.normalizers.StripNormalizer(left, right)
 
 
 class StripAccentsNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.StripAccentsNormalizer()
 
 
 class NFCNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.NFCNormalizer()
 
 
 class NFDNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.NFDNormalizer()
 
 
 class NFKCNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.NFKCNormalizer()
 
 
 class NFKDNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.NFKDNormalizer()
 
 
 class NmtNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.NmtNormalizer()
 
 
 class LowercaseNormalizer(Normalizer):
-
     def __init__(self):
         self._normalizer = C.normalizers.LowercaseNormalizer()
 
 
 class SequenceNormalizer(Normalizer):
-
     def __init__(self, normalizer_list=[]):
-        normalizer_list = [
-            normalizer._normalizer for normalizer in normalizer_list
-        ]
+        normalizer_list = [normalizer._normalizer for normalizer in normalizer_list]
         self._normalizer = C.normalizers.SequenceNormalizer(normalizer_list)
 
 
 class PrecompiledNormalizer(Normalizer):
-
     def __init__(self, precompiled_charsmap: str):
-        self._normalizer = C.normalizers.PrecompiledNormalizer(
-            precompiled_charsmap)
+        self._normalizer = C.normalizers.PrecompiledNormalizer(precompiled_charsmap)

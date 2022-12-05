@@ -46,28 +46,25 @@ parser.add_argument("--predict_file", type=str, default="predict.txt", help="pre
 args = parser.parse_args()
 
 
-def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
-                                tokenizer):
-    with open(args.test_file, 'r', encoding='utf-8') as fin:
-        with open(args.predict_file, 'w', encoding='utf-8') as fout:
+def write_sighan_result_to_file(args, corr_preds, det_preds, lengths, tokenizer):
+    with open(args.test_file, "r", encoding="utf-8") as fin:
+        with open(args.predict_file, "w", encoding="utf-8") as fout:
             for i, line in enumerate(fin.readlines()):
-                ids, words = line.strip('\n').split('\t')[0:2]
-                ids = ids.split('=')[1][:-1]
-                pred_result = parse_decode(words, corr_preds[i], det_preds[i],
-                                           lengths[i], tokenizer,
-                                           args.max_seq_length)
+                ids, words = line.strip("\n").split("\t")[0:2]
+                ids = ids.split("=")[1][:-1]
+                pred_result = parse_decode(
+                    words, corr_preds[i], det_preds[i], lengths[i], tokenizer, args.max_seq_length
+                )
                 words = list(words)
                 pred_result = list(pred_result)
                 result = ids
                 if pred_result == words:
-                    result += ', 0'
+                    result += ", 0"
                 else:
-                    assert len(pred_result) == len(
-                        words), "pred_result: {}, words: {}".format(
-                            pred_result, words)
+                    assert len(pred_result) == len(words), "pred_result: {}, words: {}".format(pred_result, words)
                     for i, word in enumerate(pred_result):
                         if word != words[i]:
-                            result += ', {}, {}'.format(i + 1, word)
+                            result += ", {}, {}".format(i + 1, word)
                 fout.write("{}\n".format(result))
 
 
@@ -75,38 +72,31 @@ def write_sighan_result_to_file(args, corr_preds, det_preds, lengths,
 def do_predict(args):
     paddle.set_device(args.device)
 
-    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
-                                         unk_token='[UNK]',
-                                         pad_token='[PAD]')
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path, unk_token="[UNK]", pad_token="[PAD]")
 
     tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
     ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = ErnieForCSC(ernie,
-                        pinyin_vocab_size=len(pinyin_vocab),
-                        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
+    model = ErnieForCSC(ernie, pinyin_vocab_size=len(pinyin_vocab), pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     eval_ds = load_dataset(read_test_ds, data_path=args.test_file, lazy=False)
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         pinyin_vocab=pinyin_vocab,
-                         max_seq_length=args.max_seq_length,
-                         is_test=True)
+    trans_func = partial(
+        convert_example,
+        tokenizer=tokenizer,
+        pinyin_vocab=pinyin_vocab,
+        max_seq_length=args.max_seq_length,
+        is_test=True,
+    )
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # segment
-        Pad(axis=0,
-            pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token],
-            dtype='int64'),  # pinyin
-        Stack(axis=0, dtype='int64'),  # length
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        Pad(axis=0, pad_val=pinyin_vocab.token_to_idx[pinyin_vocab.pad_token], dtype="int64"),  # pinyin
+        Stack(axis=0, dtype="int64"),  # length
     ): [data for data in fn(samples)]
 
-    test_data_loader = create_dataloader(eval_ds,
-                                         mode='test',
-                                         batch_size=args.batch_size,
-                                         batchify_fn=batchify_fn,
-                                         trans_fn=trans_func)
+    test_data_loader = create_dataloader(
+        eval_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.ckpt_path:
         model_dict = paddle.load(args.ckpt_path)
@@ -119,8 +109,7 @@ def do_predict(args):
     lengths = []
     for step, batch in enumerate(test_data_loader):
         input_ids, token_type_ids, pinyin_ids, length = batch
-        det_error_probs, corr_logits = model(input_ids, pinyin_ids,
-                                             token_type_ids)
+        det_error_probs, corr_logits = model(input_ids, pinyin_ids, token_type_ids)
         # corr_logits shape: [B, T, V]
         det_pred = det_error_probs.argmax(axis=-1)
         det_pred = det_pred.numpy()

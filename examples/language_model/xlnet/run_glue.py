@@ -98,61 +98,64 @@ def evaluate(model, loss_fct, metric, data_loader):
     if isinstance(metric, AccuracyAndF1):
         print(
             "eval loss: %f, acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s"
-            % (np.average(losses), res[0], res[1], res[2], res[3], res[4]))
+            % (np.average(losses), res[0], res[1], res[2], res[3], res[4])
+        )
 
-        final_res = "final:    acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s"\
-                    % (res[0], res[1], res[2], res[3], res[4])
+        final_res = "final:    acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s" % (
+            res[0],
+            res[1],
+            res[2],
+            res[3],
+            res[4],
+        )
     elif isinstance(metric, Mcc):
         print("eval loss: %f, mcc: %s" % (np.average(losses), res[0]))
         final_res = "final:    mcc: %s" % (res[0])
     elif isinstance(metric, PearsonAndSpearman):
         print(
             "eval loss: %f, pearson: %s, spearman: %s, pearson and spearman: %s"
-            % (np.average(losses), res[0], res[1], res[2]))
-        final_res = "final:    pearson: %s, spearman: %s, pearson and spearman: %s" % (
-            res[0], res[1], res[2])
+            % (np.average(losses), res[0], res[1], res[2])
+        )
+        final_res = "final:    pearson: %s, spearman: %s, pearson and spearman: %s" % (res[0], res[1], res[2])
     else:
         print("eval loss: %f, acc: %s" % (np.average(losses), res))
         final_res = "final:    acc: %s" % res
     model.train()
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    pad_to_max_seq_len=False,
-                    is_test=False):
+def convert_example(example, tokenizer, label_list, max_seq_length=512, pad_to_max_seq_len=False, is_test=False):
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
         label_dtype = "int64" if label_list else "float32"
         # Get the label
-        label = example['labels']
+        label = example["labels"]
         label = np.array([label], dtype=label_dtype)
     # Convert raw text to feature
     if (int(is_test) + len(example)) == 2:
-        example = tokenizer(example['sentence'],
-                            max_seq_len=max_seq_length,
-                            pad_to_max_seq_len=pad_to_max_seq_len,
-                            return_attention_mask=True)
+        example = tokenizer(
+            example["sentence"],
+            max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
+            return_attention_mask=True,
+        )
     else:
-        example = tokenizer(example['sentence1'],
-                            text_pair=example['sentence2'],
-                            max_seq_len=max_seq_length,
-                            pad_to_max_seq_len=pad_to_max_seq_len,
-                            return_attention_mask=True)
+        example = tokenizer(
+            example["sentence1"],
+            text_pair=example["sentence2"],
+            max_seq_len=max_seq_length,
+            pad_to_max_seq_len=pad_to_max_seq_len,
+            return_attention_mask=True,
+        )
 
     if not is_test:
-        return example['input_ids'], example['token_type_ids'], example[
-            'attention_mask'], label
+        return example["input_ids"], example["token_type_ids"], example["attention_mask"], label
     else:
-        return example['input_ids'], example['token_type_ids'], example[
-            'attention_mask']
+        return example["input_ids"], example["token_type_ids"], example["attention_mask"]
 
 
 def create_data_loader(args, tokenizer):
-    train_ds = load_dataset('glue', args.task_name, splits="train")
+    train_ds = load_dataset("glue", args.task_name, splits="train")
 
     trans_func = partial(
         convert_example,
@@ -162,58 +165,60 @@ def create_data_loader(args, tokenizer):
         pad_to_max_seq_len=args.pad_to_max_seq_len,
     )
     train_ds = train_ds.map(trans_func, lazy=True)
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, pad_right=False),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False
-            ),  # token_type
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, pad_right=False),  # token_type
         Pad(axis=0, pad_val=0, pad_right=False),  # attention_mask
         Stack(dtype="int64" if train_ds.label_list else "float32"),  # label
     ): fn(samples)
 
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=batchify_fn,
-                                   num_workers=0,
-                                   return_list=True)
+    train_data_loader = DataLoader(
+        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+    )
 
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
-            'glue', args.task_name, splits=["dev_matched", "dev_mismatched"])
+            "glue", args.task_name, splits=["dev_matched", "dev_mismatched"]
+        )
         dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
         dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
-        dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_ds_matched, batch_size=args.batch_size, shuffle=False)
+        dev_batch_sampler_matched = paddle.io.BatchSampler(dev_ds_matched, batch_size=args.batch_size, shuffle=False)
         dev_data_loader_matched = DataLoader(
             dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
             collate_fn=batchify_fn,
             num_workers=0,
-            return_list=True)
+            return_list=True,
+        )
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size, shuffle=False
+        )
         dev_data_loader_mismatched = DataLoader(
             dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
             collate_fn=batchify_fn,
             num_workers=0,
-            return_list=True)
+            return_list=True,
+        )
 
-        return train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched
+        return (
+            train_data_loader,
+            dev_data_loader_matched,
+            dev_data_loader_mismatched,
+            train_ds,
+            dev_ds_matched,
+            dev_ds_mismatched,
+        )
     else:
-        dev_ds = load_dataset('glue', args.task_name, splits='dev')
+        dev_ds = load_dataset("glue", args.task_name, splits="dev")
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
-                                                   batch_size=args.batch_size,
-                                                   shuffle=False)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
 
-        dev_data_loader = DataLoader(dataset=dev_ds,
-                                     batch_sampler=dev_batch_sampler,
-                                     collate_fn=batchify_fn,
-                                     num_workers=0,
-                                     return_list=True)
+        dev_data_loader = DataLoader(
+            dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+        )
 
         return train_data_loader, dev_data_loader, train_ds, dev_ds
 
@@ -233,15 +238,19 @@ def do_train(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     if args.task_name == "mnli":
-        train_data_loader, dev_data_loader_matched, dev_data_loader_mismatched, train_ds, dev_ds_matched, dev_ds_mismatched = create_data_loader(
-            args, tokenizer)
+        (
+            train_data_loader,
+            dev_data_loader_matched,
+            dev_data_loader_mismatched,
+            train_ds,
+            dev_ds_matched,
+            dev_ds_mismatched,
+        ) = create_data_loader(args, tokenizer)
     else:
-        train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(
-            args, tokenizer)
+        train_data_loader, dev_data_loader, train_ds, dev_ds = create_data_loader(args, tokenizer)
 
     num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
-    model = XLNetForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=num_classes)
+    model = XLNetForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=num_classes)
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
@@ -254,16 +263,12 @@ def do_train(args):
         num_train_epochs = args.num_train_epochs
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.max_grad_norm)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "layer_norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "layer_norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
@@ -272,10 +277,10 @@ def do_train(args):
         parameters=model.parameters(),
         grad_clip=clip,
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
-    loss_fct = paddle.nn.loss.CrossEntropyLoss(
-    ) if train_ds.label_list else paddle.nn.loss.MSELoss()
+    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
@@ -304,8 +309,7 @@ def do_train(args):
             profiler.add_profiler_step(args.profiler_options)
 
             if global_step % args.logging_steps == 0:
-                speed = args.logging_steps / (train_reader_cost +
-                                              train_run_cost)
+                speed = args.logging_steps / (train_reader_cost + train_run_cost)
                 avg_reader_cost = train_reader_cost / args.logging_steps
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s, avg_reader_cost: %.4f sec, avg_batch_cost: %.4f sec, avg_samples: %d, avg_ips: %.4f sequences/sec"
@@ -322,7 +326,8 @@ def do_train(args):
                         1.0 / speed,
                         args.batch_size,
                         speed * args.batch_size,
-                    ))
+                    )
+                )
                 train_reader_cost = 0.0
                 train_run_cost = 0.0
 
@@ -333,24 +338,19 @@ def do_train(args):
                     evaluate(model, loss_fct, metric, dev_data_loader_matched)
                     final_res1 = "matched " + final_res
                     print("mismatched ", end="")
-                    evaluate(model, loss_fct, metric,
-                             dev_data_loader_mismatched)
+                    evaluate(model, loss_fct, metric, dev_data_loader_mismatched)
                     final_res2 = "mismatched " + final_res
                     final_res = final_res1 + "\r\n" + final_res2
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
                     print("eval done total : %s s" % (time.time() - tic_eval))
-                if (not paddle.distributed.get_world_size() > 1
-                    ) or paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(
-                        args.output_dir,
-                        "%s_ft_model_%d" % (args.task_name, global_step))
+                if (not paddle.distributed.get_world_size() > 1) or paddle.distributed.get_rank() == 0:
+                    output_dir = os.path.join(args.output_dir, "%s_ft_model_%d" % (args.task_name, global_step))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
+                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
                 if global_step == num_training_steps:
@@ -362,10 +362,10 @@ def do_train(args):
 
 def print_arguments(args):
     """print arguments"""
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
 
 
 if __name__ == "__main__":

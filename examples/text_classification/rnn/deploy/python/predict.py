@@ -59,7 +59,6 @@ def preprocess_prediction_data(text, tokenizer):
 
 
 class Predictor(object):
-
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -77,20 +76,11 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
-    def predict(self,
-                data,
-                tokenizer,
-                label_map,
-                batch_size=1,
-                network="bilstm"):
+    def predict(self, data, tokenizer, label_map, batch_size=1, network="bilstm"):
         """
         Predicts the data labels.
 
@@ -98,7 +88,7 @@ class Predictor(object):
             model (obj:`paddle.nn.Layer`): A model to classify texts.
             data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
                 A Example object contains `text`(word_ids) and `se_len`(sequence length).
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from 
+            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from
                 :class:`~paddlenlp.transformers.PretrainedTokenizer` which contains most of the methods.
                  Users should refer to the superclass for more information regarding methods.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
@@ -113,25 +103,17 @@ class Predictor(object):
             examples.append((input_id, seq_len))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)
-                ),  # input_id
-            Stack()  # seq_len
+            Pad(axis=0, pad_val=tokenizer.vocab.token_to_idx.get("[PAD]", 0)), Stack()  # input_id  # seq_len
         ): fn(samples)
 
         # Seperates data into some batches.
-        batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
+        batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         results = []
         for batch in batches:
             input_ids, seq_lens = batchify_fn(batch)
             self.input_handles[0].copy_from_cpu(input_ids)
-            if network in [
-                    "lstm", "bilstm", "gru", "bigru", "rnn", "birnn",
-                    "bilstm_attn"
-            ]:
+            if network in ["lstm", "bilstm", "gru", "bigru", "rnn", "birnn", "bilstm_attn"]:
                 self.input_handles[1].copy_from_cpu(seq_lens)
             self.predictor.run()
             logits = self.output_handle.copy_to_cpu()
@@ -146,23 +128,18 @@ class Predictor(object):
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_file, args.params_file, args.device,
-                          args.max_seq_length)
+    predictor = Predictor(args.model_file, args.params_file, args.device, args.max_seq_length)
 
     # Firstly pre-processing prediction data  and then do predict.
     data = [
-        '非常不错，服务很好，位于市中心区，交通方便，不过价格也高！',
-        '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-        '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
+        "非常不错，服务很好，位于市中心区，交通方便，不过价格也高！",
+        "怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
+        "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。",
     ]
     vocab = Vocab.from_json(args.vocab_path)
     tokenizer = JiebaTokenizer(vocab)
-    label_map = {0: 'negative', 1: 'positive'}
+    label_map = {0: "negative", 1: "positive"}
 
-    results = predictor.predict(data,
-                                tokenizer,
-                                label_map,
-                                batch_size=args.batch_size,
-                                network=args.network)
+    results = predictor.predict(data, tokenizer, label_map, batch_size=args.batch_size, network=args.network)
     for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+        print("Data: {} \t Label: {}".format(text, results[idx]))

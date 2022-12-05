@@ -61,13 +61,10 @@ def evaluate(model, metric, data_loader):
     for batch in data_loader:
         token_ids, length, labels = batch
         preds = model(token_ids, length)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            length, preds, labels)
-        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
-                      num_correct_chunks.numpy())
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(length, preds, labels)
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
         precision, recall, f1_score = metric.accumulate()
-    logger.info("eval precision: %f, recall: %f, f1: %f" %
-                (precision, recall, f1_score))
+    logger.info("eval precision: %f, recall: %f, f1: %f" % (precision, recall, f1_score))
     model.train()
     return precision, recall, f1_score
 
@@ -80,18 +77,12 @@ def train(args):
         paddle.distributed.init_parallel_env()
     rank = paddle.distributed.get_rank()
 
-    word_vocab, label_vocab, train_loader, test_loader = create_data_loader(
-        args)
+    word_vocab, label_vocab, train_loader, test_loader = create_data_loader(args)
 
     # Define the model netword and its loss
-    model = BiGruCrf(args.emb_dim,
-                     args.hidden_size,
-                     len(word_vocab),
-                     len(label_vocab),
-                     crf_lr=args.crf_lr)
+    model = BiGruCrf(args.emb_dim, args.hidden_size, len(word_vocab), len(label_vocab), crf_lr=args.crf_lr)
     # Prepare optimizer, loss and metric evaluator
-    optimizer = paddle.optimizer.Adam(learning_rate=args.base_lr,
-                                      parameters=model.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=args.base_lr, parameters=model.parameters())
     chunk_evaluator = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     if args.init_checkpoint:
@@ -100,8 +91,7 @@ def train(args):
             model_dict = paddle.load(args.init_checkpoint)
             model.load_dict(model_dict)
         else:
-            logger.info("Cannot init checkpoint from %s which doesn't exist" %
-                        args.init_checkpoint)
+            logger.info("Cannot init checkpoint from %s which doesn't exist" % args.init_checkpoint)
     logger.info("Start training")
     # Start training
     global_step = 0
@@ -124,12 +114,16 @@ def train(args):
             if global_step % args.logging_steps == 0:
                 logger.info(
                     "global step %d / %d, loss: %f, avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                    %
-                    (global_step, last_step, avg_loss,
-                     train_reader_cost / args.logging_steps,
-                     (train_reader_cost + train_run_cost) / args.logging_steps,
-                     total_samples / args.logging_steps, total_samples /
-                     (train_reader_cost + train_run_cost)))
+                    % (
+                        global_step,
+                        last_step,
+                        avg_loss,
+                        train_reader_cost / args.logging_steps,
+                        (train_reader_cost + train_run_cost) / args.logging_steps,
+                        total_samples / args.logging_steps,
+                        total_samples / (train_reader_cost + train_run_cost),
+                    )
+                )
                 train_reader_cost = 0.0
                 train_run_cost = 0.0
                 total_samples = 0
@@ -139,19 +133,14 @@ def train(args):
             if global_step % args.save_steps == 0 or global_step == last_step:
                 if rank == 0:
                     paddle.save(
-                        model.state_dict(),
-                        os.path.join(args.model_save_dir,
-                                     "model_%d.pdparams" % global_step))
+                        model.state_dict(), os.path.join(args.model_save_dir, "model_%d.pdparams" % global_step)
+                    )
                     logger.info("Save %d steps model." % (global_step))
                     if args.do_eval:
-                        precision, recall, f1_score = evaluate(
-                            model, chunk_evaluator, test_loader)
+                        precision, recall, f1_score = evaluate(model, chunk_evaluator, test_loader)
                         if f1_score > max_f1_score:
                             max_f1_score = f1_score
-                            paddle.save(
-                                model.state_dict(),
-                                os.path.join(args.model_save_dir,
-                                             "best_model.pdparams"))
+                            paddle.save(model.state_dict(), os.path.join(args.model_save_dir, "best_model.pdparams"))
                             logger.info("Save best model.")
 
             reader_start = time.time()

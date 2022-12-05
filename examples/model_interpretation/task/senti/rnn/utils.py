@@ -14,9 +14,9 @@
 import numpy as np
 
 
-def convert_example(example, tokenizer, is_test=False, language='en'):
+def convert_example(example, tokenizer, is_test=False, language="en"):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
 
     Args:
@@ -31,18 +31,18 @@ def convert_example(example, tokenizer, is_test=False, language='en'):
     """
     if is_test:
         input_ids = tokenizer.encode(example["context"])
-        valid_length = np.array(len(input_ids), dtype='int64')
-        input_ids = np.array(input_ids, dtype='int64')
+        valid_length = np.array(len(input_ids), dtype="int64")
+        input_ids = np.array(input_ids, dtype="int64")
         return input_ids, valid_length
     else:
-        if language == 'en':
+        if language == "en":
             input_ids = tokenizer.encode(example["sentence"])
-            label = np.array(example['labels'], dtype="int64")
+            label = np.array(example["labels"], dtype="int64")
         else:
             input_ids = tokenizer.encode(example["text"])
-            label = np.array(example['label'], dtype="int64")
-        valid_length = np.array(len(input_ids), dtype='int64')
-        input_ids = np.array(input_ids, dtype='int64')
+            label = np.array(example["label"], dtype="int64")
+        valid_length = np.array(len(input_ids), dtype="int64")
+        input_ids = np.array(input_ids, dtype="int64")
         return input_ids, valid_length, label
 
 
@@ -62,8 +62,7 @@ def preprocess_prediction_data(data, tokenizer):
     examples = []
     for text in data:
         # ids = tokenizer.encode(text)                        # JiebaTokenizer
-        ids = tokenizer.encode(text)[0].tolist()[
-            1:-1]  # ErnieTokenizer        list[ids]
+        ids = tokenizer.encode(text)[0].tolist()[1:-1]  # ErnieTokenizer        list[ids]
         examples.append([ids, len(ids)])
 
     return examples
@@ -76,7 +75,6 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class CharTokenizer:
-
     def __init__(self, vocab, language, vocab_path):
         self.tokenizer = list
         self.vocab = vocab
@@ -85,90 +83,84 @@ class CharTokenizer:
         self.unk_token = []
 
     def encode(self, sentence):
-        if self.language == 'ch':
+        if self.language == "ch":
             words = tokenizer_punc(sentence, self.vocab_path)
         else:
             words = sentence.strip().split()
-        return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in words
-        ]
+        return [get_idx_from_word(word, self.vocab.token_to_idx, self.vocab.unk_token) for word in words]
 
     def tokenize(self, sentence, wo_unk=True):
-        if self.language == 'ch':
+        if self.language == "ch":
             return tokenizer_punc(sentence, self.vocab_path)
         else:
             return sentence.strip().split()
 
     def convert_tokens_to_string(self, tokens):
-        return ' '.join(tokens)
+        return " ".join(tokens)
 
     def convert_tokens_to_ids(self, tokens):
-        return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in tokens
-        ]
+        return [get_idx_from_word(word, self.vocab.token_to_idx, self.vocab.unk_token) for word in tokens]
 
 
 def tokenizer_lac(string, lac):
-    temp = ''
+    temp = ""
     res = []
     for c in string:
-        if '\u4e00' <= c <= '\u9fff':
-            if temp != '':
+        if "\u4e00" <= c <= "\u9fff":
+            if temp != "":
                 res.extend(lac.run(temp))
-                temp = ''
+                temp = ""
             res.append(c)
         else:
             temp += c
-    if temp != '':
+    if temp != "":
         res.extend(lac.run(temp))
     return res
 
 
 def tokenizer_punc(string, vocab_path):
     res = []
-    sub_string_list = string.strip().split('[MASK]')
+    sub_string_list = string.strip().split("[MASK]")
     for idx, sub_string in enumerate(sub_string_list):
-        temp = ''
+        temp = ""
         for c in sub_string:
-            if '\u4e00' <= c <= '\u9fff':
-                if temp != '':
+            if "\u4e00" <= c <= "\u9fff":
+                if temp != "":
                     temp_seg = punc_split(temp, vocab_path)
                     res.extend(temp_seg)
-                    temp = ''
+                    temp = ""
                 res.append(c)
             else:
                 temp += c
-        if temp != '':
+        if temp != "":
             temp_seg = punc_split(temp, vocab_path)
             res.extend(temp_seg)
         if idx < len(sub_string_list) - 1:
-            res.append('[MASK]')
+            res.append("[MASK]")
     return res
 
 
 def punc_split(string, vocab_path):
     punc_set = set()
-    with open(vocab_path, 'r') as f:
+    with open(vocab_path, "r") as f:
         for token in f:
             punc_set.add(token.strip())
-        punc_set.add(' ')
+        punc_set.add(" ")
         for ascii_num in range(65296, 65306):
             punc_set.add(chr(ascii_num))
         for ascii_num in range(48, 58):
             punc_set.add(chr(ascii_num))
 
     res = []
-    temp = ''
+    temp = ""
     for c in string:
         if c in punc_set:
-            if temp != '':
+            if temp != "":
                 res.append(temp)
-                temp = ''
+                temp = ""
             res.append(c)
         else:
             temp += c
-    if temp != '':
+    if temp != "":
         res.append(temp)
     return res

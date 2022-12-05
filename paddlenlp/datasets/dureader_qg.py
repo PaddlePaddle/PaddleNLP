@@ -21,33 +21,34 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['DuReaderQG']
+__all__ = ["DuReaderQG"]
 
 
 class DuReaderQG(DatasetBuilder):
-    '''
-    This dataset is made form the machine reading comprehension dataset 
+    """
+    This dataset is made form the machine reading comprehension dataset
     (i.e. DuReader robust) for question generation task.
-    '''
+    """
 
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5", "URL"))
     SPLITS = {
-        'train':
-        META_INFO(
-            os.path.join('train.json'), 'a6d96bda4662e657ce644ed0e178fe70',
-            'https://bj.bcebos.com/paddlenlp/datasets/DuReaderQG/train.json'),
-        'dev':
-        META_INFO(
-            os.path.join('dev.json'), 'a6bd22b0da0ed8e20784398f507d4acc',
-            'https://bj.bcebos.com/paddlenlp/datasets/DuReaderQG/dev.json')
+        "train": META_INFO(
+            os.path.join("train.json"),
+            "a6d96bda4662e657ce644ed0e178fe70",
+            "https://bj.bcebos.com/paddlenlp/datasets/DuReaderQG/train.json",
+        ),
+        "dev": META_INFO(
+            os.path.join("dev.json"),
+            "a6bd22b0da0ed8e20784398f507d4acc",
+            "https://bj.bcebos.com/paddlenlp/datasets/DuReaderQG/dev.json",
+        ),
     }
 
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash, URL = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(URL, default_root)
 
         return fullname
@@ -60,11 +61,11 @@ class DuReaderQG(DatasetBuilder):
                     continue
 
                 json_data = json.loads(line)
-                title = json_data.get('answer', None)
+                title = json_data.get("answer", None)
 
                 yield {
-                    'source': json_data["context"],
-                    'target': json_data.get("question", ''),
-                    'title': title,
-                    'id': json_data['id']
+                    "source": json_data["context"],
+                    "target": json_data.get("question", ""),
+                    "title": title,
+                    "id": json_data["id"],
                 }
