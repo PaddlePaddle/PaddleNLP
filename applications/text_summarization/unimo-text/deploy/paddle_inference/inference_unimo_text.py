@@ -27,10 +27,12 @@ import os
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inference_model_dir",
-                        default="../../inference_model",
-                        type=str,
-                        help="Path to save inference model of UNIMOText. ")
+    parser.add_argument(
+        "--inference_model_dir",
+        default="../../inference_model",
+        type=str,
+        help="Path to save inference model of UNIMOText. ",
+    )
     args = parser.parse_args()
     return args
 
@@ -58,11 +60,13 @@ def setup_predictor(args):
 def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
     """Convert all examples into necessary features."""
     source = example
-    tokenized_example = tokenizer.gen_encode(source,
-                                             max_seq_len=max_seq_len,
-                                             add_start_token_for_decoding=True,
-                                             return_length=True,
-                                             is_split_into_words=False)
+    tokenized_example = tokenizer.gen_encode(
+        source,
+        max_seq_len=max_seq_len,
+        add_start_token_for_decoding=True,
+        return_length=True,
+        is_split_into_words=False,
+    )
     return tokenized_example
 
 
@@ -73,30 +77,23 @@ def batchify_fn(batch_examples, pad_val, pad_right=False):
         """Pad attention_mask."""
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
-        attention_mask = np.ones(
-            (batch_size, max_len, max_len), dtype='float32') * -1e9
+        attention_mask = np.ones((batch_size, max_len, max_len), dtype="float32") * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
             if pad_right:
-                mask_data[:seq_len:, :seq_len] = np.array(
-                    batch_attention_mask[i], dtype='float32')
+                mask_data[:seq_len:, :seq_len] = np.array(batch_attention_mask[i], dtype="float32")
             else:
-                mask_data[-seq_len:,
-                          -seq_len:] = np.array(batch_attention_mask[i],
-                                                dtype='float32')
+                mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype="float32")
         # In order to ensure the correct broadcasting mechanism, expand one
         # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 
-    pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype='int32')
-    input_ids = pad_func([example['input_ids'] for example in batch_examples])
-    token_type_ids = pad_func(
-        [example['token_type_ids'] for example in batch_examples])
-    attention_mask = pad_mask(
-        [example['attention_mask'] for example in batch_examples])
-    seq_len = np.asarray([example['seq_len'] for example in batch_examples],
-                         dtype='int32')
+    pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype="int32")
+    input_ids = pad_func([example["input_ids"] for example in batch_examples])
+    token_type_ids = pad_func([example["token_type_ids"] for example in batch_examples])
+    attention_mask = pad_mask([example["attention_mask"] for example in batch_examples])
+    seq_len = np.asarray([example["seq_len"] for example in batch_examples], dtype="int32")
     input_dict = {}
     input_dict["input_ids"] = input_ids
     input_dict["token_type_ids"] = token_type_ids
@@ -120,11 +117,11 @@ def postprocess_response(token_ids, tokenizer):
 
 def infer(args, predictor):
     """Use predictor to inference."""
-    tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0-summary')
+    tokenizer = UNIMOTokenizer.from_pretrained("unimo-text-1.0-summary")
 
     inputs = [
         "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
-        "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。"
+        "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。",
     ]
 
     examples = [convert_example(i, tokenizer) for i in inputs]
@@ -135,10 +132,7 @@ def infer(args, predictor):
         input_handles[name] = predictor.get_input_handle(name)
         input_handles[name].copy_from_cpu(data[name])
 
-    output_handles = [
-        predictor.get_output_handle(name)
-        for name in predictor.get_output_names()
-    ]
+    output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
 
     predictor.run()
 
@@ -148,8 +142,7 @@ def infer(args, predictor):
         for beam_idx, beam in enumerate(sample):
             if beam_idx > len(sample) // 2:
                 break
-            print(f"Example {idx} beam beam_idx {beam_idx}: ",
-                  "".join(postprocess_response(beam, tokenizer)))
+            print(f"Example {idx} beam beam_idx {beam_idx}: ", "".join(postprocess_response(beam, tokenizer)))
 
 
 if __name__ == "__main__":

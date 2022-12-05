@@ -22,11 +22,11 @@ import argparse
 
 
 def get_args():
-    parser = argparse.ArgumentParser('F1 eval')
+    parser = argparse.ArgumentParser("F1 eval")
 
-    parser.add_argument('--golden_path', required=True)
-    parser.add_argument('--pred_path', required=True)
-    parser.add_argument('--language', required=True, choices=['ch', 'en'])
+    parser.add_argument("--golden_path", required=True)
+    parser.add_argument("--pred_path", required=True)
+    parser.add_argument("--language", required=True, choices=["ch", "en"])
 
     args = parser.parse_args()
     return args
@@ -38,22 +38,20 @@ def load_from_file(args):
     :return: golden_raw: {sent_id, rationales_lists}, pred_raw: {sent_id, rationales_list},
              golden_label: {sent_id, label}, pred_label: {sent_id, label}
     """
-    golden_f = open(args.golden_path, 'r')
-    pred_f = open(args.pred_path, 'r')
+    golden_f = open(args.golden_path, "r")
+    pred_f = open(args.pred_path, "r")
 
     golden_raw_rationale, pred_rationale = {}, {}
 
     for golden_line in golden_f.readlines():
         golden_dict = json.loads(golden_line)
-        sent_id = golden_dict['sent_id']
-        golden_raw_rationale[sent_id] = [
-            int(x) for x in golden_dict['rationales']
-        ]
+        sent_id = golden_dict["sent_id"]
+        golden_raw_rationale[sent_id] = [int(x) for x in golden_dict["rationales"]]
 
     for pred_line in pred_f.readlines():
         pred_dict = json.loads(pred_line)
-        senti_id = pred_dict['id']
-        pred_rationale[senti_id] = pred_dict['rationale'][0]
+        senti_id = pred_dict["id"]
+        pred_rationale[senti_id] = pred_dict["rationale"][0]
 
     return golden_raw_rationale, pred_rationale
 
@@ -74,9 +72,9 @@ def calc_f1(golden_evid, pred_evid):
 
 def calc_model_f1(golden_dict, pred_dict):
     """
-        :param golden_dict: dict
-        :param pred_dict:   dict
-        :return:    macro-f1, micro-f1
+    :param golden_dict: dict
+    :param pred_dict:   dict
+    :return:    macro-f1, micro-f1
     """
 
     scores = {}
@@ -92,17 +90,15 @@ def calc_model_f1(golden_dict, pred_dict):
         rec = len(tp) / len(golden_evid) if len(golden_evid) else 0
         f1 = _f1(prec, rec)
         scores[s_id] = {
-            'tp_count': len(tp),
-            'pred_count': len(pred_evid),
-            'golden_count': len(golden_evid),
-            'prec': prec,
-            'rec': rec,
-            'f1': f1
+            "tp_count": len(tp),
+            "pred_count": len(pred_evid),
+            "golden_count": len(golden_evid),
+            "prec": prec,
+            "rec": rec,
+            "f1": f1,
         }
 
-    macro_f1 = sum(score['f1']
-                   for score in scores.values()) / len(golden_dict) if len(
-                       golden_dict) else 0
+    macro_f1 = sum(score["f1"] for score in scores.values()) / len(golden_dict) if len(golden_dict) else 0
 
     return macro_f1, scores
 
@@ -113,8 +109,7 @@ def main(args):
     return macro_f1, len(golden_raw), scores
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     macro_f1, num, scores = main(args)
-    print('total\tnum: %d\tmacor_f1: %.1f' \
-        % (num, macro_f1 * 100))
+    print("total\tnum: %d\tmacor_f1: %.1f" % (num, macro_f1 * 100))

@@ -22,7 +22,7 @@ import paddle
 from ..transformers import AutoModelForMaskedLM, AutoTokenizer
 from .base_augment import BaseAugment
 
-__all__ = ['WordInsert']
+__all__ = ["WordInsert"]
 
 
 class WordInsert(BaseAugment):
@@ -48,39 +48,35 @@ class WordInsert(BaseAugment):
             Maximum number of augmented words in sequences.
     """
 
-    def __init__(self,
-                 aug_type,
-                 custom_file_path=None,
-                 delete_file_path=None,
-                 create_n=1,
-                 aug_n=None,
-                 aug_percent=0.02,
-                 aug_min=1,
-                 aug_max=10):
-        super().__init__(create_n=create_n,
-                         aug_n=aug_n,
-                         aug_percent=aug_percent,
-                         aug_min=aug_min,
-                         aug_max=aug_max)
+    def __init__(
+        self,
+        aug_type,
+        custom_file_path=None,
+        delete_file_path=None,
+        create_n=1,
+        aug_n=None,
+        aug_percent=0.02,
+        aug_min=1,
+        aug_max=10,
+    ):
+        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
         self.model_name = "ernie-1.0"
         if isinstance(aug_type, str):
             self.type = aug_type
-            if aug_type in ['synonym', 'homonym', 'custom']:
+            if aug_type in ["synonym", "homonym", "custom"]:
                 self.dict = self._load_insert_dict(aug_type)
-            elif aug_type in ['mlm']:
-                self.mlm_model = AutoModelForMaskedLM.from_pretrained(
-                    self.model_name)
-                self.mlm_tokenizer = AutoTokenizer.from_pretrained(
-                    self.model_name)
+            elif aug_type in ["mlm"]:
+                self.mlm_model = AutoModelForMaskedLM.from_pretrained(self.model_name)
+                self.mlm_tokenizer = AutoTokenizer.from_pretrained(self.model_name)
         elif isinstance(aug_type, Iterable):
-            self.type = 'combination'
+            self.type = "combination"
             self.dict = {}
             # Merge dictionaries from different sources
             for t in aug_type:
-                if t in ['synonym', 'homonym', 'custom']:
+                if t in ["synonym", "homonym", "custom"]:
                     t_dict = self._load_insert_dict(t)
                     for k in t_dict:
                         if k in self.dict:
@@ -92,15 +88,15 @@ class WordInsert(BaseAugment):
             self.type = aug_type
 
     def _load_insert_dict(self, source_type):
-        '''Load insert dictionary'''
-        if source_type in ['synonym', 'homonym']:
-            fullname = self._load_file('word_' + source_type)
-        elif source_type in ['custom']:
+        """Load insert dictionary"""
+        if source_type in ["synonym", "homonym"]:
+            fullname = self._load_file("word_" + source_type)
+        elif source_type in ["custom"]:
             fullname = self.custom_file_path
-        elif source_type in ['delete']:
+        elif source_type in ["delete"]:
             fullname = self.delete_file_path
         if os.path.exists(fullname):
-            with open(fullname, 'r', encoding='utf-8') as f:
+            with open(fullname, "r", encoding="utf-8") as f:
                 insert_dict = json.load(f)
             f.close()
         else:
@@ -113,7 +109,7 @@ class WordInsert(BaseAugment):
         aug_n = self._get_aug_n(len(seq_tokens), len(aug_indexes))
         if aug_n == 0:
             return []
-        elif self.type == 'mlm':
+        elif self.type == "mlm":
             return self._augment_mlm(sequence, seq_tokens, aug_indexes)
         elif aug_n == 1:
             return self._augment_single(seq_tokens, aug_indexes)
@@ -131,19 +127,17 @@ class WordInsert(BaseAugment):
             p = random.randint(0, 1)
             idx = random.sample(aug_indexes, 1)[0]
             aug_tokens = [[idx, "[MASK]" * len(seq_tokens[idx])]]
-            sequence_mask = self._generate_sequence(seq_tokens.copy(),
-                                                    aug_tokens, p)
+            sequence_mask = self._generate_sequence(seq_tokens.copy(), aug_tokens, p)
             tokenized = self.mlm_tokenizer(sequence_mask)
             masked_positions = [
-                i for i, idx in enumerate(tokenized['input_ids'])
-                if idx == self.mlm_tokenizer.mask_token_id
+                i for i, idx in enumerate(tokenized["input_ids"]) if idx == self.mlm_tokenizer.mask_token_id
             ]
             output = self.mlm_model(
-                paddle.to_tensor([tokenized['input_ids']]),
-                paddle.to_tensor([tokenized['token_type_ids']]))
-            predicted = ''.join(
-                self.mlm_tokenizer.convert_ids_to_tokens(
-                    paddle.argmax(output[0][masked_positions], axis=-1)))
+                paddle.to_tensor([tokenized["input_ids"]]), paddle.to_tensor([tokenized["token_type_ids"]])
+            )
+            predicted = "".join(
+                self.mlm_tokenizer.convert_ids_to_tokens(paddle.argmax(output[0][masked_positions], axis=-1))
+            )
             for p in predicted:
                 if p in self.stop_words:
                     skip = True
@@ -153,54 +147,43 @@ class WordInsert(BaseAugment):
 
             aug_tokens = [[idx, predicted]]
 
-            sequence_generate = self._generate_sequence(seq_tokens.copy(),
-                                                        aug_tokens, p)
+            sequence_generate = self._generate_sequence(seq_tokens.copy(), aug_tokens, p)
             if sequence_generate != sequence and sequence_generate not in sentences:
                 sentences.append(sequence_generate)
         return sentences
 
     def _augment_multi(self, seq_tokens, aug_n, aug_indexes):
         sentences = []
-        if self.type in ['synonym', 'homonym', 'combination', 'custom']:
+        if self.type in ["synonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             for aug_index in aug_indexes:
                 if seq_tokens[aug_index] in self.dict:
-                    candidate_tokens.append(
-                        [aug_index, self.dict[seq_tokens[aug_index]]])
+                    candidate_tokens.append([aug_index, self.dict[seq_tokens[aug_index]]])
             aug_n = min(aug_n, len(candidate_tokens))
             if aug_n != 0:
                 t = 0
-                while t < self.create_n * self.loop and len(
-                        sentences) < self.create_n:
+                while t < self.create_n * self.loop and len(sentences) < self.create_n:
                     t += 1
-                    idxes = random.sample(list(range(len(candidate_tokens))),
-                                          aug_n)
+                    idxes = random.sample(list(range(len(candidate_tokens))), aug_n)
                     aug_tokens = []
                     for idx in idxes:
                         aug_index, aug_dict = candidate_tokens[idx]
-                        aug_tokens.append(
-                            [aug_index,
-                             random.sample(aug_dict, 1)[0]])
+                        aug_tokens.append([aug_index, random.sample(aug_dict, 1)[0]])
                     p = random.randint(0, 1)
-                    sentence = self._generate_sequence(seq_tokens.copy(),
-                                                       aug_tokens, p)
+                    sentence = self._generate_sequence(seq_tokens.copy(), aug_tokens, p)
                     if sentence not in sentences:
                         sentences.append(sentence)
-        elif self.type in ['random']:
+        elif self.type in ["random"]:
             t = 0
-            while t < self.create_n * self.loop and len(
-                    sentences) < self.create_n:
+            while t < self.create_n * self.loop and len(sentences) < self.create_n:
                 t += 1
                 aug_tokens = []
                 aug_indexes = random.sample(aug_indexes, aug_n)
                 for aug_index in aug_indexes:
-                    token = self.vocab.to_tokens(
-                        random.randint(0,
-                                       len(self.vocab) - 2))
+                    token = self.vocab.to_tokens(random.randint(0, len(self.vocab) - 2))
                     aug_tokens.append([aug_index, token])
                 p = random.randint(0, 1)
-                sentence = self._generate_sequence(seq_tokens.copy(),
-                                                   aug_tokens, p)
+                sentence = self._generate_sequence(seq_tokens.copy(), aug_tokens, p)
                 if sentence not in sentences:
                     sentences.append(sentence)
         return sentences
@@ -209,7 +192,7 @@ class WordInsert(BaseAugment):
 
         sentences = []
         aug_tokens = []
-        if self.type in ['synonym', 'homonym', 'combination', 'custom']:
+        if self.type in ["synonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             for aug_index in aug_indexes:
                 if seq_tokens[aug_index] in self.dict:
@@ -217,29 +200,25 @@ class WordInsert(BaseAugment):
                         candidate_tokens.append([aug_index, token])
             create_n = min(self.create_n, len(candidate_tokens))
             aug_tokens = random.sample(candidate_tokens, create_n)
-        elif self.type in ['random']:
+        elif self.type in ["random"]:
             t = 0
-            while t < self.create_n * self.loop and len(
-                    aug_tokens) < self.create_n:
+            while t < self.create_n * self.loop and len(aug_tokens) < self.create_n:
                 t += 1
                 aug_index = random.sample(aug_indexes, 1)[0]
-                token = self.vocab.to_tokens(
-                    random.randint(0,
-                                   len(self.vocab) - 2))
+                token = self.vocab.to_tokens(random.randint(0, len(self.vocab) - 2))
                 if [aug_index, token] not in aug_tokens:
                     aug_tokens.append([aug_index, token])
         for aug_token in aug_tokens:
             p = random.randint(0, 1)
-            sentences.append(
-                self._generate_sequence(seq_tokens.copy(), [aug_token], p))
+            sentences.append(self._generate_sequence(seq_tokens.copy(), [aug_token], p))
         return sentences
 
     def _generate_sequence(self, output_seq_tokens, aug_tokens, p):
-        '''Genearte the sequences according to the mapping list'''
+        """Genearte the sequences according to the mapping list"""
         for aug_token in aug_tokens:
             idx, token = aug_token
             if p == 0:
                 output_seq_tokens[idx] = token + output_seq_tokens[idx]
             else:
                 output_seq_tokens[idx] += token
-        return ''.join(output_seq_tokens)
+        return "".join(output_seq_tokens)

@@ -42,6 +42,7 @@ def test_layoutlm_paddle():
 def test_layoutlm_torch():
     # import pytorch models
     from layoutlmft.models.layoutxlm import LayoutXLMModel, LayoutXLMTokenizer
+
     model = LayoutXLMModel.from_pretrained("microsoft/layoutxlm-base")
     model.eval()
     model = model.cuda()
@@ -79,14 +80,12 @@ if __name__ == "__main__":
     paddle_pool_out = paddle_pool_out.numpy()
     print(paddle_hidden_out.shape, paddle_pool_out.shape)
 
-    mean_abs_diff, max_abs_diff = get_statistic_info(torch_hidden_out,
-                                                     paddle_hidden_out)
+    mean_abs_diff, max_abs_diff = get_statistic_info(torch_hidden_out, paddle_hidden_out)
     print("======hidden_out diff  info====")
     print("\t mean_abs_diff: {}".format(mean_abs_diff))
     print("\t max_abs_diff: {}".format(max_abs_diff))
 
-    mean_abs_diff, max_abs_diff = get_statistic_info(torch_pool_out,
-                                                     paddle_pool_out)
+    mean_abs_diff, max_abs_diff = get_statistic_info(torch_pool_out, paddle_pool_out)
     print("======pool_out diff  info====")
     print("\t mean_abs_diff: {}".format(mean_abs_diff))
     print("\t max_abs_diff: {}".format(max_abs_diff))

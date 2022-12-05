@@ -39,7 +39,7 @@ MODEL_CLASSES = {
     "bert": (BertForQuestionAnswering, BertTokenizer),
     "ernie": (ErnieForQuestionAnswering, ErnieTokenizer),
     "ernie_gram": (ErnieGramForQuestionAnswering, ErnieGramTokenizer),
-    "roberta": (RobertaForQuestionAnswering, RobertaTokenizer)
+    "roberta": (RobertaForQuestionAnswering, RobertaTokenizer),
 }
 
 
@@ -59,36 +59,36 @@ def evaluate(model, raw_dataset, data_loader, args):
 
     for batch in data_loader:
         input_ids, token_type_ids = batch
-        start_logits_tensor, end_logits_tensor = model(input_ids,
-                                                       token_type_ids)
+        start_logits_tensor, end_logits_tensor = model(input_ids, token_type_ids)
 
         for idx in range(start_logits_tensor.shape[0]):
             if len(all_start_logits) % 1000 == 0 and len(all_start_logits):
                 print("Processing example: %d" % len(all_start_logits))
-                print('time per 1000:', time.time() - tic_eval)
+                print("time per 1000:", time.time() - tic_eval)
                 tic_eval = time.time()
 
             all_start_logits.append(start_logits_tensor.numpy()[idx])
             all_end_logits.append(end_logits_tensor.numpy()[idx])
 
     all_predictions, _, _ = compute_prediction(
-        raw_dataset, data_loader.dataset, (all_start_logits, all_end_logits),
-        False, args.n_best_size, args.max_answer_length)
+        raw_dataset,
+        data_loader.dataset,
+        (all_start_logits, all_end_logits),
+        False,
+        args.n_best_size,
+        args.max_answer_length,
+    )
 
     # Can also write all_nbest_json and scores_diff_json files if needed
-    with open('prediction.json', "w", encoding='utf-8') as writer:
-        writer.write(
-            json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
+    with open("prediction.json", "w", encoding="utf-8") as writer:
+        writer.write(json.dumps(all_predictions, ensure_ascii=False, indent=4) + "\n")
 
-    squad_evaluate(examples=[raw_data for raw_data in raw_dataset],
-                   preds=all_predictions,
-                   is_whitespace_splited=False)
+    squad_evaluate(examples=[raw_data for raw_data in raw_dataset], preds=all_predictions, is_whitespace_splited=False)
 
     model.train()
 
 
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
-
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
@@ -97,10 +97,8 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
-                                                        label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
-                                                      label=end_position)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits, label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits, label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 
@@ -116,9 +114,8 @@ def run(args):
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     set_seed(args)
 
-    train_examples = load_dataset('PaddlePaddle/dureader_robust', split="train")
-    dev_examples = load_dataset('PaddlePaddle/dureader_robust',
-                                split="validation")
+    train_examples = load_dataset("PaddlePaddle/dureader_robust", split="train")
+    dev_examples = load_dataset("PaddlePaddle/dureader_robust", split="validation")
 
     column_names = train_examples.column_names
     if rank == 0:
@@ -136,13 +133,10 @@ def run(args):
         # context that overlaps a bit the context of the previous feature.
         # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-        contexts = examples['context']
-        questions = examples['question']
+        contexts = examples["context"]
+        questions = examples["question"]
 
-        tokenized_examples = tokenizer(questions,
-                                       contexts,
-                                       stride=args.doc_stride,
-                                       max_seq_len=args.max_seq_length)
+        tokenized_examples = tokenizer(questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length)
 
         # Since one example might give us several features if it has a long context, we need a map from a feature to
         # its corresponding example. This key gives us just that.
@@ -161,11 +155,11 @@ def run(args):
             cls_index = input_ids.index(tokenizer.cls_token_id)
 
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_examples['token_type_ids'][i]
+            sequence_ids = tokenized_examples["token_type_ids"][i]
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
-            answers = examples['answers'][sample_index]
+            answers = examples["answers"][sample_index]
             # If no answers are given, set the cls_index as answer.
             if len(answers["answer_start"]) == 0:
                 tokenized_examples["start_positions"].append(cls_index)
@@ -187,67 +181,52 @@ def run(args):
                 token_end_index -= 1
 
                 # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-                if not (offsets[token_start_index][0] <= start_char
-                        and offsets[token_end_index][1] >= end_char):
+                if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
                     tokenized_examples["start_positions"].append(cls_index)
                     tokenized_examples["end_positions"].append(cls_index)
                 else:
                     # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
                     # Note: we could go after the last offset if the answer is the last word (edge case).
-                    while token_start_index < len(offsets) and offsets[
-                            token_start_index][0] <= start_char:
+                    while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
                         token_start_index += 1
-                    tokenized_examples["start_positions"].append(
-                        token_start_index - 1)
+                    tokenized_examples["start_positions"].append(token_start_index - 1)
                     while offsets[token_end_index][1] >= end_char:
                         token_end_index -= 1
-                    tokenized_examples["end_positions"].append(token_end_index +
-                                                               1)
+                    tokenized_examples["end_positions"].append(token_end_index + 1)
 
         return tokenized_examples
 
     if args.do_train:
-        train_ds = train_examples.map(prepare_train_features,
-                                      batched=True,
-                                      remove_columns=column_names,
-                                      num_proc=4)
-        train_batch_sampler = paddle.io.DistributedBatchSampler(
-            train_ds, batch_size=args.batch_size, shuffle=True)
+        train_ds = train_examples.map(prepare_train_features, batched=True, remove_columns=column_names, num_proc=4)
+        train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
         train_batchify_fn = lambda samples, fn=Dict(
             {
                 "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
-                "token_type_ids": Pad(axis=0,
-                                      pad_val=tokenizer.pad_token_type_id),
+                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
                 "start_positions": Stack(dtype="int64"),
-                "end_positions": Stack(dtype="int64")
-            }): fn(samples)
+                "end_positions": Stack(dtype="int64"),
+            }
+        ): fn(samples)
 
-        train_data_loader = DataLoader(dataset=train_ds,
-                                       batch_sampler=train_batch_sampler,
-                                       collate_fn=train_batchify_fn,
-                                       return_list=True)
+        train_data_loader = DataLoader(
+            dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=train_batchify_fn, return_list=True
+        )
 
-        num_training_steps = args.max_steps if args.max_steps > 0 else len(
-            train_data_loader) * args.num_train_epochs
-        num_train_epochs = math.ceil(num_training_steps /
-                                     len(train_data_loader))
+        num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
+        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps,
-                                             args.warmup_proportion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
+        decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
         optimizer = paddle.optimizer.AdamW(
             learning_rate=lr_scheduler,
             epsilon=args.adam_epsilon,
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params)
+            apply_decay_param_fun=lambda x: x in decay_params,
+        )
         criterion = CrossEntropyLossForSQuAD()
 
         global_step = 0
@@ -256,15 +235,14 @@ def run(args):
             for step, batch in enumerate(train_data_loader):
                 global_step += 1
                 input_ids, token_type_ids, start_positions, end_positions = batch
-                logits = model(input_ids=input_ids,
-                               token_type_ids=token_type_ids)
+                logits = model(input_ids=input_ids, token_type_ids=token_type_ids)
                 loss = criterion(logits, (start_positions, end_positions))
 
                 if global_step % args.logging_steps == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch + 1, step + 1, loss,
-                           args.logging_steps / (time.time() - tic_train)))
+                        % (global_step, epoch + 1, step + 1, loss, args.logging_steps / (time.time() - tic_train))
+                    )
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
@@ -273,16 +251,14 @@ def run(args):
 
                 if global_step % args.save_steps == 0 or global_step == num_training_steps:
                     if rank == 0:
-                        output_dir = os.path.join(args.output_dir,
-                                                  "model_%d" % global_step)
+                        output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                         if not os.path.exists(output_dir):
                             os.makedirs(output_dir)
                         # need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(
-                            model, paddle.DataParallel) else model
+                        model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                         model_to_save.save_pretrained(output_dir)
                         tokenizer.save_pretrained(output_dir)
-                        print('Saving checkpoint to:', output_dir)
+                        print("Saving checkpoint to:", output_dir)
                     if global_step == num_training_steps:
                         break
 
@@ -290,16 +266,14 @@ def run(args):
         # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
         # in one example possible giving several features when a context is long, each of those features having a
         # context that overlaps a bit the context of the previous feature.
-        #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+        # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
         # that HugggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-        contexts = examples['context']
-        questions = examples['question']
+        contexts = examples["context"]
+        questions = examples["question"]
 
-        tokenized_examples = tokenizer(questions,
-                                       contexts,
-                                       stride=args.doc_stride,
-                                       max_seq_len=args.max_seq_length,
-                                       return_attention_mask=True)
+        tokenized_examples = tokenizer(
+            questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length, return_attention_mask=True
+        )
 
         # Since one example might give us several features if it has a long context, we need a map from a feature to
         # its corresponding example. This key gives us just that.
@@ -311,13 +285,12 @@ def run(args):
 
         for i in range(len(tokenized_examples["input_ids"])):
             # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-            sequence_ids = tokenized_examples['token_type_ids'][i]
+            sequence_ids = tokenized_examples["token_type_ids"][i]
             context_index = 1
 
             # One example can give several spans, this is the index of the example containing this span of text.
             sample_index = sample_mapping[i]
-            tokenized_examples["example_id"].append(
-                examples["id"][sample_index])
+            tokenized_examples["example_id"].append(examples["id"][sample_index])
 
             # Set to None the offset_mapping that are not part of the context so it's easy to determine if a token
             # position is part of the context or not.
@@ -329,25 +302,19 @@ def run(args):
         return tokenized_examples
 
     if args.do_predict and rank == 0:
-        dev_ds = dev_examples.map(prepare_validation_features,
-                                  batched=True,
-                                  remove_columns=column_names,
-                                  num_proc=4)
-        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
-                                                   batch_size=args.batch_size,
-                                                   shuffle=False)
+        dev_ds = dev_examples.map(prepare_validation_features, batched=True, remove_columns=column_names, num_proc=4)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
 
-        dev_batchify_fn = lambda samples, fn=Dict({
-            "input_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            "token_type_ids":
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id)
-        }): fn(samples)
+        dev_batchify_fn = lambda samples, fn=Dict(
+            {
+                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            }
+        ): fn(samples)
 
-        dev_data_loader = DataLoader(dataset=dev_ds,
-                                     batch_sampler=dev_batch_sampler,
-                                     collate_fn=dev_batchify_fn,
-                                     return_list=True)
+        dev_data_loader = DataLoader(
+            dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=dev_batchify_fn, return_list=True
+        )
 
         evaluate(model, dev_examples, dev_data_loader, args)
 

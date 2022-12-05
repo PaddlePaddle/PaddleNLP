@@ -13,33 +13,27 @@
 # limitations under the License.
 
 tnews_labels = {
-    '109': '科技',
-    '102': '娱乐',
-    '107': '汽车',
-    '112': '旅游',
-    '104': '财经',
-    '108': '教育',
-    '113': '国际',
-    '106': '房产',
-    '116': '电竞',
-    '110': '军事',
-    '100': '故事',
-    '101': '文化',
-    '103': '体育',
-    '115': '农业',
-    '114': '股票'
+    "109": "科技",
+    "102": "娱乐",
+    "107": "汽车",
+    "112": "旅游",
+    "104": "财经",
+    "108": "教育",
+    "113": "国际",
+    "106": "房产",
+    "116": "电竞",
+    "110": "军事",
+    "100": "故事",
+    "101": "文化",
+    "103": "体育",
+    "115": "农业",
+    "114": "股票",
 }
 
-tnews_label_descriptions = {
-    key: "下面报道一条" + value + "新闻"
-    for key, value in tnews_labels.items()
-}
+tnews_label_descriptions = {key: "下面报道一条" + value + "新闻" for key, value in tnews_labels.items()}
 
-eprstmt_labels = {'Negative': '不满意', 'Positive': '满意'}
-eprstmt_label_descriptions = {
-    key: "这表达了" + value + "的情感"
-    for key, value in eprstmt_labels.items()
-}
+eprstmt_labels = {"Negative": "不满意", "Positive": "满意"}
+eprstmt_label_descriptions = {key: "这表达了" + value + "的情感" for key, value in eprstmt_labels.items()}
 
 csldcp_labels = {
     "材料科学与工程": "材料",
@@ -111,10 +105,7 @@ csldcp_labels = {
     "植物保护": "植物",
 }
 
-csldcp_label_description = {
-    key: "这篇论文阐述了" + key
-    for key, value in csldcp_labels.items()
-}
+csldcp_label_description = {key: "这篇论文阐述了" + key for key, value in csldcp_labels.items()}
 
 iflytek_labels = {
     "0": "打车",
@@ -238,18 +229,11 @@ iflytek_labels = {
     "9": "政务",
 }
 
-iflytek_label_description = {
-    key: "这段文本的应用描述主题是" + value
-    for key, value in iflytek_labels.items()
-}
+iflytek_label_description = {key: "这段文本的应用描述主题是" + value for key, value in iflytek_labels.items()}
 
 bustm_label_description = {"1": "entail", "0": "not_entail"}
 
-ocnli_label_description = {
-    "contradiction": "不",
-    "entailment": "很",
-    "neutral": "无"
-}
+ocnli_label_description = {"contradiction": "不", "entailment": "很", "neutral": "无"}
 
 # Note: chid_label_description has no effect for model performance
 # just for get candidate number from chid_label_description

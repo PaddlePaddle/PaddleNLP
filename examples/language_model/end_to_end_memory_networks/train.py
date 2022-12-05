@@ -43,29 +43,26 @@ def train_single_epoch(model: MemN2N, lr, data, config):
     N = int(math.ceil(len(data) / config.batch_size))  # total train N batchs
 
     clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=config.max_grad_norm)
-    optimizer = paddle.optimizer.SGD(learning_rate=lr,
-                                     parameters=model.parameters(),
-                                     grad_clip=clip)
-    lossfn = nn.CrossEntropyLoss(reduction='sum')
+    optimizer = paddle.optimizer.SGD(learning_rate=lr, parameters=model.parameters(), grad_clip=clip)
+    lossfn = nn.CrossEntropyLoss(reduction="sum")
 
     total_loss = 0
 
     if config.show:
-        ProgressBar = getattr(import_module('utils'), 'ProgressBar')
-        bar = ProgressBar('Train', max=N)
+        ProgressBar = getattr(import_module("utils"), "ProgressBar")
+        bar = ProgressBar("Train", max=N)
 
     for batch in range(N):
         if config.show:
             bar.next()
 
         optimizer.clear_grad()
-        context = np.ndarray([config.batch_size, config.mem_size],
-                             dtype=np.int64)
+        context = np.ndarray([config.batch_size, config.mem_size], dtype=np.int64)
         target = np.ndarray([config.batch_size], dtype=np.int64)
         for i in range(config.batch_size):
             m = random.randrange(config.mem_size, len(data))
             target[i] = data[m]
-            context[i, :] = data[m - config.mem_size:m]
+            context[i, :] = data[m - config.mem_size : m]
 
         batch_data = paddle.to_tensor(context)
         batch_label = paddle.to_tensor(target)
@@ -91,7 +88,7 @@ def train(model: MemN2N, train_data, valid_data, config):
         train_data: training data
         valid_data: validating data
         config: model and training configs
-    
+
     Returns:
         no return
     """
@@ -107,7 +104,7 @@ def train(model: MemN2N, train_data, valid_data, config):
         train_loss = train_single_epoch(model, lr, train_data, config)
         valid_loss = eval(model, valid_data, config, "Validation")
 
-        info = {'epoch': epoch, 'learning_rate': lr}
+        info = {"epoch": epoch, "learning_rate": lr}
 
         # When the loss on the valid no longer drops, it's like learning rate divided by 1.5
         if len(valid_losses) > 0 and valid_loss > valid_losses[-1] * 0.9999:
@@ -144,8 +141,8 @@ def train(model: MemN2N, train_data, valid_data, config):
     paddle.save(model.state_dict(), save_dir)
 
 
-if __name__ == '__main__':
-    config = Config('config.yaml')
+if __name__ == "__main__":
+    config = Config("config.yaml")
 
     if not os.path.exists(config.checkpoint_dir):
         os.makedirs(config.checkpoint_dir)

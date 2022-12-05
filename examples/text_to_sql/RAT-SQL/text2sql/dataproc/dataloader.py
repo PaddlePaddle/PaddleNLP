@@ -25,8 +25,7 @@ from text2sql.utils import nn_utils
 
 
 def collate_batch_data_v2(origin_batch, config):
-    """format origin batch data for model forward
-    """
+    """format origin batch data for model forward"""
     TOKEN_IDS = []
     SENT_IDS = []
     INPUT_MASK = []
@@ -43,9 +42,9 @@ def collate_batch_data_v2(origin_batch, config):
     lst_orig_labels = []
     for orig_input, orig_label in origin_batch:
         if orig_input.value_indexes[-1] > 510:
-            logging.warning('sequence is too long: %d. question is %s',
-                            orig_input.value_indexes[-1] + 2,
-                            orig_input.question)
+            logging.warning(
+                "sequence is too long: %d. question is %s", orig_input.value_indexes[-1] + 2, orig_input.question
+            )
             continue
         lst_orig_inputs.append(orig_input)
         lst_orig_labels.append(orig_label)
@@ -54,42 +53,36 @@ def collate_batch_data_v2(origin_batch, config):
         SENT_IDS.append(orig_input.sent_ids)
 
         # orig_input.span_lens[0] 即 question 包含 [cls], [sep] 的长度
-        QUESTION_TOKENS_INDEX.append(
-            list(range(1, orig_input.column_indexes[0] - 1)))
+        QUESTION_TOKENS_INDEX.append(list(range(1, orig_input.column_indexes[0] - 1)))
         TABLE_INDEX.append(orig_input.table_indexes)
         COLUMN_INDEX.append(orig_input.column_indexes)
         VALUE_INDEX.append(orig_input.value_indexes)
 
         relations = orig_input.relations
-        RELATION_MATRIXES.append(
-            np.pad(relations, (0, config.max_seq_len - relations.shape[0])))
+        RELATION_MATRIXES.append(np.pad(relations, (0, config.max_seq_len - relations.shape[0])))
 
     TOKEN_IDS = nn_utils.pad_sequences(TOKEN_IDS, max_len=config.max_seq_len)
     SENT_IDS = nn_utils.pad_sequences(SENT_IDS, max_len=config.max_seq_len)
 
-    QUESTION_TOKENS_INDEX = nn_utils.pad_sequences(
-        QUESTION_TOKENS_INDEX, max_len=config.max_question_len)
-    TABLE_INDEX = nn_utils.pad_sequences(TABLE_INDEX,
-                                         max_len=config.max_table_num)
-    COLUMN_INDEX = nn_utils.pad_sequences(COLUMN_INDEX,
-                                          max_len=config.max_column_num)
-    VALUE_INDEX = nn_utils.pad_sequences(VALUE_INDEX,
-                                         max_len=config.max_column_num * 2)
+    QUESTION_TOKENS_INDEX = nn_utils.pad_sequences(QUESTION_TOKENS_INDEX, max_len=config.max_question_len)
+    TABLE_INDEX = nn_utils.pad_sequences(TABLE_INDEX, max_len=config.max_table_num)
+    COLUMN_INDEX = nn_utils.pad_sequences(COLUMN_INDEX, max_len=config.max_column_num)
+    VALUE_INDEX = nn_utils.pad_sequences(VALUE_INDEX, max_len=config.max_column_num * 2)
 
     inputs = {
-        'src_ids': TOKEN_IDS,
-        'sent_ids': SENT_IDS,
-        'question_tokens_index': QUESTION_TOKENS_INDEX,
-        'table_indexes': TABLE_INDEX,
-        'column_indexes': COLUMN_INDEX,
-        'value_indexes': VALUE_INDEX,
-        'orig_inputs': lst_orig_inputs,
+        "src_ids": TOKEN_IDS,
+        "sent_ids": SENT_IDS,
+        "question_tokens_index": QUESTION_TOKENS_INDEX,
+        "table_indexes": TABLE_INDEX,
+        "column_indexes": COLUMN_INDEX,
+        "value_indexes": VALUE_INDEX,
+        "orig_inputs": lst_orig_inputs,
     }
     RELATION_MATRIXES = np.array(RELATION_MATRIXES).astype(np.int64)
     inputs["relations"] = RELATION_MATRIXES
 
     for key, value in inputs.items():
-        if key in ('orig_inputs', ):
+        if key in ("orig_inputs",):
             continue
         inputs[key] = paddle.to_tensor(value)
     return (inputs, lst_orig_labels)
@@ -98,15 +91,17 @@ def collate_batch_data_v2(origin_batch, config):
 class DataLoader(object):
     """Data Loader for train, test and inference"""
 
-    def __init__(self,
-                 config,
-                 dataset,
-                 batch_size=1,
-                 collate_fn=collate_batch_data_v2,
-                 shuffle=False,
-                 drop_last=False,
-                 use_data_parallel=False,
-                 use_multiprocess=False):
+    def __init__(
+        self,
+        config,
+        dataset,
+        batch_size=1,
+        collate_fn=collate_batch_data_v2,
+        shuffle=False,
+        drop_last=False,
+        use_data_parallel=False,
+        use_multiprocess=False,
+    ):
         super(DataLoader, self).__init__()
         assert batch_size > 0, "batch_size must be an interger that > 0"
 
@@ -120,7 +115,8 @@ class DataLoader(object):
         self._use_multiprocess = use_multiprocess
 
         self.dataloader = paddle.io.DataLoader.from_generator(
-            capacity=1000, return_list=True, use_multiprocess=use_multiprocess)
+            capacity=1000, return_list=True, use_multiprocess=use_multiprocess
+        )
         self.dataloader.set_batch_generator(self.create_generator())
         if use_data_parallel:
             self.dataloader = paddle.distributed_batch_reader(self.dataloader)

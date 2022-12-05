@@ -36,9 +36,8 @@ args = parser.parse_args()
 
 if __name__ == "__main__":
     # The number of labels should be in accordance with the training dataset.
-    label_map = {0: 'negative', 1: 'positive'}
-    model = SkepForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(label_map))
+    label_map = {0: "negative", 1: "positive"}
+    model = SkepForSequenceClassification.from_pretrained(args.model_name, num_classes=len(label_map))
 
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
@@ -50,10 +49,9 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        ],
+    )
     # Save in static graph model.
     paddle.jit.save(model, args.output_path)

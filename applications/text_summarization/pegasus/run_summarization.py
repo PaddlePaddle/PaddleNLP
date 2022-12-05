@@ -43,24 +43,16 @@ def parse_args():
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
         type=str,
         required=True,
-        help="Path to pre-trained model. ")
-    parser.add_argument("--train_file",
-                        type=str,
-                        required=False,
-                        default=None,
-                        help="Train data path.")
-    parser.add_argument("--eval_file",
-                        type=str,
-                        required=False,
-                        default=None,
-                        help="Eval data path.")
+        help="Path to pre-trained model. ",
+    )
+    parser.add_argument("--train_file", type=str, required=False, default=None, help="Train data path.")
+    parser.add_argument("--eval_file", type=str, required=False, default=None, help="Eval data path.")
     parser.add_argument(
         "--output_dir",
         default="output",
         type=str,
         required=True,
-        help=
-        "The output directory where the model predictions and checkpoints will be written.",
+        help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--max_source_length",
@@ -73,8 +65,8 @@ def parse_args():
         "--min_target_length",
         default=0,
         type=int,
-        help=
-        "The minimum total sequence length for target text when generating. ")
+        help="The minimum total sequence length for target text when generating. ",
+    )
     parser.add_argument(
         "--max_target_length",
         default=64,
@@ -83,24 +75,15 @@ def parse_args():
         "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
         "during ``evaluate`` and ``predict``.",
     )
-    parser.add_argument("--learning_rate",
-                        default=1e-4,
-                        type=float,
-                        help="The initial learning rate for Adam.")
+    parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
         help="Total number of training epochs to perform.",
     )
-    parser.add_argument("--logging_steps",
-                        type=int,
-                        default=100,
-                        help="Log every X updates steps.")
-    parser.add_argument("--save_steps",
-                        type=int,
-                        default=100,
-                        help="Save checkpoint every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
+    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--train_batch_size",
         default=20,
@@ -113,49 +96,35 @@ def parse_args():
         type=int,
         help="Batch size per GPU/CPU for evaluation.",
     )
-    parser.add_argument("--weight_decay",
-                        default=0.0,
-                        type=float,
-                        help="Weight decay if we apply some.")
+    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
     parser.add_argument(
         "--warmup_steps",
         default=0,
         type=int,
-        help=
-        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
-    parser.add_argument("--warmup_proportion",
-                        default=0.1,
-                        type=float,
-                        help="Linear warmup proportion over total steps.")
-    parser.add_argument("--adam_epsilon",
-                        default=1e-6,
-                        type=float,
-                        help="Epsilon for Adam optimizer.")
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion",
+    )
+    parser.add_argument(
+        "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps."
+    )
+    parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help=
-        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--seed",
-                        default=42,
-                        type=int,
-                        help="random seed for initialization")
+    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
         type=str,
         choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument("--use_amp",
-                        default=False,
-                        type=distutils.util.strtobool,
-                        help="Enable mixed precision training.")
-    parser.add_argument("--scale_loss",
-                        default=2**15,
-                        type=float,
-                        help="The value of scale_loss for fp16.")
+        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+    )
+    parser.add_argument(
+        "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
+    )
+    parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
 
@@ -171,28 +140,25 @@ def set_seed(args):
 
 
 @paddle.no_grad()
-def evaluate(model, data_loader, tokenizer, min_target_length,
-             max_target_length):
+def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length):
     model.eval()
     all_preds = []
     all_labels = []
     model = model._layers if isinstance(model, paddle.DataParallel) else model
     for batch in tqdm(data_loader, total=len(data_loader), desc="Eval step"):
-        labels = batch.pop('labels').numpy()
-        preds = model.generate(input_ids=batch['input_ids'],
-                               attention_mask=batch['attention_mask'],
-                               min_length=min_target_length,
-                               max_length=max_target_length,
-                               use_cache=True)[0]
+        labels = batch.pop("labels").numpy()
+        preds = model.generate(
+            input_ids=batch["input_ids"],
+            attention_mask=batch["attention_mask"],
+            min_length=min_target_length,
+            max_length=max_target_length,
+            use_cache=True,
+        )[0]
         all_preds.extend(
-            tokenizer.batch_decode(preds.numpy(),
-                                   skip_special_tokens=True,
-                                   clean_up_tokenization_spaces=False))
+            tokenizer.batch_decode(preds.numpy(), skip_special_tokens=True, clean_up_tokenization_spaces=False)
+        )
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-        all_labels.extend(
-            tokenizer.batch_decode(labels,
-                                   skip_special_tokens=True,
-                                   clean_up_tokenization_spaces=False))
+        all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
     compute_metrics(all_preds, all_labels)
     model.train()
 
@@ -207,67 +173,50 @@ def do_train(args):
     tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
     train_set = load_dataset("json", data_files=args.train_file, split="train")
     dev_set = load_dataset("json", data_files=args.eval_file, split="train")
-    remove_columns = ['content', 'title']
-    trans_func = partial(convert_example,
-                         text_column='content',
-                         summary_column='title',
-                         tokenizer=tokenizer,
-                         max_source_length=args.max_source_length,
-                         max_target_length=args.max_target_length)
+    remove_columns = ["content", "title"]
+    trans_func = partial(
+        convert_example,
+        text_column="content",
+        summary_column="title",
+        tokenizer=tokenizer,
+        max_source_length=args.max_source_length,
+        max_target_length=args.max_target_length,
+    )
     with main_process_first(desc="train dataset map pre-processing"):
-        train_set = train_set.map(trans_func,
-                                  batched=True,
-                                  load_from_cache_file=True,
-                                  remove_columns=remove_columns)
+        train_set = train_set.map(trans_func, batched=True, load_from_cache_file=True, remove_columns=remove_columns)
     with main_process_first(desc="dev dataset map pre-processing"):
-        dev_set = dev_set.map(trans_func,
-                              batched=True,
-                              load_from_cache_file=True,
-                              remove_columns=remove_columns)
+        dev_set = dev_set.map(trans_func, batched=True, load_from_cache_file=True, remove_columns=remove_columns)
 
-    model = PegasusForConditionalGeneration.from_pretrained(
-        args.model_name_or_path)
+    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path)
     batchify_fn = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
 
-    train_batch_sampler = DistributedBatchSampler(
-        train_set, batch_size=args.train_batch_size, shuffle=True)
+    train_batch_sampler = DistributedBatchSampler(train_set, batch_size=args.train_batch_size, shuffle=True)
 
-    train_data_loader = DataLoader(dataset=train_set,
-                                   batch_sampler=train_batch_sampler,
-                                   num_workers=0,
-                                   collate_fn=batchify_fn,
-                                   return_list=True)
+    train_data_loader = DataLoader(
+        dataset=train_set, batch_sampler=train_batch_sampler, num_workers=0, collate_fn=batchify_fn, return_list=True
+    )
 
-    dev_batch_sampler = BatchSampler(dev_set,
-                                     batch_size=args.eval_batch_size,
-                                     shuffle=False)
-    dev_data_loader = DataLoader(dataset=dev_set,
-                                 batch_sampler=dev_batch_sampler,
-                                 num_workers=0,
-                                 collate_fn=batchify_fn,
-                                 return_list=True)
+    dev_batch_sampler = BatchSampler(dev_set, batch_size=args.eval_batch_size, shuffle=False)
+    dev_data_loader = DataLoader(
+        dataset=dev_set, batch_sampler=dev_batch_sampler, num_workers=0, collate_fn=batchify_fn, return_list=True
+    )
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     if args.max_steps > 0:
         num_training_steps = args.max_steps
-        num_train_epochs = math.ceil(num_training_steps /
-                                     len(train_data_loader))
+        num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
     else:
         num_training_steps = len(train_data_loader) * args.num_train_epochs
         num_train_epochs = args.num_train_epochs
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         warmup)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         beta1=0.9,
@@ -275,7 +224,8 @@ def do_train(args):
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
@@ -284,9 +234,7 @@ def do_train(args):
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            with paddle.amp.auto_cast(
-                    args.use_amp,
-                    custom_white_list=["layer_norm", "softmax", "gelu"]):
+            with paddle.amp.auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax", "gelu"]):
                 lm_logits, new_cache, loss = model(**batch)
             if args.use_amp:
                 scaled_loss = scaler.scale(loss)
@@ -300,35 +248,38 @@ def do_train(args):
             if global_step % args.logging_steps == 0:
                 logger.info(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
-                    % (global_step, num_training_steps, epoch, step,
-                       paddle.distributed.get_rank(), loss, optimizer.get_lr(),
-                       args.logging_steps / (time.time() - tic_train)))
+                    % (
+                        global_step,
+                        num_training_steps,
+                        epoch,
+                        step,
+                        paddle.distributed.get_rank(),
+                        loss,
+                        optimizer.get_lr(),
+                        args.logging_steps / (time.time() - tic_train),
+                    )
+                )
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
-                evaluate(model, dev_data_loader, tokenizer,
-                         args.min_target_length, args.max_target_length)
+                evaluate(model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length)
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
                 if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "pegeaus_model_%d" % global_step)
+                    output_dir = os.path.join(args.output_dir, "pegeaus_model_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
+                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 return
     if paddle.distributed.get_rank() == 0:
-        output_dir = os.path.join(args.output_dir,
-                                  "pegeaus_modelfinal_%d" % global_step)
+        output_dir = os.path.join(args.output_dir, "pegeaus_modelfinal_%d" % global_step)
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         # Need better way to get inner model of DataParallel
-        model_to_save = model._layers if isinstance(
-            model, paddle.DataParallel) else model
+        model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
         model_to_save.save_pretrained(output_dir)
         tokenizer.save_pretrained(output_dir)
 

@@ -31,16 +31,13 @@ def postprocess_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
 def prepare_input(tokenizer, sentences):
     tokenized = tokenizer(sentences, padding=True)
-    input_ids = paddle.to_tensor(tokenized['input_ids'], dtype='int64')
+    input_ids = paddle.to_tensor(tokenized["input_ids"], dtype="int64")
     return input_ids
 
 
@@ -50,45 +47,25 @@ def parse_args():
         "--model_name_or_path",
         default="bart-base",
         type=str,
-        help=
-        "The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. "
+        help="The model name to specify the bart to use. Can be one of ['bart-base', 'bart-large',]. ",
     )
     parser.add_argument(
         "--decoding_strategy",
-        default='beam_search',
+        default="beam_search",
         type=str,
-        help=
-        "The decoding strategy. Can be one of [greedy_search, beam_search, sampling]"
+        help="The decoding strategy. Can be one of [greedy_search, beam_search, sampling]",
     )
-    parser.add_argument("--beam_size",
-                        default=5,
-                        type=int,
-                        help="The parameters for beam search. ")
+    parser.add_argument("--beam_size", default=5, type=int, help="The parameters for beam search. ")
+    parser.add_argument("--top_k", default=4, type=int, help="The number of candidate to procedure beam search. ")
     parser.add_argument(
-        "--top_k",
-        default=4,
-        type=int,
-        help="The number of candidate to procedure beam search. ")
+        "--top_p", default=1.0, type=float, help="The probability threshold to procedure topp sampling. "
+    )
+    parser.add_argument("--max_length", default=20, type=int, help="Maximum output length. ")
+    parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity of beam search. ")
     parser.add_argument(
-        "--top_p",
-        default=1.0,
-        type=float,
-        help="The probability threshold to procedure topp sampling. ")
-    parser.add_argument("--max_length",
-                        default=20,
-                        type=int,
-                        help="Maximum output length. ")
-    parser.add_argument("--diversity_rate",
-                        default=0.0,
-                        type=float,
-                        help="The diversity of beam search. ")
-    parser.add_argument("--length_penalty",
-                        default=0.6,
-                        type=float,
-                        help="The power number in length penalty calculation")
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 decoding to predict. ")
+        "--length_penalty", default=0.6, type=float, help="The power number in length penalty calculation"
+    )
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
@@ -98,9 +75,8 @@ def do_predict(args):
     paddle.set_device(place)
 
     tokenizer = BartTokenizer.from_pretrained(args.model_name_or_path)
-    logger.info('Loading the model parameters, please wait...')
-    model = BartForConditionalGeneration.from_pretrained(
-        args.model_name_or_path)
+    logger.info("Loading the model parameters, please wait...")
+    model = BartForConditionalGeneration.from_pretrained(args.model_name_or_path)
 
     # Set evaluate mode
     model.eval()
@@ -111,9 +87,9 @@ def do_predict(args):
         "Drop everything now. Meet me in the pouring <mask>. Kiss me on the sidewalk.",
     ]
 
-    bos_id = model.bart.config['bos_token_id']
-    eos_id = model.bart.config['eos_token_id']
-    pad_id = model.bart.config['pad_token_id']
+    bos_id = model.bart.config["bos_token_id"]
+    eos_id = model.bart.config["eos_token_id"]
+    pad_id = model.bart.config["pad_token_id"]
     input_ids = prepare_input(tokenizer, sentences)
     # Define model
     faster_bart = model
@@ -138,11 +114,11 @@ def do_predict(args):
                 diversity_rate=args.diversity_rate,
                 length_penalty=args.length_penalty,
                 use_fp16_decoding=args.use_fp16_decoding,
-                use_faster=True)
+                use_faster=True,
+            )
 
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoding is %f ms" %
-                    ((time.perf_counter() - start) / 50 * 1000))
+        logger.info("Average test time for decoding is %f ms" % ((time.perf_counter() - start) / 50 * 1000))
 
         # Output
         finished_seq = finished_seq.numpy()

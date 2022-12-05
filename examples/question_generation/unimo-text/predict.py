@@ -66,7 +66,7 @@ def parse_args():
 
 
 def read_file(file):
-    with open(file, 'r', encoding='utf-8') as f:
+    with open(file, "r", encoding="utf-8") as f:
         for line in f.readlines():
             line = line.strip()
             if not line:
@@ -92,22 +92,18 @@ def run(args):
     if args.predict_file:
         dev_ds = load_dataset(read_file, file=args.predict_file, lazy=False)
     else:
-        dev_ds = load_dataset(args.dataset_name,
-                              splits='dev',
-                              data_files=args.predict_file)
+        dev_ds = load_dataset(args.dataset_name, splits="dev", data_files=args.predict_file)
 
-    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
-                                                 'test')
+    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args, "test")
 
     if args.do_predict:
-        model_eval = model._layers if isinstance(model,
-                                                 paddle.DataParallel) else model
+        model_eval = model._layers if isinstance(model, paddle.DataParallel) else model
         prediction(model_eval, dev_data_loader, args, tokenizer)
 
 
 @paddle.no_grad()
 def prediction(model, data_loader, args, tokenizer):
-    print('\nPred begin...')
+    print("\nPred begin...")
     model.eval()
     pred_ref = []
     time_begin = time.time()
@@ -130,26 +126,25 @@ def prediction(model, data_loader, args, tokenizer):
             length_penalty=args.length_penalty,
             num_return_sequences=args.num_return_sequences,
             bos_token_id=tokenizer.cls_token_id,
-            eos_token_id=tokenizer.mask_token_id)
+            eos_token_id=tokenizer.mask_token_id,
+        )
 
-        total_time += (time.time() - start_time)
+        total_time += time.time() - start_time
         if step % args.logging_steps == 0:
-            print('step %d - %.3fs/step' %
-                  (step, total_time / args.logging_steps))
+            print("step %d - %.3fs/step" % (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        results = select_sum(ids, scores, tokenizer, args.max_dec_len,
-                             args.num_return_sequences)
+        results = select_sum(ids, scores, tokenizer, args.max_dec_len, args.num_return_sequences)
         pred_ref.extend(results)
         start_time = time.time()
-    print('Generation cost time:', time.time() - time_begin)
+    print("Generation cost time:", time.time() - time_begin)
 
-    with open(args.output_path, 'w', encoding='utf-8') as fout:
+    with open(args.output_path, "w", encoding="utf-8") as fout:
         for ref in pred_ref:
-            fout.write(ref + '\n')
+            fout.write(ref + "\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     print_args(args)
     run(args)

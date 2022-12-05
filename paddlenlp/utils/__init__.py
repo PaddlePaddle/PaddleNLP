@@ -15,4 +15,4 @@
 from .batch_sampler import *
 from .import_utils import install_package, uninstall_package
 
-CONFIG_NAME = 'model_config.json'
+CONFIG_NAME = "model_config.json"

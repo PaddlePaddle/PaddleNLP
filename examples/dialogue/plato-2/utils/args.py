@@ -18,7 +18,7 @@ import json
 
 
 def str2bool(v):
-    """ Support bool type for argparse. """
+    """Support bool type for argparse."""
     if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
     elif v.lower() in ("no", "false", "f", "n", "0"):
@@ -28,7 +28,7 @@ def str2bool(v):
 
 
 class Args(dict):
-    """ Arguments class
+    """Arguments class
 
     Store arguments in training / infer / ... scripts.
     """
@@ -75,7 +75,7 @@ class Args(dict):
 
 
 def parse_args(parser: argparse.ArgumentParser, allow_unknown=False) -> Args:
-    """ Parse hyper-parameters from cmdline. """
+    """Parse hyper-parameters from cmdline."""
     if allow_unknown:
         parsed, _ = parser.parse_known_args()
     else:

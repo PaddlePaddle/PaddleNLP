@@ -27,15 +27,18 @@ from paddlenlp.utils.log import logger
 from datasets import load_metric, load_dataset
 
 sys.path.append("../ernie-1.0/finetune")
-from question_answering import QuestionAnsweringTrainer, CrossEntropyLossForSQuAD, prepare_train_features, prepare_validation_features
+from question_answering import (
+    QuestionAnsweringTrainer,
+    CrossEntropyLossForSQuAD,
+    prepare_train_features,
+    prepare_validation_features,
+)
 from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, CompressionArguments))
-    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
-    )
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses()
 
     paddle.set_device(compression_args.device)
     data_args.dataset = data_args.dataset.strip()
@@ -46,17 +49,15 @@ def main():
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
-        dataset_config[0],
-        None if len(dataset_config) <= 1 else dataset_config[1],
-        cache_dir=model_args.cache_dir)
+        dataset_config[0], None if len(dataset_config) <= 1 else dataset_config[1], cache_dir=model_args.cache_dir
+    )
 
-    label_list = getattr(raw_datasets['train'], "label_list", None)
+    label_list = getattr(raw_datasets["train"], "label_list", None)
     data_args.label_list = label_list
 
     # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForQuestionAnswering.from_pretrained(
-        model_args.model_name_or_path)
+    model = AutoModelForQuestionAnswering.from_pretrained(model_args.model_name_or_path)
 
     loss_fct = CrossEntropyLossForSQuAD()
 
@@ -68,12 +69,10 @@ def main():
 
     train_dataset = raw_datasets["train"]
     # Create train feature from dataset
-    with compression_args.main_process_first(
-            desc="train dataset map pre-processing"):
+    with compression_args.main_process_first(desc="train dataset map pre-processing"):
         # Dataset pre-process
         train_dataset = train_dataset.map(
-            partial(prepare_train_features, tokenizer=tokenizer,
-                    args=data_args),
+            partial(prepare_train_features, tokenizer=tokenizer, args=data_args),
             batched=True,
             num_proc=4,
             remove_columns=column_names,
@@ -81,12 +80,9 @@ def main():
             desc="Running tokenizer on train dataset",
         )
     eval_examples = raw_datasets["validation"]
-    with compression_args.main_process_first(
-            desc="evaluate dataset map pre-processing"):
+    with compression_args.main_process_first(desc="evaluate dataset map pre-processing"):
         eval_dataset = eval_examples.map(
-            partial(prepare_validation_features,
-                    tokenizer=tokenizer,
-                    args=data_args),
+            partial(prepare_validation_features, tokenizer=tokenizer, args=data_args),
             batched=True,
             num_proc=4,
             remove_columns=column_names,
@@ -109,10 +105,7 @@ def main():
             null_score_diff_threshold=data_args.null_score_diff_threshold,
         )
 
-        references = [{
-            "id": ex["id"],
-            "answers": ex["answers"]
-        } for ex in examples]
+        references = [{"id": ex["id"], "answers": ex["answers"]} for ex in examples]
         return EvalPrediction(predictions=predictions, label_ids=references)
 
     def criterion(outputs, label):
@@ -134,7 +127,8 @@ def main():
         data_collator=data_collator,
         post_process_function=post_processing_function,
         tokenizer=tokenizer,
-        criterion=criterion)
+        criterion=criterion,
+    )
 
     compression_args.print_config()
 

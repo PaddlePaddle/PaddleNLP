@@ -40,26 +40,21 @@ def read(data_path):
             yield example
 
 
-def convert_example_to_feature(example,
-                               tokenizer,
-                               label2id,
-                               max_seq_len=512,
-                               is_test=False):
-    encoded_inputs = tokenizer(list(example["text"]),
-                               is_split_into_words=True,
-                               max_seq_len=max_seq_len,
-                               return_length=True)
+def convert_example_to_feature(example, tokenizer, label2id, max_seq_len=512, is_test=False):
+    encoded_inputs = tokenizer(
+        list(example["text"]), is_split_into_words=True, max_seq_len=max_seq_len, return_length=True
+    )
 
     if not is_test:
-        label = [label2id["O"]] + [
-            label2id[label_term] for label_term in example["label"]
-        ][:(max_seq_len - 2)] + [label2id["O"]]
+        label = (
+            [label2id["O"]]
+            + [label2id[label_term] for label_term in example["label"]][: (max_seq_len - 2)]
+            + [label2id["O"]]
+        )
 
         assert len(encoded_inputs["input_ids"]) == len(
             label
         ), f"input_ids: {len(encoded_inputs['input_ids'])}, label: {len(label)}"
-        return encoded_inputs["input_ids"], encoded_inputs[
-            "token_type_ids"], encoded_inputs["seq_len"], label
+        return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"], label
 
-    return encoded_inputs["input_ids"], encoded_inputs[
-        "token_type_ids"], encoded_inputs["seq_len"]
+    return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"]

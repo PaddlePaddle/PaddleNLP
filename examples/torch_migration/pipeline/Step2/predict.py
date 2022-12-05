@@ -27,13 +27,12 @@ import functools
 import pandas as pd
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 from models.pd_bert import BertConfig, BertForSequenceClassification
 
 
 def get_data():
-
     def read(data_path):
         df = pd.read_csv(data_path, sep="\t")
         for _, row in df.iterrows():
@@ -41,21 +40,19 @@ def get_data():
 
     def convert_example(example, tokenizer, max_length=128):
         labels = [example["labels"]]
-        #labels = np.array([example["labels"]], dtype="int64")
+        # labels = np.array([example["labels"]], dtype="int64")
         example = tokenizer(example["sentence"], max_seq_len=max_length)
         return example
 
     tokenizer = PPNLPBertTokenizer.from_pretrained("bert-base-uncased")
-    dataset_test = ppnlp_load_dataset(read,
-                                      data_path='demo_sst2_sentence/demo.tsv',
-                                      lazy=False)
+    dataset_test = ppnlp_load_dataset(read, data_path="demo_sst2_sentence/demo.tsv", lazy=False)
     trans_func = partial(convert_example, tokenizer=tokenizer, max_length=128)
 
     dataset_test = dataset_test.map(trans_func, lazy=False)
     one_sentence = dataset_test.new_data[0]
 
     for k in ["input_ids", "token_type_ids"]:
-        one_sentence[k] = paddle.to_tensor(one_sentence[k], dtype='int64')
+        one_sentence[k] = paddle.to_tensor(one_sentence[k], dtype="int64")
         one_sentence[k] = paddle.unsqueeze(one_sentence[k], axis=0)
 
     return one_sentence
@@ -64,14 +61,13 @@ def get_data():
 @paddle.no_grad()
 def main():
     # 模型定义
-    paddle_dump_path = '../weights/paddle_weight.pdparams'
+    paddle_dump_path = "../weights/paddle_weight.pdparams"
     config = BertConfig()
     model = BertForSequenceClassification(config)
     checkpoint = paddle.load(paddle_dump_path)
     model.bert.load_dict(checkpoint)
 
-    classifier_weights = paddle.load(
-        "../classifier_weights/paddle_classifier_weights.bin")
+    classifier_weights = paddle.load("../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
 
     model.eval()

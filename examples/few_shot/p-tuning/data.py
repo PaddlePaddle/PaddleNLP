@@ -20,41 +20,26 @@ import paddle
 from paddlenlp.utils.log import logger
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
-                                                          batch_size=batch_size,
-                                                          shuffle=shuffle)
+    shuffle = True if mode == "train" else False
+    if mode == "train":
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    return paddle.io.DataLoader(dataset=dataset,
-                                batch_sampler=batch_sampler,
-                                collate_fn=batchify_fn,
-                                return_list=True)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    p_embedding_num=5,
-                    is_test=False):
+def convert_example(example, tokenizer, max_seq_length=512, p_embedding_num=5, is_test=False):
     """
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         p_embedding_num(obj:`int`) The number of p-embedding.
 
@@ -88,55 +73,45 @@ def convert_example(example,
     p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
 
     # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-        start_mask_position:]
+    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
 
     # Stpe4: Insert P-tokens at begin of sentence
     src_ids = p_token_ids + src_ids
 
     # calculate mask_positions
-    mask_positions = [
-        index + start_mask_position + len(p_token_ids)
-        for index in range(label_length)
-    ]
+    mask_positions = [index + start_mask_position + len(p_token_ids) for index in range(label_length)]
 
     if "sentence2" in example:
-        encoded_inputs = tokenizer(text=example["sentence2"],
-                                   max_seq_len=max_seq_length)
+        encoded_inputs = tokenizer(text=example["sentence2"], max_seq_len=max_seq_length)
         sentence2_src_ids = encoded_inputs["input_ids"][1:]
         src_ids += sentence2_src_ids
         token_type_ids += [1] * len(sentence2_src_ids)
 
     token_type_ids = [0] * len(src_ids)
 
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
+    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
 
     if is_test:
         return src_ids, token_type_ids, mask_positions
     else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
+        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
 
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
+        assert (
+            len(mask_lm_labels) == len(mask_positions) == label_length
+        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
+            mask_lm_labels, mask_positions, text_label
+        )
 
         return src_ids, token_type_ids, mask_positions, mask_lm_labels
 
 
-def convert_chid_example(example,
-                         tokenizer,
-                         max_seq_length=512,
-                         p_embedding_num=5,
-                         is_test=False):
+def convert_chid_example(example, tokenizer, max_seq_length=512, p_embedding_num=5, is_test=False):
     """
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         p_embedding_num(obj:`int`) The number of p-embedding.
 
@@ -155,9 +130,7 @@ def convert_chid_example(example,
     seg_tokens.remove("淠")
     sentence1 = "".join(seg_tokens)
     candidates = example["candidates"]
-    candidate_labels_ids = [
-        tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates
-    ]
+    candidate_labels_ids = [tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates]
 
     sentence1 = example["sentence1"]
 
@@ -180,33 +153,28 @@ def convert_chid_example(example,
     p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
 
     # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[
-        start_mask_position:]
+    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
 
     # Stpe4: Insert P-tokens at begin of sentence
     src_ids = p_token_ids + src_ids
 
     # calculate mask_positions
-    mask_positions = [
-        index + start_mask_position + len(p_token_ids)
-        for index in range(label_length)
-    ]
+    mask_positions = [index + start_mask_position + len(p_token_ids) for index in range(label_length)]
 
     token_type_ids = [0] * len(src_ids)
 
-    assert len(src_ids) == len(
-        token_type_ids), "length src_ids, token_type_ids must be equal"
+    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
 
     if is_test:
         return src_ids, token_type_ids, mask_positions, candidate_labels_ids
     else:
-        mask_lm_labels = tokenizer(
-            text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
+        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
 
-        assert len(mask_lm_labels) == len(
-            mask_positions
-        ) == label_length, "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label)
+        assert (
+            len(mask_lm_labels) == len(mask_positions) == label_length
+        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
+            mask_lm_labels, mask_positions, text_label
+        )
 
         return src_ids, token_type_ids, mask_positions, mask_lm_labels, candidate_labels_ids
 
@@ -222,16 +190,16 @@ def transform_iflytek(example, label_normalize_dict=None, is_test=False):
 
         return example
     else:
-        origin_label = example['label_des']
+        origin_label = example["label_des"]
 
         # Normalize some of the labels, eg. English -> Chinese
         if origin_label in label_normalize_dict:
-            example['label_des'] = label_normalize_dict[origin_label]
+            example["label_des"] = label_normalize_dict[origin_label]
         else:
             # Note: Ideal way is drop these examples
             # which maybe need to change MapDataset
             # Now hard code may hurt performance of `iflytek` dataset
-            example['label_des'] = "旅游"
+            example["label_des"] = "旅游"
 
         example["text_label"] = example["label_des"]
         example["sentence1"] = example["sentence"]
@@ -249,9 +217,9 @@ def transform_tnews(example, label_normalize_dict=None, is_test=False):
         del example["sentence"]
         return example
     else:
-        origin_label = example['label_desc']
+        origin_label = example["label_desc"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['label_desc'] = label_normalize_dict[origin_label]
+        example["label_desc"] = label_normalize_dict[origin_label]
 
         example["sentence1"] = example["sentence"]
         example["text_label"] = example["label_desc"]
@@ -265,13 +233,13 @@ def transform_tnews(example, label_normalize_dict=None, is_test=False):
 def transform_eprstmt(example, label_normalize_dict=None, is_test=False):
     if is_test:
         example["label_length"] = 1
-        example['sentence1'] = example["sentence"]
+        example["sentence1"] = example["sentence"]
         return example
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
-        example['sentence1'] = example["sentence"]
+        example["text_label"] = label_normalize_dict[origin_label]
+        example["sentence1"] = example["sentence"]
 
         del example["sentence"]
         del example["label"]
@@ -286,7 +254,7 @@ def transform_ocnli(example, label_normalize_dict=None, is_test=False):
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
         del example["label"]
 
@@ -296,8 +264,7 @@ def transform_ocnli(example, label_normalize_dict=None, is_test=False):
 def transform_csl(example, label_normalize_dict=None, is_test=False):
     if is_test:
         example["label_length"] = 1
-        example["sentence1"] = "本文的关键词是:" + "，".join(
-            example["keyword"]) + example["abst"]
+        example["sentence1"] = "本文的关键词是:" + "，".join(example["keyword"]) + example["abst"]
 
         del example["abst"]
         del example["keyword"]
@@ -306,10 +273,9 @@ def transform_csl(example, label_normalize_dict=None, is_test=False):
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
-        example["sentence1"] = "本文的关键词是:" + "，".join(
-            example["keyword"]) + example["abst"]
+        example["sentence1"] = "本文的关键词是:" + "，".join(example["keyword"]) + example["abst"]
 
         del example["label"]
         del example["abst"]
@@ -328,7 +294,7 @@ def transform_csldcp(example, label_normalize_dict=None, is_test=False):
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
         normalized_label = label_normalize_dict[origin_label]
-        example['text_label'] = normalized_label
+        example["text_label"] = normalized_label
         example["sentence1"] = example["content"]
 
         del example["label"]
@@ -346,7 +312,7 @@ def transform_bustm(example, label_normalize_dict=None, is_test=False):
         origin_label = str(example["label"])
 
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
         del example["label"]
 
@@ -362,7 +328,7 @@ def transform_chid(example, label_normalize_dict=None, is_test=False):
 
         return example
     else:
-        label_index = int(example['answer'])
+        label_index = int(example["answer"])
         candidates = example["candidates"]
         example["text_label"] = candidates[label_index]
 
@@ -389,7 +355,7 @@ def transform_cluewsc(example, label_normalize_dict=None, is_test=False):
     else:
         origin_label = example["label"]
         # Normalize some of the labels, eg. English -> Chinese
-        example['text_label'] = label_normalize_dict[origin_label]
+        example["text_label"] = label_normalize_dict[origin_label]
 
         text = example["text"]
         span1_text = example["target"]["span1_text"]
@@ -412,5 +378,5 @@ transform_fn_dict = {
     "csl": transform_csl,
     "csldcp": transform_csldcp,
     "cluewsc": transform_cluewsc,
-    "chid": transform_chid
+    "chid": transform_chid,
 }

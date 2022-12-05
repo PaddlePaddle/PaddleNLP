@@ -34,14 +34,11 @@ from classification.data import convert_example_to_feature as convert_example_to
 
 
 class Predictor(object):
-
     def __init__(self, args):
         self.args = args
-        self.ext_predictor, self.ext_input_handles, self.ext_output_hanle = self.create_predictor(
-            args.ext_model_path)
+        self.ext_predictor, self.ext_input_handles, self.ext_output_hanle = self.create_predictor(args.ext_model_path)
         print(f"ext_model_path: {args.ext_model_path}, {self.ext_predictor}")
-        self.cls_predictor, self.cls_input_handles, self.cls_output_hanle = self.create_predictor(
-            args.cls_model_path)
+        self.cls_predictor, self.cls_input_handles, self.cls_output_hanle = self.create_predictor(args.cls_model_path)
         self.ext_label2id, self.ext_id2label = load_dict(args.ext_label_path)
         self.cls_label2id, self.cls_id2label = load_dict(args.cls_label_path)
         self.tokenizer = SkepTokenizer.from_pretrained(args.base_model_name)
@@ -62,15 +59,14 @@ class Predictor(object):
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "int8": inference.PrecisionType.Int8,
             }
             precision_mode = precision_map[args.precision]
 
             if args.use_tensorrt:
                 config.enable_tensorrt_engine(
-                    max_batch_size=self.args.batch_size,
-                    min_subgraph_size=30,
-                    precision_mode=precision_mode)
+                    max_batch_size=self.args.batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                )
         elif self.args.device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -86,34 +82,28 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handle = predictor.get_output_handle(
-            predictor.get_output_names()[0])
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handle = predictor.get_output_handle(predictor.get_output_names()[0])
 
         return predictor, input_handles, output_handle
 
     def predict_ext(self, args):
-        ori_test_ds = load_dataset(read_test_file,
-                                   data_path=args.test_path,
-                                   lazy=False)
-        trans_func = partial(convert_example_to_feature_ext,
-                             tokenizer=self.tokenizer,
-                             label2id=self.ext_label2id,
-                             max_seq_len=args.ext_max_seq_len,
-                             is_test=True)
+        ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
+        trans_func = partial(
+            convert_example_to_feature_ext,
+            tokenizer=self.tokenizer,
+            label2id=self.ext_label2id,
+            max_seq_len=args.ext_max_seq_len,
+            is_test=True,
+        )
         test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
-        batch_list = [
-            test_ds[idx:idx + args.batch_size]
-            for idx in range(0, len(test_ds), args.batch_size)
-        ]
+        batch_list = [test_ds[idx : idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
-                ), Stack(dtype="int64")): fn(samples)
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
+            Stack(dtype="int64"),
+        ): fn(samples)
 
         results = []
         for bid, batch_data in enumerate(batch_list):
@@ -124,44 +114,42 @@ class Predictor(object):
             logits = self.ext_output_hanle.copy_to_cpu()
 
             predictions = logits.argmax(axis=2)
-            for eid, (seq_len,
-                      prediction) in enumerate(zip(seq_lens, predictions)):
+            for eid, (seq_len, prediction) in enumerate(zip(seq_lens, predictions)):
                 idx = bid * args.batch_size + eid
-                tag_seq = [
-                    self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]
-                ]
+                tag_seq = [self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
                 text = ori_test_ds[idx]["text"]
-                aps = decoding(text[:args.ext_max_seq_len - 2], tag_seq)
+                aps = decoding(text[: args.ext_max_seq_len - 2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
-                    aspect_text = self._concate_aspect_and_opinion(
-                        text, aspect, opinions)
-                    results.append({
-                        "id": str(idx) + "_" + str(aid),
-                        "aspect": aspect,
-                        "opinions": opinions,
-                        "text": text,
-                        "aspect_text": aspect_text
-                    })
+                    aspect_text = self._concate_aspect_and_opinion(text, aspect, opinions)
+                    results.append(
+                        {
+                            "id": str(idx) + "_" + str(aid),
+                            "aspect": aspect,
+                            "opinions": opinions,
+                            "text": text,
+                            "aspect_text": aspect_text,
+                        }
+                    )
         return results
 
     def predict_cls(self, args, ext_results):
         test_ds = MapDataset(ext_results)
-        trans_func = partial(convert_example_to_feature_cls,
-                             tokenizer=self.tokenizer,
-                             label2id=self.cls_label2id,
-                             max_seq_len=args.cls_max_seq_len,
-                             is_test=True)
+        trans_func = partial(
+            convert_example_to_feature_cls,
+            tokenizer=self.tokenizer,
+            label2id=self.cls_label2id,
+            max_seq_len=args.cls_max_seq_len,
+            is_test=True,
+        )
         test_ds = test_ds.map(trans_func, lazy=False)
-        batch_list = [
-            test_ds[idx:idx + args.batch_size]
-            for idx in range(0, len(test_ds), args.batch_size)
-        ]
+        batch_list = [test_ds[idx : idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
-                ), Stack(dtype="int64")): fn(samples)
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
+            Stack(dtype="int64"),
+        ): fn(samples)
 
         results = []
         for batch_data in batch_list:
@@ -192,23 +180,20 @@ class Predictor(object):
             for idx, single_ap in enumerate(collect_dict[eid]):
                 if idx == 0:
                     sentiment_result["text"] = single_ap["text"]
-                ap_list.append({
-                    "aspect":
-                    single_ap["aspect"],
-                    "opinions":
-                    single_ap["opinions"],
-                    "sentiment_polarity":
-                    single_ap["sentiment_polarity"]
-                })
+                ap_list.append(
+                    {
+                        "aspect": single_ap["aspect"],
+                        "opinions": single_ap["opinions"],
+                        "sentiment_polarity": single_ap["sentiment_polarity"],
+                    }
+                )
             sentiment_result["ap_list"] = ap_list
             sentiment_results.append(sentiment_result)
 
         with open(args.save_path, "w", encoding="utf-8") as f:
             for sentiment_result in sentiment_results:
                 f.write(json.dumps(sentiment_result, ensure_ascii=False) + "\n")
-        print(
-            f"sentiment analysis results has been saved to path: {args.save_path}"
-        )
+        print(f"sentiment analysis results has been saved to path: {args.save_path}")
 
     def predict(self, args):
         ext_results = self.predict_ext(args)
