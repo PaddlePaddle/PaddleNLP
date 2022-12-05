@@ -50,5 +50,5 @@ python export_model.py --pretrained_model_name_or_path runwayml/stable-diffusion
 
 | 参数 |参数说明 |
 |----------|--------------|
-|<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](../examples/textual_inversion/README.md)。|
+|<div style="width: 230pt">--pretrained_model_name_or_path </div> | ppdiffuers提供的diffusion预训练模型。默认为："CompVis/stable-diffusion-v1-4    "。更多diffusion预训练模型可参考[ppdiffuser模型列表](https://github.com/PaddlePaddle/PaddleNLP/tree/main/ppdiffusers#ppdiffusers%E6%A8%A1%E5%9E%8B%E6%94%AF%E6%8C%81%E7%9A%84%E6%9D%83%E9%87%8D)。|
 |--output_path | 导出的模型目录。 |
