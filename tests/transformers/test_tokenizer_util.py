@@ -22,24 +22,21 @@ from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
 
 
 class EmptyTokenizer(PretrainedTokenizer):
-
     def __init__(self, a=1, b=2):
         pass
 
 
 class SubEmptyTokenizer(EmptyTokenizer):
-
     def __init__(self, c=3, d=4):
         super().__init__(a=c, b=d)
 
 
 class TokenizerUtilsTest(unittest.TestCase):
-
     def test_multi_inherit(self):
         tokenizer = SubEmptyTokenizer()
 
-        self.assertIn('c', tokenizer.init_kwargs)
-        self.assertEqual(tokenizer.init_kwargs['c'], 3)
+        self.assertIn("c", tokenizer.init_kwargs)
+        self.assertEqual(tokenizer.init_kwargs["c"], 3)
 
     def test_config(self):
         tmpdirname = tempfile.mkdtemp()
@@ -47,11 +44,9 @@ class TokenizerUtilsTest(unittest.TestCase):
         tokenizer = SubEmptyTokenizer()
         tokenizer.save_pretrained(tmpdirname)
 
-        with open(os.path.join(tmpdirname, "tokenizer_config.json"),
-                  'r',
-                  encoding='utf-8') as f:
+        with open(os.path.join(tmpdirname, "tokenizer_config.json"), "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        self.assertIn('c', data)
-        self.assertEqual(data['c'], 3)
-        self.assertEqual(data['tokenizer_class'], "SubEmptyTokenizer")
+        self.assertIn("c", data)
+        self.assertEqual(data["c"], 3)
+        self.assertEqual(data["tokenizer_class"], "SubEmptyTokenizer")
