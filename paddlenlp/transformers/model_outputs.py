@@ -35,7 +35,7 @@ def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
         loss (Optional[Tensor], optional): the loss of the model. Defaults to None.
     """
     if loss is not None:
-        outputs = (loss, ) + outputs
+        outputs = (loss,) + outputs
     if len(outputs) == 1:
         return outputs[0]
     return outputs
@@ -44,8 +44,8 @@ def tuple_output(outputs: Tuple[Tensor], loss: Optional[Tensor] = None):
 def convert_encoder_output(encoder_output):
     """
     Convert encoder_output from tuple to class:`~paddlenlp.transformers.model_outputs.BaseModelOutput`.
-    
-    Args: 
+
+    Args:
         encoder_output (tuple or ModleOutput):
             The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
             The data type of `last_hidden_state` is float32 and its shape is [batch_size, sequence_length, hidden_size].
@@ -58,7 +58,6 @@ def convert_encoder_output(encoder_output):
 
 
 def layer_init_wrapper(func):
-
     @functools.wraps(func)
     def _impl(self, *args, **kwargs):
         enable_recompute = kwargs.pop("enable_recompute", False)
@@ -71,11 +70,7 @@ def layer_init_wrapper(func):
     return _impl
 
 
-def _transformer_encoder_layer_fwd(self,
-                                   src,
-                                   src_mask=None,
-                                   cache=None,
-                                   output_attentions=False):
+def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_attentions=False):
     self.self_attn.need_weights = output_attentions
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
@@ -103,8 +98,7 @@ def _transformer_encoder_layer_fwd(self,
     if not self.normalize_before:
         src = self.norm2(src)
 
-    return src if outputs is None else (
-        (src, ) + outputs[::-1])  # hidden_states, cache, attentions
+    return src if outputs is None else ((src,) + outputs[::-1])  # hidden_states, cache, attentions
 
 
 def _transformer_decoder_layer_fwd(
@@ -125,8 +119,7 @@ def _transformer_decoder_layer_fwd(
     if self.normalize_before:
         tgt = self.norm1(tgt)
 
-    self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                       cache[0] if cache else None)
+    self_attn_outputs = self.self_attn(tgt, tgt, tgt, tgt_mask, cache[0] if cache else None)
     # self_attn_outputs = (tgt, attn_weights, incremental_cache) or only tgt
     if isinstance(self_attn_outputs, type(tgt)):
         tgt = self_attn_outputs
@@ -151,8 +144,7 @@ def _transformer_decoder_layer_fwd(
         if self.normalize_before:
             tgt = self.norm2(tgt)
 
-        cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask,
-                                             cache[1] if cache else None)
+        cross_attn_outputs = self.cross_attn(tgt, memory, memory, memory_mask, cache[1] if cache else None)
         if isinstance(cross_attn_outputs, type(tgt)):
             tgt = cross_attn_outputs
         else:
@@ -178,25 +170,25 @@ def _transformer_decoder_layer_fwd(
     if not output_attentions and cache is None:
         return tgt
     else:
-        outputs = (tgt, )
+        outputs = (tgt,)
         if output_attentions:
-            outputs += (self_attn_weights,
-                        cross_attn_weights if memory is not None else None)
+            outputs += (self_attn_weights, cross_attn_weights if memory is not None else None)
         if cache:
-            outputs += ((incremental_cache,
-                         static_cache if memory is not None else None), )
+            outputs += ((incremental_cache, static_cache if memory is not None else None),)
         return outputs
 
 
-def _transformer_decoder_fwd(self,
-                             tgt,
-                             memory=None,
-                             tgt_mask=None,
-                             memory_mask=None,
-                             cache=None,
-                             output_attentions=False,
-                             output_hidden_states=False,
-                             return_dict=False):
+def _transformer_decoder_fwd(
+    self,
+    tgt,
+    memory=None,
+    tgt_mask=None,
+    memory_mask=None,
+    cache=None,
+    output_attentions=False,
+    output_hidden_states=False,
+    return_dict=False,
+):
     tgt_mask = _convert_attention_mask(tgt_mask, tgt.dtype)
     if memory is not None:
         memory_mask = _convert_attention_mask(memory_mask, memory.dtype)
@@ -209,8 +201,7 @@ def _transformer_decoder_fwd(self,
     for i, mod in enumerate(self.layers):
         if cache is None:
             if self.enable_recompute:
-                outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask,
-                                    None, output_attentions)
+                outputs = recompute(mod, tgt, memory, tgt_mask, memory_mask, None, output_attentions)
             else:
                 outputs = mod(
                     tgt,
@@ -221,12 +212,14 @@ def _transformer_decoder_fwd(self,
                     output_attentions=output_attentions,
                 )
         else:
-            outputs = mod(tgt,
-                          memory,
-                          tgt_mask=tgt_mask,
-                          memory_mask=memory_mask,
-                          cache=cache[i] if cache else None,
-                          output_attentions=output_attentions)
+            outputs = mod(
+                tgt,
+                memory,
+                tgt_mask=tgt_mask,
+                memory_mask=memory_mask,
+                cache=cache[i] if cache else None,
+                output_attentions=output_attentions,
+            )
         if isinstance(outputs, type(tgt)):
             tgt = outputs
         else:
@@ -266,13 +259,9 @@ def _transformer_decoder_fwd(self,
     )
 
 
-def _transformer_encoder_fwd(self,
-                             src,
-                             src_mask=None,
-                             cache=None,
-                             output_attentions=False,
-                             output_hidden_states=False,
-                             return_dict=False):
+def _transformer_encoder_fwd(
+    self, src, src_mask=None, cache=None, output_attentions=False, output_hidden_states=False, return_dict=False
+):
     src_mask = _convert_attention_mask(src_mask, src.dtype)
 
     output = src
@@ -283,8 +272,7 @@ def _transformer_encoder_fwd(self,
         cache = [tuple(self.layers[0].gen_cache(src))] * len(self.layers)
     # To be compatible with `TransformerEncoder.forward`, `_use_cache` defualts
     # to True when cache is not None.
-    new_caches = [] if cache is not None and getattr(self, "_use_cache",
-                                                     True) else None
+    new_caches = [] if cache is not None and getattr(self, "_use_cache", True) else None
     all_attentions = [] if output_attentions else None
     # NOTE: Also includes embeding output which is same as HF.
     all_hidden_states = [output] if output_hidden_states else None
@@ -292,17 +280,27 @@ def _transformer_encoder_fwd(self,
         if self.enable_recompute:
             # Note: recompute do not support pass as **kwargs yet.
             layer_outputs = recompute(
-                mod, output, src_mask, None if cache is None else
-                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
-                MultiHeadAttention.Cache(*cache[i]), output_attentions)
+                mod,
+                output,
+                src_mask,
+                None
+                if cache is None
+                else cache[i]
+                if isinstance(cache[i], MultiHeadAttention.Cache)
+                else MultiHeadAttention.Cache(*cache[i]),
+                output_attentions,
+            )
         else:
             layer_outputs = mod(
                 output,
                 src_mask=src_mask,
-                cache=None if cache is None else
-                cache[i] if isinstance(cache[i], MultiHeadAttention.Cache) else
-                MultiHeadAttention.Cache(*cache[i]),
-                output_attentions=output_attentions)
+                cache=None
+                if cache is None
+                else cache[i]
+                if isinstance(cache[i], MultiHeadAttention.Cache)
+                else MultiHeadAttention.Cache(*cache[i]),
+                output_attentions=output_attentions,
+            )
 
         if isinstance(layer_outputs, tuple):
             output = layer_outputs[0]
@@ -316,8 +314,7 @@ def _transformer_encoder_fwd(self,
         if output_attentions:
             all_attentions.append(outputs[-1])
         if new_caches is not None:
-            new_caches.append(outputs[0] if isinstance(
-                cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
+            new_caches.append(outputs[0] if isinstance(cache[i], MultiHeadAttention.Cache) else (tuple(outputs[0])))
 
     if self.norm is not None:
         output = self.norm(output)
@@ -327,12 +324,15 @@ def _transformer_encoder_fwd(self,
 
     if not return_dict:
         outputs = tuple(
-            tuple(v) if isinstance(v, list) else v for v in [
+            tuple(v) if isinstance(v, list) else v
+            for v in [
                 output,
                 new_caches,
                 all_hidden_states,
                 all_attentions,
-            ] if v is not None)
+            ]
+            if v is not None
+        )
         if len(outputs) == 1:
             return output
         else:
@@ -342,7 +342,8 @@ def _transformer_encoder_fwd(self,
         last_hidden_state=output,
         past_key_values=new_caches,
         hidden_states=all_hidden_states,
-        attentions=all_attentions)
+        attentions=all_attentions,
+    )
 
 
 # patches of paddle.nn.Transformer to get all hidden_states and attentions
@@ -358,7 +359,6 @@ paddle.nn.TransformerDecoder.__init__ = layer_init_wrapper(_decoder_init)
 
 
 def _get_wrap_setattr(cls):
-
     def _wrap_setattr(self, name, value):
         value = adapt_stale_fwd_patch(self, name, value)
         return super(cls, self).__setattr__(name, value)
@@ -366,15 +366,15 @@ def _get_wrap_setattr(cls):
     return _wrap_setattr
 
 
-paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(
-    paddle.nn.TransformerEncoderLayer.__setattr__)(_get_wrap_setattr(
-        paddle.nn.TransformerEncoderLayer))
-paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(
-    paddle.nn.TransformerEncoder.__setattr__)(_get_wrap_setattr(
-        paddle.nn.TransformerEncoder))
-paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(
-    paddle.nn.TransformerDecoder.__setattr__)(_get_wrap_setattr(
-        paddle.nn.TransformerDecoder))
+paddle.nn.TransformerEncoderLayer.__setattr__ = functools.wraps(paddle.nn.TransformerEncoderLayer.__setattr__)(
+    _get_wrap_setattr(paddle.nn.TransformerEncoderLayer)
+)
+paddle.nn.TransformerEncoder.__setattr__ = functools.wraps(paddle.nn.TransformerEncoder.__setattr__)(
+    _get_wrap_setattr(paddle.nn.TransformerEncoder)
+)
+paddle.nn.TransformerDecoder.__setattr__ = functools.wraps(paddle.nn.TransformerDecoder.__setattr__)(
+    _get_wrap_setattr(paddle.nn.TransformerDecoder)
+)
 
 
 def is_tensor(x):
@@ -413,13 +413,10 @@ class ModelOutput(OrderedDict):
         if not len(class_fields):
             raise ValueError(f"{self.__class__.__name__} has no fields.")
         if not all(field.default is None for field in class_fields[1:]):
-            raise ValueError(
-                f"{self.__class__.__name__} should not have more than one required field."
-            )
+            raise ValueError(f"{self.__class__.__name__} should not have more than one required field.")
 
         first_field = getattr(self, class_fields[0].name)
-        other_fields_are_none = all(
-            getattr(self, field.name) is None for field in class_fields[1:])
+        other_fields_are_none = all(getattr(self, field.name) is None for field in class_fields[1:])
 
         if other_fields_are_none and not is_tensor(first_field):
             if isinstance(first_field, dict):
@@ -436,9 +433,11 @@ class ModelOutput(OrderedDict):
             # set the associated fields
             if first_field_iterator:
                 for element in iterator:
-                    if (not isinstance(element,
-                                       (list, tuple)) or not len(element) == 2
-                            or not isinstance(element[0], str)):
+                    if (
+                        not isinstance(element, (list, tuple))
+                        or not len(element) == 2
+                        or not isinstance(element[0], str)
+                    ):
                         break
                     setattr(self, element[0], element[1])
                     if element[1] is not None:
@@ -452,23 +451,16 @@ class ModelOutput(OrderedDict):
                     self[field.name] = v
 
     def __delitem__(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``__delitem__`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``__delitem__`` on a {self.__class__.__name__} instance.")
 
     def setdefault(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``setdefault`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``setdefault`` on a {self.__class__.__name__} instance.")
 
     def pop(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``pop`` on a {self.__class__.__name__} instance.")
+        raise Exception(f"You cannot use ``pop`` on a {self.__class__.__name__} instance.")
 
     def update(self, *args, **kwargs):
-        raise Exception(
-            f"You cannot use ``update`` on a {self.__class__.__name__} instance."
-        )
+        raise Exception(f"You cannot use ``update`` on a {self.__class__.__name__} instance.")
 
     def __getitem__(self, k):
         if isinstance(k, str):
@@ -500,7 +492,7 @@ class ModelOutput(OrderedDict):
         for field in fields(self):
             if getattr(self, field.name, None) is None:
                 continue
-            tuples = tuples + (getattr(self, field.name), )
+            tuples = tuples + (getattr(self, field.name),)
 
         return tuples
 
@@ -897,7 +889,7 @@ class Seq2SeqModelOutput(ModelOutput):
             Returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`.
 
             Hidden-states of the decoder at the output of each layer plus the optional initial embedding outputs.
-        decoder_attentions (`tuple(paddle.Tensor)`, optional): 
+        decoder_attentions (`tuple(paddle.Tensor)`, optional):
             Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
             sequence_length)`.
             Returned when `output_attentions=True` is passed or when `config.output_attentions=True`.
@@ -1077,7 +1069,7 @@ class Seq2SeqSequenceClassifierOutput(ModelOutput):
     Base class for outputs of sequence-to-sequence sentence classification models.
 
     Args:
-        loss (`paddle.Tensor` optional): 
+        loss (`paddle.Tensor` optional):
             Classification (or regression if config.num_labels==1) loss of shape `(1,)`. Returned when `label` is provided).
         logits (`paddle.Tensor`):
             Classification (or regression if config.num_labels==1) scores (before SoftMax) of shape `(batch_size, config.num_labels)`

@@ -512,7 +512,6 @@ class MBartStandaloneDecoderModelTester:
 
         encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
         origin_cache = model.decoder.gen_cache(encoder_output)
-
         # first forward pass
         past_key_values = model(
             input_ids,

@@ -150,7 +150,6 @@ class BartModelTester:
     def create_and_check_decoder_model_past_large_inputs(self, config, inputs_dict):
         encoder = BartModel(config).get_encoder()
         decoder = BartModel(config).get_decoder()
-
         encoder.eval()
         decoder.eval()
 
