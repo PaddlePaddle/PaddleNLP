@@ -17,9 +17,7 @@ import os
 import unittest
 
 from paddlenlp.data.vocab import Vocab
-from paddlenlp.transformers.roformer.tokenizer import (JiebaBasicTokenizer,
-                                                       RoFormerTokenizer,
-                                                       WordpieceTokenizer)
+from paddlenlp.transformers.roformer.tokenizer import JiebaBasicTokenizer, RoFormerTokenizer, WordpieceTokenizer
 
 from ...testing_utils import slow
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
@@ -53,9 +51,7 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "lowest",
         ]
 
-        self.vocab_file = os.path.join(
-            self.tmpdirname,
-            RoFormerTokenizer.resource_files_names["vocab_file"])
+        self.vocab_file = os.path.join(self.tmpdirname, RoFormerTokenizer.resource_files_names["vocab_file"])
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
 
@@ -68,42 +64,34 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tokenizer = self.tokenizer_class(self.vocab_file)
 
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
-        self.assertListEqual(tokens,
-                             ["un", "##want", "##ed", ",", "runn", "##ing"])
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [9, 6, 7, 12, 10, 11])
+        self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
 
     def test_chinese(self):
-        tokenizer = RoFormerTokenizer.from_pretrained(list(
-            RoFormerTokenizer.pretrained_init_configuration.keys())[0],
-                                                      use_jieba=True)
+        tokenizer = RoFormerTokenizer.from_pretrained(
+            list(RoFormerTokenizer.pretrained_init_configuration.keys())[0], use_jieba=True
+        )
         # test jieba tokenizer in rofromer
 
         tokens = tokenizer.tokenize("ah\u535A\u63A8zz")
-        self.assertListEqual(tokens, ["ah", "博", "推", 'z', '##z'])
+        self.assertListEqual(tokens, ["ah", "博", "推", "z", "##z"])
 
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [5829, 713, 2093, 167, 48585])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [5829, 713, 2093, 167, 48585])
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
-        self.assertListEqual(
-            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
-            [["[UNK]"], [], ["[UNK]"]])
+        self.assertListEqual([tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["[UNK]"], [], ["[UNK]"]])
 
     @slow
     def test_sequence_builders(self):
-        tokenizer = self.tokenizer_class.from_pretrained(
-            "roformer-chinese-small")
+        tokenizer = self.tokenizer_class.from_pretrained("roformer-chinese-small")
 
-        text = tokenizer.encode("sequence builders",
-                                return_token_type_ids=None,
-                                add_special_tokens=False)["input_ids"]
-        text_2 = tokenizer.encode("multi-sequence build",
-                                  return_token_type_ids=None,
-                                  add_special_tokens=False)["input_ids"]
+        text = tokenizer.encode("sequence builders", return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+        text_2 = tokenizer.encode("multi-sequence build", return_token_type_ids=None, add_special_tokens=False)[
+            "input_ids"
+        ]
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
@@ -113,10 +101,8 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_offsets_with_special_characters(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 # sentence = f"testing with {tokenizer.mask_token} simple sentence"
                 sentence = f"a simple {tokenizer.mask_token} allennlp sentence."
@@ -140,8 +126,7 @@ class RoFormerTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     ((0, 0), tokenizer.sep_token),
                 ]
 
-                self.assertEqual([e[1] for e in expected_results],
-                                 tokenizer.convert_ids_to_tokens(
-                                     tokens["input_ids"]))
-                self.assertEqual([e[0] for e in expected_results],
-                                 tokens["offset_mapping"])
+                self.assertEqual(
+                    [e[1] for e in expected_results], tokenizer.convert_ids_to_tokens(tokens["input_ids"])
+                )
+                self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])

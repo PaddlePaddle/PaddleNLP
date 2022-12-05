@@ -18,36 +18,28 @@ import math
 from paddle.optimizer.lr import LambdaDecay, LRScheduler
 
 __all__ = [
-    'LinearDecayWithWarmup',
-    'ConstScheduleWithWarmup',
-    'CosineDecayWithWarmup',
-    'PolyDecayWithWarmup',
-    'CosineAnnealingWithWarmupDecay',
-    'LinearAnnealingWithWarmupDecay',
+    "LinearDecayWithWarmup",
+    "ConstScheduleWithWarmup",
+    "CosineDecayWithWarmup",
+    "PolyDecayWithWarmup",
+    "CosineAnnealingWithWarmupDecay",
+    "LinearAnnealingWithWarmupDecay",
 ]
 
 
 def is_integer(number):
-    if sys.version > '3':
+    if sys.version > "3":
         return isinstance(number, int)
     return isinstance(number, (int, long))
 
 
 class CosineAnnealingWithWarmupDecay(LRScheduler):
-
-    def __init__(self,
-                 max_lr,
-                 min_lr,
-                 warmup_step,
-                 decay_step,
-                 last_epoch=-1,
-                 verbose=False):
+    def __init__(self, max_lr, min_lr, warmup_step, decay_step, last_epoch=-1, verbose=False):
         self.decay_step = decay_step
         self.warmup_step = warmup_step
         self.max_lr = max_lr
         self.min_lr = min_lr
-        super(CosineAnnealingWithWarmupDecay,
-              self).__init__(max_lr, last_epoch, verbose)
+        super(CosineAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch, verbose)
 
     def get_lr(self):
         if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:
@@ -64,21 +56,13 @@ class CosineAnnealingWithWarmupDecay(LRScheduler):
 
 
 class LinearAnnealingWithWarmupDecay(LRScheduler):
-
-    def __init__(self,
-                 max_lr,
-                 min_lr,
-                 warmup_step,
-                 decay_step,
-                 last_epoch=-1,
-                 verbose=False):
+    def __init__(self, max_lr, min_lr, warmup_step, decay_step, last_epoch=-1, verbose=False):
 
         self.decay_step = decay_step
         self.warmup_step = warmup_step
         self.max_lr = max_lr
         self.min_lr = min_lr
-        super(LinearAnnealingWithWarmupDecay,
-              self).__init__(max_lr, last_epoch, verbose)
+        super(LinearAnnealingWithWarmupDecay, self).__init__(max_lr, last_epoch, verbose)
 
     def get_lr(self):
         if self.warmup_step > 0 and self.last_epoch <= self.warmup_step:
@@ -90,7 +74,7 @@ class LinearAnnealingWithWarmupDecay(LRScheduler):
         num_step_ = self.last_epoch - self.warmup_step
         decay_step_ = self.decay_step - self.warmup_step
         decay_ratio = float(num_step_) / float(decay_step_)
-        coeff = (1.0 - decay_ratio)
+        coeff = 1.0 - decay_ratio
         return self.min_lr + coeff * (self.max_lr - self.min_lr)
 
 
@@ -110,14 +94,14 @@ class LinearDecayWithWarmup(LambdaDecay):
             the proportion of warmup in total training steps.
         last_epoch (int, optional):
             The index of last epoch. It can be set to restart training. If
-            None, it means initial learning rate. 
+            None, it means initial learning rate.
             Defaults to -1.
         verbose (bool, optional):
             If True, prints a message to stdout for each update.
             Defaults to False.
 
     Examples:
-        
+
         .. code-block:: python
 
             from paddlenlp.transformers import LinearDecayWithWarmup
@@ -126,25 +110,15 @@ class LinearDecayWithWarmup(LambdaDecay):
 
     """
 
-    def __init__(self,
-                 learning_rate,
-                 total_steps,
-                 warmup,
-                 last_epoch=-1,
-                 verbose=False):
-        warmup_steps = warmup if is_integer(warmup) else int(
-            math.floor(warmup * total_steps))
+    def __init__(self, learning_rate, total_steps, warmup, last_epoch=-1, verbose=False):
+        warmup_steps = warmup if is_integer(warmup) else int(math.floor(warmup * total_steps))
 
         def lr_lambda(current_step):
             if current_step < warmup_steps:
                 return float(current_step) / float(max(1, warmup_steps))
-            return max(
-                0.0,
-                float(total_steps - current_step) /
-                float(max(1, total_steps - warmup_steps)))
+            return max(0.0, float(total_steps - current_step) / float(max(1, total_steps - warmup_steps)))
 
-        super(LinearDecayWithWarmup, self).__init__(learning_rate, lr_lambda,
-                                                    last_epoch, verbose)
+        super(LinearDecayWithWarmup, self).__init__(learning_rate, lr_lambda, last_epoch, verbose)
 
 
 class ConstScheduleWithWarmup(LambdaDecay):
@@ -154,7 +128,7 @@ class ConstScheduleWithWarmup(LambdaDecay):
     rate a constant after that.
 
     Args:
-        learning_rate (float): 
+        learning_rate (float):
             The base learning rate. It is a python float number.
         warmup (int or float):
             If int, it means the number of steps for warmup. If float, it means
@@ -165,11 +139,11 @@ class ConstScheduleWithWarmup(LambdaDecay):
             Defaults to None.
         last_epoch (int, optional):
             The index of last epoch. It can be set to restart training. If
-            None, it means initial learning rate. 
+            None, it means initial learning rate.
             Defaults to -1.
 
     Examples:
-        
+
         .. code-block:: python
 
             from paddlenlp.transformers import ConstScheduleWithWarmup
@@ -178,14 +152,8 @@ class ConstScheduleWithWarmup(LambdaDecay):
 
     """
 
-    def __init__(self,
-                 learning_rate,
-                 warmup,
-                 total_steps=None,
-                 last_epoch=-1,
-                 verbose=False):
-        warmup_steps = warmup if is_integer(warmup) else int(
-            math.floor(warmup * total_steps))
+    def __init__(self, learning_rate, warmup, total_steps=None, last_epoch=-1, verbose=False):
+        warmup_steps = warmup if is_integer(warmup) else int(math.floor(warmup * total_steps))
         if is_integer(warmup):
             warmup_steps = warmup
         elif total_steps:
@@ -200,8 +168,7 @@ class ConstScheduleWithWarmup(LambdaDecay):
                 return float(current_step) / float(max(1.0, warmup_steps))
             return 1.0
 
-        super(ConstScheduleWithWarmup, self).__init__(learning_rate, lr_lambda,
-                                                      last_epoch, verbose)
+        super(ConstScheduleWithWarmup, self).__init__(learning_rate, lr_lambda, last_epoch, verbose)
 
 
 class CosineDecayWithWarmup(LambdaDecay):
@@ -231,11 +198,11 @@ class CosineDecayWithWarmup(LambdaDecay):
             Defaults to None.
         last_epoch (int, optional):
             The index of last epoch. It can be set to restart training. If
-            None, it means initial learning rate. 
+            None, it means initial learning rate.
             Defaults to -1.
 
     Examples:
-        
+
         .. code-block:: python
 
             from paddlenlp.transformers import CosineDecayWithWarmup
@@ -244,20 +211,25 @@ class CosineDecayWithWarmup(LambdaDecay):
 
     """
 
-    def __init__(self,
-                 learning_rate,
-                 total_steps,
-                 warmup,
-                 with_hard_restarts=False,
-                 num_cycles=None,
-                 last_epoch=-1,
-                 verbose=False):
-        warmup_steps = warmup if is_integer(warmup) else int(
-            math.floor(warmup * total_steps))
+    def __init__(
+        self,
+        learning_rate,
+        total_steps,
+        warmup,
+        with_hard_restarts=False,
+        num_cycles=None,
+        last_epoch=-1,
+        verbose=False,
+    ):
+        warmup_steps = warmup if is_integer(warmup) else int(math.floor(warmup * total_steps))
         # Input check
         if num_cycles is not None:
-            assert not with_hard_restarts and isinstance(num_cycles, int) or with_hard_restarts and isinstance(num_cycles, float), \
-            "`num_circles` should be an integer while `with_hard_restarts` is False, an float while `with_hard_restarts` is True."
+            assert (
+                not with_hard_restarts
+                and isinstance(num_cycles, int)
+                or with_hard_restarts
+                and isinstance(num_cycles, float)
+            ), "`num_circles` should be an integer while `with_hard_restarts` is False, an float while `with_hard_restarts` is True."
         else:
             num_cycles = 1 if not with_hard_restarts else 0.5
 
@@ -265,23 +237,16 @@ class CosineDecayWithWarmup(LambdaDecay):
             if current_step < warmup_steps:
                 return float(current_step) / float(max(1, warmup_steps))
 
-            progress = float(current_step - warmup_steps) / float(
-                max(1, total_steps - warmup_steps))
+            progress = float(current_step - warmup_steps) / float(max(1, total_steps - warmup_steps))
 
             if with_hard_restarts:
                 if progress >= 1.0:
                     return 0.0
-                return max(
-                    0.0, 0.5 *
-                    (1.0 + math.cos(math.pi *
-                                    ((float(num_cycles) * progress) % 1.0))))
+                return max(0.0, 0.5 * (1.0 + math.cos(math.pi * ((float(num_cycles) * progress) % 1.0))))
 
-            return max(
-                0.0, 0.5 *
-                (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+            return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
-        super(CosineDecayWithWarmup, self).__init__(learning_rate, lr_lambda,
-                                                    last_epoch, verbose)
+        super(CosineDecayWithWarmup, self).__init__(learning_rate, lr_lambda, last_epoch, verbose)
 
 
 class PolyDecayWithWarmup(LambdaDecay):
@@ -289,7 +254,7 @@ class PolyDecayWithWarmup(LambdaDecay):
     Creates a learning rate scheduler, which increases learning rate linearly
     from 0 to given `lr_init`, after this warmup period learning rate would
     be decreased as a polynomial decay from the base learning rate to the end
-    learning rate `lr_end`. 
+    learning rate `lr_end`.
 
     Args:
         learning_rate (float):
@@ -311,7 +276,7 @@ class PolyDecayWithWarmup(LambdaDecay):
             Defaults to -1.
 
     Examples:
-        
+
         .. code-block:: python
 
             from paddlenlp.transformers import PolyDecayWithWarmup
@@ -320,18 +285,12 @@ class PolyDecayWithWarmup(LambdaDecay):
 
     """
 
-    def __init__(self,
-                 learning_rate,
-                 total_steps,
-                 warmup,
-                 lr_end=1e-7,
-                 power=1.0,
-                 last_epoch=-1,
-                 verbose=False):
+    def __init__(self, learning_rate, total_steps, warmup, lr_end=1e-7, power=1.0, last_epoch=-1, verbose=False):
         lr_init = learning_rate
-        assert lr_init > lr_end, f"`lr_end` must be be smaller than `learning_rate`. But `lr_end` is {lr_end} while `learning_rate` is {lr_init}."
-        warmup_steps = warmup if is_integer(warmup) else int(
-            math.floor(warmup * total_steps))
+        assert (
+            lr_init > lr_end
+        ), f"`lr_end` must be be smaller than `learning_rate`. But `lr_end` is {lr_end} while `learning_rate` is {lr_init}."
+        warmup_steps = warmup if is_integer(warmup) else int(math.floor(warmup * total_steps))
 
         def lr_lambda(current_step):
             if current_step < warmup_steps:
@@ -345,5 +304,4 @@ class PolyDecayWithWarmup(LambdaDecay):
                 decay = lr_range * pct_remaining**power + lr_end
                 return decay / lr_init  # it multiplies by lr_init equals to decay
 
-        super(PolyDecayWithWarmup, self).__init__(lr_init, lr_lambda,
-                                                  last_epoch, verbose)
+        super(PolyDecayWithWarmup, self).__init__(lr_init, lr_lambda, last_epoch, verbose)
