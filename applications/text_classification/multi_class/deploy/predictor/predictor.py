@@ -29,20 +29,16 @@ from paddlenlp.utils.log import logger
 
 
 class InferBackend(object):
-
-    def __init__(self,
-                 model_path_prefix,
-                 device='cpu',
-                 device_id=0,
-                 use_fp16=False,
-                 use_quantize=False,
-                 num_threads=10):
+    def __init__(
+        self, model_path_prefix, device="cpu", device_id=0, use_fp16=False, use_quantize=False, num_threads=10
+    ):
         logger.info(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
-            enable_onnx_checker=True)
+            enable_onnx_checker=True,
+        )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
         with open(float_onnx_file, "wb") as f:
@@ -56,11 +52,10 @@ class InferBackend(object):
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
                 from onnxconverter_common import float16
                 import onnx
-                fp16_model_file = os.path.join(infer_model_dir,
-                                               "fp16_model.onnx")
+
+                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
             if use_quantize:
@@ -71,12 +66,11 @@ class InferBackend(object):
             self.predictor = ort.InferenceSession(
                 onnx_model,
                 sess_options=sess_options,
-                providers=['CUDAExecutionProvider'],
-                provider_options=[{
-                    'device_id': device_id
-                }])
+                providers=["CUDAExecutionProvider"],
+                provider_options=[{"device_id": device_id}],
+            )
             try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+                assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
                     f"The environment for GPU inference is not set properly. "
@@ -91,21 +85,20 @@ class InferBackend(object):
                     ">>> [InferBackend] use_fp16 only takes effect when deploying on gpu, use_quantize for acceleration when deploying on cpu ..."
                 )
             if use_quantize:
-                dynamic_quantize_model = os.path.join(infer_model_dir,
-                                                      "int8_model.onnx")
+                dynamic_quantize_model = os.path.join(infer_model_dir, "int8_model.onnx")
                 self.dynamic_quantize(float_onnx_file, dynamic_quantize_model)
                 onnx_model = dynamic_quantize_model
             sess_options = ort.SessionOptions()
             sess_options.intra_op_num_threads = num_threads
             self.predictor = ort.InferenceSession(
-                onnx_model,
-                sess_options=sess_options,
-                providers=['CPUExecutionProvider'])
+                onnx_model, sess_options=sess_options, providers=["CPUExecutionProvider"]
+            )
 
         logger.info(">>> [InferBackend] Engine Created ...")
 
     def dynamic_quantize(self, input_float_model, dynamic_quantized_model):
         from onnxruntime.quantization import quantize_dynamic
+
         quantize_dynamic(input_float_model, dynamic_quantized_model)
 
     def infer(self, input_dict: dict):
@@ -114,31 +107,29 @@ class InferBackend(object):
 
 
 class Predictor(object):
-
     def __init__(self, args, label_list):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
-                                                       use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
         self.label_list = label_list
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              args.device, args.device_id,
-                                              args.use_fp16, args.use_quantize,
-                                              args.num_threads)
+        self.inference_backend = InferBackend(
+            args.model_path_prefix, args.device, args.device_id, args.use_fp16, args.use_quantize, args.num_threads
+        )
 
     def preprocess(self, input_data: list):
 
         # tokenizer + pad
-        data = self.tokenizer(input_data,
-                              max_length=self.max_seq_length,
-                              padding=True,
-                              truncation=True,
-                              return_position_ids=False,
-                              return_attention_mask=False)
+        data = self.tokenizer(
+            input_data,
+            max_length=self.max_seq_length,
+            padding=True,
+            truncation=True,
+            return_position_ids=False,
+            return_attention_mask=False,
+        )
         tokenized_data = {}
         for tokenizer_key in data:
-            tokenized_data[tokenizer_key] = np.array(data[tokenizer_key],
-                                                     dtype="int64")
+            tokenized_data[tokenizer_key] = np.array(data[tokenizer_key], dtype="int64")
         return tokenized_data
 
     def postprocess(self, infer_data):
@@ -162,8 +153,7 @@ class Predictor(object):
             preprocess_result_batch = {}
             for tokenizer_key in preprocess_result:
                 preprocess_result_batch[tokenizer_key] = [
-                    preprocess_result[tokenizer_key][i + j]
-                    for j in range(batch_size)
+                    preprocess_result[tokenizer_key][i + j] for j in range(batch_size)
                 ]
 
             result = self.infer(preprocess_result_batch)
@@ -179,7 +169,7 @@ class Predictor(object):
             labels = []
             logger.info("input data: {}".format(text))
             logger.info("labels: {}".format(self.label_list[result[idx]]))
-            logger.info('----------------------------')
+            logger.info("----------------------------")
 
     def predict(self, input_data: list):
         preprocess_result = self.preprocess(input_data)
@@ -194,8 +184,7 @@ class Predictor(object):
         start = time.time()
         infer_result = self.infer_batch(preprocess_result)
         total_time = time.time() - start
-        logger.info("sample nums: %s, time: %.2f, latency: %.2f ms" %
-                    (nums, total_time, 1000 * total_time / nums))
+        logger.info("sample nums: %s, time: %.2f, latency: %.2f ms" % (nums, total_time, 1000 * total_time / nums))
         return
 
     def evaluate(self, preprocess_result, labels):
@@ -216,6 +205,6 @@ class Predictor(object):
         all_texts = []
         all_labels = []
         for ii in range(len(ds)):
-            all_texts.append(ds[ii]['text_a'])
-            all_labels.append(ds[ii]['label'])
-        return all_texts, np.array(all_labels, dtype='int64')
+            all_texts.append(ds[ii]["text_a"])
+            all_labels.append(ds[ii]["label"])
+        return all_texts, np.array(all_labels, dtype="int64")

@@ -32,9 +32,7 @@ args = parser.parse_args()
 if __name__ == "__main__":
 
     # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in [
-            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"
-    ]:
+    if args.encoding_model in ["ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"]:
         pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     else:
         pretrained_model = None
@@ -75,13 +73,13 @@ if __name__ == "__main__":
     model.eval()
 
     # Convert to static graph with specific input description
-    model = paddle.jit.to_static(model,
-                                 input_spec=[
-                                     paddle.static.InputSpec(shape=[None, None],
-                                                             dtype="int64"),
-                                     paddle.static.InputSpec(shape=[None, None],
-                                                             dtype="int64"),
-                                 ])
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

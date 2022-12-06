@@ -75,14 +75,12 @@ def do_train():
 
     set_seed(args.seed)
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
     latest_checkpoint, latest_global_step = get_latest_checkpoint(args)
     logger.info("get latest_checkpoint:{}".format(latest_checkpoint))
 
-    model = SemanticIndexANCE(pretrained_model,
-                              margin=args.margin,
-                              output_emb_size=args.output_emb_size)
+    model = SemanticIndexANCE(pretrained_model, margin=args.margin, output_emb_size=args.output_emb_size)
 
     if latest_checkpoint:
         state_dict = paddle.load(latest_checkpoint)
@@ -91,11 +89,9 @@ def do_train():
 
     model = paddle.DataParallel(model)
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
@@ -109,41 +105,29 @@ def do_train():
     global_step = 0
 
     while global_step < args.max_training_steps:
-        latest_ann_data, latest_ann_data_step = get_latest_ann_data(
-            args.ann_data_dir)
+        latest_ann_data, latest_ann_data_step = get_latest_ann_data(args.ann_data_dir)
 
         if latest_ann_data_step == -1:
             # No ann_data generated yet
             latest_ann_data = args.train_set_file
-            logger.info("No ann_data generated yet, Use training_set:{}".format(
-                args.train_set_file))
+            logger.info("No ann_data generated yet, Use training_set:{}".format(args.train_set_file))
         else:
             # Using ann_data to training model
-            logger.info("Latest ann_data is ready for training: [{}]".format(
-                latest_ann_data))
+            logger.info("Latest ann_data is ready for training: [{}]".format(latest_ann_data))
 
-        train_ds = load_dataset(read_text_triplet,
-                                data_path=latest_ann_data,
-                                lazy=False)
+        train_ds = load_dataset(read_text_triplet, data_path=latest_ann_data, lazy=False)
 
-        train_data_loader = create_dataloader(train_ds,
-                                              mode='train',
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
+        train_data_loader = create_dataloader(
+            train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        )
 
         num_training_steps = len(train_data_loader) * args.epochs
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps,
-                                             args.warmup_proportion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
-        decay_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
+        decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
         clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=1.0)
 
@@ -152,12 +136,20 @@ def do_train():
             parameters=model.parameters(),
             weight_decay=args.weight_decay,
             apply_decay_param_fun=lambda x: x in decay_params,
-            grad_clip=clip)
+            grad_clip=clip,
+        )
 
         tic_train = time.time()
         for epoch in range(1, args.epochs + 1):
             for step, batch in enumerate(train_data_loader, start=1):
-                text_input_ids, text_token_type_ids, pos_sample_input_ids, pos_sample_token_type_ids, neg_sample_input_ids, neg_sample_token_type_ids, = batch
+                (
+                    text_input_ids,
+                    text_token_type_ids,
+                    pos_sample_input_ids,
+                    pos_sample_token_type_ids,
+                    neg_sample_input_ids,
+                    neg_sample_token_type_ids,
+                ) = batch
 
                 loss = model(
                     text_input_ids=text_input_ids,
@@ -165,14 +157,15 @@ def do_train():
                     neg_sample_input_ids=neg_sample_input_ids,
                     text_token_type_ids=text_token_type_ids,
                     pos_sample_token_type_ids=pos_sample_token_type_ids,
-                    neg_sample_token_type_ids=neg_sample_token_type_ids)
+                    neg_sample_token_type_ids=neg_sample_token_type_ids,
+                )
 
                 global_step += 1
                 if global_step % 10 == 0 and rank == 0:
                     print(
                         "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s, trainning_file: %s"
-                        % (global_step, epoch, step, loss, 10 /
-                           (time.time() - tic_train), latest_ann_data))
+                        % (global_step, epoch, step, loss, 10 / (time.time() - tic_train), latest_ann_data)
+                    )
                     tic_train = time.time()
                 loss.backward()
                 optimizer.step()
@@ -182,15 +175,13 @@ def do_train():
                     save_dir = os.path.join(args.save_dir, str(global_step))
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   'model_state.pdparams')
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
                     paddle.save(model.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
 
                     # Flag to indicate succeefully save model
-                    succeed_flag_file = os.path.join(save_dir,
-                                                     "succeed_flag_file")
-                    open(succeed_flag_file, 'a').close()
+                    succeed_flag_file = os.path.join(save_dir, "succeed_flag_file")
+                    open(succeed_flag_file, "a").close()
 
 
 if __name__ == "__main__":

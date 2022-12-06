@@ -29,30 +29,23 @@ def repeat_array(array, times):
 def gen_inputs(inputs, latent_type_size):
     batch_size = len(inputs["data_id"])
     new_bsz = batch_size * latent_type_size
-    inputs = {
-        name: repeat_array(array, latent_type_size)
-        for name, array in inputs.items()
-    }
+    inputs = {name: repeat_array(array, latent_type_size) for name, array in inputs.items()}
     # Add latent_id
     inputs["latent_id"] = np.array(
-        [i for i in range(latent_type_size) for _ in range(batch_size)],
-        dtype="int64").reshape([-1, 1])
+        [i for i in range(latent_type_size) for _ in range(batch_size)], dtype="int64"
+    ).reshape([-1, 1])
 
-    #print('\nplato_inputs:')
+    # print('\nplato_inputs:')
     for key in inputs:
         inputs[key] = paddle.to_tensor(inputs[key])
-        if key in [
-                'token_ids', 'type_ids', 'pos_ids', 'tgt_ids', 'tgt_pos',
-                'data_id'
-        ]:
+        if key in ["token_ids", "type_ids", "pos_ids", "tgt_ids", "tgt_pos", "data_id"]:
             inputs[key] = paddle.squeeze(inputs[key], axis=-1)
-        #print(key, inputs[key].shape, inputs[key].dtype)
+        # print(key, inputs[key].shape, inputs[key].dtype)
     return inputs
 
 
 def pad_batch_data(insts, pad_id=0):
-    """Pad the instances to the max sequence length in batch. """
+    """Pad the instances to the max sequence length in batch."""
     max_len = max(map(len, insts))
-    inst_data = np.array(
-        [list(inst) + [pad_id] * (max_len - len(inst)) for inst in insts])
+    inst_data = np.array([list(inst) + [pad_id] * (max_len - len(inst)) for inst in insts])
     return inst_data.astype("int64").reshape([-1, max_len, 1])

@@ -23,21 +23,12 @@ from paddlenlp.trainer import PredictionOutput
 
 
 class QuestionAnsweringTrainer(Trainer):
-
-    def __init__(self,
-                 *args,
-                 eval_examples=None,
-                 post_process_function=None,
-                 **kwargs):
+    def __init__(self, *args, eval_examples=None, post_process_function=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
 
-    def evaluate(self,
-                 eval_dataset=None,
-                 eval_examples=None,
-                 ignore_keys=None,
-                 metric_key_prefix: str = "eval"):
+    def evaluate(self, eval_dataset=None, eval_examples=None, ignore_keys=None, metric_key_prefix: str = "eval"):
         eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         eval_examples = self.eval_examples if eval_examples is None else eval_examples
@@ -59,8 +50,7 @@ class QuestionAnsweringTrainer(Trainer):
             self.compute_metrics = compute_metrics
 
         if self.post_process_function is not None and self.compute_metrics is not None:
-            eval_preds = self.post_process_function(eval_examples, eval_dataset,
-                                                    output.predictions)
+            eval_preds = self.post_process_function(eval_examples, eval_dataset, output.predictions)
             metrics = self.compute_metrics(eval_preds)
 
             # Prefix all keys with metric_key_prefix + '_'
@@ -72,15 +62,10 @@ class QuestionAnsweringTrainer(Trainer):
         else:
             metrics = {}
 
-        self.control = self.callback_handler.on_evaluate(
-            self.args, self.state, self.control, metrics)
+        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
         return metrics
 
-    def predict(self,
-                predict_dataset,
-                predict_examples,
-                ignore_keys=None,
-                metric_key_prefix: str = "test"):
+    def predict(self, predict_dataset, predict_examples, ignore_keys=None, metric_key_prefix: str = "test"):
         predict_dataloader = self.get_test_dataloader(predict_dataset)
 
         # Temporarily disable metric computation, we will do it in the loop here.
@@ -102,9 +87,7 @@ class QuestionAnsweringTrainer(Trainer):
         if self.post_process_function is None or self.compute_metrics is None:
             return output
 
-        predictions = self.post_process_function(predict_examples,
-                                                 predict_dataset,
-                                                 output.predictions, "predict")
+        predictions = self.post_process_function(predict_examples, predict_dataset, output.predictions, "predict")
         metrics = self.compute_metrics(predictions)
 
         # Prefix all keys with metric_key_prefix + '_'
@@ -112,13 +95,10 @@ class QuestionAnsweringTrainer(Trainer):
             if not key.startswith(f"{metric_key_prefix}_"):
                 metrics[f"{metric_key_prefix}_{key}"] = metrics.pop(key)
 
-        return PredictionOutput(predictions=predictions.predictions,
-                                label_ids=predictions.label_ids,
-                                metrics=metrics)
+        return PredictionOutput(predictions=predictions.predictions, label_ids=predictions.label_ids, metrics=metrics)
 
 
 class CrossEntropyLossForSQuAD(paddle.nn.Layer):
-
     def __init__(self):
         super(CrossEntropyLossForSQuAD, self).__init__()
 
@@ -127,10 +107,8 @@ class CrossEntropyLossForSQuAD(paddle.nn.Layer):
         start_position, end_position = label
         start_position = paddle.unsqueeze(start_position, axis=-1)
         end_position = paddle.unsqueeze(end_position, axis=-1)
-        start_loss = paddle.nn.functional.cross_entropy(input=start_logits,
-                                                        label=start_position)
-        end_loss = paddle.nn.functional.cross_entropy(input=end_logits,
-                                                      label=end_position)
+        start_loss = paddle.nn.functional.cross_entropy(input=start_logits, label=start_position)
+        end_loss = paddle.nn.functional.cross_entropy(input=end_logits, label=end_position)
         loss = (start_loss + end_loss) / 2
         return loss
 
@@ -140,13 +118,10 @@ def prepare_train_features(examples, tokenizer, args):
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
     # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function.
-    contexts = examples['context']
-    questions = examples['question']
+    contexts = examples["context"]
+    questions = examples["question"]
 
-    tokenized_examples = tokenizer(questions,
-                                   contexts,
-                                   stride=args.doc_stride,
-                                   max_seq_len=args.max_seq_length)
+    tokenized_examples = tokenizer(questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length)
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -165,11 +140,11 @@ def prepare_train_features(examples, tokenizer, args):
         cls_index = input_ids.index(tokenizer.cls_token_id)
 
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_examples['token_type_ids'][i]
+        sequence_ids = tokenized_examples["token_type_ids"][i]
 
         # One example can give several spans, this is the index of the example containing this span of text.
         sample_index = sample_mapping[i]
-        answers = examples['answers'][sample_index]
+        answers = examples["answers"][sample_index]
         # If no answers are given, set the cls_index as answer.
         if len(answers["answer_start"]) == 0:
             tokenized_examples["start_positions"].append(cls_index)
@@ -191,18 +166,15 @@ def prepare_train_features(examples, tokenizer, args):
             token_end_index -= 1
 
             # Detect if the answer is out of the span (in which case this feature is labeled with the CLS index).
-            if not (offsets[token_start_index][0] <= start_char
-                    and offsets[token_end_index][1] >= end_char):
+            if not (offsets[token_start_index][0] <= start_char and offsets[token_end_index][1] >= end_char):
                 tokenized_examples["start_positions"].append(cls_index)
                 tokenized_examples["end_positions"].append(cls_index)
             else:
                 # Otherwise move the token_start_index and token_end_index to the two ends of the answer.
                 # Note: we could go after the last offset if the answer is the last word (edge case).
-                while token_start_index < len(offsets) and offsets[
-                        token_start_index][0] <= start_char:
+                while token_start_index < len(offsets) and offsets[token_start_index][0] <= start_char:
                     token_start_index += 1
-                tokenized_examples["start_positions"].append(token_start_index -
-                                                             1)
+                tokenized_examples["start_positions"].append(token_start_index - 1)
                 while offsets[token_end_index][1] >= end_char:
                     token_end_index -= 1
                 tokenized_examples["end_positions"].append(token_end_index + 1)
@@ -214,16 +186,14 @@ def prepare_validation_features(examples, tokenizer, args):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
-    #NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
+    # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function. The main difference is
     # that HuggingFace uses ArrowTable as basic data structure, while we use list of dictionary instead.
-    contexts = examples['context']
-    questions = examples['question']
+    contexts = examples["context"]
+    questions = examples["question"]
 
-    tokenized_examples = tokenizer(questions,
-                                   contexts,
-                                   stride=args.doc_stride,
-                                   max_seq_len=args.max_seq_length,
-                                   return_attention_mask=True)
+    tokenized_examples = tokenizer(
+        questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length, return_attention_mask=True
+    )
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -235,7 +205,7 @@ def prepare_validation_features(examples, tokenizer, args):
 
     for i in range(len(tokenized_examples["input_ids"])):
         # Grab the sequence corresponding to that example (to know what is the context and what is the question).
-        sequence_ids = tokenized_examples['token_type_ids'][i]
+        sequence_ids = tokenized_examples["token_type_ids"][i]
         context_index = 1
 
         # One example can give several spans, this is the index of the example containing this span of text.
@@ -246,8 +216,7 @@ def prepare_validation_features(examples, tokenizer, args):
         # position is part of the context or not.
 
         tokenized_examples["offset_mapping"][i] = [
-            (o if sequence_ids[k] == context_index
-             and k != len(sequence_ids) - 1 else None)
+            (o if sequence_ids[k] == context_index and k != len(sequence_ids) - 1 else None)
             for k, o in enumerate(tokenized_examples["offset_mapping"][i])
         ]
 

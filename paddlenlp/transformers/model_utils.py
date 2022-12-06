@@ -400,14 +400,7 @@ class PretrainedModel(Layer, GenerationMixin):
         return cls.config_class is not None and issubclass(cls.config_class, PretrainedConfig)
 
     @classmethod
-    def from_pretrained(
-        cls,
-        pretrained_model_name_or_path: str,
-        *args,
-        from_hf_hub: bool = False,
-        load_state_as_np: bool = False,
-        **kwargs
-    ):
+    def from_pretrained(cls, pretrained_model_name_or_path, *args, from_hf_hub=False, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, or a community contributed model,
@@ -519,6 +512,14 @@ class PretrainedModel(Layer, GenerationMixin):
                     resolved_resource_files[file_id] = hf_hub_download(
                         pretrained_model_name_or_path, file_path, cache_dir=MODEL_HOME
                     )
+
+                resolved_resource_files[file_id] = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=file_path,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
 
             else:
                 path = os.path.join(default_root, file_path.split("/")[-1])

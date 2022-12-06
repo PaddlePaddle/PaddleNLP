@@ -23,8 +23,8 @@ MIN_INPUT_OCCUR = 1
 MIN_OUTPUT_OCCUR = 1
 
 
-class ATISVocabulary():
-    """ Stores the vocabulary for the ATIS data.
+class ATISVocabulary:
+    """Stores the vocabulary for the ATIS data.
 
     Attributes:
         raw_vocab (`Vocabulary`): Vocabulary object.
@@ -33,20 +33,13 @@ class ATISVocabulary():
             unchanging order.
     """
 
-    def __init__(self,
-                 token_sequences,
-                 filename,
-                 params,
-                 is_input='input',
-                 min_occur=1,
-                 anonymizer=None,
-                 skip=None):
+    def __init__(self, token_sequences, filename, params, is_input="input", min_occur=1, anonymizer=None, skip=None):
 
-        if is_input == 'input':
+        if is_input == "input":
             functional_types = INPUT_FN_TYPES
-        elif is_input == 'output':
+        elif is_input == "output":
             functional_types = OUTPUT_FN_TYPES
-        elif is_input == 'schema':
+        elif is_input == "schema":
             functional_types = [UNK_TOK]
         else:
             functional_types = []
@@ -56,8 +49,10 @@ class ATISVocabulary():
             filename,
             functional_types=functional_types,
             min_occur=min_occur,
-            ignore_fn=lambda x: snippets.is_snippet(x) or
-            (anonymizer and anonymizer.is_anon_tok(x)) or (skip and x in skip))
+            ignore_fn=lambda x: snippets.is_snippet(x)
+            or (anonymizer and anonymizer.is_anon_tok(x))
+            or (skip and x in skip),
+        )
         self.tokens = set(self.raw_vocab.token_to_id.keys())
         self.inorder_tokens = self.raw_vocab.id_to_token
 
@@ -67,7 +62,7 @@ class ATISVocabulary():
         return len(self.raw_vocab)
 
     def token_to_id(self, token):
-        """ Maps from a token to a unique ID.
+        """Maps from a token to a unique ID.
 
         Args:
             token (`str`): The token to look up.
@@ -78,7 +73,7 @@ class ATISVocabulary():
         return self.raw_vocab.token_to_id[token]
 
     def id_to_token(self, identifier):
-        """ Maps from a unique integer to an identifier.
+        """Maps from a unique integer to an identifier.
 
         Args:
             identifier (`int`): The unique ID.

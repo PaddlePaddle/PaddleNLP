@@ -29,33 +29,185 @@ import paddle
 from paddlenlp.transformers import BertTokenizer, BertForPretraining
 
 logging.basicConfig(
-    format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s',
-    datefmt='%m/%d/%Y %H:%M:%S',
-    level=logging.INFO)
+    format="%(asctime)s - %(levelname)s - %(name)s -   %(message)s", datefmt="%m/%d/%Y %H:%M:%S", level=logging.INFO
+)
 
 logger = logging.getLogger(__name__)
 
 StopWordsList = [
-    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you',
-    "you're", "you've", "you'll", "you'd", 'your', 'yours', 'yourself',
-    'yourselves', 'he', 'him', 'his', 'himself', 'she', "she's", 'her', 'hers',
-    'herself', 'it', "it's", 'its', 'itself', 'they', 'them', 'their', 'theirs',
-    'themselves', 'this', 'that', "that'll", 'these', 'those', 'am', 'is',
-    'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having',
-    'do', 'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or',
-    'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about',
-    'against', 'between', 'into', 'through', 'during', 'before', 'after',
-    'above', 'below', 'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off',
-    'over', 'under', 'again', 'further', 'then', 'once', 'here', 'there', 'all',
-    'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
-    'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't',
-    'can', 'will', 'just', 'don', "don't", 'should', "should've", 'now', 'd',
-    'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', "aren't", 'couldn',
-    "couldn't", 'didn', "didn't", 'doesn', "doesn't", 'hadn', "hadn't", 'hasn',
-    "hasn't", 'haven', "haven't", 'isn', "isn't", 'ma', 'mightn', "mightn't",
-    'mustn', "mustn't", 'needn', "needn't", 'shan', "shan't", 'shouldn',
-    "shouldn't", 'wasn', "wasn't", 'weren', "weren't", 'won', "won't", 'wouldn',
-    "wouldn't", "'s", "'re"
+    "i",
+    "me",
+    "my",
+    "myself",
+    "we",
+    "our",
+    "ours",
+    "ourselves",
+    "you",
+    "you're",
+    "you've",
+    "you'll",
+    "you'd",
+    "your",
+    "yours",
+    "yourself",
+    "yourselves",
+    "he",
+    "him",
+    "his",
+    "himself",
+    "she",
+    "she's",
+    "her",
+    "hers",
+    "herself",
+    "it",
+    "it's",
+    "its",
+    "itself",
+    "they",
+    "them",
+    "their",
+    "theirs",
+    "themselves",
+    "this",
+    "that",
+    "that'll",
+    "these",
+    "those",
+    "am",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "been",
+    "being",
+    "have",
+    "has",
+    "had",
+    "having",
+    "do",
+    "does",
+    "did",
+    "doing",
+    "a",
+    "an",
+    "the",
+    "and",
+    "but",
+    "if",
+    "or",
+    "because",
+    "as",
+    "until",
+    "while",
+    "of",
+    "at",
+    "by",
+    "for",
+    "with",
+    "about",
+    "against",
+    "between",
+    "into",
+    "through",
+    "during",
+    "before",
+    "after",
+    "above",
+    "below",
+    "to",
+    "from",
+    "up",
+    "down",
+    "in",
+    "out",
+    "on",
+    "off",
+    "over",
+    "under",
+    "again",
+    "further",
+    "then",
+    "once",
+    "here",
+    "there",
+    "all",
+    "any",
+    "both",
+    "each",
+    "few",
+    "more",
+    "most",
+    "other",
+    "some",
+    "such",
+    "no",
+    "nor",
+    "not",
+    "only",
+    "own",
+    "same",
+    "so",
+    "than",
+    "too",
+    "very",
+    "s",
+    "t",
+    "can",
+    "will",
+    "just",
+    "don",
+    "don't",
+    "should",
+    "should've",
+    "now",
+    "d",
+    "ll",
+    "m",
+    "o",
+    "re",
+    "ve",
+    "y",
+    "ain",
+    "aren",
+    "aren't",
+    "couldn",
+    "couldn't",
+    "didn",
+    "didn't",
+    "doesn",
+    "doesn't",
+    "hadn",
+    "hadn't",
+    "hasn",
+    "hasn't",
+    "haven",
+    "haven't",
+    "isn",
+    "isn't",
+    "ma",
+    "mightn",
+    "mightn't",
+    "mustn",
+    "mustn't",
+    "needn",
+    "needn't",
+    "shan",
+    "shan't",
+    "shouldn",
+    "shouldn't",
+    "wasn",
+    "wasn't",
+    "weren",
+    "weren't",
+    "won",
+    "won't",
+    "wouldn",
+    "wouldn't",
+    "'s",
+    "'re",
 ]
 
 
@@ -68,19 +220,19 @@ def strip_accents(text):
     :rtype: String.
     """
     try:
-        text = unicode(text, 'utf-8')
+        text = unicode(text, "utf-8")
     except (TypeError, NameError):
         # unicode is a default on python 3
         pass
-    text = unicodedata.normalize('NFD', text)
-    text = text.encode('ascii', 'ignore')
+    text = unicodedata.normalize("NFD", text)
+    text = text.encode("ascii", "ignore")
     text = text.decode("utf-8")
     return str(text)
 
 
 # valid string only includes al
 def _is_valid(string):
-    return True if not re.search('[^a-z]', string) else False
+    return True if not re.search("[^a-z]", string) else False
 
 
 def _read_tsv(input_file, quotechar=None):
@@ -90,7 +242,7 @@ def _read_tsv(input_file, quotechar=None):
         lines = []
         for line in reader:
             if sys.version_info[0] == 2:
-                line = list(unicode(cell, 'utf-8') for cell in line)
+                line = list(unicode(cell, "utf-8") for cell in line)
             lines.append(line)
         return lines
 
@@ -101,7 +253,7 @@ def prepare_embedding_retrieval(glove_file, vocab_size=100000):
     embeddings = {}
 
     # only read first 100,000 words for fast retrieval
-    with open(glove_file, 'r', encoding='utf-8') as fin:
+    with open(glove_file, "r", encoding="utf-8") as fin:
         for line in fin:
             items = line.strip().split()
             words.append(items[0])
@@ -117,20 +269,18 @@ def prepare_embedding_retrieval(glove_file, vocab_size=100000):
     vector_dim = len(embeddings[ids_to_tokens[0]])
     emb_matrix = np.zeros((vocab_size, vector_dim))
     for word, v in embeddings.items():
-        if word == '<unk>':
+        if word == "<unk>":
             continue
         emb_matrix[vocab[word], :] = v
 
     # normalize each word vector
-    d = (np.sum(emb_matrix**2, 1)**0.5)
+    d = np.sum(emb_matrix**2, 1) ** 0.5
     emb_norm = (emb_matrix.T / d).T
     return emb_norm, vocab, ids_to_tokens
 
 
 class DataAugmentor(object):
-
-    def __init__(self, model, tokenizer, emb_norm, vocab, ids_to_tokens, M, N,
-                 p):
+    def __init__(self, model, tokenizer, emb_norm, vocab, ids_to_tokens, M, N, p):
         self.model = model
         self.tokenizer = tokenizer
         self.emb_norm = emb_norm
@@ -149,37 +299,34 @@ class DataAugmentor(object):
         dist = np.dot(self.emb_norm, word_emb.T)
         dist[word_idx] = -np.Inf
 
-        candidate_ids = np.argsort(-dist)[:self.M]
-        return [self.ids_to_tokens[idx] for idx in candidate_ids][:self.M]
+        candidate_ids = np.argsort(-dist)[: self.M]
+        return [self.ids_to_tokens[idx] for idx in candidate_ids][: self.M]
 
     def _masked_language_model(self, sent, word_pieces, mask_id):
         tokenized_text = self.tokenizer.tokenize(sent)
-        tokenized_text = ['[CLS]'] + tokenized_text
+        tokenized_text = ["[CLS]"] + tokenized_text
         tokenized_len = len(tokenized_text)
 
-        tokenized_text = word_pieces + ['[SEP]'
-                                        ] + tokenized_text[1:] + ['[SEP]']
+        tokenized_text = word_pieces + ["[SEP]"] + tokenized_text[1:] + ["[SEP]"]
 
         if len(tokenized_text) > 512:
             tokenized_text = tokenized_text[:512]
 
         token_ids = self.tokenizer.convert_tokens_to_ids(tokenized_text)
-        segments_ids = [0] * (tokenized_len + 1) + [1] * (len(tokenized_text) -
-                                                          tokenized_len - 1)
+        segments_ids = [0] * (tokenized_len + 1) + [1] * (len(tokenized_text) - tokenized_len - 1)
 
         tokens_tensor = paddle.to_tensor([token_ids])
         segments_tensor = paddle.to_tensor([segments_ids])
 
         predictions, _ = self.model(tokens_tensor, segments_tensor)
-        word_candidates = paddle.argsort(
-            predictions[0, mask_id], descending=True)[:self.M].numpy().tolist()
+        word_candidates = paddle.argsort(predictions[0, mask_id], descending=True)[: self.M].numpy().tolist()
         word_candidates = self.tokenizer.convert_ids_to_tokens(word_candidates)
 
         return list(filter(lambda x: x.find("##"), word_candidates))
 
     def _word_augment(self, sentence, mask_token_idx, mask_token):
         word_pieces = self.tokenizer.tokenize(sentence)
-        word_pieces = ['[CLS]'] + word_pieces
+        word_pieces = ["[CLS]"] + word_pieces
         tokenized_len = len(word_pieces)
 
         token_idx = -1
@@ -196,9 +343,8 @@ class DataAugmentor(object):
                 word_piece_ids.append(i)
 
         if len(word_piece_ids) == 1:
-            word_pieces[word_piece_ids[0]] = '[MASK]'
-            candidate_words = self._masked_language_model(
-                sentence, word_pieces, word_piece_ids[0])
+            word_pieces[word_piece_ids[0]] = "[MASK]"
+            candidate_words = self._masked_language_model(sentence, word_pieces, word_piece_ids[0])
         elif len(word_piece_ids) > 1:
             candidate_words = self._word_distance(mask_token)
         else:
@@ -229,38 +375,37 @@ class DataAugmentor(object):
                     new_sent[idx] = candidate_word
 
             if " ".join(new_sent) not in candidate_sents:
-                candidate_sents.append(' '.join(new_sent))
+                candidate_sents.append(" ".join(new_sent))
             cnt += 1
 
         return candidate_sents
 
 
 class AugmentProcessor(object):
-
     def __init__(self, augmentor, glue_dir, task_name):
         self.augmentor = augmentor
         self.glue_dir = glue_dir
         self.task_name = task_name
         self.augment_ids = {
-            'MRPC': [3, 4],
-            'MNLI': [8, 9],
-            'CoLA': [3],
-            'SST-2': [0],
-            'STS-B': [7, 8],
-            'QQP': [3, 4],
-            'QNLI': [1, 2],
-            'RTE': [1, 2]
+            "MRPC": [3, 4],
+            "MNLI": [8, 9],
+            "CoLA": [3],
+            "SST-2": [0],
+            "STS-B": [7, 8],
+            "QQP": [3, 4],
+            "QNLI": [1, 2],
+            "RTE": [1, 2],
         }
 
         self.filter_flags = {
-            'MRPC': True,
-            'MNLI': True,
-            'CoLA': False,
-            'SST-2': True,
-            'STS-B': True,
-            'QQP': True,
-            'QNLI': True,
-            'RTE': True
+            "MRPC": True,
+            "MNLI": True,
+            "CoLA": False,
+            "SST-2": True,
+            "STS-B": True,
+            "QQP": True,
+            "QNLI": True,
+            "RTE": True,
         }
 
         assert self.task_name in self.augment_ids
@@ -273,7 +418,7 @@ class AugmentProcessor(object):
         augment_ids_ = self.augment_ids[self.task_name]
         filter_flag = self.filter_flags[self.task_name]
 
-        with open(output_filename, 'w', newline='', encoding="utf-8") as f:
+        with open(output_filename, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f, delimiter="\t")
             for (i, line) in enumerate(train_samples):
                 if i == 0 and filter_flag:
@@ -288,8 +433,7 @@ class AugmentProcessor(object):
                         writer.writerow(line)
 
                 if (i + 1) % 1000 == 0:
-                    logger.info("Having been processing {} examples".format(
-                        str(i + 1)))
+                    logger.info("Having been processing {} examples".format(str(i + 1)))
 
 
 def main():
@@ -300,73 +444,37 @@ def main():
         default=None,
         type=str,
         required=True,
-        help=
-        "Downloaded pretrained model (bert-base-uncased) is under this folder")
-    parser.add_argument("--glove_embs",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="Glove word embeddings file")
-    parser.add_argument("--glue_dir",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="GLUE data dir")
+        help="Downloaded pretrained model (bert-base-uncased) is under this folder",
+    )
+    parser.add_argument("--glove_embs", default=None, type=str, required=True, help="Glove word embeddings file")
+    parser.add_argument("--glue_dir", default=None, type=str, required=True, help="GLUE data dir")
     parser.add_argument(
         "--task_name",
         default=None,
         type=str,
         required=True,
-        help=
-        "Task(eg. CoLA, SST-2) that we want to do data augmentation for its train set"
+        help="Task(eg. CoLA, SST-2) that we want to do data augmentation for its train set",
     )
-    parser.add_argument("--N",
-                        default=30,
-                        type=int,
-                        help="How many times is the corpus expanded?")
+    parser.add_argument("--N", default=30, type=int, help="How many times is the corpus expanded?")
     parser.add_argument(
-        "--M",
-        default=15,
-        type=int,
-        help="Choose from M most-likely words in the corresponding position")
-    parser.add_argument("--p",
-                        default=0.4,
-                        type=float,
-                        help="Threshold probability p to replace current word")
+        "--M", default=15, type=int, help="Choose from M most-likely words in the corresponding position"
+    )
+    parser.add_argument("--p", default=0.4, type=float, help="Threshold probability p to replace current word")
 
-    parser.add_argument("--device",
-                        default="gpu",
-                        type=str,
-                        help="device, gpu or cpu")
+    parser.add_argument("--device", default="gpu", type=str, help="device, gpu or cpu")
 
     args = parser.parse_args()
     logger.info(args)
 
     default_params = {
-        "CoLA": {
-            "N": 30
-        },
-        "MNLI": {
-            "N": 10
-        },
-        "MRPC": {
-            "N": 30
-        },
-        "SST-2": {
-            "N": 20
-        },
-        "STS-b": {
-            "N": 30
-        },
-        "QQP": {
-            "N": 10
-        },
-        "QNLI": {
-            "N": 20
-        },
-        "RTE": {
-            "N": 30
-        }
+        "CoLA": {"N": 30},
+        "MNLI": {"N": 10},
+        "MRPC": {"N": 30},
+        "SST-2": {"N": 20},
+        "STS-b": {"N": 30},
+        "QQP": {"N": 10},
+        "QNLI": {"N": 20},
+        "RTE": {"N": 30},
     }
 
     device = paddle.set_device(args.device)
@@ -378,11 +486,9 @@ def main():
     model = BertForPretraining.from_pretrained(args.pretrained_bert_model)
     model.eval()
 
-    emb_norm, vocab, ids_to_tokens = prepare_embedding_retrieval(
-        args.glove_embs)
+    emb_norm, vocab, ids_to_tokens = prepare_embedding_retrieval(args.glove_embs)
 
-    data_augmentor = DataAugmentor(model, tokenizer, emb_norm, vocab,
-                                   ids_to_tokens, args.M, args.N, args.p)
+    data_augmentor = DataAugmentor(model, tokenizer, emb_norm, vocab, ids_to_tokens, args.M, args.N, args.p)
 
     # Do data augmentation
     processor = AugmentProcessor(data_augmentor, args.glue_dir, args.task_name)

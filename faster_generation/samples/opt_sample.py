@@ -15,7 +15,7 @@
 from paddlenlp.transformers import OPTForCausalLM, GPTTokenizer
 import paddle
 
-model_name = 'facebook/opt-350m'
+model_name = "facebook/opt-350m"
 
 tokenizer = GPTTokenizer.from_pretrained(model_name)
 model = OPTForCausalLM.from_pretrained(model_name)
@@ -29,12 +29,12 @@ Statue: New york city.
 Human: how long have you lived there?。"""
 
 inputs_ids = tokenizer([inputs])["input_ids"]
-inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64')
+inputs_ids = paddle.to_tensor(inputs_ids, dtype="int64")
 
 outputs, _ = model.generate(
     input_ids=inputs_ids,
     max_length=20,
-    decode_strategy='greedy_search',
+    decode_strategy="greedy_search",
     use_faster=True,
 )
 

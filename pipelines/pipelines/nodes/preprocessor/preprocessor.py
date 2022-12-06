@@ -51,7 +51,6 @@ iso639_to_nltk = {
 
 
 class PreProcessor(BasePreProcessor):
-
     def __init__(
         self,
         clean_whitespace: bool = True,
@@ -142,15 +141,12 @@ class PreProcessor(BasePreProcessor):
         ret = []
 
         if type(documents) == dict:
-            ret = self._process_single(document=documents,
-                                       **kwargs)  # type: ignore
+            ret = self._process_single(document=documents, **kwargs)  # type: ignore
         elif type(documents) == list:
             ret = self._process_batch(documents=list(documents), **kwargs)
 
         else:
-            raise Exception(
-                "documents provided to PreProcessor.prepreprocess() is not of type list nor Document"
-            )
+            raise Exception("documents provided to PreProcessor.prepreprocess() is not of type list nor Document")
 
         return ret
 
@@ -181,7 +177,7 @@ class PreProcessor(BasePreProcessor):
             split_overlap = self.split_overlap
         if split_respect_sentence_boundary is None:
             split_respect_sentence_boundary = self.split_respect_sentence_boundary
-        if (split_answers is None):
+        if split_answers is None:
             split_answers = self.split_answers
 
         cleaned_document = self.clean(
@@ -201,10 +197,7 @@ class PreProcessor(BasePreProcessor):
         return split_documents
 
     def _process_batch(self, documents: List[dict], **kwargs) -> List[dict]:
-        nested_docs = [
-            self._process_single(d, **kwargs)
-            for d in tqdm(documents, unit="docs")
-        ]
+        nested_docs = [self._process_single(d, **kwargs) for d in tqdm(documents, unit="docs")]
         return [d for x in nested_docs for d in x]
 
     def clean(
@@ -221,10 +214,8 @@ class PreProcessor(BasePreProcessor):
         text = document["content"]
         if clean_header_footer:
             text = self._find_and_remove_header_footer(
-                text,
-                n_chars=300,
-                n_first_pages_to_ignore=1,
-                n_last_pages_to_ignore=1)
+                text, n_chars=300, n_first_pages_to_ignore=1, n_last_pages_to_ignore=1
+            )
 
         if clean_whitespace:
             lines = text.splitlines()
@@ -269,8 +260,7 @@ class PreProcessor(BasePreProcessor):
 
         if split_respect_sentence_boundary and split_by == "word":
             # split by words ensuring no sub sentence splits
-            sentences = nltk.tokenize.sent_tokenize(text,
-                                                    language=self.language)
+            sentences = nltk.tokenize.sent_tokenize(text, language=self.language)
             word_count = 0
             list_splits = []
             current_slice: List[str] = []
@@ -317,8 +307,7 @@ class PreProcessor(BasePreProcessor):
             elif split_by == "passage":
                 elements = text.split("\n\n")
             elif split_by == "sentence":
-                elements = nltk.tokenize.sent_tokenize(text,
-                                                       language=self.language)
+                elements = nltk.tokenize.sent_tokenize(text, language=self.language)
             elif split_by == "word":
                 elements = text.split(" ")
             else:
@@ -328,10 +317,8 @@ class PreProcessor(BasePreProcessor):
 
             # concatenate individual elements based on split_length & split_stride
             # FAQ text process don't need split text into fix lengths
-            if (not split_answers):
-                segments = windowed(elements,
-                                    n=split_length,
-                                    step=split_length - split_overlap)
+            if not split_answers:
+                segments = windowed(elements, n=split_length, step=split_length - split_overlap)
 
                 text_splits = []
                 for seg in segments:
@@ -346,17 +333,13 @@ class PreProcessor(BasePreProcessor):
 
             if "meta" not in doc.keys() or doc["meta"] is None:
                 doc["meta"] = {}
-            if (split_answers):
-                text_arr = doc["content"].split('\t')
-                if (len(text_arr) > 2):
-                    raise Exception(
-                        "Each line text must be two columns and separated by \t"
-                    )
+            if split_answers:
+                text_arr = doc["content"].split("\t")
+                if len(text_arr) > 2:
+                    raise Exception("Each line text must be two columns and separated by \t")
                 # Maybe empty lines
-                if (len(text_arr) == 1):
-                    logger.info(
-                        'Some lines in your text cannot parse into question and text, maybe empty lines'
-                    )
+                if len(text_arr) == 1:
+                    logger.info("Some lines in your text cannot parse into question and text, maybe empty lines")
                     continue
                 else:
                     query, answer = text_arr
@@ -367,9 +350,9 @@ class PreProcessor(BasePreProcessor):
 
         return documents
 
-    def _find_and_remove_header_footer(self, text: str, n_chars: int,
-                                       n_first_pages_to_ignore: int,
-                                       n_last_pages_to_ignore: int) -> str:
+    def _find_and_remove_header_footer(
+        self, text: str, n_chars: int, n_first_pages_to_ignore: int, n_last_pages_to_ignore: int
+    ) -> str:
         """
         Heuristic to find footers and headers across different pages by searching for the longest common string.
         For headers we only search in the first n_chars characters (for footer: last n_chars).
@@ -385,25 +368,17 @@ class PreProcessor(BasePreProcessor):
         pages = text.split("\f")
 
         # header
-        start_of_pages = [
-            p[:n_chars]
-            for p in pages[n_first_pages_to_ignore:-n_last_pages_to_ignore]
-        ]
+        start_of_pages = [p[:n_chars] for p in pages[n_first_pages_to_ignore:-n_last_pages_to_ignore]]
         found_header = self._find_longest_common_ngram(start_of_pages)
         if found_header:
             pages = [page.replace(found_header, "") for page in pages]
 
         # footer
-        end_of_pages = [
-            p[-n_chars:]
-            for p in pages[n_first_pages_to_ignore:-n_last_pages_to_ignore]
-        ]
+        end_of_pages = [p[-n_chars:] for p in pages[n_first_pages_to_ignore:-n_last_pages_to_ignore]]
         found_footer = self._find_longest_common_ngram(end_of_pages)
         if found_footer:
             pages = [page.replace(found_footer, "") for page in pages]
-        logger.debug(
-            f"Removed header '{found_header}' and footer '{found_footer}' in document"
-        )
+        logger.debug(f"Removed header '{found_header}' and footer '{found_footer}' in document")
         text = "\f".join(pages)
         return text
 
@@ -421,24 +396,21 @@ class PreProcessor(BasePreProcessor):
         seq = seq.replace("\t", " \t")
 
         words = seq.split(" ")
-        ngrams = (" ".join(words[i:i + n]).replace(" \n",
-                                                   "\n").replace(" \t", "\t")
-                  for i in range(0,
-                                 len(words) - n + 1))
+        ngrams = (
+            " ".join(words[i : i + n]).replace(" \n", "\n").replace(" \t", "\t") for i in range(0, len(words) - n + 1)
+        )
 
         return ngrams
 
     def _allngram(self, seq: str, min_ngram: int, max_ngram: int) -> Set[str]:
-        lengths = range(min_ngram, max_ngram) if max_ngram else range(
-            min_ngram, len(seq))
+        lengths = range(min_ngram, max_ngram) if max_ngram else range(min_ngram, len(seq))
         ngrams = map(partial(self._ngram, seq), lengths)
         res = set(chain.from_iterable(ngrams))
         return res
 
-    def _find_longest_common_ngram(self,
-                                   sequences: List[str],
-                                   max_ngram: int = 30,
-                                   min_ngram: int = 3) -> Optional[str]:
+    def _find_longest_common_ngram(
+        self, sequences: List[str], max_ngram: int = 30, min_ngram: int = 3
+    ) -> Optional[str]:
         """
         Find the longest common ngram across different text sequences (e.g. start of pages).
         Considering all ngrams between the specified range. Helpful for finding footers, headers etc.
@@ -451,9 +423,7 @@ class PreProcessor(BasePreProcessor):
         sequences = [s for s in sequences if s]  # filter empty sequences
         if not sequences:
             return None
-        seqs_ngrams = map(
-            partial(self._allngram, min_ngram=min_ngram, max_ngram=max_ngram),
-            sequences)
+        seqs_ngrams = map(partial(self._allngram, min_ngram=min_ngram, max_ngram=max_ngram), sequences)
         intersection = reduce(set.intersection, seqs_ngrams)
 
         try:

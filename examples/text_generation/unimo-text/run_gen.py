@@ -62,9 +62,9 @@ def parse_args():
 
 def calc_bleu(preds, targets):
     assert len(preds) == len(targets), (
-        'The length of pred_responses should be equal to the length of '
-        'target_responses. But received {} and {}.'.format(
-            len(preds), len(targets)))
+        "The length of pred_responses should be equal to the length of "
+        "target_responses. But received {} and {}.".format(len(preds), len(targets))
+    )
     bleu4 = BLEU(n_size=4)
     tokenizer = BasicTokenizer()
 
@@ -74,9 +74,9 @@ def calc_bleu(preds, targets):
 
         bleu4.add_inst(pred_tokens, [target_token])
 
-    print('\n' + '*' * 15)
-    print('The auto evaluation result is:')
-    print('BLEU-4:', bleu4.score())
+    print("\n" + "*" * 15)
+    print("The auto evaluation result is:")
+    print("BLEU-4:", bleu4.score())
 
 
 def save_ckpt(model, tokenizer, save_dir, name):
@@ -84,8 +84,7 @@ def save_ckpt(model, tokenizer, save_dir, name):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
     # Need better way to get inner model of DataParallel
-    model_to_save = model._layers if isinstance(model,
-                                                paddle.DataParallel) else model
+    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
     model_to_save.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
@@ -104,53 +103,42 @@ def run(args):
     if world_size > 1:
         model = paddle.DataParallel(model)
 
-    train_ds = load_dataset(args.dataset_name,
-                            splits='train',
-                            data_files=args.train_file)
-    dev_ds = load_dataset(args.dataset_name,
-                          splits='dev',
-                          data_files=args.predict_file)
+    train_ds = load_dataset(args.dataset_name, splits="train", data_files=args.train_file)
+    dev_ds = load_dataset(args.dataset_name, splits="dev", data_files=args.predict_file)
 
-    train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args,
-                                                     'train')
-    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args,
-                                                 'test')
+    train_ds, train_data_loader = create_data_loader(train_ds, tokenizer, args, "train")
+    dev_ds, dev_data_loader = create_data_loader(dev_ds, tokenizer, args, "test")
 
     if args.do_train:
         num_training_steps = args.epochs * len(train_data_loader)
 
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps,
-                                             args.warmup_propotion)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_propotion)
         # Generate parameter names needed to perform weight decay.
         # All bias and LayerNorm parameters are excluded.
 
-        decay_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
+        decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
-        optimizer = AdamW(learning_rate=lr_scheduler,
-                          parameters=model.parameters(),
-                          weight_decay=args.weight_decay,
-                          beta1=args.beta1,
-                          beta2=args.beta2,
-                          epsilon=args.epsilon,
-                          apply_decay_param_fun=lambda x: x in decay_params,
-                          grad_clip=paddle.nn.ClipGradByGlobalNorm(
-                              args.max_grad_norm))
+        optimizer = AdamW(
+            learning_rate=lr_scheduler,
+            parameters=model.parameters(),
+            weight_decay=args.weight_decay,
+            beta1=args.beta1,
+            beta2=args.beta2,
+            epsilon=args.epsilon,
+            apply_decay_param_fun=lambda x: x in decay_params,
+            grad_clip=paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm),
+        )
 
         step = 0
         total_time = 0.0
         for epoch in range(args.epochs):
-            print('\nEpoch %d/%d' % (epoch + 1, args.epochs))
+            print("\nEpoch %d/%d" % (epoch + 1, args.epochs))
             batch_start_time = time.time()
             for inputs in train_data_loader:
                 step += 1
                 labels = inputs[-1]
                 logits = model(*inputs[:-1])
-                labels = paddle.nn.functional.one_hot(
-                    labels, num_classes=logits.shape[-1])
+                labels = paddle.nn.functional.one_hot(labels, num_classes=logits.shape[-1])
                 labels = paddle.nn.functional.label_smooth(labels)
                 loss = F.cross_entropy(logits, labels, soft_label=True)
 
@@ -159,37 +147,34 @@ def run(args):
                 lr_scheduler.step()
                 optimizer.clear_grad()
 
-                total_time += (time.time() - batch_start_time)
+                total_time += time.time() - batch_start_time
                 if step % args.logging_steps == 0:
                     ppl = paddle.exp(loss)
                     print(
-                        'step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step'
-                        % (step, loss, ppl, optimizer.get_lr(),
-                           total_time / args.logging_steps))
+                        "step %d - loss: %.4f - ppl: %.4f - lr: %.7f - %.3fs/step"
+                        % (step, loss, ppl, optimizer.get_lr(), total_time / args.logging_steps)
+                    )
                     total_time = 0.0
 
                 if step % args.save_steps == 0 or step >= num_training_steps:
                     if dist.get_rank() == 0:
                         save_ckpt(model, tokenizer, args.save_dir, step)
-                        print('Saved step {} model.\n'.format(step))
+                        print("Saved step {} model.\n".format(step))
                         if args.do_predict:
-                            model_eval = model._layers if isinstance(
-                                model, paddle.DataParallel) else model
-                            evaluation(model_eval, dev_data_loader, args,
-                                       tokenizer)
+                            model_eval = model._layers if isinstance(model, paddle.DataParallel) else model
+                            evaluation(model_eval, dev_data_loader, args, tokenizer)
 
                 batch_start_time = time.time()
 
-        print('\nTraining completed.')
+        print("\nTraining completed.")
     elif args.do_predict:
-        model_eval = model._layers if isinstance(model,
-                                                 paddle.DataParallel) else model
+        model_eval = model._layers if isinstance(model, paddle.DataParallel) else model
         evaluation(model_eval, dev_data_loader, args, tokenizer)
 
 
 @paddle.no_grad()
 def evaluation(model, data_loader, args, tokenizer):
-    print('\nEval begin...')
+    print("\nEval begin...")
     model.eval()
     pred_ref = []
     total_time = 0.0
@@ -211,34 +196,33 @@ def evaluation(model, data_loader, args, tokenizer):
             length_penalty=args.length_penalty,
             num_return_sequences=args.num_return_sequences,
             bos_token_id=tokenizer.cls_token_id,
-            eos_token_id=tokenizer.mask_token_id)
+            eos_token_id=tokenizer.mask_token_id,
+        )
 
-        total_time += (time.time() - start_time)
+        total_time += time.time() - start_time
         if step % args.logging_steps == 0:
-            print('step %d - %.3fs/step' %
-                  (step, total_time / args.logging_steps))
+            print("step %d - %.3fs/step" % (step, total_time / args.logging_steps))
             total_time = 0.0
 
-        results = select_sum(ids, scores, tokenizer, args.max_dec_len,
-                             args.num_return_sequences)
+        results = select_sum(ids, scores, tokenizer, args.max_dec_len, args.num_return_sequences)
         pred_ref.extend(results)
         start_time = time.time()
 
-    with open(args.output_path, 'w', encoding='utf-8') as fout:
+    with open(args.output_path, "w", encoding="utf-8") as fout:
         for ref in pred_ref:
-            fout.write(ref + '\n')
+            fout.write(ref + "\n")
 
-    print('\nSave inference result into: %s' % args.output_path)
+    print("\nSave inference result into: %s" % args.output_path)
 
-    if 'target' in data_loader.dataset[0].keys():
-        targets = [example['target'] for example in data_loader.dataset]
+    if "target" in data_loader.dataset[0].keys():
+        targets = [example["target"] for example in data_loader.dataset]
         calc_bleu(pred_ref, targets)
 
     model.train()
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     print_args(args)
     run(args)

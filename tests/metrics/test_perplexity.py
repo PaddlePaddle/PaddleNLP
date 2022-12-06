@@ -21,18 +21,13 @@ from common_test import CommonTest
 
 
 class NpPerplexity(object):
-
     def __init__(self):
         self.total_ce = 0
         self.total_word_num = 0
 
     def compute(self, pred, label, seq_mask=None):
         label = np.expand_dims(label, axis=2)
-        ce = cross_entropy(softmax=pred,
-                           label=label,
-                           soft_label=False,
-                           axis=-1,
-                           ignore_index=-100)
+        ce = cross_entropy(softmax=pred, label=label, soft_label=False, axis=-1, ignore_index=-100)
         ce = np.squeeze(ce, axis=2)
         if seq_mask is not None:
             ce = ce * seq_mask
@@ -49,9 +44,8 @@ class NpPerplexity(object):
 
 
 class TestPerplexity(CommonTest):
-
     def setUp(self):
-        self.config['name'] = 'test_perplexity'
+        self.config["name"] = "test_perplexity"
         self.cls_num = 10
         self.shape = (5, 20, self.cls_num)
         self.label_shape = (5, 20)
@@ -59,37 +53,31 @@ class TestPerplexity(CommonTest):
         self.np_metrics = NpPerplexity()
 
     def get_random_case(self):
-        label = np.random.randint(self.cls_num,
-                                  size=self.label_shape).astype("int64")
-        logits = np.random.uniform(0.1, 1.0, self.shape).astype(
-            paddle.get_default_dtype())
+        label = np.random.randint(self.cls_num, size=self.label_shape).astype("int64")
+        logits = np.random.uniform(0.1, 1.0, self.shape).astype(paddle.get_default_dtype())
         pred = np.apply_along_axis(stable_softmax, -1, logits)
         seq_mask = np.random.randint(2, size=self.label_shape).astype("int64")
         return label, logits, pred, seq_mask
 
     def test_name(self):
-        self.check_output_equal(self.metrics.name(), self.config['name'])
+        self.check_output_equal(self.metrics.name(), self.config["name"])
 
     def test_compute(self):
         label, logits, pred, _ = self.get_random_case()
         expected_result = self.np_metrics.compute(pred, label)
-        result = self.metrics.compute(paddle.to_tensor(logits),
-                                      paddle.to_tensor(label))
+        result = self.metrics.compute(paddle.to_tensor(logits), paddle.to_tensor(label))
         self.check_output_equal(expected_result, result.numpy())
 
     def test_compute_with_mask(self):
         label, logits, pred, seq_mask = self.get_random_case()
         expected_result = self.np_metrics.compute(pred, label, seq_mask)
-        result = self.metrics.compute(paddle.to_tensor(logits),
-                                      paddle.to_tensor(label),
-                                      paddle.to_tensor(seq_mask))
+        result = self.metrics.compute(paddle.to_tensor(logits), paddle.to_tensor(label), paddle.to_tensor(seq_mask))
         self.check_output_equal(expected_result[0], result[0].numpy())
         self.check_output_equal(expected_result[1], result[1])
 
     def test_reset(self):
         label, logits, pred, _ = self.get_random_case()
-        result = self.metrics.compute(paddle.to_tensor(logits),
-                                      paddle.to_tensor(label))
+        result = self.metrics.compute(paddle.to_tensor(logits), paddle.to_tensor(label))
         self.metrics.update(result.numpy())
         self.check_output_not_equal(self.metrics.total_ce, 0)
         self.check_output_not_equal(self.metrics.total_word_num, 0)
@@ -103,12 +91,10 @@ class TestPerplexity(CommonTest):
         for i in range(steps):
             label, logits, pred, _ = self.get_random_case()
             expected_result = self.np_metrics.compute(pred, label)
-            result = self.metrics.compute(paddle.to_tensor(logits),
-                                          paddle.to_tensor(label))
+            result = self.metrics.compute(paddle.to_tensor(logits), paddle.to_tensor(label))
             self.metrics.update(result.numpy())
             self.np_metrics.update(expected_result)
-        self.check_output_equal(self.metrics.accumulate(),
-                                self.np_metrics.accumulate())
+        self.check_output_equal(self.metrics.accumulate(), self.np_metrics.accumulate())
 
 
 if __name__ == "__main__":

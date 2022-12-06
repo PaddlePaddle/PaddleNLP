@@ -21,9 +21,7 @@ from paddlenlp.utils.log import logger
 
 def build_index(args, data_loader, model):
 
-    index = hnswlib.Index(
-        space='ip',
-        dim=args.output_emb_size if args.output_emb_size > 0 else 768)
+    index = hnswlib.Index(space="ip", dim=args.output_emb_size if args.output_emb_size > 0 else 768)
 
     # Initializing index
     # max_elements - the maximum number of elements (capacity). Will throw an exception if exceeded
@@ -34,9 +32,7 @@ def build_index(args, data_loader, model):
     #
     # M - is tightly connected with internal dimensionality of the data. Strongly affects memory consumption (~M)
     # Higher M leads to higher accuracy/run_time at fixed ef/efConstruction
-    index.init_index(max_elements=args.hnsw_max_elements,
-                     ef_construction=args.hnsw_ef,
-                     M=args.hnsw_m)
+    index.init_index(max_elements=args.hnsw_max_elements, ef_construction=args.hnsw_ef, M=args.hnsw_m)
 
     # Controlling the recall by setting ef:
     # higher ef leads to better accuracy, but slower search

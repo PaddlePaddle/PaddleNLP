@@ -37,11 +37,8 @@ def concate_aspect_and_opinion(text, aspect, opinion_words):
 
 def format_print(results):
     for result in results:
-        aspect, opinions, sentiment = result["aspect"], result[
-            "opinions"], result["sentiment_polarity"]
-        print(
-            f"aspect: {aspect}, opinions: {opinions}, sentiment_polarity: {sentiment}"
-        )
+        aspect, opinions, sentiment = result["aspect"], result["opinions"], result["sentiment_polarity"]
+        print(f"aspect: {aspect}, opinions: {opinions}, sentiment_polarity: {sentiment}")
     print()
 
 
@@ -59,9 +56,7 @@ def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
 
         input_text = input_text.strip().replace(" ", "")
         # processing input text
-        encoded_inputs = tokenizer(list(input_text),
-                                   is_split_into_words=True,
-                                   max_seq_len=args.ext_max_seq_len)
+        encoded_inputs = tokenizer(list(input_text), is_split_into_words=True, max_seq_len=args.ext_max_seq_len)
         input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
         token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
 
@@ -70,32 +65,25 @@ def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
         predictions = logits.argmax(axis=2).numpy()[0]
         tag_seq = [ext_id2label[idx] for idx in predictions][1:-1]
 
-        aps = decoding(input_text[:args.ext_max_seq_len - 2], tag_seq)
+        aps = decoding(input_text[: args.ext_max_seq_len - 2], tag_seq)
 
         # predict sentiment for aspect with cls_model
         results = []
         for ap in aps:
             aspect = ap[0]
             opinion_words = list(set(ap[1:]))
-            aspect_text = concate_aspect_and_opinion(input_text, aspect,
-                                                     opinion_words)
+            aspect_text = concate_aspect_and_opinion(input_text, aspect, opinion_words)
 
-            encoded_inputs = tokenizer(aspect_text,
-                                       text_pair=input_text,
-                                       max_seq_len=args.cls_max_seq_len,
-                                       return_length=True)
+            encoded_inputs = tokenizer(
+                aspect_text, text_pair=input_text, max_seq_len=args.cls_max_seq_len, return_length=True
+            )
             input_ids = paddle.to_tensor([encoded_inputs["input_ids"]])
-            token_type_ids = paddle.to_tensor(
-                [encoded_inputs["token_type_ids"]])
+            token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
 
             logits = cls_model(input_ids, token_type_ids=token_type_ids)
             prediction = logits.argmax(axis=1).numpy()[0]
 
-            result = {
-                "aspect": aspect,
-                "opinions": opinion_words,
-                "sentiment_polarity": cls_id2label[prediction]
-            }
+            result = {"aspect": aspect, "opinions": opinion_words, "sentiment_polarity": cls_id2label[prediction]}
             results.append(result)
 
         format_print(results)

@@ -26,11 +26,11 @@ class ErnieForCSC(nn.Layer):
 
     See more details on https://aclanthology.org/2021.findings-acl.198.pdf.
     Args:
-        ernie (ErnieModel): 
+        ernie (ErnieModel):
             An instance of `paddlenlp.transformers.ErnieModel`.
-        pinyin_vocab_size (int): 
+        pinyin_vocab_size (int):
             The vocab size of pinyin vocab.
-        pad_pinyin_id (int, optional): 
+        pad_pinyin_id (int, optional):
             The pad token id of pinyin vocab. Defaults to 0.
     """
 
@@ -44,19 +44,12 @@ class ErnieForCSC(nn.Layer):
         self.pad_token_id = self.ernie.config["pad_token_id"]
         self.pinyin_vocab_size = pinyin_vocab_size
         self.pad_pinyin_id = pad_pinyin_id
-        self.pinyin_embeddings = nn.Embedding(self.pinyin_vocab_size,
-                                              emb_size,
-                                              padding_idx=pad_pinyin_id)
+        self.pinyin_embeddings = nn.Embedding(self.pinyin_vocab_size, emb_size, padding_idx=pad_pinyin_id)
         self.detection_layer = nn.Linear(hidden_size, 2)
         self.correction_layer = nn.Linear(hidden_size, vocab_size)
         self.softmax = nn.Softmax()
 
-    def forward(self,
-                input_ids,
-                pinyin_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, pinyin_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -105,27 +98,26 @@ class ErnieForCSC(nn.Layer):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.detection_layer.weight.dtype) * -1e4,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.detection_layer.weight.dtype) * -1e4, axis=[1, 2]
+            )
 
-        embedding_output = self.ernie.embeddings(input_ids=input_ids,
-                                                 position_ids=position_ids,
-                                                 token_type_ids=token_type_ids)
+        embedding_output = self.ernie.embeddings(
+            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids
+        )
         pinyin_embedding_output = self.pinyin_embeddings(pinyin_ids)
 
         # Detection module aims to detect whether each Chinese charater has spelling error.
         detection_outputs = self.ernie.encoder(embedding_output, attention_mask)
         # detection_error_probs shape: [B, T, 2]. It indicates the erroneous probablity of each
         # word in the sequence from 0 to 1.
-        detection_error_probs = self.softmax(
-            self.detection_layer(detection_outputs))
+        detection_error_probs = self.softmax(self.detection_layer(detection_outputs))
         # Correction module aims to correct each potential wrong charater to right charater.
-        word_pinyin_embedding_output = detection_error_probs[:, :, 0:1] * embedding_output \
-                    + detection_error_probs[:,:, 1:2] * pinyin_embedding_output
+        word_pinyin_embedding_output = (
+            detection_error_probs[:, :, 0:1] * embedding_output
+            + detection_error_probs[:, :, 1:2] * pinyin_embedding_output
+        )
 
-        correction_outputs = self.ernie.encoder(word_pinyin_embedding_output,
-                                                attention_mask)
+        correction_outputs = self.ernie.encoder(word_pinyin_embedding_output, attention_mask)
         # correction_logits shape: [B, T, V]. It indicates the correct score of each token in vocab
         # according to each word in the sequence.
         correction_logits = self.correction_layer(correction_outputs)

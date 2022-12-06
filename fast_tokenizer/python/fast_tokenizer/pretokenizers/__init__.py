@@ -22,11 +22,9 @@ from .. import Token, OffsetType
 
 
 class StringSplit:
-
     def __init__(self, nomalized_text: NormalizedString, tokens: List[Token]):
         tokens = [token._token for token in tokens]
-        self._string_split = C.pretokenizers.StringSplit(
-            nomalized_text._normalized, tokens)
+        self._string_split = C.pretokenizers.StringSplit(nomalized_text._normalized, tokens)
 
     @property
     def normalized(self):
@@ -46,7 +44,6 @@ class StringSplit:
 
 
 class PreTokenizedString:
-
     def __init__(self, text: str):
         self._pretokenized = C.pretokenizers.PreTokenizedString(text)
 
@@ -71,48 +68,36 @@ class PreTokenizedString:
 
 
 class PreTokenizer(ABC):
-
     def __call__(self, pretokenized: PreTokenizedString):
         return self._pretokenizer(pretokenized._pretokenized)
 
 
 class WhitespacePreTokenizer(PreTokenizer):
-
     def __init__(self):
         self._pretokenizer = C.pretokenizers.WhitespacePreTokenizer()
 
 
 class BertPreTokenizer(PreTokenizer):
-
     def __init__(self):
         self._pretokenizer = C.pretokenizers.BertPreTokenizer()
 
 
 class MetaSpacePreTokenizer(PreTokenizer):
-
     def __init__(self, replacement: str = "_", add_prefix_space: bool = True):
-        self._pretokenizer = C.pretokenizers.MetaSpacePreTokenizer(
-            replacement, add_prefix_space)
+        self._pretokenizer = C.pretokenizers.MetaSpacePreTokenizer(replacement, add_prefix_space)
 
 
 class SequencePreTokenizer(PreTokenizer):
-
     def __init__(self, pretokenizers: List):
-        pretokenizers = [
-            pretokenizer._pretokenizer for pretokenizer in pretokenizers
-        ]
+        pretokenizers = [pretokenizer._pretokenizer for pretokenizer in pretokenizers]
         self._pretokenizer = C.pretokenizers.SequencePreTokenizer(pretokenizers)
 
 
 class ByteLevelPreTokenizer(PreTokenizer):
-
     def __init__(self, add_prefix_space: bool = True, use_regex: bool = True):
-        self._pretokenizer = C.pretokenizers.ByteLevelPreTokenizer(
-            add_prefix_space, use_regex)
+        self._pretokenizer = C.pretokenizers.ByteLevelPreTokenizer(add_prefix_space, use_regex)
 
 
 class SplitPreTokenizer(PreTokenizer):
-
     def __init__(self, pattern: str, split_mode: int, invert: bool = True):
-        self._pretokenizer = C.pretokenizers.SplitPreTokenizer(
-            pattern, C.SplitMode(split_mode), invert)
+        self._pretokenizer = C.pretokenizers.SplitPreTokenizer(pattern, C.SplitMode(split_mode), invert)

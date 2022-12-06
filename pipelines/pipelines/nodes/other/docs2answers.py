@@ -37,16 +37,13 @@ class Docs2Answers(BaseComponent):
         for doc in documents:
             # For FAQ style QA use cases
             if "answer" in doc.meta:
-                doc.meta[
-                    "query"] = doc.content  # question from the existing FAQ
+                doc.meta["query"] = doc.content  # question from the existing FAQ
                 cur_answer = Answer(
                     answer=doc.meta["answer"],
                     type="other",
                     score=doc.score,
                     context=doc.meta["answer"],
-                    offsets_in_context=[
-                        Span(start=0, end=len(doc.meta["answer"]))
-                    ],
+                    offsets_in_context=[Span(start=0, end=len(doc.meta["answer"]))],
                     document_id=doc.id,
                     meta=doc.meta,
                 )

@@ -45,14 +45,14 @@ def predict_ext(args):
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(read_test_file,
-                               data_path=args.test_path,
-                               lazy=False)
-    trans_func = partial(convert_example_to_feature_ext,
-                         tokenizer=tokenizer,
-                         label2id=ext_label2id,
-                         max_seq_len=args.ext_max_seq_len,
-                         is_test=True)
+    ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
+    trans_func = partial(
+        convert_example_to_feature_ext,
+        tokenizer=tokenizer,
+        label2id=ext_label2id,
+        max_seq_len=args.ext_max_seq_len,
+        is_test=True,
+    )
     test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
@@ -61,18 +61,13 @@ def predict_ext(args):
         Stack(dtype="int64"),
     ): fn(samples)
 
-    test_batch_sampler = paddle.io.BatchSampler(test_ds,
-                                                batch_size=args.batch_size,
-                                                shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds,
-                                       batch_sampler=test_batch_sampler,
-                                       collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load ext model
     ext_state_dict = paddle.load(args.ext_model_path)
-    ext_model = SkepForTokenClassification.from_pretrained(
-        model_name, num_classes=len(ext_label2id))
+    ext_model = SkepForTokenClassification.from_pretrained(model_name, num_classes=len(ext_label2id))
     ext_model.load_dict(ext_state_dict)
     print("extraction model loaded.")
 
@@ -87,17 +82,19 @@ def predict_ext(args):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
             text = ori_test_ds[idx]["text"]
-            aps = decoding(text[:args.ext_max_seq_len - 2], tag_seq)
+            aps = decoding(text[: args.ext_max_seq_len - 2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
                 aspect_text = concate_aspect_and_opinion(text, aspect, opinions)
-                results.append({
-                    "id": str(idx) + "_" + str(aid),
-                    "aspect": aspect,
-                    "opinions": opinions,
-                    "text": text,
-                    "aspect_text": aspect_text
-                })
+                results.append(
+                    {
+                        "id": str(idx) + "_" + str(aid),
+                        "aspect": aspect,
+                        "opinions": opinions,
+                        "text": text,
+                        "aspect_text": aspect_text,
+                    }
+                )
 
     return results
 
@@ -109,31 +106,29 @@ def predict_cls(args, ext_results):
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     test_ds = MapDataset(ext_results)
-    trans_func = partial(convert_example_to_feature_cls,
-                         tokenizer=tokenizer,
-                         label2id=cls_label2id,
-                         max_seq_len=args.cls_max_seq_len,
-                         is_test=True)
+    trans_func = partial(
+        convert_example_to_feature_cls,
+        tokenizer=tokenizer,
+        label2id=cls_label2id,
+        max_seq_len=args.cls_max_seq_len,
+        is_test=True,
+    )
     test_ds = test_ds.map(trans_func, lazy=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id), Stack(dtype="int64")
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+        Stack(dtype="int64"),
     ): fn(samples)
 
     # set shuffle is False
-    test_batch_sampler = paddle.io.BatchSampler(test_ds,
-                                                batch_size=args.batch_size,
-                                                shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds,
-                                       batch_sampler=test_batch_sampler,
-                                       collate_fn=batchify_fn)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
     print("test data loaded.")
 
     # load cls model
     cls_state_dict = paddle.load(args.cls_model_path)
-    cls_model = SkepForSequenceClassification.from_pretrained(
-        model_name, num_classes=len(cls_label2id))
+    cls_model = SkepForSequenceClassification.from_pretrained(model_name, num_classes=len(cls_label2id))
     cls_model.load_dict(cls_state_dict)
     print("classification model loaded.")
 
@@ -167,11 +162,13 @@ def post_process(ext_results, cls_results):
         for idx, single_ap in enumerate(collect_dict[eid]):
             if idx == 0:
                 sentiment_result["text"] = single_ap["text"]
-            ap_list.append({
-                "aspect": single_ap["aspect"],
-                "opinions": single_ap["opinions"],
-                "sentiment_polarity": single_ap["sentiment_polarity"]
-            })
+            ap_list.append(
+                {
+                    "aspect": single_ap["aspect"],
+                    "opinions": single_ap["opinions"],
+                    "sentiment_polarity": single_ap["sentiment_polarity"],
+                }
+            )
         sentiment_result["ap_list"] = ap_list
         sentiment_results.append(sentiment_result)
 

@@ -38,9 +38,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        tokenizer = ErnieMTokenizer(vocab_file=EN_VOCAB,
-                                    sentencepiece_model_file=EN_SENTENCEPIECE,
-                                    unk_token="<unk>")
+        tokenizer = ErnieMTokenizer(vocab_file=EN_VOCAB, sentencepiece_model_file=EN_SENTENCEPIECE, unk_token="<unk>")
         tokenizer.save_pretrained(self.tmpdirname)
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
@@ -56,65 +54,99 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         token = "<unk>"
         token_id = 0
 
-        self.assertEqual(self.get_tokenizer()._convert_token_to_id(token),
-                         token_id)
-        self.assertEqual(self.get_tokenizer()._convert_id_to_token(token_id),
-                         token)
+        self.assertEqual(self.get_tokenizer()._convert_token_to_id(token), token_id)
+        self.assertEqual(self.get_tokenizer()._convert_id_to_token(token_id), token)
 
     def test_full_tokenizer(self):
         tokenizer = ErnieMTokenizer.from_pretrained(self.tmpdirname)
 
         tokens = tokenizer.tokenize("This is a test")
-        self.assertListEqual(tokens, ['▁This', '▁is', '▁a', '▁t', 'est'])
+        self.assertListEqual(tokens, ["▁This", "▁is", "▁a", "▁t", "est"])
 
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [474, 97, 5, 3, 263])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [474, 97, 5, 3, 263])
 
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
-        self.assertListEqual(tokens, [
-            '▁I', '▁was', '▁b', 'or', 'n', '▁in', '9', '2', '0', '0', '0', ',',
-            '▁and', '▁this', '▁is', '▁f', 'al', 's', 'é', '.'
-        ])
+        self.assertListEqual(
+            tokens,
+            [
+                "▁I",
+                "▁was",
+                "▁b",
+                "or",
+                "n",
+                "▁in",
+                "9",
+                "2",
+                "0",
+                "0",
+                "0",
+                ",",
+                "▁and",
+                "▁this",
+                "▁is",
+                "▁f",
+                "al",
+                "s",
+                "é",
+                ".",
+            ],
+        )
         ids = tokenizer.convert_tokens_to_ids(tokens)
-        self.assertListEqual(ids, [
-            16, 52, 12, 27, 936, 39, 0, 998, 992, 992, 992, 953, 32, 119, 97,
-            20, 81, 939, 0, 951
-        ])
+        self.assertListEqual(
+            ids, [16, 52, 12, 27, 936, 39, 0, 998, 992, 992, 992, 953, 32, 119, 97, 20, 81, 939, 0, 951]
+        )
 
         back_tokens = tokenizer.convert_ids_to_tokens(ids)
-        self.assertListEqual(back_tokens, [
-            '▁I', '▁was', '▁b', 'or', 'n', '▁in', '<unk>', '2', '0', '0', '0',
-            ',', '▁and', '▁this', '▁is', '▁f', 'al', 's', '<unk>', '.'
-        ])
+        self.assertListEqual(
+            back_tokens,
+            [
+                "▁I",
+                "▁was",
+                "▁b",
+                "or",
+                "n",
+                "▁in",
+                "<unk>",
+                "2",
+                "0",
+                "0",
+                "0",
+                ",",
+                "▁and",
+                "▁this",
+                "▁is",
+                "▁f",
+                "al",
+                "s",
+                "<unk>",
+                ".",
+            ],
+        )
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual(
-            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
-            [['▁T', 'est'], ['\xad'], ['▁t', 'est']])
+            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["▁T", "est"], ["\xad"], ["▁t", "est"]]
+        )
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-m-base")
 
-        text = tokenizer.encode("sequence builders",
-                                return_token_type_ids=None,
-                                add_special_tokens=False)["input_ids"]
-        text_2 = tokenizer.encode("multi-sequence build",
-                                  return_token_type_ids=None,
-                                  add_special_tokens=False)["input_ids"]
+        text = tokenizer.encode("sequence builders", return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+        text_2 = tokenizer.encode("multi-sequence build", return_token_type_ids=None, add_special_tokens=False)[
+            "input_ids"
+        ]
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
 
-        assert encoded_sentence == [tokenizer.cls_token_id
-                                    ] + text + [tokenizer.sep_token_id]
+        assert encoded_sentence == [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id]
         assert encoded_pair == [tokenizer.cls_token_id] + text + [
-            tokenizer.sep_token_id, tokenizer.sep_token_id
+            tokenizer.sep_token_id,
+            tokenizer.sep_token_id,
         ] + text_2 + [tokenizer.sep_token_id]
 
     def test_token_type_ids(self):
-        self.skipTest(
-            "Ernie-M model doesn't have token_type embedding. so skip this test"
-        )
+        self.skipTest("Ernie-M model doesn't have token_type embedding. so skip this test")

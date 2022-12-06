@@ -70,48 +70,30 @@ class ChnSentiCorp(datasets.GeneratorBasedBuilder):
     ]
 
     def _info(self):
-        features = {
-            "id": datasets.Value("int32"),
-            "text": datasets.Value("string"),
-            "label": datasets.Value("int32")
-        }
+        features = {"id": datasets.Value("int32"), "text": datasets.Value("string"), "label": datasets.Value("int32")}
 
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(features),
             homepage="https://www.luge.ai/#/luge/dataDetail?id=25",
-            citation=_CITATION)
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         downloaded_dir = dl_manager.download_and_extract(_URL)
         data_dir = os.path.join(downloaded_dir, "ChnSentiCorp")
 
-        train_split = datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                              gen_kwargs={
-                                                  "filepath":
-                                                  os.path.join(
-                                                      data_dir, "train.tsv"),
-                                                  "split":
-                                                  "train"
-                                              })
+        train_split = datasets.SplitGenerator(
+            name=datasets.Split.TRAIN, gen_kwargs={"filepath": os.path.join(data_dir, "train.tsv"), "split": "train"}
+        )
 
-        dev_split = datasets.SplitGenerator(name=datasets.Split.VALIDATION,
-                                            gen_kwargs={
-                                                "filepath":
-                                                os.path.join(
-                                                    data_dir, "dev.tsv"),
-                                                "split":
-                                                "dev"
-                                            })
+        dev_split = datasets.SplitGenerator(
+            name=datasets.Split.VALIDATION, gen_kwargs={"filepath": os.path.join(data_dir, "dev.tsv"), "split": "dev"}
+        )
 
-        test_split = datasets.SplitGenerator(name=datasets.Split.TEST,
-                                             gen_kwargs={
-                                                 "filepath":
-                                                 os.path.join(
-                                                     data_dir, "test.tsv"),
-                                                 "split":
-                                                 "test"
-                                             })
+        test_split = datasets.SplitGenerator(
+            name=datasets.Split.TEST, gen_kwargs={"filepath": os.path.join(data_dir, "test.tsv"), "split": "test"}
+        )
 
         return [train_split, dev_split, test_split]
 

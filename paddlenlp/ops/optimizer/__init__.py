@@ -16,4 +16,4 @@ import os
 from .ema import ExponentialMovingAverage
 from .adamwdl import layerwise_lr_decay, AdamWDL
 
-__all__ = ['layerwise_lr_decay', 'AdamWDL', 'ExponentialMovingAverage']
+__all__ = ["layerwise_lr_decay", "AdamWDL", "ExponentialMovingAverage"]

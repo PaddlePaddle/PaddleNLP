@@ -45,20 +45,17 @@ MODEL_CLASSES = {
 class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training and evaluating.
-    Using `PdArgumentParser` we can turn this class into argparse arguments to be able to 
+    Using `PdArgumentParser` we can turn this class into argparse arguments to be able to
     specify them on the command line.
     """
 
     input_dir: str = field(
-        default=None,
-        metadata={
-            "help": "The name of the dataset to use (via the datasets library)."
-        })
+        default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."}
+    )
     max_seq_length: int = field(
         default=512,
         metadata={
-            "help":
-            "The maximum total input sequence length after tokenization. Sequences longer "
+            "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
     )
@@ -73,22 +70,20 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to pre-train from.
     """
+
     model_type: Optional[str] = field(
-        default="ernie-health",
-        metadata={
-            "help": "Only support for ernie-health pre-training for now."
-        })
+        default="ernie-health", metadata={"help": "Only support for ernie-health pre-training for now."}
+    )
     model_name_or_path: str = field(
         default="ernie-health-chinese",
         metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-        })
+            "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        },
+    )
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     training_args.eval_iters = 10
@@ -103,53 +98,46 @@ def main():
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
-        +
-        f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
     )
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(
-            training_args.output_dir
-    ) and training_args.do_train and not training_args.overwrite_output_dir:
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(os.listdir(
-                training_args.output_dir)) > 1:
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 1:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome.")
+                "Use --overwrite_output_dir to overcome."
+            )
         elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    model_class, tokenizer_class = MODEL_CLASSES['ernie-health']
+    model_class, tokenizer_class = MODEL_CLASSES["ernie-health"]
 
     # Loads or initialize a model.
-    pretrained_models = list(
-        tokenizer_class.pretrained_init_configuration.keys())
+    pretrained_models = list(tokenizer_class.pretrained_init_configuration.keys())
 
     if model_args.model_name_or_path in pretrained_models:
-        tokenizer = tokenizer_class.from_pretrained(
-            model_args.model_name_or_path)
+        tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
         generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[
-                model_args.model_name_or_path + "-generator"]))
+            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-generator"])
+        )
         discriminator = ErnieHealthDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[
-                model_args.model_name_or_path + "-discriminator"]))
+            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-discriminator"])
+        )
         model = model_class(generator, discriminator)
     else:
         raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
     # Loads dataset.
     tic_load_data = time.time()
-    logger.info("start load data : %s" %
-                (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
+    logger.info("start load data : %s" % (time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())))
 
-    train_dataset = MedicalCorpus(data_path=data_args.input_dir,
-                                  tokenizer=tokenizer)
+    train_dataset = MedicalCorpus(data_path=data_args.input_dir, tokenizer=tokenizer)
     logger.info("load data done, total : %s s" % (time.time() - tic_load_data))
 
     # Reads data and generates mini-batches.
@@ -157,21 +145,18 @@ def main():
         tokenizer=tokenizer,
         max_seq_length=data_args.max_seq_length,
         mlm_prob=data_args.masked_lm_prob,
-        return_dict=True)
+        return_dict=True,
+    )
 
     class CriterionWrapper(paddle.nn.Layer):
-        """
-        """
+        """ """
 
         def __init__(self):
-            """CriterionWrapper
-            """
+            """CriterionWrapper"""
             super(CriterionWrapper, self).__init__()
             self.criterion = ErnieHealthPretrainingCriterion(
-                getattr(
-                    model.generator,
-                    ElectraGenerator.base_model_prefix).config["vocab_size"],
-                model.gen_weight)
+                getattr(model.generator, ElectraGenerator.base_model_prefix).config["vocab_size"], model.gen_weight
+            )
 
         def forward(self, output, labels):
             """forward function
@@ -187,8 +172,8 @@ def main():
             generator_labels = labels
 
             loss, gen_loss, rtd_loss, mts_loss, csp_loss = self.criterion(
-                generator_logits, generator_labels, logits_rtd, logits_mts,
-                logits_csp, disc_labels, masks)
+                generator_logits, generator_labels, logits_rtd, logits_mts, logits_csp, disc_labels, masks
+            )
 
             return loss
 

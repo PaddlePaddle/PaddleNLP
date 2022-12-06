@@ -33,19 +33,16 @@ from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
 def fn_args_to_dict(func, *args, **kwargs):
     """
     Inspect function `func` and its arguments for running, and extract a
-    dict mapping between argument names and keys. 
+    dict mapping between argument names and keys.
     """
-    if hasattr(inspect, 'getfullargspec'):
-        (spec_args, spec_varargs, spec_varkw, spec_defaults, _, _,
-         _) = inspect.getfullargspec(func)
+    if hasattr(inspect, "getfullargspec"):
+        (spec_args, spec_varargs, spec_varkw, spec_defaults, _, _, _) = inspect.getfullargspec(func)
     else:
-        (spec_args, spec_varargs, spec_varkw,
-         spec_defaults) = inspect.getargspec(func)
+        (spec_args, spec_varargs, spec_varkw, spec_defaults) = inspect.getargspec(func)
     # add positional argument values
     init_dict = dict(zip(spec_args, args))
     # add default argument values
-    kwargs_dict = dict(zip(spec_args[-len(spec_defaults):],
-                           spec_defaults)) if spec_defaults else {}
+    kwargs_dict = dict(zip(spec_args[-len(spec_defaults) :], spec_defaults)) if spec_defaults else {}
     for k in list(kwargs_dict.keys()):
         if k in init_dict:
             kwargs_dict.pop(k)
@@ -64,21 +61,25 @@ def adapt_stale_fwd_patch(self, name, value):
         # NOTE(guosheng): In dygraph to static, `layer.forward` would be patched
         # by an instance of `StaticFunction`. And use string compare to avoid to
         # import fluid.
-        if type(value).__name__.endswith('StaticFunction'):
+        if type(value).__name__.endswith("StaticFunction"):
             return value
-        if hasattr(inspect, 'getfullargspec'):
-            (patch_spec_args, patch_spec_varargs, patch_spec_varkw,
-             patch_spec_defaults, _, _, _) = inspect.getfullargspec(value)
-            (spec_args, spec_varargs, spec_varkw, spec_defaults, _, _,
-             _) = inspect.getfullargspec(self.forward)
+        if hasattr(inspect, "getfullargspec"):
+            (
+                patch_spec_args,
+                patch_spec_varargs,
+                patch_spec_varkw,
+                patch_spec_defaults,
+                _,
+                _,
+                _,
+            ) = inspect.getfullargspec(value)
+            (spec_args, spec_varargs, spec_varkw, spec_defaults, _, _, _) = inspect.getfullargspec(self.forward)
         else:
-            (patch_spec_args, patch_spec_varargs, patch_spec_varkw,
-             patch_spec_defaults) = inspect.getargspec(value)
-            (spec_args, spec_varargs, spec_varkw,
-             spec_defaults) = inspect.getargspec(self.forward)
+            (patch_spec_args, patch_spec_varargs, patch_spec_varkw, patch_spec_defaults) = inspect.getargspec(value)
+            (spec_args, spec_varargs, spec_varkw, spec_defaults) = inspect.getargspec(self.forward)
         new_args = [
-            arg for arg in ('output_hidden_states', 'output_attentions',
-                            'return_dict')
+            arg
+            for arg in ("output_hidden_states", "output_attentions", "return_dict")
             if arg not in patch_spec_args and arg in spec_args
         ]
 
@@ -89,14 +90,16 @@ def adapt_stale_fwd_patch(self, name, value):
                     "might be based on an old oversion which missing some "
                     f"arguments compared with the latest, such as {new_args}. "
                     "We automatically add compatibility on the patch for "
-                    "these arguemnts, and maybe the patch should be updated.")
+                    "these arguemnts, and maybe the patch should be updated."
+                )
             else:
                 warnings.warn(
                     f"The `forward` method of {self.__class__ if isinstance(self, Layer) else self} "
                     "is patched and the patch might be conflict with patches made "
                     f"by paddlenlp which seems have more arguments such as {new_args}. "
                     "We automatically add compatibility on the patch for "
-                    "these arguemnts, and maybe the patch should be updated.")
+                    "these arguemnts, and maybe the patch should be updated."
+                )
             if isinstance(self, Layer) and inspect.isfunction(value):
 
                 @functools.wraps(value)
@@ -104,6 +107,7 @@ def adapt_stale_fwd_patch(self, name, value):
                     for arg in new_args:
                         kwargs.pop(arg, None)
                     return value(self, *args, **kwargs)
+
             else:
 
                 @functools.wraps(value)
@@ -134,12 +138,9 @@ class InitTrackerMeta(type(Layer)):
         # If attrs has `__init__`, wrap it using accessable `_pre_init, _post_init`.
         # Otherwise, no need to wrap again since the super cls has been wraped.
         # TODO: remove reduplicated tracker if using super cls `__init__`
-        pre_init_func = getattr(cls, '_pre_init',
-                                None) if '__init__' in attrs else None
-        post_init_func = getattr(cls, '_post_init',
-                                 None) if '__init__' in attrs else None
-        cls.__init__ = InitTrackerMeta.init_and_track_conf(
-            init_func, pre_init_func, post_init_func)
+        pre_init_func = getattr(cls, "_pre_init", None) if "__init__" in attrs else None
+        post_init_func = getattr(cls, "_post_init", None) if "__init__" in attrs else None
+        cls.__init__ = InitTrackerMeta.init_and_track_conf(init_func, pre_init_func, post_init_func)
         super(InitTrackerMeta, cls).__init__(name, bases, attrs)
 
     @staticmethod
@@ -156,7 +157,7 @@ class InitTrackerMeta(type(Layer)):
             post_init_func (callable, optional): If provided, it would be hooked after
                 `init_func` and called as `post_init_func(self, init_func, *init_args, **init_args)`.
                 Default None.
-        
+
         Returns:
             function: the wrapped function
         """
@@ -173,8 +174,8 @@ class InitTrackerMeta(type(Layer)):
                 post_init_func(self, init_func, *args, **kwargs)
             self.init_config = kwargs
             if args:
-                kwargs['init_args'] = args
-            kwargs['init_class'] = self.__class__.__name__
+                kwargs["init_args"] = args
+            kwargs["init_class"] = self.__class__.__name__
 
         return __impl__
 
@@ -194,7 +195,7 @@ def param_in_func(func, param_field: str) -> bool:
         bool: the result of existence
     """
 
-    if hasattr(inspect, 'getfullargspec'):
+    if hasattr(inspect, "getfullargspec"):
         result = inspect.getfullargspec(func)
     else:
         result = inspect.getargspec(func)
@@ -202,8 +203,7 @@ def param_in_func(func, param_field: str) -> bool:
     return param_field in result[0]
 
 
-def resolve_cache_dir(pretrained_model_name_or_path: str,
-                      cache_dir: Optional[str] = None) -> str:
+def resolve_cache_dir(pretrained_model_name_or_path: str, cache_dir: Optional[str] = None) -> str:
     """resolve cache dir for PretrainedModel and PretrainedConfig
 
     Args:
@@ -220,7 +220,7 @@ def resolve_cache_dir(pretrained_model_name_or_path: str,
 
 
 def find_transformer_model_type(model_class: Type) -> str:
-    """get the model type from module name, 
+    """get the model type from module name,
         eg:
             BertModel -> bert,
             RobertaForTokenClassification -> roberta
@@ -233,7 +233,7 @@ def find_transformer_model_type(model_class: Type) -> str:
     """
     from paddlenlp.transformers import PretrainedModel
 
-    default_model_type = ''
+    default_model_type = ""
 
     if not issubclass(model_class, PretrainedModel):
         return default_model_type
@@ -249,8 +249,7 @@ def find_transformer_model_type(model_class: Type) -> str:
     return tokens[2]
 
 
-def find_transformer_model_class_by_name(
-        model_name: str) -> Optional[Type[PretrainedModel]]:
+def find_transformer_model_class_by_name(model_name: str) -> Optional[Type[PretrainedModel]]:
     """find transformer model_class by name
 
     Args:
