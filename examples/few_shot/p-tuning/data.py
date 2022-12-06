@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,371 +12,191 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import json
-import numpy as np
+from functools import partial
 
 import paddle
-from paddlenlp.utils.log import logger
+
+from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
+from paddlenlp.datasets import MapDataset, load_dataset
 
 
-def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
-    if trans_fn:
-        dataset = dataset.map(trans_fn)
-
-    shuffle = True if mode == "train" else False
-    if mode == "train":
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
-    else:
-        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
-
-    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
-
-
-def convert_example(example, tokenizer, max_seq_length=512, p_embedding_num=5, is_test=False):
+def extend_with_pseudo_data(data_ds, pseudo_path, labels_to_ids):
     """
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        p_embedding_num(obj:`int`) The number of p-embedding.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-        mask_positions(obj: `list[int]`): The list of mask_positions.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
+    Extend train dataset with pseudo labeled examples if exists.
     """
-
-    # Insert "[MASK]" after "[CLS]"
-    start_mask_position = 1
-    sentence1 = example["sentence1"]
-
-    encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-    src_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    # Step1: gen mask ids
-    if is_test:
-        label_length = example["label_length"]
-    else:
-        text_label = example["text_label"]
-        label_length = len(text_label)
-
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
-
-    # Step2: gen p_token_ids
-    p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-    p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-    # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
-
-    # Stpe4: Insert P-tokens at begin of sentence
-    src_ids = p_token_ids + src_ids
-
-    # calculate mask_positions
-    mask_positions = [index + start_mask_position + len(p_token_ids) for index in range(label_length)]
-
-    if "sentence2" in example:
-        encoded_inputs = tokenizer(text=example["sentence2"], max_seq_len=max_seq_length)
-        sentence2_src_ids = encoded_inputs["input_ids"][1:]
-        src_ids += sentence2_src_ids
-        token_type_ids += [1] * len(sentence2_src_ids)
-
-    token_type_ids = [0] * len(src_ids)
-
-    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
-
-    if is_test:
-        return src_ids, token_type_ids, mask_positions
-    else:
-        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
-
-        assert (
-            len(mask_lm_labels) == len(mask_positions) == label_length
-        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label
-        )
-
-        return src_ids, token_type_ids, mask_positions, mask_lm_labels
+    if pseudo_path is None:
+        return data_ds
+    with open(pseudo_path, "r", encoding="utf-8") as fp:
+        pseudo_data = [json.loads(x.strip()) for x in fp]
+    data_ds = MapDataset([x for x in data_ds] + pseudo_data)
+    return data_ds
 
 
-def convert_chid_example(example, tokenizer, max_seq_length=512, p_embedding_num=5, is_test=False):
+def extend_with_data_augment(data_ds, aug_type, num_aug=10, percent=0.1, aug_base="mlm", example_keys=None):
     """
-    Args:
-        example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
-            which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
-            Sequences longer than this will be truncated, sequences shorter will be padded.
-        p_embedding_num(obj:`int`) The number of p-embedding.
-
-    Returns:
-        input_ids(obj:`list[int]`): The list of query token ids.
-        token_type_ids(obj: `list[int]`): List of query sequence pair mask.
-        mask_positions(obj: `list[int]`): The list of mask_positions.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
-        mask_lm_labels(obj: `list[int]`): The list of mask_lm_labels.
+    Extend train dataset with augmentation.
     """
-    # FewClue Task `Chid`' label's position must be calculated by special token: "淠"
-    seg_tokens = tokenizer.tokenize(example["sentence1"])
-
-    # find insert position of `[MASK]`
-    start_mask_position = seg_tokens.index("淠") + 1
-    seg_tokens.remove("淠")
-    sentence1 = "".join(seg_tokens)
-    candidates = example["candidates"]
-    candidate_labels_ids = [tokenizer(text=idom)["input_ids"][1:-1] for idom in candidates]
-
-    sentence1 = example["sentence1"]
-
-    encoded_inputs = tokenizer(text=sentence1, max_seq_len=max_seq_length)
-    src_ids = encoded_inputs["input_ids"]
-    token_type_ids = encoded_inputs["token_type_ids"]
-
-    # Step1: gen mask ids
-    if is_test:
-        label_length = example["label_length"]
+    if example_keys is None:
+        return data_ds
+    if aug_type is None or aug_type == "None":
+        return data_ds
+    if aug_type == "delete":
+        aug = WordDelete(create_n=num_aug, aug_percent=percent)
+    elif aug_type == "substitute":
+        aug = WordSubstitute(aug_base, create_n=num_aug, aug_percent=percent)
+    elif aug_type == "insert":
+        aug = WordInsert(aug_base, create_n=num_aug, aug_percent=percent)
+    elif aug_type == "swap":
+        aug = WordSwap(create_n=num_aug, aug_percent=percent)
     else:
-        text_label = example["text_label"]
-        label_length = len(text_label)
+        raise ValueError("Unsupported data augment strategy `{}`".format(aug_type))
 
-    mask_tokens = ["[MASK]"] * label_length
-    mask_ids = tokenizer.convert_tokens_to_ids(mask_tokens)
+    aug_data = []
+    for example in data_ds:
+        for key in example_keys:
+            text_aug = aug.augment(example[key])
+            for text in text_aug:
+                new_example = example.copy()
+                example[key] = text
+                aug_data.append(new_example)
 
-    # Step2: gen p_token_ids
-    p_tokens = ["[unused{}]".format(i) for i in range(p_embedding_num)]
-    p_token_ids = tokenizer.convert_tokens_to_ids(p_tokens)
-
-    # Step3: Insert "[MASK]" to src_ids based on start_mask_position
-    src_ids = src_ids[0:start_mask_position] + mask_ids + src_ids[start_mask_position:]
-
-    # Stpe4: Insert P-tokens at begin of sentence
-    src_ids = p_token_ids + src_ids
-
-    # calculate mask_positions
-    mask_positions = [index + start_mask_position + len(p_token_ids) for index in range(label_length)]
-
-    token_type_ids = [0] * len(src_ids)
-
-    assert len(src_ids) == len(token_type_ids), "length src_ids, token_type_ids must be equal"
-
-    if is_test:
-        return src_ids, token_type_ids, mask_positions, candidate_labels_ids
-    else:
-        mask_lm_labels = tokenizer(text=text_label, max_seq_len=max_seq_length)["input_ids"][1:-1]
-
-        assert (
-            len(mask_lm_labels) == len(mask_positions) == label_length
-        ), "length of mask_lm_labels:{} mask_positions:{} label_length:{} not equal".format(
-            mask_lm_labels, mask_positions, text_label
-        )
-
-        return src_ids, token_type_ids, mask_positions, mask_lm_labels, candidate_labels_ids
+    data_ds = MapDataset([x for x in data_ds] + aug_data)
+    return data_ds
 
 
-def transform_iflytek(example, label_normalize_dict=None, is_test=False):
+def convert_chid(data_ds):
+    """
+    Insert idioms into positions of `#idiom#` so that the task is converted
+    to binary classification.
+    """
+    split_data_ds = []
+    for example in data_ds:
+        fragments = example["content"].split("#idiom#")
+        label = example.get("answer", None)
+        for index, cand in enumerate(example["candidates"]):
+            new_example = {"content_pre": fragments[0], "content_post": fragments[1], "idiom": cand}
+            if label is not None:
+                new_example["label"] = str(int(index == label))
+            split_data_ds.append(new_example)
+    return MapDataset(split_data_ds)
 
-    if is_test:
-        # When do_test, set label_length field to point
-        # where to insert [MASK] id
-        example["label_length"] = 2
-        example["sentence1"] = example["sentence"]
-        del example["sentence"]
 
-        return example
-    else:
-        origin_label = example["label_des"]
+def convert_csl(data_ds):
+    """
+    Concatanate keywords and it can be replaced by keyword `options` in develop versioin.
+    """
+    concat_data_ds = []
+    for example in data_ds:
+        example["keyword"] = "，".join(example["keyword"])
+        concat_data_ds.append(example)
+    return MapDataset(concat_data_ds)
 
-        # Normalize some of the labels, eg. English -> Chinese
-        if origin_label in label_normalize_dict:
-            example["label_des"] = label_normalize_dict[origin_label]
+
+def convert_cluewsc(data_ds):
+    """
+    Mark the pronoun and entity with special tokens.
+    """
+    marked_data_ds = []
+    for example in data_ds:
+        target, text = example["target"], list(example["text"])
+        pronoun, p_index = target["span2_text"], target["span2_index"]
+        entity, e_index = target["span1_text"], target["span1_index"]
+        label = example.get("label", None)
+        if p_index > e_index:
+            text.insert(p_index, "_")
+            text.insert(p_index + len(pronoun) + 1, "_")
+            text.insert(e_index, "[")
+            text.insert(e_index + len(entity) + 1, "]")
         else:
-            # Note: Ideal way is drop these examples
-            # which maybe need to change MapDataset
-            # Now hard code may hurt performance of `iflytek` dataset
-            example["label_des"] = "旅游"
-
-        example["text_label"] = example["label_des"]
-        example["sentence1"] = example["sentence"]
-
-        del example["sentence"]
-        del example["label_des"]
-
-        return example
+            text.insert(e_index, "[")
+            text.insert(e_index + len(entity) + 1, "]")
+            text.insert(p_index, "_")
+            text.insert(p_index + len(pronoun) + 1, "_")
+        new_example = {"text": "".join(text), "pronoun": pronoun, "entity": entity}
+        if label is not None:
+            new_example["label"] = label
+        marked_data_ds.append(new_example)
+    return MapDataset(marked_data_ds)
 
 
-def transform_tnews(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        example["sentence1"] = example["sentence"]
-        del example["sentence"]
-        return example
+def convert_labels_to_ids(example, orig_key, labels_to_ids, pop_keys=None):
+    """
+    Convert the keyword in datasets to `labels`.
+    """
+    if orig_key in example:
+        example["label_ids"] = labels_to_ids[example.pop(orig_key)]
+    if pop_keys is not None:
+        for key in pop_keys:
+            if key in example:
+                example.pop(key)
+    return example
+
+
+def convert_ids_to_words(example, token_ids):
+    """
+    Convert label id to the first word in mapping from labels to words,
+    the length of which should coincide with that of `mask` in prompt.
+    """
+    if "label_ids" in example:
+        labels = paddle.index_select(token_ids, paddle.to_tensor(example.pop("label_ids")), axis=0).squeeze(0)
+        example["labels"] = labels
+    return example
+
+
+def load_fewclue_dataset(args, verbalizer, example_keys=None):
+    """
+    Load fewclue datasets and convert them to the standard format of PET.
+    """
+    split_id = args.split_id
+    splits = [f"train_{split_id}", f"dev_{split_id}", "test_public", "test"]
+    if args.task_name == "cluewsc":
+        train_ds, dev_ds, public_test_ds, test_ds = load_dataset("fewclue", name=args.task_name, splits=splits)
+        unlabeled_ds = None
     else:
-        origin_label = example["label_desc"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example["label_desc"] = label_normalize_dict[origin_label]
+        splits.append("unlabeled")
+        train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds = load_dataset(
+            "fewclue", name=args.task_name, splits=splits
+        )
+    data_ds = [train_ds, dev_ds, public_test_ds, test_ds, unlabeled_ds]
 
-        example["sentence1"] = example["sentence"]
-        example["text_label"] = example["label_desc"]
+    # Preprocess data for mask prediction task.
+    if args.task_name == "chid":
+        for index, sub_data_ds in enumerate(data_ds):
+            data_ds[index] = convert_chid(sub_data_ds)
+    elif args.task_name == "cluewsc":
+        for index, sub_data_ds in enumerate(data_ds[:-1]):
+            data_ds[index] = convert_cluewsc(sub_data_ds)
+    elif args.task_name == "csl":
+        for index, sub_data_ds in enumerate(data_ds):
+            data_ds[index] = convert_csl(sub_data_ds)
+    orig_key = "label"
+    pop_keys = ["id"]
+    if args.task_name == "tnews":
+        orig_key = "label_desc"
+        pop_keys = ["keywords", "label", "id"]
+    elif args.task_name == "iflytek":
+        orig_key = "label_des"
+        pop_keys = ["id", "label"]
+    elif args.task_name == "ocnli":
+        pop_keys = ["level", "label0", "label1", "label2", "label3", "label4", "genre", "prem_id", "id"]
+    convert_label = partial(
+        convert_labels_to_ids, orig_key=orig_key, labels_to_ids=verbalizer.labels_to_ids, pop_keys=pop_keys
+    )
+    for index, sub_data_ds in enumerate(data_ds):
+        if sub_data_ds is not None:
+            data_ds[index] = sub_data_ds.map(convert_label)
 
-        del example["sentence"]
-        del example["label_desc"]
+    # Extend train dataset with data augmentation and pseudo-label data.
+    data_ds[0] = extend_with_data_augment(
+        data_ds[0], args.augment_type, args.num_augment, args.word_augment_percent, args.augment_method, example_keys
+    )
+    data_ds[0] = extend_with_pseudo_data(data_ds[0], args.pseudo_data_path, verbalizer.labels_to_ids)
 
-        return example
+    dev_labels = [x["label_ids"] for x in data_ds[1]]
+    test_labels = [x["label_ids"] for x in data_ds[2]]
 
+    convert_fn = partial(convert_ids_to_words, token_ids=verbalizer.token_ids[:, 0, :])
+    data_ds[:3] = [x.map(convert_fn) for x in data_ds[:3]]
 
-def transform_eprstmt(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        example["sentence1"] = example["sentence"]
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example["text_label"] = label_normalize_dict[origin_label]
-        example["sentence1"] = example["sentence"]
-
-        del example["sentence"]
-        del example["label"]
-
-        return example
-
-
-def transform_ocnli(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example["text_label"] = label_normalize_dict[origin_label]
-
-        del example["label"]
-
-        return example
-
-
-def transform_csl(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 1
-        example["sentence1"] = "本文的关键词是:" + "，".join(example["keyword"]) + example["abst"]
-
-        del example["abst"]
-        del example["keyword"]
-
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example["text_label"] = label_normalize_dict[origin_label]
-
-        example["sentence1"] = "本文的关键词是:" + "，".join(example["keyword"]) + example["abst"]
-
-        del example["label"]
-        del example["abst"]
-        del example["keyword"]
-
-        return example
-
-
-def transform_csldcp(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        example["sentence1"] = example["content"]
-        del example["content"]
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        normalized_label = label_normalize_dict[origin_label]
-        example["text_label"] = normalized_label
-        example["sentence1"] = example["content"]
-
-        del example["label"]
-        del example["content"]
-
-        return example
-
-
-def transform_bustm(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        # Label: ["很"， "不"]
-        example["label_length"] = 1
-        return example
-    else:
-        origin_label = str(example["label"])
-
-        # Normalize some of the labels, eg. English -> Chinese
-        example["text_label"] = label_normalize_dict[origin_label]
-
-        del example["label"]
-
-        return example
-
-
-def transform_chid(example, label_normalize_dict=None, is_test=False):
-
-    if is_test:
-        example["label_length"] = 4
-        example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        del example["content"]
-
-        return example
-    else:
-        label_index = int(example["answer"])
-        candidates = example["candidates"]
-        example["text_label"] = candidates[label_index]
-
-        # Note: `#idom#` represent a idom which must be replaced with rarely-used Chinese characters
-        # to get the label's position after the text processed by tokenizer
-        example["sentence1"] = example["content"].replace("#idiom#", "淠")
-        del example["content"]
-
-        return example
-
-
-def transform_cluewsc(example, label_normalize_dict=None, is_test=False):
-    if is_test:
-        example["label_length"] = 2
-        text = example["text"]
-        span1_text = example["target"]["span1_text"]
-        span2_text = example["target"]["span2_text"]
-        example["sentence1"] = text + span2_text + "指代" + span1_text
-
-        del example["text"]
-        del example["target"]
-
-        return example
-    else:
-        origin_label = example["label"]
-        # Normalize some of the labels, eg. English -> Chinese
-        example["text_label"] = label_normalize_dict[origin_label]
-
-        text = example["text"]
-        span1_text = example["target"]["span1_text"]
-        span2_text = example["target"]["span2_text"]
-        example["sentence1"] = text + span2_text + "指代" + span1_text
-
-        del example["label"]
-        del example["text"]
-        del example["target"]
-
-        return example
-
-
-transform_fn_dict = {
-    "iflytek": transform_iflytek,
-    "tnews": transform_tnews,
-    "eprstmt": transform_eprstmt,
-    "bustm": transform_bustm,
-    "ocnli": transform_ocnli,
-    "csl": transform_csl,
-    "csldcp": transform_csldcp,
-    "cluewsc": transform_cluewsc,
-    "chid": transform_chid,
-}
+    return data_ds, (dev_labels, test_labels)
