@@ -32,26 +32,27 @@ NEG_INF = -1e4
 
 
 class BertConfig:
-
-    def __init__(self,
-                 vocab_size: int = 30522,
-                 hidden_size: int = 768,
-                 num_hidden_layers: int = 12,
-                 num_attention_heads: int = 12,
-                 intermediate_size: int = 3072,
-                 hidden_act: str = "gelu",
-                 hidden_dropout_prob: float = 0.1,
-                 attention_probs_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: int = 2,
-                 initializer_range: float = 0.02,
-                 pad_token_id: int = 0,
-                 pool_act: str = "tanh",
-                 layer_norm_eps: float = 1e-12,
-                 output_attentions: bool = False,
-                 output_hidden_states: bool = False,
-                 num_labels=2,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size: int = 30522,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "gelu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 2,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+        pool_act: str = "tanh",
+        layer_norm_eps: float = 1e-12,
+        output_attentions: bool = False,
+        output_hidden_states: bool = False,
+        num_labels=2,
+        **kwargs
+    ):
         self.pad_token_id = pad_token_id
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -76,21 +77,14 @@ class BertEmbeddings(nn.Module):
 
     def __init__(self, config):
         super().__init__()
-        self.word_embeddings = nn.Embedding(config.vocab_size,
-                                            config.hidden_size,
-                                            padding_idx=config.pad_token_id)
-        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
-                                                config.hidden_size)
-        self.token_type_embeddings = nn.Embedding(config.type_vocab_size,
-                                                  config.hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
 
-        self.LayerNorm = nn.LayerNorm(config.hidden_size,
-                                      eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer(
-            "position_ids",
-            torch.arange(config.max_position_embeddings).expand((1, -1)))
+        self.register_buffer("position_ids", torch.arange(config.max_position_embeddings).expand((1, -1)))
 
     def forward(
         self,
@@ -105,9 +99,7 @@ class BertEmbeddings(nn.Module):
             position_ids = self.position_ids[:, :seq_length]
 
         if token_type_ids is None:
-            token_type_ids = torch.zeros(input_shape,
-                                         dtype=torch.long,
-                                         device=self.position_ids.device)
+            token_type_ids = torch.zeros(input_shape, dtype=torch.long, device=self.position_ids.device)
 
         inputs_embeds = self.word_embeddings(input_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
@@ -119,7 +111,6 @@ class BertEmbeddings(nn.Module):
 
 
 class BertSelfAttention(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.num_attention_heads = config.num_attention_heads
@@ -133,8 +124,7 @@ class BertSelfAttention(nn.Module):
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
     def transpose_for_scores(self, x: torch.Tensor) -> torch.Tensor:
-        new_x_shape = x.size()[:-1] + (self.num_attention_heads,
-                                       self.attention_head_size)
+        new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
         x = x.view(new_x_shape)
         return x.permute(0, 2, 1, 3)
 
@@ -151,11 +141,9 @@ class BertSelfAttention(nn.Module):
         value_layer = self.transpose_for_scores(self.value(hidden_states))
 
         # Take the dot product between "query" and "key" to get the raw attention scores.
-        attention_scores = torch.matmul(query_layer,
-                                        key_layer.transpose(-1, -2))
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
 
-        attention_scores = attention_scores / math.sqrt(
-            self.attention_head_size)
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
 
@@ -166,27 +154,22 @@ class BertSelfAttention(nn.Module):
         context_layer = torch.matmul(attention_probs, value_layer)
 
         context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
-        new_context_layer_shape = context_layer.size()[:-2] + (
-            self.all_head_size, )
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
         context_layer = context_layer.view(new_context_layer_shape)
 
-        outputs = (context_layer,
-                   attention_probs) if output_attentions else (context_layer, )
+        outputs = (context_layer, attention_probs) if output_attentions else (context_layer,)
 
         return outputs
 
 
 class BertSelfOutput(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
-        self.LayerNorm = nn.LayerNorm(config.hidden_size,
-                                      eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states: torch.Tensor,
-                input_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, input_tensor: torch.Tensor) -> torch.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -194,7 +177,6 @@ class BertSelfOutput(nn.Module):
 
 
 class BertAttention(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.self = BertSelfAttention(config)
@@ -212,13 +194,11 @@ class BertAttention(nn.Module):
             output_attentions,
         )
         attention_output = self.output(self_outputs[0], hidden_states)
-        outputs = (attention_output,
-                   ) + self_outputs[1:]  # add attentions if we output them
+        outputs = (attention_output,) + self_outputs[1:]  # add attentions if we output them
         return outputs
 
 
 class BertIntermediate(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.intermediate_size)
@@ -234,16 +214,13 @@ class BertIntermediate(nn.Module):
 
 
 class BertOutput(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.intermediate_size, config.hidden_size)
-        self.LayerNorm = nn.LayerNorm(config.hidden_size,
-                                      eps=config.layer_norm_eps)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-    def forward(self, hidden_states: torch.Tensor,
-                input_tensor: torch.Tensor) -> torch.Tensor:
+    def forward(self, hidden_states: torch.Tensor, input_tensor: torch.Tensor) -> torch.Tensor:
         hidden_states = self.dense(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -251,7 +228,6 @@ class BertOutput(nn.Module):
 
 
 class BertLayer(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.seq_len_dim = 1
@@ -273,25 +249,22 @@ class BertLayer(nn.Module):
         )
         attention_output = self_attention_outputs[0]
 
-        outputs = self_attention_outputs[
-            1:]  # add self attentions if we output attention weights
+        outputs = self_attention_outputs[1:]  # add self attentions if we output attention weights
 
         # ffn
         intermediate_output = self.intermediate(attention_output)
         layer_output = self.output(intermediate_output, attention_output)
 
-        outputs = (layer_output, ) + outputs
+        outputs = (layer_output,) + outputs
 
         return outputs
 
 
 class BertEncoder(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.config = config
-        self.layer = nn.ModuleList(
-            [BertLayer(config) for _ in range(config.num_hidden_layers)])
+        self.layer = nn.ModuleList([BertLayer(config) for _ in range(config.num_hidden_layers)])
 
     def forward(
         self,
@@ -306,7 +279,7 @@ class BertEncoder(nn.Module):
         for layer_module in self.layer:
             # add hidden_states
             if output_hidden_states:
-                all_hidden_states = all_hidden_states + (hidden_states, )
+                all_hidden_states = all_hidden_states + (hidden_states,)
 
             layer_outputs = layer_module(
                 hidden_states,
@@ -317,20 +290,23 @@ class BertEncoder(nn.Module):
 
             # add self attn
             if output_attentions:
-                all_self_attentions = all_self_attentions + (layer_outputs[1], )
+                all_self_attentions = all_self_attentions + (layer_outputs[1],)
 
         if output_hidden_states:
-            all_hidden_states = all_hidden_states + (hidden_states, )
+            all_hidden_states = all_hidden_states + (hidden_states,)
 
-        return tuple(v for v in [
-            hidden_states,
-            all_hidden_states,
-            all_self_attentions,
-        ] if v is not None)
+        return tuple(
+            v
+            for v in [
+                hidden_states,
+                all_hidden_states,
+                all_self_attentions,
+            ]
+            if v is not None
+        )
 
 
 class BertPooler(nn.Module):
-
     def __init__(self, config):
         super().__init__()
         self.dense = nn.Linear(config.hidden_size, config.hidden_size)
@@ -344,19 +320,16 @@ class BertPooler(nn.Module):
 
 
 class BertPreTrainedModel(nn.Module):
-
     def _init_weights(self, module):
         """Initialize the weights"""
         if isinstance(module, nn.Linear):
             # Slightly different from the TF version which uses truncated_normal for initialization
             # cf https://github.com/pytorch/pytorch/pull/5617
-            module.weight.data.normal_(mean=0.0,
-                                       std=self.config.initializer_range)
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
             if module.bias is not None:
                 module.bias.data.zero_()
         elif isinstance(module, nn.Embedding):
-            module.weight.data.normal_(mean=0.0,
-                                       std=self.config.initializer_range)
+            module.weight.data.normal_(mean=0.0, std=self.config.initializer_range)
             if module.padding_idx is not None:
                 module.weight.data[module.padding_idx].zero_()
         elif isinstance(module, nn.LayerNorm):
@@ -365,7 +338,6 @@ class BertPreTrainedModel(nn.Module):
 
 
 class BertModel(BertPreTrainedModel):
-
     def __init__(self, config, add_pooling_layer=True):
         super().__init__()
         self.config = config
@@ -386,16 +358,14 @@ class BertModel(BertPreTrainedModel):
         output_hidden_states: Optional[bool] = None,
     ) -> Tuple[torch.Tensor]:
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (output_hidden_states
-                                if output_hidden_states is not None else
-                                self.config.output_hidden_states)
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
 
         device = input_ids.device
 
         if token_type_ids is None:
-            token_type_ids = torch.zeros(input_ids.shape,
-                                         dtype=torch.long,
-                                         device=device)
+            token_type_ids = torch.zeros(input_ids.shape, dtype=torch.long, device=device)
 
         if attention_mask is not None:
             attention_mask = (1.0 - attention_mask[:, :, None, None]) * NEG_INF
@@ -411,14 +381,12 @@ class BertModel(BertPreTrainedModel):
             output_hidden_states=output_hidden_states,
         )
         sequence_output = encoder_outputs[0]
-        pooled_output = self.pooler(
-            sequence_output) if self.pooler is not None else None
+        pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
 
         return (sequence_output, pooled_output) + encoder_outputs[1:]
 
 
 class BertForSequenceClassification(BertPreTrainedModel):
-
     def __init__(self, config):
         super().__init__()
         self.num_labels = config.num_labels
@@ -452,5 +420,5 @@ class BertForSequenceClassification(BertPreTrainedModel):
         pooled_output = outputs[1]
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
-        output = (logits, ) + outputs[2:]
+        output = (logits,) + outputs[2:]
         return output

@@ -16,11 +16,13 @@
 Import utilities: Utilities related to imports and our lazy inits.
 """
 import importlib.util
+import operator as op
 import os
 import sys
 from collections import OrderedDict
+from typing import Union
 
-from packaging import version
+from packaging.version import Version, parse
 
 from . import logging
 
@@ -37,12 +39,15 @@ ENV_VARS_TRUE_AND_AUTO_VALUES = ENV_VARS_TRUE_VALUES.union({"AUTO"})
 
 USE_PADDLE = os.environ.get("USE_PADDLE", "AUTO").upper()
 
+STR_OPERATION_TO_FUNC = {">": op.gt, ">=": op.ge, "==": op.eq, "!=": op.ne, "<=": op.le, "<": op.lt}
+
 _paddle_version = "N/A"
 if USE_PADDLE in ENV_VARS_TRUE_AND_AUTO_VALUES:
     _paddle_available = importlib.util.find_spec("paddle") is not None
     if _paddle_available:
         try:
             import paddle
+
             _paddle_version = paddle.__version__
             logger.info(f"Paddle version {_paddle_version} available.")
         except importlib_metadata.PackageNotFoundError:
@@ -54,8 +59,7 @@ else:
 _paddlenlp_available = importlib.util.find_spec("paddlenlp") is not None
 try:
     _paddlenlp_version = importlib_metadata.version("paddlenlp")
-    logger.debug(
-        f"Successfully imported paddlenlp version {_paddlenlp_version}")
+    logger.debug(f"Successfully imported paddlenlp version {_paddlenlp_version}")
 except importlib_metadata.PackageNotFoundError:
     _paddlenlp_available = False
 
@@ -69,23 +73,27 @@ except importlib_metadata.PackageNotFoundError:
 _unidecode_available = importlib.util.find_spec("unidecode") is not None
 try:
     _unidecode_version = importlib_metadata.version("unidecode")
-    logger.debug(
-        f"Successfully imported unidecode version {_unidecode_version}")
+    logger.debug(f"Successfully imported unidecode version {_unidecode_version}")
 except importlib_metadata.PackageNotFoundError:
     _unidecode_available = False
 
 _modelcards_available = importlib.util.find_spec("modelcards") is not None
 try:
     _modelcards_version = importlib_metadata.version("modelcards")
-    logger.debug(
-        f"Successfully imported modelcards version {_modelcards_version}")
+    logger.debug(f"Successfully imported modelcards version {_modelcards_version}")
 except importlib_metadata.PackageNotFoundError:
     _modelcards_available = False
 
+_onnxruntime_version = "N/A"
 _onnx_available = importlib.util.find_spec("onnxruntime") is not None
 if _onnx_available:
-    candidates = ("onnxruntime", "onnxruntime-gpu", "onnxruntime-directml",
-                  "onnxruntime-openvino")
+    candidates = (
+        "onnxruntime",
+        "onnxruntime-gpu",
+        "onnxruntime-directml",
+        "onnxruntime-openvino",
+        "ort_nightly_directml",
+    )
     _onnxruntime_version = None
     # For the metadata, we have to look for both onnxruntime and onnxruntime-gpu
     for pkg in candidates:
@@ -96,8 +104,7 @@ if _onnx_available:
             pass
     _onnx_available = _onnxruntime_version is not None
     if _onnx_available:
-        logger.debug(
-            f"Successfully imported onnxruntime version {_onnxruntime_version}")
+        logger.debug(f"Successfully imported onnxruntime version {_onnxruntime_version}")
 
 _scipy_available = importlib.util.find_spec("scipy") is not None
 try:
@@ -119,8 +126,7 @@ if _fastdeploy_available:
             pass
     _fastdeploy_available = _fastdeploy_version is not None
     if _fastdeploy_available:
-        logger.debug(
-            f"Successfully imported fastdeploy version {_fastdeploy_version}")
+        logger.debug(f"Successfully imported fastdeploy version {_fastdeploy_version}")
 
 
 def is_paddle_available():
@@ -156,6 +162,12 @@ def is_fastdeploy_available():
 
 
 # docstyle-ignore
+FASTDEPLOY_IMPORT_ERROR = """
+{0} requires the fastdeploy library but it was not found in your environment. You can install it with pip: `pip install
+fastdeploy-gpu-python -f https://www.paddlepaddle.org.cn/whl/fastdeploy.html`
+"""
+
+# docstyle-ignore
 INFLECT_IMPORT_ERROR = """
 {0} requires the inflect library but it was not found in your environment. You can install it with pip: `pip install
 inflect`
@@ -166,6 +178,7 @@ PADDLE_IMPORT_ERROR = """
 {0} requires the Paddle library but it was not found in your environment. Checkout the instructions on the
 installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment.
 """
+
 # docstyle-ignore
 ONNX_IMPORT_ERROR = """
 {0} requires the onnxruntime library but it was not found in your environment. You can install it with pip: `pip
@@ -190,14 +203,17 @@ UNIDECODE_IMPORT_ERROR = """
 Unidecode`
 """
 
-BACKENDS_MAPPING = OrderedDict([
-    ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
-    ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
-    ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
-    ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
-    ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
-    ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
-])
+BACKENDS_MAPPING = OrderedDict(
+    [
+        ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
+        ("inflect", (is_inflect_available, INFLECT_IMPORT_ERROR)),
+        ("onnx", (is_onnx_available, ONNX_IMPORT_ERROR)),
+        ("scipy", (is_scipy_available, SCIPY_IMPORT_ERROR)),
+        ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
+        ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
+        ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
+    ]
+)
 
 
 def requires_backends(obj, backends):
@@ -221,3 +237,36 @@ class DummyObject(type):
         if key.startswith("_"):
             return super().__getattr__(cls, key)
         requires_backends(cls, cls._backends)
+
+
+# This function was copied from: https://github.com/huggingface/accelerate/blob/874c4967d94badd24f893064cc3bef45f57cadf7/src/accelerate/utils/versions.py#L319
+def compare_versions(library_or_version: Union[str, Version], operation: str, requirement_version: str):
+    """
+    Args:
+    Compares a library version to some requirement using a given operation.
+        library_or_version (`str` or `packaging.version.Version`):
+            A library name or a version to check.
+        operation (`str`):
+            A string representation of an operator, such as `">"` or `"<="`.
+        requirement_version (`str`):
+            The version to compare the library version against
+    """
+    if operation not in STR_OPERATION_TO_FUNC.keys():
+        raise ValueError(f"`operation` must be one of {list(STR_OPERATION_TO_FUNC.keys())}, received {operation}")
+    operation = STR_OPERATION_TO_FUNC[operation]
+    if isinstance(library_or_version, str):
+        library_or_version = parse(importlib_metadata.version(library_or_version))
+    return operation(library_or_version, parse(requirement_version))
+
+
+# This function was copied from: https://github.com/huggingface/accelerate/blob/874c4967d94badd24f893064cc3bef45f57cadf7/src/accelerate/utils/versions.py#L338
+def is_paddle_version(operation: str, version: str):
+    """
+    Args:
+    Compares the current Paddle version to a given reference with an operation.
+        operation (`str`):
+            A string representation of an operator, such as `">"` or `"<="`
+        version (`str`):
+            A string version of Paddle
+    """
+    return compare_versions(parse(_paddle_version), operation, version)

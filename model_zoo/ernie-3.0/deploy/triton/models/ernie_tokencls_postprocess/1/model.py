@@ -44,7 +44,7 @@ class TritonPythonModel:
           * model_version: Model version
           * model_name: Model name
         """
-        self.model_config = model_config = json.loads(args['model_config'])
+        self.model_config = model_config = json.loads(args["model_config"])
         print("model_config:", self.model_config)
 
         self.input_names = []
@@ -60,9 +60,7 @@ class TritonPythonModel:
             self.output_dtype.append(dtype)
         print("output:", self.output_names)
         # The label names of NER models trained by different data sets may be different
-        self.label_names = [
-            'O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'
-        ]
+        self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]
 
     def execute(self, requests):
         """`execute` must be implemented in every Python model. `execute`
@@ -86,8 +84,7 @@ class TritonPythonModel:
         responses = []
         # print("num:", len(requests), flush=True)
         for request in requests:
-            data = pb_utils.get_input_tensor_by_name(request,
-                                                     self.input_names[0])
+            data = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
             data = data.as_numpy()
             # print("post data:", data)
             tokens_label = data.argmax(axis=-1).tolist()
@@ -98,25 +95,31 @@ class TritonPythonModel:
                 items = []
                 for i, label in enumerate(token_label):
                     if self.label_names[label] == "O" and start >= 0:
-                        items.append({
-                            "pos": [start, i - 2],
-                            "label": label_name,
-                        })
+                        items.append(
+                            {
+                                "pos": [start, i - 2],
+                                "label": label_name,
+                            }
+                        )
                         start = -1
                     elif "B-" in self.label_names[label]:
                         start = i - 1
                         label_name = self.label_names[label][2:]
                 if start >= 0:
-                    items.append({
-                        "pos": [start, len(token_label) - 1],
-                        "label": label_name,
-                    })
+                    items.append(
+                        {
+                            "pos": [start, len(token_label) - 1],
+                            "label": label_name,
+                        }
+                    )
                 value.append(items)
-            out_result = np.array(value, dtype='object')
+            out_result = np.array(value, dtype="object")
             out_tensor = pb_utils.Tensor(self.output_names[0], out_result)
-            inference_response = pb_utils.InferenceResponse(output_tensors=[
-                out_tensor,
-            ])
+            inference_response = pb_utils.InferenceResponse(
+                output_tensors=[
+                    out_tensor,
+                ]
+            )
             responses.append(inference_response)
         return responses
 
@@ -125,4 +128,4 @@ class TritonPythonModel:
         Implementing `finalize` function is optional. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        print('Cleaning up...')
+        print("Cleaning up...")

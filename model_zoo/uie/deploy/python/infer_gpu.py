@@ -36,25 +36,17 @@ def parse_args():
     )
     parser.add_argument(
         "--use_fp16",
-        action='store_true',
-        help=
-        "Whether to use fp16 inference, only takes effect when deploying on gpu.",
+        action="store_true",
+        help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
     )
     parser.add_argument(
         "--max_seq_len",
         default=512,
         type=int,
-        help=
-        "The maximum input sequence length. Sequences longer than this will be split automatically.",
+        help="The maximum input sequence length. Sequences longer than this will be split automatically.",
     )
-    parser.add_argument("--batch_size",
-                        default=4,
-                        type=int,
-                        help="Batch size per GPU for inference.")
-    parser.add_argument("--device_id",
-                        default=0,
-                        type=int,
-                        help="The GPU device ID.")
+    parser.add_argument("--batch_size", default=4, type=int, help="Batch size per GPU for inference.")
+    parser.add_argument("--device_id", default=0, type=int, help="The GPU device ID.")
     args = parser.parse_args()
     return args
 
@@ -64,12 +56,12 @@ def main():
 
     texts = [
         '"北京市海淀区人民法院\n民事判决书\n(199x)建初字第xxx号\n原告：张三。\n委托代理人李四，北京市 A律师事务所律师。\n被告：B公司，法定代表人王五，开发公司总经理。\n委托代理人赵六，北京市 C律师事务所律师。"',
-        '原告赵六，2022年5月29日生\n委托代理人孙七，深圳市C律师事务所律师。\n被告周八，1990年7月28日出生\n委托代理人吴九，山东D律师事务所律师'
+        "原告赵六，2022年5月29日生\n委托代理人孙七，深圳市C律师事务所律师。\n被告周八，1990年7月28日出生\n委托代理人吴九，山东D律师事务所律师",
     ]
-    schema1 = ['法院', {'原告': '委托代理人'}, {'被告': '委托代理人'}]
-    schema2 = [{'原告': ['出生日期', '委托代理人']}, {'被告': ['出生日期', '委托代理人']}]
+    schema1 = ["法院", {"原告": "委托代理人"}, {"被告": "委托代理人"}]
+    schema2 = [{"原告": ["出生日期", "委托代理人"]}, {"被告": ["出生日期", "委托代理人"]}]
 
-    args.device = 'gpu'
+    args.device = "gpu"
     args.schema = schema1
     predictor = UIEPredictor(args)
 

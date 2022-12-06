@@ -31,7 +31,7 @@ from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenize
 from paddlenlp.metrics import ChunkEvaluator
 from utils import read_by_lines, write_by_lines, load_dict
 
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)

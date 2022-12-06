@@ -28,10 +28,7 @@ args = parser.parse_args()
 
 
 def infer(text_prompt, top_k_images, Size, style):
-    results, raw_json = text_to_image_search(text_prompt,
-                                             resolution=Size,
-                                             top_k_images=top_k_images,
-                                             style=style)
+    results, raw_json = text_to_image_search(text_prompt, resolution=Size, top_k_images=top_k_images, style=style)
     return results
 
 
@@ -44,7 +41,7 @@ def main():
                 with gr.Row().style(mobile_collapse=False, equal_height=True):
                     text_prompt = gr.Textbox(
                         label="Enter your prompt",
-                        value='宁静的小镇',
+                        value="宁静的小镇",
                         show_label=False,
                         max_lines=1,
                         placeholder="Enter your prompt",
@@ -57,38 +54,41 @@ def main():
                         margin=False,
                         rounded=(False, True, True, False),
                     )
-            gallery = gr.Gallery(label="Generated images",
-                                 show_label=False,
-                                 elem_id="gallery").style(grid=[2],
-                                                          height="auto")
+            gallery = gr.Gallery(label="Generated images", show_label=False, elem_id="gallery").style(
+                grid=[2], height="auto"
+            )
 
-            advanced_button = gr.Button("Advanced options",
-                                        elem_id="advanced-btn")
+            advanced_button = gr.Button("Advanced options", elem_id="advanced-btn")
 
             with gr.Row(elem_id="advanced-options"):
-                top_k_images = gr.Slider(label="Images",
-                                         minimum=1,
-                                         maximum=50,
-                                         value=5,
-                                         step=1)
-                style = gr.Radio(label='Style',
-                                 value='古风',
-                                 choices=[
-                                     '古风', '油画', '卡通画', '二次元', "水彩画", "浮世绘",
-                                     "蒸汽波艺术", "low poly", "像素风格", "概念艺术",
-                                     "未来主义", "赛博朋克", "写实风格", "洛丽塔风格", "巴洛克风格",
-                                     "超现实主义", "探索无限"
-                                 ])
-                Size = gr.Radio(label='Size',
-                                value='1024*1024',
-                                choices=['1024*1024', '1024*1536', '1536*1024'])
+                top_k_images = gr.Slider(label="Images", minimum=1, maximum=50, value=5, step=1)
+                style = gr.Radio(
+                    label="Style",
+                    value="古风",
+                    choices=[
+                        "古风",
+                        "油画",
+                        "卡通画",
+                        "二次元",
+                        "水彩画",
+                        "浮世绘",
+                        "蒸汽波艺术",
+                        "low poly",
+                        "像素风格",
+                        "概念艺术",
+                        "未来主义",
+                        "赛博朋克",
+                        "写实风格",
+                        "洛丽塔风格",
+                        "巴洛克风格",
+                        "超现实主义",
+                        "探索无限",
+                    ],
+                )
+                Size = gr.Radio(label="Size", value="1024*1024", choices=["1024*1024", "1024*1536", "1536*1024"])
 
-            text_prompt.submit(infer,
-                               inputs=[text_prompt, top_k_images, Size, style],
-                               outputs=gallery)
-            btn.click(infer,
-                      inputs=[text_prompt, top_k_images, Size, style],
-                      outputs=gallery)
+            text_prompt.submit(infer, inputs=[text_prompt, top_k_images, Size, style], outputs=gallery)
+            btn.click(infer, inputs=[text_prompt, top_k_images, Size, style], outputs=gallery)
             advanced_button.click(
                 None,
                 [],
@@ -99,6 +99,4 @@ def main():
 
 if __name__ == "__main__":
     block = main()
-    block.launch(server_name='0.0.0.0',
-                 server_port=args.serving_port,
-                 share=False)
+    block.launch(server_name="0.0.0.0", server_port=args.serving_port, share=False)

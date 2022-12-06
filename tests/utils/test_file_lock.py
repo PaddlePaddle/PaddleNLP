@@ -36,11 +36,10 @@ def time_lock(lock_file: str) -> datetime:
 
 
 class TestFileLock(unittest.TestCase):
-
     def test_time_lock(self):
         """lock the time"""
         with TemporaryDirectory() as tempdir:
-            lock_file = os.path.join(tempdir, 'download.lock')
+            lock_file = os.path.join(tempdir, "download.lock")
             pre_time, seconds = datetime.now(), 0
 
             with Pool(4) as pool:
@@ -52,5 +51,4 @@ class TestFileLock(unittest.TestCase):
                     if pre_time is None:
                         pre_time = current_time
                     else:
-                        self.assertGreater((current_time - pre_time).seconds,
-                                           1 - 1e-3)
+                        self.assertGreater((current_time - pre_time).seconds, 1 - 1e-3)

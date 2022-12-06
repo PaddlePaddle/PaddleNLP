@@ -21,27 +21,28 @@ from fast_tokenizer.postprocessors import BertPostProcessor
 from fast_tokenizer import decoders
 from fast_tokenizer import Tokenizer
 
-__all__ = ['ErnieFastTokenizer']
+__all__ = ["ErnieFastTokenizer"]
 
 
 class ErnieFastTokenizer(BaseFastTokenizer):
-
-    def __init__(self,
-                 vocab=None,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 cls_token="[CLS]",
-                 pad_token="[PAD]",
-                 mask_token="[MASK]",
-                 clean_text=True,
-                 handle_chinese_chars=True,
-                 strip_accents=True,
-                 lowercase=True,
-                 wordpieces_prefix="##",
-                 max_sequence_len=None,
-                 max_input_chars_per_word=100,
-                 use_fast_wordpiece=False,
-                 use_fast_wordpiece_with_pretokenization=False):
+    def __init__(
+        self,
+        vocab=None,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        cls_token="[CLS]",
+        pad_token="[PAD]",
+        mask_token="[MASK]",
+        clean_text=True,
+        handle_chinese_chars=True,
+        strip_accents=True,
+        lowercase=True,
+        wordpieces_prefix="##",
+        max_sequence_len=None,
+        max_input_chars_per_word=100,
+        use_fast_wordpiece=False,
+        use_fast_wordpiece_with_pretokenization=False,
+    ):
         tokenizer_model = WordPiece if not use_fast_wordpiece else FastWordPiece
         model_kwargs = {
             "unk_token": str(unk_token),
@@ -49,8 +50,7 @@ class ErnieFastTokenizer(BaseFastTokenizer):
             "max_input_chars_per_word": max_input_chars_per_word,
         }
         if use_fast_wordpiece:
-            model_kwargs[
-                "with_pretokenization"] = use_fast_wordpiece_with_pretokenization
+            model_kwargs["with_pretokenization"] = use_fast_wordpiece_with_pretokenization
         else:
             model_kwargs["handle_chinese_chars"] = handle_chinese_chars
         if vocab is not None:
@@ -73,7 +73,8 @@ class ErnieFastTokenizer(BaseFastTokenizer):
             clean_text=clean_text,
             handle_chinese_chars=handle_chinese_chars,
             strip_accents=strip_accents,
-            lowercase=lowercase)
+            lowercase=lowercase,
+        )
         if not use_fast_wordpiece or not use_fast_wordpiece_with_pretokenization:
             tokenizer.pretokenizer = BertPreTokenizer()
 
@@ -85,8 +86,7 @@ class ErnieFastTokenizer(BaseFastTokenizer):
             if cls_token_id is None:
                 raise TypeError("cls_token not found in the vocabulary")
 
-            tokenizer.postprocessor = BertPostProcessor(
-                (str(sep_token), sep_token_id), (str(cls_token), cls_token_id))
+            tokenizer.postprocessor = BertPostProcessor((str(sep_token), sep_token_id), (str(cls_token), cls_token_id))
 
         tokenizer.decoder = decoders.WordPiece(prefix=wordpieces_prefix)
         if max_sequence_len == None:

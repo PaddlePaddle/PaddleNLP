@@ -35,10 +35,9 @@ def quant_post(args):
     train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
-    trans_func = partial(convert_example_to_feature,
-                         tokenizer=tokenizer,
-                         label2id=label2id,
-                         max_seq_len=args.max_seq_len)
+    trans_func = partial(
+        convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len
+    )
     train_ds = train_ds.map(trans_func, lazy=True)
 
     def batch_generator_func():
@@ -48,8 +47,7 @@ def quant_post(args):
             batch_data[1].append(data[1])
             if len(batch_data[0]) == args.batch_size:
                 input_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[0])
-                segment_ids = Pad(axis=0, pad_val=0,
-                                  dtype="int64")(batch_data[1])
+                segment_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[1])
                 yield [input_ids, segment_ids]
                 batch_data = [[], []]
 
@@ -64,13 +62,14 @@ def quant_post(args):
         batch_generator=batch_generator_func,
         model_filename=args.input_model_filename,
         params_filename=args.input_param_filename,
-        quantizable_op_type=['matmul', 'matmul_v2'],
+        quantizable_op_type=["matmul", "matmul_v2"],
         weight_bits=8,
-        weight_quantize_type='channel_wise_abs_max',
-        batch_nums=1)
+        weight_quantize_type="channel_wise_abs_max",
+        batch_nums=1,
+    )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
     parser.add_argument("--base_model_name", type=str, default="ppminilm-6l-768h", help="The path of ppminilm model.")
@@ -92,6 +91,4 @@ if __name__ == '__main__':
     # start quantize model
     paddle.enable_static()
     quant_post(args)
-    print(
-        f"quantize model done. the quantized model has been saved to {args.quant_model_dir}"
-    )
+    print(f"quantize model done. the quantized model has been saved to {args.quant_model_dir}")

@@ -23,9 +23,9 @@ from paddlenlp.transformers.tokenizer_utils import (
     tokenize_special_chars,
 )
 
-re_eng = re.compile('[#a-zA-Z0-9]', re.U)
-re_sep = re.compile('\[[A-Z]+\]', re.U)
-re_sep_eng = re.compile('\<[\/a-z]+\>', re.U)
+re_eng = re.compile("[#a-zA-Z0-9]", re.U)
+re_sep = re.compile("\[[A-Z]+\]", re.U)
+re_sep_eng = re.compile("\<[\/a-z]+\>", re.U)
 
 bt = BasicTokenizer()
 normalize_chars = lambda x: "".join(bt.tokenize(x))
@@ -39,8 +39,7 @@ def chinese_char():
 # 日文 或 谚文字母
 def jk_vocab(c):
     c = ord(c)
-    return (c >= 0x3040 and c<= 0x33FF) or \
-              (c>= 0x1100 and c<=0x11FF)   #  谚文字母
+    return (c >= 0x3040 and c <= 0x33FF) or (c >= 0x1100 and c <= 0x11FF)  #  谚文字母
 
 
 # 特殊 TOKEN
@@ -79,8 +78,7 @@ def add_vocab(char, f):
         if _is_whitespace(k) or _is_control(k):
             continue
         if k not in final_vocab:
-            if not _is_punctuation(k) and not is_chinese_char(
-                    ord(k)) and k == tokenize_special_chars(k):
+            if not _is_punctuation(k) and not is_chinese_char(ord(k)) and k == tokenize_special_chars(k):
                 other_char.append(k)
             final_vocab.add(k)
             f.write(f"{k}\n")

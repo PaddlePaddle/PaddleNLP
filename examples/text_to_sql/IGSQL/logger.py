@@ -14,8 +14,7 @@
 """Contains the logging class."""
 
 
-class Logger():
-
+class Logger:
     def __init__(self, filename, option):
         self.fileptr = open(filename, option)
         if option == "r":
@@ -32,7 +31,7 @@ class Logger():
         """Closes the logger."""
         self.fileptr.close()
 
-    def findlast(self, identifier, default=0.):
+    def findlast(self, identifier, default=0.0):
         """Finds the last line in the log with a certain value."""
         for line in self.lines[::-1]:
             if line.lower().startswith(identifier):
