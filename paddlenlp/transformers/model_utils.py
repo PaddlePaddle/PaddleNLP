@@ -37,6 +37,7 @@ from paddlenlp.utils.downloader import (
     get_path_from_url_with_filelock,
     hf_file_exists,
     is_url,
+    url_file_exists,
 )
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
@@ -163,23 +164,21 @@ def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name:
         str: the path of config file
     """
 
-    def map_hf_config(config: Union[str, dict], _cache_dir: str) -> dict:
+    def map_hf_config(config: Union[str, dict], _cache_dir: str) -> str:
         """map the hf config to paddle config"""
         if isinstance(config, str):
             with open(config, "r", encoding="utf-8") as f:
                 config = json.load(f)
 
-        hf_config_map = {}
         if cls.config_class is not None:
-            hf_config_map = cls.config_class.hf_config_map
+            standard_config_map = cls.config_class.standard_config_map
         else:
-            hf_config_map = cls.hf_config_map
+            standard_config_map = cls.standard_config_map
 
-        for hf_key, paddle_key in hf_config_map.items():
-            config[paddle_key] = config.pop(paddle_key, None) or config.pop(hf_key, None)
+        for standard_key, paddle_key in standard_config_map.items():
+            config[paddle_key] = config.pop(paddle_key, None) or config.pop(standard_key, None)
 
-        config_file = os.path.join(_cache_dir, "model_config.json")
-
+        config_file = os.path.join(_cache_dir, "config.json")
         with open(config_file, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False)
 
@@ -187,13 +186,12 @@ def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name:
 
     # 1. if pretrained_model_name is directory
     if os.path.isdir(pretrained_model_name):
-        config_file = os.path.join(cache_dir, "model_config.json")
-        if os.path.exists(config_file):
-            return config_file
-
         config_file = os.path.join(cache_dir, "config.json")
         if os.path.exists(config_file):
-            config_file = map_hf_config(config_file, pretrained_model_name)
+            return map_hf_config(config_file, pretrained_model_name)
+
+        config_file = os.path.join(cache_dir, "model_config.json")
+        if os.path.exists(config_file):
             return config_file
 
         raise FileNotFoundError(
@@ -201,14 +199,14 @@ def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name:
         )
 
     # 2. is name, fetch from hf
-    if hf_file_exists(pretrained_model_name, "model_config.json", cache_dir=cache_dir):
-        config_file = hf_hub_download(repo_id=pretrained_model_name, filename="model_config.json", cache_dir=cache_dir)
-    else:
-        # try to load huggingface config.json file
+    if hf_file_exists(pretrained_model_name, "config.json", cache_dir=cache_dir):
         config_file = hf_hub_download(repo_id=pretrained_model_name, filename="config.json", cache_dir=cache_dir)
 
-        config_file = map_hf_config(config_file, cache_dir)
-    return config_file
+        # this method should be removed after all models config parameter has been refactored
+        return map_hf_config(config_file, cache_dir)
+
+    # try to load huggingface model_config.json file
+    return hf_hub_download(repo_id=pretrained_model_name, filename="model_config.json", cache_dir=cache_dir)
 
 
 @six.add_metaclass(InitTrackerMeta)
@@ -267,7 +265,7 @@ class PretrainedModel(Layer, GenerationMixin):
     config_class = None
 
     # map hf attribute to paddle attribute, only work for no PretrainedConfig models
-    hf_config_map: Dict[str, str] = {}
+    standard_config_map: Dict[str, str] = {}
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
     # keys we find (keys inside the model but not in the checkpoint) and avoid unnecessary warnings.
@@ -482,9 +480,7 @@ class PretrainedModel(Layer, GenerationMixin):
             if os.path.exists(config_file_path):
                 resource_files["config_file"] = config_file_path
             else:
-                resource_files["model_config_file"] = os.path.join(
-                    pretrained_model_name_or_path, cls.model_config_file
-                )
+                resource_files["config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
@@ -492,9 +488,13 @@ class PretrainedModel(Layer, GenerationMixin):
                 resource_files[file_id] = full_file_name
 
             # check remote file exist
-            resource_files["model_config_file"] = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
+            config_file_url = "/".join([COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.config_file])
+            if url_file_exists(config_file_url):
+                resource_files["config_file"] = config_file_url
+            else:
+                resource_files["config_file"] = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
+                )
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
@@ -502,9 +502,10 @@ class PretrainedModel(Layer, GenerationMixin):
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
+
             # If from_hf_hub, let HF Hub takes care of the cache and the download process
             if from_hf_hub:
-                if file_path == cls.model_config_file:
+                if file_path == cls.config_file:
                     resolved_resource_files[file_id] = load_hf_model_config_file(
                         cls=cls, pretrained_model_name=pretrained_model_name_or_path, cache_dir=MODEL_HOME
                     )
@@ -542,7 +543,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
-        model_config_file = resolved_resource_files.pop("model_config_file", None)
+        model_config_file = resolved_resource_files.pop("config_file", None)
         if model_config_file is not None:
             with io.open(model_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
@@ -609,7 +610,7 @@ class PretrainedModel(Layer, GenerationMixin):
             model = cls(*derived_args, **derived_kwargs)
 
         # save the model config file into cache dir
-        model_config_file_path = os.path.join(default_root, cls.model_config_file)
+        model_config_file_path = os.path.join(default_root, cls.config_file)
         # check if there is model config file in cache directory
         if (
             pretrained_model_name_or_path in cls.pretrained_init_configuration
@@ -740,9 +741,9 @@ class PretrainedModel(Layer, GenerationMixin):
             save_dir (str): Directory to save model_config file into.
         """
         # Save model config
-        model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.get_model_config()
-        with io.open(model_config_file, "w", encoding="utf-8") as f:
+        config_file = os.path.join(save_dir, self.model_config_file)
+        with io.open(config_file, "w", encoding="utf-8") as f:
             f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
     def save_pretrained(self, save_dir: str):

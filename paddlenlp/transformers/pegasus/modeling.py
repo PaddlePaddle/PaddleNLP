@@ -59,7 +59,7 @@ class PegasusPretrainedModel(PretrainedModel):
     pretrained_init_configuration = {}
     pretrained_resource_files_map = {}
     base_model_prefix = "pegasus"
-    hf_config_map: Dict[str, str] = {
+    standard_config_map: Dict[str, str] = {
         "num_encoder_layers": "encoder_layers",
         "num_decoder_layers": "decoder_layers",
     }

@@ -36,7 +36,12 @@ from paddlenlp.utils.env import HF_CACHE_HOME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url, is_url
+from ..utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url,
+    is_url,
+    url_file_exists,
+)
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -203,6 +208,18 @@ def flatten_model_config(config: dict) -> dict:
         config["architectures"] = [config.pop("init_class")]
 
     return config
+
+
+def is_standard_config(config: Dict[str, Any]) -> bool:
+    """
+    check whether the config is standard
+    Args:
+        config: the dict data of config
+    """
+    if isinstance(config, PretrainedConfig):
+        return True
+
+    return "init_class" not in config and "architectures" in config
 
 
 class PretrainedConfig:
@@ -740,18 +757,28 @@ class PretrainedConfig:
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
-            if os.path.isfile(configuration_file):
+            if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:
-                raise FileNotFoundError(
-                    "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
-                    "param into `from_pretarined` method to specific the configuration file name"
-                )
+                # try to detect old-school config file
+                configuration_file = os.path.join(pretrained_model_name_or_path, "model_config.json")
+                if os.path.exists(configuration_file):
+                    resolved_config_file = configuration_file
+                else:
+                    raise FileNotFoundError(
+                        "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
+                        "param into `from_pretarined` method to specific the configuration file name"
+                    )
         # 4. load it as the community resource file
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
-            assert is_url(community_url)
-            return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+            if url_file_exists(community_url):
+                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
+            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, "model_config.json")
+            if url_file_exists(community_url):
+                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict
