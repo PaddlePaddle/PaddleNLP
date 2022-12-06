@@ -33,3 +33,4 @@ from pipelines.nodes.document import DocOCRProcessor, DocPrompter
 from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
 from pipelines.nodes.answer_extractor import AnswerExtractor, QAFilter, AnswerExtractorPreprocessor, QAFilterPostprocessor
 from pipelines.nodes.question_generator import QuestionGenerator
+from pipelines.nodes.sentiment_analysis import SentaProcessor, UIESenta
