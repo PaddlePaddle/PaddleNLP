@@ -20,8 +20,8 @@ import json
 import os
 import re
 import shutil
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
 import tempfile
+from typing import Any, Dict, List, Optional, Tuple, Type, Union
 
 import numpy as np
 import paddle
@@ -517,20 +517,16 @@ class PretrainedModel(Layer, GenerationMixin):
             if from_hf_hub:
                 if file_path == cls.config_file:
                     resolved_resource_files[file_id] = load_hf_model_config_file(
-                        cls=cls, pretrained_model_name=pretrained_model_name_or_path, cache_dir=MODEL_HOME
+                        cls=cls, pretrained_model_name=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME
                     )
                 else:
                     resolved_resource_files[file_id] = hf_hub_download(
-                        pretrained_model_name_or_path, file_path, cache_dir=MODEL_HOME
+                        repo_id=pretrained_model_name_or_path,
+                        filename=file_path,
+                        cache_dir=HF_CACHE_HOME,
+                        library_name="PaddleNLP",
+                        library_version=__version__,
                     )
-
-                resolved_resource_files[file_id] = hf_hub_download(
-                    repo_id=pretrained_model_name_or_path,
-                    filename=file_path,
-                    cache_dir=HF_CACHE_HOME,
-                    library_name="PaddleNLP",
-                    library_version=__version__,
-                )
 
             else:
                 path = os.path.join(default_root, file_path.split("/")[-1])
@@ -1275,7 +1271,9 @@ class PretrainedModel(Layer, GenerationMixin):
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path=pretrained_model_name_or_path, cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(
+            pretrained_model_name_or_path=pretrained_model_name_or_path, from_hf_hub=from_hf_hub, cache_dir=cache_dir
+        )
 
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model

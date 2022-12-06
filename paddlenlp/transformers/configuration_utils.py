@@ -729,7 +729,7 @@ class PretrainedConfig:
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
