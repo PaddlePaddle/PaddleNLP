@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 from functools import partial
 
@@ -192,12 +193,9 @@ def main():
     if training_args.do_predict:
         test_ret = trainer.predict(predict_dataset, predict_examples)
         trainer.log_metrics("predict", test_ret.metrics)
-
-        if test_ret.label_ids is None:
-            paddle.save(
-                test_ret.predictions,
-                os.path.join(training_args.output_dir, "test_results.pdtensor"),
-            )
+        out_dict = {"query": test_ret.predictions, "answer": test_ret.label_ids}
+        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
+        json.dump(out_dict, out_file)
 
     # Export inference model
     if training_args.do_export:

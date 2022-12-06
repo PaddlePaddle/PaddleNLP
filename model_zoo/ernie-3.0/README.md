@@ -1593,14 +1593,7 @@ Python部署请参考：[Python 部署指南](./deploy/python/README.md)
 
 <a name="Paddle2ONNX部署"></a>
 
-### Paddle2ONNX 部署
 
-ONNX 导出及 ONNXRuntime 部署请参考：[ONNX 导出及 ONNXRuntime 部署指南](./deploy/paddle2onnx/README.md)
-
-
-### Paddle Lite 移动端部署
-
-即将支持，敬请期待
 
 
 <a name="参考文献"></a>
