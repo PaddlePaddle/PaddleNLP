@@ -15,14 +15,22 @@
 # limitations under the License.
 
 import collections
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
+from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    SequenceClassifierOutputWithPast,
+    TokenClassifierOutput,
+)
 
 __all__ = [
     "GPTModel",
@@ -217,32 +225,67 @@ class TransformerDecoder(nn.Layer):
             raise ValueError("Only support LayerNorm")
         self.checkpoints = []
 
-    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, use_cache=False, cache=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
         layer.
         """
         output = tgt
-        new_caches = []
+        new_caches = [] if use_cache else None
         self.checkpoints = []
+        all_self_attentions = () if output_attentions else None
+        all_hidden_states = () if output_hidden_states else None
 
         for i, mod in enumerate(self.layers):
-            if cache is None:
-                if use_cache:
-                    output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
-                    new_caches.append(new_cache)
-                else:
-                    output = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
-
-            else:
-                output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
-                new_caches.append(new_cache)
+            outputs = mod(
+                output,
+                memory,
+                tgt_mask=tgt_mask,
+                use_cache=use_cache,
+                cache=cache[i] if cache is not None else cache,
+                output_attentions=output_attentions,
+            )
+            # outputs = hidden_states if both use_cache and output_attentions are False
+            # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
+            output = outputs[0] if (use_cache or output_attentions) else outputs
+            if output_attentions:
+                all_self_attentions = all_self_attentions + (outputs[1],)
+            if use_cache:
+                new_caches.append(outputs[-1])
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (output,)
             self.checkpoints.append(output.name)
 
         if self.norm is not None:
             output = self.norm(output)
-        return output if use_cache is False else (output, new_caches)
+
+        if not return_dict:
+            temp_list = [output, all_hidden_states, new_caches, all_self_attentions]
+
+            if not (use_cache or output_attentions or output_hidden_states):
+                return output
+
+            return tuple(v for v in temp_list if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=output,
+            past_key_values=new_caches,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+            cross_attentions=None,
+        )
 
     def gen_cache(self, memory, do_zip=False):
         r"""
@@ -292,7 +335,13 @@ class TransformerDecoderLayer(nn.Layer):
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
         self.self_attn = MultiHeadAttention(
-            d_model, nhead, dropout=attn_dropout, weight_attr=weight_attrs[0], bias_attr=bias_attrs[0], topo=topo
+            d_model,
+            nhead,
+            dropout=attn_dropout,
+            need_weights=True,
+            weight_attr=weight_attrs[0],
+            bias_attr=bias_attrs[0],
+            topo=topo,
         )
         self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
         self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
@@ -307,16 +356,17 @@ class TransformerDecoderLayer(nn.Layer):
         else:
             self.activation = getattr(F, activation)
 
-    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
+    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
         residual = tgt
 
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
+        # self.self_attn(...) --> hidden_states, weights, (cache)
         if use_cache is False:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            tgt, attn_weights = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            tgt, attn_weights, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         tgt = residual + self.dropout1(tgt)
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -330,7 +380,12 @@ class TransformerDecoderLayer(nn.Layer):
         if not self.normalize_before:
             tgt = self.norm2(tgt)
 
-        return tgt if use_cache is False else (tgt, incremental_cache)
+        if not (output_attentions or use_cache):
+            return tgt
+
+        temp_list = [tgt, attn_weights if output_attentions else None, incremental_cache if use_cache else None]
+
+        return tuple(v for v in temp_list if v is not None)
 
     def gen_cache(self, memory):
         incremental_cache = self.self_attn.gen_cache(memory, type=self.self_attn.Cache)
@@ -694,7 +749,17 @@ class GPTModel(GPTPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTModel forward method, overrides the `__call__()` special method.
 
@@ -725,9 +790,24 @@ class GPTModel(GPTPretrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `encoder_output`, which is the output at the last layer of the model.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+
+            Especially, When `return_dict=output_hidden_states=output_attentions=False`,
+            returns tensor `outputs` which is the output at the last layer of the model.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         Example:
@@ -775,11 +855,27 @@ class GPTModel(GPTPretrainedModel):
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
-        encoder_outputs = self.decoder(
-            embedding_output, memory=None, tgt_mask=attention_mask, use_cache=use_cache, cache=cache
+        outputs = self.decoder(
+            embedding_output,
+            memory=None,
+            tgt_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
         )
+
+        if output_hidden_states:
+            if return_dict:
+                outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+            else:  # outputs is a tuple
+                idx = 2 if use_cache else 1
+                all_hidden_states = (embedding_output,) + outputs[idx]
+                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
         self.checkpoints.extend(self.decoder.checkpoints)
-        return encoder_outputs
+
+        return outputs
 
 
 class GPTForPretraining(GPTPretrainedModel):
@@ -1007,7 +1103,18 @@ class GPTLMHeadModel(GPTPretrainedModel):
         )
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        use_cache=False,
+        cache=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
 
         Args:
@@ -1021,29 +1128,70 @@ class GPTLMHeadModel(GPTPretrainedModel):
                 See :class:`GPTModel`.
             cache (Tensor, optional):
                 See :class:`GPTModel`.
+            labels (paddle.Tensor, optional):
+                A Tensor of shape `(batch_size, sequence_length)`.
+                Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
+                `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
+                are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
+                Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
-            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the gpt model.
-            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
 
+            Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
+            returns a tensor `logits` which is the output of the gpt model.
         """
         outputs = self.gpt(
-            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
         )
-
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
+        if isinstance(outputs, type(input_ids)):
+            hidden_states = outputs
         else:
-            encoder_outputs = outputs
+            hidden_states = outputs[0]
 
-        logits = self.lm_head(encoder_outputs)
+        logits = self.lm_head(hidden_states)
 
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits[:, :-1, :]
+            shift_labels = labels[:, 1:]
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+
+        # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
+        if not return_dict:
+            if isinstance(outputs, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
+
+            outputs = (logits,) + outputs[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
@@ -1136,7 +1284,16 @@ class GPTForTokenClassification(GPTPretrainedModel):
         self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTForTokenClassification forward method, overrides the __call__() special method.
 
@@ -1147,9 +1304,25 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input token classification logits.
             Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
@@ -1166,11 +1339,39 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.gpt(input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
+        hidden_states = self.dropout(hidden_states)
+        logits = self.classifier(hidden_states)
 
-        sequence_output = self.dropout(sequence_output)
-        logits = self.classifier(sequence_output)
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+
+        if not return_dict:
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
+
+            outputs = (logits,) + sequence_output[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class GPTForSequenceClassification(GPTPretrainedModel):
@@ -1186,13 +1387,25 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt, num_classes=2):
+    def __init__(self, gpt, num_classes=2, problem_type=None):
         super(GPTForSequenceClassification, self).__init__()
         self.gpt = gpt  # allow gpt to be config
+        self.num_classes = num_classes
+        self.problem_type = problem_type
         self.score = nn.Linear(self.gpt.config["hidden_size"], num_classes, bias_attr=False)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids,
+        position_ids=None,
+        attention_mask=None,
+        labels=None,
+        use_cache=False,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -1203,9 +1416,27 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            use_cache (bool, optional):
+                See :classL `GPTModel`.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_classes]` and dtype as float32.
 
         Example:
@@ -1224,18 +1455,54 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         """
 
         # sequence_output shape [bs, seq_len, hidden_size]
-        sequence_output = self.gpt(input_ids, position_ids=position_ids, attention_mask=attention_mask)
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
         # logits shape [bs, seq_len, num_class]
-        logits = self.score(sequence_output)
+        logits = self.score(hidden_states)
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
         # sequence_lengths shape [bs,]
         sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
-        pooled_logits = logits.gather_nd(
-            paddle.stack([paddle.arange(sequence_output.shape[0]), sequence_lengths], axis=-1)
-        )
 
-        return pooled_logits
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = MSELoss()
+                loss = loss_fct(pooled_logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            else:
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(pooled_logits, labels)
+
+        if not return_dict:
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss, pooled_logits) if loss is not None else pooled_logits
+
+            outputs = (pooled_logits,) + sequence_output[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return SequenceClassifierOutputWithPast(
+            loss=loss,
+            logits=pooled_logits,
+            past_key_values=sequence_output.past_key_values,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 GPTForCausalLM = GPTLMHeadModel
