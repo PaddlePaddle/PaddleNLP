@@ -12,22 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import sys
-
-import argparse
-import numpy as np
-import yaml
-from attrdict import AttrDict
 from pprint import pprint
 
 import paddle
+import yaml
+from attrdict import AttrDict
 from paddle import inference
 
 from paddlenlp.utils.log import logger
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir, os.pardir)))
-import reader
+import reader  # noqa: E402
 
 
 def parse_args():
@@ -53,11 +51,17 @@ def parse_args():
     )
     parser.add_argument("--profile", action="store_true", help="Whether to profile. ")
     parser.add_argument(
+        "--data_dir",
+        default=None,
+        type=str,
+        help="The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. ",
+    )
+    parser.add_argument(
         "--test_file",
         nargs="+",
         default=None,
         type=str,
-        help="The file for testing. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to process testing.",
+        help="The files for test. Can be set by using --test_file source_language_file. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--save_log_path",
@@ -72,6 +76,20 @@ def parse_args():
         help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
+        "--src_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument("-s", "--src_lang", default=None, type=str, help="Source language. ")
+    parser.add_argument("-t", "--trg_lang", default=None, type=str, help="Target language. ")
+    parser.add_argument(
         "--unk_token",
         default=None,
         type=str,
@@ -82,6 +100,12 @@ def parse_args():
     )
     parser.add_argument(
         "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
     args = parser.parse_args()
     return args
@@ -253,16 +277,48 @@ if __name__ == "__main__":
     args.model_name = "transformer_base" if "base" in ARGS.config else "transformer_big"
     if ARGS.model_dir != "":
         args.inference_model_dir = ARGS.model_dir
-    args.test_file = ARGS.test_file
     args.save_log_path = ARGS.save_log_path
-    args.vocab_file = ARGS.vocab_file
+    args.data_dir = ARGS.data_dir
+    args.test_file = ARGS.test_file
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARGS.vocab_file
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
+
+    if ARGS.src_lang is not None:
+        args.src_lang = ARGS.src_lang
+    if ARGS.trg_lang is not None:
+        args.trg_lang = ARGS.trg_lang
+
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
 
     if args.profile:
         import importlib
+
         import tls.recorder as recorder
 
         try:

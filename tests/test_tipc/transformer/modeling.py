@@ -1,5 +1,18 @@
-import numpy as np
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -13,7 +26,6 @@ __all__ = [
     "TransformerDecodeCell",
     "TransformerBeamSearchDecoder",
     "TransformerModel",
-    "InferTransformerModel",
 ]
 
 
@@ -611,6 +623,10 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
     """
 
     def __init__(
@@ -629,12 +645,15 @@ class TransformerModel(nn.Layer):
         act_dropout=None,
         bos_id=0,
         eos_id=1,
+        pad_id=None,
+        activation="relu",
     ):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
+        self.pad_id = pad_id if pad_id is not None else self.bos_id
         self.dropout = dropout
 
         self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
@@ -658,7 +677,7 @@ class TransformerModel(nn.Layer):
             dropout=dropout,
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
-            activation="relu",
+            activation=activation,
             normalize_before=True,
         )
 
