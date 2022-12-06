@@ -26,14 +26,14 @@ from ...schedulers import DDIMScheduler
 class LDMPipeline(DiffusionPipeline):
     r"""
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
 
     Parameters:
         vqvae ([`VQModel`]):
             Vector-quantized (VQ) Model to encode and decode images to and from latent representations.
         unet ([`UNet2DModel`]): U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
-            [`DDIMScheduler`] is to be used in combination with `unet` to denoise the encoded image latens.
+            [`DDIMScheduler`] is to be used in combination with `unet` to denoise the encoded image latents.
     """
 
     def __init__(self, vqvae: VQModel, unet: UNet2DModel, scheduler: DDIMScheduler):
@@ -44,7 +44,7 @@ class LDMPipeline(DiffusionPipeline):
     def __call__(
         self,
         batch_size: int = 1,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         eta: float = 0.0,
         num_inference_steps: int = 50,
         output_type: Optional[str] = "pil",
@@ -55,8 +55,8 @@ class LDMPipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 Number of images to generate.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A [paddle generator] to make generation deterministic.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
@@ -71,12 +71,14 @@ class LDMPipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        if seed is not None:
-            paddle.seed(seed)
 
         latents = paddle.randn(
             (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
+            generator=generator,
         )
+
+        # scale the initial noise by the standard deviation required by the scheduler
+        latents = latents * self.scheduler.init_noise_sigma
 
         self.scheduler.set_timesteps(num_inference_steps)
 
@@ -88,8 +90,9 @@ class LDMPipeline(DiffusionPipeline):
             extra_kwargs["eta"] = eta
 
         for t in self.progress_bar(self.scheduler.timesteps):
+            latent_model_input = self.scheduler.scale_model_input(latents, t)
             # predict the noise residual
-            noise_prediction = self.unet(latents, t).sample
+            noise_prediction = self.unet(latent_model_input, t).sample
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.scheduler.step(noise_prediction, t, latents, **extra_kwargs).prev_sample
 
@@ -97,7 +100,7 @@ class LDMPipeline(DiffusionPipeline):
         image = self.vqvae.decode(latents).sample
 
         image = (image / 2 + 0.5).clip(0, 1)
-        image = image.transpose([0, 2, 3, 1]).numpy()
+        image = image.transpose([0, 2, 3, 1]).cast("float32").numpy()
         if output_type == "pil":
             image = self.numpy_to_pil(image)
 

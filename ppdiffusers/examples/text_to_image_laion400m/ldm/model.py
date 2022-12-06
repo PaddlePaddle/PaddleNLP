@@ -11,23 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import contextlib
+import inspect
 import os
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import contextlib
-import inspect
-from ppdiffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, DDPMScheduler, LDMBertModel
-from paddlenlp.transformers import AutoTokenizer
 
+from paddlenlp.transformers import AutoTokenizer
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    DDPMScheduler,
+    LDMBertModel,
+    UNet2DConditionModel,
+)
 from ppdiffusers.modeling_utils import freeze_params
+from ppdiffusers.models.attention import AttentionBlock
 from ppdiffusers.models.ema import LitEma
-from ppdiffusers.models.attention import AttentionBlock, SpatialTransformer
-from ppdiffusers.models.resnet import ResnetBlock2D
-from ppdiffusers.initializer import reset_initialized_parameter, normal_, zeros_
-from paddlenlp.utils.log import logger
+
+try:
+    from ppdiffusers.models.attention import SpatialTransformer
+except ImportError:
+    from ppdiffusers.models.attention import Transformer2DModel as SpatialTransformer
 
 import json
+
+from paddlenlp.utils.log import logger
+from ppdiffusers.initializer import normal_, reset_initialized_parameter, zeros_
+from ppdiffusers.models.resnet import ResnetBlock2D
 
 
 def read_json(file):
@@ -104,6 +117,7 @@ class LatentDiffusionModel(nn.Layer):
             beta_schedule="scaled_linear",
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
         )
         self.eval_scheduler.set_timesteps(model_args.num_inference_steps)
         self.init_weights()

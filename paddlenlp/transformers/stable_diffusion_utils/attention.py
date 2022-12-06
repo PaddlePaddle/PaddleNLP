@@ -15,10 +15,10 @@
 
 import math
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import numpy as np
 
 
 def finfo(dtype):

@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ def enable_full_determinism(seed: int):
 def set_seed(seed: int = None):
     """
     Args:
-    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`.
+    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `paddle`.
         seed (`int`): The seed to set.
     """
     if seed is not None:
@@ -72,7 +72,8 @@ class EMAModel:
             min_value (float): The minimum EMA decay rate. Default: 0.
         """
 
-        self.averaged_model = copy.deepcopy(model).eval()
+        self.averaged_model = copy.deepcopy(model)
+        self.averaged_model.eval()
         for params in self.averaged_model.parameters():
             params.stop_gradient = True
 
@@ -110,15 +111,15 @@ class EMAModel:
             try:
                 ema_param = ema_params[key]
             except KeyError:
-                ema_param = param.astype("float32").clone() if param.ndim == 1 else copy.deepcopy(param)
+                ema_param = param.cast("float32").clone() if param.ndim == 1 else copy.deepcopy(param)
                 ema_params[key] = ema_param
 
-            if not param.stop_gradient:
-                ema_params[key].copy_(param.astype(ema_param.dtype), True)
+            if param.stop_gradient:
+                ema_params[key].copy_(param.cast(ema_param.dtype), True)
                 ema_param = ema_params[key]
             else:
-                ema_param = ema_param.multiply(self.decay)
-                ema_param.add_(param.astype(ema_param.dtype) * (1 - self.decay))
+                ema_param.scale_(self.decay)
+                ema_param.add_(param.cast(ema_param.dtype) * (1 - self.decay))
 
             ema_state_dict[key] = ema_param
 
