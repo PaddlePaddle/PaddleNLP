@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 import tempfile
-import pytest
 from unittest import TestCase
+
 import parameterized
-from paddlenlp.cli.main import load_all_models
-from paddlenlp.transformers import BertPretrainedModel, GPTPretrainedModel, AlbertPretrainedModel, RobertaPretrainedModel
+
+from paddlenlp.transformers import BertPretrainedModel
 
 
 def get_tokenizer_test():
     model_names = []
-    model_names.extend(
-        list(BertPretrainedModel.pretrained_init_configuration.keys()))
+    model_names.extend(list(BertPretrainedModel.pretrained_init_configuration.keys()))
     model_names = [{"model_name": model_name} for model_name in model_names]
     # return model_names
 
@@ -34,7 +32,6 @@ def get_tokenizer_test():
 
 @parameterized.parameterized_class(get_tokenizer_test())
 class TestTokenizerCompatibility(TestCase):
-
     def setUp(self):
         self.tempdirectory = tempfile.TemporaryDirectory()
 
@@ -48,11 +45,12 @@ class TestTokenizerCompatibility(TestCase):
     def run_compatibility_test(self, model_name: str):
         from transformers import AutoTokenizer
         from transformers.tokenization_utils import PreTrainedTokenizer
-        hf_tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(
-            model_name)
+
+        hf_tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(model_name)
         hf_tokenizer.save_pretrained(self.tempdirectory.name)
 
         from paddlenlp.transformers import AutoTokenizer
+
         tokenizer = AutoTokenizer.from_pretrained(self.tempdirectory.name)
 
         # 1. test token_id
@@ -65,6 +63,7 @@ class TestTokenizerCompatibility(TestCase):
 
         # 2. convert id to tokens
         import paddle
+
         random_ids = paddle.randint(high=len(tokenizer), shape=[100]).tolist()
         hf_tokens = hf_tokenizer.convert_ids_to_tokens(random_ids)
         tokens = tokenizer.convert_ids_to_tokens(random_ids)
