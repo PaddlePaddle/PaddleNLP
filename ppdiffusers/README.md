@@ -406,6 +406,7 @@ url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/data/image_Kuris
 image = load_image(url).resize((512, 512))
 prompt = "Kurisu Makise, looking at viewer, long hair, standing, 1girl, hair ornament, hair flower, cute, jacket, white flower, white dress"
 negative_prompt = "lowres, bad anatomy, bad hands, text, error, missing fingers, extra digit, fewer digits, cropped, worst quality, low quality, normal quality, jpeg artifacts, signature, watermark, username, blurry"
+
 image_img2img = fd_pipe.img2img(
     prompt=prompt, negative_prompt=negative_prompt, image=image, strength=0.75, guidance_scale=7.5
 ).images[0]
@@ -417,6 +418,7 @@ mask_url = "https://paddlenlp.bj.bcebos.com/models/community/CompVis/stable-diff
 image = load_image(img_url).resize((512, 512))
 mask_image = load_image(mask_url).resize((512, 512))
 prompt = "a red cat sitting on a bench"
+
 image_inpaint_legacy = fd_pipe.inpaint_legacy(
     prompt=prompt, image=image, mask_image=mask_image, strength=0.75, num_inference_steps=50
 ).images[0]
