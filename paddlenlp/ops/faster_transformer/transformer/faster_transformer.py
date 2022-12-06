@@ -13,47 +13,43 @@
 # limitations under the License.
 import os
 import shutil
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from paddlenlp.transformers import (
-    TransformerModel,
-    WordEmbedding,
-    PositionalEmbedding,
-    position_encoding_init,
-    InferTransformerModel,
-    GPTModel,
-)
 from paddlenlp.ops import (
-    InferTransformerDecoding,
-    InferGptDecoding,
-    InferUnifiedDecoding,
     InferBartDecoding,
+    InferGptDecoding,
+    InferGptJDecoding,
     InferMBartDecoding,
     InferOptDecoding,
-    InferGptJDecoding,
     InferPegasusDecoding,
+    InferTransformerDecoding,
+    InferUnifiedDecoding,
 )
-
-from .encoder import enable_faster_encoder, disable_faster_encoder
-from paddlenlp.ops.ext_utils import load
-from paddlenlp.utils.log import logger
 from paddlenlp.transformers import (
-    GPTChineseTokenizer,
-    GPTTokenizer,
-    UnifiedTransformerPretrainedModel,
-    UNIMOPretrainedModel,
     BartPretrainedModel,
+    CodeGenPreTrainedModel,
+    GPTChineseTokenizer,
+    GPTJPretrainedModel,
     GPTPretrainedModel,
+    GPTTokenizer,
+    InferTransformerModel,
     MBartPretrainedModel,
     OPTPretrainedModel,
-    GPTJPretrainedModel,
-    CodeGenPreTrainedModel,
     PegasusPretrainedModel,
+    PositionalEmbedding,
+    TransformerModel,
+    UnifiedTransformerPretrainedModel,
+    UNIMOPretrainedModel,
+    WordEmbedding,
+    position_encoding_init,
 )
+from paddlenlp.utils.log import logger
+
+from .encoder import enable_faster_encoder
 
 
 class FasterTransformer(TransformerModel):
@@ -95,6 +91,8 @@ class FasterTransformer(TransformerModel):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         decoding_strategy (str, optional):
             Indicating the strategy of decoding. It can be 'beam_search', 'beam_search_v2',
             'topk_sampling' and 'topp_sampling'. For beam search strategies,
@@ -156,6 +154,7 @@ class FasterTransformer(TransformerModel):
         act_dropout=None,
         bos_id=0,
         eos_id=1,
+        pad_id=None,
         decoding_strategy="beam_search",
         beam_size=4,
         topk=1,
@@ -195,6 +194,7 @@ class FasterTransformer(TransformerModel):
         self.trg_vocab_size = trg_vocab_size
         self.d_model = d_model
         self.bos_id = bos_id
+        self.pad_id = pad_id if pad_id is not None else self.bos_id
         self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
 
@@ -234,9 +234,9 @@ class FasterTransformer(TransformerModel):
     def forward(self, src_word, trg_word=None):
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = (
-            paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
+            paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e9
         )
-        src_pos = paddle.cast(src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(start=0, end=src_max_len)
+        src_pos = paddle.cast(src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(start=0, end=src_max_len)
 
         # Run encoder
         src_emb = self.src_word_embedding(src_word)
@@ -254,7 +254,7 @@ class FasterTransformer(TransformerModel):
         elif not self.use_fp16_decoding and enc_output.dtype != paddle.float32:
             enc_output = paddle.cast(enc_output, dtype="float32")
 
-        mem_seq_lens = paddle.sum(paddle.cast(src_word != self.bos_id, dtype="int32"), dtype="int32", axis=1)
+        mem_seq_lens = paddle.sum(paddle.cast(src_word != self.pad_id, dtype="int32"), dtype="int32", axis=1)
         ids = self.decoding(enc_output, mem_seq_lens, trg_word=trg_word)
 
         return ids
@@ -475,6 +475,10 @@ class TransformerGenerator(paddle.nn.Layer):
             The beam width for beam search. Defaults to 4.
         max_out_len (int, optional):
             The maximum output length. Defaults to 256.
+        activation (str, optional):
+            The activation used in FFN. Defaults to "relu".
+        normalize_before (bool, optional):
+            Whether to apply pre-normalization. Defaults to True.
         kwargs:
             The key word arguments can be `output_time_major`, `use_ft`, `use_fp16_decoding`,
             `rel_len`, `alpha`:
@@ -532,8 +536,11 @@ class TransformerGenerator(paddle.nn.Layer):
         weight_sharing,
         bos_id=0,
         eos_id=1,
+        pad_id=None,
         beam_size=4,
         max_out_len=256,
+        activation="relu",
+        normalize_before=True,
         **kwargs
     ):
         logger.warning("TransformerGenerator is an experimental API and subject to change.")
@@ -553,7 +560,9 @@ class TransformerGenerator(paddle.nn.Layer):
         rel_len = kwargs.pop("rel_len", False)
         alpha = kwargs.pop("alpha", 0.6)
 
-        if use_ft:
+        # TODO: Faster version needs to update attr to support custom
+        # activation and normalize_before which are both aupport in cpp codes.
+        if use_ft and activation == "relu" and normalize_before:
             try:
                 decoding_strategy = "beam_search_v2" if beam_search_version == "v2" else "beam_search"
                 self.transformer = FasterTransformer(
@@ -569,6 +578,7 @@ class TransformerGenerator(paddle.nn.Layer):
                     weight_sharing=weight_sharing,
                     bos_id=bos_id,
                     eos_id=eos_id,
+                    pad_id=pad_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
                     diversity_rate=diversity_rate,
@@ -598,10 +608,13 @@ class TransformerGenerator(paddle.nn.Layer):
                     weight_sharing=weight_sharing,
                     bos_id=bos_id,
                     eos_id=eos_id,
+                    pad_id=pad_id,
                     beam_size=beam_size,
                     max_out_len=max_out_len,
                     output_time_major=self.output_time_major,
                     beam_search_version=beam_search_version,
+                    activation=activation,
+                    normalize_before=normalize_before,
                     rel_len=rel_len,
                     alpha=alpha,
                 )
@@ -623,10 +636,13 @@ class TransformerGenerator(paddle.nn.Layer):
                 weight_sharing=weight_sharing,
                 bos_id=bos_id,
                 eos_id=eos_id,
+                pad_id=pad_id,
                 beam_size=beam_size,
                 max_out_len=max_out_len,
                 output_time_major=self.output_time_major,
                 beam_search_version=beam_search_version,
+                activation=activation,
+                normalize_before=normalize_before,
                 rel_len=rel_len,
                 alpha=alpha,
             )
@@ -1679,7 +1695,6 @@ class FasterPegasus(PegasusPretrainedModel):
                 "encoder_output"
             ]
 
-        batch_size = paddle.shape(encoder_output)[0]
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
             seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id, dtype="int32"), axis=-1, dtype="int32")

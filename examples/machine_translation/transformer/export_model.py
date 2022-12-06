@@ -1,12 +1,25 @@
-import os
-import yaml
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import argparse
+import os
 from pprint import pprint
-from attrdict import AttrDict
 
 import paddle
-
 import reader
+import yaml
+from attrdict import AttrDict
 
 from paddlenlp.transformers import InferTransformerModel, position_encoding_init
 from paddlenlp.utils.log import logger
@@ -29,16 +42,28 @@ def parse_args():
         help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
     parser.add_argument(
-        "--unk_token",
+        "--src_vocab",
         default=None,
         type=str,
-        help="The unknown token. It should be provided when use custom vocab_file. ",
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
     )
     parser.add_argument(
         "--bos_token", default=None, type=str, help="The bos token. It should be provided when use custom vocab_file. "
     )
     parser.add_argument(
         "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
     args = parser.parse_args()
     return args
@@ -61,9 +86,11 @@ def do_export(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
+        pad_id=args.pad_idx,
         beam_size=args.beam_size,
         max_out_len=args.max_out_len,
         beam_search_version=args.beam_search_version,
+        normalize_before=args.get("normalize_before", True),
         rel_len=args.use_rel_len,
         alpha=args.alpha,
     )
@@ -104,10 +131,34 @@ if __name__ == "__main__":
     with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.benchmark = ARGS.benchmark
-    args.vocab_file = ARGS.vocab_file
-    args.unk_token = ARGS.unk_token
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARGS.vocab_file
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
+
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     pprint(args)
 
     do_export(args)
