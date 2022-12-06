@@ -32,9 +32,8 @@ def launch_es(sleep=15, delete_existing=False):
     logger.debug("Starting Elasticsearch ...")
     if delete_existing:
         _ = subprocess.run(
-            [f"docker rm --force {ELASTICSEARCH_CONTAINER_NAME}"],
-            shell=True,
-            stdout=subprocess.DEVNULL)
+            [f"docker rm --force {ELASTICSEARCH_CONTAINER_NAME}"], shell=True, stdout=subprocess.DEVNULL
+        )
     status = subprocess.run(
         [
             f'docker run -d -p 9200:9200 -e "discovery.type=single-node" --name {ELASTICSEARCH_CONTAINER_NAME} elasticsearch:7.9.2'
@@ -57,9 +56,7 @@ def launch_opensearch(sleep=15, delete_existing=False):
     # This line is needed since it is not possible to start a new docker container with the name opensearch if there is a stopped image with the same now
     # docker rm only succeeds if the container is stopped, not if it is running
     if delete_existing:
-        _ = subprocess.run([f"docker rm --force {OPENSEARCH_CONTAINER_NAME}"],
-                           shell=True,
-                           stdout=subprocess.DEVNULL)
+        _ = subprocess.run([f"docker rm --force {OPENSEARCH_CONTAINER_NAME}"], shell=True, stdout=subprocess.DEVNULL)
     status = subprocess.run(
         [
             f'docker run -d -p 9201:9200 -p 9600:9600 -e "discovery.type=single-node" --name {OPENSEARCH_CONTAINER_NAME} opensearchproject/opensearch:1.2.4'
@@ -133,9 +130,7 @@ def stop_service(document_store, delete_container=False):
     elif "WeaviateDocumentStore" in ds_class:
         stop_weaviate(delete_container)
     else:
-        logger.warning(
-            f"No support yet for auto stopping the service behind a {type(document_store)}"
-        )
+        logger.warning(f"No support yet for auto stopping the service behind a {type(document_store)}")
 
 
 def launch_milvus(sleep=15, delete_existing=False):
@@ -152,8 +147,7 @@ def launch_milvus(sleep=15, delete_existing=False):
     with open(milvus_dir / "docker-compose.yml", "wb") as f:
         f.write(request.content)
 
-    status = subprocess.run(["cd /home/$USER/milvus/ && docker-compose up -d"],
-                            shell=True)
+    status = subprocess.run(["cd /home/$USER/milvus/ && docker-compose up -d"], shell=True)
 
     if status.returncode:
         logger.warning(

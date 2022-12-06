@@ -22,11 +22,7 @@ from utils.args import str2bool
 
 def clean_text(text):
     """Performs invalid character removal and whitespace cleanup on text."""
-    text = text.replace(u"“", u'"')\
-        .replace(u'”', u'"')\
-        .replace(u'‘', "'")\
-        .replace(u'’', u"'")\
-        .replace(u'—', u'-')
+    text = text.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-")
 
     output = []
     for char in text:
@@ -86,7 +82,7 @@ def convert_to_unicode(text):
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
     vocab = collections.OrderedDict()
-    fin = open(vocab_file, 'r', encoding="UTF-8")
+    fin = open(vocab_file, "r", encoding="UTF-8")
     for num, line in enumerate(fin):
         items = convert_to_unicode(line.rstrip()).split("\t")
         if len(items) > 2:
@@ -149,7 +145,7 @@ class SentencePieceTokenizer(object):
         """Merge subword."""
         ret = []
         for token in tokens:
-            if token.startswith(u"▁"):
+            if token.startswith("▁"):
                 ret.append(token[1:])
             else:
                 if len(ret):

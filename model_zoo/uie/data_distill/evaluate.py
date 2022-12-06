@@ -30,14 +30,11 @@ from metric import get_eval
 @paddle.no_grad()
 def evaluate(model, dataloader, label_maps, task_type="relation_extraction"):
     model.eval()
-    all_preds = ([], []) if task_type in [
-        "opinion_extraction", "relation_extraction", "event_extraction"
-    ] else []
+    all_preds = ([], []) if task_type in ["opinion_extraction", "relation_extraction", "event_extraction"] else []
     for batch in tqdm(dataloader, desc="Evaluating: ", leave=False):
         input_ids, attention_masks, offset_mappings, texts = batch
         logits = model(input_ids, attention_masks)
-        batch_outputs = postprocess(logits, offset_mappings, texts, label_maps,
-                                    task_type)
+        batch_outputs = postprocess(logits, offset_mappings, texts, label_maps, task_type)
         if isinstance(batch_outputs, tuple):
             all_preds[0].extend(batch_outputs[0])  # Entity output
             all_preds[1].extend(batch_outputs[1])  # Relation output
@@ -59,24 +56,22 @@ def do_eval():
         model = GPLinkerForRelationExtraction(encoder, label_maps)
 
     if args.model_path:
-        state_dict = paddle.load(
-            os.path.join(args.model_path, "model_state.pdparams"))
+        state_dict = paddle.load(os.path.join(args.model_path, "model_state.pdparams"))
         model.set_dict(state_dict)
 
     test_ds = load_dataset(reader, data_path=args.test_path, lazy=False)
 
-    test_dataloader = create_dataloader(test_ds,
-                                        tokenizer,
-                                        max_seq_len=args.max_seq_len,
-                                        batch_size=args.batch_size,
-                                        label_maps=label_maps,
-                                        mode="test",
-                                        task_type=args.task_type)
+    test_dataloader = create_dataloader(
+        test_ds,
+        tokenizer,
+        max_seq_len=args.max_seq_len,
+        batch_size=args.batch_size,
+        label_maps=label_maps,
+        mode="test",
+        task_type=args.task_type,
+    )
 
-    eval_result = evaluate(model,
-                           test_dataloader,
-                           label_maps,
-                           task_type=args.task_type)
+    eval_result = evaluate(model, test_dataloader, label_maps, task_type=args.task_type)
     logger.info("Evaluation precision: " + str(eval_result))
 
 

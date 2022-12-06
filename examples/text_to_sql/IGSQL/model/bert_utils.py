@@ -25,9 +25,8 @@ from paddlenlp.transformers import BertModel, BertPretrainedModel, BertTokenizer
 
 def get_bert(params):
     model_bert = BertModel.from_pretrained("bert-base-uncased")
-    bert_config = BertPretrainedModel.pretrained_init_configuration[
-        "bert-base-uncased"]
-    tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+    bert_config = BertPretrainedModel.pretrained_init_configuration["bert-base-uncased"]
+    tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
 
     return model_bert, tokenizer, bert_config
 
@@ -127,12 +126,9 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
         l_hs.append(len(hds1))
 
         # 1. 2nd tokenization using WordPiece
-        tt_to_t_idx1 = [
-        ]  # number indicates where sub-token belongs to in 1st-level-tokens (here, CoreNLP).
-        t_to_tt_idx1 = [
-        ]  # orig_to_tok_idx[i] = start index of i-th-1st-level-token in all_tokens.
-        nlu_tt1 = [
-        ]  # all_doc_tokens[ orig_to_tok_idx[i] ] returns first sub-token segement of i-th-1st-level-token
+        tt_to_t_idx1 = []  # number indicates where sub-token belongs to in 1st-level-tokens (here, CoreNLP).
+        t_to_tt_idx1 = []  # orig_to_tok_idx[i] = start index of i-th-1st-level-token in all_tokens.
+        nlu_tt1 = []  # all_doc_tokens[ orig_to_tok_idx[i] ] returns first sub-token segement of i-th-1st-level-token
         for (i, token) in enumerate(nlu_t1):
             t_to_tt_idx1.append(
                 len(nlu_tt1)
@@ -140,9 +136,7 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
             sub_tokens = tokenizer.tokenize(token)
             for sub_token in sub_tokens:
                 tt_to_t_idx1.append(i)
-                nlu_tt1.append(
-                    sub_token
-                )  # all_doc_tokens are further tokenized using WordPiece tokenizer
+                nlu_tt1.append(sub_token)  # all_doc_tokens are further tokenized using WordPiece tokenizer
         nlu_tt.append(nlu_tt1)
         tt_to_t_idx.append(tt_to_t_idx1)
         t_to_tt_idx.append(t_to_tt_idx1)
@@ -151,8 +145,7 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
 
         # [CLS] nlu [SEP] col1 [SEP] col2 [SEP] ...col-n [SEP]
         # 2. Generate BERT inputs & indices.
-        tokens1, sent_ids1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(
-            tokenizer, nlu_tt1, hds1)
+        tokens1, sent_ids1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(tokenizer, nlu_tt1, hds1)
 
         assert len(t_to_tt_idx_hds1) == len(hds1)
 
@@ -197,9 +190,8 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
 
     # 4. Generate BERT output.
     all_encoder_layer, pooled_output = model_bert(
-        all_input_ids,
-        token_type_ids=all_segment_ids,
-        output_hidden_states=True)
+        all_input_ids, token_type_ids=all_segment_ids, output_hidden_states=True
+    )
 
     # 5. generate l_hpu from i_hds
     l_hpu = gen_l_hpu(i_hds)
@@ -207,13 +199,23 @@ def get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length):
     assert len(set(l_n)) == 1 and len(set(i_nlu)) == 1
     assert l_n[0] == i_nlu[0][1] - i_nlu[0][0]
 
-    return all_encoder_layer, pooled_output, tokens, i_nlu, i_hds, \
-           l_n, l_hpu, l_hs, \
-           nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds
+    return (
+        all_encoder_layer,
+        pooled_output,
+        tokens,
+        i_nlu,
+        i_hds,
+        l_n,
+        l_hpu,
+        l_hs,
+        nlu_tt,
+        t_to_tt_idx,
+        tt_to_t_idx,
+        t_to_tt_idx_hds,
+    )
 
 
-def get_wemb_n(i_nlu, l_n, hS, num_hidden_layers, all_encoder_layer,
-               num_out_layers_n):
+def get_wemb_n(i_nlu, l_n, hS, num_hidden_layers, all_encoder_layer, num_out_layers_n):
     """
     Get the representation of each tokens.
     """
@@ -229,18 +231,15 @@ def get_wemb_n(i_nlu, l_n, hS, num_hidden_layers, all_encoder_layer,
             i_layer = num_hidden_layers - 1 - i_noln
             st = i_noln * hS
             ed = (i_noln + 1) * hS
-            tmp = all_encoder_layer[i_layer][
-                b, i_nlu1[0]:i_nlu1[1], :].unsqueeze(0)
+            tmp = all_encoder_layer[i_layer][b, i_nlu1[0] : i_nlu1[1], :].unsqueeze(0)
             pad_right = l_n_max - (i_nlu1[1] - i_nlu1[0])
-            pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right],
-                                               data_format='NLC').squeeze(0)
+            pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right], data_format="NLC").squeeze(0)
             wemb_n.append(pad_tmp)
     wemb_n = paddle.stack(wemb_n)
     return wemb_n
 
 
-def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer,
-               num_out_layers_h):
+def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer, num_out_layers_h):
     """
     As if
     [ [table-1-col-1-tok1, t1-c1-t2, ...],
@@ -262,29 +261,33 @@ def get_wemb_h(i_hds, l_hpu, l_hs, hS, num_hidden_layers, all_encoder_layer,
                 i_layer = num_hidden_layers - 1 - i_nolh
                 st = i_nolh * hS
                 ed = (i_nolh + 1) * hS
-                tmp = all_encoder_layer[i_layer][
-                    b, i_hds11[0]:i_hds11[1], :].unsqueeze(0)
+                tmp = all_encoder_layer[i_layer][b, i_hds11[0] : i_hds11[1], :].unsqueeze(0)
                 pad_right = l_hpu_max - (i_hds11[1] - i_hds11[0])
-                pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right],
-                                                   data_format='NLC').squeeze(0)
+                pad_tmp = paddle.nn.functional.pad(tmp, [0, pad_right], data_format="NLC").squeeze(0)
                 wemb_h.append(pad_tmp)
     wemb_h = paddle.stack(wemb_h)
     return wemb_h
 
 
-def get_wemb_bert(bert_config,
-                  model_bert,
-                  tokenizer,
-                  nlu_t,
-                  hds,
-                  max_seq_length,
-                  num_out_layers_n=1,
-                  num_out_layers_h=1):
+def get_wemb_bert(
+    bert_config, model_bert, tokenizer, nlu_t, hds, max_seq_length, num_out_layers_n=1, num_out_layers_h=1
+):
 
     # get contextual output of all tokens from bert
-    all_encoder_layer, pooled_output, tokens, i_nlu, i_hds,\
-    l_n, l_hpu, l_hs, \
-    nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length)
+    (
+        all_encoder_layer,
+        pooled_output,
+        tokens,
+        i_nlu,
+        i_hds,
+        l_n,
+        l_hpu,
+        l_hs,
+        nlu_tt,
+        t_to_tt_idx,
+        tt_to_t_idx,
+        t_to_tt_idx_hds,
+    ) = get_bert_output(model_bert, tokenizer, nlu_t, hds, max_seq_length)
     # all_encoder_layer: BERT outputs from all layers.
     # pooled_output: output of [CLS] vec.
     # tokens: BERT intput tokens
@@ -292,16 +295,21 @@ def get_wemb_bert(bert_config,
     # i_hds: start and end indices of headers
 
     # get the wemb
-    wemb_n = get_wemb_n(i_nlu, l_n, bert_config['hidden_size'],
-                        bert_config['num_hidden_layers'], all_encoder_layer,
-                        num_out_layers_n)
+    wemb_n = get_wemb_n(
+        i_nlu, l_n, bert_config["hidden_size"], bert_config["num_hidden_layers"], all_encoder_layer, num_out_layers_n
+    )
 
-    wemb_h = get_wemb_h(i_hds, l_hpu, l_hs, bert_config['hidden_size'],
-                        bert_config['num_hidden_layers'], all_encoder_layer,
-                        num_out_layers_h)
+    wemb_h = get_wemb_h(
+        i_hds,
+        l_hpu,
+        l_hs,
+        bert_config["hidden_size"],
+        bert_config["num_hidden_layers"],
+        all_encoder_layer,
+        num_out_layers_h,
+    )
 
-    return wemb_n, wemb_h, l_n, l_hpu, l_hs, \
-           nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds
+    return wemb_n, wemb_h, l_n, l_hpu, l_hs, nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds
 
 
 def prepare_input(tokenizer, input_sequence, input_schema, max_seq_length):
@@ -318,8 +326,7 @@ def prepare_input(tokenizer, input_sequence, input_schema, max_seq_length):
     current_hds1 = []
     for hds1 in all_hds:
         new_hds1 = current_hds1 + [hds1]
-        tokens1, _, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(
-            tokenizer, nlu_tt1, new_hds1)
+        tokens1, _, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(tokenizer, nlu_tt1, new_hds1)
         if len(segment_ids1) > max_seq_length:
             nlu_t.append(nlu_t1)
             hds.append(current_hds1)
@@ -347,14 +354,13 @@ def prepare_input_v2(tokenizer, input_sequence, input_schema):
         nlu_tt1 += tokenizer.tokenize(token)
 
     current_hds1 = []
-    current_table = ''
+    current_table = ""
     for hds1 in all_hds:
-        hds1_table = hds1.split('.')[0].strip()
+        hds1_table = hds1.split(".")[0].strip()
         if hds1_table == current_table:
             current_hds1.append(hds1)
         else:
-            tokens1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(
-                tokenizer, nlu_tt1, current_hds1)
+            tokens1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(tokenizer, nlu_tt1, current_hds1)
             max_seq_length = max(max_seq_length, len(segment_ids1))
 
             nlu_t.append(nlu_t1)
@@ -363,8 +369,7 @@ def prepare_input_v2(tokenizer, input_sequence, input_schema):
             current_table = hds1_table
 
     if len(current_hds1) > 0:
-        tokens1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(
-            tokenizer, nlu_tt1, current_hds1)
+        tokens1, segment_ids1, i_nlu1, i_hds1, t_to_tt_idx_hds1 = generate_inputs(tokenizer, nlu_tt1, current_hds1)
         max_seq_length = max(max_seq_length, len(segment_ids1))
         nlu_t.append(nlu_t1)
         hds.append(current_hds1)
@@ -372,34 +377,33 @@ def prepare_input_v2(tokenizer, input_sequence, input_schema):
     return nlu_t, hds, max_seq_length
 
 
-def get_bert_encoding(bert_config,
-                      model_bert,
-                      tokenizer,
-                      input_sequence,
-                      input_schema,
-                      bert_input_version='v1',
-                      max_seq_length=512,
-                      num_out_layers_n=1,
-                      num_out_layers_h=1):
-    if bert_input_version == 'v1':
-        nlu_t, hds = prepare_input(tokenizer, input_sequence, input_schema,
-                                   max_seq_length)
-    elif bert_input_version == 'v2':
-        nlu_t, hds, max_seq_length = prepare_input_v2(tokenizer, input_sequence,
-                                                      input_schema)
+def get_bert_encoding(
+    bert_config,
+    model_bert,
+    tokenizer,
+    input_sequence,
+    input_schema,
+    bert_input_version="v1",
+    max_seq_length=512,
+    num_out_layers_n=1,
+    num_out_layers_h=1,
+):
+    if bert_input_version == "v1":
+        nlu_t, hds = prepare_input(tokenizer, input_sequence, input_schema, max_seq_length)
+    elif bert_input_version == "v2":
+        nlu_t, hds, max_seq_length = prepare_input_v2(tokenizer, input_sequence, input_schema)
 
     wemb_n, wemb_h, l_n, l_hpu, l_hs, nlu_tt, t_to_tt_idx, tt_to_t_idx, t_to_tt_idx_hds = get_wemb_bert(
-        bert_config, model_bert, tokenizer, nlu_t, hds, max_seq_length,
-        num_out_layers_n, num_out_layers_h)
+        bert_config, model_bert, tokenizer, nlu_t, hds, max_seq_length, num_out_layers_n, num_out_layers_h
+    )
 
     t_to_tt_idx = t_to_tt_idx[0]
     assert len(t_to_tt_idx) == len(input_sequence)
-    assert sum(len(t_to_tt_idx_hds1)
-               for t_to_tt_idx_hds1 in t_to_tt_idx_hds) == len(
-                   input_schema.column_names_embedder_input)
+    assert sum(len(t_to_tt_idx_hds1) for t_to_tt_idx_hds1 in t_to_tt_idx_hds) == len(
+        input_schema.column_names_embedder_input
+    )
 
-    assert list(wemb_h.shape)[0] == len(
-        input_schema.column_names_embedder_input)
+    assert list(wemb_h.shape)[0] == len(input_schema.column_names_embedder_input)
 
     utterance_states = []
     for i in range(len(t_to_tt_idx)):
@@ -408,8 +412,7 @@ def get_bert_encoding(bert_config,
             end = l_n[0]
         else:
             end = t_to_tt_idx[i + 1]
-        utterance_states.append(
-            paddle.mean(wemb_n[:, start:end, :], axis=[0, 1]))
+        utterance_states.append(paddle.mean(wemb_n[:, start:end, :], axis=[0, 1]))
     assert len(utterance_states) == len(input_sequence)
 
     schema_token_states = []
@@ -424,13 +427,10 @@ def get_bert_encoding(bert_config,
                     end = l_hpu[cnt]
                 else:
                     end = t_to_tt_idx_hds11[i + 1]
-                schema_token_states1.append(
-                    paddle.mean(wemb_h[cnt, start:end, :], axis=0))
-            assert len(schema_token_states1) == len(
-                input_schema.column_names_embedder_input[cnt].split())
+                schema_token_states1.append(paddle.mean(wemb_h[cnt, start:end, :], axis=0))
+            assert len(schema_token_states1) == len(input_schema.column_names_embedder_input[cnt].split())
             schema_token_states.append(schema_token_states1)
 
-    assert len(schema_token_states) == len(
-        input_schema.column_names_embedder_input)
+    assert len(schema_token_states) == len(input_schema.column_names_embedder_input)
 
     return utterance_states, schema_token_states

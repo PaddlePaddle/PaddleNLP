@@ -37,19 +37,21 @@ def vector_insert(file_path):
     print(len(embedding_ids))
     client = VecToMilvus()
 
-    if (client.has_partition(collection_name, partition_tag)):
+    if client.has_partition(collection_name, partition_tag):
         client.delete_partition(collection_name, partition_tag)
     data_size = len(embedding_ids)
     batch_size = 50000
     for i in tqdm(range(0, data_size, batch_size)):
         cur_end = i + batch_size
-        if (cur_end > data_size):
+        if cur_end > data_size:
             cur_end = data_size
         batch_emb = embeddings[np.arange(i, cur_end)]
-        status, ids = client.insert(collection_name=collection_name,
-                                    vectors=batch_emb.tolist(),
-                                    ids=embedding_ids[i:i + batch_size],
-                                    partition_tag=partition_tag)
+        status, ids = client.insert(
+            collection_name=collection_name,
+            vectors=batch_emb.tolist(),
+            ids=embedding_ids[i : i + batch_size],
+            partition_tag=partition_tag,
+        )
 
 
 if __name__ == "__main__":

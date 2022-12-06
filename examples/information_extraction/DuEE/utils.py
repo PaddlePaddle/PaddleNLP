@@ -38,18 +38,18 @@ def write_by_lines(path, data):
 
 def text_to_sents(text):
     """text_to_sents"""
-    deliniter_symbols = [u"。", u"？", u"！"]
+    deliniter_symbols = ["。", "？", "！"]
     paragraphs = text.split("\n")
     ret = []
     for para in paragraphs:
-        if para == u"":
+        if para == "":
             continue
-        sents = [u""]
+        sents = [""]
         for s in para:
             sents[-1] += s
             if s in deliniter_symbols:
-                sents.append(u"")
-        if sents[-1] == u"":
+                sents.append("")
+        if sents[-1] == "":
             sents = sents[:-1]
         ret.extend(sents)
     return ret
@@ -58,8 +58,8 @@ def text_to_sents(text):
 def load_dict(dict_path):
     """load_dict"""
     vocab = {}
-    for line in open(dict_path, 'r', encoding='utf-8'):
-        value, key = line.strip('\n').split('\t')
+    for line in open(dict_path, "r", encoding="utf-8"):
+        value, key = line.strip("\n").split("\t")
         vocab[key] = int(value)
     return vocab
 
@@ -69,11 +69,11 @@ def extract_result(text, labels):
     ret, is_start, cur_type = [], False, None
     if len(text) != len(labels):
         # 韩文回导致label 比 text要长
-        labels = labels[:len(text)]
+        labels = labels[: len(text)]
     for i, label in enumerate(labels):
-        if label != u"O":
+        if label != "O":
             _type = label[2:]
-            if label.startswith(u"B-"):
+            if label.startswith("B-"):
                 is_start = True
                 cur_type = _type
                 ret.append({"start": i, "text": [text[i]], "type": _type})

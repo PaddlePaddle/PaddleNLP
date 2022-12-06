@@ -42,21 +42,20 @@ def get_match_size(cand_ngram, refs_ngram):
 
 
 def get_ngram(sent, n_size, label=None):
-
     def _ngram(sent, n_size):
         ngram_list = []
         for left in range(len(sent) - n_size):
-            ngram_list.append(sent[left:left + n_size + 1])
+            ngram_list.append(sent[left : left + n_size + 1])
         return ngram_list
 
     ngram_list = _ngram(sent, n_size)
     if label is not None:
-        ngram_list = [ngram + '_' + label for ngram in ngram_list]
+        ngram_list = [ngram + "_" + label for ngram in ngram_list]
     return ngram_list
 
 
 class BLEU(paddle.metric.Metric):
-    r'''
+    r"""
     BLEU (bilingual evaluation understudy) is an algorithm for evaluating the
     quality of text which has been machine-translated from one natural language
     to another. This metric uses a modified form of precision to compare a
@@ -128,20 +127,18 @@ class BLEU(paddle.metric.Metric):
             bleu_metric = BLEU(vocab=src_vocab.idx_to_token)
             model.prepare(optimizer, CrossEntropyCriterion(), [ppl_metric, bleu_metric])
 
-    '''
+    """
 
-    def __init__(self,
-                 trans_func=None,
-                 vocab=None,
-                 n_size=4,
-                 weights=None,
-                 name="bleu"):
+    def __init__(self, trans_func=None, vocab=None, n_size=4, weights=None, name="bleu"):
         super(BLEU, self).__init__()
         if not weights:
             weights = [1 / n_size for _ in range(n_size)]
-        assert len(weights) == n_size, (
-            "Number of weights and n-gram should be the same, got Number of weights: '%d' and n-gram: '%d'"
-            % (len(weights), n_size))
+        assert (
+            len(weights) == n_size
+        ), "Number of weights and n-gram should be the same, got Number of weights: '%d' and n-gram: '%d'" % (
+            len(weights),
+            n_size,
+        )
         self._name = name
         self.match_ngram = {}
         self.candi_ngram = {}
@@ -158,26 +155,22 @@ class BLEU(paddle.metric.Metric):
                 raise AttributeError(
                     "The `update` method requires users to provide `trans_func` or `vocab` when initializing BLEU."
                 )
-            cand_list, ref_list = default_trans_func(output,
-                                                     label,
-                                                     seq_mask=seq_mask,
-                                                     vocab=self.vocab)
+            cand_list, ref_list = default_trans_func(output, label, seq_mask=seq_mask, vocab=self.vocab)
         else:
             cand_list, ref_list = self.trans_func(output, label, seq_mask)
         if len(cand_list) != len(ref_list):
-            raise ValueError(
-                "Length error! Please check the output of network.")
+            raise ValueError("Length error! Please check the output of network.")
         for i in range(len(cand_list)):
             self.add_inst(cand_list[i], ref_list[i])
 
     def add_inst(self, cand, ref_list):
-        '''
+        """
         Update the states based on a pair of candidate and references.
 
         Args:
             cand (list): Tokenized candidate sentence.
             ref_list (list of list): List of tokenized ground truth sentences.
-        '''
+        """
         for n_size in range(self.n_size):
             self.count_ngram(cand, ref_list, n_size)
         self.count_bp(cand, ref_list)
@@ -197,8 +190,7 @@ class BLEU(paddle.metric.Metric):
 
     def count_bp(self, cand, ref_list):
         self.bp_c += len(cand)
-        self.bp_r += min([(abs(len(cand) - len(ref)), len(ref))
-                          for ref in ref_list])[1]
+        self.bp_r += min([(abs(len(cand) - len(ref)), len(ref)) for ref in ref_list])[1]
 
     def reset(self):
         self.match_ngram = {}
@@ -207,28 +199,26 @@ class BLEU(paddle.metric.Metric):
         self.bp_c = 0
 
     def accumulate(self):
-        '''
+        """
         Calculates and returns the final bleu metric.
 
         Returns:
             Tensor: Returns the accumulated metric `bleu` and its data type is float64.
-        '''
+        """
         prob_list = []
         for n_size in range(self.n_size):
             try:
                 if self.candi_ngram[n_size] == 0:
                     _score = 0.0
                 else:
-                    _score = self.match_ngram[n_size] / float(
-                        self.candi_ngram[n_size])
+                    _score = self.match_ngram[n_size] / float(self.candi_ngram[n_size])
             except:
                 _score = 0
             if _score == 0:
                 _score = sys.float_info.min
             prob_list.append(_score)
 
-        logs = math.fsum(w_i * math.log(p_i)
-                         for w_i, p_i in zip(self.weights, prob_list))
+        logs = math.fsum(w_i * math.log(p_i) for w_i, p_i in zip(self.weights, prob_list))
         bp = math.exp(min(1 - self.bp_r / float(self.bp_c), 0))
         bleu = bp * math.exp(logs)
         return bleu
@@ -241,7 +231,7 @@ class BLEU(paddle.metric.Metric):
 
 
 class BLEUForDuReader(BLEU):
-    '''
+    """
     BLEU metric with bonus for DuReader contest.
 
     Please refer to `DuReader Homepage<https://ai.baidu.com//broad/subordinate?dataset=dureader>`_ for more details.
@@ -251,19 +241,14 @@ class BLEUForDuReader(BLEU):
         alpha (float, optional): Weight of YesNo dataset when adding bonus for DuReader contest. Defaults to 1.0.
         beta (float, optional): Weight of Entity dataset when adding bonus for DuReader contest. Defaults to 1.0.
 
-    '''
+    """
 
     def __init__(self, n_size=4, alpha=1.0, beta=1.0):
         super(BLEUForDuReader, self).__init__(n_size)
         self.alpha = alpha
         self.beta = beta
 
-    def add_inst(self,
-                 cand,
-                 ref_list,
-                 yn_label=None,
-                 yn_ref=None,
-                 entity_ref=None):
+    def add_inst(self, cand, ref_list, yn_label=None, yn_ref=None, entity_ref=None):
         BLEU.add_inst(self, cand, ref_list)
         if yn_label is not None and yn_ref is not None:
             self.add_yn_bonus(cand, ref_list, yn_label, yn_ref)
@@ -282,10 +267,10 @@ class BLEUForDuReader(BLEU):
 
     def add_entity_bonus(self, cand, entity_ref):
         for n_size in range(self.n_size):
-            cand_ngram = get_ngram(cand, n_size, label='ENTITY')
+            cand_ngram = get_ngram(cand, n_size, label="ENTITY")
             ref_ngram = []
             for reff_id, r in enumerate(entity_ref):
-                ref_ngram.append(get_ngram(r, n_size, label='ENTITY'))
+                ref_ngram.append(get_ngram(r, n_size, label="ENTITY"))
             match_size, cand_size = get_match_size(cand_ngram, ref_ngram)
             self.match_ngram[n_size] += self.beta * match_size
             self.candi_ngram[n_size] += self.beta * match_size

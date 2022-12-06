@@ -49,9 +49,7 @@ class BaseComponent:
     @classmethod
     def get_subclass(cls, component_type: str):
         if component_type not in cls.subclasses.keys():
-            raise Exception(
-                f"pipelines component with the name '{component_type}' does not exist."
-            )
+            raise Exception(f"pipelines component with the name '{component_type}' does not exist.")
         subclass = cls.subclasses[component_type]
         return subclass
 
@@ -68,8 +66,7 @@ class BaseComponent:
         return instance
 
     @classmethod
-    def load_from_pipeline_config(cls, pipeline_config: dict,
-                                  component_name: str):
+    def load_from_pipeline_config(cls, pipeline_config: dict, component_name: str):
         """
         Load an individual component from a YAML config for Pipelines.
 
@@ -78,20 +75,15 @@ class BaseComponent:
         """
         if pipeline_config:
             all_component_configs = pipeline_config["components"]
-            all_component_names = [
-                comp["name"] for comp in all_component_configs
-            ]
-            component_config = next(comp for comp in all_component_configs
-                                    if comp["name"] == component_name)
+            all_component_names = [comp["name"] for comp in all_component_configs]
+            component_config = next(comp for comp in all_component_configs if comp["name"] == component_name)
             component_params = component_config["params"]
 
             for key, value in component_params.items():
                 if value in all_component_names:  # check if the param value is a reference to another component
-                    component_params[key] = cls.load_from_pipeline_config(
-                        pipeline_config, value)
+                    component_params[key] = cls.load_from_pipeline_config(pipeline_config, value)
 
-            component_instance = cls.load_from_args(component_config["type"],
-                                                    **component_params)
+            component_instance = cls.load_from_args(component_config["type"], **component_params)
         else:
             component_instance = cls.load_from_args(component_name)
         return component_instance
@@ -160,9 +152,7 @@ class BaseComponent:
 
                     for _k, _v in value.items():
                         if _k not in run_signature_args:
-                            raise Exception(
-                                f"Invalid parameter '{_k}' for the node '{self.name}'."
-                            )
+                            raise Exception(f"Invalid parameter '{_k}' for the node '{self.name}'.")
 
                 run_params.update(**value)
             elif key in run_signature_args:  # global params
@@ -182,10 +172,7 @@ class BaseComponent:
             debug_info["input"] = {**run_inputs, **run_params}
             debug_info["input"]["debug"] = self.debug
             # Include output, exclude _debug to avoid recursion
-            filtered_output = {
-                key: value
-                for key, value in output.items() if key != "_debug"
-            }
+            filtered_output = {key: value for key, value in output.items() if key != "_debug"}
             debug_info["output"] = filtered_output
         # Include custom debug info
         custom_debug = output.get("_debug", {})

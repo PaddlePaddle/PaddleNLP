@@ -65,13 +65,19 @@ args = parser.parse_args()
 
 
 def do_infer(model, tokenizer, data_loader):
-    assert isinstance(
-        model, Encoder), "please make sure that model is instance of Encoder."
+    assert isinstance(model, Encoder), "please make sure that model is instance of Encoder."
     sims = []
     model.eval()
     with paddle.no_grad():
         for batch in data_loader:
-            query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask = batch
+            (
+                query_input_ids,
+                query_token_type_ids,
+                query_attention_mask,
+                key_input_ids,
+                key_token_type_ids,
+                key_attention_mask,
+            ) = batch
             cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 key_input_ids=key_input_ids,
@@ -87,13 +93,20 @@ def do_infer(model, tokenizer, data_loader):
 
 
 def do_eval(model, tokenizer, data_loader):
-    assert isinstance(
-        model, Encoder), "please make sure that model is instance of Encoder."
+    assert isinstance(model, Encoder), "please make sure that model is instance of Encoder."
     sims, labels = [], []
     model.eval()
     with paddle.no_grad():
         for batch in data_loader:
-            query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask, label = batch
+            (
+                query_input_ids,
+                query_token_type_ids,
+                query_attention_mask,
+                key_input_ids,
+                key_token_type_ids,
+                key_attention_mask,
+                label,
+            ) = batch
             cosine_sim = model.cosine_sim(
                 query_input_ids=query_input_ids,
                 key_input_ids=key_input_ids,
@@ -113,91 +126,88 @@ def do_eval(model, tokenizer, data_loader):
 
 
 def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     global_step = 0
-    best_score = 0.
+    best_score = 0.0
     tic_train = time.time()
     model = paddle.DataParallel(model)
     model.train()
     for epoch in range(1, args.epochs + 1):
         for step, batch in enumerate(train_data_loader, start=1):
-            query_input_ids, query_token_type_ids, query_attention_mask, key_input_ids, key_token_type_ids, key_attention_mask = batch
+            (
+                query_input_ids,
+                query_token_type_ids,
+                query_attention_mask,
+                key_input_ids,
+                key_token_type_ids,
+                key_attention_mask,
+            ) = batch
 
-            loss, rtd_loss = model(query_input_ids,
-                                   key_input_ids,
-                                   query_token_type_ids=query_token_type_ids,
-                                   key_token_type_ids=key_token_type_ids,
-                                   query_attention_mask=query_attention_mask,
-                                   key_attention_mask=key_attention_mask)
+            loss, rtd_loss = model(
+                query_input_ids,
+                key_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                key_token_type_ids=key_token_type_ids,
+                query_attention_mask=query_attention_mask,
+                key_attention_mask=key_attention_mask,
+            )
 
             global_step += 1
             if global_step % (args.eval_steps // 10) == 0 and rank == 0:
                 print(
-                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, rtd_loss: {:.5f}, rtd_acc: {:.5f}, rtd_rep_acc: {:.5f}, rtd_fix_acc: {:.5f}, pos_avg: {:.5f}, neg_avg: {:.5f}, speed: {:.2f} step/s"
-                    .format(global_step, epoch, step, loss.item(),
-                            rtd_loss.item(), model._layers.rtd_acc,
-                            model._layers.rtd_rep_acc,
-                            model._layers.rtd_fix_acc,
-                            model._layers.encoder.sim.pos_avg,
-                            model._layers.encoder.sim.neg_avg,
-                            (args.eval_steps // 10) /
-                            (time.time() - tic_train)))
-                writer.add_scalar(tag="train/loss",
-                                  step=global_step,
-                                  value=loss.item())
-                writer.add_scalar(tag="train/rtd_loss",
-                                  step=global_step,
-                                  value=rtd_loss.item())
-                writer.add_scalar(tag="train/rtd_acc",
-                                  step=global_step,
-                                  value=model._layers.rtd_acc)
-                writer.add_scalar(tag="train/rtd_rep_acc",
-                                  step=global_step,
-                                  value=model._layers.rtd_rep_acc)
-                writer.add_scalar(tag="train/rtd_fix_acc",
-                                  step=global_step,
-                                  value=model._layers.rtd_fix_acc)
+                    "global step {}, epoch: {}, batch: {}, loss: {:.5f}, rtd_loss: {:.5f}, rtd_acc: {:.5f}, rtd_rep_acc: {:.5f}, rtd_fix_acc: {:.5f}, pos_avg: {:.5f}, neg_avg: {:.5f}, speed: {:.2f} step/s".format(
+                        global_step,
+                        epoch,
+                        step,
+                        loss.item(),
+                        rtd_loss.item(),
+                        model._layers.rtd_acc,
+                        model._layers.rtd_rep_acc,
+                        model._layers.rtd_fix_acc,
+                        model._layers.encoder.sim.pos_avg,
+                        model._layers.encoder.sim.neg_avg,
+                        (args.eval_steps // 10) / (time.time() - tic_train),
+                    )
+                )
+                writer.add_scalar(tag="train/loss", step=global_step, value=loss.item())
+                writer.add_scalar(tag="train/rtd_loss", step=global_step, value=rtd_loss.item())
+                writer.add_scalar(tag="train/rtd_acc", step=global_step, value=model._layers.rtd_acc)
+                writer.add_scalar(tag="train/rtd_rep_acc", step=global_step, value=model._layers.rtd_rep_acc)
+                writer.add_scalar(tag="train/rtd_fix_acc", step=global_step, value=model._layers.rtd_fix_acc)
 
                 tic_train = time.time()
 
             if global_step % args.eval_steps == 0 and rank == 0:
-                score = do_eval(model._layers.encoder, tokenizer,
-                                dev_data_loader)
+                score = do_eval(model._layers.encoder, tokenizer, dev_data_loader)
                 print("Evaluation - score:{:.5f}".format(score))
 
                 if best_score < score:
                     print(
-                        "best checkpoint has been updated: from last best_score {} --> new score {}."
-                        .format(best_score, score))
+                        "best checkpoint has been updated: from last best_score {} --> new score {}.".format(
+                            best_score, score
+                        )
+                    )
                     best_score = score
                     # save best model
                     save_dir = os.path.join(args.save_dir, "best")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
-                    paddle.save(model._layers.encoder.state_dict(),
-                                save_param_path)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model._layers.encoder.state_dict(), save_param_path)
                     tokenizer.save_pretrained(save_dir)
 
-                writer.add_scalar(tag="eval/score",
-                                  step=global_step,
-                                  value=score)
+                writer.add_scalar(tag="eval/score", step=global_step, value=score)
                 model.train()
 
             loss.backward()
@@ -205,8 +215,7 @@ def do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=None):
             lr_scheduler.step()
             optimizer.clear_grad()
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir,
-                                        "checkpoint_{}".format(global_step))
+                save_dir = os.path.join(args.save_dir, "checkpoint_{}".format(global_step))
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 save_param_path = os.path.join(save_dir, "model_state.pdparams")
@@ -230,38 +239,31 @@ if __name__ == "__main__":
         os.makedirs(args.save_dir)
 
     # define tokenizer for processing data
-    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(
-        args.encoder_name)
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.encoder_name)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     if args.mode == "train":
         start_time = time.time()
 
         # load data
-        train_ds = load_dataset(read_text_single,
-                                data_path=args.train_set_file,
-                                lazy=False)
-        dev_ds = load_dataset(read_text_pair,
-                              data_path=args.eval_set_file,
-                              lazy=False)
-        gen_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(
-            args.generator_name)
-        dis_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(
-            args.discriminator_name)
+        train_ds = load_dataset(read_text_single, data_path=args.train_set_file, lazy=False)
+        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
+        gen_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.generator_name)
+        dis_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.discriminator_name)
 
         # intializing DiffCSE model
-        model = DiffCSE(encoder_name=args.encoder_name,
-                        generator_name=args.generator_name,
-                        discriminator_name=args.discriminator_name,
-                        enc_tokenizer=tokenizer,
-                        gen_tokenizer=gen_tokenizer,
-                        dis_tokenizer=dis_tokenizer,
-                        temp=args.temp,
-                        output_emb_size=args.output_emb_size,
-                        mlm_probability=args.mlm_probability,
-                        lambda_weight=args.lambda_weight)
+        model = DiffCSE(
+            encoder_name=args.encoder_name,
+            generator_name=args.generator_name,
+            discriminator_name=args.discriminator_name,
+            enc_tokenizer=tokenizer,
+            gen_tokenizer=gen_tokenizer,
+            dis_tokenizer=dis_tokenizer,
+            temp=args.temp,
+            output_emb_size=args.output_emb_size,
+            mlm_probability=args.mlm_probability,
+            lambda_weight=args.lambda_weight,
+        )
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -281,23 +283,15 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        train_data_loader = create_dataloader(train_ds,
-                                              mode="train",
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
-        dev_data_loader = create_dataloader(dev_ds,
-                                            mode="eval",
-                                            batch_size=args.batch_size,
-                                            batchify_fn=dev_batchify_fn,
-                                            trans_fn=trans_func)
+        train_data_loader = create_dataloader(
+            train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        )
+        dev_data_loader = create_dataloader(
+            dev_ds, mode="eval", batch_size=args.batch_size, batchify_fn=dev_batchify_fn, trans_fn=trans_func
+        )
 
         with LogWriter(logdir=os.path.join(args.log_dir, "scalar")) as writer:
-            do_train(model,
-                     tokenizer,
-                     train_data_loader,
-                     dev_data_loader,
-                     writer=writer)
+            do_train(model, tokenizer, train_data_loader, dev_data_loader, writer=writer)
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))
@@ -305,22 +299,20 @@ if __name__ == "__main__":
     if args.mode == "eval":
         start_time = time.time()
         # initalizing encoder model for eval
-        model = Encoder(args.encoder_name,
-                        temp=args.temp,
-                        output_emb_size=args.output_emb_size)
+        model = Encoder(args.encoder_name, temp=args.temp, output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
                 print(
-                    "*************************initializing model from {}*****************************"
-                    .format(init_from_ckpt))
+                    "*************************initializing model from {}*****************************".format(
+                        init_from_ckpt
+                    )
+                )
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        dev_ds = load_dataset(read_text_pair,
-                              data_path=args.eval_set_file,
-                              lazy=False)
+        dev_ds = load_dataset(read_text_pair, data_path=args.eval_set_file, lazy=False)
 
         dev_batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -332,11 +324,9 @@ if __name__ == "__main__":
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
 
-        dev_data_loader = create_dataloader(dev_ds,
-                                            mode="eval",
-                                            batch_size=args.batch_size,
-                                            batchify_fn=dev_batchify_fn,
-                                            trans_fn=trans_func)
+        dev_data_loader = create_dataloader(
+            dev_ds, mode="eval", batch_size=args.batch_size, batchify_fn=dev_batchify_fn, trans_fn=trans_func
+        )
 
         score = do_eval(model, tokenizer, dev_data_loader)
         print("Evaluation - score:{:.5f}".format(score))
@@ -347,23 +337,20 @@ if __name__ == "__main__":
     if args.mode == "infer":
         start_time = time.time()
         # initalizing encoder model for eval
-        model = Encoder(args.encoder_name,
-                        temp=args.temp,
-                        output_emb_size=args.output_emb_size)
+        model = Encoder(args.encoder_name, temp=args.temp, output_emb_size=args.output_emb_size)
         # load model from saved checkpoint
         if args.ckpt_dir:
             init_from_ckpt = os.path.join(args.ckpt_dir, "model_state.pdparams")
             if os.path.isfile(init_from_ckpt):
                 print(
-                    "*************************initializing model from {}*****************************"
-                    .format(init_from_ckpt))
+                    "*************************initializing model from {}*****************************".format(
+                        init_from_ckpt
+                    )
+                )
                 state_dict = paddle.load(init_from_ckpt)
                 model.set_dict(state_dict)
 
-        infer_ds = load_dataset(read_text_pair,
-                                data_path=args.infer_set_file,
-                                lazy=False,
-                                is_infer=True)
+        infer_ds = load_dataset(read_text_pair, data_path=args.infer_set_file, lazy=False, is_infer=True)
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
@@ -374,11 +361,9 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
 
-        infer_data_loader = create_dataloader(infer_ds,
-                                              mode="infer",
-                                              batch_size=args.batch_size,
-                                              batchify_fn=batchify_fn,
-                                              trans_fn=trans_func)
+        infer_data_loader = create_dataloader(
+            infer_ds, mode="infer", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+        )
 
         cosin_sim = do_infer(model, tokenizer, infer_data_loader)
 
@@ -386,8 +371,7 @@ if __name__ == "__main__":
             for idx, cos in enumerate(cosin_sim):
                 msg = "{} --> {}\n".format(idx, cos)
                 f.write(msg)
-            print("Inference result has been saved to : {}".format(
-                args.save_infer_path))
+            print("Inference result has been saved to : {}".format(args.save_infer_path))
 
         end_time = time.time()
         print("running time {} s".format(end_time - start_time))

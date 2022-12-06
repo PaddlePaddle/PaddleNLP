@@ -15,15 +15,15 @@
 
 import inspect
 import random
+from typing import Optional
 
 import numpy as np
 import paddle
 from PIL import Image
 from tqdm.auto import tqdm
-from typing import Optional
 
-from .schedulers import PNDMScheduler, LMSDiscreteScheduler, DDIMScheduler
 from ..image_utils import load_image
+from .schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 
 __all__ = ["StableDiffusionMixin"]
 
@@ -327,7 +327,7 @@ class StableDiffusionMixin:
 
             # check sizes
             if not mask.shape == init_latents.shape:
-                raise ValueError(f"The mask and init_image should be the same size!")
+                raise ValueError("The mask and init_image should be the same size!")
 
             # get the original timestep using init_timestep
             init_timestep = int(num_inference_steps * strength) + offset

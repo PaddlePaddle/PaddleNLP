@@ -87,35 +87,26 @@ def main():
 
     dev_ds = load_dataset(read_data, data_path=args.test_file, lazy=False)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=2)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=2)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func_eval = partial(convert_example,
-                              tokenizer=tokenizer,
-                              max_seq_length=args.max_seq_length,
-                              is_pair=True)
+    trans_func_eval = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_pair=True)
 
     batchify_fn_eval = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # pair_segment
-        Stack(dtype="int64")  # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # pair_segment
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn_eval,
-                                        trans_fn=trans_func_eval)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn_eval, trans_fn=trans_func_eval
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         model.set_dict(state_dict)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     metric = paddle.metric.Auc()
     evaluate(model, metric, dev_data_loader, "dev")

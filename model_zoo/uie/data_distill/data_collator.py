@@ -29,15 +29,9 @@ class DataCollator:
     label_maps: Optional[dict] = None
     task_type: Optional[str] = None
 
-    def __call__(
-        self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]
-    ) -> Dict[str, paddle.Tensor]:
-        labels = ([feature["labels"] for feature in features]
-                  if "labels" in features[0].keys() else None)
-        new_features = [{
-            k: v
-            for k, v in f.items() if k not in ["labels"] + ignore_list
-        } for f in features]
+    def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
+        labels = [feature["labels"] for feature in features] if "labels" in features[0].keys() else None
+        new_features = [{k: v for k, v in f.items() if k not in ["labels"] + ignore_list} for f in features]
 
         batch = self.tokenizer.pad(
             new_features,
@@ -48,8 +42,7 @@ class DataCollator:
 
         if labels is None:  # for test
             if "offset_mapping" in features[0].keys():
-                batch.append(
-                    [feature["offset_mapping"] for feature in features])
+                batch.append([feature["offset_mapping"] for feature in features])
             if "text" in features[0].keys():
                 batch.append([feature["text"] for feature in features])
             return batch
@@ -59,12 +52,10 @@ class DataCollator:
             # Ensure the dimension is greater or equal to 1
             max_ent_num = max(max([len(lb["ent_labels"]) for lb in labels]), 1)
             num_ents = len(self.label_maps["entity2id"])
-            batch_entity_labels = paddle.zeros(
-                shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
+            batch_entity_labels = paddle.zeros(shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
             for i, lb in enumerate(labels):
-                for eidx, (l, eh, et) in enumerate(lb['ent_labels']):
-                    batch_entity_labels[i, l,
-                                        eidx, :] = paddle.to_tensor([eh, et])
+                for eidx, (l, eh, et) in enumerate(lb["ent_labels"]):
+                    batch_entity_labels[i, l, eidx, :] = paddle.to_tensor([eh, et])
 
             batch.append([batch_entity_labels])
         else:
@@ -76,22 +67,15 @@ class DataCollator:
                 num_rels = len(self.label_maps["relation2id"])
             else:
                 num_rels = len(self.label_maps["sentiment2id"])
-            batch_entity_labels = paddle.zeros(
-                shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
-            batch_head_labels = paddle.zeros(
-                shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
-            batch_tail_labels = paddle.zeros(
-                shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+            batch_entity_labels = paddle.zeros(shape=[bs, num_ents, max_ent_num, 2], dtype="int64")
+            batch_head_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
+            batch_tail_labels = paddle.zeros(shape=[bs, num_rels, max_spo_num, 2], dtype="int64")
 
             for i, lb in enumerate(labels):
-                for eidx, (l, eh, et) in enumerate(lb['ent_labels']):
-                    batch_entity_labels[i, l,
-                                        eidx, :] = paddle.to_tensor([eh, et])
-                for spidx, (sh, st, p, oh, ot) in enumerate(lb['rel_labels']):
-                    batch_head_labels[i, p,
-                                      spidx, :] = paddle.to_tensor([sh, oh])
-                    batch_tail_labels[i, p,
-                                      spidx, :] = paddle.to_tensor([st, ot])
-            batch.append(
-                [batch_entity_labels, batch_head_labels, batch_tail_labels])
+                for eidx, (l, eh, et) in enumerate(lb["ent_labels"]):
+                    batch_entity_labels[i, l, eidx, :] = paddle.to_tensor([eh, et])
+                for spidx, (sh, st, p, oh, ot) in enumerate(lb["rel_labels"]):
+                    batch_head_labels[i, p, spidx, :] = paddle.to_tensor([sh, oh])
+                    batch_tail_labels[i, p, spidx, :] = paddle.to_tensor([st, ot])
+            batch.append([batch_entity_labels, batch_head_labels, batch_tail_labels])
         return batch

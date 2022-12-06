@@ -123,6 +123,8 @@ dropout: 0.1
 # The flag indicating whether to share embedding and softmax weights.
 # Vocabularies in source and target should be same for weight sharing.
 weight_sharing: True
+# Whether to apply pre-normalization or not. 
+normalize_before: True
 
 # Mixed precision training
 use_amp: False
