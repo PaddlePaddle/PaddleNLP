@@ -25,25 +25,20 @@ from . import DatasetBuilder
 class HYP(DatasetBuilder):
     """
     Hyperpartisan News Detection
-    Task: Given a news article text, decide whether it follows a hyperpartisan 
-    argumentation, i.e., whether it exhibits blind, prejudiced, or unreasoning 
+    Task: Given a news article text, decide whether it follows a hyperpartisan
+    argumentation, i.e., whether it exhibits blind, prejudiced, or unreasoning
     allegiance to one party, faction, cause, or person.
-    
+
     More detail at https://pan.webis.de/semeval19/semeval19-web/
     """
+
     URL = "https://bj.bcebos.com/paddlenlp/datasets/hyp.zip"
     MD5 = "125c504b4da6882c2d163ae9962b6220"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5"))
     SPLITS = {
-        'train':
-        META_INFO(os.path.join('hyp', 'train.xml'),
-                  "f9dc8cb583db4c061a5abfb556d8c164"),
-        'dev':
-        META_INFO(os.path.join('hyp', 'eval.xml'),
-                  "20a7a7e82ae695a7fac4b8c48d0e4932"),
-        'test':
-        META_INFO(os.path.join('hyp', 'test.xml'),
-                  "5b1a166e7966fa744b402b033b9ed3ae")
+        "train": META_INFO(os.path.join("hyp", "train.xml"), "f9dc8cb583db4c061a5abfb556d8c164"),
+        "dev": META_INFO(os.path.join("hyp", "eval.xml"), "20a7a7e82ae695a7fac4b8c48d0e4932"),
+        "test": META_INFO(os.path.join("hyp", "test.xml"), "5b1a166e7966fa744b402b033b9ed3ae"),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -51,8 +46,7 @@ class HYP(DatasetBuilder):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
@@ -60,14 +54,11 @@ class HYP(DatasetBuilder):
     def _read(self, filename, split):
         """Reads data."""
         dom = xml.dom.minidom.parse(filename)
-        example_nodes = dom.documentElement.getElementsByTagName('article')
+        example_nodes = dom.documentElement.getElementsByTagName("article")
         for example in example_nodes:
-            text = ''.join([
-                nodes.toprettyxml(indent='', newl='')
-                for nodes in example.childNodes
-            ])
-            label = example.getAttribute('hyperpartisan')
-            yield {'text': text, 'label': label}
+            text = "".join([nodes.toprettyxml(indent="", newl="") for nodes in example.childNodes])
+            label = example.getAttribute("hyperpartisan")
+            yield {"text": text, "label": label}
 
     def get_labels(self):
         """

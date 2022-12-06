@@ -77,32 +77,29 @@ class Squad(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "title":
-                datasets.Value("string"),
-                "context":
-                datasets.Value("string"),
-                "question":
-                datasets.Value("string"),
-                "answers":
-                datasets.features.Sequence({
-                    "text":
-                    datasets.Value("string"),
-                    "answer_start":
-                    datasets.Value("int32"),
-                }),
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "title": datasets.Value("string"),
+                    "context": datasets.Value("string"),
+                    "question": datasets.Value("string"),
+                    "answers": datasets.features.Sequence(
+                        {
+                            "text": datasets.Value("string"),
+                            "answer_start": datasets.Value("int32"),
+                        }
+                    ),
+                }
+            ),
             # No default supervised_keys (as we have to pass both question
             # and context as input).
             supervised_keys=None,
             homepage="https://rajpurkar.github.io/SQuAD-explorer/",
             citation=_CITATION,
             task_templates=[
-                QuestionAnsweringExtractive(question_column="question",
-                                            context_column="context",
-                                            answers_column="answers")
+                QuestionAnsweringExtractive(
+                    question_column="question", context_column="context", answers_column="answers"
+                )
             ],
         )
 
@@ -110,12 +107,8 @@ class Squad(datasets.GeneratorBasedBuilder):
         downloaded_files = dl_manager.download_and_extract(_URLS)
 
         return [
-            datasets.SplitGenerator(
-                name=datasets.Split.TRAIN,
-                gen_kwargs={"filepath": downloaded_files["train"]}),
-            datasets.SplitGenerator(
-                name=datasets.Split.VALIDATION,
-                gen_kwargs={"filepath": downloaded_files["dev"]}),
+            datasets.SplitGenerator(name=datasets.Split.TRAIN, gen_kwargs={"filepath": downloaded_files["train"]}),
+            datasets.SplitGenerator(name=datasets.Split.VALIDATION, gen_kwargs={"filepath": downloaded_files["dev"]}),
         ]
 
     def _generate_examples(self, filepath):
@@ -127,12 +120,9 @@ class Squad(datasets.GeneratorBasedBuilder):
             for article in squad["data"]:
                 title = article.get("title", "")
                 for paragraph in article["paragraphs"]:
-                    context = paragraph[
-                        "context"]  # do not strip leading blank spaces GH-2585
+                    context = paragraph["context"]  # do not strip leading blank spaces GH-2585
                     for qa in paragraph["qas"]:
-                        answer_starts = [
-                            answer["answer_start"] for answer in qa["answers"]
-                        ]
+                        answer_starts = [answer["answer_start"] for answer in qa["answers"]]
                         answers = [answer["text"] for answer in qa["answers"]]
                         # Features currently used are "context", "question", and "answers".
                         # Others are extracted here for the ease of future expansions.

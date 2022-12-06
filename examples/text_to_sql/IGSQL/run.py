@@ -27,8 +27,14 @@ from data_util import atis_data
 from model.schema_interaction_model import SchemaInteractionATISModel
 from logger import Logger
 from model.model import ATISModel
-from model_util import Metrics, evaluate_utterance_sample, evaluate_interaction_sample, \
-    train_epoch_with_utterances, train_epoch_with_interactions, evaluate_using_predicted_queries
+from model_util import (
+    Metrics,
+    evaluate_utterance_sample,
+    evaluate_interaction_sample,
+    train_epoch_with_utterances,
+    train_epoch_with_interactions,
+    evaluate_using_predicted_queries,
+)
 
 import paddle
 
@@ -36,17 +42,13 @@ np.random.seed(0)
 np.set_printoptions(16)
 random.seed(0)
 
-VALID_EVAL_METRICS = [
-    Metrics.LOSS, Metrics.TOKEN_ACCURACY, Metrics.STRING_ACCURACY
-]
-TRAIN_EVAL_METRICS = [
-    Metrics.LOSS, Metrics.TOKEN_ACCURACY, Metrics.STRING_ACCURACY
-]
+VALID_EVAL_METRICS = [Metrics.LOSS, Metrics.TOKEN_ACCURACY, Metrics.STRING_ACCURACY]
+TRAIN_EVAL_METRICS = [Metrics.LOSS, Metrics.TOKEN_ACCURACY, Metrics.STRING_ACCURACY]
 FINAL_EVAL_METRICS = [Metrics.STRING_ACCURACY, Metrics.TOKEN_ACCURACY]
 
 
 def train(model, data, params):
-    """ Trains a model.
+    """Trains a model.
 
     Args:
         model (ATISModel): The model to train.
@@ -56,8 +58,7 @@ def train(model, data, params):
     # Get the training batches.
     log = Logger(os.path.join(params.logdir, params.logfile), "w")
     num_train_original = atis_data.num_utterances(data.train_data)
-    log.put("Original number of training utterances:\t" +
-            str(num_train_original))
+    log.put("Original number of training utterances:\t" + str(num_train_original))
 
     eval_fn = evaluate_utterance_sample
     trainbatch_fn = data.get_utterance_batches
@@ -72,40 +73,35 @@ def train(model, data, params):
         validsample_fn = data.get_all_interactions
 
     maximum_output_length = params.train_maximum_sql_length
-    train_batches = trainbatch_fn(batch_size,
-                                  max_output_length=maximum_output_length,
-                                  randomize=not params.deterministic)
+    train_batches = trainbatch_fn(
+        batch_size, max_output_length=maximum_output_length, randomize=not params.deterministic
+    )
 
     if params.num_train >= 0:
-        train_batches = train_batches[:params.num_train]
+        train_batches = train_batches[: params.num_train]
 
-    training_sample = trainsample_fn(params.train_evaluation_size,
-                                     max_output_length=maximum_output_length)
-    valid_examples = validsample_fn(data.valid_data,
-                                    max_output_length=maximum_output_length)
+    training_sample = trainsample_fn(params.train_evaluation_size, max_output_length=maximum_output_length)
+    valid_examples = validsample_fn(data.valid_data, max_output_length=maximum_output_length)
 
     num_train_examples = sum([len(batch) for batch in train_batches])
     num_steps_per_epoch = len(train_batches)
 
-    log.put("Actual number of used training examples:\t" +
-            str(num_train_examples))
+    log.put("Actual number of used training examples:\t" + str(num_train_examples))
     log.put("(Shortened by output limit of " + str(maximum_output_length) + ")")
     log.put("Number of steps per epoch:\t" + str(num_steps_per_epoch))
     log.put("Batch size:\t" + str(batch_size))
 
-    print("Kept " + str(num_train_examples) + "/" + str(num_train_original) +
-          " examples")
-    print("Batch size of " + str(batch_size) + " gives " +
-          str(num_steps_per_epoch) + " steps per epoch")
+    print("Kept " + str(num_train_examples) + "/" + str(num_train_original) + " examples")
+    print("Batch size of " + str(batch_size) + " gives " + str(num_steps_per_epoch) + " steps per epoch")
 
     # Keeping track of things during training.
     epochs = 0
     patience = params.initial_patience
-    learning_rate_coefficient = 1.
-    previous_epoch_loss = float('inf')
-    previous_valid_acc = 0.
-    maximum_validation_accuracy = 0.
-    maximum_string_accuracy = 0.
+    learning_rate_coefficient = 1.0
+    previous_epoch_loss = float("inf")
+    previous_valid_acc = 0.0
+    maximum_validation_accuracy = 0.0
+    maximum_string_accuracy = 0.0
 
     countdown = int(patience)
 
@@ -114,7 +110,7 @@ def train(model, data, params):
 
     save_num = 0
 
-    #init learning_rate
+    # init learning_rate
     model.set_learning_rate(params.initial_learning_rate)
 
     while keep_training:
@@ -123,8 +119,7 @@ def train(model, data, params):
         model.train()
 
         if not params.scheduler:
-            model.set_learning_rate(learning_rate_coefficient *
-                                    params.initial_learning_rate)
+            model.set_learning_rate(learning_rate_coefficient * params.initial_learning_rate)
 
         # Run a training step.
         if params.interaction_level:
@@ -135,45 +130,45 @@ def train(model, data, params):
                 randomize=not params.deterministic,
                 db2id=data.db2id,
                 id2db=data.id2db,
-                step=step)
+                step=step,
+            )
         else:
-            epoch_loss = train_epoch_with_utterances(
-                train_batches, model, randomize=not params.deterministic)
+            epoch_loss = train_epoch_with_utterances(train_batches, model, randomize=not params.deterministic)
 
         log.put("train epoch loss:\t" + str(epoch_loss))
 
-        model.set_dropout(0.)
+        model.set_dropout(0.0)
 
         model.eval()
 
         with paddle.no_grad():
 
             # Run an evaluation step on a sample of the training data.
-            train_eval_results = eval_fn(training_sample,
-                                         model,
-                                         params.train_maximum_sql_length,
-                                         name=os.path.join(
-                                             params.logdir, "train-eval"),
-                                         write_results=True,
-                                         gold_forcing=True,
-                                         metrics=TRAIN_EVAL_METRICS)[0]
+            train_eval_results = eval_fn(
+                training_sample,
+                model,
+                params.train_maximum_sql_length,
+                name=os.path.join(params.logdir, "train-eval"),
+                write_results=True,
+                gold_forcing=True,
+                metrics=TRAIN_EVAL_METRICS,
+            )[0]
 
             for name, value in train_eval_results.items():
-                log.put("train final gold-passing " + name.name + ":\t" +
-                        "%.2f" % value)
+                log.put("train final gold-passing " + name.name + ":\t" + "%.2f" % value)
 
             # Run an evaluation step on the validation set.
-            valid_eval_results = eval_fn(valid_examples,
-                                         model,
-                                         params.eval_maximum_sql_length,
-                                         name=os.path.join(
-                                             params.logdir, "valid-eval"),
-                                         write_results=True,
-                                         gold_forcing=True,
-                                         metrics=VALID_EVAL_METRICS)[0]
+            valid_eval_results = eval_fn(
+                valid_examples,
+                model,
+                params.eval_maximum_sql_length,
+                name=os.path.join(params.logdir, "valid-eval"),
+                write_results=True,
+                gold_forcing=True,
+                metrics=VALID_EVAL_METRICS,
+            )[0]
             for name, value in valid_eval_results.items():
-                log.put("valid gold-passing " + name.name + ":\t" +
-                        "%.2f" % value)
+                log.put("valid gold-passing " + name.name + ":\t" + "%.2f" % value)
 
             valid_loss = valid_eval_results[Metrics.LOSS]
             valid_token_accuracy = valid_eval_results[Metrics.TOKEN_ACCURACY]
@@ -182,10 +177,13 @@ def train(model, data, params):
             if params.scheduler:
                 model.scheduler.step(valid_loss)
 
-            if valid_loss > previous_epoch_loss and valid_token_accuracy < previous_valid_acc and step >= params.warmup_step:
+            if (
+                valid_loss > previous_epoch_loss
+                and valid_token_accuracy < previous_valid_acc
+                and step >= params.warmup_step
+            ):
                 learning_rate_coefficient *= params.learning_rate_ratio
-                log.put("learning rate coefficient:\t" +
-                        str(learning_rate_coefficient))
+                log.put("learning rate coefficient:\t" + str(learning_rate_coefficient))
 
             previous_epoch_loss = valid_loss
             previous_valid_acc = valid_token_accuracy
@@ -198,8 +196,7 @@ def train(model, data, params):
                 last_save_file = os.path.join(params.logdir, "best_model")
                 model.save(last_save_file)
 
-                log.put("maximum string accuracy:\t" +
-                        str(maximum_string_accuracy))
+                log.put("maximum string accuracy:\t" + str(maximum_string_accuracy))
                 log.put("patience:\t" + str(patience))
                 log.put("save file:\t" + str(last_save_file))
 
@@ -231,19 +228,18 @@ def evaluate(model, data, params, last_save_file, split):
         model.load(last_save_file)
     else:
         if not params.save_file:
-            raise ValueError(
-                "Must provide a save file name if not training first.")
+            raise ValueError("Must provide a save file name if not training first.")
         model.load(params.save_file)
 
     filename = split
 
-    if filename == 'dev':
+    if filename == "dev":
         split = data.dev_data
-    elif filename == 'train':
+    elif filename == "train":
         split = data.train_data
-    elif filename == 'test':
+    elif filename == "test":
         split = data.test_data
-    elif filename == 'valid':
+    elif filename == "valid":
         split = data.valid_data
     else:
         raise ValueError("Split not recognized: " + str(params.evaluate_split))
@@ -271,7 +267,8 @@ def evaluate(model, data, params, last_save_file, split):
                 max_generation_length=params.eval_maximum_sql_length,
                 write_results=True,
                 use_gpu=True,
-                compute_metrics=params.compute_metrics)
+                compute_metrics=params.compute_metrics,
+            )
         else:
             evaluate_using_predicted_queries(
                 examples,
@@ -281,7 +278,8 @@ def evaluate(model, data, params, last_save_file, split):
                 total_num=atis_data.num_utterances(split),
                 database_username=params.database_username,
                 database_password=params.database_password,
-                database_timeout=params.database_timeout)
+                database_timeout=params.database_timeout,
+            )
     else:
         examples = data.get_all_utterances(split)
         evaluate_utterance_sample(
@@ -295,7 +293,8 @@ def evaluate(model, data, params, last_save_file, split):
             database_username=params.database_username,
             database_password=params.database_password,
             database_timeout=params.database_timeout,
-            write_results=True)
+            write_results=True,
+        )
 
 
 def main():
@@ -312,13 +311,16 @@ def main():
     if params.interaction_level:
         model_type = SchemaInteractionATISModel
     else:
-        print('not implemented')
+        print("not implemented")
         exit()
 
     model = model_type(
-        params, data.input_vocabulary, data.output_vocabulary,
-        data.output_vocabulary_schema, data.anonymizer
-        if params.anonymize and params.anonymization_scoring else None)
+        params,
+        data.input_vocabulary,
+        data.output_vocabulary,
+        data.output_vocabulary_schema,
+        data.anonymizer if params.anonymize and params.anonymization_scoring else None,
+    )
 
     model.build_optim()
 
@@ -328,12 +330,12 @@ def main():
 
     if params.train:
         last_save_file = train(model, data, params)
-    if params.evaluate and 'valid' in params.evaluate_split:
-        evaluate(model, data, params, last_save_file, split='valid')
-    if params.evaluate and 'dev' in params.evaluate_split:
-        evaluate(model, data, params, last_save_file, split='dev')
-    if params.evaluate and 'test' in params.evaluate_split:
-        evaluate(model, data, params, last_save_file, split='test')
+    if params.evaluate and "valid" in params.evaluate_split:
+        evaluate(model, data, params, last_save_file, split="valid")
+    if params.evaluate and "dev" in params.evaluate_split:
+        evaluate(model, data, params, last_save_file, split="dev")
+    if params.evaluate and "test" in params.evaluate_split:
+        evaluate(model, data, params, last_save_file, split="test")
 
 
 if __name__ == "__main__":

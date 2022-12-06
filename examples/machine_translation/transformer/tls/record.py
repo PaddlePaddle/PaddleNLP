@@ -1,5 +1,4 @@
 class AverageStatistical(object):
-
     def __init__(self):
         self.reset()
 

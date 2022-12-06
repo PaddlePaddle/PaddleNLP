@@ -32,18 +32,15 @@ class RequestBase(BaseModel, extra=Extra.forbid):
 
 
 class HttpRouterManager(BaseRouterManager):
-
     def register_models_router(self, task_name):
 
         # Url path to register the model
         paths = [f"/models/{task_name}"]
         for path in paths:
-            logger.info(
-                "   Transformer model request [path]={} is genereated.".format(
-                    path))
+            logger.info("   Transformer model request [path]={} is genereated.".format(path))
 
         # Unique name to create the pydantic model
-        unique_name = (hashlib.md5(task_name.encode()).hexdigest())
+        unique_name = hashlib.md5(task_name.encode()).hexdigest()
 
         # Create request model
         req_model = create_model(
@@ -61,9 +58,8 @@ class HttpRouterManager(BaseRouterManager):
 
         # Template predict endpoint function to dynamically serve different models
         def predict(request: Request, inference_request: req_model):
-            result = self._app._model_manager.predict(
-                inference_request.data, inference_request.parameters)
-            return {'result': result}
+            result = self._app._model_manager.predict(inference_request.data, inference_request.parameters)
+            return {"result": result}
 
         # Register the route and add to the app
         router = APIRouter()
@@ -84,11 +80,10 @@ class HttpRouterManager(BaseRouterManager):
         # Url path to register the model
         paths = [f"/taskflow/{task_name}"]
         for path in paths:
-            logger.info(
-                "   Taskflow  request [path]={} is genereated.".format(path))
+            logger.info("   Taskflow  request [path]={} is genereated.".format(path))
 
         # Unique name to create the pydantic model
-        unique_name = (hashlib.md5(task_name.encode()).hexdigest())
+        unique_name = hashlib.md5(task_name.encode()).hexdigest()
 
         # Create request model
         req_model = create_model(
@@ -106,9 +101,8 @@ class HttpRouterManager(BaseRouterManager):
 
         # Template predict endpoint function to dynamically serve different models
         def predict(request: Request, inference_request: req_model):
-            result = self._app._taskflow_manager.predict(
-                inference_request.data, inference_request.parameters)
-            return {'result': result}
+            result = self._app._taskflow_manager.predict(inference_request.data, inference_request.parameters)
+            return {"result": result}
 
         # Register the route and add to the app
         router = APIRouter()

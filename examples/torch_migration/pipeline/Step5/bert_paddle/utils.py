@@ -86,7 +86,6 @@ class SmoothedValue(object):
 
 
 class MetricLogger(object):
-
     def __init__(self, delimiter="\t"):
         self.meters = defaultdict(SmoothedValue)
         self.delimiter = delimiter
@@ -103,8 +102,7 @@ class MetricLogger(object):
             return self.meters[attr]
         if attr in self.__dict__:
             return self.__dict__[attr]
-        raise AttributeError("'{}' object has no attribute '{}'".format(
-            type(self).__name__, attr))
+        raise AttributeError("'{}' object has no attribute '{}'".format(type(self).__name__, attr))
 
     def __str__(self):
         loss_str = []
@@ -129,23 +127,27 @@ class MetricLogger(object):
         data_time = SmoothedValue(fmt="{avg:.4f}")
         space_fmt = ":" + str(len(str(len(iterable)))) + "d"
         if paddle.device.is_compiled_with_cuda():
-            log_msg = self.delimiter.join([
-                header,
-                "[{0" + space_fmt + "}/{1}]",
-                "eta: {eta}",
-                "{meters}",
-                "time: {time}",
-                "data: {data}",
-            ])
+            log_msg = self.delimiter.join(
+                [
+                    header,
+                    "[{0" + space_fmt + "}/{1}]",
+                    "eta: {eta}",
+                    "{meters}",
+                    "time: {time}",
+                    "data: {data}",
+                ]
+            )
         else:
-            log_msg = self.delimiter.join([
-                header,
-                "[{0" + space_fmt + "}/{1}]",
-                "eta: {eta}",
-                "{meters}",
-                "time: {time}",
-                "data: {data}",
-            ])
+            log_msg = self.delimiter.join(
+                [
+                    header,
+                    "[{0" + space_fmt + "}/{1}]",
+                    "eta: {eta}",
+                    "{meters}",
+                    "time: {time}",
+                    "data: {data}",
+                ]
+            )
         for obj in iterable:
             data_time.update(time.time() - end)
             yield obj
@@ -161,7 +163,8 @@ class MetricLogger(object):
                         meters=str(self),
                         time=str(iter_time),
                         data=str(data_time),
-                    ))
+                    )
+                )
             i += 1
             end = time.time()
         total_time = time.time() - start_time
@@ -188,12 +191,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(
-            f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(
-            f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,

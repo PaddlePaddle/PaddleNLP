@@ -36,44 +36,41 @@ args = parser.parse_args()
 
 def offline_qa_generation():
     answer_extractor = AnswerExtractor(
-        model='uie-base-answer-extractor-v1',
+        model="uie-base-answer-extractor-v1",
         device=args.device,
-        schema=['答案'],
+        schema=["答案"],
         position_prob=0.01,
     )
 
     question_generator = QuestionGenerator(
-        model='unimo-text-1.0-question-generator-v1',
+        model="unimo-text-1.0-question-generator-v1",
         device=args.device,
     )
 
     qa_filter = QAFilter(
-        model='uie-base-qa-filter-v1',
+        model="uie-base-qa-filter-v1",
         device=args.device,
-        schema=['答案'],
+        schema=["答案"],
         position_prob=0.1,
     )
 
-    pipe = QAGenerationPipeline(answer_extractor=answer_extractor,
-                                question_generator=question_generator,
-                                qa_filter=qa_filter)
+    pipe = QAGenerationPipeline(
+        answer_extractor=answer_extractor, question_generator=question_generator, qa_filter=qa_filter
+    )
     pipeline_params = {"QAFilter": {"is_filter": True}}
 
     if args.source_file:
         meta = []
-        with open(args.source_file, 'r', encoding='utf-8') as rf:
+        with open(args.source_file, "r", encoding="utf-8") as rf:
             for line in rf:
                 meta.append(line.strip())
         prediction = pipe.run(meta=meta, params=pipeline_params)
-        prediction = prediction['filtered_cqa_triples']
+        prediction = prediction["filtered_cqa_triples"]
         if not os.path.exists(args.doc_dir):
             os.makedirs(args.doc_dir)
-        with open(os.path.join(args.doc_dir, 'generated_qa_pairs.txt'),
-                  'w',
-                  encoding='utf-8') as wf:
+        with open(os.path.join(args.doc_dir, "generated_qa_pairs.txt"), "w", encoding="utf-8") as wf:
             for pair in prediction:
-                wf.write(pair['synthetic_question'].strip() + '\t' +
-                         pair['synthetic_answer'].strip() + '\n')
+                wf.write(pair["synthetic_question"].strip() + "\t" + pair["synthetic_answer"].strip() + "\n")
 
 
 if __name__ == "__main__":

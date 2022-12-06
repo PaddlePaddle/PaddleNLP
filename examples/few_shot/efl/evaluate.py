@@ -34,8 +34,7 @@ def do_evaluate(model, tokenizer, data_loader, task_label_description):
     for batch in data_loader:
         src_ids, token_type_ids, true_labels = batch
         # Prediction_probs:[bs * class_num, 2]
-        prediction_probs = model(input_ids=src_ids,
-                                 token_type_ids=token_type_ids).numpy()
+        prediction_probs = model(input_ids=src_ids, token_type_ids=token_type_ids).numpy()
 
         all_prediction_probs.append(prediction_probs)
         all_labels.append(true_labels.numpy())
@@ -48,10 +47,9 @@ def do_evaluate(model, tokenizer, data_loader, task_label_description):
     prediction_pos_probs = np.reshape(prediction_pos_probs, (-1, class_num))
     y_pred_index = np.argmax(prediction_pos_probs, axis=-1)
 
-    y_true_index = np.array([
-        true_label_index for idx, true_label_index in enumerate(all_labels)
-        if idx % class_num == 0
-    ])
+    y_true_index = np.array(
+        [true_label_index for idx, true_label_index in enumerate(all_labels) if idx % class_num == 0]
+    )
 
     total_num = len(y_true_index)
     correct_num = (y_pred_index == y_true_index).sum()

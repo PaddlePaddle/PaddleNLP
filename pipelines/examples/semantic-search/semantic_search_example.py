@@ -83,17 +83,14 @@ def get_faiss_retriever(use_gpu):
         dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
 
         fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
-        dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                       split_paragraphs=True,
-                                       encoding='utf-8')
+        dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
 
         if os.path.exists(args.index_name):
             os.remove(args.index_name)
         if os.path.exists(faiss_document_store):
             os.remove(faiss_document_store)
 
-        document_store = FAISSDocumentStore(embedding_dim=args.embedding_dim,
-                                            faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(embedding_dim=args.embedding_dim, faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
         retriever = DensePassageRetriever(
@@ -121,15 +118,14 @@ def get_milvus_retriever(use_gpu):
 
     milvus_document_store = "milvus_document_store.db"
     if os.path.exists(milvus_document_store):
-        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
-                                             host=args.host,
-                                             index=args.index_name,
-                                             port=args.port,
-                                             index_param={
-                                                 "M": 16,
-                                                 "efConstruction": 50
-                                             },
-                                             index_type="HNSW")
+        document_store = MilvusDocumentStore(
+            embedding_dim=args.embedding_dim,
+            host=args.host,
+            index=args.index_name,
+            port=args.port,
+            index_param={"M": 16, "efConstruction": 50},
+            index_type="HNSW",
+        )
         # connect to existed Milvus Index
         retriever = DensePassageRetriever(
             document_store=document_store,
@@ -148,18 +144,15 @@ def get_milvus_retriever(use_gpu):
         dureader_data = "https://paddlenlp.bj.bcebos.com/applications/dureader_dev.zip"
 
         fetch_archive_from_http(url=dureader_data, output_dir=doc_dir)
-        dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                       split_paragraphs=True,
-                                       encoding='utf-8')
-        document_store = MilvusDocumentStore(embedding_dim=args.embedding_dim,
-                                             host=args.host,
-                                             index=args.index_name,
-                                             port=args.port,
-                                             index_param={
-                                                 "M": 16,
-                                                 "efConstruction": 50
-                                             },
-                                             index_type="HNSW")
+        dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
+        document_store = MilvusDocumentStore(
+            embedding_dim=args.embedding_dim,
+            host=args.host,
+            index=args.index_name,
+            port=args.port,
+            index_param={"M": 16, "efConstruction": 50},
+            index_type="HNSW",
+        )
         retriever = DensePassageRetriever(
             document_store=document_store,
             query_embedding_model=args.query_embedding_model,
@@ -182,48 +175,30 @@ def get_milvus_retriever(use_gpu):
 
 def semantic_search_tutorial():
 
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
 
-    if (args.search_engine == 'milvus'):
+    if args.search_engine == "milvus":
         retriever = get_milvus_retriever(use_gpu)
     else:
         retriever = get_faiss_retriever(use_gpu)
 
     ### Ranker
-    ranker = ErnieRanker(
-        model_name_or_path="rocketqa-zh-dureader-cross-encoder",
-        use_gpu=use_gpu)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
     ### Pipeline
     from pipelines import SemanticSearchPipeline
+
     pipe = SemanticSearchPipeline(retriever, ranker)
 
-    prediction = pipe.run(query="亚马逊河流的介绍",
-                          params={
-                              "Retriever": {
-                                  "top_k": 50
-                              },
-                              "Ranker": {
-                                  "top_k": 5
-                              }
-                          })
+    prediction = pipe.run(query="亚马逊河流的介绍", params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}})
 
     print_documents(prediction)
     # Batch prediction
-    predictions = pipe.run_batch(queries=["亚马逊河流的介绍", '期货交易手续费指的是什么?'],
-                                 params={
-                                     "Retriever": {
-                                         "top_k": 50
-                                     },
-                                     "Ranker": {
-                                         "top_k": 5
-                                     }
-                                 })
-    for i in range(len(predictions['queries'])):
-        result = {
-            'documents': predictions['documents'][i],
-            'query': predictions['queries'][i]
-        }
+    predictions = pipe.run_batch(
+        queries=["亚马逊河流的介绍", "期货交易手续费指的是什么?"], params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}}
+    )
+    for i in range(len(predictions["queries"])):
+        result = {"documents": predictions["documents"][i], "query": predictions["queries"][i]}
         print_documents(result)
 
 

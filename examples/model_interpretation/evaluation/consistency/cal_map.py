@@ -24,35 +24,32 @@ import argparse
 
 
 def get_args():
-    parser = argparse.ArgumentParser('map eval')
-    parser.add_argument('--pred_path', required=True)
-    parser.add_argument('--golden_path', required=True)
-    parser.add_argument('--language',
-                        type=str,
-                        required=True,
-                        help='language that the model is built for')
+    parser = argparse.ArgumentParser("map eval")
+    parser.add_argument("--pred_path", required=True)
+    parser.add_argument("--golden_path", required=True)
+    parser.add_argument("--language", type=str, required=True, help="language that the model is built for")
     args = parser.parse_args()
     return args
 
 
 def evids_load(args, path):
-    golden_f = open(args.golden_path, 'r')
+    golden_f = open(args.golden_path, "r")
     golden = {}
     ins_num = 0
     for golden_line in golden_f.readlines():
         line = json.loads(golden_line)
-        if line['sample_type'] == 'disturb':
+        if line["sample_type"] == "disturb":
             ins_num += 1
-        golden[line['sent_id']] = line
+        golden[line["sent_id"]] = line
 
     evids = {}
-    with open(path, 'r') as f:
+    with open(path, "r") as f:
         for line in f.readlines():
             dic = json.loads(line)
-            dic['sample_type'] = golden[dic['id']]['sample_type']
-            if 'rel_ids' in golden[dic['id']]:
-                dic['rel_ids'] = golden[dic['id']]['rel_ids']
-            evids[dic['id']] = dic
+            dic["sample_type"] = golden[dic["id"]]["sample_type"]
+            if "rel_ids" in golden[dic["id"]]:
+                dic["rel_ids"] = golden[dic["id"]]["rel_ids"]
+            evids[dic["id"]] = dic
     return evids, ins_num
 
 
@@ -66,7 +63,7 @@ def _calc_MAP_by_bin(top_p, length_adv, adv_attriRank_list, ori_attriRank_list):
     length_t = math.ceil(length_adv * top_p)
     adv_t = adv_attriRank_list[:length_t]
     for char_idx, char in enumerate(adv_t):
-        if char in ori_attriRank_list[:char_idx + 1]:
+        if char in ori_attriRank_list[: char_idx + 1]:
             hits += 1
         sum_precs += hits / (char_idx + 1)
     if length_t > 0:
@@ -74,8 +71,7 @@ def _calc_MAP_by_bin(top_p, length_adv, adv_attriRank_list, ori_attriRank_list):
     return sum_precs
 
 
-def _calc_MAP_by_bin_paper(top_p, length_adv, adv_attriRank_list,
-                           ori_attriRank_list):
+def _calc_MAP_by_bin_paper(top_p, length_adv, adv_attriRank_list, ori_attriRank_list):
     """
     This function calculates MAP using the equation in our paper,
     which follows equation one in consistency section of README
@@ -102,21 +98,19 @@ def _calc_map(evids, key, ins_num):
     ori_num = 0
     sample_length = len(evids)
     for ori_idx in evids:
-        if evids[ori_idx]['sample_type'] == 'ori':
+        if evids[ori_idx]["sample_type"] == "ori":
             ori = evids[ori_idx]
             ori_num += 1
             # One original instance can be related to several disturbed instance
-            for adv_idx in evids[ori_idx]['rel_ids']:
+            for adv_idx in evids[ori_idx]["rel_ids"]:
                 if adv_idx in evids:
                     adv_num += 1
                     adv = evids[adv_idx]
-                    ori_attriRank_list = list(ori['rationale_token'][key])
-                    adv_attriRank_list = list(adv['rationale_token'][key])
+                    ori_attriRank_list = list(ori["rationale_token"][key])
+                    adv_attriRank_list = list(adv["rationale_token"][key])
                     length_adv = len(adv_attriRank_list)
 
-                    sum_precs = _calc_MAP_by_bin_paper(1, length_adv,
-                                                       adv_attriRank_list,
-                                                       ori_attriRank_list)
+                    sum_precs = _calc_MAP_by_bin_paper(1, length_adv, adv_attriRank_list, ori_attriRank_list)
                     t_map += sum_precs
 
     return t_map / ins_num, ori_num + adv_num
@@ -130,18 +124,17 @@ def cal_MAP(args, pred_path, la):
     first_key = list(evids.keys())[0]
     t_map = 0
     num = 0
-    for i in range(len(evids[first_key]['rationale'])):
+    for i in range(len(evids[first_key]["rationale"])):
         t_map_tmp, num_tmp = _calc_map(evids, i, ins_num)
         t_map += t_map_tmp
         num += num_tmp
-    t_map /= len(evids[first_key]['rationale'])
-    num /= len(evids[first_key]['rationale'])
-    print('total\t%d\t%.1f' % \
-        (num, 100 * t_map))
+    t_map /= len(evids[first_key]["rationale"])
+    num /= len(evids[first_key]["rationale"])
+    print("total\t%d\t%.1f" % (num, 100 * t_map))
     return 0
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     la = args.language
     pred_path = args.pred_path

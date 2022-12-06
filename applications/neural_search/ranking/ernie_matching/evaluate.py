@@ -71,8 +71,7 @@ def evaluate(model, metric, data_loader, phase="dev"):
     for idx, batch in enumerate(data_loader):
         input_ids, token_type_ids, labels = batch
 
-        pos_probs = model.predict(input_ids=input_ids,
-                                  token_type_ids=token_type_ids)
+        pos_probs = model.predict(input_ids=input_ids, token_type_ids=token_type_ids)
 
         neg_probs = 1.0 - pos_probs
 
@@ -86,21 +85,21 @@ def evaluate(model, metric, data_loader, phase="dev"):
 
 # 构建读取函数，读取原始数据
 def read(src_path, is_predict=False):
-    data = pd.read_csv(src_path, sep='\t')
+    data = pd.read_csv(src_path, sep="\t")
     for index, row in tqdm(data.iterrows()):
-        query = row['query']
-        title = row['title']
-        neg_title = row['neg_title']
-        yield {'query': query, 'title': title, 'neg_title': neg_title}
+        query = row["query"]
+        title = row["title"]
+        neg_title = row["neg_title"]
+        yield {"query": query, "title": title, "neg_title": neg_title}
 
 
 def read_test(src_path, is_predict=False):
-    data = pd.read_csv(src_path, sep='\t')
+    data = pd.read_csv(src_path, sep="\t")
     for index, row in tqdm(data.iterrows()):
-        query = row['query']
-        title = row['title']
-        label = row['label']
-        yield {'query': query, 'title': title, 'label': label}
+        query = row["query"]
+        title = row["title"]
+        label = row["label"]
+        yield {"query": query, "title": title, "label": label}
 
 
 def main():
@@ -117,24 +116,17 @@ def main():
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func_eval = partial(convert_example,
-                              tokenizer=tokenizer,
-                              max_seq_length=args.max_seq_length,
-                              phase="eval")
+    trans_func_eval = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, phase="eval")
 
     batchify_fn_eval = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # pair_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # pair_segment
-        Stack(dtype="int64")  # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # pair_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # pair_segment
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn_eval,
-                                        trans_fn=trans_func_eval)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn_eval, trans_fn=trans_func_eval
+    )
 
     model = PairwiseMatching(pretrained_model, margin=args.margin)
 

@@ -36,38 +36,27 @@ def parse_args():
         "--config",
         default="./faster_transformer/sample/config/decoding.sample.yaml",
         type=str,
-        help="Path of the config file. ")
-    parser.add_argument("--decoding_lib",
-                        default="./build/lib/libdecoding_op.so",
-                        type=str,
-                        help="Path of libdecoding_op.so. ")
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 decoding to predict. ")
+        help="Path of the config file. ",
+    )
+    parser.add_argument(
+        "--decoding_lib", default="./build/lib/libdecoding_op.so", type=str, help="Path of libdecoding_op.so. "
+    )
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
         "--enable_faster_encoder",
         action="store_true",
-        help=
-        "Whether to use faster version encoder to predict. This is experimental option for now. "
+        help="Whether to use faster version encoder to predict. This is experimental option for now. ",
     )
-    parser.add_argument("--use_fp16_encoder",
-                        action="store_true",
-                        help="Whether to use fp16 encoder to predict. ")
+    parser.add_argument("--use_fp16_encoder", action="store_true", help="Whether to use fp16 encoder to predict. ")
     args = parser.parse_args()
     return args
 
 
 def generate_src_word(batch_size, vocab_size, max_length, eos_idx, pad_idx):
-    memory_sequence_length = np.random.randint(low=1,
-                                               high=max_length,
-                                               size=batch_size).astype(np.int32)
+    memory_sequence_length = np.random.randint(low=1, high=max_length, size=batch_size).astype(np.int32)
     data = []
     for i in range(batch_size):
-        data.append(
-            np.random.randint(low=3,
-                              high=vocab_size,
-                              size=memory_sequence_length[i],
-                              dtype=np.int64))
+        data.append(np.random.randint(low=3, high=vocab_size, size=memory_sequence_length[i], dtype=np.int64))
 
     word_pad = Pad(pad_idx)
     src_word = word_pad([list(word) + [eos_idx] for word in data])
@@ -101,20 +90,22 @@ def do_predict(args):
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
         enable_faster_encoder=args.enable_faster_encoder,
-        use_fp16_encoder=args.use_fp16_encoder)
+        use_fp16_encoder=args.use_fp16_encoder,
+    )
 
     # Set evaluate mode
     transformer.eval()
 
     if args.enable_faster_encoder:
-        transformer = enable_faster_encoder(transformer,
-                                            use_fp16=args.use_fp16_encoder)
+        transformer = enable_faster_encoder(transformer, use_fp16=args.use_fp16_encoder)
 
-    src_word = generate_src_word(batch_size=args.infer_batch_size,
-                                 vocab_size=args.src_vocab_size,
-                                 max_length=args.max_length,
-                                 eos_idx=args.eos_idx,
-                                 pad_idx=args.bos_idx)
+    src_word = generate_src_word(
+        batch_size=args.infer_batch_size,
+        vocab_size=args.src_vocab_size,
+        max_length=args.max_length,
+        eos_idx=args.eos_idx,
+        pad_idx=args.bos_idx,
+    )
 
     with paddle.no_grad():
         for i in range(100):
@@ -124,14 +115,13 @@ def do_predict(args):
                 start = time.time()
             transformer(src_word=src_word)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for encoder-decoding is %f ms" %
-                    ((time.time() - start) / 50 * 1000))
+        logger.info("Average test time for encoder-decoding is %f ms" % ((time.time() - start) / 50 * 1000))
 
 
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
