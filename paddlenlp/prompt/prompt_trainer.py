@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import os
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
@@ -40,10 +40,10 @@ class PromptTrainer(Trainer):
 
     def __init__(
         self,
-        model: Union[nn.Layer],
+        model: nn.Layer,
         tokenizer: PretrainedTokenizer,
-        criterion: Union[nn.Layer],
-        args: PromptTuningArguments = None,
+        criterion: Optional[nn.Layer] = None,
+        args: Optional[PromptTuningArguments] = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[MapDataset] = None,
         eval_dataset: Optional[MapDataset] = None,
