@@ -23,8 +23,7 @@ from dataclasses import dataclass
 import numpy as np
 import paddle
 
-from ..transformers.tokenizer_utils_base import (PretrainedTokenizerBase,
-                                                 PaddingStrategy)
+from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
 
 
 def signature(function):
@@ -32,17 +31,14 @@ def signature(function):
     Obtain the input arguments of the given function.
     """
     sig = inspect.signature(function)
-    args = [
-        p.name for p in sig.parameters.values()
-        if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD
-    ]
+    args = [p.name for p in sig.parameters.values() if p.kind == inspect.Parameter.POSITIONAL_OR_KEYWORD]
     return args
 
 
 @dataclass
 class PromptDataCollatorWithPadding:
     """
-    Data collator that will group inputs by keywords and dynamically 
+    Data collator that will group inputs by keywords and dynamically
     pad the inputs to the longest sequence in the batch.
 
     Args:
@@ -56,9 +52,13 @@ class PromptDataCollatorWithPadding:
     pad_to_multiple_of: Optional[int] = None
     return_tensors: str = "pd"
     return_attention_mask: Optional[bool] = None
-    default_model_input_names: List = ("input_ids", "token_type_ids",
-                                       "special_tokens_mask", "offset_mapping",
-                                       "position_ids")
+    default_model_input_names: List = (
+        "input_ids",
+        "token_type_ids",
+        "special_tokens_mask",
+        "offset_mapping",
+        "position_ids",
+    )
 
     def _convert_to_tensors(self, data):
         if self.return_tensors == "np":
@@ -78,7 +78,8 @@ class PromptDataCollatorWithPadding:
             max_length=self.max_length,
             pad_to_multiple_of=self.pad_to_multiple_of,
             return_tensors=self.return_tensors,
-            return_attention_mask=self.return_attention_mask)
+            return_attention_mask=self.return_attention_mask,
+        )
         max_length = batch["input_ids"].shape[1]
         for key in features[0]:
             if key not in self.default_model_input_names:
@@ -90,8 +91,7 @@ class PromptDataCollatorWithPadding:
                         new_values.extend(value.tolist())
                     values = new_values
                 elif key == "attention_mask":
-                    new_values = np.zeros(
-                        [len(values), 1, max_length, max_length])
+                    new_values = np.zeros([len(values), 1, max_length, max_length])
                     for index, value in enumerate(values):
                         length = len(value)
                         new_values[index][0, :length, :length] = value

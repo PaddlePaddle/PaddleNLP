@@ -58,14 +58,7 @@ transformer = FasterTransformer(
 
 #### 数据准备
 
-公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
-
-同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/WMT14ende/`。
-
-``` python
-datasets = load_dataset('wmt14ende', splits=('test'))
-```
-
+本示例可以使用 PaddleNLP 内置的处理好的 WMT14 EN-DE 翻译的数据进行训练、预测，也可以使用自定义数据集。数据准备部分可以参考前页文档 [使用自定义翻译数据集](../README.md)。
 
 #### 模型推断
 
@@ -87,11 +80,14 @@ tar -zxf transformer-base-wmt_ende_bpe.tar.gz
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 0
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --decoding_strategy beam_search --beam_size 5
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --decoding_strategy beam_search \
+    --beam_size 5
 ```
 
 其中:
@@ -108,7 +104,6 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
-
 #### 使用动态图预测(使用 float16 decoding 预测)
 
 float16 与 float32 预测的基本流程相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use_fp16_decoding` 选项，表示使用 fp16 进行预测。后按照与之前相同的方式执行即可。具体执行方式如下：
@@ -116,11 +111,15 @@ float16 与 float32 预测的基本流程相同，不过在使用 float16 的 de
 ``` sh
 # setting visible devices for prediction
 export CUDA_VISIBLE_DEVICES=0
-export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
 ./decoding_gemm 8 4 8 64 38512 32 512 1
-python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so --use_fp16_decoding --decoding_strategy beam_search --beam_size 5
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --use_fp16_decoding \
+    --decoding_strategy beam_search \
+    --beam_size 5
 ```
 
 其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FasterTransformer decoding lib 的位置。
@@ -129,6 +128,47 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
+#### 使用自定义数据集进行预测
+
+如果需要使用准备好的自定义数据集进行高性能推理，同样可以通过在执行 `encoder_decoding_predict.py` 脚本时指明以下参数，从而引入自定义数据集。
+
+* `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
+  * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+  * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，传入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de`。
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
+
+比如：
+
+``` bash
+# setting visible devices for prediction
+export CUDA_VISIBLE_DEVICES=0
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/iwslt14.tokenized.de-en/
+
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
+./decoding_gemm 8 4 8 64 38512 32 512 1
+
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --use_fp16_decoding \
+    --decoding_strategy beam_search \
+    --beam_size 5 \
+    --test_file ${DATA_DEST_DIR}/test.de-en.de \
+    --src_vocab ${DATA_DEST_DIR}/dev.de-en.de \
+    --trg_vocab ${DATA_DEST_DIR}/dev.de-en.en \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
 #### 导出基于 FasterTransformer 的预测库使用模型文件
 
 我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
@@ -136,7 +176,10 @@ python encoder_decoding_predict.py --config ../configs/transformer.base.yaml --d
 使用 C++ 预测库，首先，我们需要做的是将动态图的 checkpoint 导出成预测库能使用的模型文件和参数文件。可以执行 `export_model.py` 实现这个过程。
 
 ``` sh
-python export_model.py --config ../configs/transformer.base.yaml  --decoding_strategy beam_search --beam_size 5
+python export_model.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_strategy beam_search \
+    --beam_size 5
 ```
 
 若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md)。编译好后，可以在执行 `export_model.py` 时使用 `--decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so` 可以完成导入。

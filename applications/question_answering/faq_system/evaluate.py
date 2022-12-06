@@ -50,14 +50,14 @@ def recall(rs, N=10):
 
 if __name__ == "__main__":
     text2similar = {}
-    with open(args.similar_text_pair, 'r', encoding='utf-8') as f:
+    with open(args.similar_text_pair, "r", encoding="utf-8") as f:
         for line in f:
             text, similar_text = line.rstrip().split("\t")
             text2similar[text] = similar_text
 
     rs = []
 
-    with open(args.recall_result_file, 'r', encoding='utf-8') as f:
+    with open(args.recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
 
@@ -72,13 +72,13 @@ if __name__ == "__main__":
                 relevance_labels.append(0)
     recall_N = []
     recall_num = [1, 5, 10]
-    result = open('result.tsv', 'a')
+    result = open("result.tsv", "a")
     res = []
     for topN in recall_num:
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
     for key, val in zip(recall_num, recall_N):
-        print('recall@{}={}'.format(key, val))
+        print("recall@{}={}".format(key, val))
         res.append(str(val))
-    result.write('\t'.join(res) + '\n')
+    result.write("\t".join(res) + "\n")
     # print("\t".join(recall_N))

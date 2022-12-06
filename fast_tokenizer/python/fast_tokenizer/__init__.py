@@ -22,12 +22,10 @@ import platform
 current_path = os.path.abspath(os.path.dirname(__file__))
 
 try:
-    if os.name == 'nt':
-        third_lib_path = current_path + os.sep + 'libs'
+    if os.name == "nt":
+        third_lib_path = current_path + os.sep + "libs"
         # Will load shared library from 'path' on windows
-        os.environ[
-            'path'] = current_path + ';' + third_lib_path + ';' + os.environ[
-                'path']
+        os.environ["path"] = current_path + ";" + third_lib_path + ";" + os.environ["path"]
         sys.path.insert(0, third_lib_path)
         # Note: from python3.8, PATH will not take effect
         # https://github.com/python/cpython/pull/12302
@@ -35,19 +33,23 @@ try:
         if sys.version_info[:2] >= (3, 8):
             os.add_dll_directory(third_lib_path)
 except ImportError as e:
-    if os.name == 'nt':
+    if os.name == "nt":
         executable_path = os.path.abspath(os.path.dirname(sys.executable))
-        raise ImportError("""NOTE: You may need to run \"set PATH=%s;%%PATH%%\"
+        raise ImportError(
+            """NOTE: You may need to run \"set PATH=%s;%%PATH%%\"
         if you encounters \"DLL load failed\" errors. If you have python
         installed in other directory, replace \"%s\" with your own
-        directory. The original error is: \n %s""" %
-                          (executable_path, executable_path, str(e)))
+        directory. The original error is: \n %s"""
+            % (executable_path, executable_path, str(e))
+        )
     else:
         raise ImportError(
             """NOTE: You may need to run \"export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH\"
         if you encounters \"libmkldnn.so not found\" errors. If you have python
         installed in other directory, replace \"/usr/local/lib\" with your own
-        directory. The original error is: \n""" + str(e))
+        directory. The original error is: \n"""
+            + str(e)
+        )
 except Exception as e:
     raise e
 
@@ -56,14 +58,17 @@ from . import core_tokenizers as C
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]
 
-TextEncodeInput = Union[TextInputSequence, Tuple[TextInputSequence,
-                                                 TextInputSequence],
-                        List[TextInputSequence], ]
+TextEncodeInput = Union[
+    TextInputSequence,
+    Tuple[TextInputSequence, TextInputSequence],
+    List[TextInputSequence],
+]
 
-PreTokenizedEncodeInput = Union[PreTokenizedInputSequence,
-                                Tuple[PreTokenizedInputSequence,
-                                      PreTokenizedInputSequence],
-                                List[PreTokenizedInputSequence], ]
+PreTokenizedEncodeInput = Union[
+    PreTokenizedInputSequence,
+    Tuple[PreTokenizedInputSequence, PreTokenizedInputSequence],
+    List[PreTokenizedInputSequence],
+]
 
 InputSequence = Union[TextInputSequence, PreTokenizedInputSequence]
 
@@ -100,7 +105,6 @@ class SplitMode:
 
 
 class Token:
-
     def __init__(self):
         self._token = C.Token()
 
@@ -133,7 +137,6 @@ class Token:
 
 
 class PadMethod:
-
     def __init__(self):
         self._pad_method = C.PadMethod()
 
@@ -143,7 +146,7 @@ class PadMethod:
 
     @strategy.setter
     def strategy(self, strategy: str):
-        """ Set the strategy of PadMethod.
+        """Set the strategy of PadMethod.
         :param strategy: (str) The strategy of PadMethod, 'batch_longest' and 'fixed_size' are valid
         :return None
         """
@@ -155,7 +158,7 @@ class PadMethod:
 
     @direction.setter
     def direction(self, direction: str):
-        """ Set the direction of PadMethod.
+        """Set the direction of PadMethod.
         :param strategy: (str) The direction of PadMethod, 'left' and 'right' are valid
         :return None
         """
@@ -203,7 +206,6 @@ class PadMethod:
 
 
 class TruncMethod:
-
     def __init__(self):
         self._trunc_method = C.TruncMethod()
 
@@ -221,7 +223,7 @@ class TruncMethod:
 
     @strategy.setter
     def strategy(self, strategy: str):
-        """ Set the strategy of TruncMethod.
+        """Set the strategy of TruncMethod.
         :param strategy: (str) The strategy of PadMethod, 'longest_first', 'only_first' and 'only_second' are valid
         :return None
         """
@@ -233,7 +235,7 @@ class TruncMethod:
 
     @direction.setter
     def direction(self, direction: str):
-        """ Set the direction of TruncMethod.
+        """Set the direction of TruncMethod.
         :param strategy: (str) The direction of TruncMethod, 'left' and 'right' are valid
         :return None
         """
@@ -249,15 +251,8 @@ class TruncMethod:
 
 
 class AddedToken:
-
-    def __init__(self,
-                 content="",
-                 single_word=False,
-                 lstrip=False,
-                 rstrip=False,
-                 normalized=True):
-        self._added_token = C.AddedToken(content, single_word, lstrip, rstrip,
-                                         normalized)
+    def __init__(self, content="", single_word=False, lstrip=False, rstrip=False, normalized=True):
+        self._added_token = C.AddedToken(content, single_word, lstrip, rstrip, normalized)
 
     @property
     def content(self):
@@ -288,15 +283,29 @@ class AddedToken:
 
 
 class Encoding:
-
-    def __init__(self, ids: List[int], type_ids: List[int], tokens: List[str],
-                 words_idx: List[int], offsets: List[Tuple[int, int]],
-                 special_tokens_mask: List[int], attention_mask: List[int],
-                 overflowing: List, sequence_ranges: Dict[str, Tuple[int,
-                                                                     int]]):
-        self._encoding = C.Encoding(ids, type_ids, tokens, words_idx, offsets,
-                                    special_tokens_mask, attention_mask,
-                                    overflowing, sequence_ranges)
+    def __init__(
+        self,
+        ids: List[int],
+        type_ids: List[int],
+        tokens: List[str],
+        words_idx: List[int],
+        offsets: List[Tuple[int, int]],
+        special_tokens_mask: List[int],
+        attention_mask: List[int],
+        overflowing: List,
+        sequence_ranges: Dict[str, Tuple[int, int]],
+    ):
+        self._encoding = C.Encoding(
+            ids,
+            type_ids,
+            tokens,
+            words_idx,
+            offsets,
+            special_tokens_mask,
+            attention_mask,
+            overflowing,
+            sequence_ranges,
+        )
 
     def __str__(self):
         return str(self._encoding)
@@ -372,24 +381,16 @@ class Encoding:
     def word_to_tokens(self, word_index: int, sequence_index: int = 0):
         return self._encoding.word_to_tokens(word_index, sequence_index)
 
-    def truncate(self,
-                 max_length: int,
-                 stride: int = 0,
-                 direction: str = "right"):
+    def truncate(self, max_length: int, stride: int = 0, direction: str = "right"):
         return self._encoding.truncate(max_length, stride, direction)
 
-    def pad(self,
-            length: int,
-            direction: str = "right",
-            pad_id: int = 0,
-            pad_type_id: int = 0,
-            pad_token: str = "[PAD]"):
-        return self._encoding.pad(length, direction, pad_id, pad_type_id,
-                                  pad_token)
+    def pad(
+        self, length: int, direction: str = "right", pad_id: int = 0, pad_type_id: int = 0, pad_token: str = "[PAD]"
+    ):
+        return self._encoding.pad(length, direction, pad_id, pad_type_id, pad_token)
 
 
 class Tokenizer:
-
     def __init__(self, model):
         self._tokenizer = None
         if model is not None:
@@ -449,27 +450,24 @@ class Tokenizer:
     def add_tokens(self, tokens: List[str]):
         return self._tokenizer.add_tokens(tokens)
 
-    def enable_padding(self,
-                       direction: str = "right",
-                       pad_id: int = 0,
-                       pad_type_id: int = 0,
-                       pad_token: str = "[PAD]",
-                       length: int = None,
-                       pad_to_multiple_of: int = None):
-        return self._tokenizer.enable_padding(direction, pad_id, pad_type_id,
-                                              pad_token, length,
-                                              pad_to_multiple_of)
+    def enable_padding(
+        self,
+        direction: str = "right",
+        pad_id: int = 0,
+        pad_type_id: int = 0,
+        pad_token: str = "[PAD]",
+        length: int = None,
+        pad_to_multiple_of: int = None,
+    ):
+        return self._tokenizer.enable_padding(direction, pad_id, pad_type_id, pad_token, length, pad_to_multiple_of)
 
     def disable_padding(self):
         return self._tokenizer.disable_padding()
 
-    def enable_truncation(self,
-                          max_length: int,
-                          stride: int = 0,
-                          strategy: str = "longest_first",
-                          direction: str = "right"):
-        return self._tokenizer.enable_truncation(max_length, stride, strategy,
-                                                 direction)
+    def enable_truncation(
+        self, max_length: int, stride: int = 0, strategy: str = "longest_first", direction: str = "right"
+    ):
+        return self._tokenizer.enable_truncation(max_length, stride, strategy, direction)
 
     def disable_truncation(self):
         return self._tokenizer.disable_truncation()
@@ -480,27 +478,27 @@ class Tokenizer:
     def get_vocab_size(self, with_added_vocabulary: bool = True):
         return self._tokenizer.get_vocab_size(with_added_vocabulary)
 
-    def encode(self,
-               sequence: InputSequence,
-               pair: InputSequence = None,
-               is_pretokenized: bool = False,
-               add_special_tokens: bool = True):
-        return self._tokenizer.encode(sequence, pair, is_pretokenized,
-                                      add_special_tokens)
+    def encode(
+        self,
+        sequence: InputSequence,
+        pair: InputSequence = None,
+        is_pretokenized: bool = False,
+        add_special_tokens: bool = True,
+    ):
+        return self._tokenizer.encode(sequence, pair, is_pretokenized, add_special_tokens)
 
-    def encode_batch(self,
-                     input: Union[List[EncodeInput], Tuple[EncodeInput]],
-                     add_special_tokens: bool = True,
-                     is_pretokenized: bool = False):
-        return self._tokenizer.encode_batch(input, add_special_tokens,
-                                            is_pretokenized)
+    def encode_batch(
+        self,
+        input: Union[List[EncodeInput], Tuple[EncodeInput]],
+        add_special_tokens: bool = True,
+        is_pretokenized: bool = False,
+    ):
+        return self._tokenizer.encode_batch(input, add_special_tokens, is_pretokenized)
 
     def decode(self, ids: List[int], skip_special_tokens: bool = True):
         return self._tokenizer.decode(ids, skip_special_tokens)
 
-    def decode_batch(self,
-                     sequences: List[List[int]],
-                     skip_special_tokens: bool = True):
+    def decode_batch(self, sequences: List[List[int]], skip_special_tokens: bool = True):
         return self._tokenizer.decode_batch(sequence, skip_special_tokens)
 
     def id_to_token(self, id: int):
@@ -532,7 +530,7 @@ class Tokenizer:
 
 
 def set_thread_num(thread_num):
-    """ Set the number of threads for accelerating batch tokenization
+    """Set the number of threads for accelerating batch tokenization
     :param thread_num: (int) The number of threads
     :return None
     """
@@ -540,7 +538,7 @@ def set_thread_num(thread_num):
 
 
 def get_thread_num():
-    """ Get the number of tokenization threads
+    """Get the number of tokenization threads
     :return int
     """
     return C.get_thread_num()

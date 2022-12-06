@@ -22,8 +22,8 @@ import paddle.distributed.fleet as fleet
 from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
 
 MODEL_CLASSES = {
-    "gpt-cn": (GPTChineseTokenizer, ),
-    "gpt": (GPTTokenizer, ),
+    "gpt-cn": (GPTChineseTokenizer,),
+    "gpt": (GPTTokenizer,),
 }
 
 
@@ -44,7 +44,6 @@ def parse_args():
 
 
 class Predictor(object):
-
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -52,23 +51,22 @@ class Predictor(object):
 
     @classmethod
     def create_predictor(cls, args):
-        device_id = int(os.environ.get('FLAGS_selected_gpus', 0))
+        device_id = int(os.environ.get("FLAGS_selected_gpus", 0))
         nranks, rank = fleet.worker_num(), fleet.worker_index()
         trainer_endpoints = fleet.worker_endpoints()
         current_endpoint = trainer_endpoints[rank]
 
-        model_path = os.path.join(args.model_path, 'rank_' + str(rank))
+        model_path = os.path.join(args.model_path, "rank_" + str(rank))
         if not os.path.isdir(model_path):
-            config = paddle.inference.Config(args.model_path + '.pdmodel',
-                                             args.model_path + '.pdiparams')
+            config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
         else:
             model_file = None
             param_file = None
             for f in os.listdir(model_path):
-                if '.pdmodel' in f:
+                if ".pdmodel" in f:
                     assert model_file is None
                     model_file = os.path.join(model_path, f)
-                if '.pdiparams' in f:
+                if ".pdiparams" in f:
                     assert param_file is None
                     param_file = os.path.join(model_path, f)
             config = paddle.inference.Config(model_file, param_file)
@@ -82,14 +80,14 @@ class Predictor(object):
         dist_config.set_endpoints(trainer_endpoints, current_endpoint)
 
         # Difficult to use, needs to be simplified...
-        ring_id_to_ranks = ','.join(['0'] + [str(i) for i in range(nranks)])
-        rank_to_ring_ids = ''
+        ring_id_to_ranks = ",".join(["0"] + [str(i) for i in range(nranks)])
+        rank_to_ring_ids = ""
         for i in range(nranks):
-            rank_to_ring_ids += '{},0\n'.format(i)
-        comm_config_str = '[ring_id -> ranks]\n' + ring_id_to_ranks + '\n[rank -> ring_ids]\n' + rank_to_ring_ids
+            rank_to_ring_ids += "{},0\n".format(i)
+        comm_config_str = "[ring_id -> ranks]\n" + ring_id_to_ranks + "\n[rank -> ring_ids]\n" + rank_to_ring_ids
 
         # Use temp file so that each rank will not have RW conflicts
-        with tempfile.NamedTemporaryFile('w') as f:
+        with tempfile.NamedTemporaryFile("w") as f:
             f.write(comm_config_str)
             f.seek(0)  # Move to beginning
             dist_config.set_comm_init_config(f.name)
@@ -97,24 +95,15 @@ class Predictor(object):
             config.set_dist_config(dist_config)
             predictor = paddle.inference.create_predictor(config)
 
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handles = [
-            predictor.get_output_handle(name)
-            for name in predictor.get_output_names()
-        ]
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
         return cls(predictor, input_handles, output_handles)
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy(
-            ) if isinstance(input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy() if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        output = [
-            output_handle.copy_to_cpu() for output_handle in self.output_handles
-        ]
+        output = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
         return output
 
     def predict(self, dataset, batch_size=1):
@@ -132,16 +121,15 @@ def main():
     fleet.init(is_collective=True)
     predictor = Predictor.create_predictor(args)
     args.model_type = args.model_type.lower()
-    tokenizer_class, = MODEL_CLASSES[args.model_type]
+    (tokenizer_class,) = MODEL_CLASSES[args.model_type]
 
     if args.tokenizer_name_or_path is None:
         if args.model_type == "gpt":
-            tokenizer = tokenizer_class.from_pretrained('gpt2-en')
+            tokenizer = tokenizer_class.from_pretrained("gpt2-en")
         elif args.model_type == "gpt-cn":
-            tokenizer = tokenizer_class.from_pretrained('gpt-cpm-large-cn')
+            tokenizer = tokenizer_class.from_pretrained("gpt-cpm-large-cn")
     else:
-        tokenizer = tokenizer_class.from_pretrained(
-            os.path.dirname(args.tokenizer_name_or_path))
+        tokenizer = tokenizer_class.from_pretrained(os.path.dirname(args.tokenizer_name_or_path))
 
     if args.model_type == "gpt":
         text = [
@@ -159,15 +147,10 @@ def main():
             "问题：中国的首都是哪里？答案：",
             "问题：世界上最高的山峰是? 答案：",
         ]
-    inputs = tokenizer(text,
-                       padding=True,
-                       return_attention_mask=True,
-                       return_position_ids=True)
-    ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype('int64')
-    attention_mask = np.array(inputs["attention_mask"]).reshape(
-        len(text), -1).astype('float32')
-    position_ids = np.array(inputs["position_ids"]).reshape(len(text),
-                                                            -1).astype('int64')
+    inputs = tokenizer(text, padding=True, return_attention_mask=True, return_position_ids=True)
+    ids = np.array(inputs["input_ids"]).reshape(len(text), -1).astype("int64")
+    attention_mask = np.array(inputs["attention_mask"]).reshape(len(text), -1).astype("float32")
+    position_ids = np.array(inputs["position_ids"]).reshape(len(text), -1).astype("int64")
 
     dataset = [[ids, attention_mask, position_ids]]
 

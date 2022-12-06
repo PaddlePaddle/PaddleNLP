@@ -27,7 +27,7 @@ args = parser.parse_args()
 # yapf: enable
 
 if __name__ == "__main__":
-    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
+    model = ErnieForPretraining.from_pretrained("ernie-3.0-medium-zh")
     if args.params_path and os.path.isfile(args.params_path):
         state_dict = paddle.load(args.params_path)
         model.set_dict(state_dict)
@@ -38,18 +38,13 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='token_type_ids'),  # segment_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),  # segment_ids
             None,  # position_ids
             None,  # attention_mask
-            paddle.static.InputSpec(
-                shape=[None], dtype="int64",
-                name='masked_positions'),  # masked_positions
-        ])
+            paddle.static.InputSpec(shape=[None], dtype="int64", name="masked_positions"),  # masked_positions
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

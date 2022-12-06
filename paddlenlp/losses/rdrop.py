@@ -16,7 +16,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-__all__ = ['RDropLoss']
+__all__ = ["RDropLoss"]
 
 
 class RDropLoss(nn.Layer):
@@ -35,12 +35,13 @@ class RDropLoss(nn.Layer):
             Defaults to ``'none'``.
     """
 
-    def __init__(self, reduction='none'):
+    def __init__(self, reduction="none"):
         super(RDropLoss, self).__init__()
-        if reduction not in ['sum', 'mean', 'none', 'batchmean']:
+        if reduction not in ["sum", "mean", "none", "batchmean"]:
             raise ValueError(
                 "'reduction' in 'RDropLoss' should be 'sum', 'mean' 'batchmean', or 'none', "
-                "but received {}.".format(reduction))
+                "but received {}.".format(reduction)
+            )
         self.reduction = reduction
 
     def forward(self, p, q, pad_mask=None):
@@ -53,12 +54,8 @@ class RDropLoss(nn.Layer):
         Returns:
             Tensor: Returns tensor `loss`, the rdrop loss of p and q.
         """
-        p_loss = F.kl_div(F.log_softmax(p, axis=-1),
-                          F.softmax(q, axis=-1),
-                          reduction=self.reduction)
-        q_loss = F.kl_div(F.log_softmax(q, axis=-1),
-                          F.softmax(p, axis=-1),
-                          reduction=self.reduction)
+        p_loss = F.kl_div(F.log_softmax(p, axis=-1), F.softmax(q, axis=-1), reduction=self.reduction)
+        q_loss = F.kl_div(F.log_softmax(q, axis=-1), F.softmax(p, axis=-1), reduction=self.reduction)
 
         # pad_mask is for seq-level tasks
         if pad_mask is not None:

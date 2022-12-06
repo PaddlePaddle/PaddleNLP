@@ -24,47 +24,37 @@ from paddlenlp.datasets import DatasetBuilder
 class Similarity(DatasetBuilder):
     # similarity test 21.10.3
     def _read(self, filename):
-        with open(filename, 'r', encoding='utf8') as f:
+        with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
-                line_split = line.strip().split('\t')
+                line_split = line.strip().split("\t")
                 assert len(line_split) == 3
-                yield {
-                    'text_a': line_split[0],
-                    'text_b': line_split[1],
-                    'label': line_split[2]
-                }
+                yield {"text_a": line_split[0], "text_b": line_split[1], "label": line_split[2]}
 
 
 class RCInterpret(DatasetBuilder):
     # interpret 21.9.24
     def _read(self, filename):
-        with open(filename, 'r', encoding='utf8') as f:
+        with open(filename, "r", encoding="utf8") as f:
             for line in f.readlines():
                 example_dic = json.loads(line)
-                id = example_dic['id']
-                title = example_dic['title']
-                context = example_dic['context']
-                question = example_dic['question']
-                if 'sent_token' in example_dic:
-                    sent_token = example_dic['sent_token']
+                id = example_dic["id"]
+                title = example_dic["title"]
+                context = example_dic["context"]
+                question = example_dic["question"]
+                if "sent_token" in example_dic:
+                    sent_token = example_dic["sent_token"]
                     yield {
-                        'id': id,
-                        'title': title,
-                        'context': context,
-                        'question': question,
-                        'sent_token': sent_token
+                        "id": id,
+                        "title": title,
+                        "context": context,
+                        "question": question,
+                        "sent_token": sent_token,
                     }
                 else:
-                    yield {
-                        'id': id,
-                        'title': title,
-                        'context': context,
-                        'question': question
-                    }
+                    yield {"id": id, "title": title, "context": context, "question": question}
 
 
 class DuReaderChecklist(DatasetBuilder):
-
     def _read(self, filename):
         with open(filename, "r", encoding="utf8") as f:
             input_data = json.load(f)["data"]
@@ -84,33 +74,29 @@ class DuReaderChecklist(DatasetBuilder):
                     if "is_impossible" in qa.keys():
                         is_impossible = qa["is_impossible"]
 
-                    answer_starts = [
-                        answer["answer_start"]
-                        for answer in qa.get("answers", [])
-                    ]
-                    answers = [
-                        answer["text"].strip()
-                        for answer in qa.get("answers", [])
-                    ]
+                    answer_starts = [answer["answer_start"] for answer in qa.get("answers", [])]
+                    answers = [answer["text"].strip() for answer in qa.get("answers", [])]
 
                     yield {
-                        'id': qas_id,
-                        'title': title,
-                        'context': context,
-                        'question': question,
-                        'answers': answers,
-                        'answer_starts': answer_starts,
-                        'is_impossible': is_impossible
+                        "id": qas_id,
+                        "title": title,
+                        "context": context,
+                        "question": question,
+                        "answers": answers,
+                        "answer_starts": answer_starts,
+                        "is_impossible": is_impossible,
                     }
 
 
-def compute_prediction_checklist(examples,
-                                 features,
-                                 predictions,
-                                 version_2_with_negative: bool = False,
-                                 n_best_size: int = 20,
-                                 max_answer_length: int = 30,
-                                 cls_threshold: float = 0.5):
+def compute_prediction_checklist(
+    examples,
+    features,
+    predictions,
+    version_2_with_negative: bool = False,
+    n_best_size: int = 20,
+    max_answer_length: int = 30,
+    cls_threshold: float = 0.5,
+):
     """
     Post-processes the predictions of a question-answering model to convert them to answers that are substrings of the
     original contexts. This is the base postprocessing functions for models that only return start and end logits.
@@ -137,14 +123,12 @@ def compute_prediction_checklist(examples,
             Only useful when :obj:`version_2_with_negative` is :obj:`True`.
     """
 
-    assert len(
-        predictions
-    ) == 3, "`predictions` should be a tuple with two elements (start_logits, end_logits, cls_logits)."
+    assert (
+        len(predictions) == 3
+    ), "`predictions` should be a tuple with two elements (start_logits, end_logits, cls_logits)."
     all_start_logits, all_end_logits, all_cls_logits = predictions
 
-    assert len(predictions[0]) == len(
-        features
-    ), "Number of predictions should be equal to number of features."  # 样本数
+    assert len(predictions[0]) == len(features), "Number of predictions should be equal to number of features."  # 样本数
 
     # Build a map example to its corresponding features.
     features_per_example = collections.defaultdict(list)
@@ -162,7 +146,7 @@ def compute_prediction_checklist(examples,
     # Let's loop over all the examples!
     for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
-        feature_indices = features_per_example[example['id']]
+        feature_indices = features_per_example[example["id"]]
 
         # if len(feature_indices) > 1:
         #     print('example_index: %s' % example_index)
@@ -176,30 +160,28 @@ def compute_prediction_checklist(examples,
             start_logits = all_start_logits[feature_index]
             end_logits = all_end_logits[feature_index]
             cls_logits = all_cls_logits[feature_index]
-            input_ids = features[feature_index]['input_ids']
+            input_ids = features[feature_index]["input_ids"]
             # This is what will allow us to map some the positions in our logits to span of texts in the original context.
             offset_mapping = features[feature_index][
-                "offset_mapping"]  # list[tuple(2)], list长度与input_ids, start_logits, end_logits相同
+                "offset_mapping"
+            ]  # list[tuple(2)], list长度与input_ids, start_logits, end_logits相同
 
             # if len(feature_indices) > 1:
             #     print('offset_mapping: %s' % offset_mapping)
 
             # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
             # available in the current feature.
-            token_is_max_context = features[feature_index].get(
-                "token_is_max_context", None)
+            token_is_max_context = features[feature_index].get("token_is_max_context", None)
 
             exp_answerable_scores = np.exp(cls_logits - np.max(cls_logits))
-            feature_answerable_score = exp_answerable_scores / exp_answerable_scores.sum(
-            )
+            feature_answerable_score = exp_answerable_scores / exp_answerable_scores.sum()
             if feature_answerable_score[-1] > score_answerable:
                 score_answerable = feature_answerable_score[-1]
                 answerable_probs = feature_answerable_score
 
             # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
-            if min_null_prediction is None or min_null_prediction[
-                    "score"] > feature_null_score:
+            if min_null_prediction is None or min_null_prediction["score"] > feature_null_score:
                 min_null_prediction = {
                     "feature_index": (0, 0),
                     "offsets": (0, 0),
@@ -209,62 +191,48 @@ def compute_prediction_checklist(examples,
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(
-                start_logits)[-1:-n_best_size -
-                              1:-1].tolist()  # list(n_best_size) 从大到小
-            end_indexes = np.argsort(
-                end_logits)[-1:-n_best_size -
-                            1:-1].tolist()  # list(n_best_size) 从大到小
+            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()  # list(n_best_size) 从大到小
+            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()  # list(n_best_size) 从大到小
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping)
-                            or end_index >= len(offset_mapping)
-                            or offset_mapping[start_index] is None
-                            or  # CLS、Question和第一个SEP的位置
-                            offset_mapping[end_index] is None or
-                            offset_mapping[start_index] == (0,
-                                                            0) or  # 第二个SEP的位置
-                            offset_mapping[end_index] == (0, 0)):
+                    if (
+                        start_index >= len(offset_mapping)
+                        or end_index >= len(offset_mapping)
+                        or offset_mapping[start_index] is None
+                        or offset_mapping[end_index] is None  # CLS、Question和第一个SEP的位置
+                        or offset_mapping[start_index] == (0, 0)
+                        or offset_mapping[end_index] == (0, 0)  # 第二个SEP的位置
+                    ):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
                         continue
                     # Don't consider answer that don't have the maximum context available (if such information is
                     # provided).
-                    if token_is_max_context is not None and not token_is_max_context.get(
-                            str(start_index), False):
+                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):
                         continue
-                    prelim_predictions.append({
-                        "feature_index": (start_index, end_index),
-                        "offsets": (offset_mapping[start_index][0],
-                                    offset_mapping[end_index][1]),
-                        "score":
-                        start_logits[start_index] + end_logits[end_index],
-                        "start_logit":
-                        start_logits[start_index],
-                        "end_logit":
-                        end_logits[end_index],
-                    })
+                    prelim_predictions.append(
+                        {
+                            "feature_index": (start_index, end_index),
+                            "offsets": (offset_mapping[start_index][0], offset_mapping[end_index][1]),
+                            "score": start_logits[start_index] + end_logits[end_index],
+                            "start_logit": start_logits[start_index],
+                            "end_logit": end_logits[end_index],
+                        }
+                    )
         if version_2_with_negative:
             # Add the minimum null prediction
             prelim_predictions.append(min_null_prediction)
             pred_cls_label = np.argmax(np.array(answerable_probs))
-            all_cls_predictions.append([
-                example['id'], pred_cls_label, answerable_probs[0],
-                answerable_probs[1]
-            ])
+            all_cls_predictions.append([example["id"], pred_cls_label, answerable_probs[0], answerable_probs[1]])
 
-
-# Only keep the best `n_best_size` predictions.
-        predictions = sorted(prelim_predictions,
-                             key=lambda x: x["score"],
-                             reverse=True)[:n_best_size]
+        # Only keep the best `n_best_size` predictions.
+        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
-        if version_2_with_negative and not any(p["offsets"] == (0, 0)
-                                               for p in predictions):
+        if version_2_with_negative and not any(p["offsets"] == (0, 0) for p in predictions):
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
@@ -272,22 +240,22 @@ def compute_prediction_checklist(examples,
         for pred in predictions:
             # offsets = pred.pop("offsets")
             offsets = pred["offsets"]
-            pred["text"] = context[offsets[0]:offsets[1]] if context[
-                offsets[0]:offsets[1]] != "" else "no answer"
+            pred["text"] = context[offsets[0] : offsets[1]] if context[offsets[0] : offsets[1]] != "" else "no answer"
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1
-                                     and predictions[0]["text"] == "no answer"):
+        if len(predictions) == 0 or (len(predictions) == 1 and predictions[0]["text"] == "no answer"):
             predictions.insert(
-                0, {
+                0,
+                {
                     "feature_index": (0, 0),
                     "offsets": (0, 0),
                     "text": "no answer",
                     "start_logit": 0.0,
                     "end_logit": 0.0,
-                    "score": 0.0
-                })
+                    "score": 0.0,
+                },
+            )
 
         # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
         # the LogSumExp trick).
@@ -302,7 +270,7 @@ def compute_prediction_checklist(examples,
         # Pick the best prediction. If the null answer is not possible, this is easy.
         if not version_2_with_negative:
             all_predictions[example["id"]] = predictions[0]["text"]
-            all_feature_index[example["id"]] = predictions[0]['feature_index']
+            all_feature_index[example["id"]] = predictions[0]["feature_index"]
         else:
             # Otherwise we first need to find the best non-empty prediction.
             i = 0
@@ -311,40 +279,41 @@ def compute_prediction_checklist(examples,
             best_non_null_pred = predictions[i]
 
             if answerable_probs[1] < cls_threshold:
-                all_predictions[example['id']] = "no answer"
+                all_predictions[example["id"]] = "no answer"
             else:
-                all_predictions[example['id']] = best_non_null_pred['text']
-            all_feature_index[example["id"]] = predictions[i]['feature_index']
+                all_predictions[example["id"]] = best_non_null_pred["text"]
+            all_feature_index[example["id"]] = predictions[i]["feature_index"]
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
-        all_nbest_json[example["id"]] = [{
-            k: (float(v) if isinstance(v, (np.float16, np.float32,
-                                           np.float64)) else v)
-            for k, v in pred.items()
-        } for pred in predictions]
+        all_nbest_json[example["id"]] = [
+            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
+            for pred in predictions
+        ]
 
     return all_predictions, all_nbest_json, all_cls_predictions, all_feature_index
 
 
-def compute_prediction(examples,
-                       features,
-                       predictions,
-                       version_2_with_negative=False,
-                       n_best_size=20,
-                       max_answer_length=30,
-                       null_score_diff_threshold=0.0):
+def compute_prediction(
+    examples,
+    features,
+    predictions,
+    version_2_with_negative=False,
+    n_best_size=20,
+    max_answer_length=30,
+    null_score_diff_threshold=0.0,
+):
     """
-    Post-processes the predictions of a question-answering model to convert 
-    them to answers that are substrings of the original contexts. This is 
-    the base postprocessing functions for models that only return start and 
+    Post-processes the predictions of a question-answering model to convert
+    them to answers that are substrings of the original contexts. This is
+    the base postprocessing functions for models that only return start and
     end logits.
 
     Args:
-        examples (list): List of raw squad-style data (see `run_squad.py 
+        examples (list): List of raw squad-style data (see `run_squad.py
             <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/
-            machine_reading_comprehension/SQuAD/run_squad.py>`__ for more 
+            machine_reading_comprehension/SQuAD/run_squad.py>`__ for more
             information).
-        features (list): List of processed squad-style features (see 
+        features (list): List of processed squad-style features (see
             `run_squad.py <https://github.com/PaddlePaddle/PaddleNLP/blob/
             develop/examples/machine_reading_comprehension/SQuAD/run_squad.py>`__
             for more information).
@@ -359,20 +328,16 @@ def compute_prediction(examples,
         null_score_diff_threshold (float, optional): The threshold used to select
             the null answer. Only useful when `version_2_with_negative` is True.
             Defaults to 0.0.
-    
+
     Returns:
-        A tuple of three dictionaries containing final selected answer, all n_best 
-        answers along with their probability and scores, and the score_diff of each 
+        A tuple of three dictionaries containing final selected answer, all n_best
+        answers along with their probability and scores, and the score_diff of each
         example.
     """
-    assert len(
-        predictions
-    ) == 2, "`predictions` should be a tuple with two elements (start_logits, end_logits)."
+    assert len(predictions) == 2, "`predictions` should be a tuple with two elements (start_logits, end_logits)."
     all_start_logits, all_end_logits = predictions
 
-    assert len(predictions[0]) == len(
-        features
-    ), "Number of predictions should be equal to number of features."
+    assert len(predictions[0]) == len(features), "Number of predictions should be equal to number of features."
 
     # Build a map example to its corresponding features.
     features_per_example = collections.defaultdict(list)
@@ -388,7 +353,7 @@ def compute_prediction(examples,
     # Let's loop over all the examples!
     for example_index, example in enumerate(examples):
         # Those are the indices of the features associated to the current example.
-        feature_indices = features_per_example[example['id']]
+        feature_indices = features_per_example[example["id"]]
 
         min_null_prediction = None
         prelim_predictions = []
@@ -403,13 +368,11 @@ def compute_prediction(examples,
             offset_mapping = features[feature_index]["offset_mapping"]
             # Optional `token_is_max_context`, if provided we will remove answers that do not have the maximum context
             # available in the current feature.
-            token_is_max_context = features[feature_index].get(
-                "token_is_max_context", None)
+            token_is_max_context = features[feature_index].get("token_is_max_context", None)
 
             # Update minimum null prediction.
             feature_null_score = start_logits[0] + end_logits[0]
-            if min_null_prediction is None or min_null_prediction[
-                    "score"] > feature_null_score:
+            if min_null_prediction is None or min_null_prediction["score"] > feature_null_score:
                 min_null_prediction = {
                     "feature_index": (0, 0),
                     "offsets": (0, 0),
@@ -419,73 +382,61 @@ def compute_prediction(examples,
                 }
 
             # Go through all possibilities for the `n_best_size` greater start and end logits.
-            start_indexes = np.argsort(start_logits)[-1:-n_best_size -
-                                                     1:-1].tolist()
-            end_indexes = np.argsort(end_logits)[-1:-n_best_size -
-                                                 1:-1].tolist()
+            start_indexes = np.argsort(start_logits)[-1 : -n_best_size - 1 : -1].tolist()
+            end_indexes = np.argsort(end_logits)[-1 : -n_best_size - 1 : -1].tolist()
             for start_index in start_indexes:
                 for end_index in end_indexes:
                     # Don't consider out-of-scope answers, either because the indices are out of bounds or correspond
                     # to part of the input_ids that are not in the context.
-                    if (start_index >= len(offset_mapping)
-                            or end_index >= len(offset_mapping)
-                            or offset_mapping[start_index] is None
-                            or offset_mapping[end_index] is None
-                            or offset_mapping[start_index] == (0, 0)
-                            or offset_mapping[end_index] == (0, 0)):
+                    if (
+                        start_index >= len(offset_mapping)
+                        or end_index >= len(offset_mapping)
+                        or offset_mapping[start_index] is None
+                        or offset_mapping[end_index] is None
+                        or offset_mapping[start_index] == (0, 0)
+                        or offset_mapping[end_index] == (0, 0)
+                    ):
                         continue
                     # Don't consider answers with a length that is either < 0 or > max_answer_length.
                     if end_index < start_index or end_index - start_index + 1 > max_answer_length:
                         continue
                     # Don't consider answer that don't have the maximum context available (if such information is
                     # provided).
-                    if token_is_max_context is not None and not token_is_max_context.get(
-                            str(start_index), False):
+                    if token_is_max_context is not None and not token_is_max_context.get(str(start_index), False):
                         continue
-                    prelim_predictions.append({
-                        "feature_index": (start_index, end_index),
-                        "offsets": (offset_mapping[start_index][0],
-                                    offset_mapping[end_index][1]),
-                        "score":
-                        start_logits[start_index] + end_logits[end_index],
-                        "start_logit":
-                        start_logits[start_index],
-                        "end_logit":
-                        end_logits[end_index],
-                    })
+                    prelim_predictions.append(
+                        {
+                            "feature_index": (start_index, end_index),
+                            "offsets": (offset_mapping[start_index][0], offset_mapping[end_index][1]),
+                            "score": start_logits[start_index] + end_logits[end_index],
+                            "start_logit": start_logits[start_index],
+                            "end_logit": end_logits[end_index],
+                        }
+                    )
         if version_2_with_negative:
             # Add the minimum null prediction
             prelim_predictions.append(min_null_prediction)
             null_score = min_null_prediction["score"]
 
         # Only keep the best `n_best_size` predictions.
-        predictions = sorted(prelim_predictions,
-                             key=lambda x: x["score"],
-                             reverse=True)[:n_best_size]
+        predictions = sorted(prelim_predictions, key=lambda x: x["score"], reverse=True)[:n_best_size]
 
         # Add back the minimum null prediction if it was removed because of its low score.
-        if version_2_with_negative and not any(p["offsets"] == (0, 0)
-                                               for p in predictions):
+        if version_2_with_negative and not any(p["offsets"] == (0, 0) for p in predictions):
             predictions.append(min_null_prediction)
 
         # Use the offsets to gather the answer text in the original context.
         context = example["context"]
         for pred in predictions:
             offsets = pred.pop("offsets")
-            pred["text"] = context[offsets[0]:offsets[1]]
+            pred["text"] = context[offsets[0] : offsets[1]]
 
         # In the very rare edge case we have not a single non-null prediction, we create a fake prediction to avoid
         # failure.
-        if len(predictions) == 0 or (len(predictions) == 1
-                                     and predictions[0]["text"] == ""):
+        if len(predictions) == 0 or (len(predictions) == 1 and predictions[0]["text"] == ""):
             predictions.insert(
-                0, {
-                    "feature_index": (0, 0),
-                    "text": "empty",
-                    "start_logit": 0.0,
-                    "end_logit": 0.0,
-                    "score": 0.0
-                })
+                0, {"feature_index": (0, 0), "text": "empty", "start_logit": 0.0, "end_logit": 0.0, "score": 0.0}
+            )
 
         # Compute the softmax of all scores (we do it with numpy to stay independent from torch/tf in this file, using
         # the LogSumExp trick).
@@ -500,7 +451,7 @@ def compute_prediction(examples,
         # Pick the best prediction. If the null answer is not possible, this is easy.
         if not version_2_with_negative:
             all_predictions[example["id"]] = predictions[0]["text"]
-            all_feature_index[example["id"]] = predictions[0]['feature_index']
+            all_feature_index[example["id"]] = predictions[0]["feature_index"]
         else:
             # Otherwise we first need to find the best non-empty prediction.
             i = 0
@@ -509,21 +460,18 @@ def compute_prediction(examples,
             best_non_null_pred = predictions[i]
 
             # Then we compare to the null prediction using the threshold.
-            score_diff = null_score - best_non_null_pred[
-                "start_logit"] - best_non_null_pred["end_logit"]
-            scores_diff_json[example["id"]] = float(
-                score_diff)  # To be JSON-serializable.
+            score_diff = null_score - best_non_null_pred["start_logit"] - best_non_null_pred["end_logit"]
+            scores_diff_json[example["id"]] = float(score_diff)  # To be JSON-serializable.
             if score_diff > null_score_diff_threshold:
                 all_predictions[example["id"]] = ""
             else:
                 all_predictions[example["id"]] = best_non_null_pred["text"]
-            all_feature_index[example["id"]] = predictions[i]['feature_index']
+            all_feature_index[example["id"]] = predictions[i]["feature_index"]
 
         # Make `predictions` JSON-serializable by casting np.float back to float.
-        all_nbest_json[example["id"]] = [{
-            k: (float(v) if isinstance(v, (np.float16, np.float32,
-                                           np.float64)) else v)
-            for k, v in pred.items()
-        } for pred in predictions]
+        all_nbest_json[example["id"]] = [
+            {k: (float(v) if isinstance(v, (np.float16, np.float32, np.float64)) else v) for k, v in pred.items()}
+            for pred in predictions
+        ]
 
     return all_predictions, all_nbest_json, scores_diff_json, all_feature_index

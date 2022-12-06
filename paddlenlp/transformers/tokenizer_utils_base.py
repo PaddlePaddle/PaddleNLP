@@ -19,24 +19,33 @@ import copy
 import io
 import json
 import os
+import shutil
+import tempfile
 import warnings
 from collections import OrderedDict, UserDict
 from dataclasses import dataclass, field
 from enum import Enum
-from shutil import copyfile
 from typing import Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import paddle
-from huggingface_hub import hf_hub_download
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
+from paddle import __version__
 
-from paddlenlp import __version__
 from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     get_path_from_url_with_filelock,
     url_file_exists,
 )
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
 
@@ -1477,7 +1486,7 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 resolved_vocab_files[file_id] = hf_hub_download(
                     repo_id=pretrained_model_name_or_path,
                     filename=file_path,
-                    cache_dir=MODEL_HOME,
+                    cache_dir=HF_CACHE_HOME,
                     library_name="PaddleNLP",
                     library_version=__version__,
                 )
@@ -1490,12 +1499,10 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
                 else:
                     logger.info("Downloading %s and saved to %s" % (file_path, default_root))
                     try:
-
                         if not url_file_exists(file_path):
                             logger.warning(f"file<{file_path}> not exist")
                             resolved_vocab_files[file_id] = None
                             continue
-
                         resolved_vocab_files[file_id] = get_path_from_url_with_filelock(file_path, default_root)
                     except RuntimeError as err:
                         if file_id not in cls.resource_files_names:
@@ -1738,7 +1745,61 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             src_path = self.init_kwargs[name]
             dst_path = os.path.join(save_directory, file_name)
             if os.path.abspath(src_path) != os.path.abspath(dst_path):
-                copyfile(src_path, dst_path)
+                shutil.copyfile(src_path, dst_path)
+
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        commit_message: Optional[bool] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this tokenizer to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # save model
+            self.save_pretrained(tmp_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=tmp_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     def tokenize(self, text: str, pair: Optional[str] = None, add_special_tokens: bool = False, **kwargs) -> List[str]:
         """

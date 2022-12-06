@@ -36,9 +36,9 @@ def get_local_rank():
 print_rank_0 = print
 
 COMPILED = False
-DSET_TYPE_BERT = 'standard_bert'
-DSET_TYPE_T5 = 't5'
-DSET_TYPE_ERNIE = 'ernie'
+DSET_TYPE_BERT = "standard_bert"
+DSET_TYPE_T5 = "t5"
+DSET_TYPE_ERNIE = "ernie"
 
 DSET_TYPES = [DSET_TYPE_BERT, DSET_TYPE_T5, DSET_TYPE_ERNIE]
 
@@ -48,18 +48,20 @@ def compile_helper():
     is invoked on a single process."""
     import os
     import subprocess
+
     path = os.path.abspath(os.path.dirname(__file__))
-    ret = subprocess.run(['make', '-C', path])
+    ret = subprocess.run(["make", "-C", path])
     if ret.returncode != 0:
         print("Making C++ dataset helpers module failed, exiting.")
         import sys
+
         sys.exit(1)
 
 
 class BlendableDataset(paddle.io.Dataset):
     """
     The BlendableDataset is a wrapper which used to mix different dataset.
-    
+
     The input is a list of dataset and corresponding weights for each dataset.
     """
 
@@ -94,22 +96,21 @@ class BlendableDataset(paddle.io.Dataset):
                 try:
                     from tool_helpers import helpers
                 except Exception as ine:
-                    print_rank_0(
-                        ' > missing tool_helpers, pip install tool_helpers please, try to compile locally.'
-                    )
+                    print_rank_0(" > missing tool_helpers, pip install tool_helpers please, try to compile locally.")
                     import data_tools.helpers as helpers
                 break
             except Exception as e:
                 if local_rank == 0:
                     compile_helper()
-                print_rank_0('> wait for hepers to be compiled!')
+                print_rank_0("> wait for hepers to be compiled!")
                 time.sleep(1)
 
-        helpers.build_blending_indices(self.dataset_index,
-                                       self.dataset_sample_index, weights,
-                                       num_datasets, self.size, local_rank == 0)
-        print_rank_0('> elapsed time for building blendable dataset indices: '
-                     '{:.2f} (sec)'.format(time.time() - start_time))
+        helpers.build_blending_indices(
+            self.dataset_index, self.dataset_sample_index, weights, num_datasets, self.size, local_rank == 0
+        )
+        print_rank_0(
+            "> elapsed time for building blendable dataset indices: " "{:.2f} (sec)".format(time.time() - start_time)
+        )
 
     def __len__(self):
         return self.size
@@ -120,8 +121,7 @@ class BlendableDataset(paddle.io.Dataset):
         return self.datasets[dataset_idx][sample_idx]
 
 
-def get_datasets_weights_and_num_samples(data_prefix,
-                                         train_valid_test_num_samples):
+def get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples):
 
     # The data prefix should be in the format of:
     #   weight-1, data-prefix-1, weight-2, data-prefix-2, ..
@@ -144,16 +144,14 @@ def get_datasets_weights_and_num_samples(data_prefix,
     # samples left to feed to the network.
     datasets_train_valid_test_num_samples = []
     for weight in weights:
-        datasets_train_valid_test_num_samples.append([
-            int(math.ceil(val * weight * 1.005))
-            for val in train_valid_test_num_samples
-        ])
+        datasets_train_valid_test_num_samples.append(
+            [int(math.ceil(val * weight * 1.005)) for val in train_valid_test_num_samples]
+        )
 
     return prefixes, weights, datasets_train_valid_test_num_samples
 
 
 class MMapIndexedDataset(paddle.io.Dataset):
-
     def __init__(self, path, skip_warmup=False):
         super().__init__()
 
@@ -165,9 +163,7 @@ class MMapIndexedDataset(paddle.io.Dataset):
             if not os.path.isfile(path + suffix):
                 raise ValueError("File Not found, %s" % (path + suffix))
 
-        self._token_ids = np.load(path + "_ids.npy",
-                                  mmap_mode="r",
-                                  allow_pickle=True)
+        self._token_ids = np.load(path + "_ids.npy", mmap_mode="r", allow_pickle=True)
         process_data = np.load(path + "_idx.npz")
         self._sizes = process_data["lens"]
         self._pointers = np.empty(len(self._sizes) + 1, dtype=np.int64)
@@ -186,24 +182,23 @@ class MMapIndexedDataset(paddle.io.Dataset):
         if isinstance(idx, int):
             size = self._sizes[idx]
             ptr = self._pointers[idx]
-            np_array = self._token_ids[ptr:ptr + size]
+            np_array = self._token_ids[ptr : ptr + size]
             return np_array
 
         elif isinstance(idx, slice):
             start, stop, step = idx.indices(len(self))
             if step != 1:
-                raise ValueError(
-                    "Slices into indexed_dataset must be contiguous")
+                raise ValueError("Slices into indexed_dataset must be contiguous")
             ptr = self._pointers[start]
             sizes = self._sizes[idx]
             offsets = list(accumulate(sizes))
             total_size = sum(sizes)
-            np_array = self._token_ids[ptr:ptr + total_size]
+            np_array = self._token_ids[ptr : ptr + total_size]
             sents = np.split(np_array, offsets[:-1])
             return sents
 
     def get(self, idx, offset=0, length=None):
-        """ Retrieves a single item from the dataset with the option to only
+        """Retrieves a single item from the dataset with the option to only
         return a portion of the item.
 
         get(idx) is the same as [idx] but get() does not support slicing.
@@ -214,7 +209,7 @@ class MMapIndexedDataset(paddle.io.Dataset):
         if length is None:
             length = size - offset
         ptr += offset
-        np_array = self._token_ids[ptr:prt + length]
+        np_array = self._token_ids[ptr : prt + length]
         return np_array
 
     @property
@@ -242,7 +237,7 @@ def get_a_and_b_segments(sample, np_rng):
     # Number of sentences in the sample.
     n_sentences = len(sample)
     # Make sure we always have two sentences.
-    assert n_sentences > 1, 'make sure each sample has at least two sentences.'
+    assert n_sentences > 1, "make sure each sample has at least two sentences."
 
     # First part:
     # `a_end` is how many sentences go into the `A`.
@@ -270,7 +265,7 @@ def get_a_and_b_segments(sample, np_rng):
 
 def truncate_segments(tokens_a, tokens_b, len_a, len_b, max_num_tokens, np_rng):
     """Truncates a pair of sequences to a maximum sequence length."""
-    #print(len_a, len_b, max_num_tokens)
+    # print(len_a, len_b, max_num_tokens)
     assert len_a > 0
     if len_a + len_b <= max_num_tokens:
         return False
@@ -315,8 +310,7 @@ def create_tokens_and_tokentypes(tokens_a, tokens_b, cls_id, sep_id):
     return tokens, tokentypes
 
 
-MaskedLmInstance = collections.namedtuple("MaskedLmInstance",
-                                          ["index", "label"])
+MaskedLmInstance = collections.namedtuple("MaskedLmInstance", ["index", "label"])
 
 
 def is_start_piece(piece):
@@ -328,24 +322,26 @@ def is_start_piece(piece):
     return not piece.startswith("##")
 
 
-def create_masked_lm_predictions(tokens,
-                                 vocab_id_list,
-                                 vocab_id_to_token_dict,
-                                 masked_lm_prob,
-                                 cls_id,
-                                 sep_id,
-                                 mask_id,
-                                 max_predictions_per_seq,
-                                 np_rng,
-                                 max_ngrams=3,
-                                 vocab_token_to_id_dict=None,
-                                 do_whole_word_mask=True,
-                                 favor_longer_ngram=False,
-                                 do_permutation=False,
-                                 geometric_dist=False,
-                                 to_chinese_char=False,
-                                 inplace_random_mask=False,
-                                 masking_style="bert"):
+def create_masked_lm_predictions(
+    tokens,
+    vocab_id_list,
+    vocab_id_to_token_dict,
+    masked_lm_prob,
+    cls_id,
+    sep_id,
+    mask_id,
+    max_predictions_per_seq,
+    np_rng,
+    max_ngrams=3,
+    vocab_token_to_id_dict=None,
+    do_whole_word_mask=True,
+    favor_longer_ngram=False,
+    do_permutation=False,
+    geometric_dist=False,
+    to_chinese_char=False,
+    inplace_random_mask=False,
+    masking_style="bert",
+):
     """Creates the predictions for the masked LM objective.
     Note: Tokens here are vocab ids and not text tokens."""
 
@@ -366,8 +362,7 @@ def create_masked_lm_predictions(tokens,
         # at all -- we still predict each WordPiece independently, softmaxed
         # over the entire vocabulary.
         vocab_id = vocab_id_to_token_dict[token]
-        if (do_whole_word_mask and len(cand_indexes) >= 1
-                and not is_start_piece(vocab_id)):
+        if do_whole_word_mask and len(cand_indexes) >= 1 and not is_start_piece(vocab_id):
             cand_indexes[-1].append(i)
         else:
             cand_indexes.append([i])
@@ -381,11 +376,10 @@ def create_masked_lm_predictions(tokens,
         for i, b in enumerate(token_boundary):
             if b == 0:
                 vocab_id = vocab_id_to_token_dict[tokens[i]]
-                new_vocab_id = vocab_id[2:] if len(
-                    re.findall('##[\u4E00-\u9FA5]', vocab_id)) > 0 else vocab_id
+                new_vocab_id = vocab_id[2:] if len(re.findall("##[\u4E00-\u9FA5]", vocab_id)) > 0 else vocab_id
                 char_tokens.append(
-                    vocab_token_to_id_dict[new_vocab_id] if new_vocab_id in
-                    vocab_token_to_id_dict else token)
+                    vocab_token_to_id_dict[new_vocab_id] if new_vocab_id in vocab_token_to_id_dict else token
+                )
             else:
                 char_tokens.append(tokens[i])
         output_tokens = list(char_tokens)
@@ -396,17 +390,15 @@ def create_masked_lm_predictions(tokens,
     masked_lm_labels = []
 
     if masked_lm_prob == 0:
-        return (output_tokens, masked_lm_positions, masked_lm_labels,
-                token_boundary)
+        return (output_tokens, masked_lm_positions, masked_lm_labels, token_boundary)
 
-    num_to_predict = min(max_predictions_per_seq,
-                         max(1, int(round(len(tokens) * masked_lm_prob))))
+    num_to_predict = min(max_predictions_per_seq, max(1, int(round(len(tokens) * masked_lm_prob))))
 
     ngrams = np.arange(1, max_ngrams + 1, dtype=np.int64)
     if not geometric_dist:
         # Note(mingdachen):
         # By default, we set the probilities to favor shorter ngram sequences.
-        pvals = 1. / np.arange(1, max_ngrams + 1)
+        pvals = 1.0 / np.arange(1, max_ngrams + 1)
         pvals /= pvals.sum(keepdims=True)
         if favor_longer_ngram:
             pvals = pvals[::-1]
@@ -415,7 +407,7 @@ def create_masked_lm_predictions(tokens,
     for idx in range(len(cand_indexes)):
         ngram_index = []
         for n in ngrams:
-            ngram_index.append(cand_indexes[idx:idx + n])
+            ngram_index.append(cand_indexes[idx : idx + n])
         ngram_indexes.append(ngram_index)
 
     np_rng.shuffle(ngram_indexes)
@@ -436,9 +428,10 @@ def create_masked_lm_predictions(tokens,
                     continue
 
         if not geometric_dist:
-            n = np_rng.choice(ngrams[:len(cand_index_set)],
-                              p=pvals[:len(cand_index_set)] /
-                              pvals[:len(cand_index_set)].sum(keepdims=True))
+            n = np_rng.choice(
+                ngrams[: len(cand_index_set)],
+                p=pvals[: len(cand_index_set)] / pvals[: len(cand_index_set)].sum(keepdims=True),
+            )
         else:
             # Sampling "n" from the geometric distribution and clipping it to
             # the max_ngrams. Using p=0.2 default from the SpanBERT paper
@@ -480,25 +473,20 @@ def create_masked_lm_predictions(tokens,
                     # 10% of the time, replace with random word
                     else:
                         if inplace_random_mask:
-                            masked_token = backup_output_tokens[np_rng.randint(
-                                0, len(output_tokens))]
+                            masked_token = backup_output_tokens[np_rng.randint(0, len(output_tokens))]
                         else:
-                            masked_token = vocab_id_list[np_rng.randint(
-                                0, len(vocab_id_list))]
+                            masked_token = vocab_id_list[np_rng.randint(0, len(vocab_id_list))]
             elif masking_style == "t5":
                 masked_token = mask_id
             else:
                 raise ValueError("invalid value of masking style")
 
             output_tokens[index] = masked_token
-            masked_lms.append(
-                MaskedLmInstance(index=index,
-                                 label=backup_output_tokens[index]))
+            masked_lms.append(MaskedLmInstance(index=index, label=backup_output_tokens[index]))
 
         masked_spans.append(
-            MaskedLmInstance(
-                index=index_set,
-                label=[backup_output_tokens[index] for index in index_set]))
+            MaskedLmInstance(index=index_set, label=[backup_output_tokens[index] for index in index_set])
+        )
 
     assert len(masked_lms) <= num_to_predict
     np_rng.shuffle(ngram_indexes)
@@ -517,9 +505,10 @@ def create_masked_lm_predictions(tokens,
                     if index in covered_indexes or index in select_indexes:
                         continue
 
-            n = np.random.choice(ngrams[:len(cand_index_set)],
-                                 p=pvals[:len(cand_index_set)] /
-                                 pvals[:len(cand_index_set)].sum(keepdims=True))
+            n = np.random.choice(
+                ngrams[: len(cand_index_set)],
+                p=pvals[: len(cand_index_set)] / pvals[: len(cand_index_set)].sum(keepdims=True),
+            )
             index_set = sum(cand_index_set[n - 1], [])
             n -= 1
 
@@ -550,8 +539,7 @@ def create_masked_lm_predictions(tokens,
 
         for src_i, tgt_i in zip(select_indexes, permute_indexes):
             output_tokens[src_i] = orig_token[tgt_i]
-            masked_lms.append(
-                MaskedLmInstance(index=src_i, label=orig_token[src_i]))
+            masked_lms.append(MaskedLmInstance(index=src_i, label=orig_token[src_i]))
 
     masked_lms = sorted(masked_lms, key=lambda x: x.index)
     # Sort the spans by the index of the first span
@@ -560,12 +548,10 @@ def create_masked_lm_predictions(tokens,
     for p in masked_lms:
         masked_lm_positions.append(p.index)
         masked_lm_labels.append(p.label)
-    return (output_tokens, masked_lm_positions, masked_lm_labels,
-            token_boundary, masked_spans)
+    return (output_tokens, masked_lm_positions, masked_lm_labels, token_boundary, masked_spans)
 
 
-def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
-                             masked_labels, pad_id, max_seq_length):
+def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions, masked_labels, pad_id, max_seq_length):
     """Pad sequences and convert them to numpy."""
 
     # Some checks.
@@ -581,8 +567,7 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     tokentypes_np = np.array(tokentypes + filler, dtype=np.int64)
 
     # Padding mask.
-    padding_mask_np = np.array([1] * num_tokens + [0] * padding_length,
-                               dtype=np.int64)
+    padding_mask_np = np.array([1] * num_tokens + [0] * padding_length, dtype=np.int64)
 
     # Lables and loss mask.
     labels = [-1] * max_seq_length
@@ -597,39 +582,42 @@ def pad_and_convert_to_numpy(tokens, tokentypes, masked_positions,
     return tokens_np, tokentypes_np, labels_np, padding_mask_np, loss_mask_np
 
 
-def build_train_valid_test_datasets(data_prefix,
-                                    args,
-                                    tokenizer,
-                                    splits_string,
-                                    train_valid_test_num_samples,
-                                    max_seq_length,
-                                    masked_lm_prob,
-                                    short_seq_prob,
-                                    seed,
-                                    skip_warmup,
-                                    binary_head=False,
-                                    max_seq_length_dec=None,
-                                    dataset_type='standard_bert'):
+def build_train_valid_test_datasets(
+    data_prefix,
+    args,
+    tokenizer,
+    splits_string,
+    train_valid_test_num_samples,
+    max_seq_length,
+    masked_lm_prob,
+    short_seq_prob,
+    seed,
+    skip_warmup,
+    binary_head=False,
+    max_seq_length_dec=None,
+    dataset_type="standard_bert",
+):
 
     if len(data_prefix) == 1:
-        return _build_train_valid_test_datasets(data_prefix[0],
-                                                args,
-                                                tokenizer,
-                                                splits_string,
-                                                train_valid_test_num_samples,
-                                                max_seq_length,
-                                                masked_lm_prob,
-                                                short_seq_prob,
-                                                seed,
-                                                skip_warmup,
-                                                binary_head,
-                                                max_seq_length_dec,
-                                                dataset_type=dataset_type)
+        return _build_train_valid_test_datasets(
+            data_prefix[0],
+            args,
+            tokenizer,
+            splits_string,
+            train_valid_test_num_samples,
+            max_seq_length,
+            masked_lm_prob,
+            short_seq_prob,
+            seed,
+            skip_warmup,
+            binary_head,
+            max_seq_length_dec,
+            dataset_type=dataset_type,
+        )
 
     # Blending dataset.
     # Parse the values.
-    output = get_datasets_weights_and_num_samples(data_prefix,
-                                                  train_valid_test_num_samples)
+    output = get_datasets_weights_and_num_samples(data_prefix, train_valid_test_num_samples)
     prefixes, weights, datasets_train_valid_test_num_samples = output
 
     # Build individual datasets.
@@ -650,7 +638,8 @@ def build_train_valid_test_datasets(data_prefix,
             skip_warmup,
             binary_head,
             max_seq_length_dec,
-            dataset_type=dataset_type)
+            dataset_type=dataset_type,
+        )
         if train_ds:
             train_datasets.append(train_ds)
         if valid_ds:
@@ -669,23 +658,24 @@ def build_train_valid_test_datasets(data_prefix,
     if test_datasets:
         blending_test_dataset = BlendableDataset(test_datasets, weights)
 
-    return (blending_train_dataset, blending_valid_dataset,
-            blending_test_dataset)
+    return (blending_train_dataset, blending_valid_dataset, blending_test_dataset)
 
 
-def _build_train_valid_test_datasets(data_prefix,
-                                     args,
-                                     tokenizer,
-                                     splits_string,
-                                     train_valid_test_num_samples,
-                                     max_seq_length,
-                                     masked_lm_prob,
-                                     short_seq_prob,
-                                     seed,
-                                     skip_warmup,
-                                     binary_head,
-                                     max_seq_length_dec,
-                                     dataset_type='standard_bert'):
+def _build_train_valid_test_datasets(
+    data_prefix,
+    args,
+    tokenizer,
+    splits_string,
+    train_valid_test_num_samples,
+    max_seq_length,
+    masked_lm_prob,
+    short_seq_prob,
+    seed,
+    skip_warmup,
+    binary_head,
+    max_seq_length_dec,
+    dataset_type="standard_bert",
+):
 
     if dataset_type not in DSET_TYPES:
         raise ValueError("Invalid dataset_type: ", dataset_type)
@@ -700,27 +690,30 @@ def _build_train_valid_test_datasets(data_prefix,
     splits = get_train_valid_test_split_(splits_string, total_num_of_documents)
 
     # Print stats about the splits.
-    print_rank_0(' > dataset split:')
+    print_rank_0(" > dataset split:")
 
     def print_split_stats(name, index):
-        print_rank_0('    {}:'.format(name))
-        print_rank_0('     document indices in [{}, {}) total of {} '
-                     'documents'.format(splits[index], splits[index + 1],
-                                        splits[index + 1] - splits[index]))
+        print_rank_0("    {}:".format(name))
+        print_rank_0(
+            "     document indices in [{}, {}) total of {} "
+            "documents".format(splits[index], splits[index + 1], splits[index + 1] - splits[index])
+        )
         start_index = indexed_dataset.doc_idx[splits[index]]
         end_index = indexed_dataset.doc_idx[splits[index + 1]]
-        print_rank_0('     sentence indices in [{}, {}) total of {} '
-                     'sentences'.format(start_index, end_index,
-                                        end_index - start_index))
+        print_rank_0(
+            "     sentence indices in [{}, {}) total of {} "
+            "sentences".format(start_index, end_index, end_index - start_index)
+        )
 
-    print_split_stats('train', 0)
-    print_split_stats('validation', 1)
-    print_split_stats('test', 2)
+    print_split_stats("train", 0)
+    print_split_stats("validation", 1)
+    print_split_stats("test", 2)
 
     def build_dataset(index, name):
         # from megatron.data.bert_dataset import BertDataset
         # from megatron.data.t5_dataset import T5Dataset
         from .ernie_dataset import ErnieDataset
+
         dataset = None
         if splits[index + 1] > splits[index]:
             # Get the pointer to the original doc-idx so we can set it later.
@@ -743,26 +736,32 @@ def _build_train_valid_test_datasets(data_prefix,
                 args=args,
             )
             if dataset_type == DSET_TYPE_T5:
-                dataset = T5Dataset(indexed_dataset=indexed_dataset,
-                                    tokenizer=tokenizer,
-                                    masked_lm_prob=masked_lm_prob,
-                                    max_seq_length_dec=max_seq_length_dec,
-                                    short_seq_prob=short_seq_prob,
-                                    **kwargs)
+                dataset = T5Dataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    max_seq_length_dec=max_seq_length_dec,
+                    short_seq_prob=short_seq_prob,
+                    **kwargs,
+                )
             elif dataset_type == DSET_TYPE_BERT:
-                dataset = BertDataset(indexed_dataset=indexed_dataset,
-                                      tokenizer=tokenizer,
-                                      masked_lm_prob=masked_lm_prob,
-                                      short_seq_prob=short_seq_prob,
-                                      binary_head=binary_head,
-                                      **kwargs)
+                dataset = BertDataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    short_seq_prob=short_seq_prob,
+                    binary_head=binary_head,
+                    **kwargs,
+                )
             elif dataset_type == DSET_TYPE_ERNIE:
-                dataset = ErnieDataset(indexed_dataset=indexed_dataset,
-                                       tokenizer=tokenizer,
-                                       masked_lm_prob=masked_lm_prob,
-                                       short_seq_prob=short_seq_prob,
-                                       binary_head=binary_head,
-                                       **kwargs)
+                dataset = ErnieDataset(
+                    indexed_dataset=indexed_dataset,
+                    tokenizer=tokenizer,
+                    masked_lm_prob=masked_lm_prob,
+                    short_seq_prob=short_seq_prob,
+                    binary_head=binary_head,
+                    **kwargs,
+                )
             else:
                 raise NotImplementedError("Dataset type not fully implemented.")
 
@@ -770,57 +769,51 @@ def _build_train_valid_test_datasets(data_prefix,
             indexed_dataset.set_doc_idx(doc_idx_ptr)
             # Checks.
             assert indexed_dataset.doc_idx[0] == 0
-            assert indexed_dataset.doc_idx.shape[0] == \
-                (total_num_of_documents + 1)
+            assert indexed_dataset.doc_idx.shape[0] == (total_num_of_documents + 1)
         return dataset
 
-    train_dataset = build_dataset(0, 'train')
-    valid_dataset = build_dataset(1, 'valid')
-    test_dataset = build_dataset(2, 'test')
+    train_dataset = build_dataset(0, "train")
+    valid_dataset = build_dataset(1, "valid")
+    test_dataset = build_dataset(2, "test")
 
     return (train_dataset, valid_dataset, test_dataset)
 
 
 def get_indexed_dataset_(data_prefix, data_impl, skip_warmup):
 
-    print_rank_0(' > building dataset index ...')
+    print_rank_0(" > building dataset index ...")
 
     start_time = time.time()
     indexed_dataset = make_indexed_dataset(data_prefix, data_impl, skip_warmup)
     assert indexed_dataset.sizes.shape[0] == indexed_dataset.doc_idx[-1]
-    print_rank_0(' > finished creating indexed dataset in {:4f} '
-                 'seconds'.format(time.time() - start_time))
+    print_rank_0(" > finished creating indexed dataset in {:4f} " "seconds".format(time.time() - start_time))
 
-    print_rank_0(' > indexed dataset stats:')
-    print_rank_0(
-        '    number of documents: {}'.format(indexed_dataset.doc_idx.shape[0] -
-                                             1))
-    print_rank_0('    number of sentences: {}'.format(
-        indexed_dataset.sizes.shape[0]))
+    print_rank_0(" > indexed dataset stats:")
+    print_rank_0("    number of documents: {}".format(indexed_dataset.doc_idx.shape[0] - 1))
+    print_rank_0("    number of sentences: {}".format(indexed_dataset.sizes.shape[0]))
 
     return indexed_dataset
 
 
 def get_train_valid_test_split_(splits_string, size):
-    """ Get dataset splits from comma or '/' separated string list."""
+    """Get dataset splits from comma or '/' separated string list."""
 
     splits = []
-    if splits_string.find(',') != -1:
-        splits = [float(s) for s in splits_string.split(',')]
-    elif splits_string.find('/') != -1:
-        splits = [float(s) for s in splits_string.split('/')]
+    if splits_string.find(",") != -1:
+        splits = [float(s) for s in splits_string.split(",")]
+    elif splits_string.find("/") != -1:
+        splits = [float(s) for s in splits_string.split("/")]
     else:
         splits = [float(splits_string)]
     while len(splits) < 3:
-        splits.append(0.)
+        splits.append(0.0)
     splits = splits[:3]
     splits_sum = sum(splits)
     assert splits_sum > 0.0
     splits = [split / splits_sum for split in splits]
     splits_index = [0]
     for index, split in enumerate(splits):
-        splits_index.append(splits_index[index] +
-                            int(round(split * float(size))))
+        splits_index.append(splits_index[index] + int(round(split * float(size))))
     diff = splits_index[-1] - size
     for index in range(1, len(splits_index)):
         splits_index[index] -= diff
@@ -829,40 +822,49 @@ def get_train_valid_test_split_(splits_string, size):
     return splits_index
 
 
-def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
-                        max_num_samples, max_seq_length, short_seq_prob, seed,
-                        name, binary_head, share_folder):
+def get_samples_mapping(
+    indexed_dataset,
+    data_prefix,
+    num_epochs,
+    max_num_samples,
+    max_seq_length,
+    short_seq_prob,
+    seed,
+    name,
+    binary_head,
+    share_folder,
+):
     """Get a list that maps a sample index to a starting sentence index, end sentence index, and length"""
 
     if not num_epochs:
         if not max_num_samples:
-            raise ValueError("Need to specify either max_num_samples "
-                             "or num_epochs")
+            raise ValueError("Need to specify either max_num_samples " "or num_epochs")
         num_epochs = np.iinfo(np.int32).max - 1
     if not max_num_samples:
         max_num_samples = np.iinfo(np.int64).max - 1
 
     # Filename of the index mapping
     indexmap_filename = data_prefix
-    indexmap_filename += '_{}_indexmap'.format(name)
+    indexmap_filename += "_{}_indexmap".format(name)
     if num_epochs != (np.iinfo(np.int32).max - 1):
-        indexmap_filename += '_{}ep'.format(num_epochs)
+        indexmap_filename += "_{}ep".format(num_epochs)
     if max_num_samples != (np.iinfo(np.int64).max - 1):
-        indexmap_filename += '_{}mns'.format(max_num_samples)
-    indexmap_filename += '_{}msl'.format(max_seq_length)
-    indexmap_filename += '_{:0.2f}ssp'.format(short_seq_prob)
-    indexmap_filename += '_{}s'.format(seed)
-    indexmap_filename += '.npy'
+        indexmap_filename += "_{}mns".format(max_num_samples)
+    indexmap_filename += "_{}msl".format(max_seq_length)
+    indexmap_filename += "_{:0.2f}ssp".format(short_seq_prob)
+    indexmap_filename += "_{}s".format(seed)
+    indexmap_filename += ".npy"
 
     local_rank = get_local_rank()
     if share_folder:
         local_rank = paddle.distributed.get_rank()
     # Build the indexed mapping if not exist.
 
-    if local_rank == 0 and \
-       not os.path.isfile(indexmap_filename):
-        print(' > WARNING: could not find index map file {}, building '
-              'the indices on rank 0 ...'.format(indexmap_filename))
+    if local_rank == 0 and not os.path.isfile(indexmap_filename):
+        print(
+            " > WARNING: could not find index map file {}, building "
+            "the indices on rank 0 ...".format(indexmap_filename)
+        )
 
         # Make sure the types match the helpers input types.
         assert indexed_dataset.doc_idx.dtype == np.int64
@@ -872,45 +874,45 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
         # Build samples mapping
         verbose = local_rank == 0
         start_time = time.time()
-        print_rank_0(
-            ' > building sapmles index mapping for {} ...'.format(name))
+        print_rank_0(" > building sapmles index mapping for {} ...".format(name))
         # First compile and then import.
         try:
             from tool_helpers import helpers
         except ModuleNotFoundError:
-            print_rank_0(
-                ' > missing tool_helpers, pip install tool_helpers please, try to compile locally.'
-            )
+            print_rank_0(" > missing tool_helpers, pip install tool_helpers please, try to compile locally.")
             if local_rank == 0:
                 compile_helper()
             import data_tools.helpers as helpers
 
-        samples_mapping = helpers.build_mapping(indexed_dataset.doc_idx,
-                                                indexed_dataset.sizes,
-                                                num_epochs, max_num_samples,
-                                                max_seq_length, short_seq_prob,
-                                                seed, verbose,
-                                                2 if binary_head else 1)
-        print_rank_0(' > done building sapmles index maping')
+        samples_mapping = helpers.build_mapping(
+            indexed_dataset.doc_idx,
+            indexed_dataset.sizes,
+            num_epochs,
+            max_num_samples,
+            max_seq_length,
+            short_seq_prob,
+            seed,
+            verbose,
+            2 if binary_head else 1,
+        )
+        print_rank_0(" > done building sapmles index maping")
         np.save(indexmap_filename, samples_mapping, allow_pickle=True)
-        print_rank_0(
-            ' > saved the index mapping in {}'.format(indexmap_filename))
+        print_rank_0(" > saved the index mapping in {}".format(indexmap_filename))
         # Make sure all the ranks have built the mapping
-        print_rank_0(' > elasped time to build and save samples mapping '
-                     '(seconds): {:4f}'.format(time.time() - start_time))
+        print_rank_0(
+            " > elasped time to build and save samples mapping " "(seconds): {:4f}".format(time.time() - start_time)
+        )
 
     else:
         while True:
-            if (not os.path.isfile(indexmap_filename)):
+            if not os.path.isfile(indexmap_filename):
                 time.sleep(3)
             else:
                 try:
-                    np.load(indexmap_filename, allow_pickle=True, mmap_mode='r')
+                    np.load(indexmap_filename, allow_pickle=True, mmap_mode="r")
                     break
                 except Exception as e:
-                    print(
-                        "%s file is still writing or damaged, please wait a moment."
-                        % indexmap_filename)
+                    print("%s file is still writing or damaged, please wait a moment." % indexmap_filename)
                     time.sleep(3)
 
     # This should be a barrier but nccl barrier assumes
@@ -921,15 +923,10 @@ def get_samples_mapping(indexed_dataset, data_prefix, num_epochs,
             paddle.distributed.barrier()
 
     # Load indexed dataset.
-    print_rank_0(' > loading indexed mapping from {}'.format(indexmap_filename))
+    print_rank_0(" > loading indexed mapping from {}".format(indexmap_filename))
     start_time = time.time()
-    samples_mapping = np.load(indexmap_filename,
-                              allow_pickle=True,
-                              mmap_mode='r')
-    print_rank_0(
-        '    loaded indexed file in {:3.3f} seconds'.format(time.time() -
-                                                            start_time))
-    print_rank_0('    total number of samples: {}'.format(
-        samples_mapping.shape[0]))
+    samples_mapping = np.load(indexmap_filename, allow_pickle=True, mmap_mode="r")
+    print_rank_0("    loaded indexed file in {:3.3f} seconds".format(time.time() - start_time))
+    print_rank_0("    total number of samples: {}".format(samples_mapping.shape[0]))
 
     return samples_mapping

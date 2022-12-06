@@ -27,14 +27,10 @@ from paddlenlp.ops.ext_utils import load
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inference_model_dir",
-                        default="./infer_model/",
-                        type=str,
-                        help="Path to save inference model of BART. ")
-    parser.add_argument("--batch_size",
-                        default=1,
-                        type=int,
-                        help="Batch size. ")
+    parser.add_argument(
+        "--inference_model_dir", default="./infer_model/", type=str, help="Path to save inference model of BART. "
+    )
+    parser.add_argument("--batch_size", default=1, type=int, help="Batch size. ")
 
     args = parser.parse_args()
 
@@ -48,9 +44,7 @@ def postprocess_response(tokenizer, seq, bos_idx, eos_idx):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1] if idx != bos_idx and idx != eos_idx
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if idx != bos_idx and idx != eos_idx]
     res = tokenizer.convert_ids_to_string(seq)
     return res
 
@@ -66,9 +60,7 @@ def infer(args):
 
     # Input ids
     input_ids = tokenizer(inputs)["input_ids"]
-    input_ids = np.asarray(input_ids,
-                           dtype="int32").reshape(1, -1).repeat(args.batch_size,
-                                                                axis=0)
+    input_ids = np.asarray(input_ids, dtype="int32").reshape(1, -1).repeat(args.batch_size, axis=0)
 
     # Forced bos token ids
     forced_bos_token = np.ones([args.batch_size, 1], dtype="int32") * bos_id
@@ -78,7 +70,8 @@ def infer(args):
 
     config = paddle_infer.Config(
         os.path.join(args.inference_model_dir, "mbart.pdmodel"),
-        os.path.join(args.inference_model_dir, "mbart.pdiparams"))
+        os.path.join(args.inference_model_dir, "mbart.pdiparams"),
+    )
 
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
@@ -104,11 +97,7 @@ def infer(args):
     output_data = output_data.transpose([1, 2, 0])
 
     # Only use the best sequence.
-    result = [
-        postprocess_response(tokenizer,
-                             sample.tolist()[0], bos_id, eos_id)
-        for sample in output_data
-    ]
+    result = [postprocess_response(tokenizer, sample.tolist()[0], bos_id, eos_id) for sample in output_data]
     print("Model input:", inputs)
     print("Result:", "\n".join(result))
 

@@ -29,7 +29,7 @@ Transformer 中的 Encoder 由若干相同的 layer 堆叠组成，每个 layer 
 - Multi-Head Attention 在这里用于实现 Self-Attention，相比于简单的 Attention 机制，其将输入进行多路线性变换后分别计算 Attention 的结果，并将所有结果拼接后再次进行线性变换作为输出。参见图2，其中 Attention 使用的是点积（Dot-Product），并在点积后进行了 scale 的处理以避免因点积结果过大进入 softmax 的饱和区域。
 - Feed-Forward 网络会对序列中的每个位置进行相同的计算（Position-wise），其采用的是两次线性变换中间加以 ReLU 激活的结构。
 
-此外，每个 sub-layer 后还施以 Residual Connection [3]和 Layer Normalization [4]来促进梯度传播和模型收敛。
+此外，每个 sub-layer 后还施以 Residual Connection [3] 和 Layer Normalization [4] 来促进梯度传播和模型收敛。
 
 <p align="center">
 <img src="images/multi_head_attention.png" height=300 hspace='10'/> <br />
@@ -38,27 +38,15 @@ Transformer 中的 Encoder 由若干相同的 layer 堆叠组成，每个 layer 
 
 Decoder 具有和 Encoder 类似的结构，只是相比于组成 Encoder 的 layer ，在组成 Decoder 的 layer 中还多了一个 Multi-Head Attention 的 sub-layer 来实现对 Encoder 输出的 Attention，这个 Encoder-Decoder Attention 在其他 Seq2Seq 模型中也是存在的。
 
-## 环境依赖
-  - attrdict
-  - pyyaml
-
-安装命令：`pip install attrdict pyyaml`
-
-**注意：如果需要使用混合精度训练，需要使用基于 PaddlePaddle develop 分支编译的包。**
-
 ## 数据准备
 
-公开数据集：WMT 翻译大赛是机器翻译领域最具权威的国际评测大赛，其中英德翻译任务提供了一个中等规模的数据集，这个数据集是较多论文中使用的数据集，也是 Transformer 论文中用到的一个数据集。我们也将[WMT'14 EN-DE 数据集](http://www.statmt.org/wmt14/translation-task.html)作为示例提供。
-
-同时，我们提供了一份已经处理好的数据集，可以编写如下代码，对应的数据集将会自动下载并且解压到 `~/.paddlenlp/datasets/WMT14ende/`。
-
-``` python
-datasets = load_dataset('wmt14ende', splits=('train', 'dev'))
-```
+本示例可以使用 PaddleNLP 内置的处理好的 WMT14 EN-DE 翻译的数据进行训练、预测，也可以使用自定义数据集。数据准备部分可以参考前页文档 [使用自定义翻译数据集](../README.md)。
 
 ## 动态图
 
-### 单机训练
+### 使用内置数据集进行训练
+
+以下文档，介绍了使用 PaddleNLP 内置的处理好的 WMT14 EN-DE 翻译数据集的训练方式。
 
 #### 单机单卡
 
@@ -85,11 +73,76 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py --config .
 
 与上面的情况相似，可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中设置相应的参数。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
+### 使用自定义数据集进行训练
+
+自定义数据集与内置数据集训练的方式基本上是一致的，不过需要额外提供数据文件的路径。可以参照以下文档。
+
+#### 单机单卡
+
+本示例这里略去自定义数据下载、处理的步骤，如果需要，可以参考前页文档 [使用自定义翻译数据集](../README.md)。
+
+本示例以处理好的 WMT14 数据为例。
+
+``` bash
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+
+python train.py \
+    --config configs/transformer.base.yaml \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
+    --dev_file ${DATA_DEST_DIR}/dev.de-en.en ${DATA_DEST_DIR}/dev.de-en.de \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>" \
+    --pad_token "<s>"
+```
+
+`train.py` 脚本中，各个参数的含义如下：
+
+* `--config`: 指明所使用的 Transformer 的 config 文件，包括模型超参、训练超参等，默认是 `transformer.big.yaml`。即，默认训练 Transformer Big 模型。
+* `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
+  * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+  * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+* `--train_file`: 指明训练所需要的 `train` 训练集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，一组平行语料的源语言和目标语言，依次两个文件的路径和名称，`--train_file ${SOURCE_LANG_FILE} ${TARGET_LANG_FILE}`。比如，`--train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en`。
+* `--dev_file`: 指明训练所需要的 `dev` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，一组平行语料的源语言和目标语言，依次两个文件的路径和名称，`--dev_file ${SOURCE_LANG_FILE} ${TARGET_LANG_FILE}`。比如，`--dev_file ${DATA_DEST_DIR}/dev.de-en.de ${DATA_DEST_DIR}/dev.de-en.en`。
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
+* `--batch_size`: 指明训练时，一个 batch 里面，最多的 token 的数目。默认为 config 中设置的 4096。
+* `--max_iter`: 指明训练时，需要训练的最大的 step 的数目，默认为 None。表示使用 config 中指定的 `epoch: 30` 来作为最大的迭代的 epoch 的数量，而不是 step。
+* `--use_amp`: 是否使用混合精度训练。设置的类型是一个 `str`，可以是 `['true', 'false', 'True', 'False']` 中任意一个。默认不使用混合精度训练。
+* `--amp_level`: 若使用混合精度，则指明混合精度的级别。可以是 `['O1', 'O2']` 中任意一个。默认是 `O1`。
+
+#### 单机多卡
+
+单机多卡的执行方式与单机打卡差别不大，需要额外加上单机多卡的启动命令，如下所示：
+
+``` bash
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train.py \
+    --config configs/transformer.base.yaml \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
+    --dev_file ${DATA_DEST_DIR}/dev.de-en.en ${DATA_DEST_DIR}/dev.de-en.de \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+其余启动参数与单机单卡相同，这里不再累述。
+
 ### 模型推断
 
-#### 使用动态图预测
+#### 使用内置数据集进行预测
 
-以英德翻译数据为例，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
+如果是基于内置的数据集训练得到的英德翻译的模型，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
 
 ``` sh
 # setting visible devices for prediction
@@ -99,9 +152,44 @@ python predict.py --config ./configs/transformer.base.yaml
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
- 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
+需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
- 另外 `predict.py` 中使用的 `TransformerGenerator` 接口对于GPU预测将在适配的条件下自动切换到 `FasterTransformer` 预测加速版本（期间会进行jit编译）， `FasterTransformer`的更多内容可以参考 `faster_transformer/README.md`。
+另外 `predict.py` 中使用的 `TransformerGenerator` 接口对于GPU预测将在适配的条件下自动切换到 `FasterTransformer` 预测加速版本（期间会进行jit编译）， `FasterTransformer`的更多内容可以参考 `faster_transformer/README.md`。
+
+#### 基于自定义数据集进行预测
+
+本示例同样支持自定义数据集进行预测。可以参照以下文档。
+
+``` bash
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+
+python predict.py \
+    --config configs/transformer.base.yaml \
+    --test_file ${DATA_DEST_DIR}/test.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+以下是各个参数的含义：
+
+* `--config`: 指明所使用的 Transformer 的 config 文件，包括模型超参、训练超参等，默认是 `transformer.big.yaml`。即，默认训练 Transformer Big 模型。
+* `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
+  * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+  * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，传入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de`。
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
+* `--without_ft`: 本示例在预测时，支持了 GPU 的翻译预测的加速，如果不使用加速特性，可以设置 `--without_ft` 即会执行普通的 PaddlePaddle 动态图预测。
+
+翻译结果会输出到 config 文件中 `output_file` 条目指定的文件中。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。
 
 #### 导出静态图预测模型与预测引擎预测
 
@@ -114,6 +202,28 @@ python export_model.py --config ./configs/transformer.base.yaml
 ```
 
 模型默认保存在 `infer_model/` 路径下面。可以在 `configs/` 路径下的配置文件中更改 `inference_model_dir` 配置，从而保存至自定义的路径。
+
+同样，因为模型导出会用到模型的词表等信息，所以如果是**自定义数据集**，仍需要传入所使用的词表。
+
+``` bash
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+
+python export_model.py \
+    --config ./configs/transformer.base.yaml \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>"
+```
+
+其中：
+
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
 
 #### 使用 Paddle Inference API 进行推理
 
@@ -129,7 +239,9 @@ python export_model.py --config ./configs/transformer.base.yaml
 
 ## 静态图
 
-### 单机训练
+在静态图中，本示例仍然可以选择内置数据集进行训练或是使用自定义数据集进行训练。
+
+### 使用内置数据集进行训练
 
 #### 单机单卡
 
@@ -140,7 +252,7 @@ export CUDA_VISIBLE_DEVICES=0
 python train.py --config ../configs/transformer.base.yaml
 ```
 
-我们建议可以在单卡执行的时候，尝试增大 `warmup_steps`。可以修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中对应参数。
+建议可以在单卡执行的时候，尝试增大 `warmup_steps`。可以修改 `configs/transformer.big.yaml` 或是 `configs/transformer.base.yaml` 中对应参数。
 
 #### 单机多卡
 
@@ -162,9 +274,89 @@ python -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py --config .
 
 需要注意的是，使用 fleet 的方式启动单机多卡务必设置 `--distributed`。
 
-#### 模型推断
+### 使用自定义数据集进行训练
 
-同样，以英德翻译数据为例，在静态图模式下，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
+静态图和动态图在训练脚本启动上差别不大，仍然需要指明对应的文件的位置。可以参照以下文档。
+
+#### 单机单卡
+
+本示例这里略去自定义数据下载、处理的步骤，如果需要，可以参考前页文档 [使用自定义翻译数据集](../README.md)。
+
+本示例以处理好的 WMT14 数据为例。
+
+``` bash
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+
+python train.py \
+    --config configs/transformer.base.yaml \
+    --train_file ${DATA_DEST_DIR}/train.de-en.en ${DATA_DEST_DIR}/train.de-en.de \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+`train.py` 脚本中，各个参数的含义如下：
+
+* `--config`: 指明所使用的 Transformer 的 config 文件，包括模型超参、训练超参等，默认是 `transformer.big.yaml`。即，默认训练 Transformer Big 模型。
+* `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
+  * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+  * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+* `--train_file`: 指明训练所需要的 `train` 训练集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，一组平行语料的源语言和目标语言，依次两个文件的路径和名称，`--train_file ${SOURCE_LANG_FILE} ${TARGET_LANG_FILE}`。比如，`--train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en`。
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
+* `--batch_size`: 指明训练时，一个 batch 里面，最多的 token 的数目。默认为 config 中设置的 4096。
+* `--max_iter`: 指明训练时，需要训练的最大的 step 的数目，默认为 None。表示使用 config 中指定的 `epoch: 30` 来作为最大的迭代的 epoch 的数量，而不是 step。
+
+#### 单机多卡
+
+单机多卡下，执行方式与上文所述单机单卡传入自定义数据集方式相同。因静态图多卡有两种方式执行，所以这里会多一个参数：
+
+* `--distributed`:（**多卡训练需要**）指明是否是使用 fleet 来启动多卡。若设置，则使用 fleet 启动多卡。具体使用方式如下。
+
+##### PE 的方式启动单机多卡：
+``` shell
+cd static/
+export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+python train.py \
+    --config ../configs/transformer.base.yaml \
+    --train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+##### fleet 的方式启动单机多卡：
+``` shell
+cd static/
+unset CUDA_VISIBLE_DEVICES
+python -m paddle.distributed.launch --gpus="0,1,2,3,4,5,6,7" train.py \
+    --config ../configs/transformer.base.yaml \
+    --distributed \
+    --train_file ${DATA_DEST_DIR}/train.de-en.de ${DATA_DEST_DIR}/train.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+需要注意的是，使用 fleet 的方式启动单机多卡务必设置 `--distributed`。
+
+#### 使用内置数据集进行预测
+
+如果是基于内置的数据集训练得到的英德翻译的模型，模型训练完成后可以执行以下命令对指定文件中的文本进行翻译：
 
 ``` sh
 # setting visible devices for prediction
@@ -173,9 +365,46 @@ export CUDA_VISIBLE_DEVICES=0
 python predict.py --config ../configs/transformer.base.yaml
 ```
 
- 由 `predict_file` 指定的文件中文本的翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
+由 `predict_file` 指定的文件中文本的翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 big model 的配置。
 
- 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
+需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
+
+#### 基于自定义数据集进行预测
+
+本示例同样支持自定义数据集进行预测。可以参照以下文档。
+
+``` bash
+cd static/
+export CUDA_VISIBLE_DEVICES=0
+
+DATA_DEST_DIR=${PATH_TO_PADDLENLP}/PaddleNLP/examples/machine_translation/data/wmt14_en_de/
+python predict.py \
+    --config configs/transformer.base.yaml \
+    --test_file ${DATA_DEST_DIR}/test.de-en.en \
+    --src_vocab ${DATA_DEST_DIR}/dict.en.txt \
+    --trg_vocab ${DATA_DEST_DIR}/dict.de.txt \
+    --bos_token "<s>" \
+    --eos_token "</s>" \
+    --unk_token "<unk>"
+```
+
+以下是各个参数的含义：
+
+* `--config`: 指明所使用的 Transformer 的 config 文件，包括模型超参、训练超参等，默认是 `transformer.big.yaml`。即，默认训练 Transformer Big 模型。
+* `--data_dir`: 指明训练需要的数据集的路径。无需提供不同的 train、dev 和 test 文件具体的文件名，会自动根据 `--src_lang` 和 `--trg_lang` 指定的语言进行构造。train、dev 和 test 默认的文件名分别为 [train|dev|test].{src_lang}-{trg_lang}.[{src_lang}|{trg_lang}]。且 `--data_dir` 设置的优先级会高于后面提到的 `--train_file`，`--dev_file` 和 `--test_file` 的优先级。
+  * `--src_lang`(`-s`): 指代翻译模型的源语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+  * `--trg_lang`(`-t`): 指代翻译模型的目标语言。比如 `de` 表示德语，`en` 表示英语，`fr` 表示法语等等。和数据集本身相关。
+* `--test_file`: 指明训练所需要的 `test` 验证集的数据集的路径。若没有提供 `--data_dir` 或是需要特别指明训练数据的名称的时候指定。指定的方式为，传入源语言的文件。比如，`--test_file ${DATA_DEST_DIR}/test.de-en.de`。
+* `--vocab_file`: 指明训练所需的词表文件的路径和名称。若指定 `--vocab_file` 则默认是源语言和目标语言使用同一个词表。且 `--vocab_file` 设置的优先级会高于后面提到的 `--src_vocab` 和 `--trg_vocab` 优先级。
+* `--src_vocab`: 指明训练所需的源语言的词表文件的路径和名称。可以与 `--trg_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--trg_vocab`: 指明训练所需的目标语言的词表文件的路径和名称。可以与 `--src_vocab` 相同，若相同，则视为源语言和目标语言共用同一个词表。
+* `--unk_token`: 若提供了自定义的词表，则需要额外指明词表中未登录词 `[UNK]` 具体的 token。比如，`--unk_token "<unk>"`。默认为 `<unk>`，与数据预处理脚本设定默认值相同。
+* `--bos_token`: 若提供了自定义的词表，则需要额外指明词表中起始词 `[BOS]` 具体的 token。比如，`--bos_token "<s>"`。默认为 `<s>`，与数据预处理脚本设定默认值相同。
+* `--eos_token`: 若提供了自定义的词表，则需要额外指明词表中结束词 `[EOS]` 具体的 token。比如，`--eos_token "</s>"`。默认为 `</s>`，与数据预处理脚本设定默认值相同。
+* `--pad_token`: 若提供了自定义的词表，原则上，需要额外指定词表中用于表示 `[PAD]` 具体的 token。比如，`--pad_token "<pad>"`。默认为 None，若使用 None，则使用 `--bos_token` 作为 `pad_token` 使用。
+* `--without_ft`: 本示例在预测时，支持了 GPU 的翻译预测的加速，如果不使用加速特性，可以设置 `--without_ft` 即会执行普通的 PaddlePaddle 动态图预测。
+
+翻译结果会输出到 config 文件中 `output_file` 条目指定的文件中。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `configs/transformer.big.yaml` 和 `configs/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。
 
 ## 使用 FasterTransformer 实现预测
 
@@ -202,7 +431,7 @@ BLEU = 27.48, 58.6/33.2/21.1/13.9 (BP=1.000, ratio=1.012, hyp_len=65312, ref_len
 ## FAQ
 
 **Q:** 预测结果中样本数少于输入的样本数是什么原因
-**A:** 若样本中最大长度超过 `transformer.yaml` 中 `max_length` 的默认设置，请注意运行时增大 `--max_length` 的设置，否则超长样本将被过滤。
+**A:** 若样本中最大长度超过 `transformer.base.yaml` 或是 `transformer.big.yaml` 中 `max_length` 的默认设置，请注意运行时增大 `max_length` 的设置，否则超长样本将被过滤。
 
 **Q:** 预测时最大长度超过了训练时的最大长度怎么办
 **A:** 由于训练时 `max_length` 的设置决定了保存模型 position encoding 的大小，若预测时长度超过 `max_length`，请调大该值，会重新生成更大的 position encoding 表。

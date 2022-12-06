@@ -26,8 +26,7 @@ TASKS = [
     "QuestionAnswering",
 ]
 
-config = yaml.load(open(osp.join(osp.abspath("."), "./config.yml"), 'r'),
-                   Loader=yaml.FullLoader)
+config = yaml.load(open(osp.join(osp.abspath("."), "./config.yml"), "r"), Loader=yaml.FullLoader)
 default_args = config["DefaultArgs"]
 
 ALL_DATASETS = {}
@@ -44,18 +43,19 @@ for task_type in TASKS:
 
 
 class Dict(object):
-
     def __init__(self, fn):
-        assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
-                                   'Received fn=%s' % (str(fn))
+        assert isinstance(fn, (dict)), (
+            "Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn "
+            "Received fn=%s" % (str(fn))
+        )
 
         self._fn = fn
 
         for col_name, ele_fn in self._fn.items():
-            assert callable(
-                ele_fn
-            ), 'Batchify functions must be callable! type(fn[%d]) = %s' % (
-                col_name, str(type(ele_fn)))
+            assert callable(ele_fn), "Batchify functions must be callable! type(fn[%d]) = %s" % (
+                col_name,
+                str(type(ele_fn)),
+            )
 
     def __call__(self, data):
 
@@ -82,17 +82,12 @@ class DataArguments:
     the command line.
     """
 
-    dataset: str = field(
-        default=None,
-        metadata={
-            "help": "The name of the dataset to use (via the datasets library)."
-        })
+    dataset: str = field(default=None, metadata={"help": "The name of the dataset to use (via the datasets library)."})
 
     max_seq_length: int = field(
         default=128,
         metadata={
-            "help":
-            "The maximum total input sequence length after tokenization. Sequences longer "
+            "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
     )
@@ -100,17 +95,13 @@ class DataArguments:
     # Additional configs for QA task.
     doc_stride: int = field(
         default=128,
-        metadata={
-            "help":
-            "When splitting up a long document into chunks, how much stride to take between chunks."
-        },
+        metadata={"help": "When splitting up a long document into chunks, how much stride to take between chunks."},
     )
 
     n_best_size: int = field(
         default=20,
         metadata={
-            "help":
-            "The total number of n-best predictions to generate in the nbest_predictions.json output file."
+            "help": "The total number of n-best predictions to generate in the nbest_predictions.json output file."
         },
     )
 
@@ -127,24 +118,20 @@ class DataArguments:
     do_lower_case: bool = field(
         default=False,
         metadata={
-            "help":
-            "Whether to lower case the input text. Should be True for uncased models and False for cased models."
+            "help": "Whether to lower case the input text. Should be True for uncased models and False for cased models."
         },
     )
     overwrite_cache: bool = field(
-        default=False,
-        metadata={"help": "Overwrite the cached training and evaluation sets"})
+        default=False, metadata={"help": "Overwrite the cached training and evaluation sets"}
+    )
     preprocessing_num_workers: Optional[int] = field(
         default=None,
-        metadata={
-            "help": "The number of processes to use for the preprocessing."
-        },
+        metadata={"help": "The number of processes to use for the preprocessing."},
     )
     null_score_diff_threshold: float = field(
         default=0.0,
         metadata={
-            "help":
-            "The threshold used to select the null answer: if the best answer has a score that is less than "
+            "help": "The threshold used to select the null answer: if the best answer has a score that is less than "
             "the score of the null answer minus this threshold, the null answer is selected for this example. "
             "Only useful when `version_2_with_negative=True`."
         },
@@ -159,28 +146,20 @@ class ModelArguments:
 
     model_name_or_path: str = field(
         metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-        })
+            "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        }
+    )
     config_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained config name or path if not the same as model_name"
-        })
+        default=None, metadata={"help": "Pretrained config name or path if not the same as model_name"}
+    )
     tokenizer_name: Optional[str] = field(
-        default=None,
-        metadata={
-            "help":
-            "Pretrained tokenizer name or path if not the same as model_name"
-        })
+        default=None, metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"}
+    )
     cache_dir: Optional[str] = field(
         default=None,
         metadata={"help": "Path to directory to store the dataset cache."},
     )
     export_model_dir: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Path to directory to store the exported inference model."
-        },
+        metadata={"help": "Path to directory to store the exported inference model."},
     )

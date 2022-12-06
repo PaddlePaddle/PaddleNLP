@@ -21,40 +21,35 @@ from reprod_log import ReprodLogger
 from transformers import AdamW
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
 from models.pd_bert import (
-    BertForSequenceClassification as PDBertForSequenceClassification, )
+    BertForSequenceClassification as PDBertForSequenceClassification,
+)
 from models.pd_bert import (
-    BertConfig as PDBertConfig, )
+    BertConfig as PDBertConfig,
+)
 from models.pt_bert import (
-    BertForSequenceClassification as HFBertForSequenceClassification, )
+    BertForSequenceClassification as HFBertForSequenceClassification,
+)
 from models.pt_bert import (
-    BertConfig as HFBertConfig, )
+    BertConfig as HFBertConfig,
+)
 
 
-def pd_train_some_iters(model,
-                        criterion,
-                        optimizer,
-                        fake_data,
-                        fake_label,
-                        max_iter=2):
-    paddle_dump_path = '../weights/paddle_weight.pdparams'
+def pd_train_some_iters(model, criterion, optimizer, fake_data, fake_label, max_iter=2):
+    paddle_dump_path = "../weights/paddle_weight.pdparams"
     config = PDBertConfig()
     model = PDBertForSequenceClassification(config)
     checkpoint = paddle.load(paddle_dump_path)
     model.bert.load_dict(checkpoint)
 
-    classifier_weights = paddle.load(
-        "../classifier_weights/paddle_classifier_weights.bin")
+    classifier_weights = paddle.load("../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
     model.eval()
     criterion = paddle.nn.CrossEntropy()
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=3e-5,
         parameters=model.parameters(),
@@ -78,33 +73,24 @@ def pd_train_some_iters(model,
 
 def hf_train_some_iters(fake_data, fake_label, max_iter=2):
 
-    pytorch_dump_path = '../weights/torch_weight.bin'
+    pytorch_dump_path = "../weights/torch_weight.bin"
     config = HFBertConfig()
     model = HFBertForSequenceClassification(config)
     checkpoint = torch.load(pytorch_dump_path)
     model.bert.load_state_dict(checkpoint)
-    classifier_weights = torch.load(
-        "../classifier_weights/torch_classifier_weights.bin")
+    classifier_weights = torch.load("../classifier_weights/torch_classifier_weights.bin")
     model.load_state_dict(classifier_weights, strict=False)
     model.eval()
     criterion = torch.nn.CrossEntropyLoss()
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if not any(nd in n for nd in no_decay)
-            ],
-            "weight_decay":
-            1e-2,
+            "params": [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)],
+            "weight_decay": 1e-2,
         },
         {
-            "params": [
-                p for n, p in model.named_parameters()
-                if any(nd in n for nd in no_decay)
-            ],
-            "weight_decay":
-            0.0,
+            "params": [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)],
+            "weight_decay": 0.0,
         },
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=3e-5)
