@@ -14,12 +14,12 @@
 
 import collections
 import os
-import warnings
 
-from paddle.io import Dataset
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
+
 from paddlenlp.utils.env import DATA_HOME
+
 from . import DatasetBuilder
 
 __all__ = ["WMT14ende"]
@@ -118,7 +118,7 @@ class WMT14ende(DatasetBuilder):
                     tgt_line = tgt_line.strip()
                     if not src_line and not tgt_line:
                         continue
-                    yield {"en": src_line, "de": tgt_line}
+                    yield {"source": src_line, "target": tgt_line}
 
     def get_vocab(self):
         bpe_vocab_fullname = os.path.join(DATA_HOME, self.__class__.__name__, self.VOCAB_INFO[0][0])

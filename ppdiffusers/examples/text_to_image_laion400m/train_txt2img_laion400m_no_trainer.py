@@ -12,30 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import contextlib
+import itertools
 import math
 import os
+import sys
 import time
-import itertools
+
 import paddle
 import paddle.nn as nn
-from paddle.io import DataLoader
-import contextlib
-import sys
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import set_seed
-from ppdiffusers.optimization import get_scheduler
-
-from ppdiffusers.modeling_utils import unwrap_model
-from paddle.optimizer import AdamW
-from paddlenlp.trainer import PdArgumentParser
 from ldm import (
-    LatentDiffusionModel,
-    TextImagePair,
-    worker_init_fn,
     DataArguments,
+    LatentDiffusionModel,
     ModelArguments,
     NoTrainerTrainingArguments,
+    TextImagePair,
+    worker_init_fn,
 )
+from paddle.io import DataLoader
+from paddle.optimizer import AdamW
+
+from paddlenlp.trainer import PdArgumentParser, set_seed
+from paddlenlp.utils.log import logger
+from ppdiffusers.modeling_utils import unwrap_model
+from ppdiffusers.optimization import get_scheduler
 
 
 def get_writer(training_args):
@@ -58,6 +58,7 @@ def main():
     training_args.image_logging_steps = model_args.image_logging_steps = (
         math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps
     )
+    training_args.resolution = data_args.resolution
     training_args.print_config(training_args, "Training")
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")

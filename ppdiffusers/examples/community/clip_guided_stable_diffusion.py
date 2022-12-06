@@ -19,9 +19,20 @@ import paddle
 from paddle import nn
 from paddle.nn import functional as F
 from paddle.vision import transforms
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPModel, CLIPTextModel, CLIPTokenizer
 
-from ppdiffusers import AutoencoderKL, DiffusionPipeline, LMSDiscreteScheduler, PNDMScheduler, UNet2DConditionModel
+from paddlenlp.transformers import (
+    CLIPFeatureExtractor,
+    CLIPModel,
+    CLIPTextModel,
+    CLIPTokenizer,
+)
+from ppdiffusers import (
+    AutoencoderKL,
+    DiffusionPipeline,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    UNet2DConditionModel,
+)
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
 from ppdiffusers.utils import logging
 

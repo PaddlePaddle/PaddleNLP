@@ -17,14 +17,14 @@
 
 import math
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
 
-from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput
+from ..configuration_utils import ConfigMixin, FrozenDict, register_to_config
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput, deprecate
 from .scheduling_utils import SchedulerMixin
 
 
@@ -82,8 +82,8 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     For more details, see the original paper: https://arxiv.org/abs/2006.11239
 
@@ -101,8 +101,15 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             `fixed_small_log`, `fixed_large`, `fixed_large_log`, `learned` or `learned_range`.
         clip_sample (`bool`, default `True`):
             option to clip predicted sample between -1 and 1 for numerical stability.
-
+        prediction_type (`str`, default `epsilon`, optional):
+            prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
+            process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
+            https://imagen.research.google/video/paper.pdf)
     """
+
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+    _deprecated_kwargs = ["predict_epsilon"]
+    order = 1
 
     @register_to_config
     def __init__(
@@ -111,13 +118,21 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.0001,
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
-        trained_betas: Optional[np.ndarray] = None,
+        trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         variance_type: str = "fixed_small",
         clip_sample: bool = True,
+        prediction_type: str = "epsilon",
+        **kwargs,
     ):
-
+        message = (
+            "Please make sure to instantiate your scheduler with `prediction_type` instead. E.g. `scheduler ="
+            " DDPMScheduler.from_pretrained(<model_id>, prediction_type='epsilon')`."
+        )
+        predict_epsilon = deprecate("predict_epsilon", "0.10.0", message, take_from=kwargs)
+        if predict_epsilon is not None:
+            self.register_to_config(prediction_type="epsilon" if predict_epsilon else "sample")
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas)
+            self.betas = paddle.to_tensor(trained_betas, dtype="float32")
         elif beta_schedule == "linear":
             self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
@@ -142,7 +157,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self.timesteps = paddle.to_tensor(np.arange(0, num_train_timesteps)[::-1].copy().astype("int64"))
+        self.timesteps = paddle.to_tensor(np.arange(0, num_train_timesteps)[::-1].copy())
 
         self.variance_type = variance_type
 
@@ -193,6 +208,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         # for rl-diffuser https://arxiv.org/abs/2205.09991
         elif variance_type == "fixed_small_log":
             variance = paddle.log(paddle.clip(variance, min=1e-20))
+            variance = paddle.exp(0.5 * variance)
         elif variance_type == "fixed_large":
             variance = self.betas[t]
         elif variance_type == "fixed_large_log":
@@ -213,8 +229,9 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: int,
         sample: paddle.Tensor,
-        predict_epsilon=True,
+        generator=None,
         return_dict: bool = True,
+        **kwargs,
     ) -> Union[DDPMSchedulerOutput, Tuple]:
         """
         Predict the sample at the previous timestep by reversing the SDE. Core function to propagate the diffusion
@@ -225,8 +242,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             timestep (`int`): current discrete timestep in the diffusion chain.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
-            predict_epsilon (`bool`):
-                optional flag to use when model predicts the samples directly instead of the noise, epsilon.
+            generator: random number generator.
             return_dict (`bool`): option for returning tuple rather than DDPMSchedulerOutput class
 
         Returns:
@@ -235,6 +251,16 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
             returning a tuple, the first element is the sample tensor.
 
         """
+        message = (
+            "Please make sure to instantiate your scheduler with `prediction_type` instead. E.g. `scheduler ="
+            " DDPMScheduler.from_pretrained(<model_id>, prediction_type='epsilon')`."
+        )
+        predict_epsilon = deprecate("predict_epsilon", "0.10.0", message, take_from=kwargs)
+        if predict_epsilon is not None:
+            new_config = dict(self.config)
+            new_config["prediction_type"] = "epsilon" if predict_epsilon else "sample"
+            self._internal_dict = FrozenDict(new_config)
+
         t = timestep
 
         if model_output.shape[1] == sample.shape[1] * 2 and self.variance_type in ["learned", "learned_range"]:
@@ -250,10 +276,17 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
         # 2. compute predicted original sample from predicted noise also called
         # "predicted x_0" of formula (15) from https://arxiv.org/pdf/2006.11239.pdf
-        if predict_epsilon:
+        if self.config.prediction_type == "epsilon":
             pred_original_sample = (sample - beta_prod_t ** (0.5) * model_output) / alpha_prod_t ** (0.5)
-        else:
+        elif self.config.prediction_type == "sample":
             pred_original_sample = model_output
+        elif self.config.prediction_type == "v_prediction":
+            pred_original_sample = (alpha_prod_t**0.5) * sample - (beta_prod_t**0.5) * model_output
+        else:
+            raise ValueError(
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, `sample` or"
+                " `v_prediction`  for the DDPMScheduler."
+            )
 
         # 3. Clip "predicted x_0"
         if self.config.clip_sample:
@@ -271,8 +304,11 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         # 6. Add noise
         variance = 0
         if t > 0:
-            noise = paddle.randn(model_output.shape, dtype=model_output.dtype)
-            variance = (self._get_variance(t, predicted_variance=predicted_variance) ** 0.5) * noise
+            variance_noise = paddle.randn(model_output.shape, generator=generator, dtype=model_output.dtype)
+            if self.variance_type == "fixed_small_log":
+                variance = self._get_variance(t, predicted_variance=predicted_variance) * variance_noise
+            else:
+                variance = (self._get_variance(t, predicted_variance=predicted_variance) ** 0.5) * variance_noise
 
         pred_prev_sample = pred_prev_sample + variance
 
@@ -288,7 +324,7 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
+        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
         sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()
@@ -302,6 +338,23 @@ class DDPMScheduler(SchedulerMixin, ConfigMixin):
 
         noisy_samples = sqrt_alpha_prod * original_samples + sqrt_one_minus_alpha_prod * noise
         return noisy_samples
+
+    def get_velocity(self, sample: paddle.Tensor, noise: paddle.Tensor, timesteps: paddle.Tensor) -> paddle.Tensor:
+        # Make sure alphas_cumprod and timestep have same dtype as original_samples
+        self.alphas_cumprod = self.alphas_cumprod.cast(sample.dtype)
+
+        sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
+        sqrt_alpha_prod = sqrt_alpha_prod.flatten()
+        while len(sqrt_alpha_prod.shape) < len(sample.shape):
+            sqrt_alpha_prod = sqrt_alpha_prod.unsqueeze(-1)
+
+        sqrt_one_minus_alpha_prod = (1 - self.alphas_cumprod[timesteps]) ** 0.5
+        sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.flatten()
+        while len(sqrt_one_minus_alpha_prod.shape) < len(sample.shape):
+            sqrt_one_minus_alpha_prod = sqrt_one_minus_alpha_prod.unsqueeze(-1)
+
+        velocity = sqrt_alpha_prod * noise - sqrt_one_minus_alpha_prod * sample
+        return velocity
 
     def __len__(self):
         return self.config.num_train_timesteps

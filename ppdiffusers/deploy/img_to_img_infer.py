@@ -12,30 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
+import distutils.util
 import os
-
-from paddlenlp.transformers import CLIPTokenizer
-
-from ppdiffusers import (
-    FastDeployStableDiffusionImg2ImgPipeline,
-    EulerAncestralDiscreteScheduler,
-    PNDMScheduler,
-    FastDeployRuntimeModel,
-)
+import time
+from io import BytesIO
 
 import fastdeploy as fd
-from fastdeploy import ModelFormat
-import numpy as np
-import distutils.util
-from PIL import Image
 import requests
-from io import BytesIO
+from fastdeploy import ModelFormat
+from PIL import Image
+
+from paddlenlp.transformers import CLIPTokenizer
+from ppdiffusers import (
+    EulerAncestralDiscreteScheduler,
+    FastDeployRuntimeModel,
+    FastDeployStableDiffusionImg2ImgPipeline,
+    PNDMScheduler,
+)
 
 
 def parse_arguments():
     import argparse
-    import ast
 
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -160,6 +157,7 @@ def get_scheduler(args):
             beta_start=0.00085,
             num_train_timesteps=1000,
             skip_prk_steps=True,
+            steps_offset=1,
         )
     elif args.scheduler == "euler_ancestral":
         scheduler = EulerAncestralDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
@@ -174,7 +172,7 @@ if __name__ == "__main__":
     scheduler = get_scheduler(args)
 
     # 2. Init tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
     vae_decoder_dynamic_shape = {
@@ -194,7 +192,7 @@ if __name__ == "__main__":
     }
 
     unet_dynamic_shape = {
-        "latent_input": {
+        "sample": {
             "min_shape": [1, 4, 64, 64],
             "max_shape": [2, 4, 64, 64],
             "opt_shape": [2, 4, 64, 64],
@@ -204,7 +202,7 @@ if __name__ == "__main__":
             "max_shape": [1],
             "opt_shape": [1],
         },
-        "encoder_embedding": {
+        "encoder_hidden_states": {
             "min_shape": [1, 77, 768],
             "max_shape": [2, 77, 768],
             "opt_shape": [2, 77, 768],
@@ -306,6 +304,6 @@ if __name__ == "__main__":
     init_image = init_image.resize((768, 512))
 
     prompt = "A fantasy landscape, trending on artstation"
-    images = pipe(prompt=prompt, init_image=init_image, num_inference_steps=args.inference_steps).images
+    images = pipe(prompt=prompt, image=init_image, num_inference_steps=args.inference_steps).images
 
     images[0].save("fantasy_landscape.png")

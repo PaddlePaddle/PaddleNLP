@@ -13,10 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from clip_guided_stable_diffusion import CLIPGuidedStableDiffusion
 from IPython.display import display
 from PIL import Image
+
 from paddlenlp.transformers import CLIPFeatureExtractor, CLIPModel
-from clip_guided_stable_diffusion import CLIPGuidedStableDiffusion
 from ppdiffusers import LMSDiscreteScheduler, StableDiffusionPipeline
 
 

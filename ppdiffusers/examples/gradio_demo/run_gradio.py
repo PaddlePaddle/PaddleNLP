@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppdiffusers import StableDiffusionPipeline
 import gradio as gr
+
+from ppdiffusers import StableDiffusionPipeline
 
 pipe = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
 pipe.enable_attention_slicing()

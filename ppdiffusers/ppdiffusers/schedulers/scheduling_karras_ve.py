@@ -56,8 +56,8 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     For more details on the parameters, see the original paper's Appendix E.: "Elucidating the Design Space of
     Diffusion-Based Generative Models." https://arxiv.org/abs/2206.00364. The grid search values used to find the
@@ -77,6 +77,8 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
+    order = 2
+
     @register_to_config
     def __init__(
         self,
@@ -87,7 +89,6 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         s_min: float = 0.05,
         s_max: float = 50,
     ):
-
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = sigma_max
 
@@ -132,9 +133,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         self.schedule = paddle.to_tensor(schedule, dtype="float32")
 
     def add_noise_to_input(
-        self,
-        sample: paddle.Tensor,
-        sigma: float,
+        self, sample: paddle.Tensor, sigma: float, generator: Optional[paddle.Generator] = None
     ) -> Tuple[paddle.Tensor, float]:
         """
         Explicit Langevin-like "churn" step of adding noise to the sample according to a factor gamma_i ≥ 0 to reach a
@@ -148,7 +147,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
             gamma = 0
 
         # sample eps ~ N(0, S_noise^2 * I)
-        eps = self.config.s_noise * paddle.randn(sample.shape)
+        eps = self.config.s_noise * paddle.randn(sample.shape, generator=generator)
         sigma_hat = sigma + gamma * sigma
         sample_hat = sample + ((sigma_hat**2 - sigma**2) ** 0.5 * eps)
 

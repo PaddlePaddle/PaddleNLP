@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from dataclasses import dataclass
 from typing import Optional, Tuple, Union
 
@@ -23,7 +22,7 @@ from ..configuration_utils import ConfigMixin, register_to_config
 from ..modeling_utils import ModelMixin
 from ..utils import BaseOutput
 from .embeddings import GaussianFourierProjection, TimestepEmbedding, Timesteps
-from .unet_blocks import UNetMidBlock2D, get_down_block, get_up_block
+from .unet_2d_blocks import UNetMidBlock2D, get_down_block, get_up_block
 
 
 @dataclass
@@ -45,15 +44,15 @@ class UNet2DModel(ModelMixin, ConfigMixin):
     implements for all the model (such as downloading or saving, etc.)
 
     Parameters:
-        sample_size (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`, *optional*):
-            Input sample size.
+        sample_size (`int` or `Tuple[int, int]`, *optional*, defaults to `None`):
+            Height and width of input/output sample.
         in_channels (`int`, *optional*, defaults to 3): Number of channels in the input image.
         out_channels (`int`, *optional*, defaults to 3): Number of channels in the output.
         center_input_sample (`bool`, *optional*, defaults to `False`): Whether to center the input sample.
         time_embedding_type (`str`, *optional*, defaults to `"positional"`): Type of time embedding to use.
         freq_shift (`int`, *optional*, defaults to 0): Frequency shift for fourier time embedding.
         flip_sin_to_cos (`bool`, *optional*, defaults to :
-            obj:`False`): Whether to flip sin to cos for fourier time embedding.
+            obj:`True`): Whether to flip sin to cos for fourier time embedding.
         down_block_types (`Tuple[str]`, *optional*, defaults to :
             obj:`("DownBlock2D", "AttnDownBlock2D", "AttnDownBlock2D", "AttnDownBlock2D")`): Tuple of downsample block
             types.
@@ -73,7 +72,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
     @register_to_config
     def __init__(
         self,
-        sample_size: Optional[int] = None,
+        sample_size: Optional[Union[int, Tuple[int, int]]] = None,
         in_channels: int = 3,
         out_channels: int = 3,
         center_input_sample: bool = False,
@@ -179,7 +178,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
             num_channels=block_out_channels[0], num_groups=num_groups_out, epsilon=norm_eps
         )
         self.conv_act = nn.Silu()
-        self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, 3, padding=1)
+        self.conv_out = nn.Conv2D(block_out_channels[0], out_channels, kernel_size=3, padding=1)
 
     def forward(
         self,
@@ -212,7 +211,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
         # broadcast to batch dimension in a way that's compatible with ONNX/Core ML
         timesteps = timesteps * paddle.ones((sample.shape[0],), dtype=timesteps.dtype)
 
-        t_emb = self.time_proj(timesteps).astype(self.dtype)
+        t_emb = self.time_proj(timesteps).cast(self.dtype)
         emb = self.time_embedding(t_emb)
 
         # 2. pre-process
@@ -246,9 +245,7 @@ class UNet2DModel(ModelMixin, ConfigMixin):
                 sample = upsample_block(sample, res_samples, emb)
 
         # 6. post-process
-        # make sure hidden states is in float32
-        # when running in half-precision
-        sample = self.conv_norm_out(sample.astype("float32")).astype(sample.dtype)
+        sample = self.conv_norm_out(sample)
         sample = self.conv_act(sample)
         sample = self.conv_out(sample)
 

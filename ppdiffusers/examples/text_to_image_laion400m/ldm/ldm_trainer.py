@@ -11,14 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+import contextlib
 import sys
-from paddlenlp.trainer import Trainer
+
 import paddle.amp.auto_cast as autocast
 from paddle.io import DataLoader
-import contextlib
-from .text_image_pair_dataset import worker_init_fn, TextImagePair
-from paddlenlp.trainer.integrations import VisualDLCallback, INTEGRATION_TO_CALLBACK, rewrite_logs
+
+from paddlenlp.trainer import Trainer
+from paddlenlp.trainer.integrations import (
+    INTEGRATION_TO_CALLBACK,
+    VisualDLCallback,
+    rewrite_logs,
+)
 from paddlenlp.utils.log import logger
+
+from .text_image_pair_dataset import TextImagePair, worker_init_fn
 
 
 class VisualDLWithImageCallback(VisualDLCallback):
@@ -58,8 +66,12 @@ class VisualDLWithImageCallback(VisualDLCallback):
         ):
             with self.autocast_smart_context_manager(args):
                 image_logs["reconstruction"] = model.decode_image(pixel_values=inputs["pixel_values"])
-                image_logs["ddim-samples-1.0"] = model.log_image(input_ids=inputs["input_ids"], guidance_scale=1.0)
-                image_logs["ddim-samples-7.5"] = model.log_image(input_ids=inputs["input_ids"], guidance_scale=7.5)
+                image_logs["ddim-samples-1.0"] = model.log_image(
+                    input_ids=inputs["input_ids"], guidance_scale=1.0, height=args.resolution, width=args.resolution
+                )
+                image_logs["ddim-samples-7.5"] = model.log_image(
+                    input_ids=inputs["input_ids"], guidance_scale=7.5, height=args.resolution, width=args.resolution
+                )
 
         if not state.is_world_process_zero:
             return

@@ -18,15 +18,16 @@
 # Does not convert optimizer state or any other thing.
 
 import argparse
-import paddle
 
-paddle.set_device("cpu")
+import paddle
 import torch
+
 from ppdiffusers import LDMTextToImagePipeline
 
 # =================#
 # UNet Conversion #
 # =================#
+paddle.set_device("cpu")
 
 unet_conversion_map = [
     # (stable-diffusion, HF Diffusers)

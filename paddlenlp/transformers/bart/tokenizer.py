@@ -13,13 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import shutil
 from functools import lru_cache
 
-import json
-import shutil
 from paddle.utils import try_import
-from .. import PretrainedTokenizer, AddedToken
+
+from .. import AddedToken, PretrainedTokenizer
 
 __all__ = ["BartTokenizer"]
 
@@ -289,7 +290,7 @@ class BartTokenizer(PretrainedTokenizer):
                     j = word.index(first, i)
                     new_word.extend(word[i:j])
                     i = j
-                except:
+                except:  # noqa: E722
                     new_word.extend(word[i:])
                     break
 

@@ -15,9 +15,10 @@
 import collections
 import io
 import json
-import numpy as np
 import os
 import warnings
+
+import numpy as np
 
 
 class Vocab(object):
@@ -553,3 +554,26 @@ class Vocab(object):
             token_to_idx, unk_token=unk_token, pad_token=pad_token, bos_token=bos_token, eos_token=eos_token, **kwargs
         )
         return vocab
+
+    def save_vocabulary(self, filepath):
+        """
+        Save the :class:`Vocab` to a specific file. Can be reloaded by calling `load_vocabulary`.
+
+        Args:
+            filepath (str): the path of file to save vocabulary.
+        """
+        with open(filepath, "w") as f:
+            for idx in range(len(self._idx_to_token)):
+                f.write(self._idx_to_token[idx] + "\n")
+
+    def get_unk_token_id(self):
+        return self._token_to_idx[self.unk_token] if self.unk_token is not None else self.unk_token
+
+    def get_bos_token_id(self):
+        return self._token_to_idx[self.bos_token] if self.bos_token is not None else self.bos_token
+
+    def get_eos_token_id(self):
+        return self._token_to_idx[self.eos_token] if self.eos_token is not None else self.eos_token
+
+    def get_pad_token_id(self):
+        return self._token_to_idx[self.pad_token] if self.pad_token is not None else self.pad_token

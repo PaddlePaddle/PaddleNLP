@@ -23,15 +23,15 @@ import shutil
 import sys
 import tempfile
 import unittest
-from collections import OrderedDict
 from itertools import takewhile
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
-from paddlenlp.transformers import AlbertTokenizer, AutoTokenizer, BertTokenizer, PretrainedTokenizer
-from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
+from paddlenlp.transformers import PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
-from ..testing_utils import get_tests_dir, slow
+from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
+
+from ..testing_utils import get_tests_dir
 
 sys.path.append(str(Path(__file__).parent.parent / "utils"))
 
@@ -924,8 +924,6 @@ class TokenizerTesterMixin:
 
                 self.assertGreater(len(seq1_tokens), 2 + stride)
 
-                smallest = seq1_tokens if len(seq0_tokens) > len(seq1_tokens) else seq0_tokens
-
                 # We are not using the special tokens - a bit too hard to test all the tokenizers with this
                 # TODO try this again later
                 sequence = tokenizer.encode(seq_0, seq_1, return_token_type_ids=None, add_special_tokens=False)[
@@ -1006,28 +1004,25 @@ class TokenizerTesterMixin:
                     tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
                     + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"][:-2]
                 )
-                truncated_longest_sequence = (
-                    truncated_first_sequence if len(seq0_tokens) > len(seq1_tokens) else truncated_second_sequence
-                )
 
-                overflow_first_sequence = (
-                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
-                        -(2 + stride) :
-                    ]
-                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
-                )
-                overflow_second_sequence = (
-                    tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
-                    + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
-                        -(2 + stride) :
-                    ]
-                )
-                overflow_longest_sequence = (
-                    overflow_first_sequence if len(seq0_tokens) > len(seq1_tokens) else overflow_second_sequence
-                )
+                # TODO(wj-Mcat): `overflow_first_sequence` and `overflow_second_sequence` is not used
+                # to make CI green, the following codes will be commented out
+
+                # overflow_first_sequence = (
+                #     tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
+                #         -(2 + stride) :
+                #     ]
+                #     + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                # )
+                # overflow_second_sequence = (
+                #     tokenizer.encode(seq_0, return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+                #     + tokenizer.encode(seq_1, return_token_type_ids=None, add_special_tokens=False)["input_ids"][
+                #         -(2 + stride) :
+                #     ]
+                # )
 
                 with self.assertRaises(ValueError) as context:
-                    information = tokenizer(
+                    tokenizer(
                         seq_0,
                         seq_1,
                         max_length=len(sequence) - 2,
@@ -1051,7 +1046,7 @@ class TokenizerTesterMixin:
 
                 # No overflowing tokens when using 'longest' in python tokenizers
                 with self.assertRaises(ValueError) as context:
-                    information = tokenizer(
+                    tokenizer(
                         seq_0,
                         seq_1,
                         max_length=len(sequence) - 2,
@@ -2046,6 +2041,22 @@ class TokenizerTesterMixin:
                 self.assertGreaterEqual(len(tokenizer.special_tokens_map["additional_special_tokens"]), 2)
 
                 self.assertEqual(len(tokenizer), vocab_size + 8)
+
+    def test_offsets_mapping_with_unk(self):
+        if not self.test_offsets:
+            return
+
+        for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+
+                text = "σπδ a no inspiration example with subtoken"
+                mappings_1 = tokenizer.get_offset_mapping(text)
+
+                text = "a σπδ no inspiration example with subtoken"
+                mappings_2 = tokenizer.get_offset_mapping(text)
+                assert len(mappings_1) == len(mappings_2)
 
     def test_offsets_mapping(self):
         if not self.test_offsets:
