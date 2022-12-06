@@ -11,13 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import itertools
 import math
 import os
+
 import paddle
+from ldm import (
+    DataArguments,
+    LatentDiffusionModel,
+    LatentDiffusionTrainer,
+    ModelArguments,
+    TextImagePair,
+)
+
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments, get_last_checkpoint
 from paddlenlp.utils.log import logger
-import itertools
-from ldm import TextImagePair, DataArguments, ModelArguments, LatentDiffusionTrainer, LatentDiffusionModel
 
 
 def main():
@@ -25,6 +33,7 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     # report to custom_visualdl
     training_args.report_to = ["custom_visualdl"]
+    training_args.resolution = data_args.resolution
     training_args.image_logging_steps = model_args.image_logging_steps = (
         math.ceil(model_args.image_logging_steps / training_args.logging_steps) * training_args.logging_steps
     )

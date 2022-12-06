@@ -14,19 +14,29 @@
 
 import argparse
 import json
-import pickle
-import paddle
-import tempfile
-import os
 import math
+import os
 import pathlib
-import matplotlib.pyplot as plt
+import pickle
+import tempfile
 
+import matplotlib.pyplot as plt
+import paddle
+from fid_score import (
+    IMAGE_EXTENSIONS,
+    InceptionV3,
+    calculate_frechet_distance,
+    compute_statistics_of_path,
+)
 from PIL import Image
-from fid_score import InceptionV3, compute_statistics_of_path, calculate_frechet_distance, IMAGE_EXTENSIONS
-from paddlenlp.transformers import CLIPProcessor, CLIPModel
-from ppdiffusers.download_utils import PPDIFFUSERS_CACHE, get_path_from_url, DOWNLOAD_SERVER
 from tqdm.auto import tqdm
+
+from paddlenlp.transformers import CLIPModel, CLIPProcessor
+from ppdiffusers.download_utils import (
+    DOWNLOAD_SERVER,
+    PPDIFFUSERS_CACHE,
+    get_path_from_url,
+)
 
 base_url = DOWNLOAD_SERVER + "/CompVis/data/"
 cache_path = os.path.join(PPDIFFUSERS_CACHE, "data")

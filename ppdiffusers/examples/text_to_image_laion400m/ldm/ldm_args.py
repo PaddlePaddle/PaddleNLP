@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, List
-from dataclasses import asdict, dataclass, field
 import types
+from dataclasses import asdict, dataclass, field
+from typing import Optional
 
 import paddle
+
 from paddlenlp.utils.log import logger
 
 

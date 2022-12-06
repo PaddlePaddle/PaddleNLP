@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +16,20 @@
 
 import os
 from functools import partial
-from typing import Callable, List, Optional, Tuple, Union
+from typing import Callable, Optional, Union
 
 import paddle
 import paddle.nn as nn
-
-from .download_utils import ppdiffusers_bos_download
 from requests import HTTPError
 
-from .utils import CONFIG_NAME, PPDIFFUSERS_CACHE, DOWNLOAD_SERVER, WEIGHTS_NAME, logging
+from .download_utils import ppdiffusers_bos_download
+from .utils import (
+    CONFIG_NAME,
+    DOWNLOAD_SERVER,
+    PPDIFFUSERS_CACHE,
+    WEIGHTS_NAME,
+    logging,
+)
 
 logger = logging.get_logger(__name__)
 
@@ -49,12 +54,17 @@ def get_parameter_dtype(parameter: nn.Layer):
         return paddle.get_default_dtype()
 
 
-def load_dict(checkpoint_file: Union[str, os.PathLike], return_numpy: bool = True):
+def load_dict(checkpoint_file: Union[str, os.PathLike], map_location: str = "cpu"):
     """
     Reads a Paddle checkpoint file, returning properly formatted errors if they arise.
     """
     try:
-        return paddle.load(checkpoint_file, return_numpy=return_numpy)
+        if map_location == "cpu":
+            with paddle.device_scope("cpu"):
+                state_dict = paddle.load(checkpoint_file)
+        else:
+            state_dict = paddle.load(checkpoint_file)
+        return state_dict
     except Exception as e:
         try:
             with open(checkpoint_file) as f:
@@ -102,7 +112,10 @@ class ModelMixin(nn.Layer):
         Note that in other frameworks this feature can be referred to as "activation checkpointing" or "checkpoint
         activations".
         """
-        return any(hasattr(m, "gradient_checkpointing") and m.gradient_checkpointing for m in self.modules())
+        return any(
+            hasattr(m, "gradient_checkpointing") and m.gradient_checkpointing
+            for m in self.sublayers(include_self=True)
+        )
 
     def enable_gradient_checkpointing(self):
         """
@@ -199,6 +212,9 @@ class ModelMixin(nn.Layer):
                     - A path to a *directory* containing model weights saved using [`~ModelMixin.save_config`], e.g.,
                       `./my_model_directory/`.
 
+            cache_dir (`Union[str, os.PathLike]`, *optional*):
+                Path to a directory in which a downloaded pretrained model configuration should be cached if the
+                standard cache should not be used.
             paddle_dtype (`str` or `paddle.dtype`, *optional*):
                 Override the default `paddle.dtype` and load the model under this dtype. If `"auto"` is passed the dtype
                 will be automatically derived from the model's weights.
@@ -208,12 +224,8 @@ class ModelMixin(nn.Layer):
                 In case the relevant files are located inside a subfolder of the model repo (either remote in
                 huggingface.co or downloaded locally), you can specify the folder name here.
 
-            mirror (`str`, *optional*):
-                Mirror source to accelerate downloads in China. If you are from China and have an accessibility
-                problem, you can set this option to resolve it. Note that we do not guarantee the timeliness or safety.
-                Please refer to the mirror site for more information.
-
         """
+        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", False)
         output_loading_info = kwargs.pop("output_loading_info", False)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
@@ -244,6 +256,7 @@ class ModelMixin(nn.Layer):
                     pretrained_model_name_or_path,
                     filename=WEIGHTS_NAME,
                     subfolder=subfolder,
+                    cache_dir=cache_dir,
                 )
             except HTTPError as err:
                 raise EnvironmentError(
@@ -266,13 +279,31 @@ class ModelMixin(nn.Layer):
                     f"containing a file named {WEIGHTS_NAME}"
                 )
 
-        model, unused_kwargs = cls.from_config(
+        config, unused_kwargs = cls.load_config(
             config_path,
+            cache_dir=cache_dir,
             return_unused_kwargs=True,
             subfolder=subfolder,
             **kwargs,
         )
-        state_dict = load_dict(model_file, return_numpy=True)
+        model = cls.from_config(config, **unused_kwargs)
+
+        state_dict = load_dict(model_file, map_location="cpu")
+
+        dtype = set(v.dtype for v in state_dict.values())
+
+        if len(dtype) > 1 and paddle.float32 not in dtype:
+            raise ValueError(
+                f"The weights of the model file {model_file} have a mixture of incompatible dtypes {dtype}. Please"
+                f" make sure that {model_file} weights have only one dtype."
+            )
+        elif len(dtype) > 1 and paddle.float32 in dtype:
+            dtype = paddle.float32
+        else:
+            dtype = dtype.pop()
+
+        # move model to correct dtype
+        model = model.to(dtype=dtype)
 
         model, missing_keys, unexpected_keys, mismatched_keys, error_msgs = cls._load_pretrained_model(
             model,
@@ -339,9 +370,8 @@ class ModelMixin(nn.Layer):
                 for checkpoint_key in loaded_keys:
                     model_key = checkpoint_key
 
-                    if (
-                        model_key in model_state_dict
-                        and list(state_dict[checkpoint_key].shape) != model_state_dict[model_key].shape
+                    if model_key in model_state_dict and list(state_dict[checkpoint_key].shape) != list(
+                        model_state_dict[model_key].shape
                     ):
                         mismatched_keys.append(
                             (checkpoint_key, state_dict[checkpoint_key].shape, model_state_dict[model_key].shape)
@@ -380,7 +410,7 @@ class ModelMixin(nn.Layer):
                 " BertForSequenceClassification model)."
             )
         else:
-            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.")
+            logger.info(f"All model checkpoint weights were used when initializing {model.__class__.__name__}.\n")
         if len(missing_keys) > 0:
             logger.warning(
                 f"Some weights of {model.__class__.__name__} were not initialized from the model checkpoint at"

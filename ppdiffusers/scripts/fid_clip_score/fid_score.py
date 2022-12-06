@@ -48,12 +48,13 @@ limitations under the License.
 import os
 import pathlib
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser
+
 import numpy as np
-from PIL import Image
-from scipy import linalg
 import paddle
 import paddle.vision.transforms as TF
 from paddle.nn.functional import adaptive_avg_pool2d
+from PIL import Image
+from scipy import linalg
 
 try:
     from tqdm import tqdm

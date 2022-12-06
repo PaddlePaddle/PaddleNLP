@@ -51,8 +51,8 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -67,6 +67,8 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         correct_steps (`int`): number of correction steps performed on a produced sample.
     """
 
+    order = 1
+
     @register_to_config
     def __init__(
         self,
@@ -77,7 +79,6 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         sampling_eps: float = 1e-5,
         correct_steps: int = 1,
     ):
-
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = sigma_max
 
@@ -155,6 +156,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: int,
         sample: paddle.Tensor,
+        generator: Optional[paddle.Generator] = None,
         return_dict: bool = True,
     ) -> Union[SdeVeOutput, Tuple]:
         """
@@ -166,6 +168,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
             timestep (`int`): current discrete timestep in the diffusion chain.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
+            generator: random number generator.
             return_dict (`bool`): option for returning tuple rather than SchedulerOutput class
 
         Returns:
@@ -178,8 +181,8 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
                 "`self.timesteps` is not set, you need to run 'set_timesteps' after creating the scheduler"
             )
 
-        timestep = timestep * paddle.ones((sample.shape[0],))
-        timesteps = (timestep * (len(self.timesteps) - 1)).astype("int64")
+        timestep = timestep * paddle.ones((sample.shape[0],))  # paddle.repeat_interleave(timestep, sample.shape[0])
+        timesteps = (timestep * (len(self.timesteps) - 1)).cast("int64")
 
         sigma = self.discrete_sigmas[timesteps]
         adjacent_sigma = self.get_adjacent_sigma(timesteps, timestep)
@@ -194,7 +197,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         drift = drift - diffusion**2 * model_output
 
         #  equation 6: sample noise for the diffusion term of
-        noise = paddle.randn(sample.shape)
+        noise = paddle.randn(sample.shape, generator=generator)
         prev_sample_mean = sample - drift  # subtract because `dt` is a small negative timestep
         # TODO is the variable diffusion the correct scaling term for the noise?
         prev_sample = prev_sample_mean + diffusion * noise  # add impact of diffusion field g
@@ -208,6 +211,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
         self,
         model_output: paddle.Tensor,
         sample: paddle.Tensor,
+        generator: Optional[paddle.Generator] = None,
         return_dict: bool = True,
     ) -> Union[SchedulerOutput, Tuple]:
         """
@@ -218,6 +222,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
             model_output (`paddle.Tensor`): direct output from learned diffusion model.
             sample (`paddle.Tensor`):
                 current instance of sample being created by diffusion process.
+            generator: random number generator.
             return_dict (`bool`): option for returning tuple rather than SchedulerOutput class
 
         Returns:
@@ -232,7 +237,7 @@ class ScoreSdeVeScheduler(SchedulerMixin, ConfigMixin):
 
         # For small batch sizes, the paper "suggest replacing norm(z) with sqrt(d), where d is the dim. of z"
         # sample noise for correction
-        noise = paddle.randn(sample.shape)
+        noise = paddle.randn(sample.shape, generator=generator)
 
         # compute step size from the model_output, the noise, and the snr
         grad_norm = paddle.norm(model_output.reshape([model_output.shape[0], -1]), axis=-1).mean()
