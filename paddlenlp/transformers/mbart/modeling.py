@@ -298,9 +298,9 @@ class MBartEncoder(MBartPretrainedModel):
         if input_ids is not None and inputs_embeds is not None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            input_shape = input_ids.shape
+            input_shape = paddle.shape(input_ids)
         elif inputs_embeds is not None:
-            input_shape = inputs_embeds.shape[:-1]
+            input_shape = paddle.shape(inputs_embeds)[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
@@ -427,10 +427,10 @@ class MBartDecoder(MBartPretrainedModel):
         if decoder_input_ids is not None and decoder_inputs_embeds is not None:
             raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
         elif decoder_input_ids is not None:
-            decoder_input_shape = decoder_input_ids.shape
+            decoder_input_shape = paddle.shape(decoder_input_ids)
             decoder_input_ids = decoder_input_ids.reshape((-1, decoder_input_shape[-1]))
         elif decoder_inputs_embeds is not None:
-            decoder_input_shape = decoder_inputs_embeds.shape[:-1]
+            decoder_input_shape = paddle.shape(decoder_inputs_embeds)[:-1]
         else:
             raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
 
@@ -1114,7 +1114,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.shape[1]
+            ignored_index = paddle.shape(start_logits)[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
