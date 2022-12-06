@@ -29,10 +29,8 @@ VOCAB_FILES_NAMES = {
 class TestTokenizationBart(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = BartTokenizer
     test_rust_tokenizer = False
-
+    test_offsets = False
     from_pretrained_filter = filter_roberta_detectors
-
-    # from_pretrained_kwargs = {'add_prefix_space': True}
 
     def setUp(self):
         super().setUp()

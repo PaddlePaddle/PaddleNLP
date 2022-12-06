@@ -11,7 +11,6 @@
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
-
 # limitations under the License.
 
 from typing import Optional, Tuple, Union
@@ -26,7 +25,7 @@ from ...schedulers import PNDMScheduler
 class PNDMPipeline(DiffusionPipeline):
     r"""
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
 
     Parameters:
         unet (`UNet2DModel`): U-Net architecture to denoise the encoded image latents.
@@ -46,7 +45,7 @@ class PNDMPipeline(DiffusionPipeline):
         self,
         batch_size: int = 1,
         num_inference_steps: int = 50,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         **kwargs,
@@ -57,7 +56,8 @@ class PNDMPipeline(DiffusionPipeline):
             num_inference_steps (`int`, `optional`, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
-            seed (`int`, `optional`): A random seed.
+            generator (`paddle.Generator`, `optional`): A [paddle
+                generator](to make generation deterministic.
             output_type (`str`, `optional`, defaults to `"pil"`): The output format of the generate image. Choose
                 between [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
             return_dict (`bool`, `optional`, defaults to `True`): Whether or not to return a
@@ -68,15 +68,13 @@ class PNDMPipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        if seed is not None:
-            paddle.seed(seed)
-
         # For more information on the sampling method you can take a look at Algorithm 2 of
         # the official paper: https://arxiv.org/pdf/2202.09778.pdf
 
         # Sample gaussian noise to begin loop
         image = paddle.randn(
             (batch_size, self.unet.in_channels, self.unet.sample_size, self.unet.sample_size),
+            generator=generator,
         )
 
         self.scheduler.set_timesteps(num_inference_steps)

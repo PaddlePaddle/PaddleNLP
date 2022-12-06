@@ -14,29 +14,37 @@
 # limitations under the License.
 
 import argparse
+import contextlib
 import hashlib
+import itertools
 import math
 import os
+import sys
+from pathlib import Path
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.io import Dataset, DataLoader, BatchSampler, DistributedBatchSampler
-import contextlib
-import sys
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import set_seed
-from ppdiffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
-from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.modeling_utils import unwrap_model, freeze_params
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-
-import itertools
-from PIL import Image
-from paddle.vision import transforms
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
+from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
 from paddle.optimizer import AdamW
+from paddle.vision import transforms
+from PIL import Image
 from tqdm.auto import tqdm
-from paddlenlp.transformers import BertModel, AutoTokenizer, CLIPTextModel
-from pathlib import Path
+
+from paddlenlp.trainer import set_seed
+from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from paddlenlp.utils.log import logger
+from ppdiffusers import (
+    AutoencoderKL,
+    DDPMScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
+from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.optimization import get_scheduler
 
 
 def parse_args(input_args=None):
@@ -378,8 +386,9 @@ def main(args):
                         image.save(image_filename)
 
                 del pipeline
-                if paddle.device.is_compiled_with_cuda():
-                    paddle.device.cuda.empty_cache()
+                # donot use paddle.device.cuda.empty_cache
+                # if paddle.device.is_compiled_with_cuda():
+                #     paddle.device.cuda.empty_cache()
 
     if args.output_dir is not None:
         os.makedirs(args.output_dir, exist_ok=True)

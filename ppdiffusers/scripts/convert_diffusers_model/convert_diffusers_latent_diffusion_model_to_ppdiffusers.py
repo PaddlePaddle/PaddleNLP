@@ -11,24 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import tempfile
+from collections import OrderedDict
+
 import paddle
+import torch
+from diffusers import LDMTextToImagePipeline as DiffusersLDMTextToImagePipeline
+
+from paddlenlp.transformers import BertTokenizer
+from ppdiffusers import AutoencoderKL, DDIMScheduler, LDMBertModel
+from ppdiffusers import LDMTextToImagePipeline as PPDiffusersLDMTextToImagePipeline
+from ppdiffusers import LMSDiscreteScheduler, PNDMScheduler, UNet2DConditionModel
 
 paddle.set_device("cpu")
-import argparse
-import torch
-from collections import OrderedDict
-from diffusers import LDMTextToImagePipeline as DiffusersLDMTextToImagePipeline
-from ppdiffusers import (
-    LDMTextToImagePipeline as PPDiffusersLDMTextToImagePipeline,
-    LDMBertModel,
-    AutoencoderKL,
-    UNet2DConditionModel,
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    DDIMScheduler,
-)
-from paddlenlp.transformers import BertTokenizer
 
 
 def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
@@ -113,14 +109,16 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     # 4. scheduler
     beta_start = diffusers_pipe.scheduler.beta_start
     beta_end = diffusers_pipe.scheduler.beta_end
-    num_train_timesteps = diffusers_pipe.scheduler.num_train_timesteps
     scheduler_type = diffusers_pipe.scheduler._class_name.lower()
     if "pndm" in scheduler_type:
         pp_scheduler = PNDMScheduler(
+            beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            beta_start=beta_start,
-            num_train_timesteps=num_train_timesteps,
+            # Make sure the scheduler compatible with DDIM
+            set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
     elif "lms" in scheduler_type:
@@ -130,8 +128,10 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
+            # Make sure the scheduler compatible with DDIM
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
         )
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")

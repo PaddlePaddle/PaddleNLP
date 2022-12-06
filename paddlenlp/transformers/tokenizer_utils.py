@@ -15,23 +15,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 import bisect
-import itertools
 import io
+import itertools
 import json
-import os
-import six
-import unicodedata
-from collections import OrderedDict, UserDict
-from shutil import copyfile
-from typing import Iterable, Iterator, Optional, List, Any, Callable, Union
-from typing import TYPE_CHECKING, Dict, NamedTuple, Sequence, Tuple
 import re
+import unicodedata
+from collections import OrderedDict
+from typing import Dict, List, Optional, Tuple, Union
 
+import six
 from paddle.utils import try_import
+
 from paddlenlp.utils.log import logger
-from dataclasses import dataclass, field
 
 try:
     from functools import lru_cache
@@ -39,23 +35,21 @@ except ImportError:
     from backports.functools_lru_cache import lru_cache
 
 from ..data.vocab import Vocab
-from .utils import InitTrackerMeta, fn_args_to_dict
-
 from .tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
     EncodedInput,
     EncodedInputPair,
+    PaddingStrategy,
     PreTokenizedInput,
     PreTokenizedInputPair,
     PretrainedTokenizerBase,
-    SpecialTokensMixin,
+    TensorType,
     TextInput,
     TextInputPair,
     TruncationStrategy,
-    PaddingStrategy,
-    TensorType,
 )
+from .utils import InitTrackerMeta, fn_args_to_dict
 
 __all__ = [
     "PretrainedTokenizer",
@@ -962,7 +956,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                 tokens = self.tokenize(text, **kwargs)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], str):
-                if is_split_into_words == True:
+                if is_split_into_words:
                     tokens = list(
                         itertools.chain(*(self.tokenize(t, is_split_into_words=True, **kwargs) for t in text))
                     )
@@ -1044,7 +1038,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
                 tokens = self.tokenize(text, **kwargs)
                 return self.convert_tokens_to_ids(tokens)
             elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], str):
-                if is_split_into_words == True:
+                if is_split_into_words:
                     tokens = list(
                         itertools.chain(*(self.tokenize(t, is_split_into_words=True, **kwargs) for t in text))
                     )
@@ -1300,6 +1294,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             char_mapping.extend([i] * len(ch))
         text, token_mapping, offset = normalized_text, [], 0
 
+        char_mapping_indexes = []
         for token in split_tokens:
             if token[:2] == "##":
                 token = token[2:]
@@ -1311,12 +1306,36 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if "σ" in token or "ς" in token:
                 start = text[offset:].replace("ς", "σ").index(token.replace("ς", "σ")) + offset
             else:
-                start = text[offset:].index(token) + offset
+
+                # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
+                if token not in text[offset:]:
+                    start = -1
+                else:
+                    start = text[offset:].index(token) + offset
 
             end = start + len(token)
+            char_mapping_indexes.append([start, end])
+
+            if start != -1:
+                offset = end
+
+        token_mapping = []
+        for index, (start, end) in enumerate(char_mapping_indexes):
+            if start == -1:
+                # init start
+                if index == 0:
+                    start = 0
+                else:
+                    start = char_mapping_indexes[index - 1][1]
+
+                # init end
+                if index == len(char_mapping_indexes) - 1:
+                    end = len(char_mapping)
+                else:
+                    # next start
+                    end = char_mapping_indexes[index + 1][0]
 
             token_mapping.append((char_mapping[start], char_mapping[end - 1] + 1))
-            offset = end
 
         return token_mapping
 
@@ -1324,7 +1343,6 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         Returns the map of tokens and the start and end index of their start and end character.
         Modified from https://github.com/bojone/bert4keras/blob/master/bert4keras/tokenizers.py#L372
-
         Args:
             text (str):
                 Input text.
@@ -1337,6 +1355,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         """
         if text is None:
             return None
+        split_tokens = self.tokenize(text)
 
         # bert-like tokenizer use the old-school code block
         if hasattr(self, "basic_tokenizer") or hasattr(self, "wordpiece_tokenizer"):
@@ -1359,6 +1378,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
         if do_lower_case:
             text = text.lower()
 
+        char_mapping_indexes = []
         for token in split_tokens:
 
             # convert tokens into original string
@@ -1374,12 +1394,36 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
             if "σ" in token or "ς" in token:
                 start = text[offset:].replace("ς", "σ").index(token.replace("ς", "σ")) + offset
             else:
-                start = text[offset:].index(token) + offset
+
+                # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
+                if token not in text[offset:]:
+                    start = -1
+                else:
+                    start = text[offset:].index(token) + offset
 
             end = start + len(token)
+            char_mapping_indexes.append([start, end])
+
+            if start != -1:
+                offset = end
+
+        token_mapping = []
+        for index, (start, end) in enumerate(char_mapping_indexes):
+            if start == -1:
+                # init start
+                if index == 0:
+                    start = 0
+                else:
+                    start = char_mapping_indexes[index - 1][1]
+
+                # init end
+                if index == len(char_mapping_indexes) - 1:
+                    end = len(char_mapping)
+                else:
+                    # next start
+                    end = char_mapping_indexes[index + 1][0]
 
             token_mapping.append((char_mapping[start], char_mapping[end - 1] + 1))
-            offset = end
 
         return token_mapping
 
@@ -1500,7 +1544,6 @@ class BPETokenizer(PretrainedTokenizer):
 
             cs = [chr(n) for n in cs]
 
-            ddict = dict(zip(bs, cs))
             return dict(zip(bs, cs))
 
         def _get_pairs(self, word):
@@ -1535,7 +1578,7 @@ class BPETokenizer(PretrainedTokenizer):
                         j = word.index(first, i)
                         new_word.extend(word[i:j])
                         i = j
-                    except:
+                    except:  # noqa: E722
                         new_word.extend(word[i:])
                         break
 
