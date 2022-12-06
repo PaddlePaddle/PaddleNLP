@@ -613,7 +613,13 @@ class PretrainedConfig:
         logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> PretrainedConfig:
         r"""
         Instantiate a [`PretrainedConfig`] (or a derived class) from a pretrained model configuration.
 
@@ -627,6 +633,8 @@ class PretrainedConfig:
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
                 - a path or url to a saved configuration JSON *file*, e.g., `./my_model_directory/configuration.json`.
+            from_hf_hub (bool, *optional*):
+                load config from huggingface hub: https://huggingface.co/models
             cache_dir (`str` or `os.PathLike`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
@@ -673,6 +681,8 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         config_dict = flatten_model_config(config_dict)
