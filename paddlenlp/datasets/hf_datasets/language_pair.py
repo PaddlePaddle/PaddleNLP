@@ -70,8 +70,8 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             train_split = datasets.SplitGenerator(
                 name="train",
                 gen_kwargs={
-                    "source_filepath": self.config.data_files["train"][0],
-                    "target_filepath": self.config.data_files["train"][1],
+                    "source_filepath": os.path.abspath(self.config.data_files["train"][0]),
+                    "target_filepath": os.path.abspath(self.config.data_files["train"][1]),
                 },
             )
 
@@ -96,8 +96,8 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             dev_split = datasets.SplitGenerator(
                 name="dev",
                 gen_kwargs={
-                    "source_filepath": self.config.data_files["dev"][0],
-                    "target_filepath": self.config.data_files["dev"][1],
+                    "source_filepath": os.path.abspath(self.config.data_files["dev"][0]),
+                    "target_filepath": os.path.abspath(self.config.data_files["dev"][1]),
                 },
             )
 
@@ -130,10 +130,11 @@ class LanguagePairDataset(datasets.GeneratorBasedBuilder):
             test_split = datasets.SplitGenerator(
                 name="test",
                 gen_kwargs={
-                    "source_filepath": self.config.data_files["test"][0],
-                    "target_filepath": self.config.data_files["test"][1],
+                    "source_filepath": os.path.abspath(self.config.data_files["test"][0]),
+                    "target_filepath": os.path.abspath(self.config.data_files["test"][1]),
                 },
             )
+
         else:
             if not is_downloaded:
                 dl_dir = dl_manager.download_and_extract(_URL)

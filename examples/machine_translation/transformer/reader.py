@@ -64,6 +64,14 @@ def create_data_loader(args, places=None):
 
         from datasets import load_dataset
 
+        if len(data_files) > 0:
+            for split in data_files:
+                if isinstance(data_files[split], (list, tuple)):
+                    for i, path in enumerate(data_files[split]):
+                        data_files[split][i] = os.path.abspath(data_files[split][i])
+                else:
+                    data_files[split] = os.path.abspath(data_files[split])
+
         datasets = load_dataset("language_pair", data_files=data_files, split=("train", "dev"))
 
         if args.src_vocab is not None:
