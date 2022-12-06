@@ -140,12 +140,20 @@ class DocParser(object):
                     for line in lines:
                         table_list.extend(re.findall("<td.*?>(.*?)</td>", line))
                     for cell_box, text in zip(cell_bbox, table_list):
-                        box = [
-                            bbox[0] + cell_box[0],
-                            bbox[1] + cell_box[1],
-                            bbox[0] + cell_box[4],
-                            bbox[1] + cell_box[5],
-                        ]
+                        if self.ocr_lang == "ch":
+                            box = [
+                                bbox[0] + cell_box[0],
+                                bbox[1] + cell_box[1],
+                                bbox[0] + cell_box[4],
+                                bbox[1] + cell_box[5],
+                            ]
+                        else:
+                            box = [
+                                bbox[0] + cell_box[0],
+                                bbox[1] + cell_box[1],
+                                bbox[0] + cell_box[2],
+                                bbox[1] + cell_box[3],
+                            ]
                         if _is_ch(text):
                             text = text.replace(" ", "")
                         layout.append((box, text, region["type"]))
@@ -243,7 +251,7 @@ class DocParser(object):
                     "Need paddleocr to process image input. "
                     "Please install module by: python3 -m pip install paddleocr"
                 )
-            self.layout_analysis_engine = PPStructure(table=True, ocr=True, show_log=False)
+            self.layout_analysis_engine = PPStructure(table=True, ocr=True, show_log=False, lang=self.ocr_lang)
 
     @classmethod
     def _normalize_box(self, box, old_size, new_size, offset_x=0, offset_y=0):

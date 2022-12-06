@@ -728,7 +728,10 @@ class UIETask(Task):
                         inputs_ids += [c_sep_id]
                         offset_mapping += [[0, 0]]
 
-                    offset_bias = offset_mapping[q_sep_index - 1][-1] + 1
+                    if len(offset_mapping) > 1:
+                        offset_bias = offset_mapping[q_sep_index - 1][-1] + 1
+                    else:
+                        offset_bias = 0
 
                     seq_len = len(inputs_ids)
                     inputs_ids += [pad_id] * (self._max_seq_len - seq_len)
