@@ -28,9 +28,7 @@ logger = logging.getLogger("pipelines")
 router = APIRouter()
 
 
-@router.post("/documents/get_by_filters",
-             response_model=List[DocumentSerialized],
-             response_model_exclude_none=True)
+@router.post("/documents/get_by_filters", response_model=List[DocumentSerialized], response_model_exclude_none=True)
 def get_documents(filters: FilterRequest):
     """
     This endpoint allows you to retrieve documents contained in your document store.
@@ -43,10 +41,7 @@ def get_documents(filters: FilterRequest):
     To get all documents you should provide an empty dict, like:
     `'{"filters": {}}'`
     """
-    docs = [
-        doc.to_dict()
-        for doc in DOCUMENT_STORE.get_all_documents(filters=filters.filters)
-    ]
+    docs = [doc.to_dict() for doc in DOCUMENT_STORE.get_all_documents(filters=filters.filters)]
     for doc in docs:
         doc["embedding"] = None
     return docs

@@ -42,24 +42,24 @@ def evaluate(label2id):
     metric = MetricReport()
     text2similar = {}
     # Encoding labels as one hot
-    with open(args.similar_text_pair, 'r', encoding='utf-8') as f:
+    with open(args.similar_text_pair, "r", encoding="utf-8") as f:
         for line in f:
             text, similar_text = line.rstrip().rsplit("\t", 1)
             text2similar[text] = np.zeros(len(label2id))
             # One hot Encoding
-            for label in similar_text.strip().split(','):
+            for label in similar_text.strip().split(","):
                 text2similar[text][label2id[label]] = 1
     pred_labels = {}
     # Convert predicted labels into one hot encoding
-    with open(args.recall_result_file, 'r', encoding='utf-8') as f:
+    with open(args.recall_result_file, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
             text_arr = line.rstrip().split("\t")
             text, labels, cosine_sim = text_arr
             # One hot Encoding
-            if (text not in pred_labels):
+            if text not in pred_labels:
                 pred_labels[text] = np.zeros(len(label2id))
-            if (float(cosine_sim) > args.threshold):
-                for label in labels.split(','):
+            if float(cosine_sim) > args.threshold:
+                for label in labels.split(","):
                     pred_labels[text][label2id[label]] = float(cosine_sim)
 
         for text, probs in tqdm(pred_labels.items()):

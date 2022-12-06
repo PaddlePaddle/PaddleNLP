@@ -28,7 +28,6 @@ class TreeState:
 
 
 class TreeTraversal:
-
     class Handler:
         handlers = {}
 
@@ -60,6 +59,7 @@ class TreeTraversal:
 
     class State(enum.Enum):
         """State"""
+
         SUM_TYPE_INQUIRE = 0
         SUM_TYPE_APPLY = 1
         CHILDREN_INQUIRE = 2
@@ -80,8 +80,7 @@ class TreeTraversal:
         self.desc_enc = desc_enc
 
         ##< TODO: model.state_update.set_dropout_masks(batch_size=1)
-        self.recurrent_state = nn_utils.lstm_init(None,
-                                                  self.model.recurrent_size, 1)
+        self.recurrent_state = nn_utils.lstm_init(None, self.model.recurrent_size, 1)
         self.prev_action_emb = model.zero_rule_emb
 
         root_type = model.preproc.grammar.root_type
@@ -121,8 +120,7 @@ class TreeTraversal:
         """step"""
         while True:
             ##<debug print('2' * 10, 'in one step...', 'last_choice:', last_choice, 'cur_item:', self.cur_item.to_str())
-            self.update_using_last_choice(last_choice, extra_choice_info,
-                                          attention_offset)
+            self.update_using_last_choice(last_choice, extra_choice_info, attention_offset)
 
             handler_name = TreeTraversal.Handler.handlers[self.cur_item.state]
             handler = getattr(self, handler_name)
@@ -134,23 +132,20 @@ class TreeTraversal:
                 ##<debug print('>>>', '2' * 10, 'one step finished.')
                 return choices
 
-    def update_using_last_choice(self, last_choice, extra_choice_info,
-                                 attention_offset):
+    def update_using_last_choice(self, last_choice, extra_choice_info, attention_offset):
         """update_using_last_choice"""
         if last_choice is None:
             return
         self.update_prev_action_emb(self, last_choice, extra_choice_info)
 
     @classmethod
-    def _update_prev_action_emb_apply_rule(cls, self, last_choice,
-                                           extra_choice_info):
+    def _update_prev_action_emb_apply_rule(cls, self, last_choice, extra_choice_info):
         """_update_prev_action_emb_apply_rule"""
         rule_idx = self.model._tensor([last_choice])
         self.prev_action_emb = self.model.rule_embedding(rule_idx)
 
     @classmethod
-    def _update_prev_action_emb_gen_token(cls, self, last_choice,
-                                          extra_choice_info):
+    def _update_prev_action_emb_gen_token(cls, self, last_choice, extra_choice_info):
         """_update_prev_action_emb_gen_token"""
         # token_idx shape: batch (=1), LongTensor
         token_idx = self.model._index(self.model.terminal_vocab, last_choice)
@@ -158,13 +153,12 @@ class TreeTraversal:
         self.prev_action_emb = self.model.terminal_embedding(token_idx)
 
     @classmethod
-    def _update_prev_action_emb_pointer(cls, self, last_choice,
-                                        extra_choice_info):
+    def _update_prev_action_emb_pointer(cls, self, last_choice, extra_choice_info):
         """_update_prev_action_emb_pointer"""
         # TODO batching
-        self.prev_action_emb = self.model.pointer_action_emb_proj[
-            self.cur_item.node_type](self.desc_enc.pointer_memories[
-                self.cur_item.node_type][:, last_choice])
+        self.prev_action_emb = self.model.pointer_action_emb_proj[self.cur_item.node_type](
+            self.desc_enc.pointer_memories[self.cur_item.node_type][:, last_choice]
+        )
 
     def pop(self):
         """pop"""
@@ -189,9 +183,7 @@ class TreeTraversal:
             self.cur_item.parent_action_emb,
             self.desc_enc,
         )
-        self.cur_item = attr.evolve(self.cur_item,
-                                    state=TreeTraversal.State.SUM_TYPE_APPLY,
-                                    parent_h=output)
+        self.cur_item = attr.evolve(self.cur_item, state=TreeTraversal.State.SUM_TYPE_APPLY, parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(self.cur_item.node_type, rule_logits)
@@ -217,8 +209,7 @@ class TreeTraversal:
         """process_children_inquire"""
         # 2. ApplyRule, like Call -> expr[func] expr*[args] keyword*[keywords]
         # Check if we have no children
-        type_info = self.model.ast_wrapper.singular_types[
-            self.cur_item.node_type]
+        type_info = self.model.ast_wrapper.singular_types[self.cur_item.node_type]
         if not type_info.fields:
             if self.pop():
                 last_choice = None
@@ -235,9 +226,7 @@ class TreeTraversal:
             self.cur_item.parent_action_emb,
             self.desc_enc,
         )
-        self.cur_item = attr.evolve(self.cur_item,
-                                    state=TreeTraversal.State.CHILDREN_APPLY,
-                                    parent_h=output)
+        self.cur_item = attr.evolve(self.cur_item, state=TreeTraversal.State.CHILDREN_APPLY, parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(self.cur_item.node_type, rule_logits)
@@ -258,13 +247,16 @@ class TreeTraversal:
                 parent_action_emb=None,
                 parent_h=None,
                 parent_field_name=None,
-            ))
+            )
+        )
         for field_info, present in reversed(
-                list(
-                    zip(
-                        self.model.ast_wrapper.singular_types[node_type].fields,
-                        children_presence,
-                    ))):
+            list(
+                zip(
+                    self.model.ast_wrapper.singular_types[node_type].fields,
+                    children_presence,
+                )
+            )
+        ):
             if not present:
                 continue
 
@@ -299,7 +291,8 @@ class TreeTraversal:
                     parent_action_emb=self.prev_action_emb,
                     parent_h=self.cur_item.parent_h,
                     parent_field_name=field_info.name,
-                ))
+                )
+            )
             self.next_item_id += 1
 
         # pop queue 的最后一个元素，并赋值给 self.cur_item
@@ -320,9 +313,7 @@ class TreeTraversal:
             self.cur_item.parent_action_emb,
             self.desc_enc,
         )
-        self.cur_item = attr.evolve(self.cur_item,
-                                    state=TreeTraversal.State.LIST_LENGTH_APPLY,
-                                    parent_h=output)
+        self.cur_item = attr.evolve(self.cur_item, state=TreeTraversal.State.LIST_LENGTH_APPLY, parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_apply_rule
         choices = self.rule_choice(list_type, rule_logits)
@@ -359,7 +350,8 @@ class TreeTraversal:
                     parent_action_emb=self.prev_action_emb,
                     parent_h=self.cur_item.parent_h,
                     parent_field_name=self.cur_item.parent_field_name,
-                ))
+                )
+            )
             self.next_item_id += 1
 
         advanced = self.pop()
@@ -401,13 +393,10 @@ class TreeTraversal:
             self.cur_item.parent_action_emb,
             self.desc_enc,
         )
-        self.cur_item = attr.evolve(self.cur_item,
-                                    state=TreeTraversal.State.POINTER_APPLY,
-                                    parent_h=output)
+        self.cur_item = attr.evolve(self.cur_item, state=TreeTraversal.State.POINTER_APPLY, parent_h=output)
 
         self.update_prev_action_emb = TreeTraversal._update_prev_action_emb_pointer
-        choices = self.pointer_choice(self.cur_item.node_type, logits,
-                                      attention_logits)
+        choices = self.pointer_choice(self.cur_item.node_type, logits, attention_logits)
         return choices, False
 
     @Handler.register_handler(State.POINTER_APPLY)

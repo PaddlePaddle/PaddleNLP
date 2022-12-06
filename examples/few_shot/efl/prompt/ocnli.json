@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "“{'text': 'sentence1'}”和“{'text': 'sentence2'}”之间{'text': 'candidate_label'}。"}
+    ],
+    "verbalizer": [
+        {"contradiction": "互相矛盾", "entailment": "相互包含", "neutral": "没有关系"}
+    ]
+}

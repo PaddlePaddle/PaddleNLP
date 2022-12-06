@@ -23,7 +23,13 @@ import paddle.nn as nn
 from tqdm import tqdm
 from paddle.io import DataLoader
 from paddlenlp.transformers import ErnieForGeneration
-from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer, BertTokenizer, ElectraTokenizer, RobertaTokenizer
+from paddlenlp.transformers import (
+    ErnieTokenizer,
+    ErnieTinyTokenizer,
+    BertTokenizer,
+    ElectraTokenizer,
+    RobertaTokenizer,
+)
 from paddlenlp.datasets import load_dataset
 from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.metrics import Rouge1, Rouge2
@@ -62,16 +68,17 @@ def evaluate():
     else:
         tokenizer = BertTokenizer.from_pretrained(args.model_name_or_path)
 
-    dev_dataset = load_dataset('poetry', splits=('dev'), lazy=False)
-    attn_id = tokenizer.vocab[
-        '[ATTN]'] if '[ATTN]' in tokenizer.vocab else tokenizer.vocab['[MASK]']
+    dev_dataset = load_dataset("poetry", splits=("dev"), lazy=False)
+    attn_id = tokenizer.vocab["[ATTN]"] if "[ATTN]" in tokenizer.vocab else tokenizer.vocab["[MASK]"]
     tgt_type_id = model.sent_emb.weight.shape[0] - 1
 
-    trans_func = convert_example(tokenizer=tokenizer,
-                                 attn_id=attn_id,
-                                 tgt_type_id=tgt_type_id,
-                                 max_encode_len=args.max_encode_len,
-                                 max_decode_len=args.max_decode_len)
+    trans_func = convert_example(
+        tokenizer=tokenizer,
+        attn_id=attn_id,
+        tgt_type_id=tgt_type_id,
+        max_encode_len=args.max_encode_len,
+        max_decode_len=args.max_decode_len,
+    )
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
@@ -85,14 +92,10 @@ def evaluate():
     ): after_padding(fn(samples))
 
     dev_dataset = dev_dataset.map(trans_func)
-    dev_batch_sampler = paddle.io.BatchSampler(dev_dataset,
-                                               batch_size=args.batch_size,
-                                               shuffle=False)
-    data_loader = DataLoader(dataset=dev_dataset,
-                             batch_sampler=dev_batch_sampler,
-                             collate_fn=batchify_fn,
-                             num_workers=0,
-                             return_list=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_dataset, batch_size=args.batch_size, shuffle=False)
+    data_loader = DataLoader(
+        dataset=dev_dataset, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+    )
 
     rouge1 = Rouge1()
     rouge2 = Rouge2()
@@ -112,31 +115,32 @@ def evaluate():
     reference_sentences_ids = []
     logger.info("Evaluating...")
     for data in tqdm(data_loader):
-        (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _,
-         raw_tgt_labels) = data  # never use target when infer
+        (src_ids, src_sids, src_pids, _, _, _, _, _, _, _, _, raw_tgt_labels) = data  # never use target when infer
         # Use greedy_search_infilling or beam_search_infilling to get predictions
-        output_ids = beam_search_infilling(model,
-                                           src_ids,
-                                           src_sids,
-                                           eos_id=eos_id,
-                                           sos_id=sos_id,
-                                           attn_id=attn_id,
-                                           pad_id=pad_id,
-                                           unk_id=unk_id,
-                                           vocab_size=vocab_size,
-                                           max_decode_len=args.max_decode_len,
-                                           max_encode_len=args.max_encode_len,
-                                           beam_width=args.beam_width,
-                                           length_penalty=args.length_penalty,
-                                           tgt_type_id=tgt_type_id)
+        output_ids = beam_search_infilling(
+            model,
+            src_ids,
+            src_sids,
+            eos_id=eos_id,
+            sos_id=sos_id,
+            attn_id=attn_id,
+            pad_id=pad_id,
+            unk_id=unk_id,
+            vocab_size=vocab_size,
+            max_decode_len=args.max_decode_len,
+            max_encode_len=args.max_encode_len,
+            beam_width=args.beam_width,
+            length_penalty=args.length_penalty,
+            tgt_type_id=tgt_type_id,
+        )
 
         for ids in output_ids.tolist():
             if eos_id in ids:
-                ids = ids[:ids.index(eos_id)]
+                ids = ids[: ids.index(eos_id)]
             evaluated_sentences_ids.append(ids)
 
         for ids in raw_tgt_labels.numpy().tolist():
-            ids = ids[:ids.index(eos_id)]
+            ids = ids[: ids.index(eos_id)]
             reference_sentences_ids.append(ids)
 
     score1 = rouge1.score(evaluated_sentences_ids, reference_sentences_ids)

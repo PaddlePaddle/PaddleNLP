@@ -47,10 +47,9 @@ class TritonPythonModel(object):
           * model_version: Model version
           * model_name: Model name
         """
-        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh",
-                                                       use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
         # You must parse model_config. JSON string is not parsed here
-        self.model_config = json.loads(args['model_config'])
+        self.model_config = json.loads(args["model_config"])
         print("model_config:", self.model_config)
 
         self.input_names = []
@@ -87,22 +86,16 @@ class TritonPythonModel(object):
         """
         responses = []
         for request in requests:
-            data = pb_utils.get_input_tensor_by_name(request,
-                                                     self.input_names[0])
+            data = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
             data = data.as_numpy()
-            data = [i[0].decode('utf-8') for i in data]
-            data = self.tokenizer(data,
-                                  max_length=128,
-                                  padding=True,
-                                  truncation=True)
+            data = [i[0].decode("utf-8") for i in data]
+            data = self.tokenizer(data, max_length=128, padding=True, truncation=True)
             input_ids = np.array(data["input_ids"], dtype=self.output_dtype[0])
-            token_type_ids = np.array(data["token_type_ids"],
-                                      dtype=self.output_dtype[1])
+            token_type_ids = np.array(data["token_type_ids"], dtype=self.output_dtype[1])
 
             out_tensor1 = pb_utils.Tensor(self.output_names[0], input_ids)
             out_tensor2 = pb_utils.Tensor(self.output_names[1], token_type_ids)
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[out_tensor1, out_tensor2])
+            inference_response = pb_utils.InferenceResponse(output_tensors=[out_tensor1, out_tensor2])
             responses.append(inference_response)
         return responses
 
@@ -111,4 +104,4 @@ class TritonPythonModel(object):
         Implementing `finalize` function is optional. This function allows
         the model to perform any necessary clean ups before exit.
         """
-        print('Cleaning up...')
+        print("Cleaning up...")

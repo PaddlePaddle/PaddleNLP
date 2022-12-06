@@ -33,7 +33,7 @@ import pickle
 
 
 def get_token_indices(token, index_to_token):
-    """ Maps from a gold token (string) to a list of indices.
+    """Maps from a gold token (string) to a list of indices.
 
     Args:
         token (`string`): String to look up.
@@ -58,7 +58,7 @@ def get_token_indices(token, index_to_token):
 
 
 def flatten_utterances(utterances):
-    """ Gets a flat sequence from a sequence of utterances.
+    """Gets a flat sequence from a sequence of utterances.
 
     Args:
         utterances (`list`): Utterances to concatenate.
@@ -77,33 +77,32 @@ def flatten_utterances(utterances):
 
 
 def encode_snippets_with_states(snippets, states):
-    """ Encodes snippets by using previous query states instead.
+    """Encodes snippets by using previous query states instead.
 
     Args:
         snippets (`list`): Input snippets.
         states (`list`): Previous hidden states to use.
     """
     for snippet in snippets:
-        snippet.set_embedding(
-            paddle.concat([states[snippet.startpos], states[snippet.endpos]],
-                          axis=0))
+        snippet.set_embedding(paddle.concat([states[snippet.startpos], states[snippet.endpos]], axis=0))
     return snippets
 
 
-def load_word_embeddings(input_vocabulary, output_vocabulary,
-                         output_vocabulary_schema, params):
+def load_word_embeddings(input_vocabulary, output_vocabulary, output_vocabulary_schema, params):
     print(output_vocabulary.inorder_tokens)
     print()
 
     if params.reload_embedding == 1:
-        input_vocabulary_embeddings = np.load(params.data_directory +
-                                              "/input_embeddings.npy")
-        output_vocabulary_embeddings = np.load(params.data_directory +
-                                               "/ouput_embeddings.npy")
-        output_vocabulary_schema_embeddings = np.load(
-            params.data_directory + "/output_schema_embeddings.npy")
+        input_vocabulary_embeddings = np.load(params.data_directory + "/input_embeddings.npy")
+        output_vocabulary_embeddings = np.load(params.data_directory + "/ouput_embeddings.npy")
+        output_vocabulary_schema_embeddings = np.load(params.data_directory + "/output_schema_embeddings.npy")
         input_embedding_size = 300
-        return input_vocabulary_embeddings, output_vocabulary_embeddings, output_vocabulary_schema_embeddings, input_embedding_size
+        return (
+            input_vocabulary_embeddings,
+            output_vocabulary_embeddings,
+            output_vocabulary_schema_embeddings,
+            input_embedding_size,
+        )
 
     def read_glove_embedding(embedding_filename, embedding_size):
         glove_embeddings = {}
@@ -114,30 +113,25 @@ def load_word_embeddings(input_vocabulary, output_vocabulary,
                 cnt += 1
                 if params.debug or not params.train:
                     if cnt == 1000:
-                        print('Read 1000 word embeddings')
+                        print("Read 1000 word embeddings")
                         break
                 l_split = line.split()
-                word = " ".join(l_split[0:len(l_split) - embedding_size])
-                embedding = np.array([
-                    float(val)
-                    for val in l_split[len(l_split) - embedding_size:]
-                ])
+                word = " ".join(l_split[0 : len(l_split) - embedding_size])
+                embedding = np.array([float(val) for val in l_split[len(l_split) - embedding_size :]])
                 glove_embeddings[word] = embedding
 
         return glove_embeddings
 
-    print('Loading Glove Embedding from', params.embedding_filename)
+    print("Loading Glove Embedding from", params.embedding_filename)
     glove_embedding_size = 300
-    glove_embeddings = read_glove_embedding(params.embedding_filename,
-                                            glove_embedding_size)
-    print('Done')
+    glove_embeddings = read_glove_embedding(params.embedding_filename, glove_embedding_size)
+    print("Done")
 
     input_embedding_size = glove_embedding_size
 
     def create_word_embeddings(vocab):
 
-        vocabulary_embeddings = np.zeros((len(vocab), glove_embedding_size),
-                                         dtype=np.float32)
+        vocabulary_embeddings = np.zeros((len(vocab), glove_embedding_size), dtype=np.float32)
         vocabulary_tokens = vocab.inorder_tokens
 
         glove_oov = 0
@@ -145,13 +139,11 @@ def load_word_embeddings(input_vocabulary, output_vocabulary,
         for token in vocabulary_tokens:
             token_id = vocab.token_to_id(token)
             if token in glove_embeddings:
-                vocabulary_embeddings[
-                    token_id][:glove_embedding_size] = glove_embeddings[token]
+                vocabulary_embeddings[token_id][:glove_embedding_size] = glove_embeddings[token]
             else:
                 glove_oov += 1
 
-        print('Glove OOV:', glove_oov, 'Para OOV', para_oov, 'Total',
-              len(vocab))
+        print("Glove OOV:", glove_oov, "Para OOV", para_oov, "Total", len(vocab))
 
         return vocabulary_embeddings
 
@@ -159,41 +151,43 @@ def load_word_embeddings(input_vocabulary, output_vocabulary,
     output_vocabulary_embeddings = create_word_embeddings(output_vocabulary)
     output_vocabulary_schema_embeddings = None
     if output_vocabulary_schema:
-        output_vocabulary_schema_embeddings = create_word_embeddings(
-            output_vocabulary_schema)
+        output_vocabulary_schema_embeddings = create_word_embeddings(output_vocabulary_schema)
 
-    np.save(params.data_directory + "/input_embeddings",
-            input_vocabulary_embeddings)
-    np.save(params.data_directory + "/ouput_embeddings",
-            output_vocabulary_embeddings)
-    np.save(params.data_directory + "/output_schema_embeddings",
-            output_vocabulary_schema_embeddings)
+    np.save(params.data_directory + "/input_embeddings", input_vocabulary_embeddings)
+    np.save(params.data_directory + "/ouput_embeddings", output_vocabulary_embeddings)
+    np.save(params.data_directory + "/output_schema_embeddings", output_vocabulary_schema_embeddings)
 
-    return input_vocabulary_embeddings, output_vocabulary_embeddings, output_vocabulary_schema_embeddings, input_embedding_size
+    return (
+        input_vocabulary_embeddings,
+        output_vocabulary_embeddings,
+        output_vocabulary_schema_embeddings,
+        input_embedding_size,
+    )
 
 
 class ATISModel(paddle.nn.Layer):
-    """ Sequence-to-sequence model for predicting a SQL query given an utterance
-        and an interaction prefix.
+    """Sequence-to-sequence model for predicting a SQL query given an utterance
+    and an interaction prefix.
     """
 
-    def __init__(self, params, input_vocabulary, output_vocabulary,
-                 output_vocabulary_schema, anonymizer):
+    def __init__(self, params, input_vocabulary, output_vocabulary, output_vocabulary_schema, anonymizer):
         super().__init__()
 
         self.params = params
 
-        self.dropout = 0.
+        self.dropout = 0.0
 
         if params.use_bert:
-            self.model_bert, self.tokenizer, self.bert_config = bert_utils.get_bert(
-                params)
+            self.model_bert, self.tokenizer, self.bert_config = bert_utils.get_bert(params)
 
-        if 'atis' not in params.data_directory:
+        if "atis" not in params.data_directory:
             if params.use_bert:
-                input_vocabulary_embeddings, output_vocabulary_embeddings, output_vocabulary_schema_embeddings, input_embedding_size = load_word_embeddings(
-                    input_vocabulary, output_vocabulary,
-                    output_vocabulary_schema, params)
+                (
+                    input_vocabulary_embeddings,
+                    output_vocabulary_embeddings,
+                    output_vocabulary_schema_embeddings,
+                    input_embedding_size,
+                ) = load_word_embeddings(input_vocabulary, output_vocabulary, output_vocabulary_schema, params)
 
                 # Create the output embeddings
                 self.output_embedder = Embedder(
@@ -202,7 +196,8 @@ class ATISModel(paddle.nn.Layer):
                     initializer=output_vocabulary_embeddings,
                     vocabulary=output_vocabulary,
                     anonymizer=anonymizer,
-                    freeze=False)
+                    freeze=False,
+                )
                 self.column_name_token_embedder = None
 
         # Create the encoder
@@ -215,10 +210,8 @@ class ATISModel(paddle.nn.Layer):
             encoder_input_size += params.encoder_state_size // 2
 
         self.utterance_encoder = paddle.nn.LSTM(
-            encoder_input_size,
-            encoder_output_size // 2,
-            num_layers=params.encoder_num_layers,
-            direction='bidirect')
+            encoder_input_size, encoder_output_size // 2, num_layers=params.encoder_num_layers, direction="bidirect"
+        )
 
         # Positional embedder for utterances
         attention_key_size = params.encoder_state_size
@@ -226,24 +219,21 @@ class ATISModel(paddle.nn.Layer):
         if params.state_positional_embeddings:
             attention_key_size += params.positional_embedding_size
             self.positional_embedder = Embedder(
-                params.positional_embedding_size,
-                name="positional-embedding",
-                num_tokens=params.maximum_utterances)
+                params.positional_embedding_size, name="positional-embedding", num_tokens=params.maximum_utterances
+            )
 
         self.utterance_attention_key_size = attention_key_size
 
         # Create the discourse-level LSTM parameters
         if params.discourse_level_lstm:
-            self.discourse_lstms = paddle.nn.LSTMCell(
-                params.encoder_state_size, params.encoder_state_size // 2)
+            self.discourse_lstms = paddle.nn.LSTMCell(params.encoder_state_size, params.encoder_state_size // 2)
 
             initial_discourse_state = self.create_parameter(
                 [params.encoder_state_size // 2],
-                dtype='float32',
-                default_initializer=paddle.nn.initializer.Uniform(low=-0.1,
-                                                                  high=0.1))
-            self.add_parameter("initial_discourse_state",
-                               initial_discourse_state)
+                dtype="float32",
+                default_initializer=paddle.nn.initializer.Uniform(low=-0.1, high=0.1),
+            )
+            self.add_parameter("initial_discourse_state", initial_discourse_state)
 
         # Snippet encoder
         final_snippet_size = 0
@@ -254,7 +244,8 @@ class ATISModel(paddle.nn.Layer):
                 params.output_embedding_size,
                 params.encoder_state_size // 2,
                 num_layers=params.encoder_num_layers,
-                direction='bidirect')
+                direction="bidirect",
+            )
 
         self.final_snippet_size = final_snippet_size
 
@@ -268,41 +259,39 @@ class ATISModel(paddle.nn.Layer):
 
         return discourse_state, (h_0, c_0)
 
-    def _add_positional_embeddings(self,
-                                   hidden_states,
-                                   utterances,
-                                   group=False):
+    def _add_positional_embeddings(self, hidden_states, utterances, group=False):
         grouped_states = []
 
         start_index = 0
         for utterance in utterances:
-            grouped_states.append(hidden_states[start_index:start_index +
-                                                len(utterance)])
+            grouped_states.append(hidden_states[start_index : start_index + len(utterance)])
             start_index += len(utterance)
-        assert len(hidden_states) == sum([
-            len(seq) for seq in grouped_states
-        ]) == sum([len(utterance) for utterance in utterances])
+        assert (
+            len(hidden_states)
+            == sum([len(seq) for seq in grouped_states])
+            == sum([len(utterance) for utterance in utterances])
+        )
 
         new_states = []
         flat_sequence = []
 
-        num_utterances_to_keep = min(self.params.maximum_utterances,
-                                     len(utterances))
+        num_utterances_to_keep = min(self.params.maximum_utterances, len(utterances))
         for i, (states, utterance) in enumerate(
-                zip(grouped_states[-num_utterances_to_keep:],
-                    utterances[-num_utterances_to_keep:])):
+            zip(grouped_states[-num_utterances_to_keep:], utterances[-num_utterances_to_keep:])
+        ):
             positional_sequence = []
             index = num_utterances_to_keep - i - 1
 
             for state in states:
-                positional_sequence.append(
-                    paddle.concat(
-                        [state, self.positional_embedder(index)], axis=0))
+                positional_sequence.append(paddle.concat([state, self.positional_embedder(index)], axis=0))
 
-            assert len(positional_sequence) == len(utterance), \
-                "Expected utterance and state sequence length to be the same, " \
-                + "but they were " + str(len(utterance)) \
-                + " and " + str(len(positional_sequence))
+            assert len(positional_sequence) == len(utterance), (
+                "Expected utterance and state sequence length to be the same, "
+                + "but they were "
+                + str(len(utterance))
+                + " and "
+                + str(len(positional_sequence))
+            )
 
             if group:
                 new_states.append(positional_sequence)
@@ -321,7 +310,7 @@ class ATISModel(paddle.nn.Layer):
                     param.name = name
                     params_trainer.append(param)
                 else:
-                    if 'model_bert' in name:
+                    if "model_bert" in name:
                         params_bert_trainer.append(param)
                     else:
                         params_trainer.append(param)
@@ -330,34 +319,30 @@ class ATISModel(paddle.nn.Layer):
         if self.params.scheduler:
             self.scheduler = paddle.optimizer.lr.ReduceOnPlateau(
                 learning_rate=self.params.initial_learning_rate,
-                mode='min',
+                mode="min",
             )
-            self.trainer = paddle.optimizer.Adam(parameters=params_trainer,
-                                                 learning_rate=self.scheduler,
-                                                 grad_clip=clip)
+            self.trainer = paddle.optimizer.Adam(
+                parameters=params_trainer, learning_rate=self.scheduler, grad_clip=clip
+            )
         else:
-            self.trainer = paddle.optimizer.Adam(parameters=params_trainer,
-                                                 learning_rate=1.0,
-                                                 grad_clip=clip)
+            self.trainer = paddle.optimizer.Adam(parameters=params_trainer, learning_rate=1.0, grad_clip=clip)
         if self.params.fine_tune_bert:
             if self.params.scheduler:
                 self.scheduler = paddle.optimizer.lr.ReduceOnPlateau(
                     learning_rate=self.params.initial_learning_rate,
-                    mode='min',
+                    mode="min",
                 )
                 self.bert_trainer = paddle.optimizer.Adam(
-                    parameters=params_bert_trainer,
-                    learning_rate=self.scheduler,
-                    grad_clip=clip)
+                    parameters=params_bert_trainer, learning_rate=self.scheduler, grad_clip=clip
+                )
             else:
                 yyy = 1.0
                 self.bert_trainer = paddle.optimizer.Adam(
-                    parameters=params_bert_trainer,
-                    learning_rate=1.0,
-                    grad_clip=clip)
+                    parameters=params_bert_trainer, learning_rate=1.0, grad_clip=clip
+                )
 
     def set_dropout(self, value):
-        """ Sets the dropout to a specified value.
+        """Sets the dropout to a specified value.
 
         Args:
             value (`float`): Value to set dropout to.
@@ -365,28 +350,28 @@ class ATISModel(paddle.nn.Layer):
         self.dropout = value
 
     def set_learning_rate(self, value):
-        """ Sets the learning rate for the trainer.
+        """Sets the learning rate for the trainer.
 
         Args:
             value (`float`): The new learning rate.
         """
-        #return
+        # return
         for param_group in self.trainer._parameter_list:
             if self.params.all_in_one_trainer:
-                if 'model_bert' in param_group.name:
-                    param_group.optimize_attr['learning_rate'] = value * 0.01
+                if "model_bert" in param_group.name:
+                    param_group.optimize_attr["learning_rate"] = value * 0.01
                 else:
-                    param_group.optimize_attr['learning_rate'] = value
+                    param_group.optimize_attr["learning_rate"] = value
             else:
-                param_group.optimize_attr['learning_rate'] = value
+                param_group.optimize_attr["learning_rate"] = value
 
         if self.params.use_bert:
             if not self.params.all_in_one_trainer:
                 for param_group in self.bert_trainer._parameter_list:
-                    param_group.optimize_attr['learning_rate'] = value * 0.01
+                    param_group.optimize_attr["learning_rate"] = value * 0.01
 
     def save(self, filename):
-        """ Saves the model to the specified filename.
+        """Saves the model to the specified filename.
 
         Args:
             filename (`str`): The filename to save to.
@@ -394,7 +379,7 @@ class ATISModel(paddle.nn.Layer):
         paddle.save(self.state_dict(), filename)
 
     def load(self, filename):
-        """ Loads saved parameters into the parameter collection.
+        """Loads saved parameters into the parameter collection.
 
         Args:
             filename (`str`): Name of file containing parameters.

@@ -21,17 +21,17 @@ import numpy as np
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
-sys.path.append('../..')
+sys.path.append("../..")
 from task.transformer import TransformerEncoderLayer, TransformerEncoder
 
-sys.path.remove('../..')
+sys.path.remove("../..")
 
 __all__ = [
-    'RobertaModel',
-    'RobertaPretrainedModel',
-    'RobertaForSequenceClassification',
-    'RobertaForTokenClassification',
-    'RobertaForQuestionAnswering',
+    "RobertaModel",
+    "RobertaPretrainedModel",
+    "RobertaForSequenceClassification",
+    "RobertaForTokenClassification",
+    "RobertaForQuestionAnswering",
 ]
 
 
@@ -40,19 +40,18 @@ class RobertaEmbeddings(nn.Layer):
     Include embeddings from word, position and token_type embeddings.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 pad_token_id=0):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        hidden_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        pad_token_id=0,
+    ):
         super(RobertaEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size,
-                                            hidden_size,
-                                            padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
+        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.layer_norm = nn.LayerNorm(hidden_size)
         self.dropout = nn.Dropout(hidden_dropout_prob)
@@ -125,7 +124,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
         },
         "roberta-wwm-ext-large": {
             "attention_probs_dropout_prob": 0.1,
@@ -139,7 +138,7 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 24,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
         },
         "rbt3": {
             "attention_probs_dropout_prob": 0.1,
@@ -167,35 +166,34 @@ class RobertaPretrainedModel(PretrainedModel):
             "num_hidden_layers": 3,
             "type_vocab_size": 2,
             "vocab_size": 21128,
-            "pad_token_id": 0
+            "pad_token_id": 0,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "roberta-wwm-ext":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_base/roberta_chn_base.pdparams",
-            "roberta-wwm-ext-large":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_large/roberta_chn_large.pdparams",
-            "rbt3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
-            "rbtl3":
-            "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
+            "roberta-wwm-ext": "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_base/roberta_chn_base.pdparams",
+            "roberta-wwm-ext-large": "https://paddlenlp.bj.bcebos.com/models/transformers/roberta_large/roberta_chn_large.pdparams",
+            "rbt3": "https://paddlenlp.bj.bcebos.com/models/transformers/rbt3/rbt3_chn_large.pdparams",
+            "rbtl3": "https://paddlenlp.bj.bcebos.com/models/transformers/rbtl3/rbtl3_chn_large.pdparams",
         }
     }
     base_model_prefix = "roberta"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
             layer.weight.set_value(
-                paddle.tensor.normal(mean=0.0,
-                                     std=self.initializer_range if hasattr(
-                                         self, "initializer_range") else
-                                     self.roberta.config["initializer_range"],
-                                     shape=layer.weight.shape))
+                paddle.tensor.normal(
+                    mean=0.0,
+                    std=self.initializer_range
+                    if hasattr(self, "initializer_range")
+                    else self.roberta.config["initializer_range"],
+                    shape=layer.weight.shape,
+                )
+            )
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
@@ -256,27 +254,28 @@ class RobertaModel(RobertaPretrainedModel):
             Defaults to `0`.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 layer_norm_eps=1e-12,
-                 pad_token_id=0):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        layer_norm_eps=1e-12,
+        pad_token_id=0,
+    ):
         super(RobertaModel, self).__init__()
         self.pad_token_id = pad_token_id
         self.initializer_range = initializer_range
-        self.embeddings = RobertaEmbeddings(vocab_size, hidden_size,
-                                            hidden_dropout_prob,
-                                            max_position_embeddings,
-                                            type_vocab_size, pad_token_id)
+        self.embeddings = RobertaEmbeddings(
+            vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings, type_vocab_size, pad_token_id
+        )
         encoder_layer = TransformerEncoderLayer(
             hidden_size,
             num_attention_heads,
@@ -284,19 +283,22 @@ class RobertaModel(RobertaPretrainedModel):
             dropout=hidden_dropout_prob,
             activation=hidden_act,
             attn_dropout=attention_probs_dropout_prob,
-            act_dropout=0)
+            act_dropout=0,
+        )
         self.encoder = TransformerEncoder(encoder_layer, num_hidden_layers)
         self.pooler = RobertaPooler(hidden_size)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                noise=None,
-                i=None,
-                n_samples=None):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        noise=None,
+        i=None,
+        n_samples=None,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -359,35 +361,34 @@ class RobertaModel(RobertaPretrainedModel):
         """
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e9,
-                axis=[1, 2])
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e9, axis=[1, 2]
+            )
         # CLS: 101; SEP: 102; PAD: 0
-        baseline_ids = paddle.to_tensor([101] + [0] * (input_ids.shape[1] - 2) +
-                                        [102],
-                                        dtype=input_ids.dtype,
-                                        place=input_ids.place,
-                                        stop_gradient=input_ids.stop_gradient)
+        baseline_ids = paddle.to_tensor(
+            [101] + [0] * (input_ids.shape[1] - 2) + [102],
+            dtype=input_ids.dtype,
+            place=input_ids.place,
+            stop_gradient=input_ids.stop_gradient,
+        )
 
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids,
-                                           token_type_ids=token_type_ids)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids, token_type_ids=token_type_ids
+        )
         baseline_embedding_output = self.embeddings(
-            input_ids=baseline_ids,
-            position_ids=position_ids,
-            token_type_ids=token_type_ids)
+            input_ids=baseline_ids, position_ids=position_ids, token_type_ids=token_type_ids
+        )
 
         if noise is not None:
-            if noise.upper() == 'GAUSSIAN':
+            if noise.upper() == "GAUSSIAN":
                 pass
-            if noise.upper() == 'INTEGRATED':
-                embedding_output = baseline_embedding_output + i / (n_samples - 1) \
-                                    * (embedding_output - baseline_embedding_output)
+            if noise.upper() == "INTEGRATED":
+                embedding_output = baseline_embedding_output + i / (n_samples - 1) * (
+                    embedding_output - baseline_embedding_output
+                )
             else:
-                raise ValueError('unsupported noise method: %s' % (noise))
+                raise ValueError("unsupported noise method: %s" % (noise))
 
-        encoder_outputs, att_weights_list = self.encoder(
-            embedding_output, attention_mask)  # interpret
+        encoder_outputs, att_weights_list = self.encoder(embedding_output, attention_mask)  # interpret
         sequence_output = encoder_outputs
         pooled_output = self.pooler(sequence_output)
         result = [sequence_output, pooled_output, att_weights_list]
@@ -454,10 +455,9 @@ class RobertaForQuestionAnswering(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.roberta(input_ids,
-                                          token_type_ids=token_type_ids,
-                                          position_ids=None,
-                                          attention_mask=None)
+        sequence_output, _ = self.roberta(
+            input_ids, token_type_ids=token_type_ids, position_ids=None, attention_mask=None
+        )
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -486,18 +486,12 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
         super(RobertaForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  roberta.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.roberta.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.roberta.config["hidden_size"], num_classes)
         self.softmax = nn.Softmax()
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -527,23 +521,24 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        _, pooled_output, _, _ = self.roberta(input_ids,
-                                              token_type_ids=token_type_ids,
-                                              position_ids=position_ids,
-                                              attention_mask=attention_mask)
+        _, pooled_output, _, _ = self.roberta(
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        )
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
         return logits
 
-    def forward_interpret(self,
-                          input_ids,
-                          token_type_ids=None,
-                          position_ids=None,
-                          attention_mask=None,
-                          noise=None,
-                          i=None,
-                          n_samples=None):
+    def forward_interpret(
+        self,
+        input_ids,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        noise=None,
+        i=None,
+        n_samples=None,
+    ):
         """
         The forward function used when we are interpreting the model
         """
@@ -554,7 +549,8 @@ class RobertaForSequenceClassification(RobertaPretrainedModel):
             attention_mask=attention_mask,
             noise=noise,
             i=i,
-            n_samples=n_samples)
+            n_samples=n_samples,
+        )
 
         pooled_output = self.dropout(pooled_output)
         logits = self.classifier(pooled_output)
@@ -583,17 +579,11 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
         super(RobertaForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.roberta = roberta  # allow roberta to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  roberta.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.roberta.config["hidden_size"],
-                                    num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.roberta.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.roberta.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         Args:
             input_ids (Tensor):
@@ -623,10 +613,9 @@ class RobertaForTokenClassification(RobertaPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output, _ = self.roberta(input_ids,
-                                          token_type_ids=token_type_ids,
-                                          position_ids=position_ids,
-                                          attention_mask=attention_mask)
+        sequence_output, _ = self.roberta(
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+        )
 
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)

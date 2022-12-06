@@ -16,23 +16,18 @@ import os
 from pathlib import Path
 
 PIPELINE_YAML_PATH = os.getenv(
-    "PIPELINE_YAML_PATH",
-    str((Path(__file__).parent / "pipeline" / "pipelines.yaml").absolute()))
+    "PIPELINE_YAML_PATH", str((Path(__file__).parent / "pipeline" / "pipelines.yaml").absolute())
+)
 QUERY_PIPELINE_NAME = os.getenv("QUERY_PIPELINE_NAME", "query")
-QUERY_QA_PAIRS_NAME = os.getenv('QUERY_QA_PAIRS_NAME', 'query_qa_pairs')
+QUERY_QA_PAIRS_NAME = os.getenv("QUERY_QA_PAIRS_NAME", "query_qa_pairs")
 INDEXING_PIPELINE_NAME = os.getenv("INDEXING_PIPELINE_NAME", "indexing")
-INDEXING_QA_GENERATING_PIPELINE_NAME = os.getenv(
-    "INDEXING_QA_GENERATING_PIPELINE_NAME", "indexing_qa_generating")
+INDEXING_QA_GENERATING_PIPELINE_NAME = os.getenv("INDEXING_QA_GENERATING_PIPELINE_NAME", "indexing_qa_generating")
 
-FILE_UPLOAD_PATH = os.getenv(
-    "FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))
+FILE_UPLOAD_PATH = os.getenv("FILE_UPLOAD_PATH", str((Path(__file__).parent / "file-upload").absolute()))
 
-FILE_PARSE_PATH = os.getenv(
-    "FILE_PARSE_PATH",
-    str((Path(__file__).parent.parent / "parse_files").absolute()))
+FILE_PARSE_PATH = os.getenv("FILE_PARSE_PATH", str((Path(__file__).parent.parent / "parse_files").absolute()))
 
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 ROOT_PATH = os.getenv("ROOT_PATH", "/")
 
-CONCURRENT_REQUEST_PER_WORKER = int(
-    os.getenv("CONCURRENT_REQUEST_PER_WORKER", "4"))
+CONCURRENT_REQUEST_PER_WORKER = int(os.getenv("CONCURRENT_REQUEST_PER_WORKER", "4"))

@@ -30,10 +30,8 @@ from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, CompressionArguments))
-    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
-    )
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses()
 
     paddle.set_device(compression_args.device)
 
@@ -57,19 +55,16 @@ def main():
 
     dataset_config = data_args.dataset.split(" ")
     raw_datasets = load_dataset(
-        dataset_config[0],
-        None if len(dataset_config) <= 1 else dataset_config[1],
-        splits=("train", "dev", "test"))
+        dataset_config[0], None if len(dataset_config) <= 1 else dataset_config[1], splits=("train", "dev", "test")
+    )
 
-    data_args.label_list = getattr(raw_datasets['train'], "label_list", None)
-    num_classes = 1 if raw_datasets["train"].label_list == None else len(
-        raw_datasets['train'].label_list)
+    data_args.label_list = getattr(raw_datasets["train"], "label_list", None)
+    num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
 
     criterion = paddle.nn.CrossEntropyLoss()
     # Defines tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=num_classes)
+    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
 
     # Defines dataset pre-process function
     if "clue" in data_args.dataset:
@@ -89,7 +84,8 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=eval_dataset,
-        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
+        criterion=criterion,
+    )  # Strategy`dynabert` needs arguments `criterion`
 
     compression_args.print_config()
 
