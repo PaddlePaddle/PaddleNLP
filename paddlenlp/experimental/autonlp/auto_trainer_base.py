@@ -24,7 +24,7 @@ from ray.tune.result_grid import ResultGrid
 from ray.tune.search import ConcurrencyLimiter
 from ray.tune.search.hyperopt import HyperOptSearch
 
-from paddlenlp.trainer import CompressionArguments, TrainingArguments
+from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import PretrainedTokenizer
 
@@ -60,13 +60,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def _default_training_argument(self) -> TrainingArguments:
         """
         Default TrainingArguments for the Trainer
-        """
-
-    @property
-    @abstractmethod
-    def _default_compress_argument(self) -> CompressionArguments:
-        """
-        Default CompressionArguments for the Trainer
         """
 
     @property
@@ -108,10 +101,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    # @abstractmethod
-    # def predict(self, test_dataset, trial_id=None) -> Dataset:
-    #     pass
-
     @abstractmethod
     def export(self, export_path, trial_id=None):
         pass
@@ -120,7 +109,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def to_taskflow(self, trial_id=None):
         pass
 
-    def _override_arguments(self, config: Dict[str, Any], default_arguments: TrainingArguments) -> Any:
+    def _override_arguments(self, config: Dict[str, Any], default_arguments: Any) -> Any:
         """
         Overrides the arguments with the provided hyperparameter config
         """
@@ -130,18 +119,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 _, hp_key = key.split(".")
                 setattr(new_arguments, hp_key, value)
         return new_arguments
-
-    def _override_training_arguments(self, config: Dict[str, Any]) -> TrainingArguments:
-        """
-        Overrides the default TrainingArguments with the provided hyperparameter config
-        """
-        return self._override_arguments(config, self._default_training_argument)
-
-    def _override_compression_arguments(self, config: Dict[str, Any]) -> CompressionArguments:
-        """
-        Overrides the default CompressionArguments with the provided hyperparameter config
-        """
-        return self._override_arguments(config, self._default_compress_argument)
 
     def _filter_model_candidates(self, language=None, preset=None) -> List[Dict[str, Any]]:
         """
