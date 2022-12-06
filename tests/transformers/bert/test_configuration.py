@@ -29,3 +29,17 @@ class BertConfigTest(unittest.TestCase):
             config.save_pretrained(tempdir)
 
             assert os.path.exists(os.path.join(tempdir, "config.json"))
+
+    def test_config_mapping(self):
+        class FakeBertConfig(BertConfig):
+            pass
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = FakeBertConfig.from_pretrained("bert-base-uncased")
+
+            config.save_pretrained(tempdir)
+
+            FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+            loaded_config = FakeBertConfig.from_pretrained(tempdir)
+            assert loaded_config["fake_field"] == config.hidden_size

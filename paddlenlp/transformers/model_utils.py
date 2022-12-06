@@ -558,14 +558,12 @@ class PretrainedModel(Layer, GenerationMixin):
         else:  # extract config for base model
             derived_args = list(init_args)
             derived_kwargs = init_kwargs
-            base_arg = None
             for i, arg in enumerate(init_args):
                 if isinstance(arg, dict) and "init_class" in arg:
                     assert arg.pop("init_class") == cls.base_model_class.__name__, (
                         "pretrained base model should be {}"
                     ).format(cls.base_model_class.__name__)
                     base_arg_index = i
-                    base_arg = arg
                     break
             for arg_name, arg in init_kwargs.items():
                 if isinstance(arg, dict) and "init_class" in arg:
@@ -573,11 +571,7 @@ class PretrainedModel(Layer, GenerationMixin):
                         "pretrained base model should be {}"
                     ).format(cls.base_model_class.__name__)
                     base_arg_index = arg_name
-                    base_arg = arg
                     break
-
-            base_args = base_arg.pop("init_args", ())
-            base_kwargs = base_arg
 
         if cls == cls.base_model_class:
             # Update with newly provided args and kwargs for base model

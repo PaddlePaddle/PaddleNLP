@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import unittest
 from typing import Dict, Optional
 
+from paddlenlp.transformers import RoFormerv2ForTokenClassification
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
 
@@ -66,7 +67,7 @@ class FakeModel(PretrainedModel):
         self.b = config.b
 
 
-class ConfigurationUtilsTest:
+class ConfigurationUtilsTest(unittest.TestCase):
     def test_parse_config_with_single_config(self):
         # 1. single config
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
@@ -132,3 +133,17 @@ class ConfigurationUtilsTest:
         assert config.get("a", None) == 10
         assert config.get("a", None) == config.a
         assert config.get("no_name", 0) == 0
+
+
+class StandardConfigMappingTest(unittest.TestCase):
+    def test_roformer_v2_config(self):
+        class FakeRoformerV2(RoFormerv2ForTokenClassification):
+            pass
+
+        roformerv2 = FakeRoformerV2.from_pretrained("__internal_testing__/roformerv2")
+        hidden_size = roformerv2.get_model_config()["init_args"][0]["hidden_size"]
+
+        FakeRoformerV2.standard_config_map = {"hidden_size": "fake_field"}
+        loaded_roformerv2 = FakeRoformerV2.from_pretrained("__internal_testing__/roformerv2")
+        fake_field = loaded_roformerv2.get_model_config()["init_args"][0]["fake_field"]
+        assert fake_field == hidden_size

@@ -389,6 +389,7 @@ class RoFormerv2Model(RoFormerv2PretrainedModel):
         pad_token_id=0,
         rotary_value=False,
         use_bias=False,
+        **kwargs
     ):
         super(RoFormerv2Model, self).__init__()
         self.pad_token_id = pad_token_id
