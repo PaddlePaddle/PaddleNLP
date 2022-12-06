@@ -157,6 +157,16 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 | stabilityai/stable-diffusion-2              | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | stable-diffusion-2 使用 stable-diffusion-2-base 权重进行初始化，首先在同一数据集上（**512x512** 分辨率）使用 [v-objective](https://arxiv.org/abs/2202.00512) 训练了 **150k** 步。然后又在 **768x768** 分辨率上使用 [v-objective](https://arxiv.org/abs/2202.00512) 继续训练了 **140k** 步。| [地址](https://huggingface.co/stabilityai/stable-diffusion-2) |
 | stabilityai/stable-diffusion-2-inpainting   | StableDiffusionInpaintPipeline |stable-diffusion-2-inpainting 使用 stable-diffusion-2-base 权重初始化，并且额外训练了 **200k** 步。训练过程使用了 [LAMA](https://github.com/saic-mdal/lama) 中提出的 Mask 生成策略，并且使用 Mask 图片的 Latent 表示（经过 VAE 编码）作为附加条件。| [地址](https://huggingface.co/stabilityai/stable-diffusion-2-inpainting) |
 | stabilityai/stable-diffusion-x4-upscaler    | StableDiffusionUpscalePipeline | 该模型在**LAION 10M** 子集上（>2048x2048）训练了 1.25M 步。该模型还在分辨率为 **512x512** 的图像上使用 [Text-guided Latent Upscaling Diffusion Model](https://arxiv.org/abs/2112.10752) 进行了训练。除了**文本输入**之外，它还接收 **noise_level** 作为输入参数，因此我们可以使用 [预定义的 Scheduler](https://huggingface.co/stabilityai/stable-diffusion-x4-upscaler/blob/main/configs/stable-diffusion/x4-upscaling.yaml) 向低分辨率的输入图片添加噪声。| [地址](https://huggingface.co/stabilityai/stable-diffusion-x4-upscaler) |
+| hakurei/waifu-diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | waifu-diffusion-v1-2 使用 stable-diffusion-v1-4 权重初始化，并且在**高质量动漫**图像数据集上进行微调后得到的模型。用于微调的数据是 **680k** 文本图像样本，这些样本是通过 **booru 网站** 下载的。| [地址](https://huggingface.co/hakurei/waifu-diffusion) |
+| hakurei/waifu-diffusion-v1-3    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | waifu-diffusion-v1-3 是 waifu-diffusion-v1-2 基础上进一步训练得到的。他们对数据集进行了额外操作：（1）删除下划线；（2）删除括号；（3）用逗号分隔每个booru 标签；（4）随机化标签顺序。| [地址](https://huggingface.co/hakurei/waifu-diffusion) |
+| naclbit/trinart_stable_diffusion_v2_60k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | trinart_stable_diffusion 使用 stable-diffusion-v1-4 权重初始化，在 40k **高分辨率漫画/动漫风格**的图片数据集上微调了 8 个 epoch。V2 版模型使用 **dropouts**、**10k+ 图像**和**新的标记策略**训练了**更长时间**。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
+| naclbit/trinart_stable_diffusion_v2_95k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **95k** 步数的的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
+| naclbit/trinart_stable_diffusion_v2_115k    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | **115k** 步数的的结果，其他同上。| [地址](https://huggingface.co/naclbit/trinart_stable_diffusion_v2) |
+| Deltaadams/Hentai-Diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | None| [地址](https://huggingface.co/Deltaadams/Hentai-Diffusion) |
+| ringhyacinth/nail-set-diffuser    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 美甲领域的扩散模型，训练数据使用了 [Weekend](https://weibo.com/u/5982308498)| [地址](https://huggingface.co/ringhyacinth/nail-set-diffuser) |
+| Linaqruf/anything-v3.0    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 该模型可通过输入几个文本提示词就能生成**高质量、高度详细的动漫风格图片**，该模型支持使用 **danbooru 标签文本** 生成图像。| [地址](https://huggingface.co/Linaqruf/anything-v3.0) |
+| MoososCap/NOVEL-MODEL    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 动漫领域的扩散模型，能生成**高质量、高度详细的动漫风格图片**。| [地址](https://huggingface.co/MoososCap/NOVEL-MODEL) |
+
 </details>
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（中文和多语言） </summary>
 
@@ -347,7 +357,8 @@ image.save("ldm-super-resolution-image.png")
 <div align="center">
 <img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/204804426-5e28b571-aa41-4f56-ba26-68cca75fdaae.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/50394665/204804148-fe7c293b-6cd7-4942-ae9c-446369fe8410.png">
-</div">
+</div>
+
 </details>
 
 ## 模型部署
