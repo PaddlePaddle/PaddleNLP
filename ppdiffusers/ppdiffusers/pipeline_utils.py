@@ -436,6 +436,8 @@ class DiffusionPipeline(ConfigMixin):
                 if issubclass(class_obj, FastDeployRuntimeModel):
                     if isinstance(runtime_options, dict):
                         options = runtime_options.get(name, None)
+                    else:
+                        options = runtime_options
                     loading_kwargs["runtime_options"] = options
                     loading_kwargs["cache_dir"] = cache_dir
 
