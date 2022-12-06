@@ -104,22 +104,21 @@ def require_paddle(test_case):
     """
     Decorator marking a test that requires Paddle. These tests are skipped when Paddle isn't installed.
     """
-    return unittest.skipUnless(is_paddle_available(),
-                               "test requires Paddle")(test_case)
+    return unittest.skipUnless(is_paddle_available(), "test requires Paddle")(test_case)
 
 
 def require_torch_gpu(test_case):
     """Decorator marking a test that requires CUDA and Paddle."""
-    return unittest.skipUnless(is_paddle_available() and paddle_device == "gpu",
-                               "test requires Paddle+CUDA")(test_case)
+    return unittest.skipUnless(is_paddle_available() and paddle_device == "gpu", "test requires Paddle+CUDA")(
+        test_case
+    )
 
 
 def require_onnxruntime(test_case):
     """
     Decorator marking a test that requires onnxruntime. These tests are skipped when onnxruntime isn't installed.
     """
-    return unittest.skipUnless(is_onnx_available(),
-                               "test requires onnxruntime")(test_case)
+    return unittest.skipUnless(is_onnx_available(), "test requires onnxruntime")(test_case)
 
 
 def load_image(image: Union[str, PIL.Image.Image]) -> PIL.Image.Image:
@@ -171,8 +170,7 @@ def pytest_addoption_shared(parser):
             option,
             action="store",
             default=False,
-            help=
-            "generate report files. The value of this option is used as a prefix to report names",
+            help="generate report files. The value of this option is used as a prefix to report names",
         )
         pytest_opt_registered[option] = 1
 
@@ -239,9 +237,7 @@ def pytest_terminal_summary_main(tr, id):
             f.write("slowest durations\n")
             for i, rep in enumerate(dlist):
                 if rep.duration < durations_min:
-                    f.write(
-                        f"{len(dlist)-i} durations < {durations_min} secs were omitted"
-                    )
+                    f.write(f"{len(dlist)-i} durations < {durations_min} secs were omitted")
                     break
                 f.write(f"{rep.duration:02.2f}s {rep.when:<8} {rep.nodeid}\n")
 
@@ -255,8 +251,7 @@ def pytest_terminal_summary_main(tr, id):
             msg = tr._getfailureheadline(rep)
             tr.write_sep("_", msg, red=True, bold=True)
             # chop off the optional leading extra frames, leaving only the last one
-            longrepr = re.sub(r".*_ _ _ (_ ){10,}_ _ ", "", rep.longreprtext, 0,
-                              re.M | re.S)
+            longrepr = re.sub(r".*_ _ _ (_ ){10,}_ _ ", "", rep.longreprtext, 0, re.M | re.S)
             tr._tw.line(longrepr)
             # note: not printing out any rep.sections to keep the report short
 

@@ -23,7 +23,6 @@ from paddlenlp.transformers import AutoTokenizer, ErnieForMaskedLM
 
 
 class TestFillMaskTask(unittest.TestCase):
-
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.model_path = os.path.join(self.temp_dir.name, "model")
@@ -39,17 +38,14 @@ class TestFillMaskTask(unittest.TestCase):
         taskflow = FillMaskTask(task="fill_mask", task_path=self.model_path)
 
         with self.assertRaises(ValueError):
-            taskflow((["飞桨深度学习框"], ))
-            taskflow((["飞[MASK]深度学[MASK]"], ))
+            taskflow((["飞桨深度学习框"],))
+            taskflow((["飞[MASK]深度学[MASK]"],))
 
     @parameterized.expand([(1, 1), (2, 3)])
     def test_fill_mask_taskflow(self, batch_size: int, top_k: int):
         # input_text is a tuple to simulate the args passed from Taskflow to TextClassificationTask
-        input_text = (["飞桨深度学习框[MASK]", "生活的真谛是[MASK]"], )
-        taskflow = FillMaskTask(task="fill_mask",
-                                task_path=self.model_path,
-                                batch_size=batch_size,
-                                top_k=top_k)
+        input_text = (["飞桨深度学习框[MASK]", "生活的真谛是[MASK]"],)
+        taskflow = FillMaskTask(task="fill_mask", task_path=self.model_path, batch_size=batch_size, top_k=top_k)
 
         results = taskflow(input_text)
         self.assertEqual(len(results), len(input_text[0]))
@@ -59,10 +55,7 @@ class TestFillMaskTask(unittest.TestCase):
     @parameterized.expand([(1, 1), (2, 3)])
     def test_taskflow(self, batch_size: int, top_k: int):
         input_text = ["飞桨深度学习框[MASK]", "生活的真谛是[MASK]"]
-        taskflow = Taskflow(task="fill_mask",
-                            task_path=self.model_path,
-                            batch_size=batch_size,
-                            top_k=top_k)
+        taskflow = Taskflow(task="fill_mask", task_path=self.model_path, batch_size=batch_size, top_k=top_k)
 
         results = taskflow(input_text)
         self.assertEqual(len(results), len(input_text))

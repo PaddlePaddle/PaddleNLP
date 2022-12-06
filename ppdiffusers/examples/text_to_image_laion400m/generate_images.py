@@ -17,7 +17,13 @@ import argparse
 import random
 import paddle
 from tqdm.auto import tqdm
-from ppdiffusers import PNDMScheduler, LMSDiscreteScheduler, EulerAncestralDiscreteScheduler, DDIMScheduler, LDMTextToImagePipeline
+from ppdiffusers import (
+    PNDMScheduler,
+    LMSDiscreteScheduler,
+    EulerAncestralDiscreteScheduler,
+    DDIMScheduler,
+    LDMTextToImagePipeline,
+)
 
 
 def batchify(data, batch_size=16):
@@ -31,18 +37,20 @@ def batchify(data, batch_size=16):
         yield one_batch
 
 
-def generate_images(model_name_or_path,
-                    batch_size=16,
-                    file='./data/mscoco.en.1k',
-                    save_path="output",
-                    seed=42,
-                    scheduler_type="ddim",
-                    eta=0.,
-                    num_inference_steps=50,
-                    guidance_scales=[3, 4, 5, 6, 7, 8],
-                    height=256,
-                    width=256,
-                    device="gpu"):
+def generate_images(
+    model_name_or_path,
+    batch_size=16,
+    file="./data/mscoco.en.1k",
+    save_path="output",
+    seed=42,
+    scheduler_type="ddim",
+    eta=0.0,
+    num_inference_steps=50,
+    guidance_scales=[3, 4, 5, 6, 7, 8],
+    height=256,
+    width=256,
+    device="gpu",
+):
     paddle.set_device(device)
     pipe = LDMTextToImagePipeline.from_pretrained(model_name_or_path)
     pipe.set_progress_bar_config(disable=True)
@@ -58,14 +66,11 @@ def generate_images(model_name_or_path,
             skip_prk_steps=True,
         )
     elif scheduler_type == "lms":
-        scheduler = LMSDiscreteScheduler(beta_start=beta_start,
-                                         beta_end=beta_end,
-                                         beta_schedule="scaled_linear")
+        scheduler = LMSDiscreteScheduler(beta_start=beta_start, beta_end=beta_end, beta_schedule="scaled_linear")
     elif scheduler_type == "euler-ancestral":
         scheduler = EulerAncestralDiscreteScheduler(
-            beta_start=beta_start,
-            beta_end=beta_end,
-            beta_schedule="scaled_linear")
+            beta_start=beta_start, beta_end=beta_end, beta_schedule="scaled_linear"
+        )
     elif scheduler_type == "ddim":
         scheduler = DDIMScheduler(
             beta_start=beta_start,
@@ -89,13 +94,15 @@ def generate_images(model_name_or_path,
         i = 0
         for batch_prompt in tqdm(batchify(all_prompt, batch_size=batch_size)):
             sd = random.randint(0, 2**32)
-            images = pipe(batch_prompt,
-                          guidance_scale=float(cfg),
-                          seed=sd,
-                          eta=eta,
-                          height=height,
-                          width=width,
-                          num_inference_steps=num_inference_steps)[0]
+            images = pipe(
+                batch_prompt,
+                guidance_scale=float(cfg),
+                seed=sd,
+                eta=eta,
+                height=height,
+                width=width,
+                num_inference_steps=num_inference_steps,
+            )[0]
             for image in images:
                 path = os.path.join(new_save_path, "{:05d}_000.png".format(i))
                 image.save(path)
@@ -104,11 +111,7 @@ def generate_images(model_name_or_path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_name_or_path",
-                        default=None,
-                        type=str,
-                        required=True,
-                        help="model_name_or_path.")
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="model_name_or_path.")
     parser.add_argument(
         "--file",
         default="./mscoco.en.1k",
@@ -126,39 +129,32 @@ if __name__ == "__main__":
         default="ddim",
         type=str,
         choices=["ddim", "lms", "pndm", "euler-ancest"],
-        help=
-        "Type of scheduler to use. Should be one of ['pndm', 'lms', 'ddim', 'euler-ancest']",
+        help="Type of scheduler to use. Should be one of ['pndm', 'lms', 'ddim', 'euler-ancest']",
     )
     parser.add_argument("--device", default="gpu", type=str, help="device")
     parser.add_argument("--batch_size", default=16, type=int, help="batch_size")
-    parser.add_argument("--num_inference_steps",
-                        default=50,
-                        type=int,
-                        help="num_inference_steps")
-    parser.add_argument("--save_path",
-                        default="output/1.5b_ldm/12w.pd",
-                        type=str,
-                        help="Path to the output file.")
-    parser.add_argument("--guidance_scales",
-                        default=[3, 4, 5, 6, 7, 8],
-                        nargs="+",
-                        type=str,
-                        help="guidance_scales list.")
+    parser.add_argument("--num_inference_steps", default=50, type=int, help="num_inference_steps")
+    parser.add_argument("--save_path", default="output/1.5b_ldm/12w.pd", type=str, help="Path to the output file.")
+    parser.add_argument(
+        "--guidance_scales", default=[3, 4, 5, 6, 7, 8], nargs="+", type=str, help="guidance_scales list."
+    )
     parser.add_argument("--height", default=256, type=int, help="height.")
     parser.add_argument("--width", default=256, type=int, help="width.")
     args = parser.parse_args()
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
-    generate_images(model_name_or_path=args.model_name_or_path,
-                    batch_size=args.batch_size,
-                    file=args.file,
-                    save_path=args.save_path,
-                    seed=args.seed,
-                    guidance_scales=args.guidance_scales,
-                    num_inference_steps=args.num_inference_steps,
-                    scheduler_type=args.scheduler_type,
-                    height=args.height,
-                    width=args.width,
-                    device=args.device)
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
+    generate_images(
+        model_name_or_path=args.model_name_or_path,
+        batch_size=args.batch_size,
+        file=args.file,
+        save_path=args.save_path,
+        seed=args.seed,
+        guidance_scales=args.guidance_scales,
+        num_inference_steps=args.num_inference_steps,
+        scheduler_type=args.scheduler_type,
+        height=args.height,
+        width=args.width,
+        device=args.device,
+    )

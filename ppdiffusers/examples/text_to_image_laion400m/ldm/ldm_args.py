@@ -25,35 +25,26 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
+
     # use pretrained vae kl-8.ckpt (CompVis/stable-diffusion-v1-4/vae)
     vae_name_or_path: Optional[str] = field(
-        default="CompVis/stable-diffusion-v1-4/vae",
-        metadata={"help": "pretrained_vae_name_or_path"})
+        default="CompVis/stable-diffusion-v1-4/vae", metadata={"help": "pretrained_vae_name_or_path"}
+    )
     text_encoder_config_file: Optional[str] = field(
-        default="./config/ldmbert.json",
-        metadata={"help": "text_encoder_config_file"})
-    unet_config_file: Optional[str] = field(
-        default="./config/unet.json", metadata={"help": "unet_config_file"})
+        default="./config/ldmbert.json", metadata={"help": "text_encoder_config_file"}
+    )
+    unet_config_file: Optional[str] = field(default="./config/unet.json", metadata={"help": "unet_config_file"})
     tokenizer_name: Optional[str] = field(
         default="bert-base-uncased",
-        metadata={
-            "help":
-            "Pretrained tokenizer name or path if not the same as model_name"
-        })
-    model_max_length: Optional[int] = field(
-        default=77, metadata={"help": "Pretrained tokenizer model_max_length"})
-    num_inference_steps: Optional[int] = field(
-        default=200, metadata={"help": "num_inference_steps"})
-    use_ema: Optional[bool] = field(default=False,
-                                    metadata={"help": "Whether or not use ema"})
+        metadata={"help": "Pretrained tokenizer name or path if not the same as model_name"},
+    )
+    model_max_length: Optional[int] = field(default=77, metadata={"help": "Pretrained tokenizer model_max_length"})
+    num_inference_steps: Optional[int] = field(default=200, metadata={"help": "num_inference_steps"})
+    use_ema: Optional[bool] = field(default=False, metadata={"help": "Whether or not use ema"})
     pretrained_model_name_or_path: str = field(
-        default=None,
-        metadata={
-            "help":
-            "Path to pretrained model or model, when we want to resume training."
-        })
-    image_logging_steps: Optional[int] = field(
-        default=1000, metadata={"help": "Log image every X steps."})
+        default=None, metadata={"help": "Path to pretrained model or model, when we want to resume training."}
+    )
+    image_logging_steps: Optional[int] = field(default=1000, metadata={"help": "Log image every X steps."})
 
 
 @dataclass
@@ -61,14 +52,16 @@ class DataArguments:
     """
     Arguments pertaining to what data we are going to input our model for training.
     """
-    file_list: str = field(default="./data/filelist/train.filelist.list",
-                           metadata={"help": "The name of the file_list."})
+
+    file_list: str = field(
+        default="./data/filelist/train.filelist.list", metadata={"help": "The name of the file_list."}
+    )
     resolution: int = field(
         default=256,
         metadata={
-            "help":
-            "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
-        })
+            "help": "The resolution for input images, all the images in the train/validation dataset will be resized to this resolution."
+        },
+    )
     num_records: int = field(default=10000000, metadata={"help": "num_records"})
     buffer_size: int = field(
         default=100,
@@ -84,90 +77,55 @@ class DataArguments:
 class NoTrainerTrainingArguments:
     output_dir: str = field(
         default="outputs",
-        metadata={
-            "help":
-            "The output directory where the model predictions and checkpoints will be written."
-        },
+        metadata={"help": "The output directory where the model predictions and checkpoints will be written."},
     )
     per_device_train_batch_size: int = field(
-        default=16,
-        metadata={"help": "Batch size per GPU core/CPU for training."})
+        default=16, metadata={"help": "Batch size per GPU core/CPU for training."}
+    )
 
     gradient_accumulation_steps: int = field(
         default=2,
-        metadata={
-            "help":
-            "Number of updates steps to accumulate before performing a backward/update pass."
-        },
+        metadata={"help": "Number of updates steps to accumulate before performing a backward/update pass."},
     )
-    learning_rate: float = field(
-        default=5e-5, metadata={"help": "The initial learning rate for AdamW."})
-    weight_decay: float = field(
-        default=0.02,
-        metadata={"help": "Weight decay for AdamW if we apply some."})
-    adam_beta1: float = field(default=0.9,
-                              metadata={"help": "Beta1 for AdamW optimizer"})
-    adam_beta2: float = field(default=0.999,
-                              metadata={"help": "Beta2 for AdamW optimizer"})
-    adam_epsilon: float = field(
-        default=1e-8, metadata={"help": "Epsilon for AdamW optimizer."})
-    max_grad_norm: float = field(default=-1.,
-                                 metadata={"help": "Max gradient norm."})
-    num_train_epochs: int = field(
-        default=100,
-        metadata={"help": "Total number of training epochs to perform."})
+    learning_rate: float = field(default=5e-5, metadata={"help": "The initial learning rate for AdamW."})
+    weight_decay: float = field(default=0.02, metadata={"help": "Weight decay for AdamW if we apply some."})
+    adam_beta1: float = field(default=0.9, metadata={"help": "Beta1 for AdamW optimizer"})
+    adam_beta2: float = field(default=0.999, metadata={"help": "Beta2 for AdamW optimizer"})
+    adam_epsilon: float = field(default=1e-8, metadata={"help": "Epsilon for AdamW optimizer."})
+    max_grad_norm: float = field(default=-1.0, metadata={"help": "Max gradient norm."})
+    num_train_epochs: int = field(default=100, metadata={"help": "Total number of training epochs to perform."})
     max_steps: int = field(
         default=1000000000,
-        metadata={
-            "help":
-            "If > 0: set total number of training steps to perform. Override num_train_epochs."
-        },
+        metadata={"help": "If > 0: set total number of training steps to perform. Override num_train_epochs."},
     )
     lr_scheduler_type: str = field(
         default="constant",
         metadata={
-            "help":
-            'The scheduler type to use. support ["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"]'
+            "help": 'The scheduler type to use. support ["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"]'
         },
     )
-    warmup_steps: int = field(
-        default=0, metadata={"help": "Linear warmup over warmup_steps."})
+    warmup_steps: int = field(default=0, metadata={"help": "Linear warmup over warmup_steps."})
 
-    logging_dir: Optional[str] = field(default="logs",
-                                       metadata={"help": "VisualDL log dir."})
+    logging_dir: Optional[str] = field(default="logs", metadata={"help": "VisualDL log dir."})
 
-    logging_steps: int = field(default=50,
-                               metadata={"help": "Log every X updates steps."})
+    logging_steps: int = field(default=50, metadata={"help": "Log every X updates steps."})
 
-    save_steps: int = field(
-        default=5000,
-        metadata={"help": "Save checkpoint every X updates steps."})
+    save_steps: int = field(default=5000, metadata={"help": "Save checkpoint every X updates steps."})
 
-    seed: int = field(
-        default=23,
-        metadata={
-            "help": "Random seed that will be set at the beginning of training."
-        })
+    seed: int = field(default=23, metadata={"help": "Random seed that will be set at the beginning of training."})
     dataloader_num_workers: int = field(
         default=6,
         metadata={
-            "help":
-            "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
+            "help": "Number of subprocesses to use for data loading. 0 means that the data will be loaded in the main process."
         },
     )
     report_to: str = field(
-        default="visualdl",
-        metadata={
-            "help":
-            "The list of integrations to report the results and logs to."
-        })
+        default="visualdl", metadata={"help": "The list of integrations to report the results and logs to."}
+    )
 
     def __str__(self):
         self_as_dict = asdict(self)
-        self_as_dict = {
-            k: f"<{k.upper()}>" if k.endswith("_token") else v
-            for k, v in self_as_dict.items()
-        }
+        self_as_dict = {k: f"<{k.upper()}>" if k.endswith("_token") else v for k, v in self_as_dict.items()}
 
         attrs_as_str = [f"{k}={v},\n" for k, v in sorted(self_as_dict.items())]
         return f"{self.__class__.__name__}(\n{''.join(attrs_as_str)})"
@@ -183,14 +141,13 @@ class NoTrainerTrainingArguments:
             args = self
             key = "Training"
 
-        logger.info('{:^40}'.format("{} Configuration Arguments".format(key)))
-        logger.info('{:30}:{}'.format("paddle commit id",
-                                      paddle.version.commit))
+        logger.info("{:^40}".format("{} Configuration Arguments".format(key)))
+        logger.info("{:30}:{}".format("paddle commit id", paddle.version.commit))
 
         for a in dir(args):
-            if a[:2] != "__":  #don't print double underscore methods
+            if a[:2] != "__":  # don't print double underscore methods
                 v = getattr(args, a)
                 if not isinstance(v, types.MethodType):
-                    logger.info('{:30}:{}'.format(a, v))
+                    logger.info("{:30}:{}".format(a, v))
 
         logger.info("")

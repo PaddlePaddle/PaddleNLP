@@ -52,7 +52,7 @@ def predict(model, data_loader):
 
     Args:
         model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
-        data_loaer (obj:`List(Example)`): The processed data ids of text pair: 
+        data_loaer (obj:`List(Example)`): The processed data ids of text pair:
                                 [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
@@ -68,8 +68,7 @@ def predict(model, data_loader):
             input_ids = paddle.to_tensor(input_ids)
             token_type_ids = paddle.to_tensor(token_type_ids)
 
-            batch_prob = model(input_ids=input_ids,
-                               token_type_ids=token_type_ids).numpy()
+            batch_prob = model(input_ids=input_ids, token_type_ids=token_type_ids).numpy()
 
             batch_probs.append(batch_prob)
 
@@ -80,29 +79,23 @@ def predict(model, data_loader):
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length,
-                         is_test=True,
-                         language=args.language)
+    trans_func = partial(
+        convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_test=True, language=args.language
+    )
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment_ids
     ): [data for data in fn(samples)]
 
-    valid_ds = load_dataset(read_text_pair,
-                            data_path=args.input_file,
-                            lazy=False)
+    valid_ds = load_dataset(read_text_pair, data_path=args.input_file, lazy=False)
 
-    valid_data_loader = create_dataloader(valid_ds,
-                                          mode='predict',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    valid_data_loader = create_dataloader(
+        valid_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     model = PointwiseMatching(pretrained_model)
 
@@ -111,15 +104,12 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     y_probs = predict(model, valid_data_loader)
     y_preds = np.argmax(y_probs, axis=1)
 
-    valid_ds = load_dataset(read_text_pair,
-                            data_path=args.input_file,
-                            lazy=False)
+    valid_ds = load_dataset(read_text_pair, data_path=args.input_file, lazy=False)
     for idx, y_pred in enumerate(y_preds):
         text_pair = valid_ds[idx]
         text_pair["pred_label"] = y_pred

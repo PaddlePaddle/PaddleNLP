@@ -25,11 +25,13 @@ import paddle_serving_server.pipeline.operator
 def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
     """Convert all examples into necessary features."""
     source = example
-    tokenized_example = tokenizer.gen_encode(source,
-                                             max_seq_len=max_seq_len,
-                                             add_start_token_for_decoding=True,
-                                             return_length=True,
-                                             is_split_into_words=False)
+    tokenized_example = tokenizer.gen_encode(
+        source,
+        max_seq_len=max_seq_len,
+        add_start_token_for_decoding=True,
+        return_length=True,
+        is_split_into_words=False,
+    )
     return tokenized_example
 
 
@@ -40,30 +42,23 @@ def batchify_fn(batch_examples, pad_val, pad_right=False):
         """Pad attention_mask."""
         batch_size = len(batch_attention_mask)
         max_len = max(map(len, batch_attention_mask))
-        attention_mask = np.ones(
-            (batch_size, max_len, max_len), dtype='float32') * -1e9
+        attention_mask = np.ones((batch_size, max_len, max_len), dtype="float32") * -1e9
         for i, mask_data in enumerate(attention_mask):
             seq_len = len(batch_attention_mask[i])
             if pad_right:
-                mask_data[:seq_len:, :seq_len] = np.array(
-                    batch_attention_mask[i], dtype='float32')
+                mask_data[:seq_len:, :seq_len] = np.array(batch_attention_mask[i], dtype="float32")
             else:
-                mask_data[-seq_len:,
-                          -seq_len:] = np.array(batch_attention_mask[i],
-                                                dtype='float32')
+                mask_data[-seq_len:, -seq_len:] = np.array(batch_attention_mask[i], dtype="float32")
         # In order to ensure the correct broadcasting mechanism, expand one
         # dimension to the second dimension (n_head of Transformer).
         attention_mask = np.expand_dims(attention_mask, axis=1)
         return attention_mask
 
-    pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype='int32')
-    input_ids = pad_func([example['input_ids'] for example in batch_examples])
-    token_type_ids = pad_func(
-        [example['token_type_ids'] for example in batch_examples])
-    attention_mask = pad_mask(
-        [example['attention_mask'] for example in batch_examples])
-    seq_len = np.asarray([example['seq_len'] for example in batch_examples],
-                         dtype='int32')
+    pad_func = Pad(pad_val=pad_val, pad_right=pad_right, dtype="int32")
+    input_ids = pad_func([example["input_ids"] for example in batch_examples])
+    token_type_ids = pad_func([example["token_type_ids"] for example in batch_examples])
+    attention_mask = pad_mask([example["attention_mask"] for example in batch_examples])
+    seq_len = np.asarray([example["seq_len"] for example in batch_examples], dtype="int32")
     input_dict = {}
     input_dict["input_ids"] = input_ids
     input_dict["token_type_ids"] = token_type_ids
@@ -89,25 +84,24 @@ class UnimoTextOp(Op):
     """Op for unimo_text."""
 
     def init_op(self):
-        self.tokenizer = UNIMOTokenizer.from_pretrained(
-            'unimo-text-1.0-summary')
+        self.tokenizer = UNIMOTokenizer.from_pretrained("unimo-text-1.0-summary")
 
     def preprocess(self, input_dicts, data_id, log_id):
         # Convert input format
-        (_, input_dict), = input_dicts.items()
+        ((_, input_dict),) = input_dicts.items()
         data = input_dict["inputs"]
         if isinstance(data, str) and "array(" in data:
             data = eval(data)
         else:
             logger.error("input value  {}is not supported.".format(data))
-        data = [i.decode('utf-8') for i in data]
+        data = [i.decode("utf-8") for i in data]
         examples = [convert_example(i, self.tokenizer) for i in data]
         input_dict = batchify_fn(examples, self.tokenizer.pad_token_id)
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model input
         return input_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
-        outputs = fetch_dict['transpose_0.tmp_0']
+        outputs = fetch_dict["transpose_0.tmp_0"]
         results = []
         for sample in outputs:
             result = []
@@ -124,7 +118,6 @@ class UnimoTextOp(Op):
 
 
 class UnimoTextService(WebService):
-
     def get_pipeline_response(self, read_op):
         return UnimoTextOp(name="text_summarization", input_ops=[read_op])
 

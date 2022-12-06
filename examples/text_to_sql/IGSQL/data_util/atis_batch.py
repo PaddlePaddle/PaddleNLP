@@ -19,8 +19,7 @@ from . import sql_util
 from . import vocabulary as vocab
 
 
-class UtteranceItem():
-
+class UtteranceItem:
     def __init__(self, interaction, index):
         self.interaction = interaction
         self.utterance_index = index
@@ -31,7 +30,7 @@ class UtteranceItem():
     def histories(self, maximum):
         if maximum > 0:
             history_seqs = []
-            for utterance in self.interaction.utterances[:self.utterance_index]:
+            for utterance in self.interaction.utterances[: self.utterance_index]:
                 history_seqs.append(utterance.input_seq_to_use)
 
             if len(history_seqs) > maximum:
@@ -41,63 +40,45 @@ class UtteranceItem():
         return []
 
     def input_sequence(self):
-        return self.interaction.utterances[
-            self.utterance_index].input_seq_to_use
+        return self.interaction.utterances[self.utterance_index].input_seq_to_use
 
     def previous_query(self):
         if self.utterance_index == 0:
             return []
-        return self.interaction.utterances[self.utterance_index -
-                                           1].anonymized_gold_query
+        return self.interaction.utterances[self.utterance_index - 1].anonymized_gold_query
 
     def anonymized_gold_query(self):
-        return self.interaction.utterances[
-            self.utterance_index].anonymized_gold_query
+        return self.interaction.utterances[self.utterance_index].anonymized_gold_query
 
     def snippets(self):
-        return self.interaction.utterances[
-            self.utterance_index].available_snippets
+        return self.interaction.utterances[self.utterance_index].available_snippets
 
     def original_gold_query(self):
-        return self.interaction.utterances[
-            self.utterance_index].original_gold_query
+        return self.interaction.utterances[self.utterance_index].original_gold_query
 
     def contained_entities(self):
-        return self.interaction.utterances[
-            self.utterance_index].contained_entities
+        return self.interaction.utterances[self.utterance_index].contained_entities
 
     def original_gold_queries(self):
-        return [
-            q[0] for q in self.interaction.utterances[
-                self.utterance_index].all_gold_queries
-        ]
+        return [q[0] for q in self.interaction.utterances[self.utterance_index].all_gold_queries]
 
     def gold_tables(self):
-        return [
-            q[1] for q in self.interaction.utterances[
-                self.utterance_index].all_gold_queries
-        ]
+        return [q[1] for q in self.interaction.utterances[self.utterance_index].all_gold_queries]
 
     def gold_query(self):
-        return self.interaction.utterances[
-            self.utterance_index].gold_query_to_use + [vocab.EOS_TOK]
+        return self.interaction.utterances[self.utterance_index].gold_query_to_use + [vocab.EOS_TOK]
 
     def gold_edit_sequence(self):
-        return self.interaction.utterances[
-            self.utterance_index].gold_edit_sequence
+        return self.interaction.utterances[self.utterance_index].gold_edit_sequence
 
     def gold_table(self):
-        return self.interaction.utterances[
-            self.utterance_index].gold_sql_results
+        return self.interaction.utterances[self.utterance_index].gold_sql_results
 
     def all_snippets(self):
         return self.interaction.snippets
 
-    def within_limits(self,
-                      max_input_length=float('inf'),
-                      max_output_length=float('inf')):
-        return self.interaction.utterances[self.utterance_index].length_valid(
-            max_input_length, max_output_length)
+    def within_limits(self, max_input_length=float("inf"), max_output_length=float("inf")):
+        return self.interaction.utterances[self.utterance_index].length_valid(max_input_length, max_output_length)
 
     def expand_snippets(self, sequence):
         # Remove the EOS
@@ -118,13 +99,11 @@ class UtteranceItem():
         no_snippets_sequence = self.interaction.expand_snippets(sequence)
 
         # Deanonymize
-        deanon_sequence = self.interaction.deanonymize(no_snippets_sequence,
-                                                       "sql")
+        deanon_sequence = self.interaction.deanonymize(no_snippets_sequence, "sql")
         return deanon_sequence
 
 
-class UtteranceBatch():
-
+class UtteranceBatch:
     def __init__(self, items):
         self.items = items
 
@@ -143,10 +122,8 @@ class UtteranceBatch():
         return self.index >= len(self.items)
 
 
-class PredUtteranceItem():
-
-    def __init__(self, input_sequence, interaction_item, previous_query, index,
-                 available_snippets):
+class PredUtteranceItem:
+    def __init__(self, input_sequence, interaction_item, previous_query, index, available_snippets):
         self.input_seq_to_use = input_sequence
         self.interaction_item = interaction_item
         self.index = index
@@ -160,8 +137,7 @@ class PredUtteranceItem():
         if maximum == 0:
             return histories
         histories = []
-        for utterance in self.interaction_item.processed_utterances[:self.
-                                                                    index]:
+        for utterance in self.interaction_item.processed_utterances[: self.index]:
             histories.append(utterance.input_sequence())
         if len(histories) > maximum:
             histories = histories[-maximum:]
@@ -177,25 +153,24 @@ class PredUtteranceItem():
         return self.interaction_item.flatten_sequence(sequence)
 
     def remove_snippets(self, sequence):
-        return sql_util.fix_parentheses(
-            self.interaction_item.expand_snippets(sequence))
+        return sql_util.fix_parentheses(self.interaction_item.expand_snippets(sequence))
 
     def set_predicted_query(self, query):
         self.anonymized_pred_query = query
 
 
-class InteractionItem():
-
-    def __init__(self,
-                 interaction,
-                 max_input_length=float('inf'),
-                 max_output_length=float('inf'),
-                 nl_to_sql_dict={},
-                 maximum_length=float('inf')):
-        if maximum_length != float('inf'):
+class InteractionItem:
+    def __init__(
+        self,
+        interaction,
+        max_input_length=float("inf"),
+        max_output_length=float("inf"),
+        nl_to_sql_dict={},
+        maximum_length=float("inf"),
+    ):
+        if maximum_length != float("inf"):
             self.interaction = copy.deepcopy(interaction)
-            self.interaction.utterances = self.interaction.utterances[:
-                                                                      maximum_length]
+            self.interaction.utterances = self.interaction.utterances[:maximum_length]
         else:
             self.interaction = interaction
         self.processed_utterances = []
@@ -238,10 +213,12 @@ class InteractionItem():
         available_snippets = self.available_snippets(snippet_keep_age=1)
 
         return PredUtteranceItem(
-            utterance.input_seq_to_use, self,
-            self.processed_utterances[-1].anonymized_pred_query
-            if len(self.processed_utterances) > 0 else [], self.index - 1,
-            available_snippets)
+            utterance.input_seq_to_use,
+            self,
+            self.processed_utterances[-1].anonymized_pred_query if len(self.processed_utterances) > 0 else [],
+            self.index - 1,
+            available_snippets,
+        )
 
     def done(self):
         return len(self.processed_utterances) == len(self.interaction)
@@ -252,14 +229,10 @@ class InteractionItem():
         self.index = 0
 
     def utterance_within_limits(self, utterance_item):
-        return utterance_item.within_limits(self.max_input_length,
-                                            self.max_output_length)
+        return utterance_item.within_limits(self.max_input_length, self.max_output_length)
 
     def available_snippets(self, snippet_keep_age):
-        return [
-            snippet for snippet in self.snippet_bank
-            if snippet.index <= snippet_keep_age
-        ]
+        return [snippet for snippet in self.snippet_bank if snippet.index <= snippet_keep_age]
 
     def gold_utterances(self):
         utterances = []
@@ -270,16 +243,9 @@ class InteractionItem():
     def get_schema(self):
         return self.interaction.schema
 
-    def add_utterance(self,
-                      utterance,
-                      predicted_sequence,
-                      snippets=None,
-                      previous_snippets=[],
-                      simple=False):
+    def add_utterance(self, utterance, predicted_sequence, snippets=None, previous_snippets=[], simple=False):
         if not snippets:
-            self.add_snippets(predicted_sequence,
-                              previous_snippets=previous_snippets,
-                              simple=simple)
+            self.add_snippets(predicted_sequence, previous_snippets=previous_snippets, simple=simple)
         else:
             for snippet in snippets:
                 snippet.assign_id(len(self.snippet_bank))
@@ -292,11 +258,9 @@ class InteractionItem():
     def add_snippets(self, sequence, previous_snippets=[], simple=False):
         if sequence:
             if simple:
-                snippets = sql_util.get_subtrees_simple(
-                    sequence, oldsnippets=previous_snippets)
+                snippets = sql_util.get_subtrees_simple(sequence, oldsnippets=previous_snippets)
             else:
-                snippets = sql_util.get_subtrees(sequence,
-                                                 oldsnippets=previous_snippets)
+                snippets = sql_util.get_subtrees(sequence, oldsnippets=previous_snippets)
             for snippet in snippets:
                 snippet.assign_id(len(self.snippet_bank))
                 self.snippet_bank.append(snippet)
@@ -305,8 +269,7 @@ class InteractionItem():
             snippet.increase_age()
 
     def expand_snippets(self, sequence):
-        return sql_util.fix_parentheses(
-            snip.expand_snippets(sequence, self.snippet_bank))
+        return sql_util.fix_parentheses(snip.expand_snippets(sequence, self.snippet_bank))
 
     def remove_snippets(self, sequence):
         if sequence[-1] == vocab.EOS_TOK:
@@ -326,14 +289,11 @@ class InteractionItem():
             no_snippets_sequence = self.expand_snippets(sequence)
         no_snippets_sequence = sql_util.fix_parentheses(no_snippets_sequence)
 
-        deanon_sequence = self.interaction.deanonymize(no_snippets_sequence,
-                                                       "sql")
+        deanon_sequence = self.interaction.deanonymize(no_snippets_sequence, "sql")
         return deanon_sequence
 
     def gold_query(self, index):
-        return self.interaction.utterances[index].gold_query_to_use + [
-            vocab.EOS_TOK
-        ]
+        return self.interaction.utterances[index].gold_query_to_use + [vocab.EOS_TOK]
 
     def original_gold_query(self, index):
         return self.interaction.utterances[index].original_gold_query
@@ -342,8 +302,7 @@ class InteractionItem():
         return self.interaction.utterances[index].gold_sql_results
 
 
-class InteractionBatch():
-
+class InteractionBatch:
     def __init__(self, items):
         self.items = items
 
@@ -359,8 +318,7 @@ class InteractionBatch():
         self.current_interactions = []
         for interaction in self.items:
             if self.timestep < len(interaction):
-                utterance_item = interaction.original_utterances(
-                    snippet_keep_age, use_gold)[self.timestep]
+                utterance_item = interaction.original_utterances(snippet_keep_age, use_gold)[self.timestep]
                 self.current_interactions.append(interaction)
                 items.append(utterance_item)
 

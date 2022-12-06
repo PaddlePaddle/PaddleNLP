@@ -22,7 +22,7 @@ import numpy as np
 import paddle
 from paddle.metric import Metric, Accuracy, Precision, Recall
 
-__all__ = ['AccuracyAndF1', 'Mcc', 'PearsonAndSpearman', 'MultiLabelsMetric']
+__all__ = ["AccuracyAndF1", "Mcc", "PearsonAndSpearman", "MultiLabelsMetric"]
 
 
 class AccuracyAndF1(Metric):
@@ -61,12 +61,7 @@ class AccuracyAndF1(Metric):
 
     """
 
-    def __init__(self,
-                 topk=(1, ),
-                 pos_label=1,
-                 name='acc_and_f1',
-                 *args,
-                 **kwargs):
+    def __init__(self, topk=(1,), pos_label=1, name="acc_and_f1", *args, **kwargs):
         super(AccuracyAndF1, self).__init__(*args, **kwargs)
         self.topk = topk
         self.pos_label = pos_label
@@ -201,7 +196,7 @@ class Mcc(Metric):
 
     """
 
-    def __init__(self, name='mcc', *args, **kwargs):
+    def __init__(self, name="mcc", *args, **kwargs):
         super(Mcc, self).__init__(*args, **kwargs)
         self._name = name
         self.tp = 0  # true positive
@@ -276,9 +271,9 @@ class Mcc(Metric):
         else:
             # mcc = (tp*tn-fp*fn)/ sqrt(tp+fp)(tp+fn)(tn+fp)(tn+fn))
             mcc = (self.tp * self.tn - self.fp * self.fn) / math.sqrt(
-                (self.tp + self.fp) * (self.tp + self.fn) *
-                (self.tn + self.fp) * (self.tn + self.fn))
-        return (mcc, )
+                (self.tp + self.fp) * (self.tp + self.fn) * (self.tn + self.fp) * (self.tn + self.fn)
+            )
+        return (mcc,)
 
     def reset(self):
         """
@@ -327,7 +322,7 @@ class PearsonAndSpearman(Metric):
 
     """
 
-    def __init__(self, name='pearson_and_spearman', *args, **kwargs):
+    def __init__(self, name="pearson_and_spearman", *args, **kwargs):
         super(PearsonAndSpearman, self).__init__(*args, **kwargs)
         self._name = name
         self.preds = []
@@ -398,8 +393,7 @@ class PearsonAndSpearman(Metric):
         p_sum = sum([preds[i] * labels[i] for i in range(n)])
 
         numerator = p_sum - (sum1 * sum2 / n)
-        denominator = math.sqrt(
-            (sum1_pow - pow(sum1, 2) / n) * (sum2_pow - pow(sum2, 2) / n))
+        denominator = math.sqrt((sum1_pow - pow(sum1, 2) / n) * (sum2_pow - pow(sum2, 2) / n))
         if denominator == 0:
             return 0.0
         return numerator / denominator
@@ -488,12 +482,10 @@ class MultiLabelsMetric(Metric):
         fscore is zero_division if all labels AND predictions are negative
     """
 
-    def __init__(self, num_labels, name='multi_labels_metric'):
+    def __init__(self, num_labels, name="multi_labels_metric"):
         super(MultiLabelsMetric, self).__init__()
         if num_labels <= 1:
-            raise ValueError(
-                f"The num_labels is {num_labels}, which must be greater than 1."
-            )
+            raise ValueError(f"The num_labels is {num_labels}, which must be greater than 1.")
         self.num_labels = num_labels
         self._name = name
         self._confusion_matrix = np.zeros((num_labels, 2, 2), dtype=int)
@@ -556,19 +548,19 @@ class MultiLabelsMetric(Metric):
                     The accumulated f1.
 
         """
-        if average not in {'binary', 'micro', 'macro', 'weighted', None}:
+        if average not in {"binary", "micro", "macro", "weighted", None}:
             raise ValueError(f"The average is {average}, which is unknown.")
-        if average == 'binary':
+        if average == "binary":
             if pos_label >= self.num_labels:
                 raise ValueError(
                     f"The pos_label is {pos_label}, num_labels is {self.num_labels}. "
-                    f"The num_labels must be greater than pos_label.")
+                    f"The num_labels must be greater than pos_label."
+                )
 
         confusion_matrix = None  # [*, 2, 2]
-        if average == 'binary':
-            confusion_matrix = np.expand_dims(self._confusion_matrix[pos_label],
-                                              axis=0)
-        elif average == 'micro':
+        if average == "binary":
+            confusion_matrix = np.expand_dims(self._confusion_matrix[pos_label], axis=0)
+        elif average == "micro":
             confusion_matrix = self._confusion_matrix.sum(axis=0, keepdims=True)
         #  if average is 'macro' or 'weighted' or None
         else:
@@ -590,28 +582,24 @@ class MultiLabelsMetric(Metric):
             # precision is zero_division if there are no positive predictions
             # recall is zero_division if there are no positive labels
             # fscore is zero_division if all labels AND predictions are negative
-            warnings.warn(f'Zero division when calculating {metric_name}.',
-                          UserWarning)
+            warnings.warn(f"Zero division when calculating {metric_name}.", UserWarning)
             result[mask] = 0.0
             return result
 
-        precision = _robust_divide(tp, pred, 'precision')
-        recall = _robust_divide(tp, true, 'recall')
-        f1 = _robust_divide(2 * (precision * recall), (precision + recall),
-                            'f1')
+        precision = _robust_divide(tp, pred, "precision")
+        recall = _robust_divide(tp, true, "recall")
+        f1 = _robust_divide(2 * (precision * recall), (precision + recall), "f1")
 
         weights = None  # [num_labels]
-        if average == 'weighted':
+        if average == "weighted":
             weights = true
             if weights.sum() == 0:
                 zero_division_value = np.float64(0.0)
                 if pred.sum() == 0:
-                    return (zero_division_value, zero_division_value,
-                            zero_division_value)
+                    return (zero_division_value, zero_division_value, zero_division_value)
                 else:
-                    return (np.float64(0.0), zero_division_value,
-                            np.float64(0.0))
-        elif average == 'macro':
+                    return (np.float64(0.0), zero_division_value, np.float64(0.0))
+        elif average == "macro":
             weights = np.ones((self.num_labels), dtype=float)
         if average is not None:
             precision = np.average(precision, weights=weights)
@@ -639,11 +627,10 @@ class MultiLabelsMetric(Metric):
             The tuple should be passed to `update` function.
         """
         if not (paddle.is_tensor(pred) and paddle.is_tensor(label)):
-            raise ValueError('pred and label must be paddle tensor')
+            raise ValueError("pred and label must be paddle tensor")
 
         if pred.shape[-1] != self.num_labels:
-            raise ValueError(f'The last dim of pred is {pred.shape[-1]}, '
-                             f'which should be num_labels')
+            raise ValueError(f"The last dim of pred is {pred.shape[-1]}, " f"which should be num_labels")
         pred = paddle.reshape(pred, [-1, self.num_labels])
         pred = paddle.argmax(pred, axis=-1)
 
@@ -653,27 +640,22 @@ class MultiLabelsMetric(Metric):
         else:
             label = paddle.reshape(label, [-1])
             if paddle.max(label) >= self.num_labels:
-                raise ValueError(f"Tensor label has value {paddle.max(label)}, "
-                                 f"which is no less than num_labels")
+                raise ValueError(f"Tensor label has value {paddle.max(label)}, " f"which is no less than num_labels")
 
         if pred.shape[0] != label.shape[0]:
-            raise ValueError(
-                f"The length of pred is not equal to the length of label")
+            raise ValueError(f"The length of pred is not equal to the length of label")
 
         return pred, label
 
     def _multi_labels_confusion_matrix(self, pred, label):
         tp_bins = label[pred == label]
         tp = np.bincount(tp_bins, minlength=self.num_labels)  # [num_labels,]
-        tp_plus_fp = np.bincount(pred,
-                                 minlength=self.num_labels)  # [num_labels,]
-        tp_plus_fn = np.bincount(label,
-                                 minlength=self.num_labels)  # [num_labels,]
+        tp_plus_fp = np.bincount(pred, minlength=self.num_labels)  # [num_labels,]
+        tp_plus_fn = np.bincount(label, minlength=self.num_labels)  # [num_labels,]
         fp = tp_plus_fp - tp  # [num_labels,]
         fn = tp_plus_fn - tp  # [num_labels,]
         tn = pred.shape[0] - tp - fp - fn  # [num_labels,]
-        return np.array([tn, fp, fn, tp]).T.reshape(-1, 2,
-                                                    2)  # [num_labels, 2, 2]
+        return np.array([tn, fp, fn, tp]).T.reshape(-1, 2, 2)  # [num_labels, 2, 2]
 
     def reset(self):
         self._confusion_matrix = np.zeros((self.num_labels, 2, 2), dtype=int)

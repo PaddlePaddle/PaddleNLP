@@ -41,7 +41,6 @@ def parse_args():
 
 
 class Predictor(object):
-
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -49,8 +48,7 @@ class Predictor(object):
 
     @classmethod
     def create_predictor(cls, args):
-        config = paddle.inference.Config(args.model_path + ".pdmodel",
-                                         args.model_path + ".pdiparams")
+        config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
         if args.select_device == "gpu":
             # Set GPU configs accordingly
             config.enable_use_gpu(100, 0)
@@ -63,24 +61,15 @@ class Predictor(object):
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handles = [
-            predictor.get_output_handle(name)
-            for name in predictor.get_output_names()
-        ]
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
         return cls(predictor, input_handles, output_handles)
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy(
-            ) if isinstance(input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy() if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        output = [
-            output_handle.copy_to_cpu() for output_handle in self.output_handles
-        ]
+        output = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
         return output
 
     def predict(self, dataset, batch_size=1):
@@ -96,8 +85,7 @@ def main():
     predictor = Predictor.create_predictor(args)
     args.model_type = args.model_type.lower()
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
-    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(
-        args.model_path))
+    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(args.model_path))
     if args.model_type == "gpt":
         ds = [
             "Question: Who is the CEO of Apple? Answer:",
@@ -115,9 +103,7 @@ def main():
             "问题：世界上最高的山峰是? 答案：",
         ]
 
-    dataset = [[
-        np.array(tokenizer(text)["input_ids"]).astype("int64").reshape([1, -1])
-    ] for text in ds]
+    dataset = [[np.array(tokenizer(text)["input_ids"]).astype("int64").reshape([1, -1])] for text in ds]
     outs = predictor.predict(dataset)
     for res in outs:
         res_ids = list(res[0].reshape([-1]))

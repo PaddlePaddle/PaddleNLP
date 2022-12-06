@@ -24,7 +24,6 @@ from paddlenlp.metrics.dureader import get_final_text, _compute_softmax, _get_be
 
 
 class F1(object):
-
     def __init__(self, positive_label=1):
         self.positive_label = positive_label
         self.reset()
@@ -33,9 +32,9 @@ class F1(object):
         if isinstance(preds, paddle.Tensor):
             preds = preds.numpy()
         elif isinstance(preds, list):
-            preds = np.array(preds, dtype='float32')
+            preds = np.array(preds, dtype="float32")
         if isinstance(labels, list):
-            labels = np.array(labels, dtype='int64')
+            labels = np.array(labels, dtype="int64")
         elif isinstance(labels, paddle.Tensor):
             labels = labels.numpy()
         preds = np.argmax(preds, axis=1)
@@ -63,10 +62,9 @@ class F1(object):
 
 
 class EM_AND_F1(object):
-
     def __init__(self):
-        self.nltk = try_import('nltk')
-        self.re = try_import('re')
+        self.nltk = try_import("nltk")
+        self.re = try_import("re")
 
     def _mixed_segmentation(self, in_str, rm_punc=False):
         """mixed_segmentation"""
@@ -74,14 +72,44 @@ class EM_AND_F1(object):
         segs_out = []
         temp_str = ""
         sp_char = [
-            '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。',
-            '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「',
-            '」', '（', '）', '－', '～', '『', '』'
+            "-",
+            ":",
+            "_",
+            "*",
+            "^",
+            "/",
+            "\\",
+            "~",
+            "`",
+            "+",
+            "=",
+            "，",
+            "。",
+            "：",
+            "？",
+            "！",
+            "“",
+            "”",
+            "；",
+            "’",
+            "《",
+            "》",
+            "……",
+            "·",
+            "、",
+            "「",
+            "」",
+            "（",
+            "）",
+            "－",
+            "～",
+            "『",
+            "』",
         ]
         for char in in_str:
             if rm_punc and char in sp_char:
                 continue
-            pattern = '[\\u4e00-\\u9fa5]'
+            pattern = "[\\u4e00-\\u9fa5]"
             if self.re.search(pattern, char) or char in sp_char:
                 if temp_str != "":
                     ss = self.nltk.word_tokenize(temp_str)
@@ -91,7 +119,7 @@ class EM_AND_F1(object):
             else:
                 temp_str += char
 
-        #Handling last part
+        # Handling last part
         if temp_str != "":
             ss = self.nltk.word_tokenize(temp_str)
             segs_out.extend(ss)
@@ -103,9 +131,39 @@ class EM_AND_F1(object):
         """remove_punctuation"""
         in_str = in_str.lower().strip()
         sp_char = [
-            '-', ':', '_', '*', '^', '/', '\\', '~', '`', '+', '=', '，', '。',
-            '：', '？', '！', '“', '”', '；', '’', '《', '》', '……', '·', '、', '「',
-            '」', '（', '）', '－', '～', '『', '』'
+            "-",
+            ":",
+            "_",
+            "*",
+            "^",
+            "/",
+            "\\",
+            "~",
+            "`",
+            "+",
+            "=",
+            "，",
+            "。",
+            "：",
+            "？",
+            "！",
+            "“",
+            "”",
+            "；",
+            "’",
+            "《",
+            "》",
+            "……",
+            "·",
+            "、",
+            "「",
+            "」",
+            "（",
+            "）",
+            "－",
+            "～",
+            "『",
+            "』",
         ]
         out_segs = []
         for char in in_str:
@@ -113,7 +171,7 @@ class EM_AND_F1(object):
                 continue
             else:
                 out_segs.append(char)
-        return ''.join(out_segs)
+        return "".join(out_segs)
 
     # Find longest common string
     def _find_lcs(self, s1, s2):
@@ -127,7 +185,7 @@ class EM_AND_F1(object):
                     if m[i + 1][j + 1] > mmax:
                         mmax = m[i + 1][j + 1]
                         p = i + 1
-        return s1[p - mmax:p], mmax
+        return s1[p - mmax : p], mmax
 
     def _calc_f1_score(self, answers, prediction):
         f1_scores = []
@@ -161,11 +219,11 @@ class EM_AND_F1(object):
         skip_count = 0
         for instance in ground_truth:
             total_count += 1
-            query_id = instance['id']
-            query_text = instance['question'].strip()
+            query_id = instance["id"]
+            query_text = instance["question"].strip()
             answers = instance["answers"]
             if query_id not in prediction:
-                sys.stderr.write('Unanswered question: {}\n'.format(query_id))
+                sys.stderr.write("Unanswered question: {}\n".format(query_id))
                 skip_count += 1
                 continue
             preds = str(prediction[query_id])
@@ -179,9 +237,9 @@ class EM_AND_F1(object):
         return em_score, f1_score, avg_score, total_count
 
 
-def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
-                           max_answer_length, do_lower_case, tokenizer,
-                           verbose):
+def compute_qa_predictions(
+    all_examples, all_features, all_results, n_best_size, max_answer_length, do_lower_case, tokenizer, verbose
+):
     """Write final predictions to the json file and log-odds of null if needed."""
 
     example_index_to_features = collections.defaultdict(list)
@@ -193,10 +251,8 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
         unique_id_to_result[result.unique_id] = result
 
     _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-        "PrelimPrediction", [
-            "feature_index", "start_index", "end_index", "start_logit",
-            "end_logit"
-        ])
+        "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
+    )
 
     all_predictions = collections.OrderedDict()
     all_nbest_json = collections.OrderedDict()
@@ -237,14 +293,15 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                             start_index=start_index,
                             end_index=end_index,
                             start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index]))
+                            end_logit=result.end_logits[end_index],
+                        )
+                    )
 
-        prelim_predictions = sorted(prelim_predictions,
-                                    key=lambda x: (x.start_logit + x.end_logit),
-                                    reverse=True)
+        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-            "NbestPrediction", ["text", "start_logit", "end_logit"])
+            "NbestPrediction", ["text", "start_logit", "end_logit"]
+        )
 
         seen_predictions = {}
         nbest = []
@@ -253,12 +310,10 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index +
-                                                              1)]
+                tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
-                                                                 1)]
+                orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
                 tok_text = " ".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -270,8 +325,7 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                 tok_text = " ".join(tok_text.split())
                 orig_text = "".join(orig_tokens)
 
-                final_text = get_final_text(tok_text, orig_text, tokenizer,
-                                            verbose)
+                final_text = get_final_text(tok_text, orig_text, tokenizer, verbose)
                 if final_text in seen_predictions:
                     continue
 
@@ -280,16 +334,12 @@ def compute_qa_predictions(all_examples, all_features, all_results, n_best_size,
                 final_text = ""
                 seen_predictions[final_text] = True
 
-            nbest.append(
-                _NbestPrediction(text=final_text,
-                                 start_logit=pred.start_logit,
-                                 end_logit=pred.end_logit))
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(
-                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         total_scores = []
         best_non_null_entry = None

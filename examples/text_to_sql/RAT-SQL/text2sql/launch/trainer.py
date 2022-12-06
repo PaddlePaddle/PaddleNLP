@@ -31,9 +31,11 @@ def log_train_step(epoch, batch, steps_loss, cost_time):
     if len(steps_loss) == 0:
         return
 
-    logging.info(f'[train] epoch {epoch}, batch {batch}. ' + \
-                 f'loss is {sum(steps_loss) / len(steps_loss):.10f}. ' + \
-                 f'cost {cost_time:.2f}s')
+    logging.info(
+        f"[train] epoch {epoch}, batch {batch}. "
+        + f"loss is {sum(steps_loss) / len(steps_loss):.10f}. "
+        + f"cost {cost_time:.2f}s"
+    )
     steps_loss.clear()
 
 
@@ -63,15 +65,11 @@ def epoch_train(config, model, optimizer, epoch, train_data, is_debug=False):
 
 
 def _eval_during_train(model, data, epoch, output_root):
-    if epoch in [1, 2, 3, 4] + \
-                [6, 7, 9, 10, 11, 13, 14, 16, 17, 19] + \
-                list(range(21, 100, 2)):
+    if epoch in [1, 2, 3, 4] + [6, 7, 9, 10, 11, 13, 14, 16, 17, 19] + list(range(21, 100, 2)):
         return 0, epoch
     model.eval()
     try:
-        output = Path(
-            output_root
-        ) / 'infer_result' / f'{data.name}.infer_epoch{epoch:03d}.sql'
+        output = Path(output_root) / "infer_result" / f"{data.name}.infer_epoch{epoch:03d}.sql"
         infer.inference(model, data, output)
     except OSError as ose:
         traceback.print_exc()
@@ -82,44 +80,31 @@ def _eval_during_train(model, data, epoch, output_root):
     return mean_loss, epoch
 
 
-def train(config,
-          model,
-          optimizer,
-          epochs,
-          train_data,
-          dev_data,
-          test_data=None):
+def train(config, model, optimizer, epochs, train_data, dev_data, test_data=None):
     best_acc = -1e10
     best_epoch = 0
     timer = utils.Timer()
     for epoch in range(1, epochs + 1):
-        loss = epoch_train(config, model, optimizer, epoch, train_data,
-                           config.general.is_debug)
+        loss = epoch_train(config, model, optimizer, epoch, train_data, config.general.is_debug)
         cost_time = timer.interval()
-        logging.info(
-            f'[train] epoch {epoch}/{epochs} loss is {loss:.6f}, cost {cost_time:.2f}s.'
-        )
+        logging.info(f"[train] epoch {epoch}/{epochs} loss is {loss:.6f}, cost {cost_time:.2f}s.")
 
-        dev_loss, dev_acc = _eval_during_train(model, dev_data, epoch,
-                                               config.data.output)
-        log_str = f'[eval] dev loss {dev_loss:.6f}, acc {dev_acc:.4f}.'
+        dev_loss, dev_acc = _eval_during_train(model, dev_data, epoch, config.data.output)
+        log_str = f"[eval] dev loss {dev_loss:.6f}, acc {dev_acc:.4f}."
         if test_data is not None:
-            test_loss, test_acc = _eval_during_train(model, test_data, epoch,
-                                                     config.data.output)
-            log_str += f' test loss {test_loss:.6f}, acc {test_acc:.4f}.'
+            test_loss, test_acc = _eval_during_train(model, test_data, epoch, config.data.output)
+            log_str += f" test loss {test_loss:.6f}, acc {test_acc:.4f}."
 
         if dev_acc > best_acc:
             best_acc, best_epoch = dev_acc, epoch
-            save_path = os.path.join(config.data.output,
-                                     f'epoch{epoch:03d}_acc{best_acc:.4f}',
-                                     'model')
+            save_path = os.path.join(config.data.output, f"epoch{epoch:03d}_acc{best_acc:.4f}", "model")
             io.save(model, optimizer, save_path)
-            log_str += ' got best and saved.'
+            log_str += " got best and saved."
         else:
-            log_str += f' best acc is {best_acc} on epoch {best_epoch}.'
+            log_str += f" best acc is {best_acc} on epoch {best_epoch}."
 
         cost_time = timer.interval()
-        log_str += f' cost [{cost_time:.2f}s]'
+        log_str += f" cost [{cost_time:.2f}s]"
         logging.info(log_str)
 
 

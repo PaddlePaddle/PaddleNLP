@@ -31,20 +31,17 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
 
     # 1. checking the related files
     files = os.listdir(pretrained_dir)
-    assert 'pytorch_model.bin' in files, f"`pytorch_model.bin` file must exist in dir<{pretrained_dir}>"
-    assert 'config.json' in files, f"`config.json` file must exist in dir<{pretrained_dir}>"
+    assert "pytorch_model.bin" in files, f"`pytorch_model.bin` file must exist in dir<{pretrained_dir}>"
+    assert "config.json" in files, f"`config.json` file must exist in dir<{pretrained_dir}>"
 
     # 2. get model architecture from config.json
-    config_file = os.path.join(pretrained_dir, 'config.json')
-    with open(config_file, 'r', encoding='utf-8') as f:
+    config_file = os.path.join(pretrained_dir, "config.json")
+    with open(config_file, "r", encoding="utf-8") as f:
         config = json.load(f)
 
-    architectures = config.pop("architectures", []) or config.pop(
-        "init_class", None)
+    architectures = config.pop("architectures", []) or config.pop("init_class", None)
     if not architectures:
-        raise ValueError(
-            "can not find the model weight architectures with field: <architectures> and <init_class>"
-        )
+        raise ValueError("can not find the model weight architectures with field: <architectures> and <init_class>")
 
     if isinstance(architectures, str):
         architectures = [architectures]
@@ -56,13 +53,10 @@ def convert_from_local_dir(pretrained_dir: str, output: str):
 
     # 3. retrieve Model Converter
     target_converter_classes = [
-        converter_class for converter_class in load_all_converters()
-        if architecture in converter_class.architectures
+        converter_class for converter_class in load_all_converters() if architecture in converter_class.architectures
     ]
     if not target_converter_classes:
-        logger.error(
-            f"can not find target Converter based on architecture<{architecture}>"
-        )
+        logger.error(f"can not find target Converter based on architecture<{architecture}>")
     if len(target_converter_classes) > 1:
         logger.warning(
             f"{len(target_converter_classes)} found, we will adopt the first one as the target converter ..."
@@ -88,8 +82,7 @@ def convert_from_local_file(weight_file_path: str, output: str):
     if not os.path.isdir(weight_file_path):
         weight_file_dir, filename = os.path.split(weight_file_path)
         if filename != "pytorch_model.bin":
-            shutil.copy(weight_file_path,
-                        os.path.join(weight_file_dir, 'pytorch_model.bin'))
+            shutil.copy(weight_file_path, os.path.join(weight_file_dir, "pytorch_model.bin"))
 
         weight_file_path = weight_file_dir
     convert_from_local_dir(weight_file_path, output)

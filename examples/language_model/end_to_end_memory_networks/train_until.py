@@ -25,14 +25,11 @@ from eval import test
 from config import Config
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--target",
-                    default=111.0,
-                    type=float,
-                    help="target perplexity")
+parser.add_argument("--target", default=111.0, type=float, help="target perplexity")
 target = parser.parse_args().target
 
-if __name__ == '__main__':
-    config = Config('config.yaml')
+if __name__ == "__main__":
+    config = Config("config.yaml")
     if not os.path.exists(config.checkpoint_dir):
         os.makedirs(config.checkpoint_dir)
 
@@ -54,8 +51,6 @@ if __name__ == '__main__':
 
         test_ppl = test(model, test_data, config)
         if test_ppl < target:
-            model_path = os.path.join(
-                config.checkpoint_dir,
-                config.model_name + "_" + str(config.srand) + "_good")
+            model_path = os.path.join(config.checkpoint_dir, config.model_name + "_" + str(config.srand) + "_good")
             paddle.save(model.state_dict(), model_path)
             break

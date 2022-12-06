@@ -20,7 +20,7 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['XNLI_CN']
+__all__ = ["XNLI_CN"]
 
 
 class XNLI_CN(DatasetBuilder):
@@ -36,17 +36,15 @@ class XNLI_CN(DatasetBuilder):
 
     URL = "https://bj.bcebos.com/paddlenlp/datasets/xnli_cn.tar.gz"
     MD5 = "aaf6de381a2553d61d8e6fad4ba96499"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5"))
     SPLITS = {
-        'train':
-        META_INFO(os.path.join('xnli_cn.tar', 'xnli_cn', 'train', 'part-0'),
-                  'b0e4df29af8413eb935a2204de8958b7'),
-        'dev':
-        META_INFO(os.path.join('xnli_cn.tar', 'xnli_cn', 'dev', 'part-0'),
-                  '401a2178e15f4b0c35812ab4a322bd94'),
-        'test':
-        META_INFO(os.path.join('xnli_cn.tar', 'xnli_cn', 'test', 'part-0'),
-                  '71b043be8207e54185e761fca00ba3d7'),
+        "train": META_INFO(
+            os.path.join("xnli_cn.tar", "xnli_cn", "train", "part-0"), "b0e4df29af8413eb935a2204de8958b7"
+        ),
+        "dev": META_INFO(os.path.join("xnli_cn.tar", "xnli_cn", "dev", "part-0"), "401a2178e15f4b0c35812ab4a322bd94"),
+        "test": META_INFO(
+            os.path.join("xnli_cn.tar", "xnli_cn", "test", "part-0"), "71b043be8207e54185e761fca00ba3d7"
+        ),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -54,42 +52,29 @@ class XNLI_CN(DatasetBuilder):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
     def _read(self, filename, split):
         """Reads data."""
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(filename, "r", encoding="utf-8") as f:
             head = None
             for line in f:
                 data = line.strip().split("\t")
                 if not head:
                     head = data
                 else:
-                    if split == 'train':
+                    if split == "train":
                         text_a, text_b, label = data
-                        yield {
-                            "text_a": text_a,
-                            "text_b": text_b,
-                            "label": label
-                        }
-                    elif split == 'dev':
+                        yield {"text_a": text_a, "text_b": text_b, "label": label}
+                    elif split == "dev":
                         text_a, text_b, label = data
-                        yield {
-                            "text_a": text_a,
-                            "text_b": text_b,
-                            "label": label
-                        }
-                    elif split == 'test':
+                        yield {"text_a": text_a, "text_b": text_b, "label": label}
+                    elif split == "test":
                         text_a, text_b, label = data
-                        yield {
-                            "text_a": text_a,
-                            "text_b": text_b,
-                            "label": label
-                        }
+                        yield {"text_a": text_a, "text_b": text_b, "label": label}
 
     def get_labels(self):
         """

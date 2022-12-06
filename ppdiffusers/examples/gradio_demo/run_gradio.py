@@ -28,34 +28,32 @@ def infer(prompt):
 
 
 with block as demo:
-    gr.Markdown(
-        "<h1><center>PaddleNLP version of Stable Diffusion</center></h1>")
+    gr.Markdown("<h1><center>PaddleNLP version of Stable Diffusion</center></h1>")
 
     with gr.Group():
         with gr.Box():
             with gr.Row().style(mobile_collapse=False, equal_height=True):
 
-                text = gr.Textbox(label="Enter your prompt",
-                                  show_label=False,
-                                  max_lines=1).style(
-                                      border=(True, False, True, True),
-                                      rounded=(True, False, False, True),
-                                      container=False,
-                                  )
+                text = gr.Textbox(label="Enter your prompt", show_label=False, max_lines=1).style(
+                    border=(True, False, True, True),
+                    rounded=(True, False, False, True),
+                    container=False,
+                )
                 btn = gr.Button("Run").style(
                     margin=False,
                     rounded=(False, True, True, False),
                 )
 
-        gallery = gr.Gallery(label="Generated images",
-                             show_label=False).style(grid=[2], height="auto")
+        gallery = gr.Gallery(label="Generated images", show_label=False).style(grid=[2], height="auto")
         text.submit(infer, inputs=[text], outputs=gallery)
         btn.click(infer, inputs=[text], outputs=gallery)
 
-    gr.Markdown("""___
+    gr.Markdown(
+        """___
         <p style='text-align: center'>
         Created by https://huggingface.co/CompVis/stable-diffusion-v1-4
         <br/>
-        </p>""")
+        </p>"""
+    )
 
 demo.launch(debug=True, server_port=8235, server_name="0.0.0.0", share=True)

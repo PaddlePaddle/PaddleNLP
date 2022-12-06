@@ -43,7 +43,6 @@ from paddlenlp.transformers import CLIPTextModel, AutoTokenizer, BertModel
 
 
 class Lambda(BaseTransform):
-
     def __init__(self, fn, keys=None):
         super().__init__(keys)
         self.fn = fn
@@ -55,9 +54,11 @@ class Lambda(BaseTransform):
 def get_writer(args):
     if args.writer_type == "visualdl":
         from visualdl import LogWriter
+
         writer = LogWriter(logdir=args.logging_dir)
     elif args.writer_type == "tensorboard":
         from tensorboardX import SummaryWriter
+
         writer = SummaryWriter(logdir=args.logging_dir)
     else:
         raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
@@ -65,93 +66,84 @@ def get_writer(args):
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(
-        description="Simple example of a training a text to image model script."
-    )
+    parser = argparse.ArgumentParser(description="Simple example of a training a text to image model script.")
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
         default="CompVis/stable-diffusion-v1-4",
         required=True,
-        help=
-        "Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
         "--dataset_name",
         type=str,
         default=None,
-        help=
-        ("The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
-         " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
-         " or to a folder containing files that 🤗 Datasets can understand."),
+        help=(
+            "The name of the Dataset (from the HuggingFace hub) to train on (could be your own, possibly private,"
+            " dataset). It can also be a path pointing to a local copy of a dataset in your filesystem,"
+            " or to a folder containing files that 🤗 Datasets can understand."
+        ),
     )
     parser.add_argument(
         "--dataset_config_name",
         type=str,
         default=None,
-        help=
-        "The config of the Dataset, leave as None if there's only one config.",
+        help="The config of the Dataset, leave as None if there's only one config.",
     )
     parser.add_argument(
         "--train_data_dir",
         type=str,
         default=None,
-        help=
-        ("A folder containing the training data. Folder contents must follow the structure described in"
-         " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
-         " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
-         ),
+        help=(
+            "A folder containing the training data. Folder contents must follow the structure described in"
+            " https://huggingface.co/docs/datasets/image_dataset#imagefolder. In particular, a `metadata.jsonl` file"
+            " must exist to provide the captions for the images. Ignored if `dataset_name` is specified."
+        ),
     )
-    parser.add_argument("--image_column",
-                        type=str,
-                        default="image",
-                        help="The column of the dataset containing an image.")
+    parser.add_argument(
+        "--image_column", type=str, default="image", help="The column of the dataset containing an image."
+    )
     parser.add_argument(
         "--caption_column",
         type=str,
         default="text",
-        help=
-        "The column of the dataset containing a caption or a list of captions.",
+        help="The column of the dataset containing a caption or a list of captions.",
     )
     parser.add_argument(
         "--max_train_samples",
         type=int,
         default=None,
-        help=
-        ("For debugging purposes or quicker training, truncate the number of training examples to this "
-         "value if set."),
+        help=(
+            "For debugging purposes or quicker training, truncate the number of training examples to this "
+            "value if set."
+        ),
     )
     parser.add_argument(
         "--output_dir",
         type=str,
         default="sd-model-finetuned",
-        help=
-        "The output directory where the model predictions and checkpoints will be written.",
+        help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--cache_dir",
         type=str,
         default=None,
-        help=
-        "The directory where the downloaded models and datasets will be stored.",
+        help="The directory where the downloaded models and datasets will be stored.",
     )
-    parser.add_argument("--seed",
-                        type=int,
-                        default=None,
-                        help="A seed for reproducible training.")
+    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
     parser.add_argument(
         "--resolution",
         type=int,
         default=512,
-        help=
-        ("The resolution for input images, all the images in the train/validation dataset will be resized to this"
-         " resolution"),
+        help=(
+            "The resolution for input images, all the images in the train/validation dataset will be resized to this"
+            " resolution"
+        ),
     )
     parser.add_argument(
         "--center_crop",
         action="store_true",
-        help=
-        "Whether to center crop images before resizing to resolution (if not set, random crop will be used)",
+        help="Whether to center crop images before resizing to resolution (if not set, random crop will be used)",
     )
     parser.add_argument(
         "--random_flip",
@@ -159,30 +151,25 @@ def parse_args():
         help="whether to randomly flip images horizontally",
     )
     parser.add_argument(
-        "--train_batch_size",
-        type=int,
-        default=16,
-        help="Batch size (per device) for the training dataloader.")
+        "--train_batch_size", type=int, default=16, help="Batch size (per device) for the training dataloader."
+    )
     parser.add_argument("--num_train_epochs", type=int, default=100)
     parser.add_argument(
         "--max_train_steps",
         type=int,
         default=None,
-        help=
-        "Total number of training steps to perform.  If provided, overrides num_train_epochs.",
+        help="Total number of training steps to perform.  If provided, overrides num_train_epochs.",
     )
     parser.add_argument(
         "--gradient_accumulation_steps",
         type=int,
         default=1,
-        help=
-        "Number of updates steps to accumulate before performing a backward/update pass.",
+        help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
         "--gradient_checkpointing",
         action="store_true",
-        help=
-        "Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
+        help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
     )
     parser.add_argument(
         "--learning_rate",
@@ -194,60 +181,40 @@ def parse_args():
         "--scale_lr",
         action="store_true",
         default=False,
-        help=
-        "Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
+        help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
     )
     parser.add_argument(
         "--lr_scheduler",
         type=str,
         default="constant",
-        help=
-        ('The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
-         ' "constant", "constant_with_warmup"]'),
+        help=(
+            'The scheduler type to use. Choose between ["linear", "cosine", "cosine_with_restarts", "polynomial",'
+            ' "constant", "constant_with_warmup"]'
+        ),
     )
     parser.add_argument(
-        "--lr_warmup_steps",
-        type=int,
-        default=500,
-        help="Number of steps for the warmup in the lr scheduler.")
+        "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
+    )
 
-    parser.add_argument("--use_ema",
-                        action="store_true",
-                        help="Whether to use EMA model.")
-    parser.add_argument("--adam_beta1",
-                        type=float,
-                        default=0.9,
-                        help="The beta1 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_beta2",
-                        type=float,
-                        default=0.999,
-                        help="The beta2 parameter for the Adam optimizer.")
-    parser.add_argument("--adam_weight_decay",
-                        type=float,
-                        default=1e-2,
-                        help="Weight decay to use.")
-    parser.add_argument("--adam_epsilon",
-                        type=float,
-                        default=1e-08,
-                        help="Epsilon value for the Adam optimizer")
-    parser.add_argument("--max_grad_norm",
-                        default=1.0,
-                        type=float,
-                        help="Max gradient norm.")
+    parser.add_argument("--use_ema", action="store_true", help="Whether to use EMA model.")
+    parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
+    parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
+    parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
+    parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
+    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
 
     parser.add_argument(
         "--logging_dir",
         type=str,
         default="logs",
-        help=
-        ("[TensorBoard](https://www.tensorflow.org/tensorboard) or [VisualDL](https://www.paddlepaddle.org.cn/paddle/visualdl) log directory. Will default to"
-         "*output_dir/logs"),
+        help=(
+            "[TensorBoard](https://www.tensorflow.org/tensorboard) or [VisualDL](https://www.paddlepaddle.org.cn/paddle/visualdl) log directory. Will default to"
+            "*output_dir/logs"
+        ),
     )
-    parser.add_argument("--writer_type",
-                        type=str,
-                        default="visualdl",
-                        choices=["tensorboard", "visualdl"],
-                        help="Log writer type.")
+    parser.add_argument(
+        "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
+    )
 
     args = parser.parse_args()
 
@@ -330,19 +297,15 @@ def main():
         os.makedirs(args.output_dir, exist_ok=True)
 
     # Load models and create wrapper for stable diffusion
-    tokenizer = AutoTokenizer.from_pretrained(
-        os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
+    tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
 
     if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
         model_cls = BertModel
     else:
         model_cls = CLIPTextModel
-    text_encoder = model_cls.from_pretrained(
-        os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
-    vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path,
-                                        subfolder="vae")
-    unet = UNet2DConditionModel.from_pretrained(
-        args.pretrained_model_name_or_path, subfolder="unet")
+    text_encoder = model_cls.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
+    vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae")
+    unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
 
     # Freeze vae and text_encoder
     freeze_params(vae.parameters())
@@ -352,35 +315,33 @@ def main():
         unet.enable_gradient_checkpointing()
 
     if args.scale_lr:
-        args.learning_rate = (args.learning_rate *
-                              args.gradient_accumulation_steps *
-                              args.train_batch_size * num_processes)
+        args.learning_rate = (
+            args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * num_processes
+        )
 
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         learning_rate=args.learning_rate,
-        num_warmup_steps=args.lr_warmup_steps *
-        args.gradient_accumulation_steps,
-        num_training_steps=args.max_train_steps *
-        args.gradient_accumulation_steps,
+        num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
+        num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
     )
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
 
     # Initialize the optimizer
-    optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=unet.parameters(),
-                      beta1=args.adam_beta1,
-                      beta2=args.adam_beta2,
-                      weight_decay=args.adam_weight_decay,
-                      epsilon=args.adam_epsilon,
-                      grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm)
-                      if args.max_grad_norm is not None else None)
+    optimizer = AdamW(
+        learning_rate=lr_scheduler,
+        parameters=unet.parameters(),
+        beta1=args.adam_beta1,
+        beta2=args.adam_beta2,
+        weight_decay=args.adam_weight_decay,
+        epsilon=args.adam_epsilon,
+        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm is not None else None,
+    )
 
-    noise_scheduler = DDPMScheduler(beta_start=0.00085,
-                                    beta_end=0.012,
-                                    beta_schedule="scaled_linear",
-                                    num_train_timesteps=1000)
+    noise_scheduler = DDPMScheduler(
+        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
+    )
 
     # Get the datasets: you can either provide your own training and evaluation files (see below)
     # or specify a Dataset from the hub (the dataset will be downloaded automatically from the datasets Hub).
@@ -413,8 +374,7 @@ def main():
     # 6. Get the column names for input/target.
     dataset_columns = dataset_name_mapping.get(args.dataset_name, None)
     if args.image_column is None:
-        image_column = dataset_columns[
-            0] if dataset_columns is not None else column_names[0]
+        image_column = dataset_columns[0] if dataset_columns is not None else column_names[0]
     else:
         image_column = args.image_column
         if image_column not in column_names:
@@ -422,8 +382,7 @@ def main():
                 f"--image_column' value '{args.image_column}' needs to be one of: {', '.join(column_names)}"
             )
     if args.caption_column is None:
-        caption_column = dataset_columns[
-            1] if dataset_columns is not None else column_names[1]
+        caption_column = dataset_columns[1] if dataset_columns is not None else column_names[1]
     else:
         caption_column = args.caption_column
         if caption_column not in column_names:
@@ -440,29 +399,29 @@ def main():
                 captions.append(caption)
             elif isinstance(caption, (list, np.ndarray)):
                 # take a random caption if there are multiple
-                captions.append(
-                    random.choice(caption) if is_train else caption[0])
+                captions.append(random.choice(caption) if is_train else caption[0])
             else:
                 raise ValueError(
                     f"Caption column `{caption_column}` should contain either strings or lists of strings."
                 )
-        inputs = tokenizer(captions,
-                           max_length=tokenizer.model_max_length,
-                           padding="do_not_pad",
-                           truncation=True,
-                           return_attention_mask=False)
+        inputs = tokenizer(
+            captions,
+            max_length=tokenizer.model_max_length,
+            padding="do_not_pad",
+            truncation=True,
+            return_attention_mask=False,
+        )
         return inputs.input_ids
 
-    train_transforms = transforms.Compose([
-        transforms.Resize((args.resolution, args.resolution),
-                          interpolation="bilinear"),
-        transforms.CenterCrop(args.resolution)
-        if args.center_crop else transforms.RandomCrop(args.resolution),
-        transforms.RandomHorizontalFlip()
-        if args.random_flip else Lambda(lambda x: x),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5]),
-    ])
+    train_transforms = transforms.Compose(
+        [
+            transforms.Resize((args.resolution, args.resolution), interpolation="bilinear"),
+            transforms.CenterCrop(args.resolution) if args.center_crop else transforms.RandomCrop(args.resolution),
+            transforms.RandomHorizontalFlip() if args.random_flip else Lambda(lambda x: x),
+            transforms.ToTensor(),
+            transforms.Normalize([0.5], [0.5]),
+        ]
+    )
 
     def preprocess_train(examples):
         images = [image.convert("RGB") for image in examples[image_column]]
@@ -473,37 +432,32 @@ def main():
 
     with main_process_first():
         if args.max_train_samples is not None:
-            dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(
-                range(args.max_train_samples))
+            dataset["train"] = dataset["train"].shuffle(seed=args.seed).select(range(args.max_train_samples))
         # Set the training transforms
         train_dataset = dataset["train"].with_transform(preprocess_train)
 
     def collate_fn(examples):
-        pixel_values = paddle.stack(
-            [example["pixel_values"] for example in examples])
+        pixel_values = paddle.stack([example["pixel_values"] for example in examples])
         pixel_values = pixel_values.astype("float32")
         input_ids = [example["input_ids"] for example in examples]
-        padded_tokens = tokenizer.pad({"input_ids": input_ids},
-                                      padding="max_length",
-                                      max_length=tokenizer.model_max_length,
-                                      return_tensors="pd")
+        padded_tokens = tokenizer.pad(
+            {"input_ids": input_ids}, padding="max_length", max_length=tokenizer.model_max_length, return_tensors="pd"
+        )
         return {
             "pixel_values": pixel_values,
             "input_ids": padded_tokens.input_ids,
         }
 
-    train_sampler = DistributedBatchSampler(
-        train_dataset, batch_size=args.train_batch_size,
-        shuffle=True) if num_processes > 1 else BatchSampler(
-            train_dataset, batch_size=args.train_batch_size, shuffle=True)
-    train_dataloader = DataLoader(train_dataset,
-                                  batch_sampler=train_sampler,
-                                  collate_fn=collate_fn)
+    train_sampler = (
+        DistributedBatchSampler(train_dataset, batch_size=args.train_batch_size, shuffle=True)
+        if num_processes > 1
+        else BatchSampler(train_dataset, batch_size=args.train_batch_size, shuffle=True)
+    )
+    train_dataloader = DataLoader(train_dataset, batch_sampler=train_sampler, collate_fn=collate_fn)
 
     # Scheduler and math around the number of training steps.
     overrode_max_train_steps = False
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if args.max_train_steps is None:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
         overrode_max_train_steps = True
@@ -512,19 +466,17 @@ def main():
         ema_unet = EMAModel(unet.parameters())
 
     # We need to recalculate our total training steps as the size of the training dataloader may have changed.
-    num_update_steps_per_epoch = math.ceil(
-        len(train_dataloader) / args.gradient_accumulation_steps)
+    num_update_steps_per_epoch = math.ceil(len(train_dataloader) / args.gradient_accumulation_steps)
     if overrode_max_train_steps:
         args.max_train_steps = args.num_train_epochs * num_update_steps_per_epoch
     # Afterwards we recalculate our number of training epochs
-    args.num_train_epochs = math.ceil(args.max_train_steps /
-                                      num_update_steps_per_epoch)
+    args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
     if rank == 0:
-        logger.info('-----------  Configuration Arguments -----------')
+        logger.info("-----------  Configuration Arguments -----------")
         for arg, value in sorted(vars(args).items()):
-            logger.info('%s: %s' % (arg, value))
-        logger.info('------------------------------------------------')
+            logger.info("%s: %s" % (arg, value))
+        logger.info("------------------------------------------------")
         writer = get_writer(args)
 
     # Train!
@@ -533,13 +485,9 @@ def main():
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
     logger.info(f"  Num Epochs = {args.num_train_epochs}")
-    logger.info(
-        f"  Instantaneous batch size per device = {args.train_batch_size}")
-    logger.info(
-        f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}"
-    )
-    logger.info(
-        f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
+    logger.info(f"  Instantaneous batch size per device = {args.train_batch_size}")
+    logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
+    logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
 
     # Only show the progress bar once on each machine.
@@ -563,9 +511,7 @@ def main():
             noise = paddle.randn(latents.shape)
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
-            timesteps = paddle.randint(
-                0, noise_scheduler.config.num_train_timesteps,
-                (batch_size, )).astype("int64")
+            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).astype("int64")
 
             # Add noise to the latents according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
@@ -573,23 +519,21 @@ def main():
 
             # Get the text embedding for conditioning
             attention_mask = paddle.ones_like(batch["input_ids"])
-            encoder_hidden_states = text_encoder(
-                batch["input_ids"], attention_mask=attention_mask)[0]
+            encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
 
-            if num_processes > 1 and (args.gradient_checkpointing or (
-                (step + 1) % args.gradient_accumulation_steps != 0)):
+            if num_processes > 1 and (
+                args.gradient_checkpointing or ((step + 1) % args.gradient_accumulation_steps != 0)
+            ):
                 # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
                 # gradient_checkpointing, no_sync every where
                 # gradient_checkpointing + grad_acc, no_sync every where
                 ctx_manager = unet.no_sync()
             else:
-                ctx_manager = contextlib.nullcontext() if sys.version_info >= (
-                    3, 7) else contextlib.suppress()
+                ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
             with ctx_manager:
                 # Predict the noise residual and compute loss
-                noise_pred = unet(noisy_latents, timesteps,
-                                  encoder_hidden_states).sample
+                noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
                 loss = F.mse_loss(noise_pred, noise, reduction="mean")
 
                 train_loss += loss.item()
@@ -609,24 +553,18 @@ def main():
                 if args.use_ema:
                     ema_unet.step(unet.parameters())
                 logs = {
-                    "epoch":
-                    str(epoch).zfill(4),
-                    "train_loss":
-                    "{0:.10f}".format(train_loss),
-                    "step_loss":
-                    "{0:.10f}".format(loss.item() *
-                                      args.gradient_accumulation_steps),
-                    "lr":
-                    lr_scheduler.get_lr()
+                    "epoch": str(epoch).zfill(4),
+                    "train_loss": "{0:.10f}".format(train_loss),
+                    "step_loss": "{0:.10f}".format(loss.item() * args.gradient_accumulation_steps),
+                    "lr": lr_scheduler.get_lr(),
                 }
                 progress_bar.set_postfix(**logs)
                 train_loss = 0.0
                 if rank == 0:
                     for name, val in logs.items():
-                        if name == "epoch": continue
-                        writer.add_scalar(f"train/{name}",
-                                          val,
-                                          step=global_step)
+                        if name == "epoch":
+                            continue
+                        writer.add_scalar(f"train/{name}", val, step=global_step)
 
             if global_step >= args.max_train_steps:
                 break
