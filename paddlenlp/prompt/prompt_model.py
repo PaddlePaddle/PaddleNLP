@@ -12,17 +12,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle.nn as nn
 
+from typing import Any, Dict, Optional
+
+import paddle
+
+from ..transformers.model_outputs import SequenceClassifierOutput
 from .prompt_utils import signature
+from .template import Template
+from .verbalizer import Verbalizer
 
 
-class PromptModelForSequenceClassification(nn.Layer):
+class PromptModelForSequenceClassification(paddle.nn.Layer):
     """
     PromptModel for classification tasks.
     """
 
-    def __init__(self, model, template, verbalizer=None, freeze_plm: bool = False, freeze_dropout: bool = False):
+    def __init__(
+        self,
+        model: paddle.nn.Layer,
+        template: Template,
+        verbalizer: Optional[Verbalizer] = None,
+        freeze_plm: bool = False,
+        freeze_dropout: bool = False,
+    ):
         super(PromptModelForSequenceClassification, self).__init__()
         self.plm = model
         self.template = template
@@ -40,15 +53,18 @@ class PromptModelForSequenceClassification(nn.Layer):
 
     def forward(
         self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        masked_positions=None,
-        soft_token_ids=None,
-        encoder_ids=None,
-        **kwargs
+        input_ids: paddle.Tensor,
+        token_type_ids: Optional[paddle.Tensor] = None,
+        position_ids: Optional[paddle.Tensor] = None,
+        attention_mask: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
+        masked_positions: Optional[paddle.Tensor] = None,
+        soft_token_ids: Optional[paddle.Tensor] = None,
+        encoder_ids: Optional[paddle.Tensor] = None,
+        return_dict: Optional[bool] = None,
+        **kwargs: Dict[str, Any]
     ):
+        return_dict = return_dict if return_dict is not None else False
         input_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -62,16 +78,36 @@ class PromptModelForSequenceClassification(nn.Layer):
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
         if "masked_positions" in model_inputs:
             model_inputs.pop("masked_positions")
-        outputs = self.plm(**model_inputs)
+        hidden_states = self.plm(**model_inputs)
         if self.verbalizer is not None:
-            label_outputs = self.verbalizer.process_outputs(outputs, input_dict["masked_positions"])
+            logits = self.verbalizer.process_outputs(hidden_states, input_dict["masked_positions"])
         else:
-            label_outputs = outputs
+            logits = hidden_states
 
-        if kwargs.pop("return_hidden_states", False):
-            return label_outputs, outputs
-        else:
-            return label_outputs
+        loss = None
+        if labels is not None:
+            if self.verbalizer is None:
+                raise ValueError("Verbalizer must be specified when labels are provided")
+            num_labels = len(self.verbalizer.label_words)
+            if num_labels == 1:
+                loss_fct = paddle.nn.MSELoss()
+                loss = loss_fct(logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = paddle.nn.CrossEntropyLoss()
+                loss = loss_fct(logits.reshape((-1, num_labels)), labels.reshape((-1,)))
+            else:
+                loss_fct = paddle.nn.BCEWithLogitsLoss()
+                loss = loss_fct(logits, labels)
+
+        if not return_dict:
+            output = (logits, hidden_states)
+            return ((loss,) + output) if loss is not None else output
+
+        return SequenceClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=hidden_states,
+        )
 
     def prompt_parameters(self):
         """
