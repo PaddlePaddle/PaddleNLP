@@ -163,7 +163,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             auto_trainer.train(
                 train_ds,
                 dev_ds,
-                preset="test",
+                preset="finetune_test",
                 num_cpus=1,
                 num_gpus=0,
                 max_concurrent_trials=1,

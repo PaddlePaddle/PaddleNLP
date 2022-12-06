@@ -17,6 +17,7 @@ from typing import Any, Callable, Dict, List
 
 import numpy as np
 import paddle
+from hyperopt import hp
 from paddle.io import Dataset
 from scipy.special import expit as sigmoid
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
@@ -90,6 +91,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
             save_strategy="epoch",
+            save_total_limit=1,
         )
 
     @property
@@ -106,34 +108,57 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             load_best_model_at_end=True,
             evaluation_strategy="epoch",
             save_strategy="epoch",
+            save_total_limit=1,
         )
 
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
         return [
             {
-                "preset": "finetune_test",
+                "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
                 "PreprocessArguments.max_length": 128,
-                "EarlyStoppingCallback.early_stopping_patience": 1,
-                "TrainingArguments.per_device_train_batch_size": 2,
-                "TrainingArguments.per_device_eval_batch_size": 2,
+                "EarlyStoppingCallback.early_stopping_patience": 2,
+                "TrainingArguments.per_device_train_batch_size": 16,
+                "TrainingArguments.per_device_eval_batch_size": 16,
+                "TrainingArguments.num_train_epochs": 10,
+                "TrainingArguments.model_name_or_path": "ernie-3.0-base-zh",
+                "TrainingArguments.learning_rate": 1e-5,
+            },
+            {
+                "preset": "prompt",
+                "language": "Chinese",
+                "trainer_type": "PromptTrainer",
+                "template.prompt": hp.choice(
+                    "template.prompt",
+                    [
+                        f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
+                        f"“{{'text': '{self.text_column}'}}”这句话是关于{{'mask'}}的",
+                    ],
+                ),
+                "PreprocessArguments.max_length": 128,
+                "EarlyStoppingCallback.early_stopping_patience": 2,
+                "PromptTuningArguments.per_device_train_batch_size": 16,
+                "PromptTuningArguments.per_device_eval_batch_size": 16,
+                "PromptTuningArguments.num_train_epochs": 10,
+                "PromptTuningArguments.model_name_or_path": "ernie-3.0-base-zh",
+                "PromptTuningArguments.learning_rate": 1e-5,
+            },
+            {
+                "preset": "finetune_test",
+                "language": "Chinese",
+                "trainer_type": "Trainer",
                 "TrainingArguments.max_steps": 5,
                 "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                "TrainingArguments.learning_rate": 1e-5,
             },
             {
                 "preset": "prompt_test",
                 "language": "Chinese",
                 "trainer_type": "PromptTrainer",
-                "PreprocessArguments.max_length": 128,
-                "EarlyStoppingCallback.early_stopping_patience": 1,
-                "TrainingArguments.per_device_train_batch_size": 2,
-                "TrainingArguments.per_device_eval_batch_size": 2,
-                "TrainingArguments.max_steps": 5,
-                "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                "TrainingArguments.learning_rate": 1e-5,
+                "template.prompt": f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
+                "PromptTuningArguments.max_steps": 5,
+                "PromptTuningArguments.model_name_or_path": "ernie-3.0-nano-zh",
             },
         ]
 
@@ -160,12 +185,18 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         def trainable(config):
             config = config["candidates"]
-            model_path = config["TrainingArguments.model_name_or_path"]
-            max_length = config["PreprocessArguments.max_length"]
-            early_stop_patience = config["EarlyStoppingCallback.early_stopping_patience"]
-            tokenizer = AutoTokenizer.from_pretrained(model_path)
-            callbacks = [EarlyStoppingCallback(early_stopping_patience=early_stop_patience)]
+            max_length = config.get("PreprocessArguments.max_length", 128)
+            if "EarlyStoppingCallback.early_stopping_patience" in config:
+                callbacks = [
+                    EarlyStoppingCallback(
+                        early_stopping_patience=config["EarlyStoppingCallback.early_stopping_patience"]
+                    )
+                ]
+            else:
+                callbacks = None
             if config["trainer_type"] == "Trainer":
+                model_path = config["TrainingArguments.model_name_or_path"]
+                tokenizer = AutoTokenizer.from_pretrained(model_path)
                 trans_func = functools.partial(
                     self._preprocess_fn,
                     tokenizer=tokenizer,
@@ -173,14 +204,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 )
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
-                problem_type = (
-                    "multi_label_classification"
-                    if self.problem_type == "multi_label"
-                    else "single_label_classification"
-                )
-                model = AutoModelForSequenceClassification.from_pretrained(
-                    model_path, num_classes=len(self.id2label), problem_type=problem_type
-                )
+                model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
                 training_args = self._override_arguments(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
@@ -197,12 +221,13 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             elif config["trainer_type"] == "PromptTrainer":
+                model_path = config["PromptTuningArguments.model_name_or_path"]
+                tokenizer = AutoTokenizer.from_pretrained(model_path)
                 processed_train_dataset = train_dataset.map(self._preprocess_labels, lazy=False)
                 processed_eval_dataset = eval_dataset.map(self._preprocess_labels, lazy=False)
                 model = AutoModelForMaskedLM.from_pretrained(model_path)
                 template = AutoTemplate.create_from(
-                    # double the '{', '}' brackets to escape them and make f-string happy
-                    prompt=f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
+                    prompt=config["template.prompt"],
                     tokenizer=tokenizer,
                     max_length=max_length,
                     model=model,
@@ -216,11 +241,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     freeze_plm=training_args.freeze_plm,
                     freeze_dropout=training_args.freeze_dropout,
                 )
+                if self.problem_type == "multi_class":
+                    criterion = paddle.nn.CrossEntropyLoss()
+                else:  # multi_label
+                    criterion = paddle.nn.BCEWithLogitsLoss()
                 trainer = PromptTrainer(
                     model=prompt_model,
                     tokenizer=tokenizer,
                     args=training_args,
-                    criterion=paddle.nn.CrossEntropyLoss(),
+                    criterion=criterion,
                     train_dataset=processed_train_dataset,
                     eval_dataset=processed_eval_dataset,
                     callbacks=callbacks,
@@ -231,7 +260,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             else:
-                raise ValueError("Exception!")
+                raise ValueError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
 
         return trainable
 
@@ -291,12 +320,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         result = tokenizer(text=example[self.text_column], max_length=max_length)
         if not is_test:
-            if self.problem_type == "multi_class":
-                result["labels"] = paddle.to_tensor([self.label2id[example[self.label_column]]], dtype="int64")
-            # multi_label
-            else:
-                labels = [1.0 if i in example[self.label_column] else 0.0 for i in self.label2id]
-                result["labels"] = paddle.to_tensor(labels, dtype="float32")
+            example_with_labels = self._preprocess_labels(example)
+            result["labels"] = example_with_labels["labels"]
         return result
 
     def export(self, export_path, trial_id=None):
@@ -309,11 +334,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def to_taskflow(self, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
+        print()
         model_config = model_result.metrics["config"]["candidates"]
         saved_model_path = os.path.join(model_result.log_dir, "trained_model")
         return Taskflow(
             "text_classification",
             task_path=saved_model_path,
             id2label=self.id2label,
-            max_length=model_config["PreprocessArguments.max_length"],
+            max_length=model_config.get("PreprocessArguments.max_length", 128),
         )
