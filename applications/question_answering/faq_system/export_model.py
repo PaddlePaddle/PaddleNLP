@@ -39,7 +39,7 @@ if __name__ == "__main__":
 
     pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     model = SimCSE(pretrained_model, output_emb_size=output_emb_size)
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -52,11 +52,10 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64")  # segment_ids
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        ],
+    )
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

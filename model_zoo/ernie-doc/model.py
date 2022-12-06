@@ -18,33 +18,33 @@ import paddle.nn.functional as F
 
 
 class ErnieDocForTextMatching(nn.Layer):
-
     def __init__(self, ernie_doc, num_classes=2, dropout=None):
         super().__init__()
         self.ernie_doc = ernie_doc
         self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(ernie_doc.config["hidden_size"],
-                                    num_classes)
+        self.classifier = nn.Linear(ernie_doc.config["hidden_size"], num_classes)
 
-    def forward(self,
-                query_input_ids,
-                title_input_ids,
-                query_memories,
-                title_memories,
-                query_token_type_ids=None,
-                query_position_ids=None,
-                query_attention_mask=None,
-                title_token_type_ids=None,
-                title_position_ids=None,
-                title_attention_mask=None):
+    def forward(
+        self,
+        query_input_ids,
+        title_input_ids,
+        query_memories,
+        title_memories,
+        query_token_type_ids=None,
+        query_position_ids=None,
+        query_attention_mask=None,
+        title_token_type_ids=None,
+        title_position_ids=None,
+        title_attention_mask=None,
+    ):
 
         _, query_pooled_output, query_mem, = self.ernie_doc(
-            query_input_ids, query_memories, query_token_type_ids,
-            query_position_ids, query_attention_mask)
+            query_input_ids, query_memories, query_token_type_ids, query_position_ids, query_attention_mask
+        )
 
         _, title_pooled_output, title_mem = self.ernie_doc(
-            title_input_ids, title_memories, title_token_type_ids,
-            title_position_ids, title_attention_mask)
+            title_input_ids, title_memories, title_token_type_ids, title_position_ids, title_attention_mask
+        )
 
         diff_pooled_output = query_pooled_output - title_pooled_output
         diff_pooled_output = self.dropout(diff_pooled_output)

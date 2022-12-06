@@ -19,8 +19,9 @@ import paddle
 
 class AnswerExtractorPreprocessor(BaseComponent):
     """
-    Answer Extractor Preprocessor used to preprocess the result of textconvert. 
+    Answer Extractor Preprocessor used to preprocess the result of textconvert.
     """
+
     return_no_answers: bool
     outgoing_edges = 1
     query_count = 0
@@ -30,5 +31,5 @@ class AnswerExtractorPreprocessor(BaseComponent):
         paddle.set_device(device)
 
     def run(self, documents):
-        results = {"meta": [document['content'] for document in documents]}
+        results = {"meta": [document["content"] for document in documents]}
         return results, "output_1"

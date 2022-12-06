@@ -34,16 +34,16 @@ log = logging.getLogger(__name__)
 
 if six.PY3:
     import io
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8")
 
 
-def csv_reader(fd, delimiter='\t', trainer_id=0, trainer_num=1):
-
+def csv_reader(fd, delimiter="\t", trainer_id=0, trainer_num=1):
     def gen():
         for i, line in enumerate(fd):
             if i % trainer_num == trainer_id:
-                slots = line.rstrip('\n').split(delimiter)
+                slots = line.rstrip("\n").split(delimiter)
                 if len(slots) == 1:
                     yield slots,
                 else:
@@ -53,22 +53,22 @@ def csv_reader(fd, delimiter='\t', trainer_id=0, trainer_num=1):
 
 
 class BaseReader(object):
-
-    def __init__(self,
-                 vocab_path,
-                 label_map_config=None,
-                 max_seq_len=512,
-                 total_num=0,
-                 do_lower_case=True,
-                 in_tokens=False,
-                 is_inference=False,
-                 random_seed=None,
-                 tokenizer="FullTokenizer",
-                 for_cn=True,
-                 task_id=0):
+    def __init__(
+        self,
+        vocab_path,
+        label_map_config=None,
+        max_seq_len=512,
+        total_num=0,
+        do_lower_case=True,
+        in_tokens=False,
+        is_inference=False,
+        random_seed=None,
+        tokenizer="FullTokenizer",
+        for_cn=True,
+        task_id=0,
+    ):
         self.max_seq_len = max_seq_len
-        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path,
-                                                    do_lower_case=do_lower_case)
+        self.tokenizer = tokenization.FullTokenizer(vocab_file=vocab_path, do_lower_case=do_lower_case)
         self.vocab = self.tokenizer.vocab
         self.pad_id = self.vocab["[PAD]"]
         self.cls_id = self.vocab["[CLS]"]
@@ -86,7 +86,7 @@ class BaseReader(object):
         self.total_num = total_num
 
         if label_map_config:
-            with open(label_map_config, encoding='utf8') as f:
+            with open(label_map_config, encoding="utf8") as f:
                 self.label_map = json.load(f)
         else:
             self.label_map = None
@@ -97,10 +97,10 @@ class BaseReader(object):
 
     def _read_tsv(self, input_file, quotechar=None):
         """Reads a tab separated value file."""
-        with open(input_file, 'r', encoding='utf8') as f:
+        with open(input_file, "r", encoding="utf8") as f:
             reader = csv_reader(f)
             headers = next(reader)
-            Example = namedtuple('Example', headers)
+            Example = namedtuple("Example", headers)
 
             examples = []
             for line in reader:
@@ -180,30 +180,23 @@ class BaseReader(object):
         position_ids = list(range(len(token_ids)))
 
         if self.is_inference:
-            Record = namedtuple('Record',
-                                ['token_ids', 'text_type_ids', 'position_ids'])
-            record = Record(token_ids=token_ids,
-                            text_type_ids=text_type_ids,
-                            position_ids=position_ids)
+            Record = namedtuple("Record", ["token_ids", "text_type_ids", "position_ids"])
+            record = Record(token_ids=token_ids, text_type_ids=text_type_ids, position_ids=position_ids)
         else:
             if self.label_map:
                 label_id = self.label_map[example.label]
             else:
                 label_id = example.label
 
-            Record = namedtuple('Record', [
-                'token_ids', 'text_type_ids', 'position_ids', 'label_id', 'qid'
-            ])
+            Record = namedtuple("Record", ["token_ids", "text_type_ids", "position_ids", "label_id", "qid"])
 
             qid = None
             if "qid" in example._fields:
                 qid = example.qid
 
-            record = Record(token_ids=token_ids,
-                            text_type_ids=text_type_ids,
-                            position_ids=position_ids,
-                            label_id=label_id,
-                            qid=qid)
+            record = Record(
+                token_ids=token_ids, text_type_ids=text_type_ids, position_ids=position_ids, label_id=label_id, qid=qid
+            )
         return record
 
     def _prepare_batch_data(self, examples, batch_size, phase=None):
@@ -212,8 +205,7 @@ class BaseReader(object):
         for index, example in enumerate(examples):
             if phase == "train":
                 self.current_example = index
-            record = self._convert_example_to_record(example, self.max_seq_len,
-                                                     self.tokenizer)
+            record = self._convert_example_to_record(example, self.max_seq_len, self.tokenizer)
             max_len = max(max_len, len(record.token_ids))
             if self.in_tokens:
                 to_append = (len(batch_records) + 1) * max_len <= batch_size
@@ -233,25 +225,18 @@ class BaseReader(object):
         #        return len(examples)
         return self.num_examples
 
-    def data_generator(self,
-                       input_file,
-                       batch_size,
-                       epoch,
-                       dev_count=1,
-                       trainer_id=0,
-                       trainer_num=1,
-                       shuffle=True,
-                       phase=None):
+    def data_generator(
+        self, input_file, batch_size, epoch, dev_count=1, trainer_id=0, trainer_num=1, shuffle=True, phase=None
+    ):
 
-        if phase == 'train':
+        if phase == "train":
             #            examples = examples[trainer_id: (len(examples) //trainer_num) * trainer_num : trainer_num]
             self.num_examples_per_node = self.total_num // trainer_num
             self.num_examples = self.num_examples_per_node * trainer_num
-            examples = self._read_tsv(input_file,
-                                      trainer_id=trainer_id,
-                                      trainer_num=trainer_num,
-                                      num_examples=self.num_examples_per_node)
-            log.info('apply sharding %d/%d' % (trainer_id, trainer_num))
+            examples = self._read_tsv(
+                input_file, trainer_id=trainer_id, trainer_num=trainer_num, num_examples=self.num_examples_per_node
+            )
+            log.info("apply sharding %d/%d" % (trainer_id, trainer_num))
         else:
             examples = self._read_tsv(input_file)
 
@@ -264,9 +249,7 @@ class BaseReader(object):
                 if shuffle:
                     np.random.shuffle(examples)
 
-                for batch_data in self._prepare_batch_data(examples,
-                                                           batch_size,
-                                                           phase=phase):
+                for batch_data in self._prepare_batch_data(examples, batch_size, phase=phase):
                     if len(all_dev_batches) < dev_count:
                         all_dev_batches.append(batch_data)
                     if len(all_dev_batches) == dev_count:
@@ -280,30 +263,21 @@ class BaseReader(object):
                     yield i
             except Exception as e:
                 import traceback
+
                 traceback.print_exc()
 
         return f
 
 
 class ClassifyReader(BaseReader):
-
-    def _read_tsv(self,
-                  input_file,
-                  quotechar=None,
-                  trainer_id=0,
-                  trainer_num=1,
-                  num_examples=0):
+    def _read_tsv(self, input_file, quotechar=None, trainer_id=0, trainer_num=1, num_examples=0):
         """Reads a tab separated value file."""
-        with open(input_file, 'r', encoding='utf8') as f:
-            reader = csv_reader(f,
-                                trainer_id=trainer_id,
-                                trainer_num=trainer_num)
+        with open(input_file, "r", encoding="utf8") as f:
+            reader = csv_reader(f, trainer_id=trainer_id, trainer_num=trainer_num)
             #            headers = next(reader)
-            headers = 'query\ttitle\tpara\tlabel'.split('\t')
-            text_indices = [
-                index for index, h in enumerate(headers) if h != "label"
-            ]
-            Example = namedtuple('Example', headers)
+            headers = "query\ttitle\tpara\tlabel".split("\t")
+            text_indices = [index for index, h in enumerate(headers) if h != "label"]
+            Example = namedtuple("Example", headers)
 
             examples = []
             for cnt, line in enumerate(reader):
@@ -312,7 +286,7 @@ class ClassifyReader(BaseReader):
                 for index, text in enumerate(line):
                     if index in text_indices:
                         if self.for_cn:
-                            line[index] = text.replace(' ', '')
+                            line[index] = text.replace(" ", "")
                         else:
                             line[index] = text
                 example = Example(*line)
@@ -326,31 +300,21 @@ class ClassifyReader(BaseReader):
 
         if not self.is_inference:
             batch_labels = [record.label_id for record in batch_records]
-            batch_labels = np.array(batch_labels).astype("int64").reshape(
-                [-1, 1])
+            batch_labels = np.array(batch_labels).astype("int64").reshape([-1, 1])
 
             if batch_records[0].qid:
                 batch_qids = [record.qid for record in batch_records]
-                batch_qids = np.array(batch_qids).astype("int64").reshape(
-                    [-1, 1])
+                batch_qids = np.array(batch_qids).astype("int64").reshape([-1, 1])
             else:
                 batch_qids = np.array([]).astype("int64").reshape([-1, 1])
 
         # padding
-        padded_token_ids, input_mask = pad_batch_data(batch_token_ids,
-                                                      pad_idx=self.pad_id,
-                                                      return_input_mask=True)
-        padded_text_type_ids = pad_batch_data(batch_text_type_ids,
-                                              pad_idx=self.pad_id)
-        padded_position_ids = pad_batch_data(batch_position_ids,
-                                             pad_idx=self.pad_id)
-        padded_task_ids = np.ones_like(padded_token_ids,
-                                       dtype="int64") * self.task_id
+        padded_token_ids, input_mask = pad_batch_data(batch_token_ids, pad_idx=self.pad_id, return_input_mask=True)
+        padded_text_type_ids = pad_batch_data(batch_text_type_ids, pad_idx=self.pad_id)
+        padded_position_ids = pad_batch_data(batch_position_ids, pad_idx=self.pad_id)
+        padded_task_ids = np.ones_like(padded_token_ids, dtype="int64") * self.task_id
 
-        return_list = [
-            padded_token_ids, padded_text_type_ids, padded_position_ids,
-            padded_task_ids, input_mask
-        ]
+        return_list = [padded_token_ids, padded_text_type_ids, padded_position_ids, padded_task_ids, input_mask]
         if not self.is_inference:
             return_list += [batch_labels, batch_qids]
 

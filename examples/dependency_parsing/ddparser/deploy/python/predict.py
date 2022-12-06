@@ -54,7 +54,7 @@ def flat_words(words, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(words[idx:idx + l])
+        sequences.append(words[idx : idx + l])
         idx += l
     words = Pad(pad_val=pad_index)(sequences)
 
@@ -70,20 +70,16 @@ def decode(s_arc, s_rel, mask, tree=True):
     lens = np.sum(mask.astype(int), axis=-1)
     arc_preds = np.argmax(s_arc, axis=-1)
 
-    bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    bad = [not istree(seq[: i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc[bad], mask[bad])
 
     rel_preds = np.argmax(s_rel, axis=-1)
-    rel_preds = [
-        rel_pred[np.arange(len(arc_pred)), arc_pred]
-        for arc_pred, rel_pred in zip(arc_preds, rel_preds)
-    ]
+    rel_preds = [rel_pred[np.arange(len(arc_pred)), arc_pred] for arc_pred, rel_pred in zip(arc_preds, rel_preds)]
     return arc_preds, rel_preds
 
 
 class Predictor(object):
-
     def __init__(self, model_dir, device):
         model_file = model_dir + "/inference.pdmodel"
         params_file = model_dir + "/inference.pdiparams"
@@ -106,15 +102,9 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = [
-            self.predictor.get_output_handle(name)
-            for name in self.predictor.get_output_names()
-        ]
+        self.output_handle = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
 
     def predict(self, data, vocabs):
         word_vocab, _, rel_vocab = vocabs
@@ -134,10 +124,7 @@ class Predictor(object):
             )
             examples.append(example)
 
-        batches = [
-            examples[idx:idx + args.batch_size]
-            for idx in range(0, len(examples), args.batch_size)
-        ]
+        batches = [examples[idx : idx + args.batch_size] for idx in range(0, len(examples), args.batch_size)]
 
         arcs, rels = [], []
         for batch in batches:
@@ -151,8 +138,7 @@ class Predictor(object):
             words = self.output_handle[2].copy_to_cpu()
 
             mask = np.logical_and(
-                np.logical_and(words != word_pad_index,
-                               words != word_bos_index),
+                np.logical_and(words != word_pad_index, words != word_bos_index),
                 words != word_eos_index,
             )
 
@@ -178,12 +164,11 @@ if __name__ == "__main__":
 
     pred_arcs, pred_rels = predictor.predict(test_ds, vocabs)
 
-    with open(args.infer_output_file, 'w', encoding='utf-8') as out_file:
+    with open(args.infer_output_file, "w", encoding="utf-8") as out_file:
         for res, head, rel in zip(test_ds_copy, pred_arcs, pred_rels):
             res["HEAD"] = tuple(head)
             res["DEPREL"] = tuple(rel)
-            res = '\n'.join('\t'.join(map(str, line))
-                            for line in zip(*res.values())) + '\n'
+            res = "\n".join("\t".join(map(str, line)) for line in zip(*res.values())) + "\n"
             out_file.write("{}\n".format(res))
     out_file.close()
     print("Results saved!")

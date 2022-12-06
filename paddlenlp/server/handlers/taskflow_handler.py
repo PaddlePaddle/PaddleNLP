@@ -12,18 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from .base_handler import BaseTaskflowHandler
 
 
-class TaskflowHandler:
-
+class TaskflowHandler(BaseTaskflowHandler):
     def __init__(self):
-        self._name = 'taskflow_handler'
+        self._name = "taskflow_handler"
 
     @classmethod
     def process(cls, predictor, data, parameters):
         text = None
-        if 'text' in data:
-            text = data['text']
+        if "text" in data:
+            text = data["text"]
         if text is None:
             return {}
         return predictor(text)

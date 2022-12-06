@@ -21,35 +21,36 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['LCSTSNew']
+__all__ = ["LCSTSNew"]
 
 
 class LCSTSNew(DatasetBuilder):
-    '''
-    Large-scale Chinese Short Text Summarization(LCSTS) dataset is 
-    constructed by utilizing the naturally annotated web resources 
-    on Sina Weibo. For more information, please refer 
+    """
+    Large-scale Chinese Short Text Summarization(LCSTS) dataset is
+    constructed by utilizing the naturally annotated web resources
+    on Sina Weibo. For more information, please refer
     to `https://aclanthology.org/D15-1229.pdf`.
-    '''
+    """
 
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5", "URL"))
     SPLITS = {
-        'train':
-        META_INFO(
-            os.path.join('train.json'), '4e06fd1cfd5e7f0380499df8cbe17237',
-            'https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/train.json'),
-        'dev':
-        META_INFO(
-            os.path.join('dev.json'), '9c39d49d25d5296bdc537409208ddc85',
-            'https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/dev.json')
+        "train": META_INFO(
+            os.path.join("train.json"),
+            "4e06fd1cfd5e7f0380499df8cbe17237",
+            "https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/train.json",
+        ),
+        "dev": META_INFO(
+            os.path.join("dev.json"),
+            "9c39d49d25d5296bdc537409208ddc85",
+            "https://bj.bcebos.com/paddlenlp/datasets/LCSTS_new/dev.json",
+        ),
     }
 
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash, URL = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(URL, default_root)
 
         return fullname
@@ -62,8 +63,4 @@ class LCSTSNew(DatasetBuilder):
                     continue
                 json_data = json.loads(line)
 
-                yield {
-                    'source': json_data["content"],
-                    'target': json_data.get("summary", ''),
-                    'id': json_data['id']
-                }
+                yield {"source": json_data["content"], "target": json_data.get("summary", ""), "id": json_data["id"]}

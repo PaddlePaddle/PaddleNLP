@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 
 class DocOCRProcessor(BaseComponent):
     """
-    Preprocess document input from image/image url/image bytestream to ocr outputs 
+    Preprocess document input from image/image url/image bytestream to ocr outputs
     """
+
     return_no_answers: bool
     outgoing_edges = 1
     query_count = 0
@@ -46,11 +47,8 @@ class DocOCRProcessor(BaseComponent):
         :param lang: Choose ocr model processing langugae
         """
         self._lang = lang
-        self._use_gpu = False if paddle.get_device() == 'cpu' else use_gpu
-        self._ocr = PaddleOCR(use_angle_cls=True,
-                              show_log=False,
-                              use_gpu=self._use_gpu,
-                              lang=self._lang)
+        self._use_gpu = False if paddle.get_device() == "cpu" else use_gpu
+        self._ocr = PaddleOCR(use_angle_cls=True, show_log=False, use_gpu=self._use_gpu, lang=self._lang)
 
     def _check_input_text(self, inputs):
         if isinstance(inputs, dict):
@@ -67,53 +65,46 @@ class DocOCRProcessor(BaseComponent):
                     else:
                         if isinstance(example["doc"], str):
 
-                            if example["doc"].startswith("http://") or example[
-                                    "doc"].startswith("https://"):
-                                download_file("./",
-                                              example["doc"].rsplit("/", 1)[-1],
-                                              example["doc"])
+                            if example["doc"].startswith("http://") or example["doc"].startswith("https://"):
+                                download_file("./", example["doc"].rsplit("/", 1)[-1], example["doc"])
                                 data["doc"] = example["doc"].rsplit("/", 1)[-1]
                             elif os.path.isfile(example["doc"]):
                                 data["doc"] = example["doc"]
                             else:
-                                img = base64.b64decode(
-                                    example["doc"].encode('utf-8'))
-                                img = np.frombuffer(bytearray(img),
-                                                    dtype='uint8')
-                                img = np.array(
-                                    Image.open(BytesIO(img)).convert('RGB'))
+                                img = base64.b64decode(example["doc"].encode("utf-8"))
+                                img = np.frombuffer(bytearray(img), dtype="uint8")
+                                img = np.array(Image.open(BytesIO(img)).convert("RGB"))
                                 img = Image.fromarray(img)
                                 img.save("./tmp.jpg")
                                 data["doc"] = "./tmp.jpg"
                         else:
-                            raise ValueError(
-                                f"Incorrect path or url, URLs must start with `http://` or `https://`"
-                            )
+                            raise ValueError(f"Incorrect path or url, URLs must start with `http://` or `https://`")
                     if "prompt" not in example.keys():
-                        raise ValueError(
-                            "Invalid inputs, the inputs should contain the prompt."
-                        )
+                        raise ValueError("Invalid inputs, the inputs should contain the prompt.")
                     else:
                         if isinstance(example["prompt"], str):
                             data["prompt"] = [example["prompt"]]
                         elif isinstance(example["prompt"], list) and all(
-                                isinstance(s, str) for s in example["prompt"]):
+                            isinstance(s, str) for s in example["prompt"]
+                        ):
                             data["prompt"] = example["prompt"]
                         else:
-                            raise TypeError(
-                                "Incorrect prompt, prompt should be string or list of string."
-                            )
+                            raise TypeError("Incorrect prompt, prompt should be string or list of string.")
                     if "word_boxes" in example.keys():
                         data["word_boxes"] = example["word_boxes"]
                     input_list.append(data)
                 else:
                     raise TypeError(
-                        "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
-                        .format(type(example)))
+                        "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!".format(
+                            type(example)
+                        )
+                    )
         else:
             raise TypeError(
-                "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!"
-                .format(type(inputs)))
+                "Invalid inputs, input for document intelligence task should be dict or list of dict, but type of {} found!".format(
+                    type(inputs)
+                )
+            )
         return input_list
 
     def run(self, meta: dict):
@@ -123,7 +114,7 @@ class DocOCRProcessor(BaseComponent):
             ocr_result = example["word_boxes"]
             example["ocr_type"] = "word_boxes"
         else:
-            ocr_result = self._ocr.ocr(example['doc'], cls=True)
+            ocr_result = self._ocr.ocr(example["doc"], cls=True)
             example["ocr_type"] = "ppocr"
             # Compatible with paddleocr>=2.6.0.2
             ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result

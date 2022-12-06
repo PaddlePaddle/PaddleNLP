@@ -30,61 +30,62 @@ from .decoding import run_custom
 
 
 def infer_transformer_encoder(
-        input,
-        attn_mask,
-        q_weight,
-        q_bias,
-        k_weight,
-        k_bias,
-        v_weight,
-        v_bias,
-        attn_out_weight,
-        attn_out_bias,
-        norm1_weight,
-        norm1_bias,
-        norm2_weight,
-        norm2_bias,
-        ffn_inter_weight,
-        ffn_inter_bias,
-        ffn_out_weight,
-        ffn_out_bias,
-        #   sequence_id_offset,
-        #   trt_seqlen_offset,
-        #   amax_list,
-        n_head,
-        size_per_head,
-        n_layer=12,
-        use_gelu=True,
-        remove_padding=False,
-        int8_mode=0,
-        layer_idx=0,
-        allow_gemm_test=False,
-        use_trt_kernel=False,
-        normalize_before=False):
+    input,
+    attn_mask,
+    q_weight,
+    q_bias,
+    k_weight,
+    k_bias,
+    v_weight,
+    v_bias,
+    attn_out_weight,
+    attn_out_bias,
+    norm1_weight,
+    norm1_bias,
+    norm2_weight,
+    norm2_bias,
+    ffn_inter_weight,
+    ffn_inter_bias,
+    ffn_out_weight,
+    ffn_out_bias,
+    #   sequence_id_offset,
+    #   trt_seqlen_offset,
+    #   amax_list,
+    n_head,
+    size_per_head,
+    n_layer=12,
+    use_gelu=True,
+    remove_padding=False,
+    int8_mode=0,
+    layer_idx=0,
+    allow_gemm_test=False,
+    use_trt_kernel=False,
+    normalize_before=False,
+):
     """
     Fusion Encoder API intergrating Encoder inference in FasterTransformer. It
     accepts the weight and bias of TransformerEncoder and some other parameters
     for inference.
     """
     inputs_names = [
-        'Input',
-        'SelfAttnMask',
-        'SelfQueryWeight@VECTOR',
-        'SelfQueryBias@VECTOR',
-        'SelfKeyWeight@VECTOR',
-        'SelfKeyBias@VECTOR',
-        'SelfValueWeight@VECTOR',
-        'SelfValueBias@VECTOR',
-        'SelfAttnOutputWeight@VECTOR',
-        'SelfAttnOutputBias@VECTOR',
-        'SelfAttnOutputLayernormWeight@VECTOR',
-        'SelfAttnOutputLayernormBias@VECTOR',
-        'OutputLayernormWeight@VECTOR',
-        'OutputLayernormBias@VECTOR',
-        'FFNInterWeight@VECTOR',
-        'FFNInterBias@VECTOR',
-        'FFNOutputWeight@VECTOR',
-        'FFNOutputBias@VECTOR',
+        "Input",
+        "SelfAttnMask",
+        "SelfQueryWeight@VECTOR",
+        "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR",
+        "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR",
+        "SelfValueBias@VECTOR",
+        "SelfAttnOutputWeight@VECTOR",
+        "SelfAttnOutputBias@VECTOR",
+        "SelfAttnOutputLayernormWeight@VECTOR",
+        "SelfAttnOutputLayernormBias@VECTOR",
+        "OutputLayernormWeight@VECTOR",
+        "OutputLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR",
+        "FFNInterBias@VECTOR",
+        "FFNOutputWeight@VECTOR",
+        "FFNOutputBias@VECTOR",
         # 'SequenceIdOffset',
         # "TRTSeqLenOffset",
         # 'AmaxList'
@@ -115,30 +116,39 @@ def infer_transformer_encoder(
     ]
 
     attrs_names = [
-        'head_num', 'size_per_head', 'use_gelu', "remove_padding", 'int8_mode',
-        'num_layer', 'layer_idx', 'allow_gemm_test', 'use_trt_kernel',
-        'normalize_before'
+        "head_num",
+        "size_per_head",
+        "use_gelu",
+        "remove_padding",
+        "int8_mode",
+        "num_layer",
+        "layer_idx",
+        "allow_gemm_test",
+        "use_trt_kernel",
+        "normalize_before",
     ]
 
     attrs_val = [
-        n_head, size_per_head, use_gelu, remove_padding, int8_mode, n_layer,
-        layer_idx, allow_gemm_test, use_trt_kernel, normalize_before
+        n_head,
+        size_per_head,
+        use_gelu,
+        remove_padding,
+        int8_mode,
+        n_layer,
+        layer_idx,
+        allow_gemm_test,
+        use_trt_kernel,
+        normalize_before,
     ]
 
     outputs_names = ["EncoderOut"]
 
     outputs_dtype = [input[0].dtype]
 
-    return run_custom("fusion_encoder", inputs_names, inputs_var, attrs_names,
-                      attrs_val, outputs_names, outputs_dtype)
+    return run_custom("fusion_encoder", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype)
 
 
-def encoder_layer_forward(self,
-                          src,
-                          src_mask,
-                          cache=None,
-                          sequence_id_offset=None,
-                          trt_seq_len=None):
+def encoder_layer_forward(self, src, src_mask, cache=None, sequence_id_offset=None, trt_seq_len=None):
     """
     Redefines `forward` function of `paddle.nn.TransformerEncoderLayer` for
     integrating FasterTransformer for inference.
@@ -203,10 +213,11 @@ def encoder_layer_forward(self,
         # sequence_id_offset=paddle.to_tensor([]),
         # trt_seqlen_offset=paddle.to_tensor([]),
         # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
-        n_head=self._config['nhead'],
-        size_per_head=self._config['d_model'] // self._config['nhead'],
-        use_gelu=self._config['activation'] == 'gelu',
-        normalize_before=self._config['normalize_before'] == True)
+        n_head=self._config["nhead"],
+        size_per_head=self._config["d_model"] // self._config["nhead"],
+        use_gelu=self._config["activation"] == "gelu",
+        normalize_before=self._config["normalize_before"] == True,
+    )
 
     return src
 
@@ -296,7 +307,7 @@ def encoder_forward(self, src, src_mask=None, cache=None):
             self.ffn_out_weight.append(layer.linear2.weight)
             self.ffn_out_bias.append(layer.linear2.bias)
 
-    output, = infer_transformer_encoder(
+    (output,) = infer_transformer_encoder(
         input=[src],
         attn_mask=[src_mask],
         q_weight=self.q_weight,
@@ -318,11 +329,11 @@ def encoder_forward(self, src, src_mask=None, cache=None):
         # sequence_id_offset=paddle.to_tensor([]),
         # trt_seqlen_offset=paddle.to_tensor([]),
         # amax_list=paddle.to_tensor([]),  # int8 mode is not supported.
-        n_head=self.layers[0]._config['nhead'],
-        size_per_head=self.layers[0]._config['d_model'] //
-        self.layers[0]._config['nhead'],
-        use_gelu=self.layers[0]._config['activation'] == 'gelu',
-        normalize_before=self.layers[0]._config['normalize_before'] == True)
+        n_head=self.layers[0]._config["nhead"],
+        size_per_head=self.layers[0]._config["d_model"] // self.layers[0]._config["nhead"],
+        use_gelu=self.layers[0]._config["activation"] == "gelu",
+        normalize_before=self.layers[0]._config["normalize_before"] == True,
+    )
 
     if self.norm is not None:
         output = self.norm(output)
@@ -351,15 +362,16 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
     def init_func(layer):
         if isinstance(layer, TransformerEncoderLayer):
             is_usable = True
-            if layer._config['bias_attr'] == False:
-                logger.warning("`False` for paddle.nn.TransformerEncoder's" \
-                               " parameter `bias_attr` is not supported in " \
-                               "FasterTransformer by now. The original forward" \
-                               " will be involved.")
+            if layer._config["bias_attr"] == False:
+                logger.warning(
+                    "`False` for paddle.nn.TransformerEncoder's"
+                    " parameter `bias_attr` is not supported in "
+                    "FasterTransformer by now. The original forward"
+                    " will be involved."
+                )
                 is_usable = False
-            if layer._config['activation'] not in ('relu', 'gelu'):
-                logger.warning("Only 'relu' or 'gelu' is supported by now. " \
-                                "The original forward will be involved.")
+            if layer._config["activation"] not in ("relu", "gelu"):
+                logger.warning("Only 'relu' or 'gelu' is supported by now. " "The original forward will be involved.")
                 is_usable = False
             if is_usable:
                 layer.forward = layer._ft_forward
@@ -374,15 +386,12 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
             # Todo: check weather decoding lib have contained encoder or not.
             if encoder_lib is not None:
                 if "FasterTransformer" not in LOADED_EXT.keys():
-                    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(
-                        encoder_lib)
+                    ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(encoder_lib)
                     LOADED_EXT["FasterTransformer"] = ops
             else:
                 load("FasterTransformer", verbose=True)
         except Exception:
-            logger.warning(
-                "Exception occurs when using FasterEncoder. " \
-                "The original forward will be involved. ")
+            logger.warning("Exception occurs when using FasterEncoder. " "The original forward will be involved. ")
             return self
         for layer in self.children():
             layer.apply(init_func)
@@ -416,7 +425,7 @@ def disable_faster_encoder(self):
 
 
 def convert_to_fp16(transformer_encoder):
-    """ Convert paddle.nn.TransformerEncoder's parameter from float32 to float16
+    """Convert paddle.nn.TransformerEncoder's parameter from float32 to float16
 
     Args:
         transformer_encoder (obeject, paddle.nn.TransformerEncoder):
@@ -425,52 +434,30 @@ def convert_to_fp16(transformer_encoder):
     """
     if not isinstance(transformer_encoder, paddle.nn.TransformerEncoder):
         logger.warning(
-            "transformer_encoder is not isinstance of paddle.nn.TransformerEncoder, return itself with no parameters convertion."
-            .format)
+            "transformer_encoder is not isinstance of paddle.nn.TransformerEncoder, return itself with no parameters convertion.".format
+        )
         return transformer_encoder
     else:
         encoder_layers = transformer_encoder.layers
 
         for mod in encoder_layers:
-            mod.norm1.weight = transfer_param(mod.norm1.weight,
-                                              restore_data=True)
-            mod.norm1.bias = transfer_param(mod.norm1.bias,
-                                            is_bias=True,
-                                            restore_data=True)
-            mod.norm2.weight = transfer_param(mod.norm2.weight,
-                                              restore_data=True)
-            mod.norm2.bias = transfer_param(mod.norm2.bias,
-                                            is_bias=True,
-                                            restore_data=True)
+            mod.norm1.weight = transfer_param(mod.norm1.weight, restore_data=True)
+            mod.norm1.bias = transfer_param(mod.norm1.bias, is_bias=True, restore_data=True)
+            mod.norm2.weight = transfer_param(mod.norm2.weight, restore_data=True)
+            mod.norm2.bias = transfer_param(mod.norm2.bias, is_bias=True, restore_data=True)
 
-            mod.linear1.weight = transfer_param(mod.linear1.weight,
-                                                restore_data=True)
-            mod.linear1.bias = transfer_param(mod.linear1.bias,
-                                              is_bias=True,
-                                              restore_data=True)
+            mod.linear1.weight = transfer_param(mod.linear1.weight, restore_data=True)
+            mod.linear1.bias = transfer_param(mod.linear1.bias, is_bias=True, restore_data=True)
 
-            mod.self_attn.q_proj.weight = transfer_param(
-                mod.self_attn.q_proj.weight, restore_data=True)
-            mod.self_attn.q_proj.bias = transfer_param(
-                mod.self_attn.q_proj.bias, is_bias=True, restore_data=True)
-            mod.self_attn.k_proj.weight = transfer_param(
-                mod.self_attn.k_proj.weight, restore_data=True)
-            mod.self_attn.k_proj.bias = transfer_param(
-                mod.self_attn.k_proj.bias, is_bias=True, restore_data=True)
-            mod.self_attn.v_proj.weight = transfer_param(
-                mod.self_attn.v_proj.weight, restore_data=True)
-            mod.self_attn.v_proj.bias = transfer_param(
-                mod.self_attn.v_proj.bias, is_bias=True, restore_data=True)
-            mod.self_attn.out_proj.weight = transfer_param(
-                mod.self_attn.out_proj.weight, restore_data=True)
-            mod.self_attn.out_proj.bias = transfer_param(
-                mod.self_attn.out_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.q_proj.weight = transfer_param(mod.self_attn.q_proj.weight, restore_data=True)
+            mod.self_attn.q_proj.bias = transfer_param(mod.self_attn.q_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.k_proj.weight = transfer_param(mod.self_attn.k_proj.weight, restore_data=True)
+            mod.self_attn.k_proj.bias = transfer_param(mod.self_attn.k_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.v_proj.weight = transfer_param(mod.self_attn.v_proj.weight, restore_data=True)
+            mod.self_attn.v_proj.bias = transfer_param(mod.self_attn.v_proj.bias, is_bias=True, restore_data=True)
+            mod.self_attn.out_proj.weight = transfer_param(mod.self_attn.out_proj.weight, restore_data=True)
+            mod.self_attn.out_proj.bias = transfer_param(mod.self_attn.out_proj.bias, is_bias=True, restore_data=True)
 
-            mod.linear2.weight = transfer_param(mod.linear2.weight,
-                                                restore_data=True)
-            mod.linear2.bias = transfer_param(mod.linear2.bias,
-                                              is_bias=True,
-                                              restore_data=True)
-        logger.info(
-            "Convert transformer_encoder's parameters from float32 to float16 succeessfully."
-        )
+            mod.linear2.weight = transfer_param(mod.linear2.weight, restore_data=True)
+            mod.linear2.bias = transfer_param(mod.linear2.bias, is_bias=True, restore_data=True)
+        logger.info("Convert transformer_encoder's parameters from float32 to float16 succeessfully.")

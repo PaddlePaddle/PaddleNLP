@@ -25,13 +25,13 @@ import math
 from ...utils.log import logger
 
 __all__ = [
-    'DalleBartModel',
-    'DalleBartPretrainedModel',
-    'DalleBartEncoder',
-    'DalleBartDecoder',
-    'DalleBartForConditionalGeneration',
-    'DalleBartForImageGeneration',
-    'VQGanDetokenizer',
+    "DalleBartModel",
+    "DalleBartPretrainedModel",
+    "DalleBartEncoder",
+    "DalleBartDecoder",
+    "DalleBartForConditionalGeneration",
+    "DalleBartForImageGeneration",
+    "VQGanDetokenizer",
 ]
 
 
@@ -55,11 +55,11 @@ def _convert_attention_mask(attn_mask, dtype):
                 to prevents attention to some unwanted positions, usually the
                 paddings or the subsequent positions. It is a tensor with shape
                 broadcasted to `[batch_size, n_head, sequence_length, sequence_length]`.
-                When the data type is bool, the unwanted positions have `False` 
-                values and the others have `True` values. When the data type is 
-                int, the unwanted positions have 0 values and the others have 1 
-                values. When the data type is float, the unwanted positions have 
-                `-INF` values and the others have 0 values. It can be None when 
+                When the data type is bool, the unwanted positions have `False`
+                values and the others have `True` values. When the data type is
+                int, the unwanted positions have 0 values and the others have 1
+                values. When the data type is float, the unwanted positions have
+                `-INF` values and the others have 0 values. It can be None when
                 nothing wanted or needed to be prevented attention to. Default None.
         dtype (VarType): The target type of `attn_mask` we expect.
 
@@ -68,7 +68,7 @@ def _convert_attention_mask(attn_mask, dtype):
     """
     if attn_mask is not None and attn_mask.dtype != dtype:
         attn_mask_dtype = convert_dtype(attn_mask.dtype)
-        if attn_mask_dtype == 'bool' or 'int' in attn_mask_dtype:
+        if attn_mask_dtype == "bool" or "int" in attn_mask_dtype:
             attn_mask = (paddle.cast(attn_mask, dtype) - 1.0) * 1e4
         else:
             attn_mask = paddle.cast(attn_mask, dtype)
@@ -83,6 +83,7 @@ class DalleBartPretrainedModel(PretrainedModel):
     loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
+
     pretrained_init_configuration = {
         "dalle-mini": {
             "text_vocab_size": 50264,
@@ -100,12 +101,12 @@ class DalleBartPretrainedModel(PretrainedModel):
             "decoder_attention_heads": 16,
             "encoder_ffn_dim": 2730,
             "decoder_ffn_dim": 2730,
-            "dropout": 0.,
+            "dropout": 0.0,
             "activation_function": "gelu",
-            "attention_dropout": 0.,
-            "activation_dropout": 0.,
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
             "use_bias": False,
-            "init_std": 0.02
+            "init_std": 0.02,
         },
         "dalle-mega-v16": {
             "text_vocab_size": 50272,
@@ -123,12 +124,12 @@ class DalleBartPretrainedModel(PretrainedModel):
             "decoder_attention_heads": 32,
             "encoder_ffn_dim": 4096,
             "decoder_ffn_dim": 4096,
-            "dropout": 0.,
+            "dropout": 0.0,
             "activation_function": "gelu",
-            "attention_dropout": 0.,
-            "activation_dropout": 0.,
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
             "use_bias": False,
-            "init_std": 0.02
+            "init_std": 0.02,
         },
         "dalle-mega-v26": {
             "text_vocab_size": 50272,
@@ -146,12 +147,12 @@ class DalleBartPretrainedModel(PretrainedModel):
             "decoder_attention_heads": 32,
             "encoder_ffn_dim": 4096,
             "decoder_ffn_dim": 4096,
-            "dropout": 0.,
+            "dropout": 0.0,
             "activation_function": "gelu",
-            "attention_dropout": 0.,
-            "activation_dropout": 0.,
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
             "use_bias": False,
-            "init_std": 0.02
+            "init_std": 0.02,
         },
         "dalle-mega": {
             "text_vocab_size": 50272,
@@ -169,43 +170,37 @@ class DalleBartPretrainedModel(PretrainedModel):
             "decoder_attention_heads": 32,
             "encoder_ffn_dim": 4096,
             "decoder_ffn_dim": 4096,
-            "dropout": 0.,
+            "dropout": 0.0,
             "activation_function": "gelu",
-            "attention_dropout": 0.,
-            "activation_dropout": 0.,
+            "attention_dropout": 0.0,
+            "activation_dropout": 0.0,
             "use_bias": False,
-            "init_std": 0.02
+            "init_std": 0.02,
         },
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "dalle-mini":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
-            "dalle-mega-v16":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
-            "dalle-mega-v26":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
-            "dalle-mega":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
+            "dalle-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mini/model_state.pdparams",
+            "dalle-mega-v16": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v16/model_state.pdparams",
+            "dalle-mega-v26": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
+            "dalle-mega": "https://bj.bcebos.com/paddlenlp/models/transformers/dallebart/dalle-mega-v26/model_state.pdparams",
         }
     }
     base_model_prefix = "dallebart"
 
     def init_weights(self, layer):
         """Initialization hook"""
-        if isinstance(
-                layer,
-            (nn.Linear, nn.Embedding, DalleBartLearnedPositionalEmbedding)):
+        if isinstance(layer, (nn.Linear, nn.Embedding, DalleBartLearnedPositionalEmbedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
                     paddle.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else
-                        self.dallebart.config["init_std"],
+                        std=self.init_std if hasattr(self, "init_std") else self.dallebart.config["init_std"],
                         shape=layer.weight.shape,
-                    ))
+                    )
+                )
 
 
 class DalleBartLearnedPositionalEmbedding(nn.Embedding):
@@ -222,9 +217,7 @@ class DalleBartLearnedPositionalEmbedding(nn.Embedding):
     def forward(self, input_ids_shape, past_key_values_length=0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         seq_len = input_ids_shape[1]
-        positions = paddle.arange(past_key_values_length,
-                                  past_key_values_length + seq_len,
-                                  dtype="int64")
+        positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
         # (gongenlei) For dygraph to static graph
         return nn.Embedding.forward(self, positions + self.offset)
 
@@ -280,26 +273,16 @@ class DalleBartEncoderLayer(nn.Layer):
         bias_attr=False,
     ):
         super().__init__()
-        assert (
-            d_model > 0
-        ), "Expected d_model to be greater than 0, " "but recieved {}".format(
-            d_model)
-        assert (
-            nhead > 0
-        ), "Expected nhead to be greater than 0, " "but recieved {}".format(
-            nhead)
-        assert (
-            dim_feedforward > 0
-        ), "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
-            dim_feedforward)
+        assert d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(d_model)
+        assert nhead > 0, "Expected nhead to be greater than 0, " "but recieved {}".format(nhead)
+        assert dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
+            dim_feedforward
+        )
 
         attn_dropout = dropout if attn_dropout is None else attn_dropout
         act_dropout = dropout if act_dropout is None else act_dropout
 
-        self.self_attn = nn.MultiHeadAttention(d_model,
-                                               nhead,
-                                               dropout=attn_dropout,
-                                               bias_attr=bias_attr)
+        self.self_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
         self.glu = GLU(
             d_model,
             dim_feedforward,
@@ -356,21 +339,23 @@ class DalleBartEncoder(DalleBartPretrainedModel):
         self.init_std = init_std
         self.text_vocab_size = text_vocab_size
         self.embed_tokens = nn.Embedding(text_vocab_size, d_model)
-        self.embed_positions = DalleBartLearnedPositionalEmbedding(
-            max_text_length, d_model)
+        self.embed_positions = DalleBartLearnedPositionalEmbedding(max_text_length, d_model)
 
-        self.layers = nn.LayerList([
-            DalleBartEncoderLayer(
-                d_model,
-                nhead,
-                dim_feedforward,
-                dropout,
-                activation,
-                attn_dropout,
-                act_dropout,
-                bias_attr,
-            ) for _ in range(encoder_layers)
-        ])
+        self.layers = nn.LayerList(
+            [
+                DalleBartEncoderLayer(
+                    d_model,
+                    nhead,
+                    dim_feedforward,
+                    dropout,
+                    activation,
+                    attn_dropout,
+                    act_dropout,
+                    bias_attr,
+                )
+                for _ in range(encoder_layers)
+            ]
+        )
         self.layernorm_embedding = nn.LayerNorm(d_model)
         self.final_ln = nn.LayerNorm(d_model)
         self.embedding_dropout = nn.Dropout(dropout)
@@ -393,20 +378,19 @@ class DalleBartEncoder(DalleBartPretrainedModel):
             raise ValueError("Input_ids cannot be None.")
 
         if attention_mask is None:
-            attention_mask = (paddle.cast(
-                input_ids == self.text_pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4)
+            attention_mask = (
+                paddle.cast(input_ids == self.text_pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+                * -1e4
+            )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
         attention_mask.stop_gradient = True
 
         inputs_embeds = self.embed_tokens(input_ids)
         inputs_embed_pos = self.embed_positions(input_ids.shape)
-        hidden_states = self.layernorm_embedding(inputs_embeds +
-                                                 inputs_embed_pos)
+        hidden_states = self.layernorm_embedding(inputs_embeds + inputs_embed_pos)
         hidden_states = self.embedding_dropout(hidden_states)
 
         for layer in self.layers:
@@ -434,30 +418,17 @@ class DalleBartDecoderLayer(nn.Layer):
     ):
         super().__init__()
 
-        assert (
-            d_model > 0
-        ), "Expected d_model to be greater than 0, " "but recieved {}".format(
-            d_model)
-        assert (
-            nhead > 0
-        ), "Expected nhead to be greater than 0, " "but recieved {}".format(
-            nhead)
-        assert (
-            dim_feedforward > 0
-        ), "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
-            dim_feedforward)
+        assert d_model > 0, "Expected d_model to be greater than 0, " "but recieved {}".format(d_model)
+        assert nhead > 0, "Expected nhead to be greater than 0, " "but recieved {}".format(nhead)
+        assert dim_feedforward > 0, "Expected dim_feedforward to be greater than 0, " "but recieved {}".format(
+            dim_feedforward
+        )
 
         attn_dropout = dropout if attn_dropout is None else attn_dropout
         act_dropout = dropout if act_dropout is None else act_dropout
 
-        self.self_attn = nn.MultiHeadAttention(d_model,
-                                               nhead,
-                                               dropout=attn_dropout,
-                                               bias_attr=bias_attr)
-        self.cross_attn = nn.MultiHeadAttention(d_model,
-                                                nhead,
-                                                dropout=attn_dropout,
-                                                bias_attr=bias_attr)
+        self.self_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
+        self.cross_attn = nn.MultiHeadAttention(d_model, nhead, dropout=attn_dropout, bias_attr=bias_attr)
 
         self.glu = GLU(
             d_model,
@@ -488,8 +459,7 @@ class DalleBartDecoderLayer(nn.Layer):
         if cache is None:
             tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, None)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    cache[0])
+            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, cache[0])
 
         tgt = self.self_attn_layer_norm(tgt)
         tgt = residual + self.dropout1(tgt)
@@ -501,8 +471,7 @@ class DalleBartDecoderLayer(nn.Layer):
         if cache is None:
             tgt = self.cross_attn(tgt, memory, memory, memory_mask, None)
         else:
-            tgt, static_cache = self.cross_attn(tgt, memory, memory,
-                                                memory_mask, cache[1])
+            tgt, static_cache = self.cross_attn(tgt, memory, memory, memory_mask, cache[1])
         tgt = self.cross_attn_layer_norm(tgt)
         tgt = residual + self.dropout2(tgt)
 
@@ -510,14 +479,11 @@ class DalleBartDecoderLayer(nn.Layer):
         residual = tgt
         tgt = self.glu(tgt)
         tgt = residual + tgt
-        return tgt if cache is None else (tgt, (incremental_cache,
-                                                static_cache))
+        return tgt if cache is None else (tgt, (incremental_cache, static_cache))
 
     def gen_cache(self, memory):
-        incremental_cache = self.self_attn.gen_cache(memory,
-                                                     type=self.self_attn.Cache)
-        static_cache = self.cross_attn.gen_cache(
-            memory, memory, type=self.cross_attn.StaticCache)
+        incremental_cache = self.self_attn.gen_cache(memory, type=self.self_attn.Cache)
+        static_cache = self.cross_attn.gen_cache(memory, memory, type=self.cross_attn.StaticCache)
         return incremental_cache, static_cache
 
 
@@ -545,20 +511,22 @@ class DalleBartDecoder(DalleBartPretrainedModel):
         self.init_std = init_std
         self.embed_tokens = nn.Embedding(image_vocab_size + 1, d_model)
 
-        self.embed_positions = DalleBartLearnedPositionalEmbedding(
-            max_image_length, d_model)
-        self.layers = nn.LayerList([
-            DalleBartDecoderLayer(
-                d_model,
-                nhead,
-                dim_feedforward,
-                dropout,
-                activation,
-                attn_dropout,
-                act_dropout,
-                bias_attr,
-            ) for _ in range(decoder_layers)
-        ])
+        self.embed_positions = DalleBartLearnedPositionalEmbedding(max_image_length, d_model)
+        self.layers = nn.LayerList(
+            [
+                DalleBartDecoderLayer(
+                    d_model,
+                    nhead,
+                    dim_feedforward,
+                    dropout,
+                    activation,
+                    attn_dropout,
+                    act_dropout,
+                    bias_attr,
+                )
+                for _ in range(decoder_layers)
+            ]
+        )
         self.layernorm_embedding = nn.LayerNorm(d_model)
         self.dropout = nn.Dropout(dropout)
         self.final_ln = nn.LayerNorm(d_model)
@@ -592,18 +560,18 @@ class DalleBartDecoder(DalleBartPretrainedModel):
         if decoder_attention_mask is None:
             decoder_length = paddle.shape(decoder_input_ids)[-1]
             decoder_attention_mask = paddle.triu(
-                (paddle.full(
-                    (decoder_length, decoder_length),
-                    -1e4,
-                    dtype=paddle.get_default_dtype(),
-                )),
+                (
+                    paddle.full(
+                        (decoder_length, decoder_length),
+                        -1e4,
+                        dtype=paddle.get_default_dtype(),
+                    )
+                ),
                 1,
             )
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
-        past_key_values_length = (paddle.shape(cache[0][0].k)[2]
-                                  if cache is not None else 0)
-        decoder_inputs_embed_pos = self.embed_positions(
-            paddle.shape(decoder_input_ids), past_key_values_length)
+        past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
+        decoder_inputs_embed_pos = self.embed_positions(paddle.shape(decoder_input_ids), past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.layernorm_embedding(hidden_states)
         hidden_states = self.dropout(hidden_states)
@@ -666,10 +634,10 @@ class DalleBartModel(DalleBartPretrainedModel):
             A special token representing the end of a image sequence.
             Defaults to `16384`.
         max_text_length (int, optional):
-            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text 
+            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text
             input sequence. Defaults to `64`.
         max_image_length (int, optional):
-            The maximum value of the dimensionality of image position encoding, which dictates the maximum supported length of the image 
+            The maximum value of the dimensionality of image position encoding, which dictates the maximum supported length of the image
             input sequence. Defaults to `256`.
         decoder_start_token_id (int, optional):
             The id indicating the start of decoding image sentence. Defaults to `16384`.
@@ -715,46 +683,65 @@ class DalleBartModel(DalleBartPretrainedModel):
             Default to `0.02`.
     """
 
-    def __init__(self,
-                 text_vocab_size=50264,
-                 image_vocab_size=16384,
-                 bos_token_id=16384,
-                 pad_token_id=16384,
-                 eos_token_id=16384,
-                 max_text_length=64,
-                 max_image_length=256,
-                 decoder_start_token_id=16384,
-                 d_model=1024,
-                 num_encoder_layers=12,
-                 num_decoder_layers=12,
-                 encoder_attention_heads=16,
-                 decoder_attention_heads=16,
-                 encoder_ffn_dim=2730,
-                 decoder_ffn_dim=2730,
-                 dropout=0.,
-                 activation_function="gelu",
-                 attention_dropout=0.,
-                 activation_dropout=0.,
-                 use_bias=False,
-                 init_std=0.02):
+    def __init__(
+        self,
+        text_vocab_size=50264,
+        image_vocab_size=16384,
+        bos_token_id=16384,
+        pad_token_id=16384,
+        eos_token_id=16384,
+        max_text_length=64,
+        max_image_length=256,
+        decoder_start_token_id=16384,
+        d_model=1024,
+        num_encoder_layers=12,
+        num_decoder_layers=12,
+        encoder_attention_heads=16,
+        decoder_attention_heads=16,
+        encoder_ffn_dim=2730,
+        decoder_ffn_dim=2730,
+        dropout=0.0,
+        activation_function="gelu",
+        attention_dropout=0.0,
+        activation_dropout=0.0,
+        use_bias=False,
+        init_std=0.02,
+    ):
         super().__init__()
         self.init_std = init_std
         self.pad_token_id = pad_token_id
         self.decoder_start_token_id = decoder_start_token_id
         self.text_pad_token_id = 1  # encoder pad id must be 1
-        self.encoder = DalleBartEncoder(d_model, encoder_attention_heads,
-                                        encoder_ffn_dim, max_text_length,
-                                        text_vocab_size, self.text_pad_token_id,
-                                        num_encoder_layers, dropout,
-                                        activation_function, attention_dropout,
-                                        activation_dropout, use_bias, init_std)
+        self.encoder = DalleBartEncoder(
+            d_model,
+            encoder_attention_heads,
+            encoder_ffn_dim,
+            max_text_length,
+            text_vocab_size,
+            self.text_pad_token_id,
+            num_encoder_layers,
+            dropout,
+            activation_function,
+            attention_dropout,
+            activation_dropout,
+            use_bias,
+            init_std,
+        )
 
-        self.decoder = DalleBartDecoder(d_model, decoder_attention_heads,
-                                        decoder_ffn_dim, image_vocab_size,
-                                        max_image_length, num_decoder_layers,
-                                        dropout, activation_function,
-                                        attention_dropout, activation_dropout,
-                                        use_bias, init_std)
+        self.decoder = DalleBartDecoder(
+            d_model,
+            decoder_attention_heads,
+            decoder_ffn_dim,
+            image_vocab_size,
+            max_image_length,
+            num_decoder_layers,
+            dropout,
+            activation_function,
+            attention_dropout,
+            activation_dropout,
+            use_bias,
+            init_std,
+        )
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -773,7 +760,7 @@ class DalleBartModel(DalleBartPretrainedModel):
         use_cache=False,
         cache=None,
     ):
-        r'''
+        r"""
         The DalleBartModel forward method, overrides the `__call__()` special method.
         Args:
             input_ids (Tensor):
@@ -826,26 +813,21 @@ class DalleBartModel(DalleBartPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
         if input_ids is None and encoder_output is None:
-            raise ValueError(
-                "You have to specify either input_ids or encoder_output")
+            raise ValueError("You have to specify either input_ids or encoder_output")
         if decoder_input_ids is None:
-            assert input_ids is not None, "input_ids should be " \
-                                          "specified when generating decoder_input_ids"
-            decoder_input_ids = shift_tokens_right(input_ids,
-                                                   self.decoder_start_token_id)
+            assert input_ids is not None, "input_ids should be " "specified when generating decoder_input_ids"
+            decoder_input_ids = shift_tokens_right(input_ids, self.decoder_start_token_id)
         if attention_mask is None:
-            assert input_ids is not None, (
-                "input_ids should be "
-                "specified when generating attention_mask")
-            attention_mask = (paddle.cast(
-                input_ids == self.text_pad_token_id,
-                dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4)
+            assert input_ids is not None, "input_ids should be " "specified when generating attention_mask"
+            attention_mask = (
+                paddle.cast(input_ids == self.text_pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+                * -1e4
+            )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
-            attention_mask = paddle.unsqueeze(
-                attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
+            attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
         if encoder_output is None:
@@ -886,19 +868,14 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
         # [0, 2, 1, 1, 1,...,1]
         # attention_mask_uncond
         # [1, 1, 0, 0, 0,...,0]
-        input_ids_uncond = [0, 2
-                            ] + [1] * (dallebart.config["max_text_length"] - 2)
-        attention_mask_uncond = [
-            1, 1
-        ] + [0] * (dallebart.config["max_text_length"] - 2)
-        self.register_buffer("input_ids_uncond",
-                             paddle.to_tensor([input_ids_uncond],
-                                              dtype="int64"),
-                             persistable=False)
-        self.register_buffer("attention_mask_uncond",
-                             paddle.to_tensor([attention_mask_uncond],
-                                              dtype="int64"),
-                             persistable=False)
+        input_ids_uncond = [0, 2] + [1] * (dallebart.config["max_text_length"] - 2)
+        attention_mask_uncond = [1, 1] + [0] * (dallebart.config["max_text_length"] - 2)
+        self.register_buffer(
+            "input_ids_uncond", paddle.to_tensor([input_ids_uncond], dtype="int64"), persistable=False
+        )
+        self.register_buffer(
+            "attention_mask_uncond", paddle.to_tensor([attention_mask_uncond], dtype="int64"), persistable=False
+        )
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -969,24 +946,23 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             return lm_logits
 
     def prepare_decoder_input_ids_from_labels(self, labels):
-        return shift_tokens_right(
-            labels, self.dallebart.config['decoder_start_token_id'])
+        return shift_tokens_right(labels, self.dallebart.config["decoder_start_token_id"])
 
-    def prepare_inputs_for_generation(self,
-                                      decoder_input_ids,
-                                      attention_mask=None,
-                                      decoder_attention_mask=None,
-                                      cache=None,
-                                      use_cache=False,
-                                      encoder_output=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(
+        self,
+        decoder_input_ids,
+        attention_mask=None,
+        decoder_attention_mask=None,
+        cache=None,
+        use_cache=False,
+        encoder_output=None,
+        **kwargs
+    ):
         # cut decoder_input_ids if past is used
         if cache is not None:
             decoder_input_ids = decoder_input_ids[:, -1].unsqueeze(-1)
             if decoder_attention_mask is not None:
-                decoder_attention_mask = decoder_attention_mask[:, :,
-                                                                -1, :].unsqueeze(
-                                                                    -2)
+                decoder_attention_mask = decoder_attention_mask[:, :, -1, :].unsqueeze(-2)
 
         return {
             "input_ids": None,
@@ -995,29 +971,29 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             "decoder_attention_mask": decoder_attention_mask,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
         }
 
-    def sample(self,
-               input_ids,
-               logits_processors,
-               max_length,
-               pad_token_id,
-               eos_token_id,
-               top_k=None,
-               top_p=None,
-               temperature=None,
-               min_tokens_to_keep=1,
-               condition_scale=1.0,
-               model_kwargs_uncond=None,
-               **model_kwargs):
-
+    def sample(
+        self,
+        input_ids,
+        logits_processors,
+        max_length,
+        pad_token_id,
+        eos_token_id,
+        top_k=None,
+        top_p=None,
+        temperature=None,
+        min_tokens_to_keep=1,
+        condition_scale=1.0,
+        model_kwargs_uncond=None,
+        **model_kwargs
+    ):
         def TopKProcess(probs, top_k, min_tokens_to_keep):
             top_k = min(max(top_k, min_tokens_to_keep), probs.shape[-1])
             # Remove all tokens with a probability less than the last token of the top-k
             topk_probs, _ = paddle.topk(probs, k=top_k)
-            probs = paddle.where(probs >= topk_probs[:, -1:], probs,
-                                 paddle.full_like(probs, 0.0))
+            probs = paddle.where(probs >= topk_probs[:, -1:], probs, paddle.full_like(probs, 0.0))
             return probs
 
         def TopPProcess(probs, top_p, min_tokens_to_keep):
@@ -1030,35 +1006,29 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             sorted_indices_to_remove = cumulative_probs > top_p
             if min_tokens_to_keep > 1:
                 # Set 'min_tokens_to_keep - 1' because the first token is kept
-                sorted_indices_to_remove[:, :min_tokens_to_keep - 1] = 0
+                sorted_indices_to_remove[:, : min_tokens_to_keep - 1] = 0
             # Keep the first token
-            sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove,
-                                                   dtype='int64')
-            sorted_indices_to_remove[:, 1:] = (
-                sorted_indices_to_remove[:, :-1].clone())
+            sorted_indices_to_remove = paddle.cast(sorted_indices_to_remove, dtype="int64")
+            sorted_indices_to_remove[:, 1:] = sorted_indices_to_remove[:, :-1].clone()
             sorted_indices_to_remove[:, 0] = 0
 
             # Scatter sorted tensors to original indexing
-            sorted_indices = sorted_indices + paddle.arange(
-                probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
-            condition = paddle.scatter(sorted_indices_to_remove.flatten(),
-                                       sorted_indices.flatten(),
-                                       sorted_indices_to_remove.flatten())
-            condition = paddle.cast(condition, 'bool').reshape(probs.shape)
+            sorted_indices = sorted_indices + paddle.arange(probs.shape[0]).unsqueeze(-1) * probs.shape[-1]
+            condition = paddle.scatter(
+                sorted_indices_to_remove.flatten(), sorted_indices.flatten(), sorted_indices_to_remove.flatten()
+            )
+            condition = paddle.cast(condition, "bool").reshape(probs.shape)
             probs = paddle.where(condition, paddle.full_like(probs, 0.0), probs)
             return probs
 
         batch_size, cur_len = input_ids.shape
         origin_len = cur_len
-        unfinished_flag = paddle.full([batch_size, 1], True, dtype='bool')
-        scores = paddle.full([batch_size, 1],
-                             0.0,
-                             dtype=paddle.get_default_dtype())
+        unfinished_flag = paddle.full([batch_size, 1], True, dtype="bool")
+        scores = paddle.full([batch_size, 1], 0.0, dtype=paddle.get_default_dtype())
 
         while cur_len < max_length:
             # prepare model inputs & get model output
-            model_inputs = self.prepare_inputs_for_generation(
-                input_ids, **model_kwargs)
+            model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
 
             outputs = self(**model_inputs)
             logits = outputs[0] if isinstance(outputs, tuple) else outputs
@@ -1068,15 +1038,12 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             # perform super conditioning
             # Source: @RiversHaveWings - https://twitter.com/RiversHaveWings/status/1478093658716966912?s=20&t=xdm-wZ61Wf7OLnE_NJHZ1w
             if condition_scale != 1.0:
-                model_inputs_uncond = self.prepare_inputs_for_generation(
-                    input_ids, **model_kwargs_uncond)
+                model_inputs_uncond = self.prepare_inputs_for_generation(input_ids, **model_kwargs_uncond)
                 outputs_uncond = self(**model_inputs_uncond)
-                logits_uncond = outputs_uncond[0] if isinstance(
-                    outputs_uncond, tuple) else outputs_uncond
+                logits_uncond = outputs_uncond[0] if isinstance(outputs_uncond, tuple) else outputs_uncond
                 # [batch_size, vocab_size]
                 logits_uncond = logits_uncond[:, -1, :]
-                logits = logits_uncond + condition_scale * (logits -
-                                                            logits_uncond)
+                logits = logits_uncond + condition_scale * (logits - logits_uncond)
 
             else:
                 outputs_uncond = None
@@ -1100,96 +1067,91 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             next_scores = paddle.index_sample(origin_probs, next_tokens)
 
             if eos_token_id is not None:
-                next_tokens = paddle.where(
-                    unfinished_flag, next_tokens,
-                    paddle.full_like(next_tokens, pad_token_id))
+                next_tokens = paddle.where(unfinished_flag, next_tokens, paddle.full_like(next_tokens, pad_token_id))
 
-            scores = self.update_scores_for_generation(scores, next_scores,
-                                                       cur_len - origin_len,
-                                                       unfinished_flag)
+            scores = self.update_scores_for_generation(scores, next_scores, cur_len - origin_len, unfinished_flag)
 
             cur_len += 1
             input_ids = paddle.concat([input_ids, next_tokens], axis=1)
 
             if eos_token_id is not None:
-                unfinished_flag = paddle.logical_and(
-                    unfinished_flag, next_tokens != eos_token_id)
+                unfinished_flag = paddle.logical_and(unfinished_flag, next_tokens != eos_token_id)
 
             # Stop when there is a </s> in all sentences
             if not paddle.any(unfinished_flag):
                 break
 
             model_kwargs = self.update_model_kwargs_for_generation(
-                outputs,
-                model_kwargs,
-                is_encoder_decoder=self.is_encoder_decoder)
+                outputs, model_kwargs, is_encoder_decoder=self.is_encoder_decoder
+            )
 
             if condition_scale != 1.0:
                 model_kwargs_uncond = self.update_model_kwargs_for_generation(
-                    outputs_uncond,
-                    model_kwargs_uncond,
-                    is_encoder_decoder=self.is_encoder_decoder)
+                    outputs_uncond, model_kwargs_uncond, is_encoder_decoder=self.is_encoder_decoder
+                )
             else:
                 model_kwargs_uncond = None
 
         return input_ids[:, origin_len:], scores
 
     @paddle.no_grad()
-    def generate(self,
-                 input_ids=None,
-                 max_length=256,
-                 min_length=256,
-                 decode_strategy='sampling',
-                 temperature=1.0,
-                 top_k=0,
-                 top_p=1.0,
-                 repetition_penalty=1.0,
-                 num_beams=1,
-                 num_beam_groups=1,
-                 length_penalty=0.0,
-                 early_stopping=False,
-                 bos_token_id=None,
-                 eos_token_id=None,
-                 pad_token_id=None,
-                 text_pad_token_id=1,
-                 decoder_start_token_id=None,
-                 forced_bos_token_id=None,
-                 forced_eos_token_id=None,
-                 num_return_sequences=1,
-                 diversity_rate=0.0,
-                 use_cache=True,
-                 use_faster=False,
-                 use_fp16_decoding=False,
-                 condition_scale=1.0,
-                 **model_kwargs):
+    def generate(
+        self,
+        input_ids=None,
+        max_length=256,
+        min_length=256,
+        decode_strategy="sampling",
+        temperature=1.0,
+        top_k=0,
+        top_p=1.0,
+        repetition_penalty=1.0,
+        num_beams=1,
+        num_beam_groups=1,
+        length_penalty=0.0,
+        early_stopping=False,
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        text_pad_token_id=1,
+        decoder_start_token_id=None,
+        forced_bos_token_id=None,
+        forced_eos_token_id=None,
+        num_return_sequences=1,
+        diversity_rate=0.0,
+        use_cache=True,
+        use_faster=False,
+        use_fp16_decoding=False,
+        condition_scale=1.0,
+        **model_kwargs
+    ):
         r"""
-        The interface for generation task. This method can generate sequences 
-        by using decoding strategy. Currently, there are three decoding 
+        The interface for generation task. This method can generate sequences
+        by using decoding strategy. Currently, there are three decoding
         strategies supported: "greedy_search", "sampling" and "beam_search".
 
         Args:
-            input_ids (Tensor, optional): The input sequence ids for the 
-                generation. It is a Tensor with shape [batch_size, sequence_length]. 
-                The data type should be int32 or int64. Default to None, which 
-                we will initialize it as a Tensor with shape [1, 1], filled 
+            input_ids (Tensor, optional): The input sequence ids for the
+                generation. It is a Tensor with shape [batch_size, sequence_length].
+                The data type should be int32 or int64. Default to None, which
+                we will initialize it as a Tensor with shape [1, 1], filled
                 with the value `bos_token_id`.
-            max_length (int, optional): The maximum length of the sequence to 
+            max_length (int, optional): The maximum length of the sequence to
                 be generated. Default to 256.
-            min_length (int, optional): The minimum length of the sequence to 
+            min_length (int, optional): The minimum length of the sequence to
                 be generated. Default to 256.
             decode_strategy (str, optional): The decoding strategy in generation.
-                Currently, there are three decoding strategies supported: 
-                "greedy_search", "sampling" and "beam_search". Default to 
+                Currently, there are three decoding strategies supported:
+                "greedy_search", "sampling" and "beam_search". Default to
                 "sampling".
-            temperature (float, optional): The value used to module the next 
-                token probabilities in the "sampling" strategy. Default to 1.0, 
+            temperature (float, optional): The value used to module the next
+                token probabilities in the "sampling" strategy. Default to 1.0,
                 which means no effect.
-            top_k (int, optional): The number of highest probability tokens to 
-                keep for top-k-filtering in the "sampling" strategy. Default to 
+            top_k (int, optional): The number of highest probability tokens to
+                keep for top-k-filtering in the "sampling" strategy. Default to
                 0, which means no effect.
-            top_p (float, optional): The cumulative probability for 
-                top-p-filtering in the "sampling" strategy. The value should 
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
+            top_p (float, optional): The cumulative probability for
+                top-p-filtering in the "sampling" strategy. The value should
+                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
                 effect.
             repetition_penalty (float, optional):
                 The parameter for repetition penalty. 1.0 means no penalty. See `this paper
@@ -1198,59 +1160,59 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                 strategy. Default to 1.
             num_beam_groups (int, optional):
                 Number of groups to divide `num_beams` into in order to use DIVERSE
-                BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__ 
+                BEAM SEARCH. See `this paper <https://arxiv.org/pdf/1610.02424.pdf>`__
                 for more details. Default to 1.
-            length_penalty (float, optional): The exponential penalty to the 
+            length_penalty (float, optional): The exponential penalty to the
                 sequence length in the "beam_search" strategy. The larger this
-                param is, the more that the model would generate shorter 
+                param is, the more that the model would generate shorter
                 sequences. Default to 0.0, which means no penalty.
-            early_stopping (bool, optional): Whether to stop searching in the 
-                "beam_search" strategy when at least `num_beams` sentences are 
+            early_stopping (bool, optional): Whether to stop searching in the
+                "beam_search" strategy when at least `num_beams` sentences are
                 finished per batch or not. Default to False.
-            bos_token_id (int, optional): The id of the `bos_token`. Default to 
+            bos_token_id (int, optional): The id of the `bos_token`. Default to
                 None.
-            eos_token_id (int, optional): The id of the `eos_token`. Default to 
+            eos_token_id (int, optional): The id of the `eos_token`. Default to
                 None.
-            pad_token_id (int, optional): The id of the `pad_token`. Default to 
+            pad_token_id (int, optional): The id of the `pad_token`. Default to
                 None.
-            decoder_start_token_id (int, optional): The start token id for 
+            decoder_start_token_id (int, optional): The start token id for
                 encoder-decoder models. Default to None.
-            forced_bos_token_id (int, optional): The id of the token to force as 
+            forced_bos_token_id (int, optional): The id of the token to force as
                 the first generated token. Usually use for multilingual models.
                 Default to None.
-            forced_eos_token_id (int, optional): The id of the token to force as 
+            forced_eos_token_id (int, optional): The id of the token to force as
                 the last generated token. Default to None.
-            num_return_sequences (int, optional): The number of returned 
+            num_return_sequences (int, optional): The number of returned
                 sequences for each sequence in the batch. Default to 1.
-            diversity_rate (float, optional): If num_beam_groups is 1, this is the 
-                diversity_rate for Diverse Siblings Search. See 
-                `this paper https://arxiv.org/abs/1611.08562`__ for more details. 
+            diversity_rate (float, optional): If num_beam_groups is 1, this is the
+                diversity_rate for Diverse Siblings Search. See
+                `this paper https://arxiv.org/abs/1611.08562`__ for more details.
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
-            use_cache: (bool, optional): Whether to use the model cache to 
+            use_cache: (bool, optional): Whether to use the model cache to
                 speed up decoding. Default to True.
-            use_faster: (bool, optional): Whether to use faster entry of model 
+            use_faster: (bool, optional): Whether to use faster entry of model
                 for FasterGeneration. Default to False.
-            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding. 
+            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
                 Only works when faster entry is avalible. Default to False.
             condition_scale (float, optional): The scale of super conditioning. See
-                `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__ 
+                `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__
                 Default to 1.0.
-            model_kwargs (dict): It can be used to specify additional kwargs 
+            model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
         Returns:
-            tuple[Tensor]: It is a tuple contains two elements: ids and scores. 
+            tuple[Tensor]: It is a tuple contains two elements: ids and scores.
             Each element is a Tensor.
 
             With the fields:
 
-            - ids (Tensor): 
-                The ids of the generated sequences. It is a Tensor with shape 
-                [batch_size * num_return_sequences, sequence_length]. The data 
+            - ids (Tensor):
+                The ids of the generated sequences. It is a Tensor with shape
+                [batch_size * num_return_sequences, sequence_length]. The data
                 type is same as the input `input_ids`.
-            - scores (Tensor): 
-                The scores of the generated sequences. It is a Tensor with shape 
-                [batch_size * num_return_sequences, 1]. The data type is float32 
+            - scores (Tensor):
+                The scores of the generated sequences. It is a Tensor with shape
+                [batch_size * num_return_sequences, 1]. The data type is float32
                 or float64, which is the same as the parameters in the model.
 
         Example:
@@ -1258,7 +1220,7 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
 
                 import paddle
                 from paddlenlp.transformers import (
-                    DalleBartForConditionalGeneration, 
+                    DalleBartForConditionalGeneration,
                     DalleBartTokenizer
                 )
 
@@ -1289,32 +1251,37 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                 print(image_token_ids.shape, scores.shape)
                 # [4, 256] [4, 1]
         """
-        assert (
-            decode_strategy in ["greedy_search", "sampling", "beam_search"]
-        ), "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
-            decode_strategy)
+        assert decode_strategy in [
+            "greedy_search",
+            "sampling",
+            "beam_search",
+        ], "`decode_strategy` must be one of 'greedy_search', 'sampling' or 'beam_search' but received {}.".format(
+            decode_strategy
+        )
 
-        bos_token_id = bos_token_id if bos_token_id is not None else getattr(
-            self, 'bos_token_id', None)
-        eos_token_id = eos_token_id if eos_token_id is not None else getattr(
-            self, 'eos_token_id', None)
-        pad_token_id = pad_token_id if pad_token_id is not None else getattr(
-            self, 'pad_token_id', None)
-        forced_bos_token_id = forced_bos_token_id if forced_bos_token_id is not None else getattr(
-            self, 'forced_bos_token_id', None)
-        forced_eos_token_id = forced_eos_token_id if forced_eos_token_id is not None else getattr(
-            self, 'forced_eos_token_id', None)
-        decoder_start_token_id = decoder_start_token_id if decoder_start_token_id is not None else getattr(
-            self, 'decoder_start_token_id', None)
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
+        forced_bos_token_id = (
+            forced_bos_token_id if forced_bos_token_id is not None else getattr(self, "forced_bos_token_id", None)
+        )
+        forced_eos_token_id = (
+            forced_eos_token_id if forced_eos_token_id is not None else getattr(self, "forced_eos_token_id", None)
+        )
+        decoder_start_token_id = (
+            decoder_start_token_id
+            if decoder_start_token_id is not None
+            else getattr(self, "decoder_start_token_id", None)
+        )
 
-        if getattr(self, '_faster_entry', None) is not False and use_faster:
+        if getattr(self, "_faster_entry", None) is not False and use_faster:
             args = locals()
-            args.pop('self')
+            args.pop("self")
             args.pop("__class__", None)
-            model_kwargs = args.pop('model_kwargs')
+            model_kwargs = args.pop("model_kwargs")
             args.update(model_kwargs)
             try:
-                if not hasattr(self, '_faster_entry'):
+                if not hasattr(self, "_faster_entry"):
                     self._build_faster(args)
                 if self._faster_entry:
                     output = self._faster_entry(**args)
@@ -1326,25 +1293,19 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                         dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
-                        output_ids = output_ids[:, :
-                                                num_return_sequences, :].reshape(
-                                                    [-1, output_ids.shape[-1]])
+                        output_ids = output_ids[:, :num_return_sequences, :].reshape([-1, output_ids.shape[-1]])
                         if dummy_srore is not None:
-                            dummy_srore = dummy_srore[:, :
-                                                      num_return_sequences].flatten(
-                                                      )
+                            dummy_srore = dummy_srore[:, :num_return_sequences].flatten()
                     else:
                         output_ids = output_ids.transpose([1, 0])
                     return output_ids, dummy_srore
 
             except Exception as e:
-                args['model_kwargs'] = model_kwargs
+                args["model_kwargs"] = model_kwargs
                 # Prevent self._convert_to_faster to throw Exception
                 self._convert_to_faster(args)
                 logger.warning(e)
-                logger.warning(
-                    "FasterGeneration is not available, "
-                    "and the original version would be used instead.")
+                logger.warning("FasterGeneration is not available, " "and the original version would be used instead.")
 
         # params check
         if input_ids is None:
@@ -1353,46 +1314,38 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
 
         if model_kwargs.get("attention_mask", None) is None:
             # Init `attention_mask` depending on `text_pad_token_id`
-            model_kwargs[
-                "attention_mask"] = self.prepare_attention_mask_for_generation(
-                    input_ids, text_pad_token_id, eos_token_id)
+            model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
+                input_ids, text_pad_token_id, eos_token_id
+            )
 
-        self.is_encoder_decoder = hasattr(self, 'encoder') and hasattr(
-            self, 'decoder')
+        self.is_encoder_decoder = hasattr(self, "encoder") and hasattr(self, "decoder")
         if self.is_encoder_decoder:
 
             if condition_scale != 1.0:
-                assert (decode_strategy == "sampling"
-                        ), "`do_sample` has to be True for super conditioning."
-                assert (num_beams == 1
-                        ), "`num_beams` has to be 1 for super conditioning."
+                assert decode_strategy == "sampling", "`do_sample` has to be True for super conditioning."
+                assert num_beams == 1, "`num_beams` has to be 1 for super conditioning."
                 input_ids_uncond = self.input_ids_uncond.expand_as(input_ids)
-                model_kwargs_uncond = {
-                    "attention_mask":
-                    self.attention_mask_uncond.expand_as(input_ids)
-                }
-                model_kwargs_uncond = (
-                    self.prepare_encoder_decoder_kwargs_for_generation(
-                        input_ids_uncond,
-                        model_kwargs_uncond,
-                    ))
+                model_kwargs_uncond = {"attention_mask": self.attention_mask_uncond.expand_as(input_ids)}
+                model_kwargs_uncond = self.prepare_encoder_decoder_kwargs_for_generation(
+                    input_ids_uncond,
+                    model_kwargs_uncond,
+                )
                 model_kwargs_uncond["use_cache"] = use_cache
             else:
                 model_kwargs_uncond = None
 
-            model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(
-                input_ids, model_kwargs)
+            model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
 
             # set input_ids as decoder_input_ids
             if "decoder_input_ids" in model_kwargs:
                 input_ids = model_kwargs.pop("decoder_input_ids")
             else:
                 input_ids = self.prepare_decoder_input_ids_for_generation(
-                    input_ids, decoder_start_token_id, bos_token_id)
+                    input_ids, decoder_start_token_id, bos_token_id
+                )
 
         if pad_token_id is None and eos_token_id is not None:
-            print("Setting `pad_token_id` to `eos_token_id`:{} for "
-                  "open-end generation.".format(eos_token_id))
+            print("Setting `pad_token_id` to `eos_token_id`:{} for " "open-end generation.".format(eos_token_id))
             pad_token_id = eos_token_id
 
         model_kwargs["use_cache"] = use_cache
@@ -1408,55 +1361,61 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
             num_beams=num_beams,
             num_beam_groups=num_beam_groups,
             diversity_rate=diversity_rate,
-            repetition_penalty=repetition_penalty)
+            repetition_penalty=repetition_penalty,
+        )
 
-        if decode_strategy == 'greedy_search':
+        if decode_strategy == "greedy_search":
             if num_return_sequences > 1:
                 raise ValueError(
                     "`num_return_sequences` has to be 1, but is {} "
-                    "when doing greedy search.".format(num_return_sequences))
+                    "when doing greedy search.".format(num_return_sequences)
+                )
 
-            return self.greedy_search(input_ids, logits_processors, max_length,
-                                      pad_token_id, eos_token_id,
-                                      **model_kwargs)
+            return self.greedy_search(
+                input_ids, logits_processors, max_length, pad_token_id, eos_token_id, **model_kwargs
+            )
 
-        elif decode_strategy == 'sampling':
+        elif decode_strategy == "sampling":
 
             if num_return_sequences > 1:
                 tmpinput_ids = input_ids.clone()
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_return_sequences, **model_kwargs)
+                    input_ids, expand_size=num_return_sequences, **model_kwargs
+                )
 
                 if condition_scale != 1.0:
                     _, model_kwargs_uncond = self.expand_inputs_for_generation(
-                        tmpinput_ids,
-                        expand_size=num_return_sequences,
-                        **model_kwargs_uncond)
+                        tmpinput_ids, expand_size=num_return_sequences, **model_kwargs_uncond
+                    )
 
-            return self.sample(input_ids,
-                               logits_processors,
-                               max_length,
-                               pad_token_id,
-                               eos_token_id,
-                               top_k,
-                               top_p,
-                               temperature,
-                               condition_scale=condition_scale,
-                               model_kwargs_uncond=model_kwargs_uncond,
-                               **model_kwargs)
+            return self.sample(
+                input_ids,
+                logits_processors,
+                max_length,
+                pad_token_id,
+                eos_token_id,
+                top_k,
+                top_p,
+                temperature,
+                condition_scale=condition_scale,
+                model_kwargs_uncond=model_kwargs_uncond,
+                **model_kwargs,
+            )
 
-        elif decode_strategy == 'beam_search':
+        elif decode_strategy == "beam_search":
             batch_size = input_ids.shape[0]
             if num_return_sequences > num_beams:
                 raise ValueError(
                     "`num_return_sequences` has to be smaller or equal to "
                     "`num_beams`. But received `num_return_sequences` is {}, "
-                    "`num_beams` is {}".format(num_return_sequences, num_beams))
+                    "`num_beams` is {}".format(num_return_sequences, num_beams)
+                )
             if num_beams <= 1:
                 raise ValueError(
                     "`num_beams` has to be bigger than 1. But received "
                     "`num_beams` is {}. If `num_beams` is 1, `decode_strategy` "
-                    "should be 'greedy_search'".format(num_beams))
+                    "should be 'greedy_search'".format(num_beams)
+                )
             if num_beam_groups > 1:
                 diverse_beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
@@ -1465,16 +1424,24 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                     length_penalty=length_penalty,
                     do_early_stopping=early_stopping,
                     num_beam_hyps_to_keep=num_return_sequences,
-                    num_beam_groups=num_beam_groups)
+                    num_beam_groups=num_beam_groups,
+                )
 
                 # interleave with `num_beams`
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_beams, **model_kwargs)
+                    input_ids, expand_size=num_beams, **model_kwargs
+                )
 
-                return self.group_beam_search(input_ids, diverse_beam_scorer,
-                                              logits_processors, max_length,
-                                              diversity_rate, pad_token_id,
-                                              eos_token_id, **model_kwargs)
+                return self.group_beam_search(
+                    input_ids,
+                    diverse_beam_scorer,
+                    logits_processors,
+                    max_length,
+                    diversity_rate,
+                    pad_token_id,
+                    eos_token_id,
+                    **model_kwargs,
+                )
             else:
                 beam_scorer = BeamSearchScorer(
                     batch_size=batch_size,
@@ -1482,15 +1449,23 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
                     num_beams=num_beams,
                     length_penalty=length_penalty,
                     do_early_stopping=early_stopping,
-                    num_beam_hyps_to_keep=num_return_sequences)
+                    num_beam_hyps_to_keep=num_return_sequences,
+                )
 
                 input_ids, model_kwargs = self.expand_inputs_for_generation(
-                    input_ids, expand_size=num_beams, **model_kwargs)
+                    input_ids, expand_size=num_beams, **model_kwargs
+                )
 
-                return self.beam_search(input_ids, beam_scorer,
-                                        logits_processors, max_length,
-                                        diversity_rate, pad_token_id,
-                                        eos_token_id, **model_kwargs)
+                return self.beam_search(
+                    input_ids,
+                    beam_scorer,
+                    logits_processors,
+                    max_length,
+                    diversity_rate,
+                    pad_token_id,
+                    eos_token_id,
+                    **model_kwargs,
+                )
 
     def __getattr__(self, name):
         try:
@@ -1506,7 +1481,6 @@ class DalleBartForConditionalGeneration(DalleBartPretrainedModel):
 
 
 class ResnetBlock(nn.Layer):
-
     def __init__(self, log2_count_in: int, log2_count_out: int):
         super().__init__()
         m, n = 2**log2_count_in, 2**log2_count_out
@@ -1532,7 +1506,6 @@ class ResnetBlock(nn.Layer):
 
 
 class AttentionBlock(nn.Layer):
-
     def __init__(self):
         super().__init__()
         n = 2**9
@@ -1565,7 +1538,6 @@ class AttentionBlock(nn.Layer):
 
 
 class MiddleLayer(nn.Layer):
-
     def __init__(self):
         super().__init__()
         self.block_1 = ResnetBlock(9, 9)
@@ -1580,7 +1552,6 @@ class MiddleLayer(nn.Layer):
 
 
 class Upsample(nn.Layer):
-
     def __init__(self, log2_count):
         super().__init__()
         n = 2**log2_count
@@ -1594,24 +1565,21 @@ class Upsample(nn.Layer):
 
 
 class UpsampleBlock(nn.Layer):
-
-    def __init__(self, log2_count_in: int, log2_count_out: int,
-                 has_attention: bool, has_upsample: bool):
+    def __init__(self, log2_count_in: int, log2_count_out: int, has_attention: bool, has_upsample: bool):
         super().__init__()
         self.has_attention = has_attention
         self.has_upsample = has_upsample
 
-        self.block = nn.LayerList([
-            ResnetBlock(log2_count_in, log2_count_out),
-            ResnetBlock(log2_count_out, log2_count_out),
-            ResnetBlock(log2_count_out, log2_count_out)
-        ])
+        self.block = nn.LayerList(
+            [
+                ResnetBlock(log2_count_in, log2_count_out),
+                ResnetBlock(log2_count_out, log2_count_out),
+                ResnetBlock(log2_count_out, log2_count_out),
+            ]
+        )
 
         if has_attention:
-            self.attn = nn.LayerList(
-                [AttentionBlock(),
-                 AttentionBlock(),
-                 AttentionBlock()])
+            self.attn = nn.LayerList([AttentionBlock(), AttentionBlock(), AttentionBlock()])
 
         if has_upsample:
             self.upsample = Upsample(log2_count_out)
@@ -1627,20 +1595,21 @@ class UpsampleBlock(nn.Layer):
 
 
 class Decoder(nn.Layer):
-
     def __init__(self):
         super().__init__()
 
         self.conv_in = nn.Conv2D(2**8, 2**9, 3, padding=1)
         self.mid = MiddleLayer()
 
-        self.up = nn.LayerList([
-            UpsampleBlock(7, 7, False, False),
-            UpsampleBlock(8, 7, False, True),
-            UpsampleBlock(8, 8, False, True),
-            UpsampleBlock(9, 8, False, True),
-            UpsampleBlock(9, 9, True, True)
-        ])
+        self.up = nn.LayerList(
+            [
+                UpsampleBlock(7, 7, False, False),
+                UpsampleBlock(8, 7, False, True),
+                UpsampleBlock(8, 8, False, True),
+                UpsampleBlock(9, 8, False, True),
+                UpsampleBlock(9, 9, True, True),
+            ]
+        )
 
         self.norm_out = nn.GroupNorm(2**5, 2**7)
         self.conv_out = nn.Conv2D(2**7, 3, 3, padding=1)
@@ -1659,7 +1628,6 @@ class Decoder(nn.Layer):
 
 
 class VQGanDetokenizer(nn.Layer):
-
     def __init__(self, image_vocab_size=2**14, embed_count=256):
         super().__init__()
         self.image_vocab_size = image_vocab_size
@@ -1694,15 +1662,17 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
         self.vqgan_detokenizer = VQGanDetokenizer(2**14, 256)
 
     @paddle.no_grad()
-    def generate(self,
-                 input_ids,
-                 attention_mask=None,
-                 top_k=0,
-                 top_p=1.0,
-                 temperature=1.0,
-                 condition_scale=1.0,
-                 num_return_sequences=1,
-                 **kwargs):
+    def generate(
+        self,
+        input_ids,
+        attention_mask=None,
+        top_k=0,
+        top_p=1.0,
+        temperature=1.0,
+        condition_scale=1.0,
+        num_return_sequences=1,
+        **kwargs
+    ):
         r"""
         The DalleBartForImageGeneration generate method.
         Args:
@@ -1710,20 +1680,20 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
                 See :class:`DalleBartForConditionalGeneration`.
             attention_mask (Tensor, optional):
                 See :class:`DalleBartForConditionalGeneration`.
-            top_k (int, optional): The number of highest probability tokens to 
-                keep for top-k-filtering in the "sampling" strategy. Default to 
+            top_k (int, optional): The number of highest probability tokens to
+                keep for top-k-filtering in the "sampling" strategy. Default to
                 0, which means no effect.
-            top_p (float, optional): The cumulative probability for 
-                top-p-filtering in the "sampling" strategy. The value should 
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
+            top_p (float, optional): The cumulative probability for
+                top-p-filtering in the "sampling" strategy. The value should
+                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
                 effect.
-            temperature (float, optional): The value used to module the next 
-                token probabilities in the "sampling" strategy. Default to 1.0, 
+            temperature (float, optional): The value used to module the next
+                token probabilities in the "sampling" strategy. Default to 1.0,
                 which means no effect.
             condition_scale (float, optional): The scale of super conditioning. See
-                `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__ 
+                `this twitter <https://twitter.com/RiversHaveWings/status/1478093658716966912>`__
                 Default to 1.0.
-            num_return_sequences (int, optional): The number of returned 
+            num_return_sequences (int, optional): The number of returned
                 sequences for each sequence in the batch. Default to 1.
         Returns:
             Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
@@ -1769,12 +1739,10 @@ class DalleBartForImageGeneration(DalleBartForConditionalGeneration):
             temperature=temperature,
             condition_scale=condition_scale,
             num_return_sequences=num_return_sequences,
-            **kwargs)[0]
+            **kwargs,
+        )[0]
         images = self.vqgan_detokenizer(image_tokens)
         # images shape [bs, num_return_sequences, 256, 256, 3]
-        images = images.reshape([
-            -1, num_return_sequences, images.shape[1], images.shape[2],
-            images.shape[3]
-        ])
+        images = images.reshape([-1, num_return_sequences, images.shape[1], images.shape[2], images.shape[3]])
         images = (images.clip(0, 1) * 255).astype("uint8")
         return images

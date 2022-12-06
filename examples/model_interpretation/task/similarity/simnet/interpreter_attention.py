@@ -54,9 +54,7 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
     """
 
     # Seperates data into some batches.
-    batches = [
-        data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
-    ]
+    batches = [data[idx : idx + batch_size] for idx in range(0, len(data), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_token_id),  # query_ids
@@ -68,45 +66,37 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
     model.eval()
     results = []
     for batch in batches:
-        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(
-            batch)
+        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(batch)
         query_ids = paddle.to_tensor(query_ids)
         title_ids = paddle.to_tensor(title_ids)
         query_seq_lens = paddle.to_tensor(query_seq_lens)
         title_seq_lens = paddle.to_tensor(title_seq_lens)
 
-        logits, attention, _ = model.forward_interpret(query_ids, title_ids,
-                                                       query_seq_lens,
-                                                       title_seq_lens)
+        logits, attention, _ = model.forward_interpret(query_ids, title_ids, query_seq_lens, title_seq_lens)
         query_att = attention[0]
         title_att = attention[1]
 
         model.clear_gradients()
-        for query_id, title_id in zip(query_ids.numpy().tolist(),
-                                      title_ids.numpy().tolist()):
+        for query_id, title_id in zip(query_ids.numpy().tolist(), title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]
             title = [vocab._idx_to_token[idx] for idx in title_id]
         results.append([query_att, query, title_att, title])
 
-        print('query_att: %s' % query_att.shape)
-        print('title_att: %s' % title_att.shape)
+        print("query_att: %s" % query_att.shape)
+        print("title_att: %s" % title_att.shape)
 
     return results
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device + ':2')
+    paddle.set_device(args.device + ":2")
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(args.vocab_path,
-                                  unk_token='[UNK]',
-                                  pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token="[UNK]", pad_token="[PAD]")
     tokenizer = CharTokenizer(vocab, args.language)
-    label_map = {0: 'dissimilar', 1: 'similar'}
+    label_map = {0: "dissimilar", 1: "similar"}
 
     # Constructs the newtork.
-    model = SimNet(network=args.network,
-                   vocab_size=len(vocab),
-                   num_classes=len(label_map))
+    model = SimNet(network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
@@ -118,9 +108,11 @@ if __name__ == "__main__":
 
     dev_examples = preprocess_data(dev_ds.data, tokenizer, args.language)
     test_examples = preprocess_data(test_ds.data, tokenizer, args.language)
-    results = interpret(model,
-                        dev_examples,
-                        label_map=label_map,
-                        batch_size=args.batch_size,
-                        pad_token_id=vocab.token_to_idx.get('[PAD]', 0),
-                        vocab=vocab)
+    results = interpret(
+        model,
+        dev_examples,
+        label_map=label_map,
+        batch_size=args.batch_size,
+        pad_token_id=vocab.token_to_idx.get("[PAD]", 0),
+        vocab=vocab,
+    )

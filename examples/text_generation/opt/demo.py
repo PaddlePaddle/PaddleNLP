@@ -1,6 +1,6 @@
 import sys
 
-sys.path.insert(0, '../../../')
+sys.path.insert(0, "../../../")
 from typing import Tuple, List
 from logging import getLogger
 import paddle
@@ -16,12 +16,10 @@ logger = getLogger(__name__)
 
 
 class Demo:
-
     def __init__(self, model_name_or_path, max_predict_len=128):
         self.tokenizer = GPTTokenizer.from_pretrained(model_name_or_path)
         logger.info("Loading the model parameters, please wait...")
-        self.model = OPTForCausalLM.from_pretrained(model_name_or_path,
-                                                    load_state_as_np=True)
+        self.model = OPTForCausalLM.from_pretrained(model_name_or_path, load_state_as_np=True)
         self.model.eval()
         self.max_predict_len = max_predict_len
         logger.info("Model loaded.")
@@ -30,10 +28,8 @@ class Demo:
     def generate(self, inputs):
         ids = self.tokenizer(inputs)["input_ids"]
         input_ids = paddle.to_tensor([ids], dtype="int64")
-        outputs = self.model.generate(input_ids,
-                                      max_length=self.max_predict_len)[0][0]
-        decode_outputs = self.tokenizer.convert_tokens_to_string(
-            self.tokenizer.convert_ids_to_tokens(outputs.cpu()))
+        outputs = self.model.generate(input_ids, max_length=self.max_predict_len)[0][0]
+        decode_outputs = self.tokenizer.convert_tokens_to_string(self.tokenizer.convert_ids_to_tokens(outputs.cpu()))
 
         print(f"input text: \n{inputs}")
         print(f"output text: \n{decode_outputs}")

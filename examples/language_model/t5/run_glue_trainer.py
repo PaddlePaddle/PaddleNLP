@@ -66,20 +66,17 @@ def trans_func(example, tokenizer, args):
             label_text = id2label[example["labels"]]
         else:
             label_text = str(example["labels"])
-        target = tokenizer(label_text,
-                           return_token_type_ids=False,
-                           return_attention_mask=True)
+        target = tokenizer(label_text, return_token_type_ids=False, return_attention_mask=True)
 
     if len(processed) == 1:
         text = processed[0] + example["sentence"]
     else:
-        text = processed[0] + example["sentence1"] + processed[1] + example[
-            "sentence2"]
+        text = processed[0] + example["sentence1"] + processed[1] + example["sentence2"]
 
     source = tokenizer(
         text,
         max_seq_len=args.max_seq_length,
-        padding='max_length',
+        padding="max_length",
         return_token_type_ids=False,
         return_attention_mask=True,
     )
@@ -92,25 +89,23 @@ def trans_func(example, tokenizer, args):
             "decoder_attention_mask": target["attention_mask"],
         }
     else:
-        return {
-            "input_ids": source["input_ids"],
-            "attention_mask": source["attention_mask"]
-        }
+        return {"input_ids": source["input_ids"], "attention_mask": source["attention_mask"]}
 
 
 class BatchDict(object):
-
     def __init__(self, fn):
-        assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
-                                   'Received fn=%s' % (str(fn))
+        assert isinstance(fn, (dict)), (
+            "Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn "
+            "Received fn=%s" % (str(fn))
+        )
 
         self._fn = fn
 
         for col_name, ele_fn in self._fn.items():
-            assert callable(
-                ele_fn
-            ), 'Batchify functions must be callable! type(fn[%d]) = %s' % (
-                col_name, str(type(ele_fn)))
+            assert callable(ele_fn), "Batchify functions must be callable! type(fn[%d]) = %s" % (
+                col_name,
+                str(type(ele_fn)),
+            )
 
     def __call__(self, data):
 
@@ -167,8 +162,7 @@ def get_mnli_dev_dataset(tokenizer, args, matched=True):
         split = "dev_matched"
     else:
         split = "dev_mismatched"
-    filename = os.path.join(args.cache_dir,
-                            args.task_name + f"_{split}" + ".pkl")
+    filename = os.path.join(args.cache_dir, args.task_name + f"_{split}" + ".pkl")
     if os.path.exists(filename):
         ds = load_pickle(filename)
     else:
@@ -192,22 +186,16 @@ class DataArguments:
     the command line.
     """
 
-    task_name: str = field(
-        default=None,
-        metadata={
-            "help": "The name of the task to use (via the datasets library)."
-        })
+    task_name: str = field(default=None, metadata={"help": "The name of the task to use (via the datasets library)."})
 
     max_seq_length: int = field(
         default=128,
         metadata={
-            "help":
-            "The maximum total input sequence length after tokenization. Sequences longer "
+            "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
     )
-    cache_dir: str = field(default="./caches",
-                           metadata={"help": "cache dir for datasets."})
+    cache_dir: str = field(default="./caches", metadata={"help": "cache dir for datasets."})
 
 
 @dataclass
@@ -219,19 +207,16 @@ class ModelArguments:
     model_name_or_path: str = field(
         default="t5-small",
         metadata={
-            "help":
-            "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
-        })
+            "help": "Path to pretrained model or model identifier from https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html"
+        },
+    )
     export_model_dir: Optional[str] = field(
         default=None,
-        metadata={
-            "help": "Path to directory to store the exported inference model."
-        },
+        metadata={"help": "Path to directory to store the exported inference model."},
     )
 
 
 class T5GlueTrainer(Trainer):
-
     def __init__(self, do_generation: bool, label2id, **kwargs):
         super().__init__(**kwargs)
         self.do_generation = do_generation
@@ -243,15 +228,12 @@ class T5GlueTrainer(Trainer):
         inputs: Dict[str, Union[paddle.Tensor, Any]],
         prediction_loss_only: bool,
         ignore_keys: Optional[List[str]] = None,
-    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor],
-               Optional[paddle.Tensor]]:
+    ) -> Tuple[Optional[paddle.Tensor], Optional[paddle.Tensor], Optional[paddle.Tensor]]:
 
         if not self.do_generation:
             return super().prediction_step(
-                model,
-                inputs,
-                prediction_loss_only=prediction_loss_only,
-                ignore_keys=ignore_keys)
+                model, inputs, prediction_loss_only=prediction_loss_only, ignore_keys=ignore_keys
+            )
 
         all_preds = []
         all_labels = []
@@ -266,11 +248,9 @@ class T5GlueTrainer(Trainer):
                 max_length=5,
             )[0]
 
-        for p, l, m in zip(outputs.numpy(), labels.numpy(),
-                           target_mask.numpy()):
+        for p, l, m in zip(outputs.numpy(), labels.numpy(), target_mask.numpy()):
             pred = self.tokenizer.decode(p, skip_special_tokens=True).strip()
-            label = self.tokenizer.decode(l[m.astype("bool")],
-                                          skip_special_tokens=True).strip()
+            label = self.tokenizer.decode(l[m.astype("bool")], skip_special_tokens=True).strip()
 
             if self.label2id:
                 # for classifaction task.
@@ -301,8 +281,7 @@ class T5GlueTrainer(Trainer):
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if "v1_1" in model_args.model_name_or_path:
@@ -319,21 +298,18 @@ def main():
     # Log on each process the small summary:
     logger.warning(
         f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
-        +
-        f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16 or training_args.bf16}"
     )
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(
-            training_args.output_dir
-    ) and training_args.do_train and not training_args.overwrite_output_dir:
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(os.listdir(
-                training_args.output_dir)) > 0:
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome.")
+                "Use --overwrite_output_dir to overcome."
+            )
         elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
@@ -352,38 +328,32 @@ def main():
     generate_max_length = label_length_map[data_args.task_name]
 
     # get model and tokenizer
-    model = T5ForConditionalGeneration.from_pretrained(
-        model_args.model_name_or_path)
+    model = T5ForConditionalGeneration.from_pretrained(model_args.model_name_or_path)
     tokenizer = T5Tokenizer.from_pretrained(model_args.model_name_or_path)
 
     # get dataloader
     train_dataset = get_train_dataset(tokenizer, data_args)
     if data_args.task_name == "mnli":
         eval_dataset = get_mnli_dev_dataset(tokenizer, data_args, matched=True)
-        eval_dataset_mismatch = get_mnli_dev_dataset(tokenizer,
-                                                     data_args,
-                                                     matched=False)
+        eval_dataset_mismatch = get_mnli_dev_dataset(tokenizer, data_args, matched=False)
     else:
         eval_dataset = get_dev_dataset(tokenizer, data_args)
 
-    batchify_fn = lambda samples, fn=BatchDict({
-        "input_ids":
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        "attention_mask":
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # attention_mask
-        "labels":
-        Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        "decoder_attention_mask":
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+    batchify_fn = lambda samples, fn=BatchDict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            "attention_mask": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
+            "labels": Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
+            "decoder_attention_mask": Pad(
+                axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
             ),  # decoder_attention_mask
-    }): fn(samples)
+        }
+    ): fn(samples)
     data_collator = batchify_fn
 
     # Define the metrics of tasks.
     def compute_metrics(p):
-        preds = p.predictions[0] if isinstance(p.predictions,
-                                               tuple) else p.predictions
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
 
         results = {}
         for metric in metric_list:

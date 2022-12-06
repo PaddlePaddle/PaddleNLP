@@ -36,22 +36,17 @@ class Conll2002(DatasetBuilder):
     For more details see https://www.clips.uantwerpen.be/conll2002/ner/
     and https://www.aclweb.org/anthology/W02-2024/
     """
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'url', 'md5'))
-    BASE_URL = 'https://bj.bcebos.com/paddlenlp/datasets/conll2002/'
+
+    META_INFO = collections.namedtuple("META_INFO", ("file", "url", "md5"))
+    BASE_URL = "https://bj.bcebos.com/paddlenlp/datasets/conll2002/"
     BUILDER_CONFIGS = {
-        'es': {
-            'splits': {
-                'train':
-                META_INFO('esp.train', BASE_URL + 'esp.train',
-                          'c8c6b342371b9de2f83a93767d352c17'),
-                'dev':
-                META_INFO('esp.testa', BASE_URL + 'esp.testa',
-                          'de0578160dde26ec68cc580595587dde'),
-                'test':
-                META_INFO('esp.testb', BASE_URL + 'esp.testb',
-                          'c8d35f340685a2ce6559ee90d78f9e37')
+        "es": {
+            "splits": {
+                "train": META_INFO("esp.train", BASE_URL + "esp.train", "c8c6b342371b9de2f83a93767d352c17"),
+                "dev": META_INFO("esp.testa", BASE_URL + "esp.testa", "de0578160dde26ec68cc580595587dde"),
+                "test": META_INFO("esp.testb", BASE_URL + "esp.testb", "c8d35f340685a2ce6559ee90d78f9e37"),
             },
-            'pos_tags': [
+            "pos_tags": [
                 "AO",
                 "AQ",
                 "CC",
@@ -112,50 +107,36 @@ class Conll2002(DatasetBuilder):
                 "VSS",
                 "Y",
                 "Z",
-            ]
+            ],
         },
-        'nl': {
-            'splits': {
-                'train':
-                META_INFO('ned.train', BASE_URL + 'ned.train',
-                          'b6189d04eb34597d2a98ca5cec477605'),
-                'dev':
-                META_INFO('ned.testa', BASE_URL + 'ned.testa',
-                          '626900497823fdbc4f84335518cb85ce'),
-                'test':
-                META_INFO('ned.testb', BASE_URL + 'ned.testb',
-                          'c37de92da20c68c6418a73dd42e322dc')
+        "nl": {
+            "splits": {
+                "train": META_INFO("ned.train", BASE_URL + "ned.train", "b6189d04eb34597d2a98ca5cec477605"),
+                "dev": META_INFO("ned.testa", BASE_URL + "ned.testa", "626900497823fdbc4f84335518cb85ce"),
+                "test": META_INFO("ned.testb", BASE_URL + "ned.testb", "c37de92da20c68c6418a73dd42e322dc"),
             },
-            'pos_tags': [
-                "Adj", "Adv", "Art", "Conj", "Int", "Misc", "N", "Num", "Prep",
-                "Pron", "Punc", "V"
-            ]
-        }
+            "pos_tags": ["Adj", "Adv", "Art", "Conj", "Int", "Misc", "N", "Num", "Prep", "Pron", "Punc", "V"],
+        },
     }
 
     def _get_data(self, mode, **kwargs):
         builder_config = self.BUILDER_CONFIGS[self.name]
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
-        filename, url, data_hash = builder_config['splits'][mode]
+        filename, url, data_hash = builder_config["splits"][mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(url, default_root, data_hash)
         return fullname
 
     def _read(self, filename, *args):
-        with open(filename, 'r', encoding="utf-8") as f:
+        with open(filename, "r", encoding="utf-8") as f:
             tokens = []
             ner_tags = []
             pos_tags = []
             for line in f.readlines():
                 if line.startswith("-DOCSTART-") or line == "" or line == "\n":
                     if tokens:
-                        yield {
-                            "tokens": tokens,
-                            "ner_tags": ner_tags,
-                            "pos_tags": pos_tags
-                        }
+                        yield {"tokens": tokens, "ner_tags": ner_tags, "pos_tags": pos_tags}
                         tokens = []
                         ner_tags = []
                         pos_tags = []
@@ -172,5 +153,6 @@ class Conll2002(DatasetBuilder):
         """
         Returns labels of ner tags and pos tags.
         """
-        return ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"], \
-               self.BUILDER_CONFIGS[self.name]['pos_tags']
+        return ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "B-MISC", "I-MISC"], self.BUILDER_CONFIGS[
+            self.name
+        ]["pos_tags"]

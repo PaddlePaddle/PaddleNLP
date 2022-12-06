@@ -18,13 +18,12 @@ import collections.abc
 import json
 import operator
 
-UNK = '<UNK>'
-BOS = '<BOS>'
-EOS = '<EOS>'
+UNK = "<UNK>"
+BOS = "<BOS>"
+EOS = "<EOS>"
 
 
 class Vocab(collections.abc.Set):
-
     def __init__(self, iterable, special_elems=(UNK, BOS, EOS)):
         elements = list(special_elems)
         elements.extend(iterable)
@@ -45,7 +44,7 @@ class Vocab(collections.abc.Set):
 
     def __getitem__(self, key):
         if isinstance(key, slice):
-            raise TypeError('Slices not supported.')
+            raise TypeError("Slices not supported.")
         return self.id_to_elem[key]
 
     def index(self, value):
@@ -65,13 +64,11 @@ class Vocab(collections.abc.Set):
         return Vocab(json.load(open(in_path)), special_elems=())
 
     def save(self, out_path):
-        with open(out_path, 'w') as ofs:
-            json.dump([self.id_to_elem[i] for i in range(len(self.id_to_elem))],
-                      ofs)
+        with open(out_path, "w") as ofs:
+            json.dump([self.id_to_elem[i] for i in range(len(self.id_to_elem))], ofs)
 
 
 class VocabBuilder:
-
     def __init__(self, min_freq=None, max_count=None):
         self.word_freq = collections.Counter()
         self.min_freq = min_freq
@@ -89,8 +86,7 @@ class VocabBuilder:
                     eligible_words_and_freqs = eligible_words_and_freqs[:i]
                     break
 
-        return Vocab((word for word, freq in sorted(eligible_words_and_freqs)),
-                     *args, **kwargs)
+        return Vocab((word for word, freq in sorted(eligible_words_and_freqs)), *args, **kwargs)
 
     def save(self, path):
         with open(path, "w") as f:

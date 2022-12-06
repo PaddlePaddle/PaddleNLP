@@ -241,7 +241,7 @@ unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus 0,1 train.py \
     --data_dir ./data/ \
     --output_dir checkpoint \
-    --device cpu \
+    --device gpu \
     --learning_rate 3e-5 \
     --num_train_epochs 100 \
     --max_seq_length 128 \

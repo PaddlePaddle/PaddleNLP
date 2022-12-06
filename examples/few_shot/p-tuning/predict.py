@@ -62,15 +62,9 @@ def set_seed(seed):
 def do_predict(model, tokenizer, data_loader, label_normalize_dict):
     model.eval()
 
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
+    normed_labels = [normalized_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
-    origin_labels = [
-        origin_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
+    origin_labels = [origin_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
     label_length = len(normed_labels[0])
 
@@ -80,21 +74,18 @@ def do_predict(model, tokenizer, data_loader, label_normalize_dict):
         src_ids, token_type_ids, masked_positions = batch
 
         # [bs * label_length, vocab_size]
-        prediction_probs = model.predict(input_ids=src_ids,
-                                         token_type_ids=token_type_ids,
-                                         masked_positions=masked_positions)
+        prediction_probs = model.predict(
+            input_ids=src_ids, token_type_ids=token_type_ids, masked_positions=masked_positions
+        )
 
         batch_size = len(src_ids)
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(prediction_probs,
-                                          shape=[batch_size, -1,
-                                                 vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
         # [label_num, label_length]
-        label_ids = np.array(
-            [tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
+        label_ids = np.array([tokenizer(label)["input_ids"][1:-1] for label in normed_labels])
 
         y_pred = np.ones(shape=[batch_size, len(label_ids)])
 
@@ -114,17 +105,14 @@ def do_predict(model, tokenizer, data_loader, label_normalize_dict):
 @paddle.no_grad()
 def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
     """
-        FewCLUE `chid` dataset is specical when evaluate: input slots have 
-        additional `candidate_label_ids`, so need to customize the
-        evaluate function.
+    FewCLUE `chid` dataset is specical when evaluate: input slots have
+    additional `candidate_label_ids`, so need to customize the
+    evaluate function.
     """
 
     model.eval()
 
-    normed_labels = [
-        normalized_lable
-        for origin_lable, normalized_lable in label_normalize_dict.items()
-    ]
+    normed_labels = [normalized_lable for origin_lable, normalized_lable in label_normalize_dict.items()]
 
     label_length = len(normed_labels[0])
 
@@ -133,17 +121,15 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
         src_ids, token_type_ids, masked_positions, candidate_label_ids = batch
 
         # [bs * label_length, vocab_size]
-        prediction_probs = model.predict(input_ids=src_ids,
-                                         token_type_ids=token_type_ids,
-                                         masked_positions=masked_positions)
+        prediction_probs = model.predict(
+            input_ids=src_ids, token_type_ids=token_type_ids, masked_positions=masked_positions
+        )
 
         batch_size = len(src_ids)
         vocab_size = prediction_probs.shape[1]
 
         # prediction_probs: [batch_size, label_lenght, vocab_size]
-        prediction_probs = paddle.reshape(prediction_probs,
-                                          shape=[batch_size, -1,
-                                                 vocab_size]).numpy()
+        prediction_probs = paddle.reshape(prediction_probs, shape=[batch_size, -1, vocab_size]).numpy()
 
         candidate_num = candidate_label_ids.shape[1]
 
@@ -161,8 +147,7 @@ def do_predict_chid(model, tokenizer, data_loader, label_normalize_dict):
                 batch_single_token_prob = []
                 for bs_index in range(batch_size):
                     # [1, 1]
-                    single_token_prob = prediction_probs[
-                        bs_index, index, slice_word_ids[bs_index]]
+                    single_token_prob = prediction_probs[bs_index, index, slice_word_ids[bs_index]]
                     batch_single_token_prob.append(single_token_prob)
 
                 y_pred[:, label_idx] *= np.array(batch_single_token_prob)
@@ -182,14 +167,12 @@ predict_file = {
     "eprstmt": "eprstmt_predict.json",
     "iflytek": "iflytekf_predict.json",
     "ocnli": "ocnlif_predict.json",
-    "tnews": "tnewsf_predict.json"
+    "tnews": "tnewsf_predict.json",
 }
 
 
 def write_iflytek(task_name, output_file, pred_labels):
-    test_ds, train_few_all = load_dataset("fewclue",
-                                          name=args.task_name,
-                                          splits=("test", "train_few_all"))
+    test_ds, train_few_all = load_dataset("fewclue", name=args.task_name, splits=("test", "train_few_all"))
 
     def label2id(train_few_all):
         label2id = {}
@@ -203,7 +186,7 @@ def write_iflytek(task_name, output_file, pred_labels):
     label2id_dict = label2id(train_few_all)
 
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = label2id_dict[pred_labels[idx]]
@@ -215,7 +198,7 @@ def write_iflytek(task_name, output_file, pred_labels):
 def write_bustm(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
@@ -227,20 +210,17 @@ def write_csldcp(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
 
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
             # {"id": 0, "label": "力学"}
-            str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
-                "id", test_example['id'], "label", test_example["label"])
+            str_test_example = '"{}": {}, "{}": "{}"'.format("id", test_example["id"], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")
 
 
 def write_tnews(task_name, output_file, pred_labels):
-    test_ds, train_few_all = load_dataset("fewclue",
-                                          name=args.task_name,
-                                          splits=("test", "train_few_all"))
+    test_ds, train_few_all = load_dataset("fewclue", name=args.task_name, splits=("test", "train_few_all"))
 
     def label2id(train_few_all):
         label2id = {}
@@ -254,7 +234,7 @@ def write_tnews(task_name, output_file, pred_labels):
     label2id_dict = label2id(train_few_all)
 
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = label2id_dict[pred_labels[idx]]
@@ -266,20 +246,19 @@ def write_tnews(task_name, output_file, pred_labels):
 def write_cluewsc(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
             # {"id": 0, "label": "力学"}
-            str_test_example = "\"{}\": {}, \"{}\": \"{}\"".format(
-                "id", test_example['id'], "label", test_example["label"])
+            str_test_example = '"{}": {}, "{}": "{}"'.format("id", test_example["id"], "label", test_example["label"])
             f.write("{" + str_test_example + "}\n")
 
 
 def write_eprstmt(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
@@ -291,7 +270,7 @@ def write_eprstmt(task_name, output_file, pred_labels):
 def write_ocnli(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
@@ -302,7 +281,7 @@ def write_ocnli(task_name, output_file, pred_labels):
 def write_csl(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["label"] = pred_labels[idx]
@@ -313,12 +292,11 @@ def write_csl(task_name, output_file, pred_labels):
 def write_chid(task_name, output_file, pred_labels):
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
     test_example = {}
-    with open(output_file, 'w', encoding='utf-8') as f:
+    with open(output_file, "w", encoding="utf-8") as f:
         for idx, example in enumerate(test_ds):
             test_example["id"] = example["id"]
             test_example["answer"] = pred_labels[idx]
-            str_test_example = "\"{}\": {}, \"{}\": {}".format(
-                "id", test_example['id'], "answer", test_example["answer"])
+            str_test_example = '"{}": {}, "{}": {}'.format("id", test_example["id"], "answer", test_example["answer"])
             f.write("{" + str_test_example + "}\n")
 
 
@@ -331,18 +309,17 @@ write_fn = {
     "eprstmt": write_eprstmt,
     "ocnli": write_ocnli,
     "csl": write_csl,
-    "chid": write_chid
+    "chid": write_chid,
 }
 
 if __name__ == "__main__":
     paddle.set_device(args.device)
     set_seed(args.seed)
 
-    label_normalize_json = os.path.join("./label_normalized",
-                                        args.task_name + ".json")
+    label_normalize_json = os.path.join("./label_normalized", args.task_name + ".json")
 
     label_norm_dict = None
-    with open(label_normalize_json, encoding='utf-8') as f:
+    with open(label_normalize_json, encoding="utf-8") as f:
         label_norm_dict = json.load(f)
 
     convert_example_fn = convert_example if args.task_name != "chid" else convert_chid_example
@@ -352,9 +329,7 @@ if __name__ == "__main__":
     test_ds = load_dataset("fewclue", name=args.task_name, splits=("test"))
 
     # Task related transform operations, eg: numbert label -> text_label, english -> chinese
-    transform_fn = partial(transform_fn_dict[args.task_name],
-                           label_normalize_dict=label_norm_dict,
-                           is_test=True)
+    transform_fn = partial(transform_fn_dict[args.task_name], label_normalize_dict=label_norm_dict, is_test=True)
 
     # Some fewshot_learning strategy is defined by transform_fn
     # Note: Set lazy=False to transform example inplace immediately,
@@ -362,8 +337,8 @@ if __name__ == "__main__":
     # iterate multi-times for train_ds
     test_ds = test_ds.map(transform_fn, lazy=False)
 
-    model = ErnieForPretraining.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    model = ErnieForPretraining.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     # Load parameters of best model on test_public.json of current task
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
@@ -371,8 +346,7 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.init_from_ckpt)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     if args.task_name != "chid":
         # [src_ids, token_type_ids, masked_positions, masked_lm_labels]
@@ -387,24 +361,22 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # src_ids
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type_ids
             Stack(dtype="int64"),  # masked_positions
-            Stack(dtype="int64"
-                  ),  # candidate_labels_ids [candidate_num, label_length]
+            Stack(dtype="int64"),  # candidate_labels_ids [candidate_num, label_length]
         ): [data for data in fn(samples)]
 
-    trans_func = partial(convert_example_fn,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length,
-                         p_embedding_num=args.p_embedding_num,
-                         is_test=True)
+    trans_func = partial(
+        convert_example_fn,
+        tokenizer=tokenizer,
+        max_seq_length=args.max_seq_length,
+        p_embedding_num=args.p_embedding_num,
+        is_test=True,
+    )
 
-    test_data_loader = create_dataloader(test_ds,
-                                         mode='eval',
-                                         batch_size=args.batch_size,
-                                         batchify_fn=batchify_fn,
-                                         trans_fn=trans_func)
+    test_data_loader = create_dataloader(
+        test_ds, mode="eval", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    y_pred_labels = predict_fn(model, tokenizer, test_data_loader,
-                               label_norm_dict)
+    y_pred_labels = predict_fn(model, tokenizer, test_data_loader, label_norm_dict)
     output_file = os.path.join(args.output_dir, predict_file[args.task_name])
 
     write_fn[args.task_name](args.task_name, output_file, y_pred_labels)

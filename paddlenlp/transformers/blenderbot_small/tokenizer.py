@@ -17,7 +17,7 @@
 from ..gpt.tokenizer import GPTTokenizer
 import re
 
-__all__ = ['BlenderbotSmallTokenizer']
+__all__ = ["BlenderbotSmallTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"blenderbot_small-90M": 512}
 
@@ -67,44 +67,42 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
             #   {'input_ids': [42, 643, 46, 1430, 45, 52, 1176, 146, 177, 753, 2430, 5],
             #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
     """
-    resource_files_names = {
-        "vocab_file": "vocab.json",
-        "merges_file": "merges.txt"
-    }
+    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "blenderbot_small-90M":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot_small/blenderbot_small-90M-vocab.json",
+            "blenderbot_small-90M": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot_small/blenderbot_small-90M-vocab.json",
         },
         "merges_file": {
-            "blenderbot_small-90M":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot_small/blenderbot_small-90M-merges.txt",
-        }
+            "blenderbot_small-90M": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot_small/blenderbot_small-90M-merges.txt",
+        },
     }
     pretrained_init_configuration = {"blenderbot_small-90M": {}}
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 max_len=None,
-                 special_tokens=None,
-                 bos_token="__start__",
-                 eos_token="__end__",
-                 unk_token="__unk__",
-                 pad_token="__null__",
-                 eol_token="__newln__",
-                 **kwargs):
-        super(BlenderbotSmallTokenizer,
-              self).__init__(vocab_file=vocab_file,
-                             merges_file=merges_file,
-                             errors=errors,
-                             max_len=max_len,
-                             special_tokens=special_tokens,
-                             pad_token=pad_token,
-                             eos_token=eos_token,
-                             eol_token=eol_token)
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        max_len=None,
+        special_tokens=None,
+        bos_token="__start__",
+        eos_token="__end__",
+        unk_token="__unk__",
+        pad_token="__null__",
+        eol_token="__newln__",
+        **kwargs
+    ):
+        super(BlenderbotSmallTokenizer, self).__init__(
+            vocab_file=vocab_file,
+            merges_file=merges_file,
+            errors=errors,
+            max_len=max_len,
+            special_tokens=special_tokens,
+            pad_token=pad_token,
+            eos_token=eos_token,
+            eol_token=eol_token,
+        )
         self.pat = r"\S+\n?"  # String matching pattern of BlenderbotSmall is different from Blenderbot
         self.unk_id = self.encoder[unk_token]
         self.eol_token = eol_token
@@ -143,9 +141,7 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
                 continue
 
             while True:
-                bigram = min(
-                    pairs,
-                    key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+                bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
                 if bigram not in self.bpe_ranks:
                     break
                 first, second = bigram
@@ -161,8 +157,7 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
                         new_word.extend(word[i:])
                         break
 
-                    if word[i] == first and i < len(word) - 1 and word[
-                            i + 1] == second:
+                    if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                         new_word.append(first + second)
                         i += 2
                     else:
@@ -192,10 +187,7 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
         """
         return " ".join(tokens).replace("@@ ", "").strip()
 
-    def convert_ids_to_string(self,
-                              ids,
-                              skip_special_tokens=True,
-                              clean_up_tokenization_spaces=True):
+    def convert_ids_to_string(self, ids, skip_special_tokens=True, clean_up_tokenization_spaces=True):
         """
         Converts a sequence of ids (list of integers) to a single string.
         Args:
@@ -209,14 +201,19 @@ class BlenderbotSmallTokenizer(GPTTokenizer):
         Returns:
             str: Converted string.
         """
-        tokens = self.convert_ids_to_tokens(
-            ids, skip_special_tokens=skip_special_tokens)
+        tokens = self.convert_ids_to_tokens(ids, skip_special_tokens=skip_special_tokens)
         output_string = self.convert_tokens_to_string(tokens)
         if clean_up_tokenization_spaces:
-            output_string = (output_string.replace(" .", ".").replace(
-                " ?", "?").replace(" !", "!").replace(" ,", ",").replace(
-                    " ' ",
-                    "'").replace(" n't", "n't").replace(" 'm", "'m").replace(
-                        " 's", "'s").replace(" 've",
-                                             "'ve").replace(" 're", "'re"))
+            output_string = (
+                output_string.replace(" .", ".")
+                .replace(" ?", "?")
+                .replace(" !", "!")
+                .replace(" ,", ",")
+                .replace(" ' ", "'")
+                .replace(" n't", "n't")
+                .replace(" 'm", "'m")
+                .replace(" 's", "'s")
+                .replace(" 've", "'ve")
+                .replace(" 're", "'re")
+            )
         return output_string

@@ -19,12 +19,12 @@ import numpy as np
 
 def init_client():
     client = PipelineClient()
-    client.connect(['127.0.0.1:18090'])
+    client.connect(["127.0.0.1:18090"])
     return client
 
 
 def test_demo(client, data):
-    data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
+    data = np.array([x.encode("utf-8") for x in data], dtype=np.object_)
     ret = client.predict(feed_dict={"sentence": data})
     out_dict = {}
     for key, value in zip(ret.key, ret.value):
@@ -34,7 +34,8 @@ def test_demo(client, data):
 
 def test_tnews_dataset(client):
     from paddlenlp.datasets import load_dataset
-    dev_ds = load_dataset('clue', "tnews", splits='dev')
+
+    dev_ds = load_dataset("clue", "tnews", splits="dev")
 
     batches = []
     labels = []
@@ -59,7 +60,7 @@ def test_tnews_dataset(client):
     """
     accuracy = 0
     for i, data in enumerate(batches):
-        data = np.array([x.encode('utf-8') for x in data], dtype=np.object_)
+        data = np.array([x.encode("utf-8") for x in data], dtype=np.object_)
         ret = client.predict(feed_dict={"sentence": data})
         # print("ret:", ret)
         for index, value in zip(ret.key, ret.value):
@@ -73,7 +74,7 @@ def test_tnews_dataset(client):
 
 if __name__ == "__main__":
     client = init_client()
-    texts = ['未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？', '黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤']
+    texts = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
     output = test_demo(client, texts)
     print(output)
     test_tnews_dataset(client)

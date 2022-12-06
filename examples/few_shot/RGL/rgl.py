@@ -60,12 +60,12 @@ args = parser.parse_args()
 
 check_args(args)
 for arg in vars(args):
-    logger.info(format(arg, '<20') + format(str(getattr(args, arg)), '<'))
+    logger.info(format(arg, "<20") + format(str(getattr(args, arg)), "<"))
 
 
 @paddle.no_grad()
 def evaluate(model, dataloader, metric, verbalizer, task_type, bound=(0, 5)):
-    if task_type == 'regression':
+    if task_type == "regression":
         logsoftmax = nn.LogSoftmax(axis=-1)
         lb, ub = bound
     model.eval()
@@ -73,26 +73,24 @@ def evaluate(model, dataloader, metric, verbalizer, task_type, bound=(0, 5)):
     logits_list = []
     labels_list = []
     for batch in dataloader:
-        logits = model(input_ids=batch['input_ids'],
-                       attention_mask=batch['attention_mask'])
+        logits = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
         label_logits = verbalizer.process_logits(logits, batch["mask_ids"])
-        if task_type == 'regression':
+        if task_type == "regression":
             label_logits = logsoftmax(label_logits)
-            label_logits = paddle.exp(
-                label_logits[..., 1].unsqueeze(-1)) * (ub - lb) + lb
-        correct = metric.compute(label_logits, batch['label'])
+            label_logits = paddle.exp(label_logits[..., 1].unsqueeze(-1)) * (ub - lb) + lb
+        correct = metric.compute(label_logits, batch["label"])
         metric.update(correct)
     score = metric.accumulate()
     score = score if isinstance(score, (list, tuple)) else [score]
-    logger.info('{:>20}'.format('Evaluation results:'))
+    logger.info("{:>20}".format("Evaluation results:"))
     for name, value in zip(metric.name(), score):
-        logger.info('{:>20} = {:.6f}'.format(name, value))
+        logger.info("{:>20} = {:.6f}".format(name, value))
     model.train()
     return score[0]
 
 
-def contrastive_loss(sentence_embeddings, labels, task_type='classification'):
-    """ Compute the loss proposed in RGL method. """
+def contrastive_loss(sentence_embeddings, labels, task_type="classification"):
+    """Compute the loss proposed in RGL method."""
 
     def _raw_equal(x, y):
         return int(x == y)
@@ -100,7 +98,7 @@ def contrastive_loss(sentence_embeddings, labels, task_type='classification'):
     def _max_equal(x, y):
         return int(np.argmax(x, axis=0) == np.argmax(y, axis=0))
 
-    equal_int = _raw_equal if task_type == 'classification' else _max_equal
+    equal_int = _raw_equal if task_type == "classification" else _max_equal
     bce_metric = nn.CrossEntropyLoss()
     cos_metric = nn.CosineSimilarity(axis=0, eps=1e-6)
     batch_size = sentence_embeddings.shape[0]
@@ -109,11 +107,9 @@ def contrastive_loss(sentence_embeddings, labels, task_type='classification'):
         for j in range(batch_size):
             score = cos_metric(sentence_embeddings[i], sentence_embeddings[j])
             score = score.unsqueeze(0)
-            logits = paddle.concat([(1 - score) * 50, (1 + score) * 50],
-                                   axis=-1)
+            logits = paddle.concat([(1 - score) * 50, (1 + score) * 50], axis=-1)
             label = paddle.to_tensor(equal_int(labels[i], labels[j]))
-            loss += bce_metric(logits.reshape([-1, logits.shape[-1]]),
-                               label.unsqueeze(0))
+            loss += bce_metric(logits.reshape([-1, logits.shape[-1]]), label.unsqueeze(0))
     loss = loss / (batch_size * (batch_size - 1))
     loss = loss / 100
     return loss
@@ -129,86 +125,69 @@ def main():
     tokenizer_wrapper = MLMTokenizerWrapper(args.max_seq_length, tokenizer)
 
     train_ds, dev_ds, test_ds, label_list = load_dataset(
-        args.dataset, data_path=args.data_path, splits=['train', 'dev', 'test'])
+        args.dataset, data_path=args.data_path, splits=["train", "dev", "test"]
+    )
 
     template = ManualTemplate(tokenizer, args.template)
-    logger.info('Set template: {}'.format(template.template))
-    verbalizer = ManualVerbalizer(tokenizer,
-                                  labels=label_list,
-                                  label_to_words=eval(args.verbalizer),
-                                  prefix=' ')
-    logger.info('Set verbalizer: {}'.format(args.verbalizer))
+    logger.info("Set template: {}".format(template.template))
+    verbalizer = ManualVerbalizer(tokenizer, labels=label_list, label_to_words=eval(args.verbalizer), prefix=" ")
+    logger.info("Set verbalizer: {}".format(args.verbalizer))
 
-    trans_fn = partial(convert_example,
-                       template=template,
-                       verbalizer=verbalizer,
-                       tokenizer_wrapper=tokenizer_wrapper)
+    trans_fn = partial(convert_example, template=template, verbalizer=verbalizer, tokenizer_wrapper=tokenizer_wrapper)
 
-    train_loader = create_dataloader(train_ds, 'train', args.batch_size,
-                                     InputFeatures.collate_fn, trans_fn)
-    dev_loader = create_dataloader(dev_ds, 'dev', args.batch_size,
-                                   InputFeatures.collate_fn, trans_fn)
-    test_loader = create_dataloader(test_ds, 'test', args.batch_size,
-                                    InputFeatures.collate_fn, trans_fn)
+    train_loader = create_dataloader(train_ds, "train", args.batch_size, InputFeatures.collate_fn, trans_fn)
+    dev_loader = create_dataloader(dev_ds, "dev", args.batch_size, InputFeatures.collate_fn, trans_fn)
+    test_loader = create_dataloader(test_ds, "test", args.batch_size, InputFeatures.collate_fn, trans_fn)
     if args.max_steps > 0:
-        num_epoch = args.max_steps // len(train_loader) + int(
-            args.max_steps % len(train_loader) > 0)
+        num_epoch = args.max_steps // len(train_loader) + int(args.max_steps % len(train_loader) > 0)
         max_steps = args.max_steps
     else:
         num_epoch = args.num_epoch
         max_steps = args.num_epoch * len(train_loader)
 
-    lr_scheduler = LinearSchedulerWarmup(args.learning_rate, args.warmup_steps,
-                                         max_steps)
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ['bias', 'norm'])
-    ]
+    lr_scheduler = LinearSchedulerWarmup(args.learning_rate, args.warmup_steps, max_steps)
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         grad_clip=paddle.nn.ClipGradByGlobalNorm(args.max_grad_norm),
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     metric_fn = METRIC_MAPPING[args.dataset]
-    if task_type == 'regression':
+    if task_type == "regression":
         loss_fn = nn.KLDivLoss()
         lb, ub = 0, 5
         logsoftmax = nn.LogSoftmax(axis=-1)
     else:
         loss_fn = nn.CrossEntropyLoss()
     with LogWriter(logdir="./log/pet/train") as writer:
-        best_metric = -float('inf')
+        best_metric = -float("inf")
         global_step = 1
         global_loss = 0
         for epoch in range(1, num_epoch + 1):
             for step, batch in enumerate(train_loader, start=1):
-                writer.add_scalar('train/lr', lr_scheduler.get_lr(),
-                                  global_step)
+                writer.add_scalar("train/lr", lr_scheduler.get_lr(), global_step)
 
-                logits = model(input_ids=batch['input_ids'],
-                               attention_mask=batch['attention_mask'])
-                label_logits = verbalizer.process_logits(
-                    logits, batch["mask_ids"])
-                if task_type == 'regression':
+                logits = model(input_ids=batch["input_ids"], attention_mask=batch["attention_mask"])
+                label_logits = verbalizer.process_logits(logits, batch["mask_ids"])
+                if task_type == "regression":
                     label_logits = logsoftmax(label_logits)
 
-                    labels = paddle.stack([
-                        1 - (batch['label'].reshape([-1]) - lb) / (ub - lb),
-                        (batch['label'].reshape([-1]) - lb) / (ub - lb)
-                    ],
-                                          axis=-1)
+                    labels = paddle.stack(
+                        [
+                            1 - (batch["label"].reshape([-1]) - lb) / (ub - lb),
+                            (batch["label"].reshape([-1]) - lb) / (ub - lb),
+                        ],
+                        axis=-1,
+                    )
                     loss = loss_fn(label_logits.reshape([-1, 2]), labels)
                 else:
-                    labels = paddle.to_tensor(batch['label'], dtype='int64')
-                    loss = loss_fn(
-                        label_logits.reshape([-1, label_logits.shape[-1]]),
-                        labels.reshape([-1]))
+                    labels = paddle.to_tensor(batch["label"], dtype="int64")
+                    loss = loss_fn(label_logits.reshape([-1, label_logits.shape[-1]]), labels.reshape([-1]))
                 if args.alpha > 0:
-                    con_loss = contrastive_loss(logits,
-                                                labels,
-                                                task_type=task_type)
+                    con_loss = contrastive_loss(logits, labels, task_type=task_type)
                     loss += args.alpha * con_loss
                 global_loss += loss.item()
 
@@ -217,22 +196,23 @@ def main():
                 lr_scheduler.step()
                 optimizer.clear_grad()
 
-                writer.add_scalar('train/loss', loss.item(), global_step)
+                writer.add_scalar("train/loss", loss.item(), global_step)
 
                 if global_step % args.logging_step == 0:
                     avg_loss = global_loss / args.logging_step
                     logger.info(
-                        'Epoch: {:3d}/{:3d}, Global Step: {:4d}, Loss: {:e}'.
-                        format(epoch, num_epoch, global_step, avg_loss))
+                        "Epoch: {:3d}/{:3d}, Global Step: {:4d}, Loss: {:e}".format(
+                            epoch, num_epoch, global_step, avg_loss
+                        )
+                    )
                     global_loss = 0
 
                 if global_step % args.eval_step == 0:
-                    logger.info('{0:-^30}'.format(' Validate '))
-                    value = evaluate(model, dev_loader, metric_fn, verbalizer,
-                                     task_type)
+                    logger.info("{0:-^30}".format(" Validate "))
+                    value = evaluate(model, dev_loader, metric_fn, verbalizer, task_type)
                     if args.save_best and value > best_metric:
                         best_metric = value
-                        save_path = os.path.join(args.output_dir, 'model_best')
+                        save_path = os.path.join(args.output_dir, "model_best")
                         if not os.path.exists(save_path):
                             os.makedirs(save_path)
                         model.save_pretrained(model_path)
@@ -242,15 +222,15 @@ def main():
                 if global_step > max_steps:
                     break
 
-        logger.info('{0:-^30}'.format(' Test '))
+        logger.info("{0:-^30}".format(" Test "))
         evaluate(model, test_loader, metric_fn, verbalizer, task_type)
         if not args.save_best:
-            save_path = os.path.join(args.output_dir, 'model_last')
+            save_path = os.path.join(args.output_dir, "model_last")
             if not os.path.exists(save_path):
                 os.makedirs(save_path)
             model.save_pretrained(save_path)
             tokenizer.save_pretrained(save_path)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -48,7 +48,6 @@ pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 ### 1.3 使用trainner开启训练
 #### 1.3.1 硬件要求
 Tips：
-- FP16 O2 在 32GB 的显卡上可正常训练。
 - FP32 在 40GB 的显卡上可正常训练。
 
 #### 1.3.2 单机单卡训练
@@ -287,6 +286,8 @@ python generate_images.py \
     --guidance_scales 3 4 5 6 7 8 \
     --seed 42 \
     --scheduler_type ddim \
+    --height 256 \
+    --width 256 \
     --num_inference_steps 50 \
     --device gpu
 ```
@@ -296,9 +297,11 @@ python generate_images.py \
 > * `--batch_size`: 生成图片所使用的batch_size。
 > * `--save_path`: 生成的图片所要保存的路径。
 > * `--guidance_scales`: guidance_scales值，我们可以输入3 4 5 6 7 8。
-> * `--seed`: 为了保证不同guidance_scales值，能够使用相同的`latents`初始值。
+> * `--seed`: 为了保证不同guidance_scales值，能够使用相同的`latents`初始值, `-1`表示不使用随机种子。
 > * `--scheduler_type`: 采样器的类型，支持`ddim`, `pndm`, `euler-ancest` 和 `lms`。
 > * `--num_inference_steps`: 推理预测时候使用的步数。
+> * `--height`: 生成图片的高度。
+> * `--width`: 生成图片的宽度。
 > * `--device`: 使用的设备，可以是`gpu`, `cpu`, `gpu:0`, `gpu:1`等。
 
 
