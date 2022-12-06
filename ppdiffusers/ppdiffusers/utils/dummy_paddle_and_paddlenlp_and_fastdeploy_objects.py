@@ -34,7 +34,7 @@ class FastDeployStableDiffusionImg2ImgPipeline(metaclass=DummyObject):
         requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
 
 
-class FastdeployStableDiffusionInpaintPipeline(metaclass=DummyObject):
+class FastDeployStableDiffusionInpaintPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp", "fastdeploy"]
 
     def __init__(self, *args, **kwargs):
@@ -49,7 +49,37 @@ class FastdeployStableDiffusionInpaintPipeline(metaclass=DummyObject):
         requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
 
 
-class FastdeployStableDiffusionPipeline(metaclass=DummyObject):
+class FastDeployStableDiffusionInpaintPipelineLegacy(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "fastdeploy"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+
+class FastDeployStableDiffusionMegaPipeline(metaclass=DummyObject):
+    _backends = ["paddle", "paddlenlp", "fastdeploy"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle", "paddlenlp", "fastdeploy"])
+
+
+class FastDeployStableDiffusionPipeline(metaclass=DummyObject):
     _backends = ["paddle", "paddlenlp", "fastdeploy"]
 
     def __init__(self, *args, **kwargs):

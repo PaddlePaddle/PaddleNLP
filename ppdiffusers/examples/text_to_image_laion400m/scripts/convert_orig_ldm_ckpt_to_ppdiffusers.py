@@ -12,12 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
-import torch
-import paddle
-
-paddle.set_device("cpu")
 import argparse
+import os
+
+import paddle
+import torch
 
 try:
     from omegaconf import OmegaConf
@@ -25,17 +24,19 @@ except ImportError:
     raise ImportError(
         "OmegaConf is required to convert the LDM checkpoints. Please install it with `pip install OmegaConf`."
     )
-from ppdiffusers import (
-    LDMBertModel,
-    AutoencoderKL,
-    UNet2DConditionModel,
-    DDIMScheduler,
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    EulerAncestralDiscreteScheduler,
-    LDMTextToImagePipeline,
-)
 from paddlenlp.transformers import BertTokenizer
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
+    LDMBertModel,
+    LDMTextToImagePipeline,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    UNet2DConditionModel,
+)
+
+paddle.set_device("cpu")
 
 
 def shave_segments(path, n_shave_prefix_segments=1):
@@ -546,6 +547,7 @@ def convert_diffusers_vae_unet_to_ppdiffusers(vae_or_unet, diffusers_vae_unet_ch
 
 
 def check_keys(model, state_dict):
+    cls_name = model.__class__.__name__
     missing_keys = []
     mismatched_keys = []
     for k, v in model.state_dict().items():
@@ -554,11 +556,11 @@ def check_keys(model, state_dict):
         if list(v.shape) != list(state_dict[k].shape):
             mismatched_keys.append(k)
     if len(missing_keys):
-        missing_keys_str = ",".join(missing_keys)
-        print(f"Found missing_keys {missing_keys_str}!")
+        missing_keys_str = ", ".join(missing_keys)
+        print(f"{cls_name} Found missing_keys {missing_keys_str}!")
     if len(mismatched_keys):
-        mismatched_keys_str = ",".join(mismatched_keys)
-        print(f"Found mismatched_keys {mismatched_keys_str}!")
+        mismatched_keys_str = ", ".join(mismatched_keys)
+        print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
 
 
 def get_default(params, key, default):
@@ -740,10 +742,13 @@ if __name__ == "__main__":
     beta_end = original_config.model.params.linear_end
     if args.scheduler_type == "pndm":
         scheduler = PNDMScheduler(
+            beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            beta_start=beta_start,
-            num_train_timesteps=num_train_timesteps,
+            # Make sure the scheduler compatible with DDIM
+            set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
     elif args.scheduler_type == "lms":
@@ -757,8 +762,10 @@ if __name__ == "__main__":
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
+            # Make sure the scheduler compatible with DDIM
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
         )
     else:
         raise ValueError(f"Scheduler of type {args.scheduler_type} doesn't exist!")

@@ -12,17 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 import random
+
 import paddle
 from tqdm.auto import tqdm
+
 from ppdiffusers import (
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    EulerAncestralDiscreteScheduler,
     DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
     LDMTextToImagePipeline,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
 )
 
 
@@ -54,15 +56,18 @@ def generate_images(
     paddle.set_device(device)
     pipe = LDMTextToImagePipeline.from_pretrained(model_name_or_path)
     pipe.set_progress_bar_config(disable=True)
-    num_train_timesteps = pipe.scheduler.num_train_timesteps
     beta_start = pipe.scheduler.beta_start
     beta_end = pipe.scheduler.beta_end
     if scheduler_type == "pndm":
         scheduler = PNDMScheduler(
+            beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            beta_start=beta_start,
-            num_train_timesteps=num_train_timesteps,
+            # Make sure the scheduler compatible with DDIM
+            clip_sample=False,
+            set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
     elif scheduler_type == "lms":
@@ -76,8 +81,10 @@ def generate_images(
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
+            # Make sure the scheduler compatible with DDIM
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
         )
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")

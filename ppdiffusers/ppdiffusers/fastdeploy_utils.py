@@ -22,8 +22,12 @@ from typing import Optional, Union
 import numpy as np
 
 from .download_utils import ppdiffusers_bos_download
-
-from .utils import FASTDEPLOY_WEIGHTS_NAME, FASTDEPLOY_MODEL_NAME, is_fastdeploy_available, logging
+from .utils import (
+    FASTDEPLOY_MODEL_NAME,
+    FASTDEPLOY_WEIGHTS_NAME,
+    is_fastdeploy_available,
+    logging,
+)
 
 if is_fastdeploy_available():
     import fastdeploy as fd
@@ -44,7 +48,11 @@ class FastDeployRuntimeModel:
         return self.model.infer(inputs)
 
     @staticmethod
-    def load_model(model_path: Union[str, Path], params_path: Union[str, Path], runtime_option=None):
+    def load_model(
+        model_path: Union[str, Path],
+        params_path: Union[str, Path],
+        runtime_options: Optional["fd.RuntimeOption"] = None,
+    ):
         """
         Loads an FastDeploy Inference Model with fastdeploy.RuntimeOption
 
@@ -53,12 +61,12 @@ class FastDeployRuntimeModel:
                 Model path from which to load
             params_path (`str` or `Path`):
                 Params path from which to load
-            runtime_option(fd.RuntimeOption, *optional*):
+            runtime_options (fd.RuntimeOption, *optional*):
                 The RuntimeOption of fastdeploy to initialize the fastdeploy runtime. Default setting
                 the device to cpu and the backend to paddle inference
         """
-        option = runtime_option
-        if option is None or not isinstance(runtime_option, fd.RuntimeOption):
+        option = runtime_options
+        if option is None or not isinstance(runtime_options, fd.RuntimeOption):
             logger.info("No fastdeploy.RuntimeOption specified, using CPU device and paddle inference backend.")
             option = fd.RuntimeOption()
             option.use_paddle_backend()
@@ -75,7 +83,7 @@ class FastDeployRuntimeModel:
     ):
         """
         Save a model and its configuration file to a directory, so that it can be re-loaded using the
-        [`~optimum.onnxruntime.modeling_ort.ORTModel.from_pretrained`] class method. It will always save the
+        [`~FastDeployRuntimeModel.from_pretrained`] class method. It will always save the
         latest_model_name.
 
         Arguments:
@@ -109,7 +117,7 @@ class FastDeployRuntimeModel:
         **kwargs,
     ):
         """
-        Save a model to a directory, so that it can be re-loaded using the [`~OnnxModel.from_pretrained`] class
+        Save a model to a directory, so that it can be re-loaded using the [`~FastDeployRuntimeModel.from_pretrained`] class
         method.:
 
         Arguments:
@@ -132,11 +140,11 @@ class FastDeployRuntimeModel:
         cache_dir: Optional[str] = None,
         model_file_name: Optional[str] = None,
         params_file_name: Optional[str] = None,
-        runtime_option: Optional["fastdeploy.RuntimeOption"] = None,
+        runtime_options: Optional["fd.RuntimeOption"] = None,
         **kwargs,
     ):
         """
-        Load a model from a directory or the HF Hub.
+        Load a model from a directory or the BOS.
 
         Arguments:
             pretrained_model_name_or_path (`str` or `Path`):
@@ -144,13 +152,13 @@ class FastDeployRuntimeModel:
             cache_dir (`Union[str, Path]`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
-            model_file_name(`str`):
+            model_file_name (`str`):
                 Overwrites the default model file name from `"inference.pdmodel"` to `file_name`. This allows you to load
                 different model files from the same repository or directory.
-            params_file_name(`str`):
+            params_file_name (`str`):
                 Overwrites the default params file name from `"inference.pdiparams"` to `file_name`. This allows you to load
                 different model files from the same repository or directory.
-            runtime_option(`fastdeploy.RuntimeOption`, *optional*):
+            runtime_options (`fastdeploy.RuntimeOption`, *optional*):
                 The RuntimeOption of fastdeploy.
             kwargs (`Dict`, *optional*):
                 kwargs will be passed to the model during initialization
@@ -162,7 +170,7 @@ class FastDeployRuntimeModel:
             model = FastDeployRuntimeModel.load_model(
                 os.path.join(pretrained_model_name_or_path, model_file_name),
                 os.path.join(pretrained_model_name_or_path, params_file_name),
-                runtime_option=runtime_option,
+                runtime_options=runtime_options,
             )
             kwargs["model_save_dir"] = Path(pretrained_model_name_or_path)
         # load model from hub
@@ -171,36 +179,37 @@ class FastDeployRuntimeModel:
             model_cache_path = ppdiffusers_bos_download(
                 pretrained_model_name_or_path=pretrained_model_name_or_path,
                 filename=model_file_name,
+                cache_dir=cache_dir,
             )
             # download params
             params_cache_path = ppdiffusers_bos_download(
                 pretrained_model_name_or_path=pretrained_model_name_or_path,
                 filename=params_file_name,
+                cache_dir=cache_dir,
             )
             kwargs["model_save_dir"] = Path(model_cache_path).parent
             kwargs["latest_model_name"] = Path(model_cache_path).name
             kwargs["latest_params_name"] = Path(params_cache_path).name
             model = FastDeployRuntimeModel.load_model(
-                model_cache_path, params_cache_path, runtime_option=runtime_option
+                model_cache_path, params_cache_path, runtime_options=runtime_options
             )
         return cls(model=model, **kwargs)
 
     @classmethod
     def from_pretrained(
         cls,
-        model_id: Union[str, Path],
-        force_download: bool = True,
-        use_auth_token: Optional[str] = None,
+        pretrained_model_name_or_path: Union[str, Path],
+        cache_dir: Optional[str] = None,
+        model_file_name: Optional[str] = None,
+        params_file_name: Optional[str] = None,
+        runtime_options: Optional["fd.RuntimeOption"] = None,
         **model_kwargs,
     ):
-        revision = None
-        if len(str(model_id).split("@")) == 2:
-            model_id, revision = model_id.split("@")
-
         return cls._from_pretrained(
-            model_id=model_id,
-            revision=revision,
-            force_download=force_download,
-            use_auth_token=use_auth_token,
+            pretrained_model_name_or_path=pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            model_file_name=model_file_name,
+            params_file_name=params_file_name,
+            runtime_options=runtime_options,
             **model_kwargs,
         )

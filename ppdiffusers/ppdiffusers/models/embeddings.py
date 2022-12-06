@@ -42,7 +42,7 @@ def get_timestep_embedding(
     exponent = exponent / (half_dim - downscale_freq_shift)
 
     emb = paddle.exp(exponent)
-    emb = timesteps[:, None].astype("float32") * emb[None, :]
+    emb = timesteps[:, None].cast("float32") * emb[None, :]
 
     # scale embeddings
     emb = scale * emb
@@ -61,14 +61,21 @@ def get_timestep_embedding(
 
 
 class TimestepEmbedding(nn.Layer):
-    def __init__(self, channel: int, time_embed_dim: int, act_fn: str = "silu"):
+    def __init__(self, in_channels: int, time_embed_dim: int, act_fn: str = "silu", out_dim: int = None):
         super().__init__()
 
-        self.linear_1 = nn.Linear(channel, time_embed_dim)
+        self.linear_1 = nn.Linear(in_channels, time_embed_dim)
         self.act = None
         if act_fn == "silu":
             self.act = nn.Silu()
-        self.linear_2 = nn.Linear(time_embed_dim, time_embed_dim)
+        elif act_fn == "mish":
+            self.act = nn.Mish()
+
+        if out_dim is not None:
+            time_embed_dim_out = out_dim
+        else:
+            time_embed_dim_out = time_embed_dim
+        self.linear_2 = nn.Linear(time_embed_dim, time_embed_dim_out)
 
     def forward(self, sample):
         sample = self.linear_1(sample)
@@ -100,17 +107,93 @@ class Timesteps(nn.Layer):
 class GaussianFourierProjection(nn.Layer):
     """Gaussian Fourier embeddings for noise levels."""
 
-    def __init__(self, embedding_size: int = 256, scale: float = 1.0):
+    def __init__(
+        self, embedding_size: int = 256, scale: float = 1.0, set_W_to_weight=True, log=True, flip_sin_to_cos=False
+    ):
         super().__init__()
-        self.register_buffer("weight", paddle.randn(embedding_size) * scale)
+        self.register_buffer("weight", paddle.randn((embedding_size,)) * scale)
+        self.log = log
+        self.flip_sin_to_cos = flip_sin_to_cos
 
-        # to delete later
-        self.register_buffer("W", paddle.randn(embedding_size) * scale)
+        if set_W_to_weight:
+            # to delete later
+            self.register_buffer("W", paddle.randn((embedding_size,)) * scale)
 
-        self.weight = self.W
+            self.weight = self.W
 
     def forward(self, x):
-        x = paddle.log(x)
+        if self.log:
+            x = paddle.log(x.cast(self.weight.dtype))
+
         x_proj = x[:, None] * self.weight[None, :] * 2 * np.pi
-        out = paddle.concat([paddle.sin(x_proj), paddle.cos(x_proj)], axis=-1)
+
+        if self.flip_sin_to_cos:
+            out = paddle.concat([paddle.cos(x_proj), paddle.sin(x_proj)], axis=-1)
+        else:
+            out = paddle.concat([paddle.sin(x_proj), paddle.cos(x_proj)], axis=-1)
         return out
+
+
+class ImagePositionalEmbeddings(nn.Layer):
+    """
+    Converts latent image classes into vector embeddings. Sums the vector embeddings with positional embeddings for the
+    height and width of the latent space.
+
+    For more details, see figure 10 of the dall-e paper: https://arxiv.org/abs/2102.12092
+
+    For VQ-diffusion:
+
+    Output vector embeddings are used as input for the transformer.
+
+    Note that the vector embeddings for the transformer are different than the vector embeddings from the VQVAE.
+
+    Args:
+        num_embed (`int`):
+            Number of embeddings for the latent pixels embeddings.
+        height (`int`):
+            Height of the latent image i.e. the number of height embeddings.
+        width (`int`):
+            Width of the latent image i.e. the number of width embeddings.
+        embed_dim (`int`):
+            Dimension of the produced vector embeddings. Used for the latent pixel, height, and width embeddings.
+    """
+
+    def __init__(
+        self,
+        num_embed: int,
+        height: int,
+        width: int,
+        embed_dim: int,
+    ):
+        super().__init__()
+
+        self.height = height
+        self.width = width
+        self.num_embed = num_embed
+        self.embed_dim = embed_dim
+
+        self.emb = nn.Embedding(self.num_embed, embed_dim)
+        self.height_emb = nn.Embedding(self.height, embed_dim)
+        self.width_emb = nn.Embedding(self.width, embed_dim)
+
+    def forward(self, index):
+        emb = self.emb(index)
+
+        height_emb = self.height_emb(paddle.arange(self.height).reshape([1, self.height]))
+
+        # 1 x H x D -> 1 x H x 1 x D
+        height_emb = height_emb.unsqueeze(2)
+
+        width_emb = self.width_emb(paddle.arange(self.width).reshape([1, self.width]))
+
+        # 1 x W x D -> 1 x 1 x W x D
+        width_emb = width_emb.unsqueeze(1)
+
+        pos_emb = height_emb + width_emb
+
+        # 1 x H x W x D -> 1 x L xD
+        pos_emb = pos_emb.reshape([1, self.height * self.width, -1])
+
+        emb = emb + pos_emb[:, : emb.shape[1], :]
+
+        return emb

@@ -12,43 +12,67 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
 import os
+
 from .deprecation_utils import deprecate
 from .import_utils import (
     ENV_VARS_TRUE_AND_AUTO_VALUES,
     ENV_VARS_TRUE_VALUES,
     USE_PADDLE,
     DummyObject,
+    is_fastdeploy_available,
     is_inflect_available,
     is_modelcards_available,
     is_onnx_available,
-    is_scipy_available,
     is_paddle_available,
+    is_paddle_version,
     is_paddlenlp_available,
+    is_scipy_available,
     is_unidecode_available,
-    is_fastdeploy_available,
     requires_backends,
 )
 from .logging import get_logger
 from .outputs import BaseOutput
+from .pil_utils import PIL_INTERPOLATION
 
 if is_paddle_available():
-    from .testing_utils import floats_tensor, load_image, parse_flag_from_env, slow
+    from .testing_utils import (
+        floats_tensor,
+        image_grid,
+        load_hf_numpy,
+        load_image,
+        load_numpy,
+        load_ppnlp_numpy,
+        paddle_all_close,
+        parse_flag_from_env,
+        slow,
+    )
 
 logger = get_logger(__name__)
 
-from paddlenlp.utils.env import _get_sub_home, _get_ppnlp_home
+from paddlenlp.utils.env import _get_ppnlp_home, _get_sub_home
 
 ppnlp_cache_home = _get_ppnlp_home()
 default_cache_path = _get_sub_home("models")
 
 CONFIG_NAME = "config.json"
 WEIGHTS_NAME = "model_state.pdparams"
-ONNX_WEIGHTS_NAME = "model.onnx"
 FASTDEPLOY_WEIGHTS_NAME = "inference.pdiparams"
 FASTDEPLOY_MODEL_NAME = "inference.pdmodel"
 DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPDIFFUSERS_CACHE = default_cache_path
 PPDIFFUSERS_DYNAMIC_MODULE_NAME = "ppdiffusers_modules"
 PPNLP_MODULES_CACHE = os.getenv("PPNLP_MODULES_CACHE", _get_sub_home("modules"))
+
+_COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
+    "DDIMScheduler",
+    "DDPMScheduler",
+    "PNDMScheduler",
+    "LMSDiscreteScheduler",
+    "EulerDiscreteScheduler",
+    "HeunDiscreteScheduler",
+    "EulerAncestralDiscreteScheduler",
+    "DPMSolverMultistepScheduler",
+]

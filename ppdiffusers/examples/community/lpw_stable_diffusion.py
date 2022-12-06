@@ -19,18 +19,19 @@ from typing import Callable, List, Optional, Union
 
 import numpy as np
 import paddle
-
 import PIL
+
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
+from paddlenlp.utils.tools import compare_version
 from ppdiffusers.configuration_utils import FrozenDict
 from ppdiffusers.models import AutoencoderKL, UNet2DConditionModel
 from ppdiffusers.pipeline_utils import DiffusionPipeline
 from ppdiffusers.pipelines.stable_diffusion import StableDiffusionPipelineOutput
-from ppdiffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
+    StableDiffusionSafetyChecker,
+)
 from ppdiffusers.schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
 from ppdiffusers.utils import deprecate, logging
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
-
-from paddlenlp.utils.tools import compare_version
 
 if compare_version(PIL.__version__, "9.1.0") >= 0:
     Resampling = PIL.Image.Resampling
@@ -503,7 +504,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         self,
         prompt: Union[str, List[str]],
         negative_prompt: Optional[Union[str, List[str]]] = None,
-        init_image: Union[paddle.Tensor, PIL.Image.Image] = None,
+        image: Union[paddle.Tensor, PIL.Image.Image] = None,
         mask_image: Union[paddle.Tensor, PIL.Image.Image] = None,
         height: int = 512,
         width: int = 512,
@@ -529,11 +530,11 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             negative_prompt (`str` or `List[str]`, *optional*):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             mask_image (`paddle.Tensor` or `PIL.Image.Image`):
-                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
                 replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
                 PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
                 contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.
@@ -551,11 +552,11 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
                 1`. Higher guidance scale encourages to generate images that are closely linked to the text `prompt`,
                 usually at the expense of lower image quality.
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             eta (`float`, *optional*, defaults to 0.0):
@@ -654,7 +655,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         mask = None
         noise = None
 
-        if init_image is None:
+        if image is None:
             # get the initial random noise unless the user supplied it
 
             # Unlike in other pipelines, latents need to be generated in the target device
@@ -683,11 +684,11 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             # scale the initial noise by the standard deviation required by the scheduler
             latents = latents * self.scheduler.init_noise_sigma
         else:
-            if isinstance(init_image, PIL.Image.Image):
-                init_image = preprocess_image(init_image)
+            if isinstance(image, PIL.Image.Image):
+                image = preprocess_image(image)
             # encode the init image into latents and scale the latents
-            init_image = init_image.astype(dtype=latents_dtype)
-            init_latent_dist = self.vae.encode(init_image).latent_dist
+            image = image.astype(dtype=latents_dtype)
+            init_latent_dist = self.vae.encode(image).latent_dist
             init_latents = init_latent_dist.sample()
             init_latents = 0.18215 * init_latents
             init_latents = paddle.concat([init_latents] * batch_size * num_images_per_prompt, axis=0)
@@ -702,7 +703,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
 
                 # check sizes
                 if not mask.shape == init_latents.shape:
-                    raise ValueError("The mask and init_image should be the same size!")
+                    raise ValueError("The mask and image should be the same size!")
 
             # get the original timestep using init_timestep
             offset = self.scheduler.config.get("steps_offset", 0)
@@ -879,7 +880,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
     def img2img(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         negative_prompt: Optional[Union[str, List[str]]] = None,
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -897,7 +898,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         r"""
         Function for image-to-image generation.
         Args:
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process.
             prompt (`str` or `List[str]`):
@@ -906,11 +907,11 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
                 The prompt or prompts not to guide the image generation. Ignored when not using guidance (i.e., ignored
                 if `guidance_scale` is less than `1`).
             strength (`float`, *optional*, defaults to 0.8):
-                Conceptually, indicates how much to transform the reference `init_image`. Must be between 0 and 1.
-                `init_image` will be used as a starting point, adding more noise to it the larger the `strength`. The
+                Conceptually, indicates how much to transform the reference `image`. Must be between 0 and 1.
+                `image` will be used as a starting point, adding more noise to it the larger the `strength`. The
                 number of denoising steps depends on the amount of noise initially added. When `strength` is 1, added
                 noise will be maximum and the denoising process will run for the full number of iterations specified in
-                `num_inference_steps`. A value of 1, therefore, essentially ignores `init_image`.
+                `num_inference_steps`. A value of 1, therefore, essentially ignores `image`.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference. This parameter will be modulated by `strength`.
@@ -951,7 +952,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         return self.__call__(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            init_image=init_image,
+            image=image,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,
             strength=strength,
@@ -969,7 +970,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
     def inpaint(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         negative_prompt: Optional[Union[str, List[str]]] = None,
         strength: float = 0.8,
@@ -988,11 +989,11 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         r"""
         Function for inpaint.
         Args:
-            init_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 `Image`, or tensor representing an image batch, that will be used as the starting point for the
                 process. This is the image whose masked region will be inpainted.
             mask_image (`paddle.Tensor` or `PIL.Image.Image`):
-                `Image`, or tensor representing an image batch, to mask `init_image`. White pixels in the mask will be
+                `Image`, or tensor representing an image batch, to mask `image`. White pixels in the mask will be
                 replaced by noise and therefore repainted, while black pixels will be preserved. If `mask_image` is a
                 PIL image, it will be converted to a single channel (luminance) before use. If it's a tensor, it should
                 contain one color channel (L) instead of 3, so the expected shape would be `(B, H, W, 1)`.
@@ -1004,7 +1005,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
             strength (`float`, *optional*, defaults to 0.8):
                 Conceptually, indicates how much to inpaint the masked area. Must be between 0 and 1. When `strength`
                 is 1, the denoising process will be run on the masked area for the full number of iterations specified
-                in `num_inference_steps`. `init_image` will be used as a reference for the masked area, adding more
+                in `num_inference_steps`. `image` will be used as a reference for the masked area, adding more
                 noise to that region the larger the `strength`. If `strength` is 0, no inpainting will occur.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The reference number of denoising steps. More denoising steps usually lead to a higher quality image at
@@ -1046,7 +1047,7 @@ class StableDiffusionLongPromptWeightingPipeline(DiffusionPipeline):
         return self.__call__(
             prompt=prompt,
             negative_prompt=negative_prompt,
-            init_image=init_image,
+            image=image,
             mask_image=mask_image,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,

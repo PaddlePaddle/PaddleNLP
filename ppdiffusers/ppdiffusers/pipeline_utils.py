@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 # Copyright (c) 2022, NVIDIA CORPORATION.  All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,34 +23,34 @@ from typing import Any, Dict, List, Optional, Union
 import numpy as np
 import paddle
 import paddle.nn as nn
-from packaging import version
-
 import PIL
+from packaging import version
 from PIL import Image
 from tqdm.auto import tqdm
 
+from . import FastDeployRuntimeModel
 from .configuration_utils import ConfigMixin
-from .utils import PPDIFFUSERS_CACHE, BaseOutput, logging, deprecate, DOWNLOAD_SERVER
-
-from . import OnnxRuntimeModel
+from .utils import PPDIFFUSERS_CACHE, BaseOutput, deprecate, logging
 
 INDEX_FILE = "model_state.pdparams"
+CUSTOM_PIPELINE_FILE_NAME = "pipeline.py"
 DUMMY_MODULES_FOLDER = "ppdiffusers.utils"
+PADDLENLP_DUMMY_MODULES_FOLDER = "paddlenlp.transformers.utils"
 
 logger = logging.get_logger(__name__)
 
 LOADABLE_CLASSES = {
     "ppdiffusers": {
         "ModelMixin": ["save_pretrained", "from_pretrained"],
-        "SchedulerMixin": ["save_config", "from_config"],
+        "SchedulerMixin": ["save_pretrained", "from_pretrained"],
         "DiffusionPipeline": ["save_pretrained", "from_pretrained"],
-        "OnnxRuntimeModel": ["save_pretrained", "from_pretrained"],
-        "LDMBertModel": ["save_pretrained", "from_pretrained"],
+        "FastDeployRuntimeModel": ["save_pretrained", "from_pretrained"],
     },
     "paddlenlp.transformers": {
         "PretrainedTokenizer": ["save_pretrained", "from_pretrained"],
         "PretrainedModel": ["save_pretrained", "from_pretrained"],
         "FeatureExtractionMixin": ["save_pretrained", "from_pretrained"],
+        "ProcessorMixin": ["save_pretrained", "from_pretrained"],
     },
 }
 
@@ -73,6 +73,20 @@ class ImagePipelineOutput(BaseOutput):
     images: Union[List[PIL.Image.Image], np.ndarray]
 
 
+@dataclass
+class AudioPipelineOutput(BaseOutput):
+    """
+    Output class for audio pipelines.
+
+    Args:
+        audios (`np.ndarray`)
+            List of denoised samples of shape `(batch_size, num_channels, sample_rate)`. Numpy array present the
+            denoised audio samples of the diffusion pipeline.
+    """
+
+    audios: np.ndarray
+
+
 class DiffusionPipeline(ConfigMixin):
     r"""
     Base class for all models.
@@ -85,21 +99,24 @@ class DiffusionPipeline(ConfigMixin):
 
     Class attributes:
 
-        - **config_name** ([`str`]) -- name of the config file that will store the class and module names of all
-          components of the diffusion pipeline.
+        - **config_name** (`str`) -- name of the config file that will store the class and module names of all
+        - **_optional_components** (List[`str`]) -- list of all components that are optional so they don't have to be
+          passed for the pipeline to function (should be overridden by subclasses).
     """
     config_name = "model_index.json"
+    _optional_components = []
 
     def register_modules(self, **kwargs):
         # import it here to avoid circular import
         from . import pipelines
 
         for name, module in kwargs.items():
-            # retrive library
+            # retrieve library
             if module is None:
                 register_dict = {name: (None, None)}
             else:
-                if "paddlenlp" in module.__module__.split("."):
+                # TODO (junnyu) support paddlenlp.transformers
+                if "paddlenlp" in module.__module__.split(".") or "ppnlp_patch_utils" in module.__module__.split("."):
                     library = "paddlenlp.transformers"
                 else:
                     library = module.__module__.split(".")[0]
@@ -142,11 +159,24 @@ class DiffusionPipeline(ConfigMixin):
         model_index_dict.pop("_class_name")
         # TODO (junnyu) support old version
         model_index_dict.pop("_diffusers_paddle_version", None)
+        model_index_dict.pop("_diffusers_version", None)
         model_index_dict.pop("_ppdiffusers_version", None)
         model_index_dict.pop("_module", None)
 
+        expected_modules, optional_kwargs = self._get_signature_keys(self)
+
+        def is_saveable_module(name, value):
+            if name not in expected_modules:
+                return False
+            if name in self._optional_components and value[0] is None:
+                return False
+            return True
+
+        model_index_dict = {k: v for k, v in model_index_dict.items() if is_saveable_module(k, v)}
+
         for pipeline_component_name in model_index_dict.keys():
             sub_model = getattr(self, pipeline_component_name)
+
             model_cls = sub_model.__class__
 
             save_method_name = None
@@ -154,17 +184,14 @@ class DiffusionPipeline(ConfigMixin):
             for library_name, library_classes in LOADABLE_CLASSES.items():
                 library = importlib.import_module(library_name)
                 for base_class, save_load_methods in library_classes.items():
-                    class_candidate = getattr(library, base_class)
-                    if issubclass(model_cls, class_candidate):
+                    class_candidate = getattr(library, base_class, None)
+                    if class_candidate is not None and issubclass(model_cls, class_candidate):
                         # if we found a suitable base class in LOADABLE_CLASSES then grab its save method
                         save_method_name = save_load_methods[0]
                         break
                 if save_method_name is not None:
                     break
 
-            # TODO 1014 junnyu for save null safety checker
-            if pipeline_component_name == "safety_checker" and save_method_name is None:
-                continue
             save_method = getattr(sub_model, save_method_name)
             save_method(os.path.join(save_directory, pipeline_component_name))
 
@@ -172,11 +199,19 @@ class DiffusionPipeline(ConfigMixin):
         if paddle_device is None:
             return self
 
-        module_names, _ = self.extract_init_dict(dict(self.config))
+        module_names, _, _ = self.extract_init_dict(dict(self.config))
         for name in module_names.keys():
             module = getattr(self, name)
             if isinstance(module, nn.Layer):
-                module.to(device=paddle_device)
+                if module.dtype == paddle.float16 and str(paddle_device) in ["cpu"]:
+                    logger.warning(
+                        "Pipelines loaded with `paddle_dtype=paddle.float16` cannot run with `cpu` device. It"
+                        " is not recommended to move them to `cpu` as running them will fail. Please make"
+                        " sure to use an accelerator to run the pipeline in inference, due to the lack of"
+                        " support for`float16` operations on this device in Paddle. Please, remove the"
+                        " `paddle_dtype=paddle.float16` argument, or use another device for inference."
+                    )
+                module.to(paddle_device)
         return self
 
     @property
@@ -185,7 +220,7 @@ class DiffusionPipeline(ConfigMixin):
         Returns:
             `paddle.device`: The paddle device on which the pipeline is located.
         """
-        module_names, _ = self.extract_init_dict(dict(self.config))
+        module_names, _, _ = self.extract_init_dict(dict(self.config))
         for name in module_names.keys():
             module = getattr(self, name)
             if isinstance(module, nn.Layer):
@@ -226,26 +261,41 @@ class DiffusionPipeline(ConfigMixin):
 
         Examples:
 
-        ```python
-            >>> from ppdiffusers import StableDiffusionPipeline
-            >>> # Download pipeline from https://bj.bcebos.com/paddlenlp/models/community/CompVis/stable-diffusion-v1-4 and cache.
-            >>> pipeline = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
+        ```py
+        >>> from ppdiffusers import DiffusionPipeline
 
-            >>> # Download pipeline, but overwrite scheduler
-            >>> from ppdiffusers import LMSDiscreteScheduler, StableDiffusionPipeline
-            >>> scheduler = LMSDiscreteScheduler(beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear")
-            >>> pipeline = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4", scheduler=scheduler)
+        >>> # Download pipeline from bos and cache.
+        >>> pipeline = DiffusionPipeline.from_pretrained("CompVis/ldm-text2im-large-256")
+
+        >>> # Download pipeline that requires an authorization token
+        >>> # For more information on access tokens, please refer to this section
+        >>> # of the documentation](https://huggingface.co/docs/hub/security-tokens)
+        >>> pipeline = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+
+        >>> # Use a different scheduler
+        >>> from ppdiffusers import LMSDiscreteScheduler
+
+        >>> scheduler = LMSDiscreteScheduler.from_config(pipeline.scheduler.config)
+        >>> pipeline.scheduler = scheduler
         ```
         """
+        cache_dir = kwargs.pop("cache_dir", PPDIFFUSERS_CACHE)
         paddle_dtype = kwargs.pop("paddle_dtype", None)
-        provider = kwargs.pop("provider", None)
-        sess_options = kwargs.pop("sess_options", None)
-        # do not use
+        # (TODO junnyu, we donot suuport this.)
+        # custom_pipeline = kwargs.pop("custom_pipeline", None)
+        # for fastdeploy model
+        runtime_options = kwargs.pop("runtime_options", None)
 
-        # 1. Download the configs
-        config_dict = cls.get_config_dict(pretrained_model_name_or_path)
+        # 1. Download the checkpoints and configs
+        if not os.path.isdir(pretrained_model_name_or_path):
+            config_dict = cls.load_config(
+                pretrained_model_name_or_path,
+                cache_dir=cache_dir,
+            )
+        else:
+            config_dict = cls.load_config(pretrained_model_name_or_path)
 
-        # 2. Load the pipeline class, if using custom module then load it from the hub
+        # 2. Load the pipeline class
         if cls != DiffusionPipeline:
             pipeline_class = cls
         else:
@@ -262,7 +312,10 @@ class DiffusionPipeline(ConfigMixin):
         if pipeline_class.__name__ == "StableDiffusionInpaintPipeline" and version.parse(
             version.parse(_ppdiffusers_version).base_version
         ) <= version.parse("0.5.1"):
-            from ppdiffusers import StableDiffusionInpaintPipeline, StableDiffusionInpaintPipelineLegacy
+            from . import (
+                StableDiffusionInpaintPipeline,
+                StableDiffusionInpaintPipelineLegacy,
+            )
 
             pipeline_class = StableDiffusionInpaintPipelineLegacy
 
@@ -280,33 +333,42 @@ class DiffusionPipeline(ConfigMixin):
         # some modules can be passed directly to the init
         # in this case they are already instantiated in `kwargs`
         # extract them here
-        expected_modules = set(inspect.signature(pipeline_class.__init__).parameters.keys()) - set(["self"])
-        passed_class_obj = {k: kwargs.pop(k) for k in expected_modules if k in kwargs}
+        expected_modules, optional_kwargs = cls._get_signature_keys(pipeline_class)
 
-        init_dict, unused_kwargs = pipeline_class.extract_init_dict(config_dict, **kwargs)
+        passed_class_obj = {k: kwargs.pop(k) for k in expected_modules if k in kwargs}
+        passed_pipe_kwargs = {k: kwargs.pop(k) for k in optional_kwargs if k in kwargs}
+
+        init_dict, unused_kwargs, _ = pipeline_class.extract_init_dict(config_dict, **kwargs)
+
+        # define init kwargs
+        init_kwargs = {k: init_dict.pop(k) for k in optional_kwargs if k in init_dict}
+        init_kwargs = {**init_kwargs, **passed_pipe_kwargs}
+
+        # remove `null` components
+        def load_module(name, value):
+            if value[0] is None:
+                return False
+            if name in passed_class_obj and passed_class_obj[name] is None:
+                return False
+            return True
+
+        init_dict = {k: v for k, v in init_dict.items() if load_module(k, v)}
 
         if len(unused_kwargs) > 0:
-            logger.warning(f"Keyword arguments {unused_kwargs} not recognized.")
-
-        init_kwargs = {}
-
+            logger.warning(
+                f"Keyword arguments {unused_kwargs} are not expected by {pipeline_class.__name__} and will be ignored."
+            )
         # import it here to avoid circular import
-        from . import pipelines
+        from . import ModelMixin, pipelines
 
         # 3. Load each module in the pipeline
         for name, (library_name, class_name) in init_dict.items():
-            # TODO 1014 junnyu for load null safety checker
-            if name == "safety_checker" and (library_name is None or class_name is None):
-                logger.warn("You have disabled the safety checker!")
-                init_kwargs[name] = None
-                continue
-
             # TODO (junnyu) support old model_index.json
             if library_name == "diffusers_paddle":
                 library_name = "ppdiffusers"
+
             is_pipeline_module = hasattr(pipelines, library_name)
             loaded_sub_model = None
-            sub_model_should_be_defined = True
 
             # if the model is in a pipeline module, then we load it from the pipeline
             if name in passed_class_obj:
@@ -315,11 +377,11 @@ class DiffusionPipeline(ConfigMixin):
                     library = importlib.import_module(library_name)
                     class_obj = getattr(library, class_name)
                     importable_classes = LOADABLE_CLASSES[library_name]
-                    class_candidates = {c: getattr(library, c) for c in importable_classes.keys()}
+                    class_candidates = {c: getattr(library, c, None) for c in importable_classes.keys()}
 
                     expected_class_obj = None
                     for class_name, class_candidate in class_candidates.items():
-                        if issubclass(class_obj, class_candidate):
+                        if class_candidate is not None and issubclass(class_obj, class_candidate):
                             expected_class_obj = class_candidate
 
                     if not issubclass(passed_class_obj[name].__class__, expected_class_obj):
@@ -327,14 +389,8 @@ class DiffusionPipeline(ConfigMixin):
                             f"{passed_class_obj[name]} is of type: {type(passed_class_obj[name])}, but should be"
                             f" {expected_class_obj}"
                         )
-                elif passed_class_obj[name] is None:
-                    logger.warn(
-                        f"You have passed `None` for {name} to disable its functionality in {pipeline_class}. Note"
-                        f" that this might lead to problems when using {pipeline_class} and is not recommended."
-                    )
-                    sub_model_should_be_defined = False
                 else:
-                    logger.warn(
+                    logger.warning(
                         f"You have passed a non-standard module {passed_class_obj[name]}. We cannot verify whether it"
                         " has the correct type"
                     )
@@ -349,19 +405,23 @@ class DiffusionPipeline(ConfigMixin):
             else:
                 # else we just import it from the library.
                 library = importlib.import_module(library_name)
+
                 class_obj = getattr(library, class_name)
                 importable_classes = LOADABLE_CLASSES[library_name]
-                class_candidates = {c: getattr(library, c) for c in importable_classes.keys()}
+                class_candidates = {c: getattr(library, c, None) for c in importable_classes.keys()}
 
-            if loaded_sub_model is None and sub_model_should_be_defined:
+            if loaded_sub_model is None:
                 load_method_name = None
                 for class_name, class_candidate in class_candidates.items():
-                    if issubclass(class_obj, class_candidate):
+                    if class_candidate is not None and issubclass(class_obj, class_candidate):
                         load_method_name = importable_classes[class_name][1]
 
                 if load_method_name is None:
                     none_module = class_obj.__module__
-                    if none_module.startswith(DUMMY_MODULES_FOLDER) and "dummy" in none_module:
+                    is_dummy_path = none_module.startswith(DUMMY_MODULES_FOLDER) or none_module.startswith(
+                        PADDLENLP_DUMMY_MODULES_FOLDER
+                    )
+                    if is_dummy_path and "dummy" in none_module:
                         # call class_obj for nice error message of missing requirements
                         class_obj()
 
@@ -373,15 +433,23 @@ class DiffusionPipeline(ConfigMixin):
                 load_method = getattr(class_obj, load_method_name)
                 loading_kwargs = {}
 
-                if issubclass(class_obj, OnnxRuntimeModel):
-                    loading_kwargs["provider"] = provider
-                    loading_kwargs["sess_options"] = sess_options
+                if issubclass(class_obj, FastDeployRuntimeModel):
+                    if isinstance(runtime_options, dict):
+                        options = runtime_options.get(name, None)
+                    else:
+                        options = runtime_options
+                    loading_kwargs["runtime_options"] = options
+                    loading_kwargs["cache_dir"] = cache_dir
+
+                if issubclass(class_obj, ModelMixin):
+                    loading_kwargs["cache_dir"] = cache_dir
 
                 model_path_dir = (
                     os.path.join(pretrained_model_name_or_path, name)
                     if os.path.isdir(pretrained_model_name_or_path)
                     else pretrained_model_name_or_path + "/" + name
                 )
+
                 loaded_sub_model = load_method(model_path_dir, **loading_kwargs)
 
             # TODO junnyu find a better way to covert to float16
@@ -390,15 +458,18 @@ class DiffusionPipeline(ConfigMixin):
                     loaded_sub_model = loaded_sub_model.to(dtype=paddle_dtype)
                 # paddlenlp model is training mode not eval mode
                 loaded_sub_model.eval()
-            init_kwargs[name] = loaded_sub_model  # UNet(...), # DiffusionSchedule(...)
+
+            init_kwargs[name] = loaded_sub_model  # UNet(...), # DiffusionScheduler(...)
 
         # 4. Potentially add passed objects if expected
         missing_modules = set(expected_modules) - set(init_kwargs.keys())
-        if len(missing_modules) > 0 and missing_modules <= set(passed_class_obj.keys()):
+        passed_modules = list(passed_class_obj.keys())
+        optional_modules = pipeline_class._optional_components
+        if len(missing_modules) > 0 and missing_modules <= set(passed_modules + optional_modules):
             for module in missing_modules:
-                init_kwargs[module] = passed_class_obj[module]
+                init_kwargs[module] = passed_class_obj.get(module, None)
         elif len(missing_modules) > 0:
-            passed_modules = set(list(init_kwargs.keys()) + list(passed_class_obj.keys()))
+            passed_modules = set(list(init_kwargs.keys()) + list(passed_class_obj.keys())) - optional_kwargs
             raise ValueError(
                 f"Pipeline {pipeline_class} expected {expected_modules}, but only {passed_modules} were passed."
             )
@@ -407,27 +478,42 @@ class DiffusionPipeline(ConfigMixin):
         model = pipeline_class(**init_kwargs)
         return model
 
+    @staticmethod
+    def _get_signature_keys(obj):
+        parameters = inspect.signature(obj.__init__).parameters
+        required_parameters = {k: v for k, v in parameters.items() if v.default == inspect._empty}
+        optional_parameters = set({k for k, v in parameters.items() if v.default != inspect._empty})
+        expected_modules = set(required_parameters.keys()) - set(["self"])
+        return expected_modules, optional_parameters
+
     @property
     def components(self) -> Dict[str, Any]:
         r"""
-        The `self.compenents` property can be useful to run different pipelines with the same weights and
+
+        The `self.components` property can be useful to run different pipelines with the same weights and
         configurations to not have to re-allocate memory.
+
         Examples:
+
         ```py
         >>> from ppdiffusers import (
         ...     StableDiffusionPipeline,
         ...     StableDiffusionImg2ImgPipeline,
         ...     StableDiffusionInpaintPipeline,
         ... )
-        >>> img2text = StableDiffusionPipeline.from_pretrained("CompVis/stable-diffusion-v1-4")
-        >>> img2img = StableDiffusionImg2ImgPipeline(**img2text.components)
-        >>> inpaint = StableDiffusionInpaintPipeline(**img2text.components)
+
+        >>> text2img = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
+        >>> img2img = StableDiffusionImg2ImgPipeline(**text2img.components)
+        >>> inpaint = StableDiffusionInpaintPipeline(**text2img.components)
         ```
+
         Returns:
-            A dictionaly containing all the modules needed to initialize the pipleline.
+            A dictionaly containing all the modules needed to initialize the pipeline.
         """
-        components = {k: getattr(self, k) for k in self.config.keys() if not k.startswith("_")}
-        expected_modules = set(inspect.signature(self.__init__).parameters.keys()) - set(["self"])
+        expected_modules, optional_parameters = self._get_signature_keys(self)
+        components = {
+            k: getattr(self, k) for k in self.config.keys() if not k.startswith("_") and k not in optional_parameters
+        }
 
         if set(components.keys()) != expected_modules:
             raise ValueError(
@@ -438,24 +524,22 @@ class DiffusionPipeline(ConfigMixin):
         return components
 
     @staticmethod
-    def numpy_to_pil(images, **kwargs):
+    def numpy_to_pil(images):
         """
         Convert a numpy image or a batch of images to a PIL image.
         """
         if images.ndim == 3:
             images = images[None, ...]
         images = (images * 255).round().astype("uint8")
-        pil_images = []
-        argument = kwargs.pop("argument", None)
-        for image in images:
-            image = Image.fromarray(image)
-            if argument is not None:
-                image.argument = argument
-            pil_images.append(image)
+        if images.shape[-1] == 1:
+            # special case for grayscale (single channel) images
+            pil_images = [Image.fromarray(image.squeeze(), mode="L") for image in images]
+        else:
+            pil_images = [Image.fromarray(image) for image in images]
 
         return pil_images
 
-    def progress_bar(self, iterable):
+    def progress_bar(self, iterable=None, total=None):
         if not hasattr(self, "_progress_bar_config"):
             self._progress_bar_config = {}
         elif not isinstance(self._progress_bar_config, dict):
@@ -463,7 +547,12 @@ class DiffusionPipeline(ConfigMixin):
                 f"`self._progress_bar_config` should be of type `dict`, but is {type(self._progress_bar_config)}."
             )
 
-        return tqdm(iterable, **self._progress_bar_config)
+        if iterable is not None:
+            return tqdm(iterable, **self._progress_bar_config)
+        elif total is not None:
+            return tqdm(total=total, **self._progress_bar_config)
+        else:
+            raise ValueError("Either `total` or `iterable` has to be defined.")
 
     def set_progress_bar_config(self, **kwargs):
         self._progress_bar_config = kwargs
