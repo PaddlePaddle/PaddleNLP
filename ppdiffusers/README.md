@@ -4,7 +4,7 @@
 
 ## News 📢
 
-* 🔥 **2022.12.02 发布 0.9.0 版本，支持 [StableDiffusion2.0](https://github.com/Stability-AI/stablediffusion) 的文生图、图生图、图像编辑及图像超分等功能；**
+* 🔥 **2022.12.06 发布 0.9.0 版本，支持 [StableDiffusion2.0](https://github.com/Stability-AI/stablediffusion) 的文生图、图生图、图像编辑及图像超分等功能；**
 
 * 🔥 **2022.11.11 发布 0.6.2 版本，支持使用FastDeploy对 [StableDiffusion进行高性能部署](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/README.md)、支持 [Diffusers或原版模型->PPDiffusers权重转换](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/scripts/convert_diffusers_model/README.md)；**
 
@@ -355,7 +355,7 @@ StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型�
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
-**注意：当前导出的vae encoder带有随机因素！[随机因素代码地址](https://github.com/JunnYu/PaddleNLP/blob/1ff41e2beff55a1fd282ed574f3a6a30a0756d7e/ppdiffusers/ppdiffusers/models/vae.py#L365-L370)**
+**注意：当前导出的vae encoder带有随机因素！[随机因素代码地址](https://github.com/PaddlePaddle/PaddleNLP/blob/649b18a1834163007358e3a9dffd6462c0f9c7cf/ppdiffusers/ppdiffusers/models/vae.py#L365-L370)**
 
 - CompVis/stable-diffusion-v1-4@fastdeploy
 - runwayml/stable-diffusion-v1-5@fastdeploy
