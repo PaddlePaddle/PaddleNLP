@@ -14,36 +14,42 @@
 # limitations under the License.
 
 import argparse
+import glob
 import itertools
 import math
 import os
 import random
+from pathlib import Path
+
 import numpy as np
 import paddle
-import glob
-from pathlib import Path
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.io import Dataset, DataLoader, BatchSampler, DistributedBatchSampler
-
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import set_seed
-from ppdiffusers import AutoencoderKL, DDPMScheduler, PNDMScheduler, StableDiffusionPipeline, UNet2DConditionModel
-from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.modeling_utils import unwrap_model, freeze_params
-
 import PIL
+from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
 from PIL import Image
+
+from paddlenlp.trainer import set_seed
+from paddlenlp.utils.log import logger
 from paddlenlp.utils.tools import compare_version
+from ppdiffusers import (
+    AutoencoderKL,
+    DDPMScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
+from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.optimization import get_scheduler
 
 if compare_version(PIL.__version__, "9.1.0") >= 0:
     Resampling = PIL.Image.Resampling
 else:
     Resampling = PIL.Image
-from paddle.vision.transforms import RandomHorizontalFlip
 from paddle.optimizer import AdamW
+from paddle.vision.transforms import RandomHorizontalFlip
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, AutoTokenizer, BertModel
+
+from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
 
 
 def get_writer(args):

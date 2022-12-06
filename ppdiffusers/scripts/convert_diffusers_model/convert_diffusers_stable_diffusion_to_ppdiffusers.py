@@ -11,25 +11,32 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import argparse
 import tempfile
+from collections import OrderedDict
+
 import paddle
+import torch
+from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
+
+from paddlenlp.transformers import (
+    CLIPFeatureExtractor,
+    CLIPTextModel,
+    CLIPTokenizer,
+    CLIPVisionModel,
+)
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+)
+from ppdiffusers import StableDiffusionPipeline as PPDiffusersStableDiffusionPipeline
+from ppdiffusers import UNet2DConditionModel
+from ppdiffusers.configuration_utils import FrozenDict
+from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
 
 paddle.set_device("cpu")
-import argparse
-import torch
-from collections import OrderedDict
-from diffusers import StableDiffusionPipeline as DiffusersStableDiffusionPipeline
-from ppdiffusers.configuration_utils import FrozenDict
-from ppdiffusers import (
-    StableDiffusionPipeline as PPDiffusersStableDiffusionPipeline,
-    AutoencoderKL,
-    UNet2DConditionModel,
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    DDIMScheduler,
-)
-from ppdiffusers.pipelines.stable_diffusion import StableDiffusionSafetyChecker
-from paddlenlp.transformers import CLIPTextModel, CLIPVisionModel, CLIPTokenizer, CLIPFeatureExtractor
 
 
 def convert_to_ppdiffusers(vae_or_unet, dtype="float32"):
@@ -116,13 +123,11 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     diffusers_pipe = DiffusersStableDiffusionPipeline.from_pretrained(
         pretrained_model_name_or_path, use_auth_token=True
     )
+    requires_safety_checker = getattr(diffusers_pipe, "requires_safety_checker", False)
     vae_state_dict = convert_to_ppdiffusers(diffusers_pipe.vae)
     unet_state_dict = convert_to_ppdiffusers(diffusers_pipe.unet)
     text_encoder_state_dict, text_encoder_config = convert_hf_clip_to_ppnlp_clip(
         diffusers_pipe.text_encoder, is_text_encoder=True
-    )
-    safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
-        diffusers_pipe.safety_checker, is_text_encoder=False
     )
 
     # 1. vae
@@ -137,21 +142,19 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     pp_text_encoder = CLIPTextModel(**text_encoder_config)
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
-    # 4. safety_checker
-    pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionModel(**safety_checker_config))
-    pp_safety_checker.set_dict(safety_checker_state_dict)
-
-    # 5. scheduler
+    # 4. scheduler
     beta_start = diffusers_pipe.scheduler.beta_start
     beta_end = diffusers_pipe.scheduler.beta_end
-    num_train_timesteps = diffusers_pipe.scheduler.num_train_timesteps
     scheduler_type = diffusers_pipe.scheduler._class_name.lower()
     if "pndm" in scheduler_type:
         pp_scheduler = PNDMScheduler(
+            beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
-            beta_start=beta_start,
-            num_train_timesteps=num_train_timesteps,
+            # Make sure the scheduler compatible with DDIM
+            set_alpha_to_one=False,
+            steps_offset=1,
+            # Make sure the scheduler compatible with PNDM
             skip_prk_steps=True,
         )
     elif "lms" in scheduler_type:
@@ -161,31 +164,53 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
             beta_start=beta_start,
             beta_end=beta_end,
             beta_schedule="scaled_linear",
+            # Make sure the scheduler compatible with DDIM
             clip_sample=False,
             set_alpha_to_one=False,
+            steps_offset=1,
         )
     else:
         raise ValueError(f"Scheduler of type {scheduler_type} doesn't exist!")
 
     with tempfile.TemporaryDirectory() as tmpdirname:
-        # 6. feature_extractor
-        diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
-        pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(tmpdirname)
-
-        # 7. tokenizer
+        # 5. tokenizer
         diffusers_pipe.tokenizer.save_pretrained(tmpdirname)
         pp_tokenizer = CLIPTokenizer.from_pretrained(tmpdirname)
 
-        # 8. create ppdiffusers pipe
-        paddle_pipe = PPDiffusersStableDiffusionPipeline(
-            vae=pp_vae,
-            text_encoder=pp_text_encoder,
-            tokenizer=pp_tokenizer,
-            unet=pp_unet,
-            safety_checker=pp_safety_checker,
-            feature_extractor=pp_feature_extractor,
-            scheduler=pp_scheduler,
-        )
+        if requires_safety_checker:
+            # 6. feature_extractor
+            # diffusers_pipe.feature_extractor.save_pretrained(tmpdirname)
+            pp_feature_extractor = CLIPFeatureExtractor.from_pretrained(
+                "CompVis/stable-diffusion-v1-4/feature_extractor"
+            )
+            # 7. safety_checker
+            safety_checker_state_dict, safety_checker_config = convert_hf_clip_to_ppnlp_clip(
+                diffusers_pipe.safety_checker, is_text_encoder=False
+            )
+            pp_safety_checker = StableDiffusionSafetyChecker(CLIPVisionModel(**safety_checker_config))
+            pp_safety_checker.set_dict(safety_checker_state_dict)
+            # 8. create ppdiffusers pipe
+            paddle_pipe = PPDiffusersStableDiffusionPipeline(
+                vae=pp_vae,
+                text_encoder=pp_text_encoder,
+                tokenizer=pp_tokenizer,
+                unet=pp_unet,
+                safety_checker=pp_safety_checker,
+                feature_extractor=pp_feature_extractor,
+                scheduler=pp_scheduler,
+            )
+        else:
+            # 8. create ppdiffusers pipe
+            paddle_pipe = PPDiffusersStableDiffusionPipeline(
+                vae=pp_vae,
+                text_encoder=pp_text_encoder,
+                tokenizer=pp_tokenizer,
+                unet=pp_unet,
+                safety_checker=None,
+                feature_extractor=None,
+                scheduler=pp_scheduler,
+                requires_safety_checker=False,
+            )
         if "runwayml/stable-diffusion-inpainting" in pretrained_model_name_or_path:
             _internal_dict = dict(paddle_pipe._internal_dict)
             if _internal_dict["_ppdiffusers_version"] == "0.0.0":

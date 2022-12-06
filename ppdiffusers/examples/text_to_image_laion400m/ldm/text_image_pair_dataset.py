@@ -12,19 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import io
-import gzip
 import base64
+import gzip
+import io
 import random
+
 import numpy as np
 import paddle
+import paddle.distributed as dist
+from paddle.io import IterableDataset, get_worker_info
+from paddle.vision import transforms
+from paddle.vision.transforms.transforms import _get_image_size
 from PIL import Image
 
 Image.MAX_IMAGE_PIXELS = 2300000000
-from paddle.vision import transforms
-from paddle.vision.transforms.transforms import _get_image_size
-from paddle.io import IterableDataset, get_worker_info
-import paddle.distributed as dist
 
 
 def parse_line(line, filename):
@@ -78,7 +79,7 @@ def parse_line(line, filename):
         if random.random() < 0.1:
             caption = ""
         return dict(image=image, caption=caption)
-    except:
+    except Exception:
         print(f"error when parse file {filename}")
         # traceback.print_exc()
         return None
@@ -174,9 +175,9 @@ class TextImagePair(IterableDataset):
                         try:
                             try:
                                 line = line.decode(encoding="utf-8")
-                            except:
+                            except Exception:
                                 line = line.decode(encoding="gb18030")
-                        except:
+                        except Exception:
                             print(f"error on file {filename}")
                             continue
                         data = parse_line(line, filename)
