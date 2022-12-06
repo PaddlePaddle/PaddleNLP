@@ -31,7 +31,7 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
 )
-from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
+from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -84,8 +84,8 @@ def main():
 
     print("step 0")
     # Define tokenizer, model, loss function.
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForTokenClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = ErnieForTokenClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
 
     class criterion(nn.Layer):
         def __init__(self):
@@ -159,7 +159,6 @@ def main():
     elif last_checkpoint is not None:
         checkpoint = last_checkpoint
 
-    print("step 2")
     # Training
     if training_args.do_train:
         train_result = trainer.train(resume_from_checkpoint=checkpoint)
@@ -173,45 +172,37 @@ def main():
     if training_args.do_eval:
         eval_metrics = trainer.evaluate()
         trainer.log_metrics("eval", eval_metrics)
-    print("data_args.label_listi:{}".format(data_args.label_list))
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
         tokens_label = test_ret.predictions.argmax(axis=-1)
         tokens_label = tokens_label.tolist()
         value = []
-        # for idx, token_label in enumerate(tokens_label):
-        #    start = -1
-        #    label_name = ""
-        #    items = []
-        #    input_data = tokenizer.convert_tokens_to_string(tokenizer.convert_ids_to_tokens(test_dataset[idx]["input_ids"]))
-        #    print(input_data)
-        #    print("The index:{}".format(idx))
-        #    #for i, label in enumerate(token_label):
-        #    #    if (data_args.label_list[label] == "O" or "B-" in data_args.label_list[label]) and start >= 0:
-        #    #        entity = input_data[start : i - 1]
-        #    #        if isinstance(entity, list):
-        #    #            entity = "".join(entity)
-        #    #        items.append(
-        #    #            {
-        #    #                "pos": [start, i - 2],
-        #    #                "entity": entity,
-        #    #                "label": label_name,
-        #    #            }
-        #    #        )
-        #    #        start = -1
-        #    #    if "B-" in data_args.label_list[label]:
-        #    #        start = i - 1
-        #    #        label_name = data_args.label_list[label][2:]
-        #    #if start >= 0:
-        #    #    items.append(
-        #    #        {
-        #    #            "pos": [start, len(token_label) - 1],
-        #    #            "entity": input_data[start : len(token_label) - 1],
-        #    #            "label": "",
-        #    #        }
-        #    #    )
-        #    #value.append(items)
+        for idx, token_label in enumerate(tokens_label):
+            label_name = ""
+            items = []
+            input_data = tokenizer.convert_ids_to_tokens(test_dataset[idx]["input_ids"])[1:-1]
+            input_len = len(input_data)
+            words = ""
+            tag = " "
+            start = 0
+            for i, label in enumerate(token_label[1 : input_len + 1]):
+                label_name = data_args.label_list[label]
+                if label_name == "O" or label_name.startswith("B-"):
+                    if len(words):
+                        items.append({"pos": [start, i], "entity": words, "label": tag})
+
+                    if label_name.startswith("B-"):
+                        tag = label_name.split("-")[1]
+                    else:
+                        tag = label_name
+                    start = i
+                    words = input_data[i]
+                else:
+                    words += input_data[i]
+            if len(words) > 0:
+                items.append({"pos": [start, i], "entity": words, "label": tag})
+            value.append(items)
 
         out_dict = {"value": value, "tokens_label": tokens_label}
         out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")

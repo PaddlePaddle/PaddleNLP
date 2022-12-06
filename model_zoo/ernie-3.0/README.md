@@ -1376,9 +1376,8 @@ python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc 
 python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml
 
 # 阅读理解任务
-python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --do_train --do_eval --config=configs/default.yml
+python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml
 ```
-
 
 
 <a name="模型压缩"></a>
@@ -1418,29 +1417,13 @@ trainer = Trainer(
 trainer.compress()
 
 ```
-使用压缩 API 基于 Trainer 需要先初始化一个 Trainer 实例，然后调用 `compress()` 启动压缩。
-
-假设上述代码位于脚本 compress.py 中，可这样调用：
-
-```shell
-python compress.py \
-    --dataset   "clue cluewsc2020"   \
-    --model_name_or_path best_models/CLUEWSC2020 \
-    --output_dir ./compress_models  \
-    --per_device_train_batch_size 32 \
-    --per_device_eval_batch_size 32 \
-    --width_mult_list 0.75 \
-    --batch_size_list 4 8 16 \
-    --batch_num_list 1 \
-```
-
-可以通过传入命令行参数来控制模型压缩的一些超参数，压缩 API 可以传入的超参数可参考[文档](../../docs/compression.md)。
+压缩 API 可以传入的超参数可参考[文档](../../docs/compression.md)。
 
 本项目提供了压缩 API 在分类（包含文本分类、文本匹配、自然语言推理、代词消歧等任务）、序列标注、阅读理解三大场景下的使用样例，可以分别参考 `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，启动方式如下：
 
 ```shell
 # 分类任务
-# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/defalut.yml 配置
 python compress_seq_cls.py \
     --dataset "clue tnews"  \
     --model_name_or_path best_models/TNEWS  \

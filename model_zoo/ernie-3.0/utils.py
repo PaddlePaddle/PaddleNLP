@@ -360,7 +360,6 @@ def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512):
 
         label_ids += [no_entity_id] * (len(tokenized_input["input_ids"]) - len(label_ids))
         tokenized_input["labels"] = label_ids
-    tokenized_input["tokens"] = example["tokens"]
     return tokenized_input
 
 

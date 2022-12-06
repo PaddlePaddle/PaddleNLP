@@ -147,11 +147,13 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    base_model_prefix = "ernie"
+    model_config_file = "model_config.json"
+    config_class = ErnieConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
+    base_model_prefix = "ernie"
+
     pretrained_init_configuration = ERNIE_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_PRETRAINED_RESOURCE_FILES_MAP
-    config_class = ErnieConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -190,7 +192,7 @@ class ErnieModel(ErniePretrainedModel):
     """
 
     def __init__(self, config: ErnieConfig):
-        super(ErnieModel, self).__init__()
+        super(ErnieModel, self).__init__(config)
         self.pad_token_id = config.pad_token_id
         self.initializer_range = config.initializer_range
         weight_attr = paddle.ParamAttr(
@@ -386,7 +388,7 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
     """
 
     def __init__(self, config):
-        super(ErnieForSequenceClassification, self).__init__()
+        super(ErnieForSequenceClassification, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(

@@ -31,7 +31,7 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
 )
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -77,8 +77,8 @@ def main():
     num_classes = len(raw_datasets["train"].label_list)
 
     # Define tokenizer, model, loss function.
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+    model = ErnieForSequenceClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
     criterion = nn.loss.CrossEntropyLoss() if data_args.label_list else nn.loss.MSELoss()
 
     # Define dataset pre-process function

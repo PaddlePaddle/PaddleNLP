@@ -727,6 +727,7 @@ class ErnieConfig(PretrainedConfig):
         hidden_size: int = 768,
         num_hidden_layers: int = 12,
         num_attention_heads: int = 12,
+        task_id=0,
         intermediate_size: int = 3072,
         hidden_act: str = "gelu",
         hidden_dropout_prob: float = 0.1,
@@ -748,7 +749,8 @@ class ErnieConfig(PretrainedConfig):
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
-        self.nmax_position_embeddingsum_attention_heads = num_attention_heads
+        self.num_attention_heads = num_attention_heads
+        self.task_id = task_id
         self.intermediate_size = intermediate_size
         self.hidden_act = hidden_act
         self.hidden_dropout_prob = hidden_dropout_prob
@@ -759,7 +761,6 @@ class ErnieConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pool_act = pool_act
         self.fuse = fuse
-
         self.layer_norm_eps = layer_norm_eps
         self.use_cache = use_cache
         self.use_task_id = use_task_id
