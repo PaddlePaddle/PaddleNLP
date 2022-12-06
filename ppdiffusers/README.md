@@ -357,7 +357,8 @@ image.save("ldm-super-resolution-image.png")
 <div align="center">
 <img width="200" alt="image" src="https://user-images.githubusercontent.com/50394665/204804426-5e28b571-aa41-4f56-ba26-68cca75fdaae.png">
 <img width="400" alt="image" src="https://user-images.githubusercontent.com/50394665/204804148-fe7c293b-6cd7-4942-ae9c-446369fe8410.png">
-</div">
+</div>
+
 </details>
 
 ## 模型部署
