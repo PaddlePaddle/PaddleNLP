@@ -178,6 +178,21 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str,
     return kwargs
 
 
+def do_standard_config_map(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    works when there are different fields between huggingface and paddle
+
+    Args:
+        standard_config_map (Dict[str, str]): mapping of between standard config and paddle config
+        config (Dict[str, Any]): config of huggingface transformers models
+
+    Returns: the config which can be mapped into config of paddle model
+    """
+    for standard_field, paddle_field in standard_config_map.items():
+        config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+    return config
+
+
 def flatten_model_config(config: dict) -> dict:
     """flatten the model config which can be old-style model config
 
@@ -422,7 +437,7 @@ class PretrainedConfig:
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
     # map hf attribute to paddle attribute
-    hf_config_map: Dict[str, str] = {}
+    standard_config_map: Dict[str, str] = {}
 
     _auto_class: Optional[str] = None
 
@@ -686,6 +701,10 @@ class PretrainedConfig:
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         config_dict = flatten_model_config(config_dict)
+
+        # do standard config map: there are some old-school pretrained-config not refactored.
+        config_dict = do_standard_config_map(cls.standard_config_map, config_dict)
+
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warning(
                 f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "

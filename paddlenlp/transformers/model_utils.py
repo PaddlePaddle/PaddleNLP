@@ -21,7 +21,7 @@ import os
 import re
 import shutil
 import tempfile
-from typing import Any, Dict, List, Optional, Tuple, Type, Union
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import paddle
@@ -51,7 +51,7 @@ from paddlenlp.utils.downloader import (
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
-from .configuration_utils import PretrainedConfig
+from .configuration_utils import PretrainedConfig, do_standard_config_map
 from .generation_utils import GenerationMixin
 from .utils import (
     InitTrackerMeta,
@@ -161,11 +161,10 @@ def register_base_model(cls):
     return cls
 
 
-def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name: str, cache_dir: str) -> str:
+def load_hf_model_config_file(pretrained_model_name: str, cache_dir: str) -> str:
     """load config file from huggingface style
 
     Args:
-        cls (Type[PretrainedModel]): the model class
         pretrained_model_name (str): the model-name or dir of pretrained_model
         cache_dir (str): cache_dir of pretrained-model
 
@@ -173,31 +172,11 @@ def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name:
         str: the path of config file
     """
 
-    def map_hf_config(config: Union[str, dict], _cache_dir: str) -> str:
-        """map the hf config to paddle config"""
-        if isinstance(config, str):
-            with open(config, "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-        if cls.config_class is not None:
-            standard_config_map = cls.config_class.standard_config_map
-        else:
-            standard_config_map = cls.standard_config_map
-
-        for standard_key, paddle_key in standard_config_map.items():
-            config[paddle_key] = config.pop(paddle_key, None) or config.pop(standard_key, None)
-
-        config_file = os.path.join(_cache_dir, "config.json")
-        with open(config_file, "w", encoding="utf-8") as f:
-            json.dump(config, f, ensure_ascii=False)
-
-        return config_file
-
     # 1. if pretrained_model_name is directory
     if os.path.isdir(pretrained_model_name):
         config_file = os.path.join(cache_dir, "config.json")
         if os.path.exists(config_file):
-            return map_hf_config(config_file, pretrained_model_name)
+            return config_file
 
         config_file = os.path.join(cache_dir, "model_config.json")
         if os.path.exists(config_file):
@@ -212,7 +191,7 @@ def load_hf_model_config_file(cls: Type[PretrainedModel], pretrained_model_name:
         config_file = hf_hub_download(repo_id=pretrained_model_name, filename="config.json", cache_dir=cache_dir)
 
         # this method should be removed after all models config parameter has been refactored
-        return map_hf_config(config_file, cache_dir)
+        return config_file
 
     # try to load huggingface model_config.json file
     return hf_hub_download(repo_id=pretrained_model_name, filename="model_config.json", cache_dir=cache_dir)
@@ -271,7 +250,7 @@ class PretrainedModel(Layer, GenerationMixin):
     pretrained_resource_files_map = {}
     base_model_prefix = ""
     main_input_name = "input_ids"
-    config_class = None
+    config_class: Optional[PretrainedConfig] = None
 
     # map hf attribute to paddle attribute, only work for no PretrainedConfig models
     standard_config_map: Dict[str, str] = {}
@@ -517,7 +496,7 @@ class PretrainedModel(Layer, GenerationMixin):
             if from_hf_hub:
                 if file_path == cls.config_file:
                     resolved_resource_files[file_id] = load_hf_model_config_file(
-                        cls=cls, pretrained_model_name=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME
+                        pretrained_model_name=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME
                     )
                 else:
                     resolved_resource_files[file_id] = hf_hub_download(
@@ -555,6 +534,14 @@ class PretrainedModel(Layer, GenerationMixin):
                 init_kwargs = json.load(f)
         else:
             init_kwargs = init_configuration
+
+        # do standard config map
+        if cls.config_class is not None:
+            standard_config_map = cls.config_class.standard_config_map
+        else:
+            standard_config_map = cls.standard_config_map
+
+        init_kwargs = do_standard_config_map(standard_config_map, init_kwargs)
 
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
