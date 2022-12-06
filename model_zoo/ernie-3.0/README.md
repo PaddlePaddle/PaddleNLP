@@ -25,11 +25,9 @@
 
 ## 模型介绍
 
-本次开源的模型是在文心大模型ERNIE 3.0 基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与 ERNIE 2.0 保持一致，相比 ERNIE 2.0 具有更强的中文效果。
+本次开源的模型是在文心大模型ERNIE 3.0, 文心大模型ERNIE 3.0 作为百亿参数知识增强的大模型，除了从海量文本数据中学习词汇、结构、语义等知识外，还从大规模知识图谱中学习。 基础上通过**在线蒸馏技术**得到的轻量级模型，模型结构与 ERNIE 2.0 保持一致，相比 ERNIE 2.0 具有更强的中文效果。
 
 相关技术详解可参考文章[《解析全球最大中文单体模型鹏城-百度·文心技术细节》](https://www.jiqizhixin.com/articles/2021-12-08-9)
-
-<a name="在线蒸馏技术"></a>
 
 ### 在线蒸馏技术
 
@@ -47,7 +45,8 @@
 
 <a name="模型效果"></a>
 
-## 模型效果
+
+### 模型效果
 
 本项目开源 **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 五个模型：
 
@@ -1277,9 +1276,10 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 <br />
 
 
-以下是本项目目录结构及说明：
-
-```shell
+<a name="代码结构"></a>
+## 代码结构
+以下是本项目代码结构
+```text
 .
 ├── run_seq_cls.py               # 分类任务的微调脚本
 ├── run_token_cls.py             # 序列标注任务的微调脚本
@@ -1288,34 +1288,49 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本
 ├── config.yml                   # 压缩配置文件
-├── infer.py                     # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
+├── run_infer.py                 # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
 ├── deploy                       # 部署目录
-│ └── python
+│ └── paddle_inference           # paddle inference离线部署
 │   └── ernie_predictor.py
 │   └── infer_cpu.py
 │   └── infer_gpu.py
 │   └── README.md
-│ └── serving
-│   └── seq_cls_rpc_client.py
-│   └── seq_cls_service.py
-│   └── seq_cls_config.yml
-│   └── token_cls_rpc_client.py
-│   └── token_cls_service.py
-│   └── token_cls_config.yml
-│   └── README.md
-│ └── paddle2onnx
+│ └── onnx_inference             # onnx inference离线部署
 │   └── ernie_predictor.py
 │   └── infer.py
 │   └── README.md
-└── README.md                    # 文档，本文件
+│ └── simple_serving            # 基于PaddleNLP SimpleServing 服务化部署
+│   └── ernie_predictor.py
+│   └── infer.py
+│   └── README.md
+│ └── triton_serving           # 基于Triton Serving 服务化部署
+│   └── ernie_predictor.py
+│   └── infer.py
+│   └── README.md
+└── README.md                    # 文档
+
+<a name="开始运行"></a>
+## 开始运行
+下面提供以CLUE数据集进行模型微调相关训练、预测、部署的代码, CLUE数据集是中文语言理解测评基准数据集，包括了文本分类、文本推理、实体抽取、问答等相关数据集。
+
+### 环境要求
+- python >= 3.7
+- paddlepaddle >= 2.3
+- paddlenlp >= 2.4
+- paddleslim >= 2.4
+
+### 数据准备
+此次微调数据主要是以CLUE benchmark 数据集为主, CLUE benchmark 包括了文本分类、实体抽取、问答三大类数据集，而 CLUE benchmark 数据目前已经集成在PaddleNLP的datasets里面，可以通过下面的方式来使用数据集
+
+```python
+from paddlenlp.datasets import load_dataset
+
+# Load the clue Tnews dataset
+train_ds, test_ds = load_dataset('clue', 'tnews', splits=('train', 'test'))
 
 ```
 
-<a name="微调"></a>
-
-## 微调
-
-ERNIE 3.0 发布的预训练模型还不能直接在下游任务上直接使用，需要使用具体任务上的数据对预训练模型进行微调。
+### 模型训练
 
 使用 PaddleNLP 只需要一行代码可以拿到 ERNIE 3.0 系列模型，之后可以在自己的下游数据下进行微调，从而获得具体任务上效果更好的模型。
 
@@ -1341,32 +1356,30 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
-python run_seq_cls.py  \
-    --task_name tnews \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --do_train
+python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --do_train --do_eval --config=configs/default.yml
 
 # 序列标注任务
-python run_token_cls.py \
-    --task_name msra_ner  \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --do_train \
-    --num_train_epochs 3 \
-    --learning_rate 0.00005 \
-    --save_steps 100 \
-    --batch_size 32 \
-    --max_seq_length 128 \
-    --remove_unused_columns False
+python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --do_train --do_eval --config=configs/default.yml
 
 # 阅读理解任务
-python run_qa.py \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --do_train \
-    --learning_rate 0.00003 \
-    --num_train_epochs 8 \
-    --batch_size 24 \
-    --max_seq_length 512
+python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --do_train --do_eval --config=configs/default.yml
 ```
+
+## 模型预测
+
+```shell
+# 分类任务
+# 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 config.yml 配置
+python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml
+
+# 序列标注任务
+python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml
+
+# 阅读理解任务
+python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --do_train --do_eval --config=configs/default.yml
+```
+
+
 
 <a name="模型压缩"></a>
 
@@ -1458,19 +1471,6 @@ python compress_qa.py \
     --per_device_eval_batch_size 24 \
 
 ```
-
-一行代码验证上面模型压缩后模型的精度：
-
-```shell
-# 原模型
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/inference/infer --use_trt
-# 裁剪后
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/float --use_trt
-# 量化后
-python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/hist16/int8 --use_trt --precision int8
-
-```
-其中 --model_path 参数需要传入静态图模型的路径和前缀名。
 
 
 <a name="压缩效果"></a>
