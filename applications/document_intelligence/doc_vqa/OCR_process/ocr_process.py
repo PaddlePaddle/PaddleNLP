@@ -260,7 +260,7 @@ def ocr_preprocess(img_dir):
     img_names = sorted(os.listdir(img_dir), key=lambda x: int(x.split("_")[1].split(".")[0]))
     for img_name in img_names:
         img_path = os.path.join(img_dir, img_name)
-        parsing_res = ocr.ocr(img_path, cls=True)
+        parsing_res = ocr.ocr(img_path, cls=True)][0]
         ocr_res = []
         for para in parsing_res:
             ocr_res.append({"text": para[1][0], "bbox": para[0]})
