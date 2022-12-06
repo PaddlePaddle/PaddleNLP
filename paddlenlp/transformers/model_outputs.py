@@ -22,7 +22,8 @@ import numpy as np
 import paddle
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
-from paddle.nn.layer.transformer import MultiHeadAttention, _convert_attention_mask
+from paddle.nn import MultiHeadAttention
+from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .utils import adapt_stale_fwd_patch
 
