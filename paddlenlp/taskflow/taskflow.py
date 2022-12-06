@@ -174,7 +174,6 @@ TASKS = {
                 "task_class": UIESentaTask,
                 "task_flag": 'sentiment_analysis-uie-base',
             }
-
         },
         "default": {"model": "bilstm"},
     },
