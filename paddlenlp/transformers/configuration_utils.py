@@ -188,6 +188,13 @@ def do_standard_config_map(standard_config_map: Dict[str, str], config: Dict[str
 
     Returns: the config which can be mapped into config of paddle model
     """
+    if "init_args" in config:
+        args = []
+        for init_arg in config["init_args"]:
+            init_arg = do_standard_config_map(standard_config_map, init_arg)
+            args.append(init_arg)
+        config["init_args"] = args
+
     for standard_field, paddle_field in standard_config_map.items():
         config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
     return config
