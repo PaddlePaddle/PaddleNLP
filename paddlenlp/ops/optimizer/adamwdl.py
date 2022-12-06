@@ -16,7 +16,7 @@ from functools import partial
 import paddle
 from paddle.optimizer import AdamW
 
-__all__ = ['AdamWDL', 'layerwise_lr_decay']
+__all__ = ["AdamWDL", "layerwise_lr_decay"]
 
 
 # Layerwise decay
@@ -37,9 +37,9 @@ def layerwise_lr_decay(decay_rate, name_dict, n_layers, param):
     if "encoder.layers" in static_name:
         idx = static_name.find("encoder.layers.")
         layer = int(static_name[idx:].split(".")[2])
-        ratio = decay_rate**(n_layers - layer)
+        ratio = decay_rate ** (n_layers - layer)
     elif "embedding" in static_name:
-        ratio = decay_rate**(n_layers + 1)
+        ratio = decay_rate ** (n_layers + 1)
     return ratio
 
 
@@ -130,44 +130,45 @@ class AdamWDL(AdamW):
             adamwdl.clear_grad()
     """
 
-    def __init__(self,
-                 learning_rate=0.001,
-                 beta1=0.9,
-                 beta2=0.999,
-                 epsilon=1e-8,
-                 parameters=None,
-                 weight_decay=0.01,
-                 apply_decay_param_fun=None,
-                 grad_clip=None,
-                 lazy_mode=False,
-                 multi_precision=False,
-                 layerwise_decay=1.0,
-                 n_layers=12,
-                 set_param_lr_fun=layerwise_lr_decay,
-                 name_dict=None,
-                 name=None):
-        if not isinstance(layerwise_decay, float) and \
-                not isinstance(layerwise_decay, paddle.framework.Variable):
+    def __init__(
+        self,
+        learning_rate=0.001,
+        beta1=0.9,
+        beta2=0.999,
+        epsilon=1e-8,
+        parameters=None,
+        weight_decay=0.01,
+        apply_decay_param_fun=None,
+        grad_clip=None,
+        lazy_mode=False,
+        multi_precision=False,
+        layerwise_decay=1.0,
+        n_layers=12,
+        set_param_lr_fun=layerwise_lr_decay,
+        name_dict=None,
+        name=None,
+    ):
+        if not isinstance(layerwise_decay, float) and not isinstance(layerwise_decay, paddle.framework.Variable):
             raise TypeError("coeff should be float or Tensor.")
         self.layerwise_decay = layerwise_decay
         self.n_layers = n_layers
-        self.set_param_lr_fun = partial(set_param_lr_fun, layerwise_decay,
-                                        name_dict, n_layers)
+        self.set_param_lr_fun = partial(set_param_lr_fun, layerwise_decay, name_dict, n_layers)
         coeff = weight_decay
         self._coeff = coeff
         self._lr_to_coeff = dict()
-        super(AdamWDL,
-              self).__init__(learning_rate=learning_rate,
-                             parameters=parameters,
-                             beta1=beta1,
-                             beta2=beta2,
-                             epsilon=epsilon,
-                             grad_clip=grad_clip,
-                             name=name,
-                             apply_decay_param_fun=apply_decay_param_fun,
-                             weight_decay=weight_decay,
-                             lazy_mode=lazy_mode,
-                             multi_precision=multi_precision)
+        super(AdamWDL, self).__init__(
+            learning_rate=learning_rate,
+            parameters=parameters,
+            beta1=beta1,
+            beta2=beta2,
+            epsilon=epsilon,
+            grad_clip=grad_clip,
+            name=name,
+            apply_decay_param_fun=apply_decay_param_fun,
+            weight_decay=weight_decay,
+            lazy_mode=lazy_mode,
+            multi_precision=multi_precision,
+        )
 
     def _set_auxiliary_var(self, key, val):
         self._auxiliary_vars[key] = val
@@ -180,8 +181,7 @@ class AdamWDL(AdamW):
 
     def _append_optimize_op(self, block, param_and_grad):
         if self.set_param_lr_fun is None:
-            return super(AdamWDL,
-                         self)._append_optimize_op(block, param_and_grad)
+            return super(AdamWDL, self)._append_optimize_op(block, param_and_grad)
 
         self._append_decoupled_weight_decay(block, param_and_grad)
         prev_lr = param_and_grad[0].optimize_attr["learning_rate"]
@@ -208,8 +208,7 @@ class AdamWDL(AdamW):
             param_and_grad = self._update_param_group(param_and_grad)
         param, grad = param_and_grad
 
-        if self._apply_decay_param_fun is not None \
-                and not self._apply_decay_param_fun(param.name):
+        if self._apply_decay_param_fun is not None and not self._apply_decay_param_fun(param.name):
             return
 
         if isinstance(self._learning_rate, float):
@@ -220,8 +219,7 @@ class AdamWDL(AdamW):
             # optimizer._create_global_learning_rate().
             learning_rate = self._create_param_lr(param_and_grad)
 
-        with block.program._optimized_guard(
-            [param, grad]), paddle.static.name_scope('weight decay'):
+        with block.program._optimized_guard([param, grad]), paddle.static.name_scope("weight decay"):
             self._params_name.add(param.name)
 
             # If it has been calculated, the result will be reused.
@@ -235,20 +233,17 @@ class AdamWDL(AdamW):
                     decay_coeff = 1.0 - learning_rate * self._coeff
                 self._lr_to_coeff[learning_rate] = decay_coeff
 
-            find_master = (self._multi_precision
-                           and param.dtype == paddle.float16)
+            find_master = self._multi_precision and param.dtype == paddle.float16
             if find_master:
                 master_weight = self._master_weights[param.name]
                 scaled_param = master_weight * decay_coeff
-                paddle.fluid.layers.assign(input=scaled_param,
-                                           output=master_weight)
+                paddle.fluid.layers.assign(input=scaled_param, output=master_weight)
             else:
                 scaled_param = param * decay_coeff
                 paddle.fluid.layers.assign(input=scaled_param, output=param)
 
     def _create_optimization_pass(self, parameters_and_grads):
-        optimize_ops = super(
-            AdamWDL, self)._create_optimization_pass(parameters_and_grads)
+        optimize_ops = super(AdamWDL, self)._create_optimization_pass(parameters_and_grads)
         # In dygraph mode, clear _lr_to_coeff after applied gradient
         self._lr_to_coeff = dict()
         return optimize_ops
@@ -257,6 +252,6 @@ class AdamWDL(AdamW):
         return " ".join(["Weight Decay, params:", ",".join(self._params_name)])
 
     def _update_param_group(self, parameters):
-        self._coeff = parameters.get('coeff', self._default_dict['coeff'])
-        parameters = parameters.get('params')
+        self._coeff = parameters.get("coeff", self._default_dict["coeff"])
+        parameters = parameters.get("params")
         return parameters

@@ -20,10 +20,12 @@ import shutil
 
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url, _decompress, _get_unique_endpoints
+
 try:
     from paddle.distributed import ParallelEnv
 except Exception as e:
     import warnings
+
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
 from paddlenlp.utils.env import DATA_HOME
@@ -52,38 +54,37 @@ class CnnDailymail(DatasetBuilder):
     An updated version of the code that does not anonymize the data is available
     at https://github.com/abisee/cnn-dailymail.
     """
+
     lazy = False
     META_INFO = collections.namedtuple("META_INFO", ("file", "url", "md5"))
     SPLITS = {
-        "train":
-        META_INFO(
+        "train": META_INFO(
             "all_train.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_train.txt",
-            "c8ca98cfcb6cf3f99a404552568490bc"),
-        "dev":
-        META_INFO(
+            "c8ca98cfcb6cf3f99a404552568490bc",
+        ),
+        "dev": META_INFO(
             "all_val.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_val.txt",
-            "83a3c483b3ed38b1392285bed668bfee"),
-        "test":
-        META_INFO(
+            "83a3c483b3ed38b1392285bed668bfee",
+        ),
+        "test": META_INFO(
             "all_test.txt",
             "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/all_test.txt",
-            "4f3ac04669934dbc746b7061e68a0258")
+            "4f3ac04669934dbc746b7061e68a0258",
+        ),
     }
     cnn_dailymail = {
         "cnn": {
-            "url":
-            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/cnn_stories.tgz",
+            "url": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/cnn_stories.tgz",
             "md5": "85ac23a1926a831e8f46a6b8eaf57263",
-            "file_num": 92579
+            "file_num": 92579,
         },
         "dailymail": {
-            "url":
-            "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/dailymail_stories.tgz",
+            "url": "https://bj.bcebos.com/paddlenlp/datasets/cnn_dailymail/dailymail_stories.tgz",
             "md5": "f9c5f565e8abe86c38bfa4ae8f96fd72",
-            "file_num": 219506
-        }
+            "file_num": 219506,
+        },
     }
 
     def _read_text_file(self, text_file):
@@ -111,7 +112,7 @@ class CnnDailymail(DatasetBuilder):
     def _get_hash_from_path(self, p):
         """Extract hash from path."""
         basename = os.path.basename(p)
-        return basename[0:basename.find(".story")]
+        return basename[0 : basename.find(".story")]
 
     def _find_files(self, dl_paths, publisher, url_dict):
         """Find files corresponding to urls."""
@@ -156,9 +157,7 @@ class CnnDailymail(DatasetBuilder):
                 return line
             if not line:
                 return line
-            if line[-1] in [
-                    ".", "!", "?", "...", "'", "`", '"', "\u2019", "\u201d", ")"
-            ]:
+            if line[-1] in [".", "!", "?", "...", "'", "`", '"', "\u2019", "\u201d", ")"]:
                 return line
             return line + " ."
 
@@ -189,7 +188,7 @@ class CnnDailymail(DatasetBuilder):
         return article, abstract
 
     def _get_data(self, mode):
-        """ Check and download Dataset """
+        """Check and download Dataset"""
         dl_paths = {}
         version = self.name
         if version is None:
@@ -202,22 +201,19 @@ class CnnDailymail(DatasetBuilder):
             dir_path = os.path.join(default_root, k)
             if not os.path.exists(dir_path):
                 get_path_from_url(v["url"], default_root, v["md5"])
-            unique_endpoints = _get_unique_endpoints(
-                ParallelEnv().trainer_endpoints[:])
+            unique_endpoints = _get_unique_endpoints(ParallelEnv().trainer_endpoints[:])
             if ParallelEnv().current_endpoint in unique_endpoints:
                 file_num = len(os.listdir(os.path.join(dir_path, "stories")))
                 if file_num != v["file_num"]:
                     logger.warning(
-                        "Number of %s stories is %d != %d, decompress again." %
-                        (k, file_num, v["file_num"]))
+                        "Number of %s stories is %d != %d, decompress again." % (k, file_num, v["file_num"])
+                    )
                     shutil.rmtree(os.path.join(dir_path, "stories"))
-                    _decompress(
-                        os.path.join(default_root, os.path.basename(v["url"])))
+                    _decompress(os.path.join(default_root, os.path.basename(v["url"])))
             dl_paths[k] = dir_path
         filename, url, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(url, default_root, data_hash)
         dl_paths[mode] = fullname
         return dl_paths

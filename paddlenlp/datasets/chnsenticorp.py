@@ -21,7 +21,7 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['ChnSentiCorp']
+__all__ = ["ChnSentiCorp"]
 
 
 class ChnSentiCorp(DatasetBuilder):
@@ -33,17 +33,15 @@ class ChnSentiCorp(DatasetBuilder):
 
     URL = "https://bj.bcebos.com/paddlenlp/datasets/ChnSentiCorp.zip"
     MD5 = "7ef61b08ad10fbddf2ba97613f071561"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5"))
     SPLITS = {
-        'train':
-        META_INFO(os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'train.tsv'),
-                  '689360c4a4a9ce8d8719ed500ae80907'),
-        'dev':
-        META_INFO(os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'dev.tsv'),
-                  '20c77cc2371634731a367996b097ec0a'),
-        'test':
-        META_INFO(os.path.join('ChnSentiCorp', 'ChnSentiCorp', 'test.tsv'),
-                  '9b4dc7d1e4ada48c645b7e938592f49c'),
+        "train": META_INFO(
+            os.path.join("ChnSentiCorp", "ChnSentiCorp", "train.tsv"), "689360c4a4a9ce8d8719ed500ae80907"
+        ),
+        "dev": META_INFO(os.path.join("ChnSentiCorp", "ChnSentiCorp", "dev.tsv"), "20c77cc2371634731a367996b097ec0a"),
+        "test": META_INFO(
+            os.path.join("ChnSentiCorp", "ChnSentiCorp", "test.tsv"), "9b4dc7d1e4ada48c645b7e938592f49c"
+        ),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -51,30 +49,29 @@ class ChnSentiCorp(DatasetBuilder):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
     def _read(self, filename, split):
         """Reads data."""
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(filename, "r", encoding="utf-8") as f:
             head = None
             for line in f:
                 data = line.strip().split("\t")
                 if not head:
                     head = data
                 else:
-                    if split == 'train':
+                    if split == "train":
                         label, text = data
-                        yield {"text": text, "label": label, "qid": ''}
-                    elif split == 'dev':
+                        yield {"text": text, "label": label, "qid": ""}
+                    elif split == "dev":
                         qid, label, text = data
                         yield {"text": text, "label": label, "qid": qid}
-                    elif split == 'test':
+                    elif split == "test":
                         qid, text = data
-                        yield {"text": text, "label": '', "qid": qid}
+                        yield {"text": text, "label": "", "qid": qid}
 
     def get_labels(self):
         """

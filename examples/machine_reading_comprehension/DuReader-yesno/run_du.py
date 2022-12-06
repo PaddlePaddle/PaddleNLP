@@ -51,11 +51,9 @@ def set_seed(args):
 def convert_example(example, tokenizer):
     """convert a Dureader-yesno example into necessary features"""
 
-    feature = tokenizer(text=example['question'],
-                        text_pair=example['answer'],
-                        max_seq_len=args.max_seq_length)
-    feature['labels'] = example['labels']
-    feature['id'] = example['id']
+    feature = tokenizer(text=example["question"], text_pair=example["answer"], max_seq_len=args.max_seq_length)
+    feature["labels"] = example["labels"]
+    feature["id"] = example["id"]
 
     return feature
 
@@ -100,75 +98,63 @@ def do_train(args):
 
     set_seed(args)
 
-    train_ds, dev_ds, test_ds = load_dataset('dureader_yesno',
-                                             splits=['train', 'dev', 'test'])
+    train_ds, dev_ds, test_ds = load_dataset("dureader_yesno", splits=["train", "dev", "test"])
 
     trans_func = partial(convert_example, tokenizer=tokenizer)
 
     train_batchify_fn = lambda samples, fn=Dict(
         {
-            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            'labels': Stack(dtype="int64")
-        }): fn(samples)
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "labels": Stack(dtype="int64"),
+        }
+    ): fn(samples)
 
     test_batchify_fn = lambda samples, fn=Dict(
         {
-            'input_ids': Pad(axis=0, pad_val=tokenizer.pad_token_id),
-            'token_type_ids': Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-            'id': Stack()
-        }): fn(samples)
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
+            "id": Stack(),
+        }
+    ): fn(samples)
 
     train_ds = train_ds.map(trans_func, lazy=True)
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=train_batchify_fn,
-                                   return_list=True)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
+    train_data_loader = DataLoader(
+        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=train_batchify_fn, return_list=True
+    )
 
     dev_ds = dev_ds.map(trans_func, lazy=True)
-    dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
-                                               batch_size=args.batch_size,
-                                               shuffle=False)
-    dev_data_loader = DataLoader(dataset=dev_ds,
-                                 batch_sampler=dev_batch_sampler,
-                                 collate_fn=train_batchify_fn,
-                                 return_list=True)
+    dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_data_loader = DataLoader(
+        dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=train_batchify_fn, return_list=True
+    )
 
     test_ds = test_ds.map(trans_func, lazy=True)
-    test_batch_sampler = paddle.io.BatchSampler(test_ds,
-                                                batch_size=args.batch_size,
-                                                shuffle=False)
-    test_data_loader = DataLoader(dataset=test_ds,
-                                  batch_sampler=test_batch_sampler,
-                                  collate_fn=test_batchify_fn,
-                                  return_list=True)
+    test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+    test_data_loader = DataLoader(
+        dataset=test_ds, batch_sampler=test_batch_sampler, collate_fn=test_batchify_fn, return_list=True
+    )
 
-    model = model_class.from_pretrained(args.model_name_or_path,
-                                        num_classes=len(train_ds.label_list))
+    model = model_class.from_pretrained(args.model_name_or_path, num_classes=len(train_ds.label_list))
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.num_train_epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
     num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
@@ -185,8 +171,8 @@ def do_train(args):
             if global_step % args.logging_steps == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                    % (global_step, epoch + 1, step + 1, loss,
-                       args.logging_steps / (time.time() - tic_train)))
+                    % (global_step, epoch + 1, step + 1, loss, args.logging_steps / (time.time() - tic_train))
+                )
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
@@ -196,24 +182,21 @@ def do_train(args):
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 if rank == 0:
                     evaluate(model, metric, dev_data_loader)
-                    output_dir = os.path.join(args.output_dir,
-                                              "model_%d" % global_step)
+                    output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # need better way to get inner model of DataParallel
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
+                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
-                    print('Saving checkpoint to:', output_dir)
+                    print("Saving checkpoint to:", output_dir)
                 if global_step == num_training_steps:
                     break
 
     if rank == 0:
         predictions = predict(model, test_data_loader)
-        with open('prediction.json', "w") as writer:
-            writer.write(
-                json.dumps(predictions, ensure_ascii=False, indent=4) + "\n")
+        with open("prediction.json", "w") as writer:
+            writer.write(json.dumps(predictions, ensure_ascii=False, indent=4) + "\n")
 
 
 if __name__ == "__main__":

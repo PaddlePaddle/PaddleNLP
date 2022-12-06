@@ -18,50 +18,34 @@ import numpy as np
 from paddlenlp.datasets import MapDataset
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
-                                                          batch_size=batch_size,
-                                                          shuffle=shuffle)
+    shuffle = True if mode == "train" else False
+    if mode == "train":
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    return paddle.io.DataLoader(dataset=dataset,
-                                batch_sampler=batch_sampler,
-                                collate_fn=batchify_fn,
-                                return_list=True)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
 
 
 def read_text_pair(data_path):
     """Reads data."""
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
             if len(data) != 2:
                 continue
-            yield {'query': data[0], 'title': data[1]}
+            yield {"query": data[0], "title": data[1]}
 
 
-def convert_pointwise_example(example,
-                              tokenizer,
-                              max_seq_length=512,
-                              is_test=False):
+def convert_pointwise_example(example, tokenizer, max_seq_length=512, is_test=False):
 
     query, title = example["query"], example["title"]
 
-    encoded_inputs = tokenizer(text=query,
-                               text_pair=title,
-                               max_seq_len=max_seq_length)
+    encoded_inputs = tokenizer(text=query, text_pair=title, max_seq_len=max_seq_length)
 
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
@@ -73,36 +57,25 @@ def convert_pointwise_example(example,
         return input_ids, token_type_ids
 
 
-def convert_pairwise_example(example,
-                             tokenizer,
-                             max_seq_length=512,
-                             phase="train"):
+def convert_pairwise_example(example, tokenizer, max_seq_length=512, phase="train"):
 
     if phase == "train":
-        query, pos_title, neg_title = example["query"], example[
-            "title"], example["neg_title"]
+        query, pos_title, neg_title = example["query"], example["title"], example["neg_title"]
 
-        pos_inputs = tokenizer(text=query,
-                               text_pair=pos_title,
-                               max_seq_len=max_seq_length)
-        neg_inputs = tokenizer(text=query,
-                               text_pair=neg_title,
-                               max_seq_len=max_seq_length)
+        pos_inputs = tokenizer(text=query, text_pair=pos_title, max_seq_len=max_seq_length)
+        neg_inputs = tokenizer(text=query, text_pair=neg_title, max_seq_len=max_seq_length)
 
         pos_input_ids = pos_inputs["input_ids"]
         pos_token_type_ids = pos_inputs["token_type_ids"]
         neg_input_ids = neg_inputs["input_ids"]
         neg_token_type_ids = neg_inputs["token_type_ids"]
 
-        return (pos_input_ids, pos_token_type_ids, neg_input_ids,
-                neg_token_type_ids)
+        return (pos_input_ids, pos_token_type_ids, neg_input_ids, neg_token_type_ids)
 
     else:
         query, title = example["query"], example["title"]
 
-        inputs = tokenizer(text=query,
-                           text_pair=title,
-                           max_seq_len=max_seq_length)
+        inputs = tokenizer(text=query, text_pair=title, max_seq_len=max_seq_length)
 
         input_ids = inputs["input_ids"]
         token_type_ids = inputs["token_type_ids"]
@@ -115,11 +88,11 @@ def convert_pairwise_example(example,
 
 
 def gen_pair(dataset, pool_size=100):
-    """ 
+    """
     Generate triplet randomly based on dataset
- 
+
     Args:
-        dataset: A `MapDataset` or `IterDataset` or a tuple of those. 
+        dataset: A `MapDataset` or `IterDataset` or a tuple of those.
             Each example is composed of 2 texts: exampe["query"], example["title"]
         pool_size: the number of example to sample negative example randomly
 

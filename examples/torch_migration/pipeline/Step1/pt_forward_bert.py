@@ -19,7 +19,7 @@ from reprod_log import ReprodLogger
 import torch
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
 from models.pt_bert import BertConfig, BertForSequenceClassification
@@ -28,14 +28,13 @@ if __name__ == "__main__":
     # def logger
     reprod_logger = ReprodLogger()
 
-    pytorch_dump_path = '../weights/torch_weight.bin'
+    pytorch_dump_path = "../weights/torch_weight.bin"
     config = BertConfig()
     model = BertForSequenceClassification(config)
     checkpoint = torch.load(pytorch_dump_path)
     model.bert.load_state_dict(checkpoint)
 
-    classifier_weights = torch.load(
-        "../classifier_weights/torch_classifier_weights.bin")
+    classifier_weights = torch.load("../classifier_weights/torch_classifier_weights.bin")
     model.load_state_dict(classifier_weights, strict=False)
     model.eval()
 

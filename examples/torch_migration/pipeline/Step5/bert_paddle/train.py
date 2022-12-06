@@ -31,7 +31,7 @@ from paddlenlp.transformers import BertTokenizer
 from reprod_log import ReprodLogger
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 2)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 2)[0]
 sys.path.append(CONFIG_PATH)
 
 from models.pd_bert import BertConfig, BertForSequenceClassification
@@ -49,10 +49,8 @@ def train_one_epoch(
 ):
     model.train()
     metric_logger = utils.MetricLogger(delimiter="  ")
-    metric_logger.add_meter("lr",
-                            utils.SmoothedValue(window_size=1, fmt="{value}"))
-    metric_logger.add_meter("sentence/s",
-                            utils.SmoothedValue(window_size=10, fmt="{value}"))
+    metric_logger.add_meter("lr", utils.SmoothedValue(window_size=1, fmt="{value}"))
+    metric_logger.add_meter("sentence/s", utils.SmoothedValue(window_size=10, fmt="{value}"))
 
     header = "Epoch: [{}]".format(epoch)
     for batch in metric_logger.log_every(data_loader, print_freq, header):
@@ -60,15 +58,17 @@ def train_one_epoch(
         labels = batch[2]
         start_time = time.time()
         with paddle.amp.auto_cast(
-                enable=scaler is not None,
-                custom_white_list=["layer_norm", "softmax", "gelu"],
+            enable=scaler is not None,
+            custom_white_list=["layer_norm", "softmax", "gelu"],
         ):
             logits = model(**inputs)[0]
             loss = criterion(
                 logits.reshape([-1, 2]),
-                labels.reshape([
-                    -1,
-                ]),
+                labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
             )
 
         optimizer.clear_grad()
@@ -82,8 +82,7 @@ def train_one_epoch(
         lr_scheduler.step()
         batch_size = inputs["input_ids"].shape[0]
         metric_logger.update(loss=loss.item(), lr=lr_scheduler.get_lr())
-        metric_logger.meters["sentence/s"].update(batch_size /
-                                                  (time.time() - start_time))
+        metric_logger.meters["sentence/s"].update(batch_size / (time.time() - start_time))
 
 
 def evaluate(model, criterion, data_loader, metric, print_freq=100):
@@ -98,9 +97,11 @@ def evaluate(model, criterion, data_loader, metric, print_freq=100):
             logits = model(**inputs)[0]
             loss = criterion(
                 logits.reshape([-1, 2]),
-                labels.reshape([
-                    -1,
-                ]),
+                labels.reshape(
+                    [
+                        -1,
+                    ]
+                ),
             )
             metric_logger.update(loss=loss.item())
             correct = metric.compute(logits, labels)
@@ -108,8 +109,7 @@ def evaluate(model, criterion, data_loader, metric, print_freq=100):
         acc_global_avg = metric.accumulate()
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
-    print(" * Accuracy {acc_global_avg:.6f}".format(
-        acc_global_avg=acc_global_avg))
+    print(" * Accuracy {acc_global_avg:.6f}".format(acc_global_avg=acc_global_avg))
     return acc_global_avg
 
 
@@ -134,18 +134,12 @@ def load_data(args, tokenizer):
     train_ds = load_dataset("glue", args.task_name, splits="train")
     validation_ds = load_dataset("glue", args.task_name, splits="dev")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_length=args.max_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_length=args.max_length)
     train_ds = train_ds.map(trans_func, lazy=False)
     validation_ds = validation_ds.map(trans_func, lazy=False)
 
-    train_sampler = paddle.io.BatchSampler(train_ds,
-                                           batch_size=args.batch_size,
-                                           shuffle=False)
-    validation_sampler = paddle.io.BatchSampler(validation_ds,
-                                                batch_size=args.batch_size,
-                                                shuffle=False)
+    train_sampler = paddle.io.BatchSampler(train_ds, batch_size=args.batch_size, shuffle=False)
+    validation_sampler = paddle.io.BatchSampler(validation_ds, batch_size=args.batch_size, shuffle=False)
 
     return train_ds, validation_ds, train_sampler, validation_sampler
 
@@ -169,9 +163,9 @@ def main(args):
             "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id),
             "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
             "labels": Stack(dtype="int64"),
-        }): fn(samples)
-    train_dataset, validation_dataset, train_sampler, validation_sampler = load_data(
-        args, tokenizer)
+        }
+    ): fn(samples)
+    train_dataset, validation_dataset, train_sampler, validation_sampler = load_data(args, tokenizer)
 
     train_data_loader = paddle.io.DataLoader(
         train_dataset,
@@ -187,14 +181,13 @@ def main(args):
     )
 
     print("Creating model")
-    paddle_dump_path = '../../weights/paddle_weight.pdparams'
+    paddle_dump_path = "../../weights/paddle_weight.pdparams"
     config = BertConfig()
     model = BertForSequenceClassification(config)
     checkpoint = paddle.load(paddle_dump_path)
     model.bert.load_dict(checkpoint)
 
-    classifier_weights = paddle.load(
-        "../../classifier_weights/paddle_classifier_weights.bin")
+    classifier_weights = paddle.load("../../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
 
     print("Creating criterion")
@@ -210,10 +203,7 @@ def main(args):
 
     print("Creating optimizer")
     # Split weights in two groups, one with weight decay and the other not.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
@@ -256,16 +246,12 @@ def main(args):
 def get_args_parser(add_help=True):
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Paddle SST-2 Classification Training", add_help=add_help)
-    parser.add_argument("--task_name",
-                        default="sst-2",
-                        help="the name of the glue task to train on.")
+    parser = argparse.ArgumentParser(description="Paddle SST-2 Classification Training", add_help=add_help)
+    parser.add_argument("--task_name", default="sst-2", help="the name of the glue task to train on.")
     parser.add_argument(
         "--model_name_or_path",
         default="bert-base-uncased",
-        help=
-        "path to pretrained model or model identifier from huggingface.co/models.",
+        help="path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument("--device", default="gpu", help="device")
     parser.add_argument("--batch_size", default=32, type=int)
@@ -273,24 +259,18 @@ def get_args_parser(add_help=True):
         "--max_length",
         type=int,
         default=128,
-        help=
-        ("The maximum total input sequence length after tokenization. Sequences longer than this will be truncated,"
-         ),
+        help=(
+            "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated,"
+        ),
     )
-    parser.add_argument("--num_train_epochs",
-                        default=3,
-                        type=int,
-                        help="number of total epochs to run")
+    parser.add_argument("--num_train_epochs", default=3, type=int, help="number of total epochs to run")
     parser.add_argument(
         "--workers",
         default=0,
         type=int,
         help="number of data loading workers (default: 16)",
     )
-    parser.add_argument("--lr",
-                        default=3e-5,
-                        type=float,
-                        help="initial learning rate")
+    parser.add_argument("--lr", default=3e-5, type=float, help="initial learning rate")
     parser.add_argument(
         "--weight_decay",
         default=1e-2,
@@ -310,26 +290,16 @@ def get_args_parser(add_help=True):
         type=int,
         help="number of steps for the warmup in the lr scheduler.",
     )
-    parser.add_argument("--print_freq",
-                        default=10,
-                        type=int,
-                        help="print frequency")
-    parser.add_argument("--output_dir",
-                        default="outputs",
-                        help="path where to save")
+    parser.add_argument("--print_freq", default=10, type=int, help="print frequency")
+    parser.add_argument("--output_dir", default="outputs", help="path where to save")
     parser.add_argument(
         "--test_only",
         help="only test the model",
         action="store_true",
     )
-    parser.add_argument("--seed",
-                        default=42,
-                        type=int,
-                        help="a seed for reproducible training.")
+    parser.add_argument("--seed", default=42, type=int, help="a seed for reproducible training.")
     # Mixed precision training parameters
-    parser.add_argument("--fp16",
-                        action="store_true",
-                        help="whether or not mixed precision training")
+    parser.add_argument("--fp16", action="store_true", help="whether or not mixed precision training")
 
     return parser
 

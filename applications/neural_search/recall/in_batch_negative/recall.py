@@ -76,21 +76,16 @@ if __name__ == "__main__":
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # text_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # text_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # text_segment
     ): [data for data in fn(samples)]
 
     pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
 
-    model = SemanticIndexBase(pretrained_model,
-                              output_emb_size=args.output_emb_size)
+    model = SemanticIndexBase(pretrained_model, output_emb_size=args.output_emb_size)
     model = paddle.DataParallel(model)
 
     # Load pretrained semantic model
@@ -99,8 +94,7 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         logger.info("Loaded parameters from %s" % args.params_path)
     else:
-        raise ValueError(
-            "Please set --params_path with correct pretrained model file")
+        raise ValueError("Please set --params_path with correct pretrained model file")
 
     id2corpus = gen_id2corpus(args.corpus_file)
 
@@ -108,11 +102,9 @@ if __name__ == "__main__":
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(corpus_ds,
-                                           mode='predict',
-                                           batch_size=args.batch_size,
-                                           batchify_fn=batchify_fn,
-                                           trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(
+        corpus_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     # Need better way to get inner model of DataParallel
     inner_model = model._layers
@@ -123,29 +115,27 @@ if __name__ == "__main__":
 
     query_ds = MapDataset(text_list)
 
-    query_data_loader = create_dataloader(query_ds,
-                                          mode='predict',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    query_data_loader = create_dataloader(
+        query_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
 
-    recall_result_file = os.path.join(args.recall_result_dir,
-                                      args.recall_result_file)
-    with open(recall_result_file, 'w', encoding='utf-8') as f:
+    recall_result_file = os.path.join(args.recall_result_dir, args.recall_result_file)
+    with open(recall_result_file, "w", encoding="utf-8") as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
-            recalled_idx, cosine_sims = final_index.knn_query(
-                batch_query_embedding.numpy(), args.recall_num)
+            recalled_idx, cosine_sims = final_index.knn_query(batch_query_embedding.numpy(), args.recall_num)
 
             batch_size = len(cosine_sims)
 
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(
-                        text_list[text_index]["text"], id2corpus[doc_idx],
-                        1.0 - cosine_sims[row_index][idx]))
+                    f.write(
+                        "{}\t{}\t{}\n".format(
+                            text_list[text_index]["text"], id2corpus[doc_idx], 1.0 - cosine_sims[row_index][idx]
+                        )
+                    )

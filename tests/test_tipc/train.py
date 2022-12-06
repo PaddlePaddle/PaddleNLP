@@ -47,8 +47,7 @@ def do_train(args):
     # Define data loader
     train_loader, eval_loader = benchmark_model.create_data_loader(args)
 
-    if args.max_steps is None or (args.max_steps is not None
-                                  and args.max_steps < 0):
+    if args.max_steps is None or (args.max_steps is not None and args.max_steps < 0):
         args.max_steps = len(train_loader) * args.epoch
 
     # Define model
@@ -64,11 +63,8 @@ def do_train(args):
 
     # for amp training
     if args.use_amp:
-        scaler = paddle.amp.GradScaler(enable=True,
-                                       init_loss_scaling=args.scale_loss)
-        model = paddle.amp.decorate(models=model,
-                                    level=args.amp_level,
-                                    save_dtype='float32')
+        scaler = paddle.amp.GradScaler(enable=True, init_loss_scaling=args.scale_loss)
+        model = paddle.amp.decorate(models=model, level=args.amp_level, save_dtype="float32")
 
     # for distributed training
     if trainer_count > 1:
@@ -92,24 +88,20 @@ def do_train(args):
 
             if args.use_amp:
                 with paddle.amp.auto_cast(
-                        custom_black_list=args.custom_black_list
-                        if args.amp_level == 'O2' else {},
-                        level=args.amp_level):
-                    loss, sample_per_cards = benchmark_model.forward(
-                        model, args, input_data)
+                    custom_black_list=args.custom_black_list if args.amp_level == "O2" else {}, level=args.amp_level
+                ):
+                    loss, sample_per_cards = benchmark_model.forward(model, args, input_data)
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
 
                 scaler.minimize(optimizer, scaled)
-                if 'set_to_zero' in inspect.getfullargspec(
-                        optimizer.clear_grad).args:
+                if "set_to_zero" in inspect.getfullargspec(optimizer.clear_grad).args:
                     optimizer.clear_grad(set_to_zero=False)
                 else:
                     optimizer.clear_grad()
             else:
-                loss, sample_per_cards = benchmark_model.forward(
-                    model, args, input_data)
+                loss, sample_per_cards = benchmark_model.forward(model, args, input_data)
 
                 loss.backward()
 
@@ -124,10 +116,8 @@ def do_train(args):
                     model_dir = args.save_model
                     if not os.path.exists(model_dir):
                         os.makedirs(model_dir)
-                    paddle.save(model.state_dict(),
-                                os.path.join(model_dir, "model.pdparams"))
-                    paddle.save(optimizer.state_dict(),
-                                os.path.join(model_dir, "model.pdopt"))
+                    paddle.save(model.state_dict(), os.path.join(model_dir, "model.pdparams"))
+                    paddle.save(optimizer.state_dict(), os.path.join(model_dir, "model.pdopt"))
                 return
 
             if args.lr_scheduler is not None and not args.scheduler_update_by_epoch:
@@ -150,7 +140,8 @@ def do_train(args):
                     batch_cost=batch_cost_avg.get_average(),
                     reader_cost=reader_cost_avg.get_average(),
                     num_samples=sample_per_cards,
-                    ips=batch_ips_avg.get_average_per_sec())
+                    ips=batch_ips_avg.get_average_per_sec(),
+                )
 
                 reader_cost_avg.reset()
                 batch_cost_avg.reset()
@@ -170,8 +161,7 @@ def do_train(args):
             lr.step()
 
         train_epoch_cost = time.time() - epoch_start
-        logger.info("train epoch: %d, epoch_cost: %.5f s" %
-                    (pass_id, train_epoch_cost))
+        logger.info("train epoch: %d, epoch_cost: %.5f s" % (pass_id, train_epoch_cost))
 
 
 def do_hapi(args):
@@ -197,18 +187,14 @@ def do_hapi(args):
 
     optimizer = benchmark_optimizer.build_optimizer(args, lr, model)
 
-    benchmark_model.forward(model,
-                            args,
-                            optimizer=optimizer,
-                            train_loader=train_loader,
-                            eval_loader=eval_loader)
+    benchmark_model.forward(model, args, optimizer=optimizer, train_loader=train_loader, eval_loader=eval_loader)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = options.get_training_parser()
     args = options.parse_args_and_model(parser)
 
-    if getattr(args, 'use_hapi', False):
+    if getattr(args, "use_hapi", False):
         do_hapi(args)
     else:
         do_train(args)

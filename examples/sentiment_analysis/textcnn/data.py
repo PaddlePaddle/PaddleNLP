@@ -17,11 +17,7 @@ import paddle
 from paddlenlp.datasets import load_dataset
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     """
     Create dataloader.
 
@@ -40,25 +36,16 @@ def create_dataloader(dataset,
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
+    shuffle = True if mode == "train" else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
 
-def preprocess_prediction_data(data,
-                               tokenizer,
-                               pad_token_id=0,
-                               max_ngram_filter_size=3):
+def preprocess_prediction_data(data, tokenizer, pad_token_id=0, max_ngram_filter_size=3):
     """
     It process the prediction data as the format used as training.
 
@@ -71,9 +58,9 @@ def preprocess_prediction_data(data,
             then max_ngram_filter_size=3
 
     Returns:
-        examples (obj:`list`): The processed data whose each element 
-            is a `list` object, which contains 
-            
+        examples (obj:`list`): The processed data whose each element
+            is a `list` object, which contains
+
             - word_ids(obj:`list[int]`): The list of word ids.
     """
     examples = []
@@ -90,7 +77,7 @@ def preprocess_prediction_data(data,
 def convert_example(example, tokenizer):
     """convert_example"""
     input_ids = tokenizer.encode(example["text"])
-    input_ids = np.array(input_ids, dtype='int64')
+    input_ids = np.array(input_ids, dtype="int64")
 
     label = np.array(example["label"], dtype="int64")
     return input_ids, label
@@ -98,7 +85,7 @@ def convert_example(example, tokenizer):
 
 def read_custom_data(filename):
     """Reads data."""
-    with open(filename, 'r', encoding='utf-8') as f:
+    with open(filename, "r", encoding="utf-8") as f:
         # Skip head
         next(f)
         for line in f:
