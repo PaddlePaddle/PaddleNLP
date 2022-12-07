@@ -119,13 +119,13 @@
   - 增值税发票（需微调）
 
     <div align="center">
-        <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=600 width=9000 />
+        <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=550 width=700 />
     </div>
 
   - 表单（需微调）
 
     <div align="center">
-        <img src=https://user-images.githubusercontent.com/40840292/206080645-2f07d560-b949-4248-a51f-1735692cb241.png height=450 width=800 />
+        <img src=https://user-images.githubusercontent.com/40840292/206080645-2f07d560-b949-4248-a51f-1735692cb241.png height=400 width=700 />
     </div>
 
 <a name="3"></a>
