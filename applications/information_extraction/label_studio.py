@@ -23,8 +23,8 @@ from decimal import Decimal
 import numpy as np
 import paddle
 
-from paddlenlp.utils.convertor import Convertor
 from paddlenlp.utils.log import logger
+from paddlenlp.utils.tools import DataConverter
 
 
 def set_seed(seed):
@@ -77,7 +77,7 @@ def do_convert():
     else:
         anno_type = "text"
 
-    convertor = Convertor(
+    data_converter = DataConverter(
         args.label_studio_file,
         negative_ratio=args.negative_ratio,
         prompt_prefix=args.prompt_prefix,
@@ -90,13 +90,13 @@ def do_convert():
     )
 
     if args.task_type == "ext":
-        train_examples = convertor.convert_ext_examples(raw_examples[:p1])
-        dev_examples = convertor.convert_ext_examples(raw_examples[p1:p2], is_train=False)
-        test_examples = convertor.convert_ext_examples(raw_examples[p2:], is_train=False)
+        train_examples = data_converter.convert_ext_examples(raw_examples[:p1])
+        dev_examples = data_converter.convert_ext_examples(raw_examples[p1:p2], is_train=False)
+        test_examples = data_converter.convert_ext_examples(raw_examples[p2:], is_train=False)
     else:
-        train_examples = convertor.convert_cls_examples(raw_examples[:p1])
-        dev_examples = convertor.convert_cls_examples(raw_examples[p1:p2])
-        test_examples = convertor.convert_cls_examples(raw_examples[p2:])
+        train_examples = data_converter.convert_cls_examples(raw_examples[:p1])
+        dev_examples = data_converter.convert_cls_examples(raw_examples[p1:p2])
+        test_examples = data_converter.convert_cls_examples(raw_examples[p2:])
 
     def _save_examples(save_dir, file_name, examples):
         count = 0
