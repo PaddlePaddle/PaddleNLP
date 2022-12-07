@@ -1424,34 +1424,13 @@ trainer.compress()
 ```shell
 # 分类任务
 # 该脚本共支持 CLUE 中 7 个分类任务，超参不全相同，因此分类任务中的超参配置利用 configs/defalut.yml 配置
-python compress_seq_cls.py \
-    --dataset "clue tnews"  \
-    --model_name_or_path best_models/TNEWS  \
-    --output_dir ./
+python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml
 
 # 序列标注任务
-python compress_token_cls.py \
-    --dataset "msra_ner"  \
-    --model_name_or_path best_models/MSRA_NER \
-    --output_dir ./ \
-    --max_seq_length 128 \
-    --per_device_train_batch_size 32 \
-    --per_device_eval_batch_size 32 \
-    --learning_rate 0.00005 \
-    --remove_unused_columns False \
-    --num_train_epochs 3
+python compress_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models/msra_ner --config=configs/default.yml
 
 # 阅读理解任务
-python compress_qa.py \
-    --dataset "clue cmrc2018" \
-    --model_name_or_path best_models/CMRC2018  \
-    --output_dir ./ \
-    --max_answer_length 50 \
-    --max_seq_length 512 \
-    --learning_rate 0.00003 \
-    --num_train_epochs 8 \
-    --per_device_train_batch_size 24 \
-    --per_device_eval_batch_size 24 \
+python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml
 
 ```
 
@@ -1589,15 +1568,9 @@ Python部署请参考：[Python 部署指南](./deploy/python/README.md)
 ### 服务化部署
 
 - [Triton Inference Server 服务化部署指南](./deploy/triton/README.md)
-- [Paddle Serving 服务化部署指南](./deploy/serving/README.md)
-
-<a name="Paddle2ONNX部署"></a>
-
-
 
 
 <a name="参考文献"></a>
-
 
 ## Notebook教程
 

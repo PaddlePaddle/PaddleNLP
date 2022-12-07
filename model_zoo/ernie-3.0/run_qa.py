@@ -37,7 +37,7 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
 )
-from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
+from paddlenlp.transformers import ErnieForQuestionAnswering, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -45,7 +45,7 @@ def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
-    # Log model and data config
+    # Load model and data config
     model_args, data_args, training_args = load_config(
         model_args.config, "QuestionAnswering", data_args.dataset, model_args, data_args, training_args
     )
@@ -83,8 +83,8 @@ def main():
     data_args.label_list = label_list
 
     # Define tokenizer, model, loss function.
-    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForQuestionAnswering.from_pretrained(model_args.model_name_or_path)
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = ErnieForQuestionAnswering.from_pretrained(model_args.model_name_or_path)
 
     loss_fct = CrossEntropyLossForSQuAD()
 

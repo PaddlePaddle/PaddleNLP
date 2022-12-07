@@ -72,17 +72,16 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    print("step -1")
     raw_datasets = load_dataset(data_args.dataset)
-
+    print("This flag", raw_datasets["train"])
     label_list = getattr(raw_datasets["train"], "label_list", None)
+    print("label list:{}".format(label_list))
     data_args.label_list = label_list
     data_args.ignore_label = -100
     data_args.no_entity_id = len(data_args.label_list) - 1
 
     num_classes = len(raw_datasets["train"].label_list)
 
-    print("step 0")
     # Define tokenizer, model, loss function.
     tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
     model = ErnieForTokenClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
@@ -119,7 +118,6 @@ def main():
     # Define the metrics of tasks.
     # Metrics
     metric = load_metric("seqeval")
-    print("step 1")
 
     def compute_metrics(p):
         predictions, labels = p
