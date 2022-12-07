@@ -128,7 +128,7 @@ class MLMPromptTokenizer(object):
 
     def _create_max_lengths_from_do_truncate(self, part_text: List[str], part_do_truncate: List[bool]):
         """
-        Create the max sequence length of each part.
+        Create the max sequence length of each part, where the longest part is truncated first.
         """
         text_length = sum([len(x) for x in part_text])
         num_special_token = self.tokenizer.num_special_tokens_to_add()
@@ -137,17 +137,20 @@ class MLMPromptTokenizer(object):
             return [None] * len(part_text)
         max_lengths = [None for _ in range(len(part_text))]
         do_truncate = [int(x) for x in part_do_truncate]
+
+        # Remove parts that can not be truncated.
         for index, part in enumerate(part_text):
             if not part_do_truncate[index]:
                 max_length -= len(part)
             else:
                 max_lengths[index] = len(part)
         if sum(do_truncate) == 0:
-            logger.info(
+            logger.warning(
                 f"Can not truncate the sequence with length {text_length}. Set more `truncate` attributes as True."
             )
             return max_lengths
 
+        # Remove parts whose length is less than average maximum length of parts to truncate.
         has_short = True
         while has_short:
             has_short = False
@@ -158,14 +161,15 @@ class MLMPromptTokenizer(object):
                     max_lengths[index] = len(part)
                     max_length -= len(part)
                     has_short = True
-        assert max_length >= 0
+        if max_length < 0:
+            raise AssertionError("Actual length has exceeded the maximum length. Check the implementation.")
         avg_max_length = max_length // sum(do_truncate)
         for index in range(len(part_text)):
             if do_truncate[index] == 1:
                 max_lengths[index] = min(avg_max_length, max_length)
                 max_length -= max_lengths[index]
                 if max_length < 0:
-                    raise ValueError("Unexpected results")
+                    raise AssertionError("Actual length has exceeded the maximum length. Check the implementation.")
         return max_lengths
 
     def _create_attention_mask(self, input_ids: List[int], option_length: Union[int, None]):
