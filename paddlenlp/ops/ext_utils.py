@@ -25,9 +25,7 @@ from distutils.dep_util import newer_group
 
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
 from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
-from paddle.utils.cpp_extension.cpp_extension import (CUDA_HOME, CppExtension,
-                                                      BuildExtension as
-                                                      PaddleBuildExtension)
+from paddle.utils.cpp_extension.cpp_extension import CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension
 from paddlenlp.utils.env import PPNLP_HOME
 from paddlenlp.utils.log import logger
 from paddlenlp.utils.file_lock import decorate as file_lock
@@ -55,7 +53,6 @@ def _get_files(path):
 
 
 class CMakeExtension(Extension):
-
     def __init__(self, name, source_dir=None):
         # A CMakeExtension needs a source_dir instead of a file list.
         Extension.__init__(self, name, sources=[])
@@ -74,8 +71,7 @@ class CMakeExtension(Extension):
         if ext_builder.compiler.compiler_type == "msvc":
             raise NotImplementedError
         cmake_args = getattr(self, "cmake_args", []) + [
-            "-DCMAKE_BUILD_TYPE={}".format(
-                "Debug" if ext_builder.debug else "Release"),
+            "-DCMAKE_BUILD_TYPE={}".format("Debug" if ext_builder.debug else "Release"),
             "-DCMAKE_LIBRARY_OUTPUT_DIRECTORY={}".format(ext_builder.build_lib),
         ]
         build_args = []
@@ -94,14 +90,12 @@ class CMakeExtension(Extension):
 
         # Redirect stdout/stderr to mute, especially when allowing errors
         stdout = getattr(self, "_std_out_handle", None)
-        subprocess.check_call(["cmake", self.source_dir] + cmake_args,
-                              cwd=ext_builder.build_temp,
-                              stdout=stdout,
-                              stderr=stdout)
-        subprocess.check_call(["cmake", "--build", "."] + build_args,
-                              cwd=ext_builder.build_temp,
-                              stdout=stdout,
-                              stderr=stdout)
+        subprocess.check_call(
+            ["cmake", self.source_dir] + cmake_args, cwd=ext_builder.build_temp, stdout=stdout, stderr=stdout
+        )
+        subprocess.check_call(
+            ["cmake", "--build", "."] + build_args, cwd=ext_builder.build_temp, stdout=stdout, stderr=stdout
+        )
 
     def get_target_filename(self):
         """
@@ -119,14 +113,11 @@ class CMakeExtension(Extension):
 
 
 class FasterTransformerExtension(CMakeExtension):
-
     def __init__(self, name, source_dir=None, need_parallel=False):
         super(FasterTransformerExtension, self).__init__(name, source_dir)
-        self.sources = _get_files(
-            os.path.join(self.source_dir, "faster_transformer",
-                         "src")) + _get_files(
-                             os.path.join(self.source_dir, "patches",
-                                          "FasterTransformer"))
+        self.sources = _get_files(os.path.join(self.source_dir, "faster_transformer", "src")) + _get_files(
+            os.path.join(self.source_dir, "patches", "FasterTransformer")
+        )
         self._std_out_handle = None
         # Env variable may not work as expected, since jit compile by `load`
         # would not re-built if source code is not update.
@@ -140,9 +131,7 @@ class FasterTransformerExtension(CMakeExtension):
         if CUDA_HOME is None:  # GPU only
             # TODO(guosheng): should we touch a dummy file or add a quick exit
             # method to avoid meaningless process in `load`
-            logger.warning(
-                "FasterTransformer is not available because CUDA can not be found."
-            )
+            logger.warning("FasterTransformer is not available because CUDA can not be found.")
             raise NotImplementedError
         # TODO(guosheng): Multiple -std seems be passed in FasterTransformer,
         # which is not allowed by NVCC. Fix it later.
@@ -154,20 +143,17 @@ class FasterTransformerExtension(CMakeExtension):
         if self.need_parallel:
             self.cmake_args += [f"-DWITH_PARALLEL=ON"]
         try:
-            super(FasterTransformerExtension,
-                  self).build_with_command(ext_builder)
+            super(FasterTransformerExtension, self).build_with_command(ext_builder)
             # FasterTransformer cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
             # to `CMAKE_BINARY_DIR/lib`, thus copy the lib back to `build_ext.build_lib`.
             # Maybe move this copy to CMakeList.
             # `copy_tree` or `copy_file`, boost lib might be included
-            ext_builder.copy_tree(os.path.join(ext_builder.build_temp, "lib"),
-                                  ext_builder.build_lib)
+            ext_builder.copy_tree(os.path.join(ext_builder.build_temp, "lib"), ext_builder.build_lib)
             # TODO(guosheng): Maybe we should delete the build dir especially
             # when it is in the dir of paddlenlp package.
             # os.remove(ext_builder.build_temp)
         except Exception as e:
-            logger.warning(
-                "FasterTransformer is not available due to build errors.")
+            logger.warning("FasterTransformer is not available due to build errors.")
             raise e
 
     def get_target_filename(self):
@@ -206,7 +192,7 @@ EXTENSIONS = {
     # NOTE: Since model parallel code is supported by definitions, to avoid
     # performance degrading on non-parallel mode, we use a separated lib for
     # model parallel.
-    "FasterTransformerParallel": FasterTransformerExtension
+    "FasterTransformerParallel": FasterTransformerExtension,
 }
 
 
@@ -222,7 +208,8 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
     `kwargws` is arguments for the corresponding Extension initialization.
     Any type extension can be jit build.
     """
-    template = textwrap.dedent("""
+    template = textwrap.dedent(
+        """
     from setuptools import setup
     from paddlenlp.ops.ext_utils import get_extension_maker, BuildExtension
 
@@ -234,16 +221,14 @@ def _write_setup_file(name, file_path, build_dir, **kwargs):
                 {kwargs_str})],
         cmdclass={{'build_ext' : BuildExtension.with_options(
             output_dir=r'{build_dir}')
-        }})""").lstrip()
+        }})"""
+    ).lstrip()
     kwargs_str = ""
     for key, value in kwargs.items():
-        kwargs_str += key + "=" + (f"'{value}'" if isinstance(value, str) else
-                                   str(value)) + ","
-    content = template.format(name=name,
-                              kwargs_str=kwargs_str,
-                              build_dir=build_dir)
+        kwargs_str += key + "=" + (f"'{value}'" if isinstance(value, str) else str(value)) + ","
+    content = template.format(name=name, kwargs_str=kwargs_str, build_dir=build_dir)
 
-    with open(file_path, 'w') as f:
+    with open(file_path, "w") as f:
         f.write(content)
 
 
@@ -254,8 +239,7 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
     # will output the error to stdout (when verbose is True) and raise `RuntimeError`,
     # which is not friendly for users though no other bad effect.
     if CUDA_HOME is None:
-        logger.warning("%s is not available because CUDA can not be found." %
-                       name)
+        logger.warning("%s is not available because CUDA can not be found." % name)
         raise NotImplementedError
     if name in LOADED_EXT.keys():
         # TODO(guosheng): Maybe the key should combined with kwargs since the
@@ -271,11 +255,9 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         # to uninstall. Thus we put it in PPNLP_HOME with digest of current path,
         # like this:
         build_dir = os.path.join(
-            PPNLP_HOME, 'extensions',
-            hashlib.md5(str(
-                Path(__file__).parent.resolve()).encode('utf-8')).hexdigest())
-    build_base_dir = os.path.abspath(
-        os.path.expanduser(os.path.join(build_dir, name)))
+            PPNLP_HOME, "extensions", hashlib.md5(str(Path(__file__).parent.resolve()).encode("utf-8")).hexdigest()
+        )
+    build_base_dir = os.path.abspath(os.path.expanduser(os.path.join(build_dir, name)))
     if not os.path.exists(build_base_dir):
         os.makedirs(build_base_dir)
 
@@ -294,12 +276,8 @@ def load(name, build_dir=None, force=False, verbose=False, **kwargs):
         lib_filepath = os.path.join(build_base_dir, lib_filename)
         if not force:
             ext_sources = extension.sources
-            if all(
-                    os.path.exists(f)
-                    and not newer_group(ext_sources, f, 'newer')
-                    for f in out_filepath):
-                logger.debug("skipping '%s' extension (up-to-date) build" %
-                             name)
+            if all(os.path.exists(f) and not newer_group(ext_sources, f, "newer") for f in out_filepath):
+                logger.debug("skipping '%s' extension (up-to-date) build" % name)
                 ops = load_op_meta_info_and_register_op(lib_filepath)
                 LOADED_EXT[name] = ops
                 return LOADED_EXT[name]

@@ -43,26 +43,26 @@ args = parser.parse_args()
 
 def read_local_dataset(path, label_list):
     label_list_dict = {label_list[i]: i for i in range(len(label_list))}
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            items = line.strip().split('\t')
+            items = line.strip().split("\t")
             if len(items) == 0:
                 continue
             elif len(items) == 1:
                 sentence = items[0]
                 labels = []
             else:
-                sentence = ''.join(items[:-1])
+                sentence = "".join(items[:-1])
                 label = items[-1]
-                labels = [label_list_dict[l] for l in label.split(',')]
-            yield {'sentence': sentence, 'label': labels}
+                labels = [label_list_dict[l] for l in label.split(",")]
+            yield {"sentence": sentence, "label": labels}
 
 
 if __name__ == "__main__":
 
     label_list = []
     label_dir = os.path.join(args.dataset_dir, "label.txt")
-    with open(label_dir, 'r', encoding='utf-8') as f:
+    with open(label_dir, "r", encoding="utf-8") as f:
         lines = f.readlines()
         for i, line in enumerate(lines):
             label_list.append(line.strip())
@@ -71,12 +71,8 @@ if __name__ == "__main__":
     predictor = Predictor(args, label_list)
 
     if args.perf:
-        eval_dir = os.path.join(args.dataset_dir,
-                                "{}.txt".format(args.perf_dataset))
-        eval_ds = load_dataset(read_local_dataset,
-                               path=eval_dir,
-                               label_list=label_list,
-                               lazy=False)
+        eval_dir = os.path.join(args.dataset_dir, "{}.txt".format(args.perf_dataset))
+        eval_ds = load_dataset(read_local_dataset, path=eval_dir, label_list=label_list, lazy=False)
         texts, labels = predictor.get_text_and_label(eval_ds)
 
         # preprocess & evaluate & latency
@@ -86,7 +82,7 @@ if __name__ == "__main__":
     else:
         data = []
         data_dir = os.path.join(args.dataset_dir, "data.txt")
-        with open(data_dir, 'r', encoding='utf-8') as f:
+        with open(data_dir, "r", encoding="utf-8") as f:
             lines = f.readlines()
             for i, line in enumerate(lines):
                 data.append(line.strip())

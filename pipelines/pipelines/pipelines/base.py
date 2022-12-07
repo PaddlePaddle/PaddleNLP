@@ -145,15 +145,12 @@ class BasePipeline:
         try:
             get_ipython().set_next_input(code)  # type: ignore
         except NameError:
-            logger.error(
-                "Could not create notebook cell. Make sure you're running in a notebook environment."
-            )
+            logger.error("Could not create notebook cell. Make sure you're running in a notebook environment.")
 
     @classmethod
-    def load_from_config(cls,
-                         pipeline_config: Dict,
-                         pipeline_name: Optional[str] = None,
-                         overwrite_with_env_variables: bool = True):
+    def load_from_config(
+        cls, pipeline_config: Dict, pipeline_name: Optional[str] = None, overwrite_with_env_variables: bool = True
+    ):
         """
         Load Pipeline from a config dict defining the individual components and how they're tied together to form
         a Pipeline. A single config can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -199,8 +196,7 @@ class BasePipeline:
                                              variable 'MYDOCSTORE_PARAMS_INDEX=documents-2021' can be set. Note that an
                                              `_` sign must be used to specify nested hierarchical properties.
         """
-        pipeline_definition = get_pipeline_definition(
-            pipeline_config=pipeline_config, pipeline_name=pipeline_name)
+        pipeline_definition = get_pipeline_definition(pipeline_config=pipeline_config, pipeline_name=pipeline_name)
         if pipeline_definition["type"] == "Pipeline":
             return Pipeline.load_from_config(
                 pipeline_config=pipeline_config,
@@ -209,14 +205,13 @@ class BasePipeline:
             )
         else:
             raise KeyError(
-                f"Pipeline Type '{pipeline_definition['type']}' is not a valid. The available types are"
-                f"'Pipeline'.")
+                f"Pipeline Type '{pipeline_definition['type']}' is not a valid. The available types are" f"'Pipeline'."
+            )
 
     @classmethod
-    def load_from_yaml(cls,
-                       path: Path,
-                       pipeline_name: Optional[str] = None,
-                       overwrite_with_env_variables: bool = True):
+    def load_from_yaml(
+        cls, path: Path, pipeline_name: Optional[str] = None, overwrite_with_env_variables: bool = True
+    ):
         """
         Load Pipeline from a YAML file defining the individual components and how they're tied together to form
         a Pipeline. A single YAML can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -270,7 +265,8 @@ class BasePipeline:
                 f"YAML version ({pipeline_config['version']}) does not match with pipelines version ({__version__}). "
                 "Issues may occur during loading. "
                 "To fix this warning, save again this pipeline with the current pipelines version using Pipeline.save_to_yaml(), "
-                f"or downgrade to pipelines version {__version__}.")
+                f"or downgrade to pipelines version {__version__}."
+            )
         return cls.load_from_config(
             pipeline_config=pipeline_config,
             pipeline_name=pipeline_name,
@@ -320,17 +316,15 @@ class Pipeline(BasePipeline):
                 self.root_node = root_node
                 self.graph.add_node(root_node, component=RootNode())
             else:
-                raise KeyError(
-                    f"Root node '{root_node}' is invalid. Available options are 'Query' and 'File'."
-                )
+                raise KeyError(f"Root node '{root_node}' is invalid. Available options are 'Query' and 'File'.")
         component.name = name
         self.graph.add_node(name, component=component, inputs=inputs)
 
         if len(self.graph.nodes) == 2:  # first node added; connect with Root
-            assert len(inputs) == 1 and inputs[0].split(
-                ".")[0] == self.root_node, (
-                    f"The '{name}' node can only input from {self.root_node}. "
-                    f"Set the 'inputs' parameter to ['{self.root_node}']")
+            assert len(inputs) == 1 and inputs[0].split(".")[0] == self.root_node, (
+                f"The '{name}' node can only input from {self.root_node}. "
+                f"Set the 'inputs' parameter to ['{self.root_node}']"
+            )
             self.graph.add_edge(self.root_node, name, label="output_1")
             return
 
@@ -338,19 +332,17 @@ class Pipeline(BasePipeline):
             if "." in i:
                 [input_node_name, input_edge_name] = i.split(".")
                 assert "output_" in input_edge_name, f"'{input_edge_name}' is not a valid edge name."
-                outgoing_edges_input_node = self.graph.nodes[input_node_name][
-                    "component"].outgoing_edges
-                assert int(
-                    input_edge_name.split("_")[1]
-                ) <= outgoing_edges_input_node, (
+                outgoing_edges_input_node = self.graph.nodes[input_node_name]["component"].outgoing_edges
+                assert int(input_edge_name.split("_")[1]) <= outgoing_edges_input_node, (
                     f"Cannot connect '{input_edge_name}' from '{input_node_name}' as it only has "
-                    f"{outgoing_edges_input_node} outgoing edge(s).")
+                    f"{outgoing_edges_input_node} outgoing edge(s)."
+                )
             else:
-                outgoing_edges_input_node = self.graph.nodes[i][
-                    "component"].outgoing_edges
+                outgoing_edges_input_node = self.graph.nodes[i]["component"].outgoing_edges
                 assert outgoing_edges_input_node == 1, (
                     f"Adding an edge from {i} to {name} is ambiguous as {i} has {outgoing_edges_input_node} edges. "
-                    f"Please specify the output explicitly.")
+                    f"Please specify the output explicitly."
+                )
                 input_node_name = i
                 input_edge_name = "output_1"
             self.graph.add_edge(input_node_name, name, label=input_edge_name)
@@ -403,20 +395,17 @@ class Pipeline(BasePipeline):
         """
         # validate the node names
         if params:
-            if not all(node_id in self.graph.nodes
-                       for node_id in params.keys()):
+            if not all(node_id in self.graph.nodes for node_id in params.keys()):
 
                 # Might be a non-targeted param. Verify that too
                 not_a_node = set(params.keys()) - set(self.graph.nodes)
                 valid_global_params = set()
                 for node_id in self.graph.nodes:
                     run_signature_args = inspect.signature(
-                        self.graph.nodes[node_id]
-                        ["component"].run).parameters.keys()
+                        self.graph.nodes[node_id]["component"].run
+                    ).parameters.keys()
                     valid_global_params |= set(run_signature_args)
-                invalid_keys = [
-                    key for key in not_a_node if key not in valid_global_params
-                ]
+                invalid_keys = [key for key in not_a_node if key not in valid_global_params]
 
                 if invalid_keys:
                     raise ValueError(
@@ -425,10 +414,7 @@ class Pipeline(BasePipeline):
 
         node_output = None
         queue = {
-            self.root_node: {
-                "root_node": self.root_node,
-                "params": params
-            }
+            self.root_node: {"root_node": self.root_node, "params": params}
         }  # ordered dict with "node_id" -> "input" mapping that acts as a FIFO queue
         if query:
             queue[self.root_node]["query"] = query
@@ -456,13 +442,10 @@ class Pipeline(BasePipeline):
                 node_input["params"][node_id]["debug"] = debug
 
             predecessors = set(nx.ancestors(self.graph, node_id))
-            if predecessors.isdisjoint(set(queue.keys(
-            ))):  # only execute if predecessor nodes are executed
+            if predecessors.isdisjoint(set(queue.keys())):  # only execute if predecessor nodes are executed
                 try:
-                    logger.debug(
-                        f"Running node `{node_id}` with input `{node_input}`")
-                    node_output, stream_id = self.graph.nodes[node_id][
-                        "component"]._dispatch_run(**node_input)
+                    logger.debug(f"Running node `{node_id}` with input `{node_input}`")
+                    node_output, stream_id = self.graph.nodes[node_id]["component"]._dispatch_run(**node_input)
                 except Exception as e:
                     tb = traceback.format_exc()
                     raise Exception(
@@ -471,15 +454,8 @@ class Pipeline(BasePipeline):
                 queue.pop(node_id)
                 #
                 if stream_id == "split_documents":
-                    for stream_id in [
-                            key for key in node_output.keys()
-                            if key.startswith("output_")
-                    ]:
-                        current_node_output = {
-                            k: v
-                            for k, v in node_output.items()
-                            if not k.startswith("output_")
-                        }
+                    for stream_id in [key for key in node_output.keys() if key.startswith("output_")]:
+                        current_node_output = {k: v for k, v in node_output.items() if not k.startswith("output_")}
                         current_docs = node_output.pop(stream_id)
                         current_node_output["documents"] = current_docs
                         next_nodes = self.get_next_nodes(node_id, stream_id)
@@ -488,14 +464,10 @@ class Pipeline(BasePipeline):
                 else:
                     next_nodes = self.get_next_nodes(node_id, stream_id)
                     for n in next_nodes:  # add successor nodes with corresponding inputs to the queue
-                        if queue.get(
-                                n):  # concatenate inputs if it's a join node
+                        if queue.get(n):  # concatenate inputs if it's a join node
                             existing_input = queue[n]
                             if "inputs" not in existing_input.keys():
-                                updated_input: dict = {
-                                    "inputs": [existing_input, node_output],
-                                    "params": params
-                                }
+                                updated_input: dict = {"inputs": [existing_input, node_output], "params": params}
                                 if query:
                                     updated_input["query"] = query
                                 if file_paths:
@@ -532,12 +504,9 @@ class Pipeline(BasePipeline):
                 "It seems that an indexing Pipeline is run, so using the nodes' run method instead of run_batch."
             )
             if isinstance(queries, list):
-                raise Exception(
-                    "For indexing, only a single query can be provided.")
+                raise Exception("For indexing, only a single query can be provided.")
             if isinstance(labels, list):
-                raise Exception(
-                    "For indexing, only one MultiLabel object can be provided as labels."
-                )
+                raise Exception("For indexing, only one MultiLabel object can be provided as labels.")
             flattened_documents: List[Document] = []
             if documents and isinstance(documents[0], list):
                 for doc_list in documents:
@@ -561,10 +530,7 @@ class Pipeline(BasePipeline):
 
         node_output = None
         queue: Dict[str, Any] = {
-            root_node: {
-                "root_node": root_node,
-                "params": params
-            }
+            root_node: {"root_node": root_node, "params": params}
         }  # ordered dict with "node_id" -> "input" mapping that acts as a FIFO queue
         if queries:
             queue[root_node]["queries"] = queries
@@ -596,34 +562,22 @@ class Pipeline(BasePipeline):
                 node_input["params"][node_id]["debug"] = debug
 
             predecessors = set(nx.ancestors(self.graph, node_id))
-            if predecessors.isdisjoint(set(queue.keys(
-            ))):  # only execute if predecessor nodes are executed
+            if predecessors.isdisjoint(set(queue.keys())):  # only execute if predecessor nodes are executed
                 try:
-                    logger.debug("Running node '%s` with input: %s", node_id,
-                                 node_input)
-                    node_output, stream_id = self.graph.nodes[node_id][
-                        "component"]._dispatch_run_batch(**node_input)
+                    logger.debug("Running node '%s` with input: %s", node_id, node_input)
+                    node_output, stream_id = self.graph.nodes[node_id]["component"]._dispatch_run_batch(**node_input)
                 except Exception as e:
                     # The input might be a really large object with thousands of embeddings.
                     # If you really want to see it, raise the log level.
-                    logger.debug(
-                        "Exception while running node '%s' with input %s",
-                        node_id, node_input)
+                    logger.debug("Exception while running node '%s' with input %s", node_id, node_input)
                     raise Exception(
                         f"Exception while running node '{node_id}': {e}\nEnable debug logging to see the data that was passed when the pipeline failed."
                     ) from e
                 queue.pop(node_id)
 
                 if stream_id == "split":
-                    for stream_id in [
-                            key for key in node_output.keys()
-                            if key.startswith("output_")
-                    ]:
-                        current_node_output = {
-                            k: v
-                            for k, v in node_output.items()
-                            if not k.startswith("output_")
-                        }
+                    for stream_id in [key for key in node_output.keys() if key.startswith("output_")]:
+                        current_node_output = {k: v for k, v in node_output.items() if not k.startswith("output_")}
                         current_docs = node_output.pop(stream_id)
                         current_node_output["documents"] = current_docs
                         next_nodes = self.get_next_nodes(node_id, stream_id)
@@ -632,14 +586,10 @@ class Pipeline(BasePipeline):
                 else:
                     next_nodes = self.get_next_nodes(node_id, stream_id)
                     for n in next_nodes:
-                        if queue.get(
-                                n):  # concatenate inputs if it's a join node
+                        if queue.get(n):  # concatenate inputs if it's a join node
                             existing_input = queue[n]
                             if "inputs" not in existing_input.keys():
-                                updated_input: Dict = {
-                                    "inputs": [existing_input, node_output],
-                                    "params": params
-                                }
+                                updated_input: Dict = {"inputs": [existing_input, node_output], "params": params}
                                 if queries:
                                     updated_input["queries"] = queries
                                 if file_paths:
@@ -666,20 +616,15 @@ class Pipeline(BasePipeline):
         Validates the node names provided in the 'params' arg of run/run_batch method.
         """
         if params:
-            if not all(node_id in self.graph.nodes
-                       for node_id in params.keys()):
+            if not all(node_id in self.graph.nodes for node_id in params.keys()):
 
                 # Might be a non-targeted param. Verify that too
                 not_a_node = set(params.keys()) - set(self.graph.nodes)
-                valid_global_params = set([
-                    "debug"
-                ])  # Debug will be picked up by _dispatch_run, see its code
+                valid_global_params = set(["debug"])  # Debug will be picked up by _dispatch_run, see its code
                 for node_id in self.graph.nodes:
                     run_signature_args = self._get_run_node_signature(node_id)
                     valid_global_params |= set(run_signature_args)
-                invalid_keys = [
-                    key for key in not_a_node if key not in valid_global_params
-                ]
+                invalid_keys = [key for key in not_a_node if key not in valid_global_params]
 
                 if invalid_keys:
                     raise ValueError(
@@ -687,15 +632,11 @@ class Pipeline(BasePipeline):
                     )
 
     def _get_run_node_signature(self, node_id: str):
-        return inspect.signature(
-            self.graph.nodes[node_id]["component"].run).parameters.keys()
+        return inspect.signature(self.graph.nodes[node_id]["component"].run).parameters.keys()
 
-    def _reorder_columns(self, df: DataFrame,
-                         desired_order: List[str]) -> DataFrame:
+    def _reorder_columns(self, df: DataFrame, desired_order: List[str]) -> DataFrame:
         filtered_order = [col for col in desired_order if col in df.columns]
-        missing_columns = [
-            col for col in df.columns if col not in desired_order
-        ]
+        missing_columns = [col for col in df.columns if col not in desired_order]
         reordered_columns = filtered_order + missing_columns
         assert len(reordered_columns) == len(df.columns)
         return df.reindex(columns=reordered_columns)
@@ -703,9 +644,9 @@ class Pipeline(BasePipeline):
     def get_next_nodes(self, node_id: str, stream_id: str):
         current_node_edges = self.graph.edges(node_id, data=True)
         next_nodes = [
-            next_node for _, next_node, data in current_node_edges
-            if not stream_id or data["label"] == stream_id
-            or stream_id == "output_all"
+            next_node
+            for _, next_node, data in current_node_edges
+            if not stream_id or data["label"] == stream_id or stream_id == "output_all"
         ]
         return next_nodes
 
@@ -722,7 +663,8 @@ class Pipeline(BasePipeline):
         """
 
         matches = [
-            self.graph.nodes.get(node)["component"] for node in self.graph.nodes
+            self.graph.nodes.get(node)["component"]
+            for node in self.graph.nodes
             if isinstance(self.graph.nodes.get(node)["component"], class_type)
         ]
         return matches
@@ -736,13 +678,11 @@ class Pipeline(BasePipeline):
         matches = self.get_nodes_by_class(class_type=BaseDocumentStore)
         if len(matches) == 0:
             matches = list(
-                set(retriever.document_store
-                    for retriever in self.get_nodes_by_class(
-                        class_type=BaseRetriever)))
+                set(retriever.document_store for retriever in self.get_nodes_by_class(class_type=BaseRetriever))
+            )
 
         if len(matches) > 1:
-            raise Exception(
-                f"Multiple Document Stores found in Pipeline: {matches}")
+            raise Exception(f"Multiple Document Stores found in Pipeline: {matches}")
         if len(matches) == 0:
             return None
         else:
@@ -768,10 +708,9 @@ class Pipeline(BasePipeline):
         graphviz.draw(path)
 
     @classmethod
-    def load_from_config(cls,
-                         pipeline_config: Dict,
-                         pipeline_name: Optional[str] = None,
-                         overwrite_with_env_variables: bool = True):
+    def load_from_config(
+        cls, pipeline_config: Dict, pipeline_name: Optional[str] = None, overwrite_with_env_variables: bool = True
+    ):
         """
         Load Pipeline from a config dict defining the individual components and how they're tied together to form
         a Pipeline. A single config can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -817,33 +756,26 @@ class Pipeline(BasePipeline):
                                              variable 'MYDOCSTORE_PARAMS_INDEX=documents-2021' can be set. Note that an
                                              `_` sign must be used to specify nested hierarchical properties.
         """
-        pipeline_definition = get_pipeline_definition(
-            pipeline_config=pipeline_config, pipeline_name=pipeline_name)
+        pipeline_definition = get_pipeline_definition(pipeline_config=pipeline_config, pipeline_name=pipeline_name)
         component_definitions = get_component_definitions(
-            pipeline_config=pipeline_config,
-            overwrite_with_env_variables=overwrite_with_env_variables)
+            pipeline_config=pipeline_config, overwrite_with_env_variables=overwrite_with_env_variables
+        )
 
         pipeline = cls()
         print(pipeline_definition)
         components: dict = {}  # instances of component objects.
         for node in pipeline_definition["nodes"]:
-            print('node', node)
+            print("node", node)
             name = node["name"]
-            if name == 'QAFilterPostprocessor':
-                print('exit')
-            component = cls._load_or_get_component(
-                name=name,
-                definitions=component_definitions,
-                components=components)
-            pipeline.add_node(component=component,
-                              name=name,
-                              inputs=node.get("inputs", []))
+            if name == "QAFilterPostprocessor":
+                print("exit")
+            component = cls._load_or_get_component(name=name, definitions=component_definitions, components=components)
+            pipeline.add_node(component=component, name=name, inputs=node.get("inputs", []))
 
         return pipeline
 
     @classmethod
-    def _load_or_get_component(cls, name: str, definitions: dict,
-                               components: dict):
+    def _load_or_get_component(cls, name: str, definitions: dict, components: dict):
         """
         Load a component from the definition or return if component object already present in `components` dict.
 
@@ -852,32 +784,26 @@ class Pipeline(BasePipeline):
         :param components: dict containing component objects.
         """
         try:
-            if name in components.keys(
-            ):  # check if component is already loaded.
+            if name in components.keys():  # check if component is already loaded.
                 return components[name]
 
             component_params = definitions[name].get("params", {})
             component_type = definitions[name]["type"]
-            logger.debug(
-                f"Loading component `{name}` of type `{definitions[name]['type']}`"
-            )
+            logger.debug(f"Loading component `{name}` of type `{definitions[name]['type']}`")
 
             for key, value in component_params.items():
                 # Component params can reference to other components. For instance, a Retriever can reference a
                 # DocumentStore defined in the YAML. All references should be recursively resolved.
                 if (
-                        isinstance(value, str) and value in definitions.keys()
+                    isinstance(value, str) and value in definitions.keys()
                 ):  # check if the param value is a reference to another component.
-                    if value not in components.keys(
-                    ):  # check if the referenced component is already loaded.
-                        cls._load_or_get_component(name=value,
-                                                   definitions=definitions,
-                                                   components=components)
+                    if value not in components.keys():  # check if the referenced component is already loaded.
+                        cls._load_or_get_component(name=value, definitions=definitions, components=components)
                     component_params[key] = components[
-                        value]  # substitute reference (string) with the component object.
+                        value
+                    ]  # substitute reference (string) with the component object.
 
-            instance = BaseComponent.load_from_args(
-                component_type=component_type, **component_params)
+            instance = BaseComponent.load_from_args(component_type=component_type, **component_params)
             components[name] = instance
         except Exception as e:
             raise Exception(f"Failed loading pipeline component '{name}': {e}")
@@ -901,13 +827,7 @@ class Pipeline(BasePipeline):
         :param return_defaults: whether to output parameters that have the default values.
         """
         pipeline_name = ROOT_NODE_TO_PIPELINE_NAME[self.root_node.lower()]
-        pipelines: dict = {
-            pipeline_name: {
-                "name": pipeline_name,
-                "type": self.__class__.__name__,
-                "nodes": []
-            }
-        }
+        pipelines: dict = {pipeline_name: {"name": pipeline_name, "type": self.__class__.__name__, "nodes": []}}
 
         components = {}
         for node in self.graph.nodes:
@@ -916,19 +836,12 @@ class Pipeline(BasePipeline):
             component_instance = self.graph.nodes.get(node)["component"]
             component_type = component_instance.pipeline_config["type"]
             component_params = component_instance.pipeline_config["params"]
-            components[node] = {
-                "name": node,
-                "type": component_type,
-                "params": {}
-            }
+            components[node] = {"name": node, "type": component_type, "params": {}}
 
             component_parent_classes = inspect.getmro(type(component_instance))
             component_signature: dict = {}
             for component_parent in component_parent_classes:
-                component_signature = {
-                    **component_signature,
-                    **inspect.signature(component_parent).parameters
-                }
+                component_signature = {**component_signature, **inspect.signature(component_parent).parameters}
 
             for param_key, param_value in component_params.items():
                 # A parameter for a Component could be another Component. For instance, a Retriever has
@@ -937,8 +850,7 @@ class Pipeline(BasePipeline):
                 # other parameters like "custom_mapping" that are dicts.
                 # This currently only checks for the case single-level nesting case, wherein, "a Component has another
                 # Component as a parameter". For deeper nesting cases, this function should be made recursive.
-                if isinstance(param_value, dict) and "type" in param_value.keys(
-                ):  # the parameter is a Component
+                if isinstance(param_value, dict) and "type" in param_value.keys():  # the parameter is a Component
                     sub_component = param_value
                     sub_component_type_name = sub_component["type"]
                     sub_component_signature = inspect.signature(
@@ -947,14 +859,12 @@ class Pipeline(BasePipeline):
                     sub_component_params = {
                         k: v
                         for k, v in sub_component["params"].items()
-                        if sub_component_signature[k].default != v
-                        or return_defaults is True
+                        if sub_component_signature[k].default != v or return_defaults is True
                     }
 
                     sub_component_name = self._generate_component_name(
-                        type_name=sub_component_type_name,
-                        params=sub_component_params,
-                        existing_components=components)
+                        type_name=sub_component_type_name, params=sub_component_params, existing_components=components
+                    )
                     components[sub_component_name] = {
                         "name": sub_component_name,
                         "type": sub_component_type_name,
@@ -962,17 +872,11 @@ class Pipeline(BasePipeline):
                     }
                     components[node]["params"][param_key] = sub_component_name
                 else:
-                    if component_signature[
-                            param_key].default != param_value or return_defaults is True:
+                    if component_signature[param_key].default != param_value or return_defaults is True:
                         components[node]["params"][param_key] = param_value
 
             # create the Pipeline definition with how the Component are connected
-            pipelines[pipeline_name]["nodes"].append({
-                "name":
-                node,
-                "inputs":
-                list(self.graph.predecessors(node))
-            })
+            pipelines[pipeline_name]["nodes"].append({"name": node, "inputs": list(self.graph.predecessors(node))})
 
         config = {
             "components": list(components.values()),
@@ -989,11 +893,10 @@ class Pipeline(BasePipeline):
     ):
         component_name: str = type_name
         # add number if there are multiple distinct ones of the same type
-        while component_name in existing_components and params != existing_components[
-                component_name]["params"]:
+        while component_name in existing_components and params != existing_components[component_name]["params"]:
             occupied_num = 1
             if len(component_name) > len(type_name):
-                occupied_num = int(component_name[len(type_name) + 1:])
+                occupied_num = int(component_name[len(type_name) + 1 :])
             new_num = occupied_num + 1
             component_name = f"{type_name}_{new_num}"
         return component_name

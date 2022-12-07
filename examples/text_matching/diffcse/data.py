@@ -30,31 +30,19 @@ def get_special_token_ids(tokenizer):
 
 def get_special_token_dict(tokenizer):
     special_tokens = ["[PAD]", "[CLS]", "[SEP]", "[MASK]", "[UNK]"]
-    special_token_dict = dict(
-        zip(special_tokens, tokenizer.convert_tokens_to_ids(special_tokens)))
+    special_token_dict = dict(zip(special_tokens, tokenizer.convert_tokens_to_ids(special_tokens)))
     return special_token_dict
 
 
-def create_dataloader(dataset,
-                      mode="train",
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
     shuffle = True if mode == "train" else False
     if mode == "train":
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
-                                                          batch_size=batch_size,
-                                                          shuffle=shuffle)
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=shuffle)
-    return paddle.io.DataLoader(dataset=dataset,
-                                batch_sampler=batch_sampler,
-                                collate_fn=batchify_fn,
-                                return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
@@ -65,9 +53,7 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
             result += [example["label"]]
         else:
             # do_train
-            encoded_inputs = tokenizer(text=text,
-                                       max_seq_len=max_seq_length,
-                                       return_attention_mask=True)
+            encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length, return_attention_mask=True)
             input_ids = encoded_inputs["input_ids"]
             token_type_ids = encoded_inputs["token_type_ids"]
             attention_mask = encoded_inputs["attention_mask"]
@@ -96,33 +82,26 @@ def mask_tokens(batch_inputs, tokenizer, mlm_probability=0.15):
 
     probability_matrix = paddle.full(mlm_inputs.shape, mlm_probability)
 
-    special_tokens_mask = paddle.cast(paddle.zeros(mlm_inputs.shape),
-                                      dtype=bool)
+    special_tokens_mask = paddle.cast(paddle.zeros(mlm_inputs.shape), dtype=bool)
     for special_token_id in get_special_token_ids(tokenizer):
-        special_tokens_mask |= (mlm_inputs == special_token_id)
+        special_tokens_mask |= mlm_inputs == special_token_id
 
-    probability_matrix = masked_fill(probability_matrix, special_tokens_mask,
-                                     0.0)
+    probability_matrix = masked_fill(probability_matrix, special_tokens_mask, 0.0)
 
-    masked_indices = paddle.cast(paddle.bernoulli(probability_matrix),
-                                 dtype=bool)
+    masked_indices = paddle.cast(paddle.bernoulli(probability_matrix), dtype=bool)
     mlm_labels = masked_fill(mlm_labels, ~masked_indices, -100)
 
     # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-    indices_replaced = paddle.cast(paddle.bernoulli(
-        paddle.full(mlm_inputs.shape, 0.8)),
-                                   dtype=bool) & masked_indices
-    mlm_inputs = masked_fill(mlm_inputs, indices_replaced,
-                             tokenizer.mask_token_id)
+    indices_replaced = paddle.cast(paddle.bernoulli(paddle.full(mlm_inputs.shape, 0.8)), dtype=bool) & masked_indices
+    mlm_inputs = masked_fill(mlm_inputs, indices_replaced, tokenizer.mask_token_id)
 
     # 10% of the time, we replace masked input tokens with random word
-    indices_random = paddle.cast(
-        paddle.bernoulli(paddle.full(mlm_inputs.shape, 0.5)),
-        dtype=bool) & masked_indices & ~indices_replaced
-    random_words = paddle.randint(0,
-                                  len(tokenizer),
-                                  mlm_inputs.shape,
-                                  dtype=mlm_inputs.dtype)
+    indices_random = (
+        paddle.cast(paddle.bernoulli(paddle.full(mlm_inputs.shape, 0.5)), dtype=bool)
+        & masked_indices
+        & ~indices_replaced
+    )
+    random_words = paddle.randint(0, len(tokenizer), mlm_inputs.shape, dtype=mlm_inputs.dtype)
     mlm_inputs = paddle.where(indices_random, random_words, mlm_inputs)
 
     # The rest of the time (10% of the time) we keep the masked input tokens unchanged

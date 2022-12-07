@@ -26,27 +26,25 @@ class TextCNNModel(nn.Layer):
     The CNN has one convolution layer for each ngram filter size. Each convolution operation gives
     out a vector of size num_filter. The number of times a convolution layer will be used
     is `num_tokens - ngram_size + 1`. The corresponding maxpooling layer aggregates all these
-    outputs from the convolution layer and outputs the max. 
+    outputs from the convolution layer and outputs the max.
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
 
     """
 
-    def __init__(self,
-                 vocab_size,
-                 num_classes,
-                 emb_dim=128,
-                 padding_idx=0,
-                 num_filter=128,
-                 ngram_filter_sizes=(1, 2, 3),
-                 fc_hidden_size=96):
+    def __init__(
+        self,
+        vocab_size,
+        num_classes,
+        emb_dim=128,
+        padding_idx=0,
+        num_filter=128,
+        ngram_filter_sizes=(1, 2, 3),
+        fc_hidden_size=96,
+    ):
         super().__init__()
-        self.embedder = nn.Embedding(vocab_size,
-                                     emb_dim,
-                                     padding_idx=padding_idx)
-        self.encoder = CNNEncoder(emb_dim=emb_dim,
-                                  num_filter=num_filter,
-                                  ngram_filter_sizes=ngram_filter_sizes)
+        self.embedder = nn.Embedding(vocab_size, emb_dim, padding_idx=padding_idx)
+        self.encoder = CNNEncoder(emb_dim=emb_dim, num_filter=num_filter, ngram_filter_sizes=ngram_filter_sizes)
         self.fc = nn.Linear(self.encoder.get_output_dim(), fc_hidden_size)
         self.output_layer = nn.Linear(fc_hidden_size, num_classes)
 

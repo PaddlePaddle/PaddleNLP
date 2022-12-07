@@ -19,12 +19,12 @@ from paddlenlp.utils.log import logger
 
 
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Unsupported value encountered.')
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def parse_args(MODEL_CLASSES):
@@ -112,15 +112,11 @@ def parse_args(MODEL_CLASSES):
 
     if args.check_accuracy:
         if args.hidden_dropout_prob != 0:
-            args.hidden_dropout_prob = .0
-            logger.warning(
-                "The hidden_dropout_prob should set to 0 for accuracy checking."
-            )
+            args.hidden_dropout_prob = 0.0
+            logger.warning("The hidden_dropout_prob should set to 0 for accuracy checking.")
         if args.attention_probs_dropout_prob != 0:
-            args.attention_probs_dropout_prob = .0
-            logger.warning(
-                "The attention_probs_dropout_prob should set to 0 for accuracy checking."
-            )
+            args.attention_probs_dropout_prob = 0.0
+            logger.warning("The attention_probs_dropout_prob should set to 0 for accuracy checking.")
     if args.dp_degree * args.mp_degree * args.pp_degree * args.sharding_degree == 1:
         if paddle.distributed.get_world_size() > 1:
             args.dp_degree = paddle.distributed.get_world_size()

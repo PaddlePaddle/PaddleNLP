@@ -15,36 +15,34 @@
 import json
 import sys
 
-predictions = [
-    json.loads(line) for line in open(sys.argv[1]).readlines() if line
-]
+predictions = [json.loads(line) for line in open(sys.argv[1]).readlines() if line]
 
-string_count = 0.
-sem_count = 0.
-syn_count = 0.
-table_count = 0.
-strict_table_count = 0.
+string_count = 0.0
+sem_count = 0.0
+syn_count = 0.0
+table_count = 0.0
+strict_table_count = 0.0
 
-precision_denom = 0.
-precision = 0.
-recall_denom = 0.
-recall = 0.
-f1_score = 0.
-f1_denom = 0.
+precision_denom = 0.0
+precision = 0.0
+recall_denom = 0.0
+recall = 0.0
+f1_score = 0.0
+f1_denom = 0.0
 
-time = 0.
+time = 0.0
 
 for prediction in predictions:
     if prediction["correct_string"]:
-        string_count += 1.
+        string_count += 1.0
     if prediction["semantic"]:
-        sem_count += 1.
+        sem_count += 1.0
     if prediction["syntactic"]:
-        syn_count += 1.
+        syn_count += 1.0
     if prediction["correct_table"]:
-        table_count += 1.
+        table_count += 1.0
     if prediction["strict_correct_table"]:
-        strict_table_count += 1.
+        strict_table_count += 1.0
     if prediction["gold_tables"] != "[[]]":
         precision += prediction["table_prec"]
         precision_denom += 1

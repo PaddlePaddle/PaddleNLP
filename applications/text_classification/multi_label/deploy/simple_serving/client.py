@@ -29,19 +29,15 @@ headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
     texts = [
-        '原、被告另购置橱柜、碗架、电磁炉、电饭锅各一个归原告王某某所有。',
-        '于是原告到儿子就读的幼儿园进行探望，被告碰见后对原告破口大骂，还不让儿子叫原告妈妈，而叫被告现在的妻子做妈妈。',
-        '由我全额出资购买的联想台式电脑，我均依次放弃。'
+        "原、被告另购置橱柜、碗架、电磁炉、电饭锅各一个归原告王某某所有。",
+        "于是原告到儿子就读的幼儿园进行探望，被告碰见后对原告破口大骂，还不让儿子叫原告妈妈，而叫被告现在的妻子做妈妈。",
+        "由我全额出资购买的联想台式电脑，我均依次放弃。",
     ]
     data = {
-        'data': {
-            'text': texts,
+        "data": {
+            "text": texts,
         },
-        'parameters': {
-            'max_seq_len': args.max_seq_len,
-            'batch_size': args.batch_size,
-            'prob_limit': args.prob_limit
-        }
+        "parameters": {"max_seq_len": args.max_seq_len, "batch_size": args.batch_size, "prob_limit": args.prob_limit},
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     print(json.loads(r.text))

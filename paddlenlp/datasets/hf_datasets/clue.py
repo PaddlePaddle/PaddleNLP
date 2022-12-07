@@ -76,8 +76,7 @@ class ClueConfig(datasets.BuilderConfig):
             of the label and processing it to the form required by the label feature
           **kwargs: keyword arguments forwarded to super.
         """
-        super(ClueConfig, self).__init__(version=datasets.Version("1.0.0", ""),
-                                         **kwargs)
+        super(ClueConfig, self).__init__(version=datasets.Version("1.0.0", ""), **kwargs)
         self.text_features = text_features
         self.label_column = label_column
         self.label_classes = label_classes
@@ -94,14 +93,13 @@ class Clue(datasets.GeneratorBasedBuilder):
     BUILDER_CONFIGS = [
         ClueConfig(
             name="afqmc",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Ant Financial Question Matching Corpus is a dataset for Chinese
             question matching (similar to QQP).
-            """),
-            text_features={
-                "sentence1": "sentence1",
-                "sentence2": "sentence2"
-            },
+            """
+            ),
+            text_features={"sentence1": "sentence1", "sentence2": "sentence2"},
             label_classes=["0", "1"],
             label_column="label",
             data_url="https://bj.bcebos.com/paddlenlp/datasets/afqmc_public.zip",
@@ -109,10 +107,12 @@ class Clue(datasets.GeneratorBasedBuilder):
         ),
         ClueConfig(
             name="tnews",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Toutiao Short Text Classification for News is a dataset for Chinese
             short news classification.
-            """),
+            """
+            ),
             text_features={"sentence": "sentence"},
             label_classes=[
                 "100",
@@ -137,26 +137,26 @@ class Clue(datasets.GeneratorBasedBuilder):
         ),
         ClueConfig(
             name="iflytek",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             IFLYTEK Long Text Classification for News is a dataset for Chinese
             long text classification. The text is crawled from an app market.
-            """),
+            """
+            ),
             text_features={"sentence": "sentence"},
             label_classes=[str(label) for label in range(119)],
             label_column="label",
-            data_url=
-            "https://bj.bcebos.com/paddlenlp/datasets/iflytek_public.zip",
+            data_url="https://bj.bcebos.com/paddlenlp/datasets/iflytek_public.zip",
         ),
         ClueConfig(
             name="cmnli",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Chinese Multi-Genre NLI is a dataset for Chinese Natural Language
             Inference. It consists of XNLI (Chinese subset) and translated MNLI.
-            """),
-            text_features={
-                "sentence1": "sentence1",
-                "sentence2": "sentence2"
-            },
+            """
+            ),
+            text_features={"sentence1": "sentence1", "sentence2": "sentence2"},
             label_classes=["neutral", "entailment", "contradiction"],
             label_column="label",
             data_url="https://bj.bcebos.com/paddlenlp/datasets/cmnli_public.zip",
@@ -164,36 +164,32 @@ class Clue(datasets.GeneratorBasedBuilder):
         ),
         ClueConfig(
             name="cluewsc2020",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             CLUE Winograd Scheme Challenge (CLUEWSC 2020) is a Chinese WSC dataset.
             The text is from contemporary literature and annotated by human experts.
             The task is to determine which noun the pronoun in the sentence refers to.
             The question appears in the form of true and false discrimination.
-            """),
-            text_features={
-                "text": "text",
-                "target": "target"
-            },
+            """
+            ),
+            text_features={"text": "text", "target": "target"},
             label_classes=["false", "true"],
             label_column="label",
-            data_url=
-            "https://bj.bcebos.com/paddlenlp/datasets/cluewsc2020_public.zip",
+            data_url="https://bj.bcebos.com/paddlenlp/datasets/cluewsc2020_public.zip",
         ),
         ClueConfig(
             name="csl",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Chinese Scientific Literature Dataset (CSL) is taken from the abstracts of
             Chinese papers and their keywords. The papers are selected from some core
             journals of Chinese social sciences and natural sciences. TF-IDF is used to
             generate a mixture of fake keywords and real keywords in the paper to construct
             abstract-keyword pairs. The task goal is to judge whether the keywords are
             all real keywords based on the abstract.
-            """),
-            text_features={
-                "abst": "abst",
-                "keyword": "keyword",
-                "corpus_id": "id"
-            },
+            """
+            ),
+            text_features={"abst": "abst", "keyword": "keyword", "corpus_id": "id"},
             label_classes=["0", "1"],
             label_column="label",
             data_url="https://bj.bcebos.com/paddlenlp/datasets/csl_public.zip",
@@ -201,46 +197,51 @@ class Clue(datasets.GeneratorBasedBuilder):
         ),
         ClueConfig(
             name="cmrc2018",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             CMRC2018 is the first Chinese Span-Extraction Machine Reading Comprehension
             Dataset. The task requires to set up a system that reads context,
             question and extract the answer from the context (the answer is a continuous
             span in the context).
-            """),
-            data_url=
-            "https://paddlenlp.bj.bcebos.com/datasets/cmrc2018_public.zip",
+            """
+            ),
+            data_url="https://paddlenlp.bj.bcebos.com/datasets/cmrc2018_public.zip",
             url="https://hfl-rc.github.io/cmrc2018/",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
                   @article{cmrc2018-dataset,
                   title={A Span-Extraction Dataset for Chinese Machine Reading Comprehension},
                   author={Cui, Yiming and Liu, Ting and Xiao, Li and Chen, Zhipeng and Ma, Wentao and Che, Wanxiang and Wang, Shijin and Hu, Guoping},
                   journal={arXiv preprint arXiv:1810.07366},
                   year={2018}
-                }"""),
+                }"""
+            ),
         ),
         ClueConfig(
             name="drcd",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Delta Reading Comprehension Dataset (DRCD) belongs to the general field of traditional
             Chinese machine reading comprehension data set. This data set is expected to become a
             standard Chinese reading comprehension data set suitable for transfer learning.
-            """),
+            """
+            ),
             data_url="https://paddlenlp.bj.bcebos.com/datasets/drcd_public.zip",
             url="https://github.com/DRCKnowledgeTeam/DRCD",
         ),
         ClueConfig(
             name="chid",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Chinese IDiom Dataset for Cloze Test (CHID) contains many masked idioms in the text.
             The candidates contain similar idioms to the real ones.
-            """),
-            text_features={
-                "candidates": "candidates",
-                "content": "content"
-            },
+            """
+            ),
+            text_features={"candidates": "candidates", "content": "content"},
             data_url="https://paddlenlp.bj.bcebos.com/datasets/chid_public.zip",
             url="https://arxiv.org/abs/1906.01265",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
                   @article{Zheng_2019,
                    title={ChID: A Large-scale Chinese IDiom Dataset for Cloze Test},
                    url={http://dx.doi.org/10.18653/v1/P19-1075},
@@ -249,23 +250,24 @@ class Clue(datasets.GeneratorBasedBuilder):
                    publisher={Association for Computational Linguistics},
                    author={Zheng, Chujie and Huang, Minlie and Sun, Aixin},
                    year={2019}
-                }"""),
+                }"""
+            ),
         ),
         ClueConfig(
             name="c3",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Multiple-Choice Chinese Machine Reading Comprehension (C3, or C^3) is a Chinese
             multi-choice reading comprehension data set, including mixed type data sets
             such as dialogue and long text. Both the training and validation sets are
             the concatenation of the dialogue and long-text subsets.
-            """),
-            text_features={
-                "candidates": "candidates",
-                "content": "content"
-            },
+            """
+            ),
+            text_features={"candidates": "candidates", "content": "content"},
             data_url="https://paddlenlp.bj.bcebos.com/datasets/c3_public.zip",
             url="https://arxiv.org/abs/1904.09679",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
                   @article{sun2020investigating,
                       author    = {Kai Sun and
                                    Dian Yu and
@@ -278,66 +280,59 @@ class Clue(datasets.GeneratorBasedBuilder):
                       pages     = {141--155},
                       year      = {2020},
                       url       = {https://transacl.org/ojs/index.php/tacl/article/view/1882}
-                    }"""),
+                    }"""
+            ),
         ),
         ClueConfig(
             name="ocnli",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             OCNLI stands for Original Chinese Natural Language Inference. It is a corpus for
             Chinese Natural Language Inference, collected following closely the procedures of MNLI,
             but with enhanced strategies aiming for more challenging inference pairs. We want to
             emphasize we did not use human/machine translation in creating the dataset, and thus
             our Chinese texts are original and not translated.
-            """),
-            text_features={
-                "sentence1": "sentence1",
-                "sentence2": "sentence2"
-            },
+            """
+            ),
+            text_features={"sentence1": "sentence1", "sentence2": "sentence2"},
             label_classes=["neutral", "entailment", "contradiction"],
             label_column="label",
-            data_url=
-            "https://paddlenlp.bj.bcebos.com/datasets/OCNLI-02d55cb3c7dc984682677b8dd81db6a1e4710720.zip",
+            data_url="https://paddlenlp.bj.bcebos.com/datasets/OCNLI-02d55cb3c7dc984682677b8dd81db6a1e4710720.zip",
             data_dir="OCNLI-02d55cb3c7dc984682677b8dd81db6a1e4710720/data/ocnli",
             url="https://arxiv.org/abs/2010.05444",
-            citation=textwrap.dedent("""\
+            citation=textwrap.dedent(
+                """\
                   @inproceedings{ocnli,
                     title={OCNLI: Original Chinese Natural Language Inference},
                     author={Hai Hu and Kyle Richardson and Liang Xu and Lu Li and Sandra Kuebler and Larry Moss},
                     booktitle={Findings of EMNLP},
                     year={2020},
                     url={https://arxiv.org/abs/2010.05444}
-                }"""),
+                }"""
+            ),
         ),
         ClueConfig(
             name="diagnostics",
-            description=textwrap.dedent("""\
+            description=textwrap.dedent(
+                """\
             Diagnostic set, used to evaluate the performance of different models on 9 Chinese language
             phenomena summarized by linguists.
 
             Use the model trained on CMNLI to directly predict the result on this diagnostic set.
-            """),
-            text_features={
-                "sentence1": "premise",
-                "sentence2": "hypothesis"
-            },
+            """
+            ),
+            text_features={"sentence1": "premise", "sentence2": "hypothesis"},
             label_classes=["neutral", "entailment", "contradiction"],
             label_column="label",
-            data_url=
-            "https://paddlenlp.bj.bcebos.com/datasets/clue_diagnostics_public.zip",
+            data_url="https://paddlenlp.bj.bcebos.com/datasets/clue_diagnostics_public.zip",
         ),
     ]
 
     def _info(self):
-        if self.config.name in [
-                "afqmc", "tnews", "iflytek", "cmnli", "diagnostics", "ocnli"
-        ]:
-            features = {
-                text_feature: datasets.Value("string")
-                for text_feature in self.config.text_features.keys()
-            }
+        if self.config.name in ["afqmc", "tnews", "iflytek", "cmnli", "diagnostics", "ocnli"]:
+            features = {text_feature: datasets.Value("string") for text_feature in self.config.text_features.keys()}
             if self.config.label_classes:
-                features["label"] = datasets.features.ClassLabel(
-                    names=self.config.label_classes)
+                features["label"] = datasets.features.ClassLabel(names=self.config.label_classes)
             else:
                 features["label"] = datasets.Value("float32")
             features["idx"] = datasets.Value("int32")
@@ -355,46 +350,35 @@ class Clue(datasets.GeneratorBasedBuilder):
             }
         elif self.config.name == "csl":
             features = {
-                "idx":
-                datasets.Value("int32"),
-                "corpus_id":
-                datasets.Value("int32"),
-                "abst":
-                datasets.Value("string"),
-                "label":
-                datasets.features.ClassLabel(names=self.config.label_classes),
-                "keyword":
-                datasets.Sequence(datasets.Value("string")),
+                "idx": datasets.Value("int32"),
+                "corpus_id": datasets.Value("int32"),
+                "abst": datasets.Value("string"),
+                "label": datasets.features.ClassLabel(names=self.config.label_classes),
+                "keyword": datasets.Sequence(datasets.Value("string")),
             }
         elif self.config.name in ["cmrc2018", "drcd"]:
             features = {
-                "id":
-                datasets.Value("string"),
-                "context":
-                datasets.Value("string"),
-                "question":
-                datasets.Value("string"),
-                "answers":
-                datasets.Sequence({
-                    "text": datasets.Value("string"),
-                    "answer_start": datasets.Value("int32"),
-                }),
+                "id": datasets.Value("string"),
+                "context": datasets.Value("string"),
+                "question": datasets.Value("string"),
+                "answers": datasets.Sequence(
+                    {
+                        "text": datasets.Value("string"),
+                        "answer_start": datasets.Value("int32"),
+                    }
+                ),
             }
         elif self.config.name == "chid":
             features = {
-                "idx":
-                datasets.Value("int32"),
-                "candidates":
-                datasets.Sequence(datasets.Value("string")),
-                "content":
-                datasets.Sequence(datasets.Value("string")),
-                "answers":
-                datasets.features.Sequence({
-                    "text":
-                    datasets.Value("string"),
-                    "candidate_id":
-                    datasets.Value("int32"),
-                }),
+                "idx": datasets.Value("int32"),
+                "candidates": datasets.Sequence(datasets.Value("string")),
+                "content": datasets.Sequence(datasets.Value("string")),
+                "answers": datasets.features.Sequence(
+                    {
+                        "text": datasets.Value("string"),
+                        "candidate_id": datasets.Value("int32"),
+                    }
+                ),
             }
         elif self.config.name == "c3":
             features = {
@@ -408,7 +392,8 @@ class Clue(datasets.GeneratorBasedBuilder):
             raise NotImplementedError(
                 "This task is not implemented. If you believe"
                 " this task was recently added to the CLUE benchmark, "
-                "please open a GitHub issue and we will add it.")
+                "please open a GitHub issue and we will add it."
+            )
 
         return datasets.DatasetInfo(
             description=_CLUE_DESCRIPTION,
@@ -442,23 +427,19 @@ class Clue(datasets.GeneratorBasedBuilder):
             train_split = datasets.SplitGenerator(
                 name=datasets.Split.TRAIN,
                 gen_kwargs={
-                    "data_file":
-                    os.path.join(
-                        data_dir or "", "train.json"
-                        if self.config.name != "c3" else "d-train.json"),
-                    "split":
-                    "train",
+                    "data_file": os.path.join(
+                        data_dir or "", "train.json" if self.config.name != "c3" else "d-train.json"
+                    ),
+                    "split": "train",
                 },
             )
             val_split = datasets.SplitGenerator(
                 name=datasets.Split.VALIDATION,
                 gen_kwargs={
-                    "data_file":
-                    os.path.join(
-                        data_dir or "", "dev.json"
-                        if self.config.name != "c3" else "d-dev.json"),
-                    "split":
-                    "dev",
+                    "data_file": os.path.join(
+                        data_dir or "", "dev.json" if self.config.name != "c3" else "d-dev.json"
+                    ),
+                    "split": "dev",
                 },
             )
             split_list += [train_split, val_split]
@@ -471,7 +452,8 @@ class Clue(datasets.GeneratorBasedBuilder):
                         "data_file": os.path.join(data_dir or "", "trial.json"),
                         "split": "trial",
                     },
-                ))
+                )
+            )
 
         return split_list
 
@@ -480,8 +462,7 @@ class Clue(datasets.GeneratorBasedBuilder):
         label_classes = self.config.label_classes
 
         if self.config.name == "chid" and split != "test":
-            answer_file = os.path.join(os.path.dirname(data_file),
-                                       f"{split}_answer.json")
+            answer_file = os.path.join(os.path.dirname(data_file), f"{split}_answer.json")
             answer_dict = json.load(open(answer_file, encoding="utf8"))
 
         if self.config.name == "c3":
@@ -489,10 +470,7 @@ class Clue(datasets.GeneratorBasedBuilder):
                 files = [data_file]
             else:
                 data_dir = os.path.dirname(data_file)
-                files = [
-                    os.path.join(data_dir, f"{typ}-{split}.json")
-                    for typ in ["d", "m"]
-                ]
+                files = [os.path.join(data_dir, f"{typ}-{split}.json") for typ in ["d", "m"]]
             data = []
             for f in files:
                 data_subset = json.load(open(f, encoding="utf8"))
@@ -519,14 +497,8 @@ class Clue(datasets.GeneratorBasedBuilder):
                                 question = qa["question"].strip()
                                 id_ = qa["id"]
 
-                                answer_starts = [
-                                    answer["answer_start"]
-                                    for answer in qa["answers"]
-                                ]
-                                answers = [
-                                    answer["text"].strip()
-                                    for answer in qa["answers"]
-                                ]
+                                answer_starts = [answer["answer_start"] for answer in qa["answers"]]
+                                answers = [answer["text"].strip() for answer in qa["answers"]]
 
                                 yield id_, {
                                     "context": context,
@@ -541,13 +513,8 @@ class Clue(datasets.GeneratorBasedBuilder):
                 else:
                     for n, line in enumerate(f):
                         row = json.loads(line)
-                        example = {
-                            feat: row[col]
-                            for feat, col in self.config.text_features.items()
-                        }
-                        example[
-                            "idx"] = n if self.config.name != "diagnostics" else int(
-                                row["index"])
+                        example = {feat: row[col] for feat, col in self.config.text_features.items()}
+                        example["idx"] = n if self.config.name != "diagnostics" else int(row["index"])
                         if self.config.name == "chid":  # CHID has a separate gold label file
                             contents = example["content"]
                             candidates = example["candidates"]
@@ -556,19 +523,18 @@ class Clue(datasets.GeneratorBasedBuilder):
                                 for content in contents:
                                     idioms = re.findall(r"#idiom\d+#", content)
                                     for idiom in idioms:
-                                        idiom_list.append({
-                                            "candidate_id":
-                                            answer_dict[idiom],
-                                            "text":
-                                            candidates[answer_dict[idiom]],
-                                        })
+                                        idiom_list.append(
+                                            {
+                                                "candidate_id": answer_dict[idiom],
+                                                "text": candidates[answer_dict[idiom]],
+                                            }
+                                        )
                             example["answers"] = idiom_list
 
                         elif self.config.label_column in row:
                             label = row[self.config.label_column]
                             # Notice: some labels in CMNLI and OCNLI are invalid. We drop these data.
-                            if self.config.name in ["cmnli", "ocnli"
-                                                    ] and label == "-":
+                            if self.config.name in ["cmnli", "ocnli"] and label == "-":
                                 continue
                             # For some tasks, the label is represented as 0 and 1 in the tsv
                             # files and needs to be cast to integer to work with the feature.

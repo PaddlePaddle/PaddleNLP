@@ -102,31 +102,22 @@ def do_train():
     dev_ds = load_dataset(read_data, data_path=args.test_file, lazy=False)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    model = AutoModelForSequenceClassification.from_pretrained(
-        args.model_name_or_path, num_classes=2)
+    model = AutoModelForSequenceClassification.from_pretrained(args.model_name_or_path, num_classes=2)
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length,
-                         is_pair=True)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length, is_pair=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # segment
-        Stack(dtype="int64")  # label
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -147,16 +138,14 @@ def do_train():
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=args.learning_rate,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
-        grad_clip=paddle.nn.ClipGradByGlobalNorm(1.0))
+        grad_clip=paddle.nn.ClipGradByGlobalNorm(1.0),
+    )
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Auc()
@@ -181,23 +170,21 @@ def do_train():
                 time_diff = time.time() - tic_train
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accuracy: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc,
-                       args.logging_steps / time_diff))
+                    % (global_step, epoch, step, loss, acc, args.logging_steps / time_diff)
+                )
                 tic_train = time.time()
             if global_step % args.eval_step == 0 and rank == 0:
                 evaluate(model, metric, dev_data_loader, "dev")
             if global_step % args.save_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
+                model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                 model_to_save.save_pretrained(save_dir)
                 tokenizer.save_pretrained(save_dir)
                 tic_train = time.time()
 
     # save final checkpoint
     save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
-    model_to_save = model._layers if isinstance(model,
-                                                paddle.DataParallel) else model
+    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
     model_to_save.save_pretrained(save_dir)
     tokenizer.save_pretrained(save_dir)
 

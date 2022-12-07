@@ -24,6 +24,7 @@ from shutil import copyfile
 import paddle
 import paddle.fluid.core as core
 from paddle.nn import Layer
+
 # TODO(fangzeyang) Temporary fix and replace by paddle framework downloader later
 from paddlenlp.utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
 from paddlenlp.utils.env import MODEL_HOME
@@ -32,33 +33,28 @@ from paddlenlp.utils.log import logger
 from paddlenlp.transformers import PretrainedModel
 from paddlenlp.experimental import FasterTokenizer
 
-__all__ = ['FasterPretrainedModel']
+__all__ = ["FasterPretrainedModel"]
 
 
 def load_vocabulary(filepath):
     token_to_idx = {}
-    with io.open(filepath, 'r', encoding='utf-8') as f:
+    with io.open(filepath, "r", encoding="utf-8") as f:
         for index, line in enumerate(f):
-            token = line.rstrip('\n')
+            token = line.rstrip("\n")
             token_to_idx[token] = int(index)
     return token_to_idx
 
 
 class FasterPretrainedModel(PretrainedModel):
-
     def to_static(self, output_path):
         self.eval()
 
         # Convert to static graph with specific input description
-        model = paddle.jit.to_static(self,
-                                     input_spec=[
-                                         paddle.static.InputSpec(
-                                             shape=[None, None],
-                                             dtype=core.VarDesc.VarType.STRINGS)
-                                     ])
+        model = paddle.jit.to_static(
+            self, input_spec=[paddle.static.InputSpec(shape=[None, None], dtype=core.VarDesc.VarType.STRINGS)]
+        )
         paddle.jit.save(model, output_path)
-        logger.info("Already save the static model to the path %s" %
-                    output_path)
+        logger.info("Already save the static model to the path %s" % output_path)
 
     @classmethod
     def from_pretrained(cls, pretrained_model_name_or_path, *args, **kwargs):
@@ -107,29 +103,22 @@ class FasterPretrainedModel(PretrainedModel):
         # From built-in pretrained models
         if pretrained_model_name_or_path in pretrained_models:
             for file_id, map_list in cls.pretrained_resource_files_map.items():
-                resource_files[file_id] = map_list[
-                    pretrained_model_name_or_path]
-            init_configuration = copy.deepcopy(
-                cls.pretrained_init_configuration[pretrained_model_name_or_path]
-            )
+                resource_files[file_id] = map_list[pretrained_model_name_or_path]
+            init_configuration = copy.deepcopy(cls.pretrained_init_configuration[pretrained_model_name_or_path])
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
                 resource_files[file_id] = full_file_name
-            resource_files["model_config_file"] = os.path.join(
-                pretrained_model_name_or_path, cls.model_config_file)
+            resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
             # Assuming from community-contributed pretrained models
             for file_id, file_name in cls.resource_files_names.items():
-                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX,
-                                              pretrained_model_name_or_path,
-                                              file_name)
+                full_file_name = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, file_name)
                 resource_files[file_id] = full_file_name
             resource_files["model_config_file"] = os.path.join(
-                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                cls.model_config_file)
+                COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file
+            )
 
         default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
         resolved_resource_files = {}
@@ -137,16 +126,14 @@ class FasterPretrainedModel(PretrainedModel):
             if file_path is None or os.path.isfile(file_path):
                 resolved_resource_files[file_id] = file_path
                 continue
-            path = os.path.join(default_root, file_path.split('/')[-1])
+            path = os.path.join(default_root, file_path.split("/")[-1])
             if os.path.exists(path):
                 logger.info("Already cached %s" % path)
                 resolved_resource_files[file_id] = path
             else:
-                logger.info("Downloading %s and saved to %s" %
-                            (file_path, default_root))
+                logger.info("Downloading %s and saved to %s" % (file_path, default_root))
                 try:
-                    resolved_resource_files[file_id] = get_path_from_url(
-                        file_path, default_root)
+                    resolved_resource_files[file_id] = get_path_from_url(file_path, default_root)
                 except RuntimeError as err:
                     logger.error(err)
                     raise RuntimeError(
@@ -159,8 +146,7 @@ class FasterPretrainedModel(PretrainedModel):
 
         # Prepare model initialization kwargs
         # Did we saved some inputs and kwargs to reload ?
-        model_config_file = resolved_resource_files.pop("model_config_file",
-                                                        None)
+        model_config_file = resolved_resource_files.pop("model_config_file", None)
         if model_config_file is not None:
             with io.open(model_config_file, encoding="utf-8") as f:
                 init_kwargs = json.load(f)
@@ -170,8 +156,7 @@ class FasterPretrainedModel(PretrainedModel):
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())
         # class name corresponds to this configuration
-        init_class = init_kwargs.pop("init_class",
-                                     cls.base_model_class.__name__)
+        init_class = init_kwargs.pop("init_class", cls.base_model_class.__name__)
         # Check if the loaded config matches the current model class's __init__
         # arguments. If not match, the loaded config is for the base model class.
         if init_class == cls.base_model_class.__name__:
@@ -186,19 +171,17 @@ class FasterPretrainedModel(PretrainedModel):
             base_arg = None
             for i, arg in enumerate(init_args):
                 if isinstance(arg, dict) and "init_class" in arg:
-                    assert arg.pop(
-                        "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}").format(
-                                cls.base_model_class.__name__)
+                    assert arg.pop("init_class") == cls.base_model_class.__name__, (
+                        "pretrained base model should be {}"
+                    ).format(cls.base_model_class.__name__)
                     base_arg_index = i
                     base_arg = arg
                     break
             for arg_name, arg in init_kwargs.items():
                 if isinstance(arg, dict) and "init_class" in arg:
-                    assert arg.pop(
-                        "init_class") == cls.base_model_class.__name__, (
-                            "pretrained base model should be {}").format(
-                                cls.base_model_class.__name__)
+                    assert arg.pop("init_class") == cls.base_model_class.__name__, (
+                        "pretrained base model should be {}"
+                    ).format(cls.base_model_class.__name__)
                     base_arg_index = arg_name
                     base_arg = arg
                     break
@@ -212,15 +195,13 @@ class FasterPretrainedModel(PretrainedModel):
             vocab_file = resolved_resource_files.pop("vocab_file", None)
             if vocab_file and base_kwargs.get("vocab_file", None) is None:
                 base_kwargs["vocab_file"] = vocab_file
-            assert base_kwargs.get("vocab_file",
-                                   None) is not None, f"The vocab "
+            assert base_kwargs.get("vocab_file", None) is not None, f"The vocab "
             f"file is None. Please reload the class  {cls.__name__} with pretrained_name."
 
             model = cls(*base_args, **base_kwargs)
         else:
             # Update with newly provided args and kwargs for derived model
-            base_parameters_dict = inspect.signature(
-                cls.base_model_class.__init__).parameters
+            base_parameters_dict = inspect.signature(cls.base_model_class.__init__).parameters
             for k, v in kwargs.items():
                 if k in base_parameters_dict:
                     base_kwargs[k] = v
@@ -228,15 +209,14 @@ class FasterPretrainedModel(PretrainedModel):
             vocab_file = resolved_resource_files.pop("vocab_file", None)
             if vocab_file and base_kwargs.get("vocab_file", None) is None:
                 base_kwargs["vocab_file"] = vocab_file
-            assert base_kwargs.get("vocab_file",
-                                   None) is not None, f"The vocab "
+            assert base_kwargs.get("vocab_file", None) is not None, f"The vocab "
             f"file is None. Please reload the class  {cls.__name__} with pretrained_name."
 
             base_model = cls.base_model_class(*base_args, **base_kwargs)
             if base_arg_index is not None:
                 derived_args[base_arg_index] = base_model
             else:
-                derived_args = (base_model, )  # assume at the first position
+                derived_args = (base_model,)  # assume at the first position
             derived_args = derived_args if not args else args
             derived_parameters_dict = inspect.signature(cls.__init__).parameters
             for k, v in kwargs.items():
@@ -246,8 +226,7 @@ class FasterPretrainedModel(PretrainedModel):
 
         # Maybe need more ways to load resources.
         weight_path = resolved_resource_files["model_state"]
-        assert weight_path.endswith(
-            ".pdparams"), "suffix of weight must be .pdparams"
+        assert weight_path.endswith(".pdparams"), "suffix of weight must be .pdparams"
 
         state_dict = paddle.load(weight_path)
         logger.info("Loaded parameters from %s" % weight_path)
@@ -260,17 +239,19 @@ class FasterPretrainedModel(PretrainedModel):
         unexpected_keys = []
         missing_keys = []
         if not hasattr(model, cls.base_model_prefix) and any(
-                s.startswith(cls.base_model_prefix) for s in state_dict.keys()):
+            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
+        ):
             # base model
             state_to_load = {}
             start_prefix = cls.base_model_prefix + "."
             for k, v in state_dict.items():
                 if k.startswith(cls.base_model_prefix):
-                    state_to_load[k[len(start_prefix):]] = v
+                    state_to_load[k[len(start_prefix) :]] = v
                 else:
                     unexpected_keys.append(k)
         if hasattr(model, cls.base_model_prefix) and not any(
-                s.startswith(cls.base_model_prefix) for s in state_dict.keys()):
+            s.startswith(cls.base_model_prefix) for s in state_dict.keys()
+        ):
             # derived model (base model with heads)
             model_to_load = getattr(model, cls.base_model_prefix)
             for k in model.state_dict().keys():
@@ -278,12 +259,14 @@ class FasterPretrainedModel(PretrainedModel):
                     missing_keys.append(k)
         if len(missing_keys) > 0:
             logger.info(
-                "Weights of {} not initialized from pretrained model: {}".
-                format(model.__class__.__name__, missing_keys))
+                "Weights of {} not initialized from pretrained model: {}".format(
+                    model.__class__.__name__, missing_keys
+                )
+            )
         if len(unexpected_keys) > 0:
             logger.info(
-                "Weights from pretrained model not used in {}: {}".format(
-                    model.__class__.__name__, unexpected_keys))
+                "Weights from pretrained model not used in {}: {}".format(model.__class__.__name__, unexpected_keys)
+            )
         if paddle.in_dynamic_mode():
             model_to_load.set_state_dict(state_to_load)
             return model
@@ -292,9 +275,9 @@ class FasterPretrainedModel(PretrainedModel):
     @staticmethod
     def load_vocabulary(filepath):
         token_to_idx = {}
-        with io.open(filepath, 'r', encoding='utf-8') as f:
+        with io.open(filepath, "r", encoding="utf-8") as f:
             for index, line in enumerate(f):
-                token = line.rstrip('\n')
+                token = line.rstrip("\n")
                 token_to_idx[token] = int(index)
         return token_to_idx
 
@@ -321,22 +304,16 @@ class FasterPretrainedModel(PretrainedModel):
                 # reload from save_directory
                 model = BertForSequenceClassification.from_pretrained('./trained_model/')
         """
-        assert not os.path.isfile(
-            save_dir
-        ), "Saving directory ({}) should be a directory, not a file".format(
-            save_dir)
+        assert not os.path.isfile(save_dir), "Saving directory ({}) should be a directory, not a file".format(save_dir)
         os.makedirs(save_dir, exist_ok=True)
         # Save model config
         self.save_model_config(save_dir)
         # Save model
         if paddle.in_dynamic_mode():
-            file_name = os.path.join(
-                save_dir,
-                list(self.resource_files_names.values())[0])
+            file_name = os.path.join(save_dir, list(self.resource_files_names.values())[0])
             paddle.save(self.state_dict(), file_name)
         else:
-            logger.warning(
-                "Save pretrained model only supported dygraph mode for now!")
+            logger.warning("Save pretrained model only supported dygraph mode for now!")
         # Save resources file
         self.save_resources(save_dir)
 
@@ -349,8 +326,7 @@ class FasterPretrainedModel(PretrainedModel):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
-            src_path = self.init_config['init_args'][0].get(name, None)
+            src_path = self.init_config["init_args"][0].get(name, None)
             dst_path = os.path.join(save_directory, file_name)
-            if src_path and os.path.abspath(src_path) != os.path.abspath(
-                    dst_path):
+            if src_path and os.path.abspath(src_path) != os.path.abspath(dst_path):
                 copyfile(src_path, dst_path)
