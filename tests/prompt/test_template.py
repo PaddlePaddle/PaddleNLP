@@ -22,7 +22,7 @@ from paddlenlp.prompt import AutoTemplate, ManualTemplate, PrefixTemplate, SoftT
 from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
 
 
-class TestTemplate(unittest.TestCase):
+class TemplateTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-nano-zh")
