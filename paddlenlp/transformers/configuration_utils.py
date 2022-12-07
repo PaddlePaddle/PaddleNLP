@@ -32,11 +32,16 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import HF_CACHE_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, LEGACY_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
-from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url, is_url
+from ..utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url,
+    is_url,
+    url_file_exists,
+)
 
 _re_configuration_file = re.compile(r"config\.(.*)\.json")
 
@@ -173,6 +178,26 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str,
     return kwargs
 
 
+def convert_to_legacy_config(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    works when there are different fields between huggingface and paddle
+    Args:
+        standard_config_map (Dict[str, str]): mapping of between standard config and paddle config
+        config (Dict[str, Any]): config of huggingface transformers models
+    Returns: the config which can be mapped into config of paddle model
+    """
+    if "init_args" in config:
+        args = []
+        for init_arg in config["init_args"]:
+            init_arg = convert_to_legacy_config(standard_config_map, init_arg)
+            args.append(init_arg)
+        config["init_args"] = args
+
+    for standard_field, paddle_field in standard_config_map.items():
+        config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+    return config
+
+
 def flatten_model_config(config: dict) -> dict:
     """flatten the model config which can be old-style model config
 
@@ -203,6 +228,18 @@ def flatten_model_config(config: dict) -> dict:
         config["architectures"] = [config.pop("init_class")]
 
     return config
+
+
+def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
+    """
+    check whether the config is standard
+    Args:
+        config: the dict data of config
+    """
+    if isinstance(config, PretrainedConfig):
+        return True
+
+    return "init_class" not in config and "architectures" in config
 
 
 class PretrainedConfig:
@@ -403,6 +440,11 @@ class PretrainedConfig:
 
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
+
+    # map hf attribute to paddle attribute
+    # { "standard_field": "paddle_field", ... }
+    standard_config_map: Dict[str, str] = {}
+
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):
@@ -592,7 +634,13 @@ class PretrainedConfig:
         logger.info(f"Configuration saved in {output_config_file}")
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> PretrainedConfig:
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> PretrainedConfig:
         r"""
         Instantiate a [`PretrainedConfig`] (or a derived class) from a pretrained model configuration.
 
@@ -606,6 +654,8 @@ class PretrainedConfig:
                 - a path to a *directory* containing a configuration file saved using the
                   [`~PretrainedConfig.save_pretrained`] method, e.g., `./my_model_directory/`.
                 - a path or url to a saved configuration JSON *file*, e.g., `./my_model_directory/configuration.json`.
+            from_hf_hub (bool, *optional*):
+                load config from huggingface hub: https://huggingface.co/models
             cache_dir (`str` or `os.PathLike`, *optional*):
                 Path to a directory in which a downloaded pretrained model configuration should be cached if the
                 standard cache should not be used.
@@ -652,7 +702,12 @@ class PretrainedConfig:
         assert config.output_attentions == True
         assert unused_kwargs == {"foo": False}
         ```"""
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
+
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
+
+        # do standard config map: there are some old-school pretrained-config not refactored.
+        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
 
         config_dict = flatten_model_config(config_dict)
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
@@ -698,7 +753,7 @@ class PretrainedConfig:
     ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         cache_dir = kwargs.pop("cache_dir", None)
         from_hf_hub = kwargs.pop("from_hf_hub", False)
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         force_download = kwargs.pop("force_download", False)
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
@@ -736,18 +791,28 @@ class PretrainedConfig:
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
-            if os.path.isfile(configuration_file):
+            if os.path.exists(configuration_file):
                 resolved_config_file = configuration_file
             else:
-                raise FileNotFoundError(
-                    "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
-                    "param into `from_pretarined` method to specific the configuration file name"
-                )
-        # 4. load it as the community resource file
+                # try to detect old-school config file
+                configuration_file = os.path.join(pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+                if os.path.exists(configuration_file):
+                    resolved_config_file = configuration_file
+                else:
+                    raise FileNotFoundError(
+                        "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
+                        "param into `from_pretarined` method to specific the configuration file name"
+                    )  # 4. load it as the community resource file
+
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
-            assert is_url(community_url)
-            return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+            if url_file_exists(community_url):
+                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
+            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
+            if url_file_exists(community_url):
+                return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
             # Load config dict

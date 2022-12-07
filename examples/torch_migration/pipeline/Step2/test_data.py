@@ -44,17 +44,14 @@ def build_paddle_data_pipeline():
     # load tokenizer
     tokenizer = PPNLPBertTokenizer.from_pretrained("bert-base-uncased")
     # load data
-    dataset_test = ppnlp_load_dataset(read,
-                                      data_path='demo_sst2_sentence/demo.tsv',
-                                      lazy=False)
+    dataset_test = ppnlp_load_dataset(read, data_path="demo_sst2_sentence/demo.tsv", lazy=False)
     trans_func = partial(convert_example, tokenizer=tokenizer, max_length=128)
 
     # tokenize data
     dataset_test = dataset_test.map(trans_func, lazy=False)
 
     test_sampler = paddle.io.SequenceSampler(dataset_test)
-    test_batch_sampler = paddle.io.BatchSampler(sampler=test_sampler,
-                                                batch_size=4)
+    test_batch_sampler = paddle.io.BatchSampler(sampler=test_sampler, batch_size=4)
     data_collator = DataCollatorWithPadding(tokenizer)
     data_loader_test = paddle.io.DataLoader(
         dataset_test,
@@ -68,6 +65,7 @@ def build_paddle_data_pipeline():
 
 def build_torch_data_pipeline():
     from transformers import DataCollatorWithPadding
+
     tokenizer = HFBertTokenizer.from_pretrained("bert-base-uncased")
 
     def preprocess_function(examples):
@@ -90,8 +88,7 @@ def build_torch_data_pipeline():
         remove_columns=dataset_test.column_names,
         desc="Running tokenizer on dataset",
     )
-    dataset_test.set_format("np",
-                            columns=["input_ids", "token_type_ids", "labels"])
+    dataset_test.set_format("np", columns=["input_ids", "token_type_ids", "labels"])
     test_sampler = torch.utils.data.SequentialSampler(dataset_test)
     collate_fn = DataCollatorWithPadding(tokenizer)
     data_loader_test = torch.utils.data.DataLoader(
@@ -120,22 +117,16 @@ def test_data_pipeline():
         rnd_idx = np.random.randint(0, len(paddle_dataset))
         for k in ["input_ids", "token_type_ids", "labels"]:
 
-            logger_paddle_data.add(f"dataset_{idx}_{k}",
-                                   np.array(paddle_dataset[rnd_idx][k]))
+            logger_paddle_data.add(f"dataset_{idx}_{k}", np.array(paddle_dataset[rnd_idx][k]))
 
-            logger_torch_data.add(f"dataset_{idx}_{k}",
-                                  np.array(torch_dataset[rnd_idx][k]))
+            logger_torch_data.add(f"dataset_{idx}_{k}", np.array(torch_dataset[rnd_idx][k]))
 
-    for idx, (paddle_batch,
-              torch_batch) in enumerate(zip(paddle_dataloader,
-                                            torch_dataloader)):
+    for idx, (paddle_batch, torch_batch) in enumerate(zip(paddle_dataloader, torch_dataloader)):
         if idx >= 5:
             break
         for i, k in enumerate(["input_ids", "token_type_ids", "labels"]):
-            logger_paddle_data.add(f"dataloader_{idx}_{k}",
-                                   paddle_batch[k].numpy())
-            logger_torch_data.add(f"dataloader_{idx}_{k}",
-                                  torch_batch[k].cpu().numpy())
+            logger_paddle_data.add(f"dataloader_{idx}_{k}", paddle_batch[k].numpy())
+            logger_torch_data.add(f"dataloader_{idx}_{k}", torch_batch[k].cpu().numpy())
 
     diff_helper.compare_info(logger_paddle_data.data, logger_torch_data.data)
     diff_helper.report()

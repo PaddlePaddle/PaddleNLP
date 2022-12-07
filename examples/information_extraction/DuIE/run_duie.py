@@ -58,14 +58,15 @@ args = parser.parse_args()
 
 
 class BCELossForDuIE(nn.Layer):
-
-    def __init__(self, ):
+    def __init__(
+        self,
+    ):
         super(BCELossForDuIE, self).__init__()
-        self.criterion = nn.BCEWithLogitsLoss(reduction='none')
+        self.criterion = nn.BCEWithLogitsLoss(reduction="none")
 
     def forward(self, logits, labels, mask):
         loss = self.criterion(logits, labels)
-        mask = paddle.cast(mask, 'float32')
+        mask = paddle.cast(mask, "float32")
         loss = loss * mask.unsqueeze(-1)
         loss = paddle.sum(loss.mean(axis=2), axis=1) / paddle.sum(mask, axis=1)
         loss = loss.mean()
@@ -94,7 +95,7 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         for line in fp:
             example_all.append(json.loads(line))
     id2spo_path = os.path.join(os.path.dirname(file_path), "id2spo.json")
-    with open(id2spo_path, 'r', encoding='utf8') as fp:
+    with open(id2spo_path, "r", encoding="utf8") as fp:
         id2spo = json.load(fp)
 
     model.eval()
@@ -106,8 +107,7 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         eval_steps += 1
         input_ids, seq_len, tok_to_orig_start_index, tok_to_orig_end_index, labels = batch
         logits = model(input_ids=input_ids)
-        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and(
-            (input_ids != 2))
+        mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and((input_ids != 2))
         loss = criterion(logits, labels, mask)
         loss_all += loss.numpy().item()
         probs = F.sigmoid(logits)
@@ -116,25 +116,29 @@ def evaluate(model, criterion, data_loader, file_path, mode):
         tok_to_orig_start_index_batch = tok_to_orig_start_index.numpy()
         tok_to_orig_end_index_batch = tok_to_orig_end_index.numpy()
         formatted_outputs.extend(
-            decoding(example_all[current_idx:current_idx + len(logits)], id2spo,
-                     logits_batch, seq_len_batch, tok_to_orig_start_index_batch,
-                     tok_to_orig_end_index_batch))
+            decoding(
+                example_all[current_idx : current_idx + len(logits)],
+                id2spo,
+                logits_batch,
+                seq_len_batch,
+                tok_to_orig_start_index_batch,
+                tok_to_orig_end_index_batch,
+            )
+        )
         current_idx = current_idx + len(logits)
     loss_avg = loss_all / eval_steps
     print("eval loss: %f" % (loss_avg))
 
     if mode == "predict":
-        predict_file_path = os.path.join(args.data_path, 'predictions.json')
+        predict_file_path = os.path.join(args.data_path, "predictions.json")
     else:
-        predict_file_path = os.path.join(args.data_path, 'predict_eval.json')
+        predict_file_path = os.path.join(args.data_path, "predict_eval.json")
 
-    predict_zipfile_path = write_prediction_results(formatted_outputs,
-                                                    predict_file_path)
+    predict_zipfile_path = write_prediction_results(formatted_outputs, predict_file_path)
 
     if mode == "eval":
-        precision, recall, f1 = get_precision_recall_f1(file_path,
-                                                        predict_zipfile_path)
-        os.system('rm {} {}'.format(predict_file_path, predict_zipfile_path))
+        precision, recall, f1 = get_precision_recall_f1(file_path, predict_zipfile_path)
+        os.system("rm {} {}".format(predict_file_path, predict_zipfile_path))
         return precision, recall, f1
     elif mode != "predict":
         raise Exception("wrong mode for eval func")
@@ -150,56 +154,49 @@ def do_train():
     label_map_path = os.path.join(args.data_path, "predicate2id.json")
     if not (os.path.exists(label_map_path) and os.path.isfile(label_map_path)):
         sys.exit("{} dose not exists or is not a file.".format(label_map_path))
-    with open(label_map_path, 'r', encoding='utf8') as fp:
+    with open(label_map_path, "r", encoding="utf8") as fp:
         label_map = json.load(fp)
     num_classes = (len(label_map.keys()) - 2) * 2 + 2
 
     # Loads pretrained model ERNIE
-    model = AutoModelForTokenClassification.from_pretrained(
-        "ernie-3.0-medium-zh", num_classes=num_classes)
+    model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=num_classes)
     model = paddle.DataParallel(model)
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     criterion = BCELossForDuIE()
 
     # Loads dataset.
     train_dataset = DuIEDataset.from_file(
-        os.path.join(args.data_path, 'train_data.json'), tokenizer,
-        args.max_seq_length, True)
+        os.path.join(args.data_path, "train_data.json"), tokenizer, args.max_seq_length, True
+    )
     train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+        train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True
+    )
     collator = DataCollator()
-    train_data_loader = DataLoader(dataset=train_dataset,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=collator,
-                                   return_list=True)
-    eval_file_path = os.path.join(args.data_path, 'dev_data.json')
-    test_dataset = DuIEDataset.from_file(eval_file_path, tokenizer,
-                                         args.max_seq_length, True)
-    test_batch_sampler = paddle.io.BatchSampler(test_dataset,
-                                                batch_size=args.batch_size,
-                                                shuffle=False,
-                                                drop_last=True)
-    test_data_loader = DataLoader(dataset=test_dataset,
-                                  batch_sampler=test_batch_sampler,
-                                  collate_fn=collator,
-                                  return_list=True)
+    train_data_loader = DataLoader(
+        dataset=train_dataset, batch_sampler=train_batch_sampler, collate_fn=collator, return_list=True
+    )
+    eval_file_path = os.path.join(args.data_path, "dev_data.json")
+    test_dataset = DuIEDataset.from_file(eval_file_path, tokenizer, args.max_seq_length, True)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True
+    )
+    test_data_loader = DataLoader(
+        dataset=test_dataset, batch_sampler=test_batch_sampler, collate_fn=collator, return_list=True
+    )
 
     # Defines learning rate strategy.
     steps_by_epoch = len(train_data_loader)
     num_training_steps = steps_by_epoch * args.num_train_epochs
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_ratio)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_ratio)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     # Starts training.
     global_step = 0
@@ -213,8 +210,7 @@ def do_train():
         for step, batch in enumerate(train_data_loader):
             input_ids, seq_lens, tok_to_orig_start_index, tok_to_orig_end_index, labels = batch
             logits = model(input_ids=input_ids)
-            mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and(
-                (input_ids != 2))
+            mask = (input_ids != 0).logical_and((input_ids != 1)).logical_and((input_ids != 2))
             loss = criterion(logits, labels, mask)
             loss.backward()
             optimizer.step()
@@ -226,41 +222,37 @@ def do_train():
             if global_step % logging_steps == 0 and rank == 0:
                 print(
                     "epoch: %d / %d, steps: %d / %d, loss: %f, speed: %.2f step/s"
-                    % (epoch, args.num_train_epochs, step, steps_by_epoch,
-                       loss_item, logging_steps / (time.time() - tic_train)))
+                    % (
+                        epoch,
+                        args.num_train_epochs,
+                        step,
+                        steps_by_epoch,
+                        loss_item,
+                        logging_steps / (time.time() - tic_train),
+                    )
+                )
                 tic_train = time.time()
 
             if global_step % save_steps == 0 and rank == 0:
-                print("\n=====start evaluating ckpt of %d steps=====" %
-                      global_step)
-                precision, recall, f1 = evaluate(model, criterion,
-                                                 test_data_loader,
-                                                 eval_file_path, "eval")
-                print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" %
-                      (100 * precision, 100 * recall, 100 * f1))
-                print("saving checkpoing model_%d.pdparams to %s " %
-                      (global_step, args.output_dir))
-                paddle.save(
-                    model.state_dict(),
-                    os.path.join(args.output_dir,
-                                 "model_%d.pdparams" % global_step))
+                print("\n=====start evaluating ckpt of %d steps=====" % global_step)
+                precision, recall, f1 = evaluate(model, criterion, test_data_loader, eval_file_path, "eval")
+                print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" % (100 * precision, 100 * recall, 100 * f1))
+                print("saving checkpoing model_%d.pdparams to %s " % (global_step, args.output_dir))
+                paddle.save(model.state_dict(), os.path.join(args.output_dir, "model_%d.pdparams" % global_step))
                 model.train()  # back to train mode
 
         tic_epoch = time.time() - tic_epoch
-        print("epoch time footprint: %d hour %d min %d sec" %
-              (tic_epoch // 3600, (tic_epoch % 3600) // 60, tic_epoch % 60))
+        print(
+            "epoch time footprint: %d hour %d min %d sec"
+            % (tic_epoch // 3600, (tic_epoch % 3600) // 60, tic_epoch % 60)
+        )
 
     # Does final evaluation.
     if rank == 0:
-        print("\n=====start evaluating last ckpt of %d steps=====" %
-              global_step)
-        precision, recall, f1 = evaluate(model, criterion, test_data_loader,
-                                         eval_file_path, "eval")
-        print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" %
-              (100 * precision, 100 * recall, 100 * f1))
-        paddle.save(
-            model.state_dict(),
-            os.path.join(args.output_dir, "model_%d.pdparams" % global_step))
+        print("\n=====start evaluating last ckpt of %d steps=====" % global_step)
+        precision, recall, f1 = evaluate(model, criterion, test_data_loader, eval_file_path, "eval")
+        print("precision: %.2f\t recall: %.2f\t f1: %.2f\t" % (100 * precision, 100 * recall, 100 * f1))
+        paddle.save(model.state_dict(), os.path.join(args.output_dir, "model_%d.pdparams" % global_step))
         print("\n=====training complete=====")
 
 
@@ -271,41 +263,34 @@ def do_predict():
     label_map_path = os.path.join(args.data_path, "predicate2id.json")
     if not (os.path.exists(label_map_path) and os.path.isfile(label_map_path)):
         sys.exit("{} dose not exists or is not a file.".format(label_map_path))
-    with open(label_map_path, 'r', encoding='utf8') as fp:
+    with open(label_map_path, "r", encoding="utf8") as fp:
         label_map = json.load(fp)
     num_classes = (len(label_map.keys()) - 2) * 2 + 2
 
     # Loads pretrained model ERNIE
-    model = AutoModelForTokenClassification.from_pretrained(
-        "ernie-3.0-medium-zh", num_classes=num_classes)
+    model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=num_classes)
     tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
     criterion = BCELossForDuIE()
 
     # Loads dataset.
-    test_dataset = DuIEDataset.from_file(args.predict_data_file, tokenizer,
-                                         args.max_seq_length, True)
+    test_dataset = DuIEDataset.from_file(args.predict_data_file, tokenizer, args.max_seq_length, True)
     collator = DataCollator()
-    test_batch_sampler = paddle.io.BatchSampler(test_dataset,
-                                                batch_size=args.batch_size,
-                                                shuffle=False,
-                                                drop_last=True)
-    test_data_loader = DataLoader(dataset=test_dataset,
-                                  batch_sampler=test_batch_sampler,
-                                  collate_fn=collator,
-                                  return_list=True)
+    test_batch_sampler = paddle.io.BatchSampler(
+        test_dataset, batch_size=args.batch_size, shuffle=False, drop_last=True
+    )
+    test_data_loader = DataLoader(
+        dataset=test_dataset, batch_sampler=test_batch_sampler, collate_fn=collator, return_list=True
+    )
 
     # Loads model parameters.
-    if not (os.path.exists(args.init_checkpoint)
-            and os.path.isfile(args.init_checkpoint)):
-        sys.exit("wrong directory: init checkpoints {} not exist".format(
-            args.init_checkpoint))
+    if not (os.path.exists(args.init_checkpoint) and os.path.isfile(args.init_checkpoint)):
+        sys.exit("wrong directory: init checkpoints {} not exist".format(args.init_checkpoint))
     state_dict = paddle.load(args.init_checkpoint)
     model.set_dict(state_dict)
 
     # Does predictions.
     print("\n=====start predicting=====")
-    evaluate(model, criterion, test_data_loader, args.predict_data_file,
-             "predict")
+    evaluate(model, criterion, test_data_loader, args.predict_data_file, "predict")
     print("=====predicting complete=====")
 
 

@@ -56,17 +56,17 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 
 def read_local_dataset(path):
     """
     Read dataset file
     """
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            sentence, label = line.strip().split('\t')
-            yield {'text': sentence, 'label': label}
+            sentence, label = line.strip().split("\t")
+            yield {"text": sentence, "label": label}
 
 
 def preprocess_function(examples, tokenizer, max_seq_length):
@@ -117,14 +117,12 @@ def run():
     set_seed(args.seed)
     paddle.set_device(args.device)
     # Define model & tokenizer
-    if os.path.exists(os.path.join(
-            args.params_path, "model_state.pdparams")) and os.path.exists(
-                os.path.join(args.params_path,
-                             "model_config.json")) and os.path.exists(
-                                 os.path.join(args.params_path,
-                                              "tokenizer_config.json")):
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.params_path)
+    if (
+        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
+        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
+        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
+    ):
+        model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
@@ -133,41 +131,30 @@ def run():
     train_path = os.path.join(args.dataset_dir, args.train_file)
     train_ds = load_dataset(read_local_dataset, path=train_path, lazy=False)
 
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length)
+    trans_func = functools.partial(preprocess_function, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
     train_ds = train_ds.map(trans_func)
 
     # Batchify dataset
     collate_fn = LocalDataCollatorWithPadding(tokenizer)
-    train_batch_sampler = BatchSampler(train_ds,
-                                       batch_size=args.batch_size,
-                                       shuffle=False)
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=collate_fn)
+    train_batch_sampler = BatchSampler(train_ds, batch_size=args.batch_size, shuffle=False)
+    train_data_loader = DataLoader(dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=collate_fn)
 
     # Classifier_layer_name is the layer name of the last output layer
-    rep_point = RepresenterPointModel(model,
-                                      train_data_loader,
-                                      classifier_layer_name="classifier")
+    rep_point = RepresenterPointModel(model, train_data_loader, classifier_layer_name="classifier")
     weight_matrix = rep_point.weight_matrix
 
     # Save dirty data & rest data
-    dirty_indexs, _ = get_dirty_data(weight_matrix, args.dirty_num,
-                                     args.dirty_threshold)
+    dirty_indexs, _ = get_dirty_data(weight_matrix, args.dirty_num, args.dirty_threshold)
 
     dirty_path = os.path.join(args.dataset_dir, args.dirty_file)
     rest_path = os.path.join(args.dataset_dir, args.rest_file)
 
-    with open(dirty_path, 'w') as f1, open(rest_path, 'w') as f2:
+    with open(dirty_path, "w") as f1, open(rest_path, "w") as f2:
         for idx in range(len(train_ds)):
             if idx in dirty_indexs:
-                f1.write(train_ds.data[idx]['text'] + '\t' +
-                         train_ds.data[idx]['label'] + '\n')
+                f1.write(train_ds.data[idx]["text"] + "\t" + train_ds.data[idx]["label"] + "\n")
             else:
-                f2.write(train_ds.data[idx]['text'] + '\t' +
-                         train_ds.data[idx]['label'] + '\n')
+                f2.write(train_ds.data[idx]["text"] + "\t" + train_ds.data[idx]["label"] + "\n")
 
     f1.close(), f2.close()
 

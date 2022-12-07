@@ -13,25 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
-
 import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..transformers import AutoTokenizer, AutoModelForConditionalGeneration, UNIMOForConditionalGeneration
-from ..datasets import load_dataset
-from ..data import Stack, Pad, Tuple
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+
+from ..data import Pad
+from ..transformers import (
+    AutoModelForConditionalGeneration,
+    AutoTokenizer,
+    UNIMOForConditionalGeneration,
+)
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            text_summarization = Taskflow("text_summarization")
            text_summarization(2022年，中国房地产进入转型阵痛期，传统“高杠杆、快周转”的模式难以为继，万科甚至直接喊话，中国房地产进入“黑铁时代”)
@@ -82,7 +76,9 @@ class TextSummarizationTask(Task):
         Construct the inference model for the predictor.
         """
         if self._custom_model:
-            self._model = AutoModelForConditionalGeneration.from_pretrained(self._task_path)
+            self._model = AutoModelForConditionalGeneration.from_pretrained(
+                self._task_path, from_hf_hub=self.from_hf_hub
+            )
         else:
             self._model = AutoModelForConditionalGeneration.from_pretrained(model)
         self._model.eval()
@@ -94,7 +90,7 @@ class TextSummarizationTask(Task):
         Construct the tokenizer for the predictor.
         """
         if self._custom_model:
-            self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
+            self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         else:
             self._tokenizer = AutoTokenizer.from_pretrained(model)
 
@@ -200,7 +196,6 @@ class TextSummarizationTask(Task):
             )
             position_ids = paddle.to_tensor(batch["position_ids"], dtype="int64") if "position_ids" in batch else None
             attention_mask = paddle.to_tensor(batch["attention_mask"], dtype="float32")
-            seq_len = paddle.to_tensor(batch["seq_len"], dtype="int64") if "seq_len" in batch else None
             ids, scores = self._model.generate(
                 input_ids=input_ids,
                 token_type_ids=token_type_ids,

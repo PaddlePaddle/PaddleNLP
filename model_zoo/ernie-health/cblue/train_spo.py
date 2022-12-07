@@ -82,23 +82,17 @@ def evaluate(model, criterion, metric, data_loader):
 
         logits = model(input_ids, token_type_ids, position_ids)
 
-        ent_loss = criterion(logits[0],
-                             ent_label[0],
-                             weight=ent_mask,
-                             reduction='sum')
-        spo_loss = criterion(logits[1],
-                             spo_label[0],
-                             weight=spo_mask,
-                             reduction='sum')
+        ent_loss = criterion(logits[0], ent_label[0], weight=ent_mask, reduction="sum")
+        spo_loss = criterion(logits[1], spo_label[0], weight=spo_mask, reduction="sum")
         loss = ent_loss + spo_loss
         losses.append(loss.numpy())
         lengths = paddle.sum(masks, axis=-1)
-        correct = metric.compute(lengths, logits[0], logits[1], ent_label[1],
-                                 spo_label[1])
+        correct = metric.compute(lengths, logits[0], logits[1], ent_label[1], spo_label[1])
         metric.update(correct)
     results = metric.accumulate()
-    print('eval loss: %.5f, entity f1: %.5f, spo f1: %.5f' %
-          (np.mean(losses), results['entity'][2], results['spo'][2]))
+    print(
+        "eval loss: %.5f, entity f1: %.5f, spo f1: %.5f" % (np.mean(losses), results["entity"][2], results["spo"][2])
+    )
     model.train()
     metric.reset()
 
@@ -111,30 +105,29 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds = load_dataset('cblue', 'CMeIE', splits=['train', 'dev'])
+    train_ds, dev_ds = load_dataset("cblue", "CMeIE", splits=["train", "dev"])
 
-    model = ElectraForSPO.from_pretrained('ernie-health-chinese',
-                                          num_classes=len(train_ds.label_list))
-    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
+    model = ElectraForSPO.from_pretrained("ernie-health-chinese", num_classes=len(train_ds.label_list))
+    tokenizer = ElectraTokenizer.from_pretrained("ernie-health-chinese")
 
-    trans_func = partial(convert_example_spo,
-                         tokenizer=tokenizer,
-                         num_classes=len(train_ds.label_list),
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(
+        convert_example_spo,
+        tokenizer=tokenizer,
+        num_classes=len(train_ds.label_list),
+        max_seq_length=args.max_seq_length,
+    )
 
     def batchify_fn(data):
-        _batchify_fn = lambda samples, fn=Dict({
-            'input_ids':
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'token_type_ids':
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'position_ids':
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),
-            'attention_mask':
-            Pad(axis=0, pad_val=0, dtype='float32'),
-        }): fn(samples)
-        ent_label = [x['ent_label'] for x in data]
-        spo_label = [x['spo_label'] for x in data]
+        _batchify_fn = lambda samples, fn=Dict(
+            {
+                "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+                "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+                "position_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
+                "attention_mask": Pad(axis=0, pad_val=0, dtype="float32"),
+            }
+        ): fn(samples)
+        ent_label = [x["ent_label"] for x in data]
+        spo_label = [x["spo_label"] for x in data]
         input_ids, token_type_ids, position_ids, masks = _batchify_fn(data)
         batch_size, batch_len = input_ids.shape
         num_classes = len(train_ds.label_list)
@@ -160,10 +153,8 @@ def do_train():
         #    [..., [0, ..., 1, ..., 0], ...], # for predicate '相关（导致）'
         #    ...]                             # the value at [23, 1, 10] is set as 1
         #
-        one_hot_ent_label = np.zeros([batch_size, batch_len, 2],
-                                     dtype=np.float32)
-        one_hot_spo_label = np.zeros(
-            [batch_size, num_classes, batch_len, batch_len], dtype=np.float32)
+        one_hot_ent_label = np.zeros([batch_size, batch_len, 2], dtype=np.float32)
+        one_hot_spo_label = np.zeros([batch_size, num_classes, batch_len, batch_len], dtype=np.float32)
         for idx, ent_idxs in enumerate(ent_label):
             # Shift index by 1 because input_ids start with [CLS] here.
             for x, y in ent_idxs:
@@ -184,51 +175,37 @@ def do_train():
         spo_label = [one_hot_spo_label, spo_label]
         return input_ids, token_type_ids, position_ids, masks, ent_label, spo_label
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.init_from_ckpt:
         if not os.path.isfile(args.init_from_ckpt):
-            raise ValueError('init_from_ckpt is not a valid model filename.')
+            raise ValueError("init_from_ckpt is not a valid model filename.")
         state_dict = paddle.load(args.init_from_ckpt)
-        state_keys = {
-            x: x.replace('discriminator.', '')
-            for x in state_dict.keys() if 'discriminator.' in x
-        }
+        state_keys = {x: x.replace("discriminator.", "") for x in state_dict.keys() if "discriminator." in x}
         if len(state_keys) > 0:
-            state_dict = {
-                state_keys[k]: state_dict[k]
-                for k in state_keys.keys()
-            }
+            state_dict = {state_keys[k]: state_dict[k] for k in state_keys.keys()}
         model.set_dict(state_dict)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.epochs
     args.epochs = (num_training_steps - 1) // len(train_data_loader) + 1
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ['bias', 'norm'])
-    ]
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     criterion = F.binary_cross_entropy_with_logits
 
@@ -248,18 +225,12 @@ def do_train():
             spo_mask = paddle.unsqueeze(spo_mask, axis=1)
 
             with paddle.amp.auto_cast(
-                    args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu'],
+                args.use_amp,
+                custom_white_list=["layer_norm", "softmax", "gelu"],
             ):
                 logits = model(input_ids, token_type_ids, position_ids)
-                ent_loss = criterion(logits[0],
-                                     ent_label[0],
-                                     weight=ent_mask,
-                                     reduction='sum')
-                spo_loss = criterion(logits[1],
-                                     spo_label[0],
-                                     weight=spo_mask,
-                                     reduction='sum')
+                ent_loss = criterion(logits[0], ent_label[0], weight=ent_mask, reduction="sum")
+                spo_loss = criterion(logits[1], spo_label[0], weight=spo_mask, reduction="sum")
 
                 loss = ent_loss + spo_loss
 
@@ -276,16 +247,17 @@ def do_train():
             if global_step % args.logging_steps == 0 and rank == 0:
                 time_diff = time.time() - tic_train
                 total_train_time += time_diff
-                print('global step %d, epoch: %d, batch: %d, loss: %.5f, '
-                      'ent_loss: %.5f, spo_loss: %.5f, speed: %.2f steps/s' %
-                      (global_step, epoch, step, loss, ent_loss, spo_loss,
-                       args.logging_steps / time_diff))
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, "
+                    "ent_loss: %.5f, spo_loss: %.5f, speed: %.2f steps/s"
+                    % (global_step, epoch, step, loss, ent_loss, spo_loss, args.logging_steps / time_diff)
+                )
 
             if global_step % args.valid_steps == 0 and rank == 0:
                 evaluate(model, criterion, metric, dev_data_loader)
 
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, 'model_%d' % global_step)
+                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 if paddle.distributed.get_world_size() > 1:
@@ -299,7 +271,7 @@ def do_train():
             tic_train = time.time()
 
     if rank == 0 and total_train_time > 0:
-        print('Speed: %.2f steps/s' % (global_step / total_train_time))
+        print("Speed: %.2f steps/s" % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

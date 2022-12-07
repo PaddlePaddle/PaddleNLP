@@ -60,13 +60,11 @@ class FileTypeClassifier(BaseComponent):
 
         for path in file_paths:
             if path.suffix != extension:
-                raise ValueError(
-                    f"Multiple file types are not allowed at once.")
+                raise ValueError(f"Multiple file types are not allowed at once.")
 
         return extension.lstrip(".")
 
-    def run(self, file_paths: Union[Path, List[Path], str, List[str],
-                                    List[Union[Path, str]]]):  # type: ignore
+    def run(self, file_paths: Union[Path, List[Path], str, List[str], List[Union[Path, str]]]):  # type: ignore
         """
         Sends out files on a different output edge depending on their extension.
 
@@ -86,5 +84,6 @@ class FileTypeClassifier(BaseComponent):
                 f"Files of type '{extension}' are not supported. "
                 f"The supported types are: {self.supported_types}. "
                 "Consider using the 'supported_types' parameter to "
-                "change the types accepted by this node.")
+                "change the types accepted by this node."
+            )
         return output, f"output_{index}"
