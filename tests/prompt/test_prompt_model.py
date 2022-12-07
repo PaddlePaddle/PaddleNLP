@@ -80,7 +80,7 @@ class TestPromptModel(unittest.TestCase):
         self.assertTrue(logits.shape[1], len(self.label_words))
         self.assertTrue(hidden_states.shape[0], len(examples))
 
-        model_outputs = self.prompt_model(**self.data_collator(encoded_examples), return_dict=True)
+        model_outputs = prompt_model(**self.data_collator(encoded_examples), return_dict=True)
         self.assertIsNone(model_outputs.loss)
         self.assertTrue(model_outputs.logits.shape[0], len(examples))
         self.assertTrue(model_outputs.logits.shape[1], len(self.label_words))
