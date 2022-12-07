@@ -253,6 +253,7 @@ class PretrainedModel(Layer, GenerationMixin):
     config_class: Optional[PretrainedConfig] = None
 
     # map hf attribute to paddle attribute, only work for no PretrainedConfig models
+    # { "standard_field": "paddle_field", ... }
     standard_config_map: Dict[str, str] = {}
 
     # a list of `re` patterns of `state_dict` keys that should be removed from the list of missing
