@@ -203,6 +203,14 @@ def create_infer_loader(args):
 
         from datasets import load_dataset
 
+        if len(data_files) > 0:
+            for split in data_files:
+                if isinstance(data_files[split], (list, tuple)):
+                    for i, path in enumerate(data_files[split]):
+                        data_files[split][i] = os.path.abspath(data_files[split][i])
+                else:
+                    data_files[split] = os.path.abspath(data_files[split])
+
         dataset = load_dataset("language_pair", data_files=data_files, split=("test"))
 
         if args.src_vocab is not None:
