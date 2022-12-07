@@ -154,11 +154,11 @@ Relation XML模板：
     - Step 3. 添加对应关系类型标签
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206095001-8293a1d2-0e1d-400a-aa0c-07712601581b.png height=360 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/206149014-8669cfed-997d-4ba7-8ab9-a6785256fa81.png height=360 width=1000 />
         </div>
 
         <div align="center">
-            <img src=https://user-images.githubusercontent.com/40840292/206095186-ff9c19a5-3acd-4455-a5e6-f979f9fff844.png height=360 width=1000 />
+            <img src=https://user-images.githubusercontent.com/40840292/206149177-096cc76c-105c-4d8a-aafb-b99a5f4ff1a0.png height=360 width=1000 />
         </div>
 
     - Step 4. 完成标注
