@@ -77,6 +77,8 @@
 **调研阶段**
 
 - 该阶段目标需求开放且缺少数据积累。我们提供Taskflow三行代码极简调用的方式，无需标注数据即可在业务场景上快速验证效果。
+  - [文本抽取 Taskflow使用指南](./taskflow_text.md)
+  - [文档抽取 Taskflow使用指南](./taskflow_doc.md)
 
 **数据准备阶段**
 
@@ -84,11 +86,11 @@
   - [文本抽取标注指南](./label_studio_text.md)
   - [文档抽取标注指南](./label_studio_doc.md)。
 
-**模型微调及蒸馏**
+**模型微调及封闭域蒸馏**
 
 - 基于UIE优秀的小样本微调能力，实现低成本模型定制适配。同时提供封闭域蒸馏的加速方案，解决抽取速度慢的问题。
-  - [文本抽取微调示例](./text/README.md)
-  - [文档抽取微调示例](./document/README.md)
+  - [文本信息抽取全流程示例](./text/README.md)
+  - [文档信息抽取全流程示例](./document/README.md)
 
 **模型部署**
 
@@ -134,7 +136,9 @@
 
 ### 3.1 Taskflow开箱即用
 
-- 通过Taskflow实现开箱即用 👉 [纯文本抽取 Taskflow使用指南](./taskflow_text.md) 及 [文档抽取 Taskflow使用指南](./taskflow_doc.md)
+- 通过Taskflow实现开箱即用
+  👉 [文本抽取 Taskflow使用指南](./taskflow_text.md)
+  👉 [文档抽取 Taskflow使用指南](./taskflow_doc.md)
 
 <a name="32"></a>
 

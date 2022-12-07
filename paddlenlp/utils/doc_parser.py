@@ -294,7 +294,7 @@ class DocParser(object):
 
     @classmethod
     def write_image_with_results(
-        self, image, layout=None, results=None, save_path=None, return_image=False, format=None, max_size=None
+        self, image, layout=None, result=None, save_path=None, return_image=False, format=None, max_size=None
     ):
         """
         write image with boxes and results
@@ -383,9 +383,9 @@ class DocParser(object):
                         break
                 draw_render.polygon(box, fill=color)
 
-        elif results:
-            results = _flatten_results(results)
-            _write_results(results, color=None, root=True)
+        elif result:
+            flatten_results = _flatten_results(result)
+            _write_results(flatten_results, color=None, root=True)
 
         img_render = Image.blend(_image, img_render, 0.3)
         img_show = Image.new("RGB", (w, h), (255, 255, 255))

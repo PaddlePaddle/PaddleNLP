@@ -271,7 +271,7 @@ pprint(results)
 # 结果可视化
 DocParser.write_image_with_results(
     doc_path,
-    results=results[0],
+    result=results[0],
     save_path="./image_show.png")
 ```
 
