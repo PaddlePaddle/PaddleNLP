@@ -26,6 +26,7 @@ from collections import OrderedDict
 from typing import Optional
 
 import requests
+from huggingface_hub.file_download import hf_hub_download
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
 from .file_lock import FileLock
@@ -463,3 +464,21 @@ def url_file_exists(url: str) -> bool:
 
     result = requests.head(url)
     return result.status_code == requests.codes.ok
+
+
+def hf_file_exists(repo_id: str, filename: str, cache_dir: Optional[str] = None) -> bool:
+    """check if the target file exist in repo
+    Args:
+        repo_id (str): the repo nam
+        filename (str): the file name hf repo
+        cache_dir (Optional[str], optional): the cache dir. Defaults to None.
+    Returns:
+        bool: whether the `filename` exists in repo
+    """
+    from huggingface_hub.utils._errors import EntryNotFoundError
+
+    try:
+        hf_hub_download(repo_id=repo_id, filename=filename, cache_dir=cache_dir)
+        return True
+    except EntryNotFoundError:
+        return False
