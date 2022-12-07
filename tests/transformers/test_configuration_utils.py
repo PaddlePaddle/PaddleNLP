@@ -21,6 +21,7 @@ from typing import Dict, Optional
 from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils import CONFIG_NAME
 from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 
 
@@ -163,7 +164,7 @@ class StandardConfigMappingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             config.save_pretrained(tempdir)
 
-            self.assertTrue(os.path.exists(os.path.join(tempdir, "config.json")))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, CONFIG_NAME)))
 
             loaded_config = BertConfig.from_pretrained(tempdir)
             self.assertEqual(loaded_config.hidden_size, 32)
@@ -178,7 +179,7 @@ class StandardConfigMappingTest(unittest.TestCase):
             config.save_pretrained(tempdir)
 
             # rename `config.json` -> `model_config.json`
-            shutil.move(os.path.join(tempdir, "config.json"), os.path.join(tempdir, LEGACY_CONFIG_NAME))
+            shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
 
             FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
 
