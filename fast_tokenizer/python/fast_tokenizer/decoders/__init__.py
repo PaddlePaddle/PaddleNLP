@@ -19,12 +19,10 @@ from .. import C
 
 
 class Decoder(ABC):
-
     def decode(self, tokens: List[str]):
         return self._decoder.decode(tokens)
 
 
 class WordPiece(Decoder):
-
     def __init__(self, prefix: str = "##", cleanup: bool = True):
         self._decoder = C.decoders.WordPiece(prefix, cleanup)

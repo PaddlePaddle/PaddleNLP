@@ -25,19 +25,18 @@ __all__ = ["ErnieSageForLinkPrediction"]
 
 
 class ErnieSageForLinkPrediction(ErniePretrainedModel):
-    """ErnieSage for link prediction task.
-    """
+    """ErnieSage for link prediction task."""
 
     def __init__(self, ernie, config):
-        """ Model which Based on the PaddleNLP PretrainedModel
+        """Model which Based on the PaddleNLP PretrainedModel
 
-        Note: 
+        Note:
             1. the ernie must be the first argument.
             2. must set self.XX = ernie to load weights.
             3. the self.config keyword is taken by PretrainedModel class.
 
         Args:
-            ernie (nn.Layer): the submodule layer of ernie model. 
+            ernie (nn.Layer): the submodule layer of ernie model.
             config (Dict): the config file
         """
         super(ErnieSageForLinkPrediction, self).__init__()
@@ -58,8 +57,7 @@ class ErnieSageForLinkPrediction(ErniePretrainedModel):
         """
         term_ids, user_index, pos_item_index, neg_item_index, user_real_index, pos_item_real_index = data
         # encoder model
-        outputs = self.encoder(graphs, term_ids,
-                               [user_index, pos_item_index, neg_item_index])
+        outputs = self.encoder(graphs, term_ids, [user_index, pos_item_index, neg_item_index])
         user_feat, pos_item_feat, neg_item_feat = outputs
 
         # calc loss
@@ -67,8 +65,7 @@ class ErnieSageForLinkPrediction(ErniePretrainedModel):
             neg_item_feat = pos_item_feat
 
         pos = paddle.sum(user_feat * pos_item_feat, -1, keepdim=True)  # [B, 1]
-        neg = paddle.matmul(user_feat, neg_item_feat,
-                            transpose_y=True)  # [B, B]
+        neg = paddle.matmul(user_feat, neg_item_feat, transpose_y=True)  # [B, B]
         loss = self.loss_func(pos, neg)
         # return loss, outputs
         return loss, outputs + [user_real_index, pos_item_real_index]

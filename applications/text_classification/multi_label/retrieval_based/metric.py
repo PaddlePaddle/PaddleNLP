@@ -23,7 +23,7 @@ class MetricReport(Metric):
     F1 score for multi-label text classification task.
     """
 
-    def __init__(self, name='MetricReport', average='micro'):
+    def __init__(self, name="MetricReport", average="micro"):
         super(MetricReport, self).__init__()
         self.average = average
         self._name = name
@@ -42,12 +42,8 @@ class MetricReport(Metric):
         """
         threshold = 0.5
         self.y_pred = y_prob > threshold
-        micro_f1_score = f1_score(y_pred=self.y_pred,
-                                  y_true=self.y_true,
-                                  average='micro')
-        macro_f1_score = f1_score(y_pred=self.y_pred,
-                                  y_true=self.y_true,
-                                  average='macro')
+        micro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="micro")
+        macro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="macro")
         return micro_f1_score, macro_f1_score
 
     def update(self, probs, labels):
@@ -75,8 +71,7 @@ class MetricReport(Metric):
         Returns classification report
         """
         self.y_pred = self.y_prob > 0.5
-        logger.info("classification report:\n" +
-                    classification_report(self.y_true, self.y_pred, digits=4))
+        logger.info("classification report:\n" + classification_report(self.y_true, self.y_pred, digits=4))
 
     def name(self):
         """

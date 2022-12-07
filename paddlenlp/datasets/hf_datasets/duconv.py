@@ -56,20 +56,16 @@ class Duconv(datasets.GeneratorBasedBuilder):
     def _info(self):
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
-            features=datasets.Features({
-                "id":
-                datasets.Value("string"),
-                "goal":
-                datasets.Sequence(datasets.Sequence(datasets.Value("string"))),
-                "knowledge":
-                datasets.Sequence(datasets.Sequence(datasets.Value("string"))),
-                "conversation":
-                datasets.Sequence(datasets.Value("string")),
-                "history":
-                datasets.Sequence(datasets.Value("string")),
-                "response":
-                datasets.Value("string"),
-            }),
+            features=datasets.Features(
+                {
+                    "id": datasets.Value("string"),
+                    "goal": datasets.Sequence(datasets.Sequence(datasets.Value("string"))),
+                    "knowledge": datasets.Sequence(datasets.Sequence(datasets.Value("string"))),
+                    "conversation": datasets.Sequence(datasets.Value("string")),
+                    "history": datasets.Sequence(datasets.Value("string")),
+                    "response": datasets.Value("string"),
+                }
+            ),
             # No default supervised_keys (as we have to pass both question
             # and context as input).
             supervised_keys=None,
@@ -80,49 +76,45 @@ class Duconv(datasets.GeneratorBasedBuilder):
         dl_dir = dl_manager.download_and_extract(_URL)
 
         return [
-            datasets.SplitGenerator(name="train",
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir, 'DuConv',
-                                                     'train.txt'),
-                                    }),
-            datasets.SplitGenerator(name="dev",
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir, 'DuConv',
-                                                     'dev.txt'),
-                                    }),
-            datasets.SplitGenerator(name="test_1",
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir, 'DuConv',
-                                                     'test_1.txt'),
-                                    }),
-            datasets.SplitGenerator(name="test_2",
-                                    gen_kwargs={
-                                        "filepath":
-                                        os.path.join(dl_dir, 'DuConv',
-                                                     'test_2.txt'),
-                                    }),
+            datasets.SplitGenerator(
+                name="train",
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, "DuConv", "train.txt"),
+                },
+            ),
+            datasets.SplitGenerator(
+                name="dev",
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, "DuConv", "dev.txt"),
+                },
+            ),
+            datasets.SplitGenerator(
+                name="test_1",
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, "DuConv", "test_1.txt"),
+                },
+            ),
+            datasets.SplitGenerator(
+                name="test_2",
+                gen_kwargs={
+                    "filepath": os.path.join(dl_dir, "DuConv", "test_2.txt"),
+                },
+            ),
         ]
 
     def _generate_examples(self, filepath):
         """This function returns the examples in the raw (text) form."""
         logger.info("generating examples from = %s", filepath)
         key = 0
-        with open(filepath, 'r', encoding="utf-8") as fin:
+        with open(filepath, "r", encoding="utf-8") as fin:
             for line in fin:
                 duconv = json.loads(line)
 
                 goal = duconv["goal"] if "goal" in duconv.keys() else [[]]
-                knowledge = duconv["knowledge"] if "knowledge" in duconv.keys(
-                ) else [[]]
-                conversation = duconv[
-                    "conversation"] if "conversation" in duconv.keys() else []
-                history = duconv["history"] if "history" in duconv.keys(
-                ) else []
-                response = duconv["response"] if "response" in duconv.keys(
-                ) else ""
+                knowledge = duconv["knowledge"] if "knowledge" in duconv.keys() else [[]]
+                conversation = duconv["conversation"] if "conversation" in duconv.keys() else []
+                history = duconv["history"] if "history" in duconv.keys() else []
+                response = duconv["response"] if "response" in duconv.keys() else ""
 
                 yield key, {
                     "id": str(key),

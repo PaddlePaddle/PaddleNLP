@@ -32,10 +32,7 @@ def post_process_seq(seq, bos_idx, eos_idx, output_bos=False, output_eos=False):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1]
-        if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if (output_bos or idx != bos_idx) and (output_eos or idx != eos_idx)]
     return seq
 
 
@@ -50,29 +47,30 @@ def do_predict(args):
     trg_idx2word = vocab.idx_to_token
 
     model = paddle.Model(
-        Seq2SeqAttnInferModel(vocab_size,
-                              args.hidden_size,
-                              args.hidden_size,
-                              args.num_layers,
-                              bos_id=bos_id,
-                              eos_id=eos_id,
-                              beam_size=args.beam_size,
-                              max_out_len=256))
+        Seq2SeqAttnInferModel(
+            vocab_size,
+            args.hidden_size,
+            args.hidden_size,
+            args.num_layers,
+            bos_id=bos_id,
+            eos_id=eos_id,
+            beam_size=args.beam_size,
+            max_out_len=256,
+        )
+    )
 
     model.prepare()
 
     # Load the trained model
-    assert args.init_from_ckpt, (
-        "Please set reload_model to load the infer model.")
+    assert args.init_from_ckpt, "Please set reload_model to load the infer model."
     model.load(args.init_from_ckpt)
 
     # TODO(guosheng): use model.predict when support variant length
-    with io.open(args.infer_output_file, 'w', encoding='utf-8') as f:
+    with io.open(args.infer_output_file, "w", encoding="utf-8") as f:
         for data in test_loader():
             inputs = data[:2]
             finished_seq = model.predict_batch(inputs=list(inputs))[0]
-            finished_seq = finished_seq[:, :, np.newaxis] if len(
-                finished_seq.shape) == 2 else finished_seq
+            finished_seq = finished_seq[:, :, np.newaxis] if len(finished_seq.shape) == 2 else finished_seq
             finished_seq = np.transpose(finished_seq, [0, 2, 1])
             for ins in finished_seq:
                 for beam_idx, beam in enumerate(ins):

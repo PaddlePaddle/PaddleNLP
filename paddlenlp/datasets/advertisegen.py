@@ -21,34 +21,35 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['AdvertiseGen']
+__all__ = ["AdvertiseGen"]
 
 
 class AdvertiseGen(DatasetBuilder):
-    '''
+    """
     This dataset contains 119K pairs of product specifications and the
-    corresponding advertising text. For more information, please refer 
+    corresponding advertising text. For more information, please refer
     to `https://arxiv.org/abs/1908.06605v2`.
-    '''
+    """
 
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5', 'URL'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5", "URL"))
     SPLITS = {
-        'train':
-        META_INFO(
-            os.path.join('train.json'), 'c0cc79f912099faa6175d28d3ddafafe',
-            'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/train.json'),
-        'dev':
-        META_INFO(
-            os.path.join('dev.json'), '5fda84828628a9722da5436485601df3',
-            'https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/dev.json')
+        "train": META_INFO(
+            os.path.join("train.json"),
+            "c0cc79f912099faa6175d28d3ddafafe",
+            "https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/train.json",
+        ),
+        "dev": META_INFO(
+            os.path.join("dev.json"),
+            "5fda84828628a9722da5436485601df3",
+            "https://bj.bcebos.com/paddlenlp/datasets/AdvertiseGen/dev.json",
+        ),
     }
 
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash, URL = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(URL, default_root)
 
         return fullname
@@ -62,9 +63,5 @@ class AdvertiseGen(DatasetBuilder):
                     continue
                 json_data = json.loads(line)
 
-                yield {
-                    'source': json_data["content"],
-                    'target': json_data.get("summary", ''),
-                    'id': data_id
-                }
+                yield {"source": json_data["content"], "target": json_data.get("summary", ""), "id": data_id}
                 data_id += 1

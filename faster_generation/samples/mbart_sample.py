@@ -28,9 +28,7 @@ def postprocess_response(seq, bos_idx, eos_idx):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1] if idx != bos_idx and idx != eos_idx
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if idx != bos_idx and idx != eos_idx]
     res = tokenizer.convert_ids_to_string(seq)
     return res
 
@@ -40,14 +38,16 @@ eos_id = model.mbart.config["eos_token_id"]
 
 inputs = "PaddleNLP is a powerful NLP library with Awesome pre-trained models and easy-to-use interface, supporting wide-range of NLP tasks from research to industrial applications."
 input_ids = tokenizer(inputs)["input_ids"]
-input_ids = paddle.to_tensor(input_ids, dtype='int32').unsqueeze(0)
+input_ids = paddle.to_tensor(input_ids, dtype="int32").unsqueeze(0)
 
-outputs, _ = model.generate(input_ids=input_ids,
-                            forced_bos_token_id=bos_id,
-                            decode_strategy="beam_search",
-                            num_beams=4,
-                            max_length=50,
-                            use_faster=True)
+outputs, _ = model.generate(
+    input_ids=input_ids,
+    forced_bos_token_id=bos_id,
+    decode_strategy="beam_search",
+    num_beams=4,
+    max_length=50,
+    use_faster=True,
+)
 
 result = postprocess_response(outputs[0].numpy().tolist(), bos_id, eos_id)
 

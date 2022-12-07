@@ -38,21 +38,47 @@ args = parser.parse_args()
 # yapf: enable
 
 LABEL_LIST = {
-    'cmeee': [[
-        'B-bod', 'I-bod', 'E-bod', 'S-bod', 'B-dis', 'I-dis', 'E-dis', 'S-dis',
-        'B-pro', 'I-pro', 'E-pro', 'S-pro', 'B-dru', 'I-dru', 'E-dru', 'S-dru',
-        'B-ite', 'I-ite', 'E-ite', 'S-ite', 'B-mic', 'I-mic', 'E-mic', 'S-mic',
-        'B-equ', 'I-equ', 'E-equ', 'S-equ', 'B-dep', 'I-dep', 'E-dep', 'S-dep',
-        'O'
-    ], ['B-sym', 'I-sym', 'E-sym', 'S-sym', 'O']]
-}
-
-TEXT = {
-    'cmeee': [
-        "研究证实，细胞减少与肺内病变程度及肺内炎性病变吸收程度密切相关。",
-        "可为不规则发热、稽留热或弛张热，但以不规则发热为多，可能与患儿应用退热药物导致热型不规律有关。"
+    "cmeee": [
+        [
+            "B-bod",
+            "I-bod",
+            "E-bod",
+            "S-bod",
+            "B-dis",
+            "I-dis",
+            "E-dis",
+            "S-dis",
+            "B-pro",
+            "I-pro",
+            "E-pro",
+            "S-pro",
+            "B-dru",
+            "I-dru",
+            "E-dru",
+            "S-dru",
+            "B-ite",
+            "I-ite",
+            "E-ite",
+            "S-ite",
+            "B-mic",
+            "I-mic",
+            "E-mic",
+            "S-mic",
+            "B-equ",
+            "I-equ",
+            "E-equ",
+            "S-equ",
+            "B-dep",
+            "I-dep",
+            "E-dep",
+            "S-dep",
+            "O",
+        ],
+        ["B-sym", "I-sym", "E-sym", "S-sym", "O"],
     ]
 }
+
+TEXT = {"cmeee": ["研究证实，细胞减少与肺内病变程度及肺内炎性病变吸收程度密切相关。", "可为不规则发热、稽留热或弛张热，但以不规则发热为多，可能与患儿应用退热药物导致热型不规律有关。"]}
 
 if __name__ == "__main__":
     for arg_name, arg_value in vars(args).items():
@@ -61,7 +87,7 @@ if __name__ == "__main__":
     dataset = args.dataset.lower()
     label_list = LABEL_LIST[dataset]
     if args.data_file is not None:
-        with open(args.data_file, 'r') as fp:
+        with open(args.data_file, "r") as fp:
             input_data = [x.strip() for x in fp.readlines()]
     else:
         input_data = TEXT[dataset]

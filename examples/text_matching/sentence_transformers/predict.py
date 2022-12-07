@@ -40,9 +40,9 @@ args = parser.parse_args()
 def convert_example(example, tokenizer, max_seq_length=512):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
+    by concatenating and adding special tokens. And creates a mask from the two sequences passed
     to be used in a sequence-pair classification task.
-        
+
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``
@@ -58,9 +58,9 @@ def convert_example(example, tokenizer, max_seq_length=512):
 
     Args:
         example(obj:`list[str]`): List of input data, containing query, title and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
 
     Returns:
@@ -91,7 +91,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         model (obj:`paddle.nn.Layer`): A model to classify texts.
         data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
             A Example object contains `text`(word_ids) and `se_len`(sequence length).
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         label_map(obj:`dict`): The label id (key) to label str (value) map.
         batch_size(obj:`int`, defaults to 1): The number of batch.
@@ -102,15 +102,12 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     examples = []
     for text_pair in data:
         query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = convert_example(
-            text_pair, tokenizer, max_seq_length=args.max_seq_length)
-        examples.append((query_input_ids, query_token_type_ids, title_input_ids,
-                         title_token_type_ids))
+            text_pair, tokenizer, max_seq_length=args.max_seq_length
+        )
+        examples.append((query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids))
 
     # Seperates data into some batches.
-    batches = [
-        examples[idx:idx + batch_size]
-        for idx in range(0, len(examples), batch_size)
-    ]
+    batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
@@ -121,18 +118,19 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     results = []
     model.eval()
     for batch in batches:
-        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batchify_fn(
-            batch)
+        query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batchify_fn(batch)
 
         query_input_ids = paddle.to_tensor(query_input_ids)
         query_token_type_ids = paddle.to_tensor(query_token_type_ids)
         title_input_ids = paddle.to_tensor(title_input_ids)
         title_token_type_ids = paddle.to_tensor(title_token_type_ids)
 
-        probs = model(query_input_ids,
-                      title_input_ids,
-                      query_token_type_ids=query_token_type_ids,
-                      title_token_type_ids=title_token_type_ids)
+        probs = model(
+            query_input_ids,
+            title_input_ids,
+            query_token_type_ids=query_token_type_ids,
+            title_token_type_ids=title_token_type_ids,
+        )
         idx = paddle.argmax(probs, axis=1).numpy()
         idx = idx.tolist()
         labels = [label_map[i] for i in idx]
@@ -144,14 +142,14 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # ErnieTinyTokenizer is special for ernie-tiny pretained model.
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
     data = [
-        ['世界上什么东西最小', '世界上什么东西最小？'],
-        ['光眼睛大就好看吗', '眼睛好看吗？'],
-        ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的'],
+        ["世界上什么东西最小", "世界上什么东西最小？"],
+        ["光眼睛大就好看吗", "眼睛好看吗？"],
+        ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"],
     ]
-    label_map = {0: 'dissimilar', 1: 'similar'}
+    label_map = {0: "dissimilar", 1: "similar"}
 
     pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
     model = SentenceTransformer(pretrained_model)
@@ -161,10 +159,6 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = predict(model,
-                      data,
-                      tokenizer,
-                      label_map,
-                      batch_size=args.batch_size)
+    results = predict(model, data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
-        print('Data: {} \t Lable: {}'.format(text, results[idx]))
+        print("Data: {} \t Lable: {}".format(text, results[idx]))

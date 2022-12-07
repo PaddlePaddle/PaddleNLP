@@ -31,9 +31,7 @@ from metric import get_eval
 
 @paddle.no_grad()
 def evaluate(uie, dataloader, task_type="relation_extraction"):
-    all_preds = ([], []) if task_type in [
-        "opinion_extraction", "relation_extraction", "event_extraction"
-    ] else []
+    all_preds = ([], []) if task_type in ["opinion_extraction", "relation_extraction", "event_extraction"] else []
 
     infer_results = []
     all_texts = []
@@ -46,10 +44,10 @@ def evaluate(uie, dataloader, task_type="relation_extraction"):
 
     for res in infer_results:
         if task_type == "entity_extraction":
-            all_preds.append(res['entity_list'])
+            all_preds.append(res["entity_list"])
         else:
-            all_preds[0].append(res['entity_list'])
-            all_preds[1].append(res['spo_list'])
+            all_preds[0].append(res["entity_list"])
+            all_preds[1].append(res["spo_list"])
 
     eval_results = get_eval(all_preds, dataloader.dataset.raw_data, task_type)
     return eval_results
@@ -57,10 +55,7 @@ def evaluate(uie, dataloader, task_type="relation_extraction"):
 
 def do_eval():
     # Load trained UIE model
-    uie = Taskflow("information_extraction",
-                   schema=args.schema,
-                   batch_size=args.batch_size,
-                   task_path=args.model_path)
+    uie = Taskflow("information_extraction", schema=args.schema, batch_size=args.batch_size, task_path=args.model_path)
 
     label_maps = get_label_maps(args.task_type, args.label_maps_path)
 
@@ -68,13 +63,15 @@ def do_eval():
 
     test_ds = load_dataset(reader, data_path=args.test_path, lazy=False)
 
-    test_dataloader = create_dataloader(test_ds,
-                                        tokenizer,
-                                        max_seq_len=args.max_seq_len,
-                                        batch_size=args.batch_size,
-                                        label_maps=label_maps,
-                                        mode="test",
-                                        task_type=args.task_type)
+    test_dataloader = create_dataloader(
+        test_ds,
+        tokenizer,
+        max_seq_len=args.max_seq_len,
+        batch_size=args.batch_size,
+        label_maps=label_maps,
+        mode="test",
+        task_type=args.task_type,
+    )
 
     eval_result = evaluate(uie, test_dataloader, task_type=args.task_type)
     logger.info("Evaluation precision: " + str(eval_result))
