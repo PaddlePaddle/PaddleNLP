@@ -195,7 +195,7 @@ layout = [
 ie({"doc": doc_path, 'layout': layout})
 ```
 
-- OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能（``layout_analysis=True``）以优化文字排序并增强抽取效果。
+- OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能``layout_analysis=True``以优化文字排序并增强抽取效果。以下例子仅举例版面分析功能的使用场景，实际场景一般需要标注微调。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206137978-3a69e7e2-dc2e-4d11-98b7-25911b0375a0.png height=350 width=600 hspace='10'/>
