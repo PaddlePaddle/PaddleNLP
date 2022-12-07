@@ -28,20 +28,30 @@ class JointErnie(ErniePretrainedModel):
         self.ernie = ernie  # allow ernie to be config
         self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie.config["hidden_dropout_prob"])
 
-        self.intent_classifier = nn.Linear(self.ernie.config["hidden_size"], self.intent_num_labels)
-        self.slot_classifier = nn.Linear(self.ernie.config["hidden_size"], self.slot_num_labels)
+        self.intent_classifier = nn.Linear(
+            self.ernie.config["hidden_size"],
+            self.intent_num_labels,
+            weight_attr=nn.initializer.KaimingNormal(),
+            bias_attr=nn.initializer.KaimingNormal(),
+        )
+        self.slot_classifier = nn.Linear(
+            self.ernie.config["hidden_size"],
+            self.slot_num_labels,
+            weight_attr=nn.initializer.KaimingNormal(),
+            bias_attr=nn.initializer.KaimingNormal(),
+        )
 
-        self.intent_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
-        self.slot_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
+        # self.intent_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
+        # self.slot_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
 
         self.apply(self.init_weights)
 
-    def forward(self, words_ids, token_type_ids=None, position_ids=None, attention_mask=None):
+    def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         sequence_output, pooled_output = self.ernie(
-            words_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
+            input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
-        sequence_output = nn.functional.relu(self.slot_hidden(self.dropout(sequence_output)))
-        pooled_output = nn.functional.relu(self.intent_hidden(self.dropout(pooled_output)))
+        # sequence_output = nn.functional.relu(self.slot_hidden(self.dropout(sequence_output)))
+        # pooled_output = nn.functional.relu(self.intent_hidden(self.dropout(pooled_output)))
 
         sequence_output = self.dropout(sequence_output)
         slot_logits = self.slot_classifier(sequence_output)
@@ -49,20 +59,28 @@ class JointErnie(ErniePretrainedModel):
         pooled_output = self.dropout(pooled_output)
         intent_logits = self.intent_classifier(pooled_output)
 
+        if paddle.in_dynamic_mode():
+            padding_mask = input_ids == 0
+            padding_mask |= (input_ids == 2) | (input_ids == 1)
+            padding_mask = padding_mask.astype(paddle.int32)
+            return intent_logits, slot_logits, padding_mask
+
         return intent_logits, slot_logits
 
 
 class NLULoss(Layer):
-    def __init__(self, pos_weight):
+    def __init__(self, ignore_index=0):
         super(NLULoss, self).__init__()
+        self.intent_loss_fct = paddle.nn.CrossEntropyLoss()
+        self.slot_loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignore_index)
 
-        self.intent_loss_fn = paddle.nn.BCEWithLogitsLoss(pos_weight=paddle.to_tensor(pos_weight))
-        self.slot_loss_fct = paddle.nn.CrossEntropyLoss()
-
-    def forward(self, logits, slot_labels, intent_labels):
-        slot_logits, intent_logits = logits
-
-        slot_loss = self.slot_loss_fct(slot_logits, slot_labels)
-        intent_loss = self.intent_loss_fn(intent_logits, intent_labels)
-
+    def forward(self, logits, labels):
+        intent_label, slot_label = labels
+        (
+            intent_logits,
+            slot_logits,
+            _,
+        ) = logits
+        intent_loss = self.intent_loss_fct(intent_logits, intent_label)
+        slot_loss = self.slot_loss_fct(slot_logits, slot_label)
         return slot_loss + intent_loss

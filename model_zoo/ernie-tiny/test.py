@@ -59,8 +59,8 @@ class ModelArguments:
     """
 
     model_name_or_path: Optional[str] = field(
-        default="ernie-3.0-tiny-medium-v2",
-        metadata={"help": "Path to pretrained model. Defaults to 'ernie-3.0-tiny-medium-v2'"},
+        default="ernie-3.0-tiny-nano-v2",
+        metadata={"help": "Path to pretrained model. Defaults to 'ernie-3.0-tiny-nano-v2'"},
     )
     dropout: float = field(default=0.1, metadata={"help": "Dropout rate for JointErnie. Defaults to 0.1."})
 
@@ -93,7 +93,7 @@ def main():
         query_list = [data["query"]]
         query_input_dict = input_preprocess(query_list, tokenizer, max_seq_length=16)
         input_ids = paddle.to_tensor(query_input_dict["input_ids"])
-        intent_logits_tensor, slot_logits_tensor = model(input_ids)
+        intent_logits_tensor, slot_logits_tensor, _ = model(input_ids)
 
         intent_logits = np.array(intent_logits_tensor)
         slot_logits = np.array(slot_logits_tensor)

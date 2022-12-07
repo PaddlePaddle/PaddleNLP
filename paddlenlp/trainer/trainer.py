@@ -1204,8 +1204,11 @@ class Trainer:
         """
         if self.criterion is not None and "labels" in inputs:
             labels = inputs.pop("labels")
-        elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
-            labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+        elif self.criterion is not None and self.label_names is not None:
+            labels = []
+            for label in self.label_names:
+                labels.append(inputs.pop(label))
+            labels = tuple(labels)
         elif self.criterion is not None and "generator_labels" in inputs:
             labels = inputs["generator_labels"]
         else:
