@@ -21,7 +21,7 @@
 
 ## 2. 文档信息抽取
 
-本章节主要介绍Taskflow的文档抽取功能，相关文档下载链接。
+本章节主要介绍Taskflow的文档抽取功能，以下示例图片[下载链接](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/cases.zip)。
 
 <a name="21"></a>
 
