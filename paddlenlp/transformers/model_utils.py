@@ -1187,7 +1187,7 @@ class PretrainedModel(Layer, GenerationMixin):
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path=pretrained_model_name_or_path, cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model

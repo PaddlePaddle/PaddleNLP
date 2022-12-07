@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import unittest
 from typing import Dict, Optional
 
+from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
 
@@ -132,3 +134,19 @@ class ConfigurationUtilsTest:
         assert config.get("a", None) == 10
         assert config.get("a", None) == config.a
         assert config.get("no_name", 0) == 0
+
+
+class StandardConfigMappingTest(unittest.TestCase):
+    def test_roformer_v2_config(self):
+        # create new fake-roformerv2 class to prevent
+        class FakeBertConfig(BertConfig):
+            pass
+
+        config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
+        hidden_size = config.hidden_size
+
+        FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+        loaded_config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
+        fake_field = loaded_config.fake_field
+        assert fake_field == hidden_size
