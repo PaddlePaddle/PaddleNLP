@@ -273,6 +273,7 @@ python label_studio.py \
 - ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
+- ``schema_lang``：选择schema的语言，将会应该训练数据prompt的构造方式，可选有`ch`和`en`。默认为`ch`。
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度分类任务有效。默认为"##"。
 
 备注：

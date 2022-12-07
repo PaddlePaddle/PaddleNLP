@@ -69,7 +69,7 @@ label-studio start
     <img src=https://user-images.githubusercontent.com/40840292/199450930-4c0cd189-6085-465a-aca0-6ba6f52a0c0d.png height=600 width=1200 />
 </div>
 
-图中展示了实体类型标签的构建，其他类型标签的构建可参考[3.3标签构建](#33)
+图中展示了Span实体类型标签的构建，其他类型标签的构建可参考[2.3标签构建](#23)
 
 <a name="22"></a>
 
@@ -85,14 +85,14 @@ label-studio start
 
 #### 2.3 标签构建
 
-- Span类型标签
+- Span实体类型标签
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199456432-ce601ab0-7d6c-458f-ac46-8839dbc4d013.png height=500 width=1200 />
 </div>
 
 
-- Relation类型标签
+- Relation关系类型标签
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/199877621-f60e00c7-81ae-42e1-b498-8ebc5b5bd0fd.png height=650 width=1200 />
@@ -121,46 +121,78 @@ Relation XML模板：
 
 - 实体抽取
 
-标注示例：
+    - 标注示例：
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879427-82806ffc-dc60-4ec7-bda5-e16419ee9d15.png height=650 width=800 />
-</div>
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/199879427-82806ffc-dc60-4ec7-bda5-e16419ee9d15.png height=650 width=800 />
+        </div>
 
-该标注示例对应的schema为：
+    - 该标注示例对应的schema为：
 
-```text
-schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '开户行及账号', '金额', '税额', '价税合计', 'No', '税率']
-```
+        ```text
+        schema = ['开票日期', '名称', '纳税人识别号', '地址、电话', '开户行及账号', '金额', '税额', '价税合计', 'No', '税率']
+        ```
 
 - 关系抽取
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879032-88896a00-85ca-4bb0-a8e8-305a47bbaf78.png height=450 width=1000 />
-</div>
+    - Step 1. 标注主体（Subject）及客体（Object）
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206094033-e9b42ac3-2de7-4c83-ba9e-38709a7ffea4.png height=400 width=1000 />
+        </div>
+
+    - Step 2. 关系连线，箭头方向由主体（Subject）指向客体（Object）
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206094569-297d7f09-8f5b-4c1e-9e73-dc1f4e483e31.png height=450 width=1000 />
+        </div>
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206094780-8bd07f32-c066-4686-933b-429fd7f0f0f9.png height=400 width=1000 />
+        </div>
+
+    - Step 3. 添加对应关系类型标签
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206095001-8293a1d2-0e1d-400a-aa0c-07712601581b.png height=360 width=1000 />
+        </div>
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206095186-ff9c19a5-3acd-4455-a5e6-f979f9fff844.png height=360 width=1000 />
+        </div>
+
+    - Step 4. 完成标注
+
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/206095809-742e1ba4-1d5d-4a75-b75b-f9cb09ac7af7.png height=450 width=1000 />
+        </div>
 
 
-```text
-schema = {
-    '名称及规格': [
-        '金额',
-        '单位',
-        '数量'
-    ]
-}
-```
+    - 该标注示例对应的schema为：
+
+        ```text
+        schema = {
+            '名称及规格': [
+                '金额',
+                '单位',
+                '数量'
+            ]
+        }
+        ```
 
 - 文档分类
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199879238-b8b41d4a-7e77-47cd-8def-2fc8ba89442f.png height=650 width=800 />
-</div>
+    - 标注示例
 
-该标注示例对应的schema为：
+        <div align="center">
+            <img src=https://user-images.githubusercontent.com/40840292/199879238-b8b41d4a-7e77-47cd-8def-2fc8ba89442f.png height=650 width=800 />
+        </div>
 
-```text
-schema = '文档类别[发票，报关单]'
-```
+    - 该标注示例对应的schema为：
+
+        ```text
+        schema = '文档类别[发票，报关单]'
+        ```
 
 
 <a name="25"></a>
@@ -225,6 +257,8 @@ python label_studio.py \
 - ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 - ``separator``: 实体类别/评价维度与分类标签的分隔符，该参数只对实体/评价维度分类任务有效。默认为"##"。
+- ``schema_lang``：选择schema的语言，将会应该训练数据prompt的构造方式，可选有`ch`和`en`。默认为`ch`。
+- ``ocr_lang``：选择OCR的语言，可选有`ch`和`en`。默认为`ch`。
 - ``layout_analysis``：是否使用PPStructure对文档进行布局分析，该参数只对文档类型标注任务有效。默认为False。
 
 备注：

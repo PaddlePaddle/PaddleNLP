@@ -255,23 +255,35 @@ python evaluate.py \
 ```python
 from pprint import pprint
 from paddlenlp import Taskflow
+from paddlenlp.utils.doc_parser import DocParser
+
 schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
 my_ie = Taskflow("information_extraction", schema=schema, task_path='./checkpoint/model_best', precison='fp16')
 ```
 
-我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取：
+我们可以根据设置的`schema`，对指定的`doc_path`文档进行信息抽取并进行可视化：
 
 ```python
-doc_path = "./data/images/b201.jpg"
-pprint(my_ie({"doc": doc_path}))
+doc_path = "./data/images/b199.jpg"
+results = my_ie({"doc": doc_path})
+pprint(results)
+
+# 结果可视化
+DocParser.write_image_with_results(
+    doc_path,
+    results=results[0],
+    save_path="./image_show.png")
 ```
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=600 width=1000 />
+</div>
 
 <a name="实验指标"></a>
 
 ### 2.6 实验指标
 
 我们在自标注的增值税数据集上进行实验：
-
 
 
   |  |  Precision  | Recall | F1 Score |

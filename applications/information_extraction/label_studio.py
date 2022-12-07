@@ -13,17 +13,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
 import argparse
 import json
+import os
 import random
+import time
 from decimal import Decimal
 
 import numpy as np
 import paddle
-from paddlenlp.utils.log import logger
+
 from paddlenlp.utils.convertor import Convertor
+from paddlenlp.utils.log import logger
 
 
 def set_seed(seed):
@@ -46,13 +47,10 @@ def do_convert():
         raise ValueError("Only []/ len(splits)==3 accepted for splits.")
 
     def _check_sum(splits):
-        return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(
-            str(splits[2])) == Decimal("1")
+        return Decimal(str(splits[0])) + Decimal(str(splits[1])) + Decimal(str(splits[2])) == Decimal("1")
 
     if len(args.splits) == 3 and not _check_sum(args.splits):
-        raise ValueError(
-            "Please set correct splits, sum of elements in splits should be equal to 1."
-        )
+        raise ValueError("Please set correct splits, sum of elements in splits should be equal to 1.")
 
     with open(args.label_studio_file, "r", encoding="utf-8") as f:
         raw_examples = json.loads(f.read())
@@ -71,33 +69,30 @@ def do_convert():
     test_ids = index_list[p2:]
 
     with open(os.path.join(args.save_dir, "sample_index.json"), "w") as fp:
-        maps = {
-            "train_ids": train_ids,
-            "dev_ids": dev_ids,
-            "test_ids": test_ids
-        }
+        maps = {"train_ids": train_ids, "dev_ids": dev_ids, "test_ids": test_ids}
         fp.write(json.dumps(maps))
 
-    if raw_examples[0]['data'].get('image'):
+    if raw_examples[0]["data"].get("image"):
         anno_type = "image"
     else:
         anno_type = "text"
 
-    convertor = Convertor(args.label_studio_file,
-                          negative_ratio=args.negative_ratio,
-                          prompt_prefix=args.prompt_prefix,
-                          options=args.options,
-                          separator=args.separator,
-                          layout_analysis=args.layout_analysis,
-                          schema_lang=args.schema_lang,
-                          anno_type=anno_type)
+    convertor = Convertor(
+        args.label_studio_file,
+        negative_ratio=args.negative_ratio,
+        prompt_prefix=args.prompt_prefix,
+        options=args.options,
+        separator=args.separator,
+        layout_analysis=args.layout_analysis,
+        schema_lang=args.schema_lang,
+        ocr_lang=args.ocr_lang,
+        anno_type=anno_type,
+    )
 
     if args.task_type == "ext":
         train_examples = convertor.convert_ext_examples(raw_examples[:p1])
-        dev_examples = convertor.convert_ext_examples(raw_examples[p1:p2],
-                                                      is_train=False)
-        test_examples = convertor.convert_ext_examples(raw_examples[p2:],
-                                                       is_train=False)
+        dev_examples = convertor.convert_ext_examples(raw_examples[p1:p2], is_train=False)
+        test_examples = convertor.convert_ext_examples(raw_examples[p2:], is_train=False)
     else:
         train_examples = convertor.convert_cls_examples(raw_examples[:p1])
         dev_examples = convertor.convert_cls_examples(raw_examples[p1:p2])
@@ -116,7 +111,7 @@ def do_convert():
     _save_examples(args.save_dir, "dev.txt", dev_examples)
     _save_examples(args.save_dir, "test.txt", test_examples)
 
-    logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
+    logger.info("Finished! It takes %.2f seconds" % (time.time() - tic_time))
 
 
 if __name__ == "__main__":
@@ -135,6 +130,7 @@ if __name__ == "__main__":
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
     parser.add_argument("--separator", type=str, default='##', help="Used only for entity/aspect-level classification task, separator for entity label and classification label")
     parser.add_argument("--schema_lang", choices=["ch", "en"], default="ch", help="Select the language type for schema.")
+    parser.add_argument("--ocr_lang", choices=["ch", "en"], default="ch", help="Select the language type for OCR.")
 
     args = parser.parse_args()
     # yapf: enable

@@ -13,28 +13,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import math
+import os
 import random
+
 from tqdm import tqdm
 
-from .log import logger
 from .doc_parser import DocParser
+from .log import logger
 
 
 class Convertor(object):
     """Convertor to convert data export from annotation platform"""
 
-    def __init__(self,
-                 label_studio_file,
-                 negative_ratio=5,
-                 prompt_prefix="情感倾向",
-                 options=["正向", "负向"],
-                 separator="##",
-                 layout_analysis=False,
-                 expand_to_a4_size=True,
-                 schema_lang="ch",
-                 anno_type="text"):
+    def __init__(
+        self,
+        label_studio_file,
+        negative_ratio=5,
+        prompt_prefix="情感倾向",
+        options=["正向", "负向"],
+        separator="##",
+        layout_analysis=False,
+        expand_to_a4_size=True,
+        schema_lang="ch",
+        ocr_lang="en",
+        anno_type="text",
+    ):
         """Init Data Convertor"""
         self.negative_ratio = negative_ratio
         self.prompt_prefix = prompt_prefix
@@ -43,43 +47,42 @@ class Convertor(object):
         self.layout_analysis = layout_analysis
         self.expand_to_a4_size = expand_to_a4_size
         self.schema_lang = schema_lang
+        self.ocr_lang = ocr_lang
         self.anno_type = anno_type
         self.label_studio_file = label_studio_file
         self.ignore_list = ["属性值", "object"]
 
     def process_text_tag(self, line, task_type="ext"):
         items = {}
-        items['text'] = line['data']['text']
+        items["text"] = line["data"]["text"]
         if task_type == "ext":
-            items['entities'] = []
-            items['relations'] = []
-            result_list = line['annotations'][0]['result']
+            items["entities"] = []
+            items["relations"] = []
+            result_list = line["annotations"][0]["result"]
             for a in result_list:
-                if a['type'] == "labels":
-                    items['entities'].append({
-                        "id": a['id'],
-                        "start_offset": a['value']['start'],
-                        "end_offset": a['value']['end'],
-                        "label": a['value']['labels'][0]
-                    })
+                if a["type"] == "labels":
+                    items["entities"].append(
+                        {
+                            "id": a["id"],
+                            "start_offset": a["value"]["start"],
+                            "end_offset": a["value"]["end"],
+                            "label": a["value"]["labels"][0],
+                        }
+                    )
                 else:
-                    items['relations'].append({
-                        "id":
-                        a['from_id'] + "-" + a['to_id'],
-                        "from_id":
-                        a['from_id'],
-                        "to_id":
-                        a['to_id'],
-                        "type":
-                        a['labels'][0]
-                    })
+                    items["relations"].append(
+                        {
+                            "id": a["from_id"] + "-" + a["to_id"],
+                            "from_id": a["from_id"],
+                            "to_id": a["to_id"],
+                            "type": a["labels"][0],
+                        }
+                    )
         elif task_type == "cls":
-            items['label'] = line['annotations'][0]['result'][0]['value'][
-                'choices']
+            items["label"] = line["annotations"][0]["result"][0]["value"]["choices"]
         return items
 
     def process_image_tag(self, line, task_type="ext"):
-
         def _io1(box1, box2):
             """calc intersection over box1 area"""
             x1 = max(box1[0], box2[0])
@@ -99,21 +102,31 @@ class Convertor(object):
                 text_len = len(segment[1])
                 if text_len == 0:
                     continue
-                char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
-                for i in range(text_len):
-                    cbox = [
-                        sbox[0] + i * char_w, sbox[1],
-                        sbox[0] + (i + 1) * char_w, sbox[3]
-                    ]
-                    c_covered = _io1(cbox, box)
-                    if c_covered >= threshold:
-                        positions.append(global_offset)
-                    elif cbox[2] == min(cbox[2], box[2]) and cbox[0] == max(cbox[0], box[0]) \
-                            and cbox[1] < box[1] and cbox[3] > box[3]:
-                        # all covered on x-axis
-                        if c_covered > 0.5:
+                if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
+                    char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
+                    for i in range(text_len):
+                        cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
+                        c_covered = _io1(cbox, box)
+                        if c_covered >= threshold:
                             positions.append(global_offset)
-                    global_offset += 1
+                        elif (
+                            cbox[2] == min(cbox[2], box[2])
+                            and cbox[0] == max(cbox[0], box[0])
+                            and cbox[1] < box[1]
+                            and cbox[3] > box[3]
+                        ):
+                            if c_covered > threshold:
+                                positions.append(global_offset)
+                        global_offset += 1
+                else:
+                    cell_covered = _io1(sbox, box)
+                    if cell_covered >= threshold:
+                        for i in range(text_len):
+                            positions.append(global_offset)
+                            global_offset += 1
+                    else:
+                        global_offset += text_len
+
             offsets = []
             if not positions:
                 return offsets
@@ -126,83 +139,74 @@ class Convertor(object):
             return offsets
 
         items = {}
-        img_file = os.path.basename(line['data']['image'])
+        img_file = os.path.basename(line["data"]["image"])
         p = img_file.find("-")
-        img_file = img_file[p + 1:]
+        img_file = img_file[p + 1 :]
 
-        img_path = os.path.join(
-            "/".join(self.label_studio_file.split('/')[:-1]), "images",
-            img_file)
+        img_path = os.path.join("/".join(self.label_studio_file.split("/")[:-1]), "images", img_file)
         if not os.path.exists(img_path):
             logger.warning(
-                "Image file %s not exist in %s" %
-                (img_file,
-                 "/".join(self.label_studio_file.split('/')[:-1]) + "images"))
+                "Image file %s not exist in %s"
+                % (img_file, "/".join(self.label_studio_file.split("/")[:-1]) + "images")
+            )
             return None
         logger.info("Parsing image file %s ..." % (img_file))
-        doc_parser = DocParser(layout_analysis=self.layout_analysis)
+        doc_parser = DocParser(layout_analysis=self.layout_analysis, ocr_lang=self.ocr_lang)
 
-        parsed_doc = doc_parser.parse({'doc': img_path})
-        img_w, img_h = parsed_doc['img_w'], parsed_doc['img_h']
+        parsed_doc = doc_parser.parse({"doc": img_path})
+        img_w, img_h = parsed_doc["img_w"], parsed_doc["img_h"]
 
-        text = ''
+        text = ""
         bbox = []
-        for segment in parsed_doc['layout']:
-            box = doc_parser._normalize_box(segment[0], [img_w, img_h],
-                                            [1000, 1000])
+        for segment in parsed_doc["layout"]:
+            box = doc_parser._normalize_box(segment[0], [img_w, img_h], [1000, 1000])
             text += segment[1]
             bbox.extend([box] * len(segment[1]))
         assert len(text) == len(bbox), "len of text is not equal to len of bbox"
-        items['text'] = text
-        items['bbox'] = bbox
-        items['image'] = parsed_doc['image']
+        items["text"] = text
+        items["bbox"] = bbox
+        items["image"] = parsed_doc["image"]
         if task_type == "ext":
-            items['entities'] = []
-            items['relations'] = []
+            items["entities"] = []
+            items["relations"] = []
 
-            result_list = line['annotations'][0]['result']
+            result_list = line["annotations"][0]["result"]
             ent_ids = []
             for e in result_list:
-                if e['type'] != 'rectanglelabels':
+                if e["type"] != "rectanglelabels":
                     continue
-                assert img_w == e['original_width'] and img_h == e[
-                    'original_height'], "Image size not match"
+                assert img_w == e["original_width"] and img_h == e["original_height"], "Image size not match"
                 box = [
-                    e['value']['x'] * 0.01 * img_w,
-                    e['value']['y'] * 0.01 * img_h,
-                    (e['value']['x'] + e['value']['width']) * 0.01 * img_w,
-                    (e['value']['y'] + e['value']['height']) * 0.01 * img_h
+                    e["value"]["x"] * 0.01 * img_w,
+                    e["value"]["y"] * 0.01 * img_h,
+                    (e["value"]["x"] + e["value"]["width"]) * 0.01 * img_w,
+                    (e["value"]["y"] + e["value"]["height"]) * 0.01 * img_h,
                 ]
-                offsets = _find_segment_in_box(parsed_doc['layout'], box)
+                offsets = _find_segment_in_box(parsed_doc["layout"], box)
                 if len(offsets) > 0:
-                    items['entities'].append({
-                        'id':
-                        e['id'],
-                        'start_offset':
-                        offsets[0][0],
-                        'end_offset':
-                        offsets[0][1],
-                        'label':
-                        e['value']['rectanglelabels'][0]
-                    })
-                    ent_ids.append(e['id'])
+                    items["entities"].append(
+                        {
+                            "id": e["id"],
+                            "start_offset": offsets[0][0],
+                            "end_offset": offsets[0][1],
+                            "label": e["value"]["rectanglelabels"][0],
+                        }
+                    )
+                    ent_ids.append(e["id"])
             for r in result_list:
-                if r['type'] != 'relation':
+                if r["type"] != "relation":
                     continue
-                if r['from_id'] in ent_ids and r['to_id'] in ent_ids:
-                    items['relations'].append({
-                        'id':
-                        r['from_id'] + '-' + r['to_id'],
-                        'from_id':
-                        r['from_id'],
-                        'to_id':
-                        r['to_id'],
-                        'type':
-                        r['labels'][0]
-                    })
+                if r["from_id"] in ent_ids and r["to_id"] in ent_ids:
+                    items["relations"].append(
+                        {
+                            "id": r["from_id"] + "-" + r["to_id"],
+                            "from_id": r["from_id"],
+                            "to_id": r["to_id"],
+                            "type": r["labels"][0],
+                        }
+                    )
         else:
-            items['label'] = line['annotations'][0]['result'][0]['value'][
-                'choices']
+            items["label"] = line["annotations"][0]["result"][0]["value"]["choices"]
         return items
 
     def convert_cls_examples(self, raw_examples):
@@ -210,8 +214,8 @@ class Convertor(object):
         Convert labeled data for classification task.
         """
         examples = []
-        logger.info(f"Converting annotation data...")
-        with tqdm(total=len(raw_examples)) as pbar:
+        logger.info("Converting annotation data...")
+        with tqdm(total=len(raw_examples)):
             for line in raw_examples:
                 if self.anno_type == "text":
                     items = self.process_text_tag(line, task_type="cls")
@@ -220,14 +224,11 @@ class Convertor(object):
                     items = self.process_image_tag(line, task_type="cls")
                     if items is None:
                         continue
-                    image, bbox = items['image'], items['bbox']
+                    image, bbox = items["image"], items["bbox"]
                 else:
-                    raise ValueError(
-                        "The type of annotation should be text or image")
+                    raise ValueError("The type of annotation should be text or image")
                 text, labels = items["text"], items["label"]
-                example = self.generate_cls_example(text, labels,
-                                                    self.prompt_prefix,
-                                                    self.options, image, bbox)
+                example = self.generate_cls_example(text, labels, self.prompt_prefix, self.options, image, bbox)
                 examples.append(example)
         return examples
 
@@ -274,7 +275,7 @@ class Convertor(object):
         else:
             images, bbox_list = [], []
 
-        logger.info(f"Converting annotation data...")
+        logger.info("Converting annotation data...")
         with tqdm(total=len(raw_examples)) as pbar:
             for line in raw_examples:
 
@@ -285,15 +286,13 @@ class Convertor(object):
                     items = self.process_image_tag(line, task_type="ext")
                     if items is None:
                         continue
-                    image, bbox = items['image'], items['bbox']
+                    image, bbox = items["image"], items["bbox"]
                     images.append(image)
                     bbox_list.append(bbox)
                 else:
-                    raise ValueError(
-                        "The type of annotation should be text or image")
+                    raise ValueError("The type of annotation should be text or image")
 
-                text, relations, entities = items["text"], items[
-                    "relations"], items["entities"]
+                text, relations, entities = items["text"], items["relations"], items["entities"]
                 texts.append(text)
 
                 entity_example = []
@@ -301,18 +300,16 @@ class Convertor(object):
                 entity_example_map = {}
                 entity_map = {}  # id to entity name
                 for entity in entities:
-                    entity_name = text[
-                        entity["start_offset"]:entity["end_offset"]]
+                    entity_name = text[entity["start_offset"] : entity["end_offset"]]
                     entity_map[entity["id"]] = {
                         "name": entity_name,
                         "start": entity["start_offset"],
-                        "end": entity["end_offset"]
+                        "end": entity["end_offset"],
                     }
                     if entity["label"] in self.ignore_list:
                         continue
 
-                    entity_label, entity_cls_label = _sep_cls_label(
-                        entity["label"], self.separator)
+                    entity_label, entity_cls_label = _sep_cls_label(entity["label"], self.separator)
 
                     # Define the prompt prefix for entity-level classification
                     # xxx + "的" + 情感倾向 -> Chinese
@@ -323,28 +320,23 @@ class Convertor(object):
                         entity_cls_prompt_prefix = self.prompt_prefix + " of " + entity_name
                     if entity_cls_label is not None:
                         entity_cls_example = self.generate_cls_example(
-                            text, entity_cls_label, entity_cls_prompt_prefix,
-                            self.options, image, bbox)
+                            text, entity_cls_label, entity_cls_prompt_prefix, self.options, image, bbox
+                        )
 
                         entity_cls_examples.append(entity_cls_example)
 
-                    result = {
-                        "text": entity_name,
-                        "start": entity["start_offset"],
-                        "end": entity["end_offset"]
-                    }
+                    result = {"text": entity_name, "start": entity["start_offset"], "end": entity["end_offset"]}
                     if entity_label not in entity_example_map.keys():
                         entity_example_map[entity_label] = {
                             "content": text,
                             "result_list": [result],
-                            "prompt": entity_label
+                            "prompt": entity_label,
                         }
                         if self.anno_type == "image":
-                            entity_example_map[entity_label]['image'] = image
-                            entity_example_map[entity_label]['bbox'] = bbox
+                            entity_example_map[entity_label]["image"] = image
+                            entity_example_map[entity_label]["bbox"] = bbox
                     else:
-                        entity_example_map[entity_label]["result_list"].append(
-                            result)
+                        entity_example_map[entity_label]["result_list"].append(result)
 
                     if entity_label not in entity_label_set and entity_label != "观点词":
                         entity_label_set.append(entity_label)
@@ -373,37 +365,29 @@ class Convertor(object):
                     # predicate + " of " + subject -> English
                     if self.schema_lang == "ch":
                         prompt = entity_map[subject_id]["name"] + "的" + predicate
-                        inverse_negative = entity_map[object_id][
-                            "name"] + "的" + predicate
+                        inverse_negative = entity_map[object_id]["name"] + "的" + predicate
                     else:
-                        prompt = predicate + " of " + entity_map[subject_id][
-                            "name"]
-                        inverse_negative = predicate + " of " + entity_map[
-                            object_id]["name"]
+                        prompt = predicate + " of " + entity_map[subject_id]["name"]
+                        inverse_negative = predicate + " of " + entity_map[object_id]["name"]
 
                     if entity_map[subject_id]["name"] not in subject_golden:
                         subject_golden.append(entity_map[subject_id]["name"])
                     result = {
                         "text": entity_map[object_id]["name"],
                         "start": entity_map[object_id]["start"],
-                        "end": entity_map[object_id]["end"]
+                        "end": entity_map[object_id]["end"],
                     }
 
                     inverse_relation.append(inverse_negative)
                     predicates.append(predicate)
 
                     if prompt not in relation_example_map.keys():
-                        relation_example_map[prompt] = {
-                            "content": text,
-                            "result_list": [result],
-                            "prompt": prompt
-                        }
+                        relation_example_map[prompt] = {"content": text, "result_list": [result], "prompt": prompt}
                         if self.anno_type == "image":
-                            relation_example_map[prompt]['image'] = image
-                            relation_example_map[prompt]['bbox'] = bbox
+                            relation_example_map[prompt]["image"] = image
+                            relation_example_map[prompt]["bbox"] = bbox
                     else:
-                        relation_example_map[prompt]["result_list"].append(
-                            result)
+                        relation_example_map[prompt]["result_list"].append(result)
 
                     if predicate not in predicate_set:
                         predicate_set.append(predicate)
@@ -419,10 +403,10 @@ class Convertor(object):
                 predicate_list.append(predicates)
                 pbar.update(1)
 
-        logger.info(f"Adding negative samples for first stage prompt...")
+        logger.info("Adding negative samples for first stage prompt...")
         positive_examples, negative_examples = self.add_entity_negative_example(
-            entity_examples, texts, entity_prompt_list, entity_label_set,
-            images, bbox_list)
+            entity_examples, texts, entity_prompt_list, entity_label_set, images, bbox_list
+        )
         if len(positive_examples) == 0:
             all_entity_examples = []
         else:
@@ -430,7 +414,7 @@ class Convertor(object):
 
         all_relation_examples = []
         if len(predicate_set) != 0:
-            logger.info(f"Adding negative samples for second stage prompt...")
+            logger.info("Adding negative samples for second stage prompt...")
             if is_train:
 
                 positive_examples = []
@@ -449,51 +433,42 @@ class Convertor(object):
                         # 2. entity_name_set ^ subject_golden_list[i]
                         redundants2 = []
                         if len(predicate_list[i]) != 0:
-                            nonentity_list = list(
-                                set(entity_name_set)
-                                ^ set(subject_golden_list[i]))
+                            nonentity_list = list(set(entity_name_set) ^ set(subject_golden_list[i]))
                             nonentity_list.sort()
 
                             if self.schema_lang == "ch":
                                 redundants2 = [
-                                    nonentity + "的" +
-                                    predicate_list[i][random.randrange(
-                                        len(predicate_list[i]))]
+                                    nonentity + "的" + predicate_list[i][random.randrange(len(predicate_list[i]))]
                                     for nonentity in nonentity_list
                                 ]
                             else:
                                 redundants2 = [
-                                    predicate_list[i][random.randrange(
-                                        len(predicate_list[i]))] + " of " +
-                                    nonentity for nonentity in nonentity_list
+                                    predicate_list[i][random.randrange(len(predicate_list[i]))] + " of " + nonentity
+                                    for nonentity in nonentity_list
                                 ]
 
                         # 3. entity_label_set ^ entity_prompt_list[i]
                         redundants3 = []
                         if len(subject_golden_list[i]) != 0:
-                            non_ent_label_list = list(
-                                set(entity_label_set)
-                                ^ set(entity_prompt_list[i]))
+                            non_ent_label_list = list(set(entity_label_set) ^ set(entity_prompt_list[i]))
                             non_ent_label_list.sort()
 
                             if self.schema_lang == "ch":
                                 redundants3 = [
-                                    subject_golden_list[i][random.randrange(
-                                        len(subject_golden_list[i]))] + "的" +
-                                    non_ent_label
+                                    subject_golden_list[i][random.randrange(len(subject_golden_list[i]))]
+                                    + "的"
+                                    + non_ent_label
                                     for non_ent_label in non_ent_label_list
                                 ]
                             else:
                                 redundants3 = [
-                                    non_ent_label + " of " +
-                                    subject_golden_list[i][random.randrange(
-                                        len(subject_golden_list[i]))]
+                                    non_ent_label
+                                    + " of "
+                                    + subject_golden_list[i][random.randrange(len(subject_golden_list[i]))]
                                     for non_ent_label in non_ent_label_list
                                 ]
 
-                        redundants_list = [
-                            redundants1, redundants2, redundants3
-                        ]
+                        redundants_list = [redundants1, redundants2, redundants3]
 
                         for redundants in redundants_list:
                             if self.anno_type == "text":
@@ -505,19 +480,17 @@ class Convertor(object):
                                 )
                             else:
                                 added, rest = self.add_relation_negative_example(
-                                    redundants, texts[i], num_positive,
-                                    per_n_ratio, images[i], bbox_list[i])
+                                    redundants, texts[i], num_positive, per_n_ratio, images[i], bbox_list[i]
+                                )
                             negative_example.extend(added)
                             collects.extend(rest)
 
-                        num_sup = num_positive * self.negative_ratio - len(
-                            negative_example)
+                        num_sup = num_positive * self.negative_ratio - len(negative_example)
                         if num_sup > 0 and collects:
                             if num_sup > len(collects):
                                 idxs = [k for k in range(len(collects))]
                             else:
-                                idxs = random.sample(range(0, len(collects)),
-                                                     num_sup)
+                                idxs = random.sample(range(0, len(collects)), num_sup)
                             for idx in idxs:
                                 negative_example.append(collects[idx])
 
@@ -527,34 +500,21 @@ class Convertor(object):
                 all_relation_examples = positive_examples + negative_examples
             else:
                 relation_examples = self.add_full_negative_example(
-                    relation_examples, texts, relation_prompt_list,
-                    predicate_set, subject_golden_list)
-                all_relation_examples = [
-                    r for relation_example in relation_examples
-                    for r in relation_example
-                ]
+                    relation_examples, texts, relation_prompt_list, predicate_set, subject_golden_list
+                )
+                all_relation_examples = [r for relation_example in relation_examples for r in relation_example]
         return all_entity_examples + all_relation_examples + entity_cls_examples
 
-    def generate_cls_example(self,
-                             text,
-                             labels,
-                             prompt_prefix,
-                             options,
-                             image=None,
-                             bbox=None):
+    def generate_cls_example(self, text, labels, prompt_prefix, options, image=None, bbox=None):
         random.shuffle(self.options)
         cls_options = ",".join(self.options)
         prompt = prompt_prefix + "[" + cls_options + "]"
 
         result_list = []
-        example = {
-            "content": text,
-            "result_list": result_list,
-            "prompt": prompt
-        }
+        example = {"content": text, "result_list": result_list, "prompt": prompt}
         if image and bbox:
-            example['image'] = image
-            example['bbox'] = bbox
+            example["image"] = image
+            example["bbox"] = bbox
         for label in labels:
             start = prompt.rfind(label) - len(prompt) - 1
             end = start + len(label)
@@ -562,14 +522,9 @@ class Convertor(object):
             example["result_list"].append(result)
         return example
 
-    def add_full_negative_example(self,
-                                  examples,
-                                  texts,
-                                  relation_prompt_list,
-                                  predicate_set,
-                                  subject_golden_list,
-                                  images=None,
-                                  bbox_list=None):
+    def add_full_negative_example(
+        self, examples, texts, relation_prompt_list, predicate_set, subject_golden_list, images=None, bbox_list=None
+    ):
         with tqdm(total=len(relation_prompt_list)) as pbar:
             for i, relation_prompt in enumerate(relation_prompt_list):
                 negative_sample = []
@@ -583,26 +538,16 @@ class Convertor(object):
                         else:
                             prompt = predicate + " of " + subject
                         if prompt not in relation_prompt:
-                            negative_result = {
-                                "content": texts[i],
-                                "result_list": [],
-                                "prompt": prompt
-                            }
+                            negative_result = {"content": texts[i], "result_list": [], "prompt": prompt}
                             if images and bbox_list:
-                                negative_result['image'] = images[i]
-                                negative_result['bbox'] = bbox_list[i]
+                                negative_result["image"] = images[i]
+                                negative_result["bbox"] = bbox_list[i]
                             negative_sample.append(negative_result)
                 examples[i].extend(negative_sample)
                 pbar.update(1)
         return examples
 
-    def add_entity_negative_example(self,
-                                    examples,
-                                    texts,
-                                    prompts,
-                                    label_set,
-                                    images=None,
-                                    bbox_list=None):
+    def add_entity_negative_example(self, examples, texts, prompts, label_set, images=None, bbox_list=None):
         negative_examples = []
         positive_examples = []
         with tqdm(total=len(prompts)) as pbar:
@@ -620,30 +565,19 @@ class Convertor(object):
                 if actual_ratio <= self.negative_ratio or self.negative_ratio == -1:
                     idxs = [k for k in range(len(redundants))]
                 else:
-                    idxs = random.sample(range(0, len(redundants)),
-                                         self.negative_ratio * num_positive)
+                    idxs = random.sample(range(0, len(redundants)), self.negative_ratio * num_positive)
 
                 for idx in idxs:
-                    negative_result = {
-                        "content": texts[i],
-                        "result_list": [],
-                        "prompt": redundants[idx]
-                    }
+                    negative_result = {"content": texts[i], "result_list": [], "prompt": redundants[idx]}
                     if images and bbox_list:
-                        negative_result['image'] = images[i]
-                        negative_result['bbox'] = bbox_list[i]
+                        negative_result["image"] = images[i]
+                        negative_result["bbox"] = bbox_list[i]
                     negative_examples.append(negative_result)
                 positive_examples.extend(examples[i])
                 pbar.update(1)
         return positive_examples, negative_examples
 
-    def add_relation_negative_example(self,
-                                      redundants,
-                                      text,
-                                      num_positive,
-                                      ratio,
-                                      image=None,
-                                      bbox=None):
+    def add_relation_negative_example(self, redundants, text, num_positive, ratio, image=None, bbox=None):
         added_example = []
         rest_example = []
 
@@ -658,30 +592,21 @@ class Convertor(object):
             idxs = all_idxs
             rest_idxs = []
         else:
-            idxs = random.sample(range(0, len(redundants)),
-                                 ratio * num_positive)
+            idxs = random.sample(range(0, len(redundants)), ratio * num_positive)
             rest_idxs = list(set(all_idxs) ^ set(idxs))
 
         for idx in idxs:
-            negative_result = {
-                "content": text,
-                "result_list": [],
-                "prompt": redundants[idx]
-            }
+            negative_result = {"content": text, "result_list": [], "prompt": redundants[idx]}
             if image and bbox:
-                negative_result['image'] = image
-                negative_result['bbox'] = bbox
+                negative_result["image"] = image
+                negative_result["bbox"] = bbox
             added_example.append(negative_result)
 
         for rest_idx in rest_idxs:
-            negative_result = {
-                "content": text,
-                "result_list": [],
-                "prompt": redundants[rest_idx]
-            }
+            negative_result = {"content": text, "result_list": [], "prompt": redundants[rest_idx]}
             if image and bbox:
-                negative_result['image'] = image
-                negative_result['bbox'] = bbox
+                negative_result["image"] = image
+                negative_result["bbox"] = bbox
             rest_example.append(negative_result)
 
         return added_example, rest_example

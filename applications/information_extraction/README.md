@@ -20,7 +20,6 @@
 
 信息抽取通俗地说就是从给定的文本/图片等输入数据中抽取出结构化信息的过程。在信息抽取的落地过程中通常面临领域多变、任务多样、数据稀缺等许多挑战。针对信息抽取领域的难点和痛点，PaddleNLP信息抽取应用**基于UIE统一建模的思想**，提供了信息抽取产业级应用方案，**除支持纯文本场景实体、关系、事件、观点等不同任务抽取外，还支持文档/图片/表格的端到端信息抽取**。该应用**不限定行业领域和抽取目标**，可实现从产品原型研发、业务POC阶段到业务落地、迭代阶段的无缝衔接，助力开发者实现特定领域抽取场景的快速适配与落地。
 
-
 **信息抽取应用亮点：**
 
 - **覆盖场景全面🎓：** 覆盖信息抽取各类主流任务，面向纯文本和文档场景，支持多语言，满足开发者多样信息抽取落地需求。
@@ -81,12 +80,45 @@
 
 **数据准备阶段**
 
-- 我们提供了不同抽取场景的Label Studio标注解决方案，可基于该方案实现从数据标注到训练数据构造的无缝衔接，大大降低了数据标注、模型定制的时间成本。详见[纯文本抽取标注指南](./label_studio_text.md) 及 [文档抽取标注指南](./label_studio_doc.md)。
+- 我们提供了不同抽取场景的Label Studio标注解决方案，可基于该方案实现从数据标注到训练数据构造的无缝衔接，大大降低了数据标注、模型定制的时间成本。
+  - [文本抽取标注指南](./label_studio_text.md)
+  - [文档抽取标注指南](./label_studio_doc.md)。
 
-**模型训练**
+**模型微调及蒸馏**
 
-- 基于UIE优秀的小样本微调能力，实现低成本模型定制适配。
+- 基于UIE优秀的小样本微调能力，实现低成本模型定制适配。同时提供封闭域蒸馏的加速方案，解决抽取速度慢的问题。
+  - [文本抽取微调示例](./text/README.md)
+  - [文档抽取微调示例](./document/README.md)
 
+**模型部署**
+
+- 提供HTTP部署方案，快速实现定制模型的部署上线。
+  - [文本抽取HTTP部署指南](./text/deploy/simple_serving/README.md)
+  - [文档抽取HTTP部署指南](./document/deploy/simple_serving/README.md)
+
+<a name="24"></a>
+
+### 2.4 效果展示
+
+- UIE-X端到端文档抽取
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/205879840-239ada90-1692-40e4-a17f-c5e963fdd204.png height=800 width=500 />
+</div>
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/205922422-f2615050-83cb-4bf5-8887-461f5633e85c.png height=250 width=700 />
+</div>
+
+- UIE-X端到端文档抽取 + PPStructure版面分析
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=600 width=1000 />
+</div>
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206080645-2f07d560-b949-4248-a51f-1735692cb241.png height=450 width=800 />
+</div>
 
 <a name="3"></a>
 
