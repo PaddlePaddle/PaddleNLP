@@ -56,7 +56,7 @@
 
 ```shell
 wget https://bj.bcebos.com/paddlenlp/datasets/military.tar.gz
-tar -zxvf military.tar.gz
+tar -xvf military.tar.gz
 mv military data
 rm military.tar.gz
 ```

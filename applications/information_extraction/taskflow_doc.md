@@ -6,8 +6,10 @@
   - [2.1 实体抽取](#21)
   - [2.2 关系抽取](#22)
   - [2.3 跨任务使用](#23)
-  - [2.4 使用说明](#24)
-  - [2.5 更多配置](#25)
+  - [2.4 输入说明](#24)
+  - [2.5 版面分析](#25)
+  - [2.6 结果可视化](#26)
+  - [2.7 更多配置](#27)
 
 <a name="1"></a>
 
@@ -18,6 +20,8 @@
 <a name="2"></a>
 
 ## 2. 文档信息抽取
+
+本章节主要介绍Taskflow的文档抽取功能，相关文档下载链接。
 
 <a name="21"></a>
 
@@ -168,7 +172,7 @@ schema = [
 
 <a name="24"></a>
 
-#### 2.4 使用说明
+#### 2.4 输入说明
 
 - 输入格式
 
@@ -195,34 +199,85 @@ layout = [
 ie({"doc": doc_path, 'layout': layout})
 ```
 
-- OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能``layout_analysis=True``以优化文字排序并增强抽取效果。以下例子仅举例版面分析功能的使用场景，实际场景一般需要标注微调。
+<a name="25"></a>
 
-<div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/206137978-3a69e7e2-dc2e-4d11-98b7-25911b0375a0.png height=350 width=600 hspace='10'/>
-</div>
+#### 2.5 使用技巧
 
-```python
->>> from pprint import pprint
->>> from paddlenlp import Taskflow
+- 使用PP-Structure版面分析功能
 
->>> schema = "抗血小板药物的用药指征"
->>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", layout_analysis=True)
->>> pprint(ie({"doc": "./cases/drug.webp"}))
-```
+OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能``layout_analysis=True``以优化文字排序并增强抽取效果。以下例子仅举例版面分析功能的使用场景，实际场景一般需要标注微调。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206139057-aedec98f-683c-4648-999d-81ce5ea04a86.png height=250 width=500 hspace='10'/>
 </div>
 
 ```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+
 >>> schema = "中标候选人名称"
->>> ie.set_schema(schema)
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", layout_analysis=True)
 >>> pprint(ie({"doc": "https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fwww.xuyiwater.com%2Fwp-content%2Fuploads%2F2021%2F06%2F1-4.jpg&refer=http%3A%2F%2Fwww.xuyiwater.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=auto?sec=1672994926&t=2a4a3fedf6999a34ccde190f97bcfa47"}))
 ```
 
-<a name="25"></a>
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206137978-3a69e7e2-dc2e-4d11-98b7-25911b0375a0.png height=350 width=600 hspace='10'/>
+</div>
 
-#### 2.5 更多配置
+```python
+>>> schema = "抗血小板药物的用药指征"
+>>> ie.set_schema(schema)
+>>> pprint(ie({"doc": "./cases/drug.webp"}))
+```
+
+<a name="26"></a>
+
+#### 2.6 结果可视化
+
+- OCR识别结果可视化：
+
+```python
+>>> from paddlenlp.utils.doc_parser import DocParser
+
+>>> doc_parser = DocParser(ocr_lang="en")
+>>> doc_path = "./cases/business_card.png"
+>>> parsed_doc = doc_parser.read_image(doc_path)
+>>> doc_parser.write_image_with_results(
+        doc_path,
+        layout=parsed_doc['layout'],
+        save_path="ocr_result.png")
+```
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206168103-0a37eab0-bb36-4eec-bd51-b3f85838b40c.png height=350 width=600 hspace='10'/>
+</div>
+
+- 抽取结果可视化：
+
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+>>> from paddlenlp.utils.doc_parser import DocParser
+
+>>> doc_path = "./cases/business_card.png"
+>>> schema = ["人名", "职位", "号码", "邮箱地址", "网址", "地址", "邮编"]
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", ocr_lang="en")
+
+>>> results = ie({"doc": doc_path})
+
+>>> DocParser.write_image_with_results(
+        doc_path,
+        result=results[0],
+        save_path="image_show.png")
+```
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/206168852-c32c34c4-f245-4116-a244-390e55c13383.png height=350 width=600 hspace='10'/>
+</div>
+
+<a name="27"></a>
+
+#### 2.7 更多配置
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -244,7 +299,11 @@ ie({"doc": doc_path, 'layout': layout})
 * `ocr_lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为16。
 * `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`，`uie-x-base`。
-* `layout_analysis`：是否使用PPStructure对文档进行布局分析以优化布局信息的排序，默认为False。
+* `layout_analysis`：是否使用PP-Structure对文档进行布局分析以优化布局信息的排序，默认为False。
 * `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
 * `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 * `use_fast`: 使用C++实现的高性能分词算子FastTokenizer进行文本预处理加速。需要通过`pip install fast-tokenizer-python`安装FastTokenizer库后方可使用。默认为`False`。更多使用说明可参考[FastTokenizer文档](../../fast_tokenizer)。
+
+## References
+- **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)**
+- **[PP-Structure](https://github.com/PaddlePaddle/PaddleOCR/tree/release/2.6/ppstructure)**

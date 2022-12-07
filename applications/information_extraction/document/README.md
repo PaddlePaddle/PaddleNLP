@@ -67,7 +67,7 @@ python ../label_studio.py \
     --task_type ext
 ```
 
-生成训练/验证集文件，可以使用PPStructure的布局分析优化OCR结果的排序：
+生成训练/验证集文件，可以使用PP-Structure的布局分析优化OCR结果的排序：
 ```shell
 python ../label_studio.py \
     --label_studio_file ./data/label_studio.json \
@@ -276,7 +276,7 @@ DocParser.write_image_with_results(
 ```
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=600 width=1000 />
+    <img src=https://user-images.githubusercontent.com/40840292/206084942-44ba477c-9244-4ce2-bbb5-ba430c9b926e.png height=550 width=700 />
 </div>
 
 <a name="实验指标"></a>
@@ -293,7 +293,7 @@ DocParser.write_image_with_results(
   | 10-shot| 0.92405 | 0.93590 |  0.92994 |
   | 20-shot| 0.93671 | 0.94872 | 0.94268 |
   | 30-shot|  0.96154  | 0.96154  | 0.96154 |
-  | 30-shot+PPStructure| 0.98718  | 0.96250 |  0.97468 |
+  | 30-shot+PP-Structure| 0.98718  | 0.96250 |  0.97468 |
 
 
-n-shot表示训练集包含n张标注图片数据进行模型微调，实验表明UIE-X可以通过少量数据（few-shot）和PPStructure的布局分析进一步提升结果。
+n-shot表示训练集包含n张标注图片数据进行模型微调，实验表明UIE-X可以通过少量数据（few-shot）和PP-Structure的布局分析进一步提升结果。
