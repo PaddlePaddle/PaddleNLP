@@ -13,18 +13,15 @@
 # limitations under the License.
 
 import re
-import numpy as np
-import paddle
 from io import BytesIO
+
+import numpy as np
 from PIL import Image
 
-from ..metrics import SpanEvaluator
-from .image_utils import ResizeImage, NormalizeImage, Permute
+from .image_utils import NormalizeImage, Permute, ResizeImage
 
 resize_func = ResizeImage(target_size=224, interp=1)
-norm_func = NormalizeImage(is_channel_first=False,
-                           mean=[123.675, 116.280, 103.530],
-                           std=[58.395, 57.120, 57.375])
+norm_func = NormalizeImage(is_channel_first=False, mean=[123.675, 116.280, 103.530], std=[58.395, 57.120, 57.375])
 permute_func = Permute(to_bgr=False)
 
 
@@ -44,7 +41,7 @@ def pad_image_data(image_data):
         return image
     # decode image
     data = np.frombuffer(bytearray(image_data), dtype="uint8")
-    image = np.array(Image.open(BytesIO(data)).convert('RGB'))
+    image = np.array(Image.open(BytesIO(data)).convert("RGB"))
     sample = {"image": image}
     # resize image
     sample = resize_func(sample)
@@ -52,15 +49,15 @@ def pad_image_data(image_data):
     sample = norm_func(sample)
     # permute
     sample = permute_func(sample)
-    return sample['image']
+    return sample["image"]
 
 
 def unify_prompt_name(prompt):
     # The classification labels are shuffled during finetuning, so they need
     # to be unified during evaluation.
-    if re.search(r'\[.*?\]$', prompt):
-        prompt_prefix = prompt[:prompt.find("[", 1)]
-        cls_options = re.search(r'\[.*?\]$', prompt).group()[1:-1].split(",")
+    if re.search(r"\[.*?\]$", prompt):
+        prompt_prefix = prompt[: prompt.find("[", 1)]
+        cls_options = re.search(r"\[.*?\]$", prompt).group()[1:-1].split(",")
         cls_options = sorted(list(set(cls_options)))
         cls_options = ",".join(cls_options)
         prompt = prompt_prefix + "[" + cls_options + "]"
@@ -69,13 +66,12 @@ def unify_prompt_name(prompt):
 
 
 def get_relation_type_dict(relation_data, schema_lang="ch"):
-
     def compare(a, b, schema_lang="ch"):
         if schema_lang == "ch":
             a = a[::-1]
             b = b[::-1]
 
-        res = ''
+        res = ""
         for i in range(min(len(a), len(b))):
             if a[i] == b[i]:
                 res += a[i]
@@ -95,18 +91,14 @@ def get_relation_type_dict(relation_data, schema_lang="ch"):
         added = False
         if relation_data[i][0] not in added_list:
             for j in range(i + 1, len(relation_data)):
-                match = compare(relation_data[i][0],
-                                relation_data[j][0],
-                                schema_lang=schema_lang)
+                match = compare(relation_data[i][0], relation_data[j][0], schema_lang=schema_lang)
                 if match != "":
                     match = unify_prompt_name(match)
                     if relation_data[i][0] not in added_list:
                         added_list.append(relation_data[i][0])
-                        relation_type_dict.setdefault(match, []).append(
-                            relation_data[i][1])
+                        relation_type_dict.setdefault(match, []).append(relation_data[i][1])
                     added_list.append(relation_data[j][0])
-                    relation_type_dict.setdefault(match, []).append(
-                        relation_data[j][1])
+                    relation_type_dict.setdefault(match, []).append(relation_data[j][1])
                     added = True
             if not added:
                 added_list.append(relation_data[i][0])
@@ -118,32 +110,5 @@ def get_relation_type_dict(relation_data, schema_lang="ch"):
                     prefix = relation_data[i][0].split(" of ", 1)[0]
                     prefix = unify_prompt_name(prefix)
                     relation_type = prefix
-                relation_type_dict.setdefault(relation_type,
-                                              []).append(relation_data[i][1])
+                relation_type_dict.setdefault(relation_type, []).append(relation_data[i][1])
     return relation_type_dict
-
-
-def uie_loss_func(outputs, labels):
-    criterion = paddle.nn.BCELoss()
-    start_ids, end_ids = labels
-    start_prob, end_prob = outputs
-    start_ids = paddle.cast(start_ids, 'float32')
-    end_ids = paddle.cast(end_ids, 'float32')
-    loss_start = criterion(start_prob, start_ids)
-    loss_end = criterion(end_prob, end_ids)
-    loss = (loss_start + loss_end) / 2.0
-    return loss
-
-
-def compute_metrics(p):
-    metric = SpanEvaluator()
-    start_prob, end_prob = p.predictions
-    start_ids, end_ids = p.label_ids
-    metric.reset()
-
-    num_correct, num_infer, num_label = metric.compute(start_prob, end_prob,
-                                                       start_ids, end_ids)
-    metric.update(num_correct, num_infer, num_label)
-    precision, recall, f1 = metric.accumulate()
-    metric.reset()
-    return {"precision": precision, "recall": recall, "f1": f1}
