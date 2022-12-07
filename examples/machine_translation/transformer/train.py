@@ -12,26 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import inspect
 import os
 import time
-
-import yaml
-import argparse
-import numpy as np
 from pprint import pprint
-from attrdict import AttrDict
-import inspect
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
-
 import reader
-from paddlenlp.transformers import TransformerModel, CrossEntropyCriterion
-from paddlenlp.utils.log import logger
-from paddlenlp.utils import profiler
-
+import yaml
+from attrdict import AttrDict
 from tls.record import AverageStatistical
 from tls.to_static import apply_to_static
+
+from paddlenlp.transformers import CrossEntropyCriterion, TransformerModel
+from paddlenlp.utils import profiler
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -46,18 +44,24 @@ def parse_args():
     )
     parser.add_argument("--max_iter", default=None, type=int, help="The maximum iteration for training. ")
     parser.add_argument(
+        "--data_dir",
+        default=None,
+        type=str,
+        help="The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. ",
+    )
+    parser.add_argument(
         "--train_file",
         nargs="+",
         default=None,
         type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. ",
+        help="The files for training, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--dev_file",
         nargs="+",
         default=None,
         type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. ",
+        help="The files for validation, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--vocab_file",
@@ -65,6 +69,20 @@ def parse_args():
         type=str,
         help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
+    parser.add_argument(
+        "--src_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument("-s", "--src_lang", default=None, type=str, help="Source language. ")
+    parser.add_argument("-t", "--trg_lang", default=None, type=str, help="Target language. ")
     parser.add_argument(
         "--unk_token",
         default=None,
@@ -76,6 +94,12 @@ def parse_args():
     )
     parser.add_argument(
         "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
     parser.add_argument("--batch_size", default=None, type=int, help="The maximum tokens per batch. ")
     parser.add_argument(
@@ -95,6 +119,7 @@ def parse_args():
         choices=["O1", "O2"],
         help="The amp level if --use_amp is on. Can be one of [O1, O2]. ",
     )
+    parser.add_argument("--weight_decay", default=None, type=float, help="Weight Decay for optimizer. ")
 
     # For benchmark.
     parser.add_argument(
@@ -154,12 +179,14 @@ def do_train(args):
         weight_sharing=args.weight_sharing,
         bos_id=args.bos_idx,
         eos_id=args.eos_idx,
+        pad_id=args.pad_idx,
+        normalize_before=args.get("normalize_before", True),
     )
 
     transformer = apply_to_static(args, transformer)
 
     # Define loss
-    criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx)
+    criterion = CrossEntropyCriterion(args.label_smooth_eps, args.bos_idx if args.pad_idx is None else args.pad_idx)
 
     scheduler = paddle.optimizer.lr.NoamDecay(args.d_model, args.warmup_steps, args.learning_rate, last_epoch=0)
 
@@ -171,6 +198,7 @@ def do_train(args):
             beta2=args.beta2,
             epsilon=float(args.eps),
             parameters=transformer.parameters(),
+            weight_decay=args.weight_decay,
         )
     else:
         optimizer = paddle.optimizer.Adam(
@@ -180,6 +208,7 @@ def do_train(args):
             epsilon=float(args.eps),
             parameters=transformer.parameters(),
             use_multi_tensor=True,
+            weight_decay=args.weight_decay,
         )
 
     # Init from some checkpoint, to resume the previous training
@@ -395,12 +424,48 @@ if __name__ == "__main__":
             args.use_amp = False
     if ARGS.amp_level:
         args.use_pure_fp16 = ARGS.amp_level == "O2"
+    args.weight_decay = ARGS.weight_decay
+
+    args.data_dir = ARGS.data_dir
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
-    args.vocab_file = ARGS.vocab_file
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARGS.vocab_file
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
+
+    if ARGS.src_lang is not None:
+        args.src_lang = ARGS.src_lang
+    if ARGS.trg_lang is not None:
+        args.trg_lang = ARGS.trg_lang
+
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
     if ARGS.to_static:
         args.to_static = ARGS.to_static
     args.device = ARGS.device

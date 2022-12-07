@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # limitations under the License.
 """ PyTorch - Paddle general utilities."""
 import re
+
 from .utils import logging
 
 logger = logging.get_logger(__name__)

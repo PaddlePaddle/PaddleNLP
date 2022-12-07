@@ -48,7 +48,6 @@ pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 ### 1.3 使用trainner开启训练
 #### 1.3.1 硬件要求
 Tips：
-- FP16 O2 在 32GB 的显卡上可正常训练。
 - FP32 在 40GB 的显卡上可正常训练。
 
 #### 1.3.2 单机单卡训练

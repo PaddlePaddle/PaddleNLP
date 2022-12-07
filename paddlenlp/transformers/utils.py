@@ -13,21 +13,20 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 import functools
 import inspect
-from copy import deepcopy
-from typing import Optional, Type, TYPE_CHECKING, List
+import os
 import warnings
+from typing import TYPE_CHECKING, Optional, Type
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
 
-from paddlenlp.utils.import_utils import import_module
 from paddle.nn import Layer
-from paddlenlp.utils.env import MODEL_HOME
+
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.import_utils import import_module
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX
 
 
 def fn_args_to_dict(func, *args, **kwargs):
@@ -203,18 +202,22 @@ def param_in_func(func, param_field: str) -> bool:
     return param_field in result[0]
 
 
-def resolve_cache_dir(pretrained_model_name_or_path: str, cache_dir: Optional[str] = None) -> str:
+def resolve_cache_dir(pretrained_model_name_or_path: str, from_hf_hub: bool, cache_dir: Optional[str] = None) -> str:
     """resolve cache dir for PretrainedModel and PretrainedConfig
 
     Args:
         pretrained_model_name_or_path (str): the name or path of pretrained model
-        kwargs (dict): the kwargs of method
+        from_hf_hub (bool): if load from huggingface hub
+        cache_dir (str): cache_dir for models
     """
     if cache_dir is not None:
         return cache_dir
 
     if os.path.isdir(pretrained_model_name_or_path):
         return pretrained_model_name_or_path
+
+    if from_hf_hub:
+        return os.path.join(HF_CACHE_HOME, pretrained_model_name_or_path)
 
     return os.path.join(MODEL_HOME, pretrained_model_name_or_path)
 

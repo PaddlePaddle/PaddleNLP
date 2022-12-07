@@ -16,13 +16,13 @@
 # DISCLAIMER: This file is strongly influenced by https://github.com/ermongroup/ddim
 
 import math
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import deprecate
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS
 from .scheduling_utils import SchedulerMixin, SchedulerOutput
 
 
@@ -62,8 +62,8 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     For more details, see the original paper: https://arxiv.org/abs/2202.09778
 
@@ -83,12 +83,19 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
             each diffusion step uses the value of alphas product at that step and at the previous one. For the final
             step there is no previous alpha. When this option is `True` the previous alpha product is fixed to `1`,
             otherwise it uses the value of alpha at step 0.
+        prediction_type (`str`, default `epsilon`, optional):
+            prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
+            process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
+            https://imagen.research.google/video/paper.pdf)
         steps_offset (`int`, default `0`):
             an offset added to the inference steps. You can use a combination of `offset=1` and
             `set_alpha_to_one=False`, to make the last step use step 0 for the previous alpha product, as done in
             stable diffusion.
 
     """
+
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+    order = 1
 
     @register_to_config
     def __init__(
@@ -97,13 +104,14 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.0001,
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
-        trained_betas: Optional[np.ndarray] = None,
+        trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
         skip_prk_steps: bool = False,
         set_alpha_to_one: bool = False,
+        prediction_type: str = "epsilon",
         steps_offset: int = 0,
     ):
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas)
+            self.betas = paddle.to_tensor(trained_betas, dtype="float32")
         elif beta_schedule == "linear":
             self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
@@ -136,12 +144,12 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        self._timesteps = np.arange(0, num_train_timesteps)[::-1].copy().astype("int64")
+        self._timesteps = np.arange(0, num_train_timesteps)[::-1].copy()
         self.prk_timesteps = None
         self.plms_timesteps = None
         self.timesteps = None
 
-    def set_timesteps(self, num_inference_steps: int) -> paddle.Tensor:
+    def set_timesteps(self, num_inference_steps: int):
         """
         Sets the discrete timesteps used for the diffusion chain. Supporting function to be run before inference.
 
@@ -364,6 +372,13 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         beta_prod_t = 1 - alpha_prod_t
         beta_prod_t_prev = 1 - alpha_prod_t_prev
 
+        if self.config.prediction_type == "v_prediction":
+            model_output = (alpha_prod_t**0.5) * model_output + (beta_prod_t**0.5) * sample
+        elif self.config.prediction_type != "epsilon":
+            raise ValueError(
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon` or `v_prediction`"
+            )
+
         # corresponds to (α_(t−δ) - α_t) divided by
         # denominator of x_t in formula (9) and plus 1
         # Note: (α_(t−δ) - α_t) / (sqrt(α_t) * (sqrt(α_(t−δ)) + sqr(α_t))) =
@@ -389,7 +404,7 @@ class PNDMScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure alphas_cumprod and timestep have same dtype as original_samples
-        self.alphas_cumprod = self.alphas_cumprod.astype(original_samples.dtype)
+        self.alphas_cumprod = self.alphas_cumprod.cast(original_samples.dtype)
 
         sqrt_alpha_prod = self.alphas_cumprod[timesteps] ** 0.5
         sqrt_alpha_prod = sqrt_alpha_prod.flatten()

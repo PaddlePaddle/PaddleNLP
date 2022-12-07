@@ -15,16 +15,12 @@
 
 import datetime
 import math
-import unittest
-import numpy as np
 import random
 
-from tests.testing_utils import slow
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
-
+import numpy as np
 import paddle
+from parameterized import parameterized_class
+
 from paddlenlp.transformers import (
     GPTForSequenceClassification,
     GPTForTokenClassification,
@@ -32,15 +28,21 @@ from paddlenlp.transformers import (
     GPTModel,
     GPTTokenizer,
 )
+from tests.testing_utils import PaddleNLPModelTest, slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
 
 GPT2_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "gpt2-small-en",
     "gpt2-en",
     "gpt2-medium-en",
     "gpt2-large-en",
     "gpt2-xl-en",
-    "gpt3-1.3B-en",
-    "gpt3-13B-en",
     "gpt-cpm-small-cn-distill",
     "gpt-cpm-large-cn",
 ]
@@ -54,7 +56,6 @@ class GPTModelTester:
         seq_length=7,
         is_training=True,
         use_input_mask=True,
-        use_labels=True,
         vocab_size=99,
         hidden_size=32,
         num_hidden_layers=5,
@@ -76,7 +77,6 @@ class GPTModelTester:
         self.seq_length = seq_length
         self.is_training = is_training
         self.use_input_mask = use_input_mask
-        self.use_labels = use_labels
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -106,7 +106,8 @@ class GPTModelTester:
         sequence_labels = None
         token_labels = None
         choice_labels = None
-        if self.use_labels:
+
+        if self.parent.use_labels:
             sequence_labels = ids_tensor([self.batch_size], self.type_sequence_label_size, dtype="int64")
             token_labels = ids_tensor([self.batch_size, self.seq_length], self.num_labels, dtype="int64")
             choice_labels = ids_tensor([self.batch_size], self.num_choices, dtype="int64")
@@ -170,9 +171,9 @@ class GPTModelTester:
         model = GPTModel(**config)
         model.eval()
 
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
-        result = model(input_ids, use_cache=True)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
@@ -182,23 +183,24 @@ class GPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, use_cache=True)
-        outputs_use_cache_conf = model(input_ids, use_cache=True)
-        outputs_no_past = model(input_ids, use_cache=False)
+        outputs = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        outputs_use_cache_conf = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
+        model(input_ids, use_cache=False, return_dict=self.parent.return_dict)
 
         self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
-        next_token_types = ids_tensor([self.batch_size, 1], self.type_vocab_size, dtype="int64")
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
 
-        output_from_no_past = model(next_input_ids)
-        output_from_past = model(next_tokens, use_cache=True, cache=past)[0]
+        output_from_no_past = model(next_input_ids, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(next_tokens, use_cache=True, cache=past, return_dict=self.parent.return_dict)[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1]).item()
@@ -218,7 +220,9 @@ class GPTModelTester:
         attn_mask[:, half_seq_length:] = 0
 
         # first forward pass
-        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True)
+        output, past = model(input_ids, attention_mask=attn_mask, use_cache=True, return_dict=self.parent.return_dict)[
+            :2
+        ]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
@@ -236,13 +240,17 @@ class GPTModelTester:
         )
 
         # get two different outputs
-        output_from_no_past = model(next_input_ids, attention_mask=attn_mask)
-        output_from_past = model(next_tokens, cache=past, use_cache=True, attention_mask=attn_mask)[0]
+        output_from_no_past = model(next_input_ids, attention_mask=attn_mask, return_dict=self.parent.return_dict)
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(
+            next_tokens, cache=past, use_cache=True, attention_mask=attn_mask, return_dict=self.parent.return_dict
+        )[0]
 
         # select random slice
         random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx].detach()
-        output_from_past_slice = output_from_past[:, 0, random_slice_idx].detach()
+        output_from_no_past_slice = output_from_no_past[:, -1, random_slice_idx]
+        output_from_past_slice = output_from_past[:, 0, random_slice_idx]
 
         # test that outputs are equal for slice
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
@@ -252,21 +260,30 @@ class GPTModelTester:
         model.eval()
 
         # first forward pass
-        outputs = model(input_ids, attention_mask=input_mask, use_cache=True)
+        outputs = model(input_ids, attention_mask=input_mask, use_cache=True, return_dict=self.parent.return_dict)
 
-        output, past = outputs
+        output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
         next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
-        next_token_types = ids_tensor([self.batch_size, 3], self.type_vocab_size, dtype="int64")
         next_mask = ids_tensor((self.batch_size, 3), vocab_size=2, dtype="int64")
 
         # append to next input_ids
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
         next_attention_mask = paddle.concat([input_mask, next_mask], axis=-1)
 
-        output_from_no_past = model(next_input_ids, attention_mask=next_attention_mask)
-        output_from_past = model(next_tokens, attention_mask=next_attention_mask, cache=past, use_cache=True)[0]
+        output_from_no_past = model(
+            next_input_ids, attention_mask=next_attention_mask, return_dict=self.parent.return_dict
+        )
+        if self.parent.return_dict:
+            output_from_no_past = output_from_no_past[0]
+        output_from_past = model(
+            next_tokens,
+            attention_mask=next_attention_mask,
+            cache=past,
+            use_cache=True,
+            return_dict=self.parent.return_dict,
+        )[0]
         self.parent.assertTrue(output_from_past.shape[1] == next_tokens.shape[1])
 
         # select random slice
@@ -282,35 +299,66 @@ class GPTModelTester:
         model = GPTLMHeadModel(base_model)
         model.eval()
 
-        result = model(input_ids, use_cache=True)[0]
-        self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.vocab_size])
+        result = model(
+            input_ids,
+            use_cache=True,
+            labels=input_ids if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.vocab_size])
+        else:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
         base_model = GPTModel(**config)
         model = GPTLMHeadModel(base_model)
 
-        loss_fct = paddle.nn.loss.CrossEntropyLoss()
-
-        logits = model(input_ids)
-        loss = loss_fct(logits, input_ids)
-        self.parent.assertEqual(loss.shape, [1])
-        self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
-        loss.backward()
+        if self.parent.use_labels:
+            loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
+            self.parent.assertEqual(loss.shape, [1])
+            self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
+            loss.backward()
 
     def create_and_check_gpt_for_sequence_classification(self, config, input_ids, input_mask, sequence_labels, *args):
         base_model = GPTModel(**config)
         model = GPTForSequenceClassification(base_model, self.num_labels)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.shape, [self.batch_size, self.num_labels])
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            labels=sequence_labels if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.num_labels])
+        elif self.parent.return_dict:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.num_labels])
+        else:
+            self.parent.assertEqual(result.shape, [self.batch_size, self.num_labels])
 
-    def create_and_check_gpt_for_token_classification(self, config, input_ids, input_mask, sequence_labels, *args):
+    def create_and_check_gpt_for_token_classification(
+        self, config, input_ids, input_mask, sequence_labels, token_labels, *args
+    ):
         # config.num_labels = self.num_labels
         base_model = GPTModel(**config)
         model = GPTForTokenClassification(base_model, self.num_labels)
         model.eval()
-        result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
+        result = model(
+            input_ids,
+            attention_mask=input_mask,
+            labels=token_labels if self.parent.use_labels else None,
+            return_dict=self.parent.return_dict,
+        )
+        if self.parent.use_labels:
+            self.parent.assertEqual(result[0].shape, [1])
+            self.parent.assertEqual(result[1].shape, [self.batch_size, self.seq_length, self.num_labels])
+        elif self.parent.return_dict:
+            self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_labels])
+        else:
+            self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_gpt_weight_initialization(self, config, *args):
         model = GPTModel(**config)
@@ -338,8 +386,19 @@ class GPTModelTester:
         return config, inputs_dict
 
 
-class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
+class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     base_model_class = GPTModel
+    use_labels = False
+    return_dict = False
 
     all_model_classes = (GPTModel, GPTLMHeadModel, GPTForSequenceClassification, GPTForTokenClassification)
     all_generative_model_classes = {GPTLMHeadModel: (GPTModel, "gpt")}
@@ -450,7 +509,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
             self.assertIsNotNone(model)
 
 
-class GPTModelLanguageGenerationTest(unittest.TestCase):
+class GPTModelLanguageGenerationTest(PaddleNLPModelTest):
     def _test_lm_generate_gpt_helper(
         self,
         verify_outputs=True,
@@ -527,6 +586,8 @@ class GPTModelLanguageGenerationTest(unittest.TestCase):
         output_seq_strs = tokenizer.batch_decode(output_seq, skip_special_tokens=True)
 
         EXPECTED_OUTPUT_STR = " I'm glad I'm here. I'm glad I'm here. I'm glad I'm here"
+
+        self.assertEqual(output_seq_strs[0], EXPECTED_OUTPUT_STR)
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
     @slow
@@ -547,18 +608,21 @@ class GPTModelLanguageGenerationTest(unittest.TestCase):
 
         start = datetime.datetime.now()
         model.generate(input_ids, decode_strategy="sampling", max_time=MAX_TIME, max_length=256)
-        duration = datetime.datetime.now() - start
+        datetime.datetime.now() - start
+        # duration = datetime.datetime.now() - start
         # self.assertGreater(duration, datetime.timedelta(seconds=MAX_TIME))
         # self.assertLess(duration, datetime.timedelta(seconds=1.5 * MAX_TIME))
 
         start = datetime.datetime.now()
         model.generate(input_ids, decode_strategy="greedy_search", max_time=MAX_TIME, max_length=256)
-        duration = datetime.datetime.now() - start
+        datetime.datetime.now() - start
+        # duration = datetime.datetime.now() - start
         # self.assertGreater(duration, datetime.timedelta(seconds=MAX_TIME))
         # self.assertLess(duration, datetime.timedelta(seconds=1.5 * MAX_TIME))
 
         start = datetime.datetime.now()
         model.generate(input_ids, decode_strategy="beam_search", num_beams=2, max_time=MAX_TIME, max_length=256)
-        duration = datetime.datetime.now() - start
+        datetime.datetime.now() - start
+        # duration = datetime.datetime.now() - start
         # self.assertGreater(duration, datetime.timedelta(seconds=MAX_TIME))
         # self.assertLess(duration, datetime.timedelta(seconds=1.5 * MAX_TIME))

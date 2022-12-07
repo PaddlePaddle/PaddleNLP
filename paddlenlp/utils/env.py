@@ -53,3 +53,6 @@ DATA_HOME = _get_sub_home("datasets")
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0
+
+LEGACY_CONFIG_NAME = "model_config.json"
+CONFIG_NAME = "config.json"

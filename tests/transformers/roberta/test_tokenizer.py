@@ -17,16 +17,13 @@ import json
 import os
 import unittest
 
+from paddlenlp.transformers.bert.tokenizer import BasicTokenizer, WordpieceTokenizer
 from paddlenlp.transformers.roberta.tokenizer import (
-    RobertaTokenizer,
     RobertaBPETokenizer,
     RobertaChineseTokenizer,
 )
-from paddlenlp.transformers.bert.tokenizer import (
-    BasicTokenizer,
-    WordpieceTokenizer,
-)
 from paddlenlp.transformers.tokenizer_utils import AddedToken
+
 from ...testing_utils import slow
 from ...transformers.test_tokenizer_common import TokenizerTesterMixin
 
@@ -35,6 +32,7 @@ VOCAB_FILES_NAMES = RobertaBPETokenizer.resource_files_names
 
 class RobertaBPETokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = RobertaBPETokenizer
+    test_offsets = False
     from_pretrained_kwargs = {"cls_token": "<s>"}
 
     def setUp(self):
