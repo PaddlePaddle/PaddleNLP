@@ -31,68 +31,68 @@
     <img src=https://user-images.githubusercontent.com/40840292/206112148-82e26dad-4a77-40e3-bc11-f877047aeb87.png height=700 width=450 hspace='10'/>
 </div>
 
-    ```python
-    >>> from pprint import pprint
-    >>> from paddlenlp import Taskflow
-    >>> schema = ["收发货人", "进口口岸", "进口日期", "运输方式", "征免性质", "境内目的地", "运输工具名称", "包装种类", "件数", "合同协议号"]
-    >>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base")
-    >>> pprint(ie({"doc": "./cases/custom.jpeg"}))
-    [{'件数': [{'bbox': [[826, 1062, 926, 1121]],
-            'end': 312,
-            'probability': 0.9832498761402597,
-            'start': 308,
-            'text': '1142'}],
-    '包装种类': [{'bbox': [[1214, 1066, 1310, 1121]],
-                'end': 314,
-                'probability': 0.9995648138860567,
-                'start': 312,
-                'text': '纸箱'}],
-    '合同协议号': [{'bbox': [[151, 1077, 258, 1117]],
-                'end': 319,
-                'probability': 0.9984179437542124,
-                'start': 314,
-                'text': '33035'}],
-    '境内目的地': [{'bbox': [[1966, 872, 2095, 923]],
-                'end': 275,
-                'probability': 0.9975541483111243,
-                'start': 272,
-                'text': '上海市'}],
-    '征免性质': [{'bbox': [[1583, 770, 1756, 821]],
-                'end': 242,
-                'probability': 0.9950633161231508,
-                'start': 238,
-                'text': '一般征税'}],
-    '收发货人': [{'bbox': [[321, 533, 841, 580]],
-                'end': 95,
-                'probability': 0.4772132061042136,
-                'start': 82,
-                'text': '上海新尚实国际贸易有限公司'},
-            {'bbox': [[306, 584, 516, 624]],
-                'end': 150,
-                'probability': 0.33807074572195006,
-                'start': 140,
-                'text': '31222609K9'}],
-    '运输工具名称': [{'bbox': [[1306, 672, 1516, 712], [1549, 668, 1645, 712]],
-                'end': 190,
-                'probability': 0.6692050414718089,
-                'start': 174,
-                'text': 'E. R. TIANAN004E'}],
-    '运输方式': [{'bbox': [[1070, 664, 1240, 715]],
-                'end': 174,
-                'probability': 0.9994416347044179,
-                'start': 170,
-                'text': '永路运输'}],
-    '进口口岸': [{'bbox': [[1070, 566, 1346, 617]],
-                'end': 120,
-                'probability': 0.9945697196994345,
-                'start': 111,
-                'text': '洋山港区-2248'}],
-    '进口日期': [{'bbox': [[1726, 569, 1933, 610]],
-                'end': 130,
-                'probability': 0.9804819494073627,
-                'start': 120,
-                'text': '2017-02-24'}]}]
-    ```
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+>>> schema = ["收发货人", "进口口岸", "进口日期", "运输方式", "征免性质", "境内目的地", "运输工具名称", "包装种类", "件数", "合同协议号"]
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base")
+>>> pprint(ie({"doc": "./cases/custom.jpeg"}))
+[{'件数': [{'bbox': [[826, 1062, 926, 1121]],
+        'end': 312,
+        'probability': 0.9832498761402597,
+        'start': 308,
+        'text': '1142'}],
+'包装种类': [{'bbox': [[1214, 1066, 1310, 1121]],
+            'end': 314,
+            'probability': 0.9995648138860567,
+            'start': 312,
+            'text': '纸箱'}],
+'合同协议号': [{'bbox': [[151, 1077, 258, 1117]],
+            'end': 319,
+            'probability': 0.9984179437542124,
+            'start': 314,
+            'text': '33035'}],
+'境内目的地': [{'bbox': [[1966, 872, 2095, 923]],
+            'end': 275,
+            'probability': 0.9975541483111243,
+            'start': 272,
+            'text': '上海市'}],
+'征免性质': [{'bbox': [[1583, 770, 1756, 821]],
+            'end': 242,
+            'probability': 0.9950633161231508,
+            'start': 238,
+            'text': '一般征税'}],
+'收发货人': [{'bbox': [[321, 533, 841, 580]],
+            'end': 95,
+            'probability': 0.4772132061042136,
+            'start': 82,
+            'text': '上海新尚实国际贸易有限公司'},
+        {'bbox': [[306, 584, 516, 624]],
+            'end': 150,
+            'probability': 0.33807074572195006,
+            'start': 140,
+            'text': '31222609K9'}],
+'运输工具名称': [{'bbox': [[1306, 672, 1516, 712], [1549, 668, 1645, 712]],
+            'end': 190,
+            'probability': 0.6692050414718089,
+            'start': 174,
+            'text': 'E. R. TIANAN004E'}],
+'运输方式': [{'bbox': [[1070, 664, 1240, 715]],
+            'end': 174,
+            'probability': 0.9994416347044179,
+            'start': 170,
+            'text': '永路运输'}],
+'进口口岸': [{'bbox': [[1070, 566, 1346, 617]],
+            'end': 120,
+            'probability': 0.9945697196994345,
+            'start': 111,
+            'text': '洋山港区-2248'}],
+'进口日期': [{'bbox': [[1726, 569, 1933, 610]],
+            'end': 130,
+            'probability': 0.9804819494073627,
+            'start': 120,
+            'text': '2017-02-24'}]}]
+```
 
 - 证件
 
@@ -101,13 +101,13 @@
     <img src=https://user-images.githubusercontent.com/40840292/206114081-8c82e2a2-0c88-4ca3-9651-b12c94266be9.png height=400 width=700 hspace='10'/>
 </div>
 
-    ```python
-    >>> from pprint import pprint
-    >>> from paddlenlp import Taskflow
-    >>> schema = ["Name", "Date of birth", "Issue date"]
-    >>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", ocr_lang="en", schema_lang="en")
-    >>> pprint(ie({"doc": "./cases/license.jpeg"}))
-    ```
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+>>> schema = ["Name", "Date of birth", "Issue date"]
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", ocr_lang="en", schema_lang="en")
+>>> pprint(ie({"doc": "./cases/license.jpeg"}))
+```
 
 <a name="22"></a>
 
@@ -121,13 +121,13 @@
     <img src=https://user-images.githubusercontent.com/40840292/206115688-30de315a-8fd4-4125-a3c3-8cb05c6e39e5.png height=180 width=600 hspace='10'/>
 </div>
 
-    ```python
-    >>> from pprint import pprint
-    >>> from paddlenlp import Taskflow
-    >>> schema = {"姓名": ["招聘单位", "报考岗位"]}
-    >>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base")
-    >>> pprint(ie({"doc": "./cases/table.png"}))
-    ```
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
+>>> schema = {"姓名": ["招聘单位", "报考岗位"]}
+>>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base")
+>>> pprint(ie({"doc": "./cases/table.png"}))
+```
 
 <a name="23"></a>
 
@@ -135,7 +135,7 @@
 
 - Delivery Note
 
-    对文档进行实体关系抽取，schema构造如下：
+对文档进行实体关系抽取，schema构造如下：
 
 ```text
 schema = [
@@ -157,14 +157,14 @@ schema = [
     <img src=https://user-images.githubusercontent.com/40840292/206120861-13b475dc-9a78-43bc-9dec-91f331db2ddf.png height=400 width=650 hspace='10'/>
 </div>
 
-    ```python
-    >>> from pprint import pprint
-    >>> from paddlenlp import Taskflow
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-    >>> schema = ["Total GBP", "No.", "Date", "Customer No.", "Subtotal without VAT", {"Description": ["Quantity", "Amount"]}]
-    >>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", ocr_lang="en", schema_lang="en")
-    >>> pprint(ie({"doc": "./cases/delivery_note.png"}))
-    ```
+>>> schema = ["Total GBP", "No.", "Date", "Customer No.", "Subtotal without VAT", {"Description": ["Quantity", "Amount"]}]
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", ocr_lang="en", schema_lang="en")
+>>> pprint(ie({"doc": "./cases/delivery_note.png"}))
+```
 
 <a name="24"></a>
 
@@ -172,28 +172,28 @@ schema = [
 
 - 输入格式
 
-    UIE-X支持图片路径、http图片链接、base64的输入形式，支持图片和PDF两种文档格式。
+UIE-X支持图片路径、http图片链接、base64的输入形式，支持图片和PDF两种文档格式。
 
-    ```python
-    [
-        {'doc': './cases/custom.jpg'},
-        {'doc': 'https://user-images.githubusercontent.com/40840292/203457719-84a70241-607e-4bb1-ab4c-3d9beee9e254.jpeg'}
-    ]
-    ```
+```python
+[
+    {'doc': './cases/custom.jpg'},
+    {'doc': 'https://user-images.githubusercontent.com/40840292/203457719-84a70241-607e-4bb1-ab4c-3d9beee9e254.jpeg'}
+]
+```
 
-    **NOTE**: 多页PDF输入目前只抽取第一页的结果，UIE-X比较适合单证文档（如票据、单据等）的信息提取，目前还不适合过长或多页的文档。
+**NOTE**: 多页PDF输入目前只抽取第一页的结果，UIE-X比较适合单证文档（如票据、单据等）的信息提取，目前还不适合过长或多页的文档。
 
 - 使用自己的layout / OCR作为输入
 
-    ```python
-    layout = [
-        ([68.0, 12.0, 167.0, 70.0], '名次'),
-        ([464.0, 13.0, 559.0, 67.0], '球员'),
-        ([833.0, 15.0, 1054.0, 64.0], '总出场时间'),
-        ......
-    ]
-    ie({"doc": doc_path, 'layout': layout})
-    ```
+```python
+layout = [
+    ([68.0, 12.0, 167.0, 70.0], '名次'),
+    ([464.0, 13.0, 559.0, 67.0], '球员'),
+    ([833.0, 15.0, 1054.0, 64.0], '总出场时间'),
+    ......
+]
+ie({"doc": doc_path, 'layout': layout})
+```
 
 - OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能（``layout_analysis=True``）以优化文字排序并增强抽取效果。
 
@@ -201,24 +201,24 @@ schema = [
     <img src=https://user-images.githubusercontent.com/40840292/206137978-3a69e7e2-dc2e-4d11-98b7-25911b0375a0.png height=350 width=600 hspace='10'/>
 </div>
 
-    ```python
-    >>> from pprint import pprint
-    >>> from paddlenlp import Taskflow
+```python
+>>> from pprint import pprint
+>>> from paddlenlp import Taskflow
 
-    >>> schema = "抗血小板药物的用药指征"
-    >>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", layout_analysis=True)
-    >>> pprint(ie({"doc": "./cases/drug.webp"}))
-    ```
+>>> schema = "抗血小板药物的用药指征"
+>>> ie = Taskflow("information_extraction", schema=schema, model="uie-x-base", layout_analysis=True)
+>>> pprint(ie({"doc": "./cases/drug.webp"}))
+```
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206139057-aedec98f-683c-4648-999d-81ce5ea04a86.png height=250 width=500 hspace='10'/>
 </div>
 
-    ```python
-    >>> schema = "中标候选人名称"
-    >>> ie.set_schema(schema)
-    >>> pprint(ie({"doc": "https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fwww.xuyiwater.com%2Fwp-content%2Fuploads%2F2021%2F06%2F1-4.jpg&refer=http%3A%2F%2Fwww.xuyiwater.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=auto?sec=1672994926&t=2a4a3fedf6999a34ccde190f97bcfa47"}))
-    ```
+```python
+>>> schema = "中标候选人名称"
+>>> ie.set_schema(schema)
+>>> pprint(ie({"doc": "https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fwww.xuyiwater.com%2Fwp-content%2Fuploads%2F2021%2F06%2F1-4.jpg&refer=http%3A%2F%2Fwww.xuyiwater.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=auto?sec=1672994926&t=2a4a3fedf6999a34ccde190f97bcfa47"}))
+```
 
 <a name="25"></a>
 
