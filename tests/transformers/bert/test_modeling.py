@@ -586,30 +586,6 @@ class BertCompatibilityTest(unittest.TestCase):
         model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased", dropout=0.3)
         self.assertEqual(model.dropout.p, 0.3)
 
-    def test_load_from_hf(self):
-        """test load config from hf"""
-        config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
-        assert config.hidden_size == 32
-
-        with tempfile.TemporaryDirectory() as tempdir:
-            config.save_pretrained(tempdir)
-
-            assert os.path.exists(os.path.join(tempdir, "config.json"))
-
-    def test_config_mapping(self):
-        class FakeBertConfig(BertConfig):
-            pass
-
-        with tempfile.TemporaryDirectory() as tempdir:
-            config = FakeBertConfig.from_pretrained("bert-base-uncased")
-
-            config.save_pretrained(tempdir)
-
-            FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
-
-            loaded_config = FakeBertConfig.from_pretrained(tempdir)
-            assert loaded_config["fake_field"] == config.hidden_size
-
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BertModel

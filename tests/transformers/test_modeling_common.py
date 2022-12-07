@@ -557,6 +557,36 @@ class ModelTesterPretrainedMixin:
     hf_remote_test_model_path: str = None
     paddlehub_remote_test_model_path: str = None
 
+    def test_load_from_hf(self):
+        """test load config from hf"""
+        if not self.base_model_class.constructed_from_pretrained_config() or not self.hf_remote_test_model_path:
+            return
+
+        config = self.base_model_class.config_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config.save_pretrained(tempdir)
+
+            assert os.path.exists(os.path.join(tempdir, CONFIG_NAME))
+
+    def test_config_mapping(self):
+
+        if not self.base_model_class.constructed_from_pretrained_config() or not self.paddlehub_remote_test_model_path:
+            return
+
+        class FakePretrainedConfig(self.base_model_class.config_class):
+            pass
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = FakePretrainedConfig.from_pretrained(self.paddlehub_remote_test_model_path)
+
+            config.save_pretrained(tempdir)
+
+            FakePretrainedConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+            loaded_config = FakePretrainedConfig.from_pretrained(tempdir)
+            self.assertEqual(loaded_config.fake_field, config.hidden_size)
+
     @slow
     def test_model_from_pretrained_hf_hub(self):
         if self.hf_remote_test_model_path is None or self.base_model_class is None:
