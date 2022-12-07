@@ -55,3 +55,4 @@ FAILED_STATUS = -1
 SUCCESS_STATUS = 0
 
 LEGACY_CONFIG_NAME = "model_config.json"
+CONFIG_NAME = "config.json"
