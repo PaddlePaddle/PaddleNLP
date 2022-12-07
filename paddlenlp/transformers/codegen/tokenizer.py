@@ -16,7 +16,7 @@
 from paddle.utils import try_import
 from .. import GPTTokenizer
 
-__all__ = ['CodeGenTokenizer']
+__all__ = ["CodeGenTokenizer"]
 
 VOCAB_FILES_NAMES = {
     "vocab_file": "vocab.json",
@@ -26,39 +26,42 @@ VOCAB_FILES_NAMES = {
 
 class CodeGenTokenizer(GPTTokenizer):
 
-    resource_files_names = {
-        "vocab_file": "vocab.json",
-        "merges_file": "merges.txt"
-    }
+    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
     pretrained_resource_files_map = {"vocab_file": {}, "merges_file": {}}
     pretrained_init_configuration = {}
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 max_len=None,
-                 pad_token='<|endoftext|>',
-                 eos_token='<|endoftext|>',
-                 unk_token='<|endoftext|>',
-                 eol_token='\u010a',
-                 **kwargs):
-        super().__init__(vocab_file=vocab_file,
-                         merges_file=merges_file,
-                         errors=errors,
-                         max_len=max_len,
-                         pad_token=pad_token,
-                         eos_token=eos_token,
-                         unk_token=unk_token,
-                         eol_token=eol_token,
-                         **kwargs)
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        max_len=None,
+        pad_token="<|endoftext|>",
+        eos_token="<|endoftext|>",
+        unk_token="<|endoftext|>",
+        eol_token="\u010a",
+        **kwargs
+    ):
+        super().__init__(
+            vocab_file=vocab_file,
+            merges_file=merges_file,
+            errors=errors,
+            max_len=max_len,
+            pad_token=pad_token,
+            eos_token=eos_token,
+            unk_token=unk_token,
+            eol_token=eol_token,
+            **kwargs,
+        )
 
-    def decode(self,
-               token_ids,
-               skip_special_tokens=False,
-               clean_up_tokenization_spaces=True,
-               truncate_before_pattern=None,
-               **kwargs):
+    def decode(
+        self,
+        token_ids,
+        skip_special_tokens=False,
+        clean_up_tokenization_spaces=True,
+        truncate_before_pattern=None,
+        **kwargs
+    ):
         """
         Converts a sequence of ids in a string, using the tokenizer and vocabulary with options to remove special
         tokens and clean up tokenization spaces.
@@ -90,44 +93,36 @@ class CodeGenTokenizer(GPTTokenizer):
             **kwargs,
         )
 
-        if truncate_before_pattern is not None and len(
-                truncate_before_pattern) > 0:
+        if truncate_before_pattern is not None and len(truncate_before_pattern) > 0:
             decoded_text = self.truncate(decoded_text, truncate_before_pattern)
 
         return decoded_text
 
     def truncate(self, completion, truncate_before_pattern):
-
         def find_re(string, pattern, start_pos):
             m = pattern.search(string, start_pos)
             return m.start() if m else -1
 
         re = try_import("regex")
-        terminals = [
-            re.compile(pattern, re.MULTILINE)
-            for pattern in truncate_before_pattern
-        ]
+        terminals = [re.compile(pattern, re.MULTILINE) for pattern in truncate_before_pattern]
 
         prints = list(re.finditer("^print", completion, re.MULTILINE))
 
         if len(prints) > 1:
-            completion = completion[:prints[1].start()]
+            completion = completion[: prints[1].start()]
 
         defs = list(re.finditer("^def", completion, re.MULTILINE))
 
         if len(defs) > 1:
-            completion = completion[:defs[1].start()]
+            completion = completion[: defs[1].start()]
 
         start_pos = 0
 
         terminals_pos = [
-            pos for pos in [
-                find_re(completion, terminal, start_pos)
-                for terminal in terminals
-            ] if pos != -1
+            pos for pos in [find_re(completion, terminal, start_pos) for terminal in terminals] if pos != -1
         ]
 
         if len(terminals_pos) > 0:
-            return completion[:min(terminals_pos)]
+            return completion[: min(terminals_pos)]
         else:
             return completion

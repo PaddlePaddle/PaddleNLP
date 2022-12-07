@@ -33,7 +33,7 @@ def get_all_chars(tokenizer):
         tok_chr = [tc.replace("▁", "") for tc in tok_chr]
         while "" in tok_chr:
             tok_chr.remove("")
-        tok_chr = ''.join(tok_chr)
+        tok_chr = "".join(tok_chr)
         if len(tok_chr) != 1:
             all_chr.append(i)
     return all_chr
@@ -53,8 +53,7 @@ def merge_bbox(tok_bboxes):
         height_m += y_max - y_min
         width_m += x_max - x_min
     height_m = height_m / len(tok_bboxes)
-    if (height_g -
-            height_m) < 0.5 * height_m and width_g - width_m < 0.1 * width_m:
+    if (height_g - height_m) < 0.5 * height_m and width_g - width_m < 0.1 * width_m:
         return False, [min_gx, max_gx, min_gy, max_gy]
     else:
         return True, tok_bboxes[0]
@@ -72,7 +71,7 @@ def xlm_parse(ocr_res, tokenizer):
             new_token_boxes.extend(item["token_box"])
 
         # get layoutxlm tokenizer results and get the final results
-        temp_span_text = ''.join(new_tokens)
+        temp_span_text = "".join(new_tokens)
         temp_span_bbox = new_token_boxes
         span_text = ""
         span_bbox = []
@@ -138,20 +137,15 @@ def xlm_parse(ocr_res, tokenizer):
                     for j in range(i, len(span_text)):
                         if span_text[j].lower() == span_tokens[tid + 1][0]:
                             break
-                        if span_text[j].lower() == "，" and span_tokens[
-                                tid + 1][0] == ",":
+                        if span_text[j].lower() == "，" and span_tokens[tid + 1][0] == ",":
                             break
-                        if span_text[j].lower() == "；" and span_tokens[
-                                tid + 1][0] == ";":
+                        if span_text[j].lower() == "；" and span_tokens[tid + 1][0] == ";":
                             break
-                        if span_text[j].lower() == "）" and span_tokens[
-                                tid + 1][0] == ")":
+                        if span_text[j].lower() == "）" and span_tokens[tid + 1][0] == ")":
                             break
-                        if span_text[j].lower() == "（" and span_tokens[
-                                tid + 1][0] == "(":
+                        if span_text[j].lower() == "（" and span_tokens[tid + 1][0] == "(":
                             break
-                        if span_text[j].lower() == "￥" and span_tokens[
-                                tid + 1][0] == "¥":
+                        if span_text[j].lower() == "￥" and span_tokens[tid + 1][0] == "¥":
                             break
 
                     tok_len = j - i
@@ -159,7 +153,7 @@ def xlm_parse(ocr_res, tokenizer):
             else:
                 if "�" == span_text[i]:
                     tok_len = len(tok) + 1
-                elif tok == "......" and "…" in span_text[i:i + 6]:
+                elif tok == "......" and "…" in span_text[i : i + 6]:
                     tok_len = len(tok) - 2
                 elif "ⅱ" in span_text[i + len(tok) - 1]:
                     if tok == "i":
@@ -172,21 +166,21 @@ def xlm_parse(ocr_res, tokenizer):
                     tok_len = len(tok)
 
             assert i + tok_len <= len(span_bbox)
-            tok_bboxes = span_bbox[i:i + tok_len]
+            tok_bboxes = span_bbox[i : i + tok_len]
             _, merged_bbox = merge_bbox(tok_bboxes)
 
             doc_bboxes.append(merged_bbox)
             i = i + tok_len
     except:
-        print('Error')
-        span_tokens = ['▁'] * 512
+        print("Error")
+        span_tokens = ["▁"] * 512
         doc_bboxes = [[0, 0, 0, 0]] * 512
 
     return span_tokens, doc_bboxes
 
 
 def tokenize_ocr_res(ocr_reses):
-    '''
+    """
     input:
         ocr_res: the ocr result of the image
     return:
@@ -198,7 +192,7 @@ def tokenize_ocr_res(ocr_reses):
                 "token_box: bounding box of each chars in ocr_res
                 }
         }
-    '''
+    """
     new_reses = []
     for img_name, ocr_res in ocr_reses:
         new_res = []
@@ -227,16 +221,16 @@ def tokenize_ocr_res(ocr_reses):
                 tok_y_max = y_max
 
                 shift = tok_x_max
-                new_token_boxes.append(
-                    [round(tok_x_min),
-                     round(tok_x_max), tok_y_min, tok_y_max])
+                new_token_boxes.append([round(tok_x_min), round(tok_x_max), tok_y_min, tok_y_max])
                 new_tokens.append(char)
-            new_res.append({
-                "text": para["text"],
-                "bounding_box": para["bbox"],
-                "tokens": new_tokens,
-                "token_box": new_token_boxes
-            })
+            new_res.append(
+                {
+                    "text": para["text"],
+                    "bounding_box": para["bbox"],
+                    "tokens": new_tokens,
+                    "token_box": new_token_boxes,
+                }
+            )
         new_reses.append((img_name, new_res))
     return new_reses
 
@@ -247,19 +241,15 @@ def process_input(ocr_reses, tokenizer, save_ocr_path):
     examples = []
     for img_name, ocr_res in ocr_reses:
         doc_tokens, doc_bboxes = xlm_parse(ocr_res, tokenizer)
-        doc_tokens.insert(0, '▁')
+        doc_tokens.insert(0, "▁")
         doc_bboxes.insert(0, doc_bboxes[0])
-        example = {
-            "img_name": img_name,
-            "document": doc_tokens,
-            "document_bbox": doc_bboxes
-        }
+        example = {"img_name": img_name, "document": doc_tokens, "document_bbox": doc_bboxes}
         examples.append(example)
 
-    with open(save_ocr_path, 'w', encoding='utf8') as f:
+    with open(save_ocr_path, "w", encoding="utf8") as f:
         for example in examples:
             json.dump(example, f, ensure_ascii=False)
-            f.write('\n')
+            f.write("\n")
 
     print(f"ocr parsing results has been save to: {save_ocr_path}")
 
@@ -267,8 +257,7 @@ def process_input(ocr_reses, tokenizer, save_ocr_path):
 def ocr_preprocess(img_dir):
     ocr = PaddleOCR(use_angle_cls=True, lang="ch", use_gpu=True)
     ocr_reses = []
-    img_names = sorted(os.listdir(img_dir),
-                       key=lambda x: int(x.split("_")[1].split(".")[0]))
+    img_names = sorted(os.listdir(img_dir), key=lambda x: int(x.split("_")[1].split(".")[0]))
     for img_name in img_names:
         img_path = os.path.join(img_dir, img_name)
         parsing_res = ocr.ocr(img_path, cls=True)
@@ -280,7 +269,7 @@ def ocr_preprocess(img_dir):
     return ocr_reses
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     img_dir = "./demo_pics"
     save_path = "./demo_ocr_res.json"
     ocr_results = ocr_preprocess(img_dir)

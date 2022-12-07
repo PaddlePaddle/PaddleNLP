@@ -53,8 +53,7 @@ class ModelArguments:
 
 def main():
     # Parse the arguments.
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, PromptTuningArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, PromptTuningArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -66,10 +65,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
-    template = AutoTemplate.create_from(data_args.prompt,
-                                        tokenizer,
-                                        training_args.max_seq_length,
-                                        model=model)
+    template = AutoTemplate.create_from(data_args.prompt, tokenizer, training_args.max_seq_length, model=model)
     logger.info("Using template: {}".format(template.prompt))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
@@ -83,20 +79,16 @@ def main():
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
-        data_path=data_args.data_dir,
-        splits=["train", "dev", "test"],
-        label_list=verbalizer.labels_to_ids)
+        data_path=data_args.data_dir, splits=["train", "dev", "test"], label_list=verbalizer.labels_to_ids
+    )
 
     # Define the criterion.
     criterion = paddle.nn.BCEWithLogitsLoss()
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForSequenceClassification(
-        model,
-        template,
-        verbalizer,
-        freeze_plm=training_args.freeze_plm,
-        freeze_dropout=training_args.freeze_dropout)
+        model, template, verbalizer, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
+    )
 
     # Define the metric function.
     def compute_metrics(eval_preds):
@@ -104,26 +96,22 @@ def main():
         preds = F.sigmoid(paddle.to_tensor(eval_preds.predictions))
         metric.update(preds, paddle.to_tensor(eval_preds.label_ids))
         micro_f1_score, macro_f1_score = metric.accumulate()
-        return {
-            "micro_f1_score": micro_f1_score,
-            "macro_f1_score": macro_f1_score
-        }
+        return {"micro_f1_score": micro_f1_score, "macro_f1_score": macro_f1_score}
 
     # Deine the early-stopping callback.
-    callbacks = [
-        EarlyStoppingCallback(early_stopping_patience=4,
-                              early_stopping_threshold=0.)
-    ]
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.
-    trainer = PromptTrainer(model=prompt_model,
-                            tokenizer=tokenizer,
-                            args=training_args,
-                            criterion=criterion,
-                            train_dataset=train_ds,
-                            eval_dataset=dev_ds,
-                            callbacks=callbacks,
-                            compute_metrics=compute_metrics)
+    trainer = PromptTrainer(
+        model=prompt_model,
+        tokenizer=tokenizer,
+        args=training_args,
+        criterion=criterion,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        callbacks=callbacks,
+        compute_metrics=compute_metrics,
+    )
 
     # Training.
     if training_args.do_train:
@@ -147,23 +135,17 @@ def main():
             InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
             InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
             InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None],
-                      dtype="float32")  # attention_mask
+            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
         ]
         if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None],
-                                        dtype="int64"))  # masked_positions
+            input_spec.append(InputSpec(shape=[None], dtype="int64"))  # masked_positions
         if "soft" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None],
-                                        dtype="int64"))  # soft_token_ids
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # soft_token_ids
         if "encoder" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None],
-                                        dtype="int64"))  # encoder_ids
-        export_path = os.path.join(training_args.output_dir, 'export')
-        trainer.export_model(export_path,
-                             input_spec=input_spec,
-                             export_type=model_args.export_type)
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # encoder_ids
+        export_path = os.path.join(training_args.output_dir, "export")
+        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

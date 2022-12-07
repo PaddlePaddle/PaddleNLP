@@ -16,8 +16,9 @@
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import paddle
-
 import PIL.Image
+
+from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -30,9 +31,10 @@ from ppdiffusers import (
     UNet2DConditionModel,
 )
 from ppdiffusers.configuration_utils import FrozenDict
-from ppdiffusers.pipelines.stable_diffusion.safety_checker import StableDiffusionSafetyChecker
+from ppdiffusers.pipelines.stable_diffusion.safety_checker import (
+    StableDiffusionSafetyChecker,
+)
 from ppdiffusers.utils import deprecate, logging
-from paddlenlp.transformers import CLIPFeatureExtractor, CLIPTextModel, CLIPTokenizer
 
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
@@ -74,19 +76,16 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
         feature_extractor: CLIPFeatureExtractor,
     ):
         super().__init__()
-        if hasattr(scheduler.config,
-                   "steps_offset") and scheduler.config.steps_offset != 1:
+        if hasattr(scheduler.config, "steps_offset") and scheduler.config.steps_offset != 1:
             deprecation_message = (
                 f"The configuration file of this scheduler: {scheduler} is outdated. `steps_offset`"
                 f" should be set to 1 instead of {scheduler.config.steps_offset}. Please make sure "
                 "to update the config accordingly as leaving `steps_offset` might led to incorrect results"
                 " in future versions. If you have downloaded this checkpoint from the Hugging Face Hub,"
                 " it would be very nice if you could open a Pull request for the `scheduler/scheduler_config.json`"
-                " file")
-            deprecate("steps_offset!=1",
-                      "1.0.0",
-                      deprecation_message,
-                      standard_warn=False)
+                " file"
+            )
+            deprecate("steps_offset!=1", "1.0.0", deprecation_message, standard_warn=False)
             new_config = dict(scheduler.config)
             new_config["steps_offset"] = 1
             scheduler._internal_dict = FrozenDict(new_config)
@@ -103,14 +102,9 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
 
     @property
     def components(self) -> Dict[str, Any]:
-        return {
-            k: getattr(self, k)
-            for k in self.config.keys() if not k.startswith("_")
-        }
+        return {k: getattr(self, k) for k in self.config.keys() if not k.startswith("_")}
 
-    def enable_attention_slicing(self,
-                                 slice_size: Optional[Union[str,
-                                                            int]] = "auto"):
+    def enable_attention_slicing(self, slice_size: Optional[Union[str, int]] = "auto"):
         r"""
         Enable sliced attention computation.
         When this option is enabled, the attention module will split the input tensor in slices, to compute attention
@@ -139,7 +133,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
     def inpaint(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
@@ -156,7 +150,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
         # For more information on how this function works, please see: https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion#diffusers.StableDiffusionImg2ImgPipeline
         return StableDiffusionInpaintPipelineLegacy(**self.components)(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             mask_image=mask_image,
             strength=strength,
             num_inference_steps=num_inference_steps,
@@ -174,7 +168,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
     def img2img(
         self,
         prompt: Union[str, List[str]],
-        init_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         strength: float = 0.8,
         num_inference_steps: Optional[int] = 50,
         guidance_scale: Optional[float] = 7.5,
@@ -191,7 +185,7 @@ class StableDiffusionMegaPipeline(DiffusionPipeline):
         # For more information on how this function works, please see: https://huggingface.co/docs/diffusers/api/pipelines/stable_diffusion#diffusers.StableDiffusionImg2ImgPipeline
         return StableDiffusionImg2ImgPipeline(**self.components)(
             prompt=prompt,
-            init_image=init_image,
+            image=image,
             strength=strength,
             num_inference_steps=num_inference_steps,
             guidance_scale=guidance_scale,

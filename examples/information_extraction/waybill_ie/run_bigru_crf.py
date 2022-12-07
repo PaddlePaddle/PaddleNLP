@@ -51,8 +51,8 @@ def convert_tokens_to_ids(tokens, vocab, oov_token=None):
 
 def convert_to_features(example, word_vocab, label_vocab):
     tokens, labels = example
-    token_ids = convert_tokens_to_ids(tokens, word_vocab, 'OOV')
-    label_ids = convert_tokens_to_ids(labels, label_vocab, 'O')
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, "OOV")
+    label_ids = convert_tokens_to_ids(labels, label_vocab, "O")
     return token_ids, len(token_ids), label_ids
 
 
@@ -65,8 +65,7 @@ def evaluate(model, metric, data_loader):
         n_infer, n_label, n_correct = metric.compute(lengths, preds, label_ids)
         metric.update(n_infer.numpy(), n_label.numpy(), n_correct.numpy())
         precision, recall, f1_score = metric.accumulate()
-    print("[EVAL] Precision: %f - Recall: %f - F1: %f" %
-          (precision, recall, f1_score))
+    print("[EVAL] Precision: %f - Recall: %f - F1: %f" % (precision, recall, f1_score))
     model.train()
 
 
@@ -83,56 +82,53 @@ def predict(model, data_loader, ds, label_vocab):
     return results
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     paddle.set_device(args.device)
 
     # Create dataset, tokenizer and dataloader.
     train_ds, dev_ds, test_ds = load_dataset(
-        datafiles=(os.path.join(args.data_dir, 'train.txt'),
-                   os.path.join(args.data_dir, 'dev.txt'),
-                   os.path.join(args.data_dir, 'test.txt')))
+        datafiles=(
+            os.path.join(args.data_dir, "train.txt"),
+            os.path.join(args.data_dir, "dev.txt"),
+            os.path.join(args.data_dir, "test.txt"),
+        )
+    )
 
-    label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
-    word_vocab = load_dict(os.path.join(args.data_dir, 'word.dic'))
+    label_vocab = load_dict(os.path.join(args.data_dir, "tag.dic"))
+    word_vocab = load_dict(os.path.join(args.data_dir, "word.dic"))
 
-    trans_func = partial(convert_to_features,
-                         word_vocab=word_vocab,
-                         label_vocab=label_vocab)
+    trans_func = partial(convert_to_features, word_vocab=word_vocab, label_vocab=label_vocab)
     train_ds.map(trans_func)
     dev_ds.map(trans_func)
     test_ds.map(trans_func)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=word_vocab.get('OOV', 0), dtype='int32'
-            ),  # token_ids
-        Stack(dtype='int64'),  # seq_len
-        Pad(axis=0, pad_val=label_vocab.get('O', 0), dtype='int64')  # label_ids
+        Pad(axis=0, pad_val=word_vocab.get("OOV", 0), dtype="int32"),  # token_ids
+        Stack(dtype="int64"),  # seq_len
+        Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype="int64"),  # label_ids
     ): fn(samples)
 
-    train_loader = paddle.io.DataLoader(dataset=train_ds,
-                                        batch_size=args.batch_size,
-                                        shuffle=True,
-                                        drop_last=True,
-                                        return_list=True,
-                                        collate_fn=batchify_fn)
+    train_loader = paddle.io.DataLoader(
+        dataset=train_ds,
+        batch_size=args.batch_size,
+        shuffle=True,
+        drop_last=True,
+        return_list=True,
+        collate_fn=batchify_fn,
+    )
 
-    dev_loader = paddle.io.DataLoader(dataset=dev_ds,
-                                      batch_size=args.batch_size,
-                                      drop_last=True,
-                                      return_list=True,
-                                      collate_fn=batchify_fn)
+    dev_loader = paddle.io.DataLoader(
+        dataset=dev_ds, batch_size=args.batch_size, drop_last=True, return_list=True, collate_fn=batchify_fn
+    )
 
-    test_loader = paddle.io.DataLoader(dataset=test_ds,
-                                       batch_size=args.batch_size,
-                                       drop_last=True,
-                                       return_list=True,
-                                       collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(
+        dataset=test_ds, batch_size=args.batch_size, drop_last=True, return_list=True, collate_fn=batchify_fn
+    )
 
     # Define the model netword and its loss
     model = BiGRUWithCRF(300, 256, len(word_vocab), len(label_vocab))
 
-    optimizer = paddle.optimizer.Adam(learning_rate=0.001,
-                                      parameters=model.parameters())
+    optimizer = paddle.optimizer.Adam(learning_rate=0.001, parameters=model.parameters())
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)
 
     step = 0
@@ -146,17 +142,12 @@ if __name__ == '__main__':
             step += 1
             print("[TRAIN] Epoch:%d - Step:%d - Loss: %f" % (epoch, step, loss))
         evaluate(model, metric, dev_loader)
-        paddle.save(
-            model.state_dict(),
-            os.path.join(args.save_dir, 'model_%d' % step,
-                         'model_state.pdparams'))
+        paddle.save(model.state_dict(), os.path.join(args.save_dir, "model_%d" % step, "model_state.pdparams"))
 
     preds = predict(model, test_loader, test_ds, label_vocab)
     file_path = "bigru_crf_results.txt"
     with open(file_path, "w", encoding="utf8") as fout:
         fout.write("\n".join(preds))
     # Print some examples
-    print(
-        "The results have been saved into: %s, some examples are shown below: "
-        % file_path)
+    print("The results have been saved into: %s, some examples are shown below: " % file_path)
     print("\n".join(preds[:10]))

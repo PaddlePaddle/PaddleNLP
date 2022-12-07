@@ -26,20 +26,15 @@ class THUCNews(DatasetBuilder):
     See descrition about this subset version at https://github.com/gaussic/text-classification-cnn-rnn#%E6%95%B0%E6%8D%AE%E9%9B%86
     The whole dataset can be downloaded at https://thunlp.oss-cn-qingdao.aliyuncs.com/THUCNews.zip
     """
+
     URL = "https://bj.bcebos.com/paddlenlp/datasets/thucnews.zip"
     MD5 = "97626b2268f902662a29aadf222f22cc"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
-    LABEL_PATH = os.path.join('thucnews', 'label.txt')
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5"))
+    LABEL_PATH = os.path.join("thucnews", "label.txt")
     SPLITS = {
-        'train':
-        META_INFO(os.path.join('thucnews', 'train.txt'),
-                  "beda43dfb4f7bd9bd3d465edb35fbb7f"),
-        'dev':
-        META_INFO(os.path.join('thucnews', 'val.txt'),
-                  "1abe8fe2c75dde701407a9161dcd223a"),
-        'test':
-        META_INFO(os.path.join('thucnews', 'test.txt'),
-                  "201f558b7d0b3419ddebcd695f3070f0")
+        "train": META_INFO(os.path.join("thucnews", "train.txt"), "beda43dfb4f7bd9bd3d465edb35fbb7f"),
+        "dev": META_INFO(os.path.join("thucnews", "val.txt"), "1abe8fe2c75dde701407a9161dcd223a"),
+        "test": META_INFO(os.path.join("thucnews", "test.txt"), "201f558b7d0b3419ddebcd695f3070f0"),
     }
 
     def _get_data(self, mode, **kwargs):
@@ -47,29 +42,27 @@ class THUCNews(DatasetBuilder):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
     def _read(self, filename, split):
-        with open(filename, "r", encoding='utf8') as f:
+        with open(filename, "r", encoding="utf8") as f:
             examples = f.readlines()
             for example in examples:
-                split_idx = example.find('\t')
+                split_idx = example.find("\t")
                 label = example[:split_idx]
-                text = example[split_idx + 1:].strip()
-                yield {'text': text, 'label': label}
+                text = example[split_idx + 1 :].strip()
+                yield {"text": text, "label": label}
 
     def get_labels(self):
         labels = []
-        filename = os.path.join(DATA_HOME, self.__class__.__name__,
-                                self.LABEL_PATH)
-        with open(filename, "r", encoding='utf8') as f:
+        filename = os.path.join(DATA_HOME, self.__class__.__name__, self.LABEL_PATH)
+        with open(filename, "r", encoding="utf8") as f:
             while True:
                 label = f.readline().strip()
-                if label == '':
+                if label == "":
                     break
                 labels.append(label)
         return labels

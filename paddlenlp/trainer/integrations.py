@@ -63,9 +63,7 @@ class VisualDLCallback(TrainerCallback):
     def __init__(self, vdl_writer=None):
         has_visualdl = is_visualdl_available()
         if not has_visualdl:
-            raise RuntimeError(
-                "VisualDLCallback requires visualdl to be installed. Please install visualdl."
-            )
+            raise RuntimeError("VisualDLCallback requires visualdl to be installed. Please install visualdl.")
         if has_visualdl:
             try:
                 from visualdl import LogWriter
@@ -95,20 +93,15 @@ class VisualDLCallback(TrainerCallback):
             self.vdl_writer.add_text("args", args.to_json_string())
             if "model" in kwargs:
                 model = kwargs["model"]
-                if isinstance(model, PretrainedModel
-                              ) and model.constructed_from_pretrained_config():
+                if isinstance(model, PretrainedModel) and model.constructed_from_pretrained_config():
                     model.config.architectures = [model.__class__.__name__]
                     self.vdl_writer.add_text("model_config", str(model.config))
-                elif hasattr(model,
-                             "init_config") and model.init_config is not None:
-                    model_config_json = json.dumps(model.get_model_config(),
-                                                   ensure_ascii=False,
-                                                   indent=2)
+                elif hasattr(model, "init_config") and model.init_config is not None:
+                    model_config_json = json.dumps(model.get_model_config(), ensure_ascii=False, indent=2)
                     self.vdl_writer.add_text("model_config", model_config_json)
 
             if hasattr(self.vdl_writer, "add_hparams"):
-                self.vdl_writer.add_hparams(args.to_sanitized_dict(),
-                                            metrics_list=[])
+                self.vdl_writer.add_hparams(args.to_sanitized_dict(), metrics_list=[])
 
     def on_log(self, args, state, control, logs=None, **kwargs):
         if not state.is_world_process_zero:
@@ -127,7 +120,8 @@ class VisualDLCallback(TrainerCallback):
                         "Trainer is attempting to log a value of "
                         f'"{v}" of type {type(v)} for key "{k}" as a scalar. '
                         "This invocation of VisualDL's writer.add_scalar() "
-                        "is incorrect so we dropped this attribute.")
+                        "is incorrect so we dropped this attribute."
+                    )
             self.vdl_writer.flush()
 
     def on_train_end(self, args, state, control, **kwargs):

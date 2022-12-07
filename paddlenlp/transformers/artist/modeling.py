@@ -19,9 +19,9 @@ from ..dallebart.modeling import VQGanDetokenizer
 from ..gpt.modeling import GPTLMHeadModel, GPTLMHead, GPTModel
 
 __all__ = [
-    'ArtistModel',
-    'ArtistForImageGeneration',
-    'ArtistForConditionalGeneration',
+    "ArtistModel",
+    "ArtistForImageGeneration",
+    "ArtistForConditionalGeneration",
 ]
 
 # set gelu_new
@@ -116,16 +116,11 @@ pretrained_init_configuration = {
 }
 pretrained_resource_files_map = {
     "model_state": {
-        "pai-painter-base-zh":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
-        "pai-painter-painting-base-zh":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
-        "pai-painter-scenery-base-zh":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/model_state.pdparams",
-        "pai-painter-commercial-base-zh":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/model_state.pdparams",
-        "pai-painter-large-zh":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
+        "pai-painter-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/model_state.pdparams",
+        "pai-painter-painting-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/model_state.pdparams",
+        "pai-painter-scenery-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/model_state.pdparams",
+        "pai-painter-commercial-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/model_state.pdparams",
+        "pai-painter-large-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/model_state.pdparams",
     }
 }
 
@@ -144,21 +139,19 @@ class ArtistForConditionalGeneration(GPTLMHeadModel):
             An instance of :class:`ArtistModel`.
 
     """
+
     pretrained_init_configuration = pretrained_init_configuration
     pretrained_resource_files_map = pretrained_resource_files_map
 
     def __init__(self, gpt):
         super().__init__(gpt)
-        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"],
-                                 self.gpt.config["vocab_size"])
+        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"], self.gpt.config["vocab_size"])
         self.apply(self.init_weights)
 
     @staticmethod
-    def prepare_attention_mask_for_generation(input_ids, pad_token_id,
-                                              eos_token_id):
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
         # we don't use attention_mask
-        attention_mask = paddle.zeros_like(input_ids,
-                                           dtype=paddle.get_default_dtype())
+        attention_mask = paddle.zeros_like(input_ids, dtype=paddle.get_default_dtype())
         return paddle.unsqueeze(attention_mask, axis=[1, 2])
 
 
@@ -170,7 +163,7 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             An instance of ArtistModel.
         image_vocab_size (int, optional):
             The vocabulary size of image.
-            Defaults to `16384`. 
+            Defaults to `16384`.
     """
     pretrained_init_configuration = pretrained_init_configuration
     pretrained_resource_files_map = pretrained_resource_files_map
@@ -180,16 +173,18 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
         self.vqgan_detokenizer = VQGanDetokenizer(image_vocab_size, 256)
 
     @paddle.no_grad()
-    def generate(self,
-                 input_ids,
-                 attention_mask=None,
-                 top_k=0,
-                 top_p=1.0,
-                 temperature=1.0,
-                 num_return_sequences=1,
-                 use_faster=False,
-                 use_fp16_decoding=False,
-                 **kwargs):
+    def generate(
+        self,
+        input_ids,
+        attention_mask=None,
+        top_k=0,
+        top_p=1.0,
+        temperature=1.0,
+        num_return_sequences=1,
+        use_faster=False,
+        use_fp16_decoding=False,
+        **kwargs
+    ):
         r"""
         The ArtistForImageGeneration generate method.
         Args:
@@ -197,23 +192,23 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
                 See :class:`ArtistForConditionalGeneration`.
             attention_mask (Tensor, optional):
                 See :class:`ArtistForConditionalGeneration`.
-            top_k (int, optional): The number of highest probability tokens to 
-                keep for top-k-filtering in the "sampling" strategy. Default to 
+            top_k (int, optional): The number of highest probability tokens to
+                keep for top-k-filtering in the "sampling" strategy. Default to
                 0, which means no effect.
-            top_p (float, optional): The cumulative probability for 
-                top-p-filtering in the "sampling" strategy. The value should 
-                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no 
+            top_p (float, optional): The cumulative probability for
+                top-p-filtering in the "sampling" strategy. The value should
+                satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
                 effect.
-            temperature (float, optional): The value used to module the next 
-                token probabilities in the "sampling" strategy. Default to 1.0, 
+            temperature (float, optional): The value used to module the next
+                token probabilities in the "sampling" strategy. Default to 1.0,
                 which means no effect.
-            num_return_sequences (int, optional): The number of returned 
+            num_return_sequences (int, optional): The number of returned
                 sequences for each sequence in the batch. Default to 1.
-            use_faster: (bool, optional): Whether to use faster entry of model 
+            use_faster: (bool, optional): Whether to use faster entry of model
                 for FasterGeneration. Default to False.
-            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding. 
+            use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
                 Only works when faster entry is avalible. Default to False.
-                
+
         Returns:
             Tensor: Returns tensor `images`, which is the output of :class:`VQGanDetokenizer`.
             Its data type should be uint8 and has a shape of [batch_size, num_return_sequences, 256, 256, 3].
@@ -251,7 +246,7 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
         image_tokens = super().generate(
             input_ids=input_ids,
             max_length=256,
-            decode_strategy='sampling',
+            decode_strategy="sampling",
             attention_mask=attention_mask,
             top_k=top_k,
             top_p=top_p,
@@ -259,13 +254,11 @@ class ArtistForImageGeneration(ArtistForConditionalGeneration):
             num_return_sequences=num_return_sequences,
             use_faster=use_faster,
             use_fp16_decoding=use_fp16_decoding,
-            seq_len=paddle.ones((input_ids.shape[0], ), dtype="int32") * 32,
-            **kwargs)[0]
+            seq_len=paddle.ones((input_ids.shape[0],), dtype="int32") * 32,
+            **kwargs,
+        )[0]
         images = self.vqgan_detokenizer(image_tokens)
         # images shape [bs, num_return_sequences, 256, 256, 3]
-        images = images.reshape([
-            -1, num_return_sequences, images.shape[1], images.shape[2],
-            images.shape[3]
-        ])
+        images = images.reshape([-1, num_return_sequences, images.shape[1], images.shape[2], images.shape[3]])
         images = ((images + 1.0) * 127.5).clip(0, 255).astype("uint8")
         return images

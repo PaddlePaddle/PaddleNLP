@@ -28,12 +28,8 @@ def check_init_checkpoint():
 
 def get_groundtruth():
     res = {
-        1: {
-            "loss": 11.008564949
-        },
-        20: {
-            "loss": 10.876321793
-        },
+        1: {"loss": 11.008564949},
+        20: {"loss": 10.876321793},
     }
     return res
 
@@ -84,21 +80,16 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_single_dygraph", "acc_single_static"]:
-            ret = os.system("cd %s && sh %s/%s.sh" %
-                            (get_gpt_path(), get_scripts_path(), task_name))
+            ret = os.system("cd %s && sh %s/%s.sh" % (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
             gt = get_groundtruth()
-            res = parse_log("./output/gpt-%s/log/workerlog.0" %
-                            task_name.replace("_", "-"))
+            res = parse_log("./output/gpt-%s/log/workerlog.0" % task_name.replace("_", "-"))
             print_test_results(task_name)
             for k in gt.keys():
-                print("%s step: %d, gt:%.9f res:%.9f " %
-                      (task_name, k, gt[k]["loss"], res[k]["loss"]))
-                self.assertAlmostEqual(gt[k]["loss"],
-                                       res[k]["loss"],
-                                       delta=1e-6)
+                print("%s step: %d, gt:%.9f res:%.9f " % (task_name, k, gt[k]["loss"], res[k]["loss"]))
+                self.assertAlmostEqual(gt[k]["loss"], res[k]["loss"], delta=1e-6)
             print("\n" * 5)
 
     def test_acc_dp(self):
@@ -106,23 +97,19 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_dp_dygraph", "acc_dp_static"]:
-            ret = os.system("cd %s && sh %s/%s.sh" %
-                            (get_gpt_path(), get_scripts_path(), task_name))
+            ret = os.system("cd %s && sh %s/%s.sh" % (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
 
             gt = get_groundtruth()
-            res1 = parse_log("./output/gpt-%s/log/workerlog.0" %
-                             task_name.replace("_", "-"))
-            res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
-                             task_name.replace("_", "-"))
+            res1 = parse_log("./output/gpt-%s/log/workerlog.0" % task_name.replace("_", "-"))
+            res2 = parse_log("./output/gpt-%s/log/workerlog.1" % task_name.replace("_", "-"))
 
             print_test_results(task_name)
             for k in gt.keys():
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
-                print("%s step: %d, gt:%.9f res:%.9f " %
-                      (task_name, k, gt[k]["loss"], mean))
+                print("%s step: %d, gt:%.9f res:%.9f " % (task_name, k, gt[k]["loss"], mean))
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
             print("\n" * 5)
 
@@ -131,56 +118,43 @@ class GPTAccuarcy(unittest.TestCase):
         check_init_checkpoint()
 
         for task_name in ["acc_sharding_static"]:
-            ret = os.system("cd %s && sh %s/%s.sh" %
-                            (get_gpt_path(), get_scripts_path(), task_name))
+            ret = os.system("cd %s && sh %s/%s.sh" % (get_gpt_path(), get_scripts_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
 
             gt = get_groundtruth()
-            res1 = parse_log("./output/gpt-%s/log/workerlog.0" %
-                             task_name.replace("_", "-"))
-            res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
-                             task_name.replace("_", "-"))
+            res1 = parse_log("./output/gpt-%s/log/workerlog.0" % task_name.replace("_", "-"))
+            res2 = parse_log("./output/gpt-%s/log/workerlog.1" % task_name.replace("_", "-"))
 
             print_test_results(task_name)
             for k in gt.keys():
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
-                print("%s step: %d, gt:%.9f res:%.9f " %
-                      (task_name, k, gt[k]["loss"], mean))
+                print("%s step: %d, gt:%.9f res:%.9f " % (task_name, k, gt[k]["loss"], mean))
                 self.assertAlmostEqual(gt[k]["loss"], mean, delta=5e-6)
             print("\n" * 5)
 
-    @unittest.skipIf(True,
-                     "This folder not support MP. Please use MP in GPT-3.")
+    @unittest.skipIf(True, "This folder not support MP. Please use MP in GPT-3.")
     def test_acc_mp_static(self):
         check_dataset()
         check_init_checkpoint()
 
         for task_name in ["acc_mp_static"]:
-            ret = os.system("cd %s && sh %s/%s.sh" %
-                            (get_gpt_path(), get_gpt_path(), task_name))
+            ret = os.system("cd %s && sh %s/%s.sh" % (get_gpt_path(), get_gpt_path(), task_name))
             if ret != 0:
                 print(ret)
                 raise ValueError("Train script failed")
 
             gt = get_groundtruth()
-            res1 = parse_log("./output/gpt-%s/log/workerlog.0" %
-                             task_name.replace("_", "-"))
-            res2 = parse_log("./output/gpt-%s/log/workerlog.1" %
-                             task_name.replace("_", "-"))
+            res1 = parse_log("./output/gpt-%s/log/workerlog.0" % task_name.replace("_", "-"))
+            res2 = parse_log("./output/gpt-%s/log/workerlog.1" % task_name.replace("_", "-"))
 
             print_test_results(task_name)
             for k in gt.keys():
-                self.assertAlmostEqual(res1[k]["loss"],
-                                       res2[k]["loss"],
-                                       delta=1e-7)
+                self.assertAlmostEqual(res1[k]["loss"], res2[k]["loss"], delta=1e-7)
                 mean = (res1[k]["loss"] + res2[k]["loss"]) / 2
-                print("%s step: %d, gt:%.9f res:%.9f " %
-                      (task_name, k, gt[k]["loss"], mean))
-                self.assertAlmostEqual(gt[k]["loss"],
-                                       res1[k]["loss"],
-                                       delta=1e-7)
+                print("%s step: %d, gt:%.9f res:%.9f " % (task_name, k, gt[k]["loss"], mean))
+                self.assertAlmostEqual(gt[k]["loss"], res1[k]["loss"], delta=1e-7)
             print("\n" * 5)
 
 

@@ -36,14 +36,10 @@ def perf_pd(args):
     place = "gpu"
     place = paddle.set_device(place)
     tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
-    model = PegasusForConditionalGeneration.from_pretrained(
-        args.model_name_or_path, load_state_as_np=True)
+    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path, load_state_as_np=True)
     model.eval()
     load_mem = query_by_id(args.gpu_id)
-    input_ids_np = [
-        np.random.choice(range(len(tokenizer.vocab)), args.input_len)
-        for _ in range(args.batch_size)
-    ]
+    input_ids_np = [np.random.choice(range(len(tokenizer.vocab)), args.input_len) for _ in range(args.batch_size)]
     input_ids = paddle.to_tensor(input_ids_np)
 
     num_loop = 100
@@ -54,17 +50,18 @@ def perf_pd(args):
                 # PaddlePaddle >= 2.2
                 paddle.device.cuda.synchronize(place)
                 start = time.perf_counter()
-            output, _ = model.generate(input_ids=input_ids,
-                                       max_length=args.generate_len,
-                                       min_length=args.generate_len,
-                                       decode_strategy="beam_search",
-                                       num_beams=args.num_beams,
-                                       use_faster=args.use_faster,
-                                       use_fp16_decoding=args.use_fp16_decoding)
+            output, _ = model.generate(
+                input_ids=input_ids,
+                max_length=args.generate_len,
+                min_length=args.generate_len,
+                decode_strategy="beam_search",
+                num_beams=args.num_beams,
+                use_faster=args.use_faster,
+                use_fp16_decoding=args.use_fp16_decoding,
+            )
             generate_mem = query_by_id(args.gpu_id)
         paddle.device.cuda.synchronize(place)
-        pd_cost = (time.perf_counter() - start) / (num_loop -
-                                                   num_loop // 2) * 1000
+        pd_cost = (time.perf_counter() - start) / (num_loop - num_loop // 2) * 1000
     return pd_cost, load_mem - start_mem, generate_mem - start_mem
 
 
@@ -72,6 +69,7 @@ def perf_hf(args):
     import torch
     from transformers import PegasusForConditionalGeneration as hf_pegasus
     from tokenizers_pegasus import PegasusTokenizer as hf_tokenizer
+
     start_mem = query_by_id(args.gpu_id)
     device = torch.device("cuda")
     tokenizer = hf_tokenizer.from_pretrained(args.model_name_or_path)
@@ -80,10 +78,7 @@ def perf_hf(args):
     model.eval()
     load_mem = query_by_id(args.gpu_id)
 
-    input_ids_np = [
-        np.random.choice(range(len(tokenizer.vocab)), args.input_len)
-        for _ in range(args.batch_size)
-    ]
+    input_ids_np = [np.random.choice(range(len(tokenizer.vocab)), args.input_len) for _ in range(args.batch_size)]
     input_ids = torch.tensor(input_ids_np)
     input_ids = input_ids.to(device)
     num_loop = 100
@@ -98,11 +93,11 @@ def perf_hf(args):
                 do_sample=False,
                 num_beams=args.num_beams,
                 max_length=args.generate_len + input_ids.shape[-1],
-                min_length=args.generate_len + input_ids.shape[-1])
+                min_length=args.generate_len + input_ids.shape[-1],
+            )
             generate_mem = query_by_id(args.gpu_id)
         torch.cuda.synchronize()
-        hf_cost = (time.perf_counter() - start) / (num_loop -
-                                                   num_loop // 2) * 1000
+        hf_cost = (time.perf_counter() - start) / (num_loop - num_loop // 2) * 1000
     return hf_cost, load_mem - start_mem, generate_mem - start_mem
 
 
@@ -112,59 +107,43 @@ def parse_args():
         "--perf_type",
         default="pd",
         type=str,
-        choices=['pd', 'pd_faster_fp32', 'pd_faster_fp16', 'hf'],
-        help="The type of perf.  ")
+        choices=["pd", "pd_faster_fp32", "pd_faster_fp16", "hf"],
+        help="The type of perf.  ",
+    )
     parser.add_argument(
         "--model_name_or_path",
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
         type=str,
         choices=[
-            'IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese',
-            'IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese',
+            "IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
+            "IDEA-CCNL/Randeng-Pegasus-523M-Summary-Chinese",
         ],
-        help="The model name to specify the pegasus to use.  ")
-    parser.add_argument("--num_beams",
-                        default=4,
-                        type=int,
-                        help="The number of beams to procedure beam search. ")
-    parser.add_argument("--batch_size",
-                        default=1,
-                        type=int,
-                        help="The size of input batch. ")
-    parser.add_argument("--input_len",
-                        default=60,
-                        type=int,
-                        help="The size of model input. ")
-    parser.add_argument("--generate_len",
-                        default=20,
-                        type=int,
-                        help="Length of output . ")
-    parser.add_argument("--gpu_id",
-                        default=2,
-                        type=int,
-                        help="The id of GPU . ")
+        help="The model name to specify the pegasus to use.  ",
+    )
+    parser.add_argument("--num_beams", default=4, type=int, help="The number of beams to procedure beam search. ")
+    parser.add_argument("--batch_size", default=1, type=int, help="The size of input batch. ")
+    parser.add_argument("--input_len", default=60, type=int, help="The size of model input. ")
+    parser.add_argument("--generate_len", default=20, type=int, help="Length of output . ")
+    parser.add_argument("--gpu_id", default=2, type=int, help="The id of GPU . ")
     parser.add_argument(
-        '--use_faster',
-        action='store_true',
-        help='Whether to process inference using faster pegasus. ')
+        "--use_faster", action="store_true", help="Whether to process inference using faster pegasus. "
+    )
 
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     args = parser.parse_args()
     return args
 
 
 def do_predict(args):
     try:
-        if args.perf_type == 'pd':
+        if args.perf_type == "pd":
             args.use_faster = False
             cost, load_mem, generate_mem = perf_pd(args)
-        elif args.perf_type == 'pd_faster_fp32':
+        elif args.perf_type == "pd_faster_fp32":
             args.use_faster = True
             args.use_fp16_decoding = False
             cost, load_mem, generate_mem = perf_pd(args)
-        elif args.perf_type == 'pd_faster_fp16':
+        elif args.perf_type == "pd_faster_fp16":
             args.use_faster = True
             args.use_fp16_decoding = True
             # paddle.set_default_dtype('float16')
@@ -173,11 +152,11 @@ def do_predict(args):
             cost, load_mem, generate_mem = perf_hf(args)
         pprint(args)
         print(
-            f'PegasusPerfResult: cost_time: {cost} ms, load_mem: {load_mem} MB, generate_mem:{generate_mem} MB, args:{args}\n'
+            f"PegasusPerfResult: cost_time: {cost} ms, load_mem: {load_mem} MB, generate_mem:{generate_mem} MB, args:{args}\n"
         )
     except Exception as e:
         pprint(args)
-        print(f'PegasusPerfResult: ERROR: {e}, args:{args}\n')
+        print(f"PegasusPerfResult: ERROR: {e}, args:{args}\n")
 
 
 if __name__ == "__main__":
