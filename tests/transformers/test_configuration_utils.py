@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import os
+import shutil
 import tempfile
 import unittest
 from typing import Dict, Optional
@@ -20,6 +21,7 @@ from typing import Dict, Optional
 from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 
 
 class FakeSimplePretrainedModelConfig(PretrainedConfig):
@@ -140,7 +142,7 @@ class ConfigurationUtilsTest:
 
 class StandardConfigMappingTest(unittest.TestCase):
     def test_roformer_v2_config(self):
-        # create new fake-roformerv2 class to prevent
+        # create new fake-bert class to prevent
         class FakeBertConfig(BertConfig):
             pass
 
@@ -169,8 +171,10 @@ class StandardConfigMappingTest(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tempdir:
             config = FakeBertConfig.from_pretrained("bert-base-uncased")
-
             config.save_pretrained(tempdir)
+
+            # rename `config.json` -> `model_config.json`
+            shutil.move(os.path.join(tempdir, "config.json"), os.path.join(tempdir, LEGACY_CONFIG_NAME))
 
             FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
 

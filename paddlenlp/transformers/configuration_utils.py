@@ -32,7 +32,7 @@ from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import HF_CACHE_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, LEGACY_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
@@ -795,7 +795,7 @@ class PretrainedConfig:
                 resolved_config_file = configuration_file
             else:
                 # try to detect old-school config file
-                configuration_file = os.path.join(pretrained_model_name_or_path, "model_config.json")
+                configuration_file = os.path.join(pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
                 if os.path.exists(configuration_file):
                     resolved_config_file = configuration_file
                 else:
@@ -809,7 +809,7 @@ class PretrainedConfig:
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
-            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, "model_config.json")
+            community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
