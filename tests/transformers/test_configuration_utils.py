@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import tempfile
 import unittest
 from typing import Dict, Optional
 
@@ -150,3 +152,27 @@ class StandardConfigMappingTest(unittest.TestCase):
         loaded_config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
         fake_field = loaded_config.fake_field
         assert fake_field == hidden_size
+
+    def test_load_from_hf(self):
+        """test load config from hf"""
+        config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
+        assert config.hidden_size == 32
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config.save_pretrained(tempdir)
+
+            assert os.path.exists(os.path.join(tempdir, "config.json"))
+
+    def test_config_mapping(self):
+        class FakeBertConfig(BertConfig):
+            pass
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = FakeBertConfig.from_pretrained("bert-base-uncased")
+
+            config.save_pretrained(tempdir)
+
+            FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+            loaded_config = FakeBertConfig.from_pretrained(tempdir)
+            assert loaded_config["fake_field"] == config.hidden_size

@@ -230,7 +230,7 @@ def flatten_model_config(config: dict) -> dict:
     return config
 
 
-def is_standard_config(config: Dict[str, Any]) -> bool:
+def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
     """
     check whether the config is standard
     Args:
