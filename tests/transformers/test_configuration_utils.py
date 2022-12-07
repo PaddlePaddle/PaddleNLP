@@ -141,8 +141,8 @@ class ConfigurationUtilsTest:
 
 
 class StandardConfigMappingTest(unittest.TestCase):
-    def test_roformer_v2_config(self):
-        # create new fake-bert class to prevent
+    def test_bert_config_mapping(self):
+        # create new fake-bert class to prevent static-attributed modified by this test
         class FakeBertConfig(BertConfig):
             pass
 
@@ -153,19 +153,23 @@ class StandardConfigMappingTest(unittest.TestCase):
 
         loaded_config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
         fake_field = loaded_config.fake_field
-        assert fake_field == hidden_size
+        self.assertEqual(fake_field, hidden_size)
 
     def test_load_from_hf(self):
         """test load config from hf"""
         config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
-        assert config.hidden_size == 32
+        self.assertEqual(config.hidden_size, 32)
 
         with tempfile.TemporaryDirectory() as tempdir:
             config.save_pretrained(tempdir)
 
-            assert os.path.exists(os.path.join(tempdir, "config.json"))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, "config.json")))
+
+            loaded_config = BertConfig.from_pretrained(tempdir)
+            self.assertEqual(loaded_config.hidden_size, 32)
 
     def test_config_mapping(self):
+        # create new fake-bert class to prevent static-attributed modified by this test
         class FakeBertConfig(BertConfig):
             pass
 
@@ -179,4 +183,4 @@ class StandardConfigMappingTest(unittest.TestCase):
             FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
 
             loaded_config = FakeBertConfig.from_pretrained(tempdir)
-            assert loaded_config["fake_field"] == config.hidden_size
+            self.assertEqual(loaded_config.fake_field, config.hidden_size)
