@@ -137,7 +137,8 @@ class TemplateTest(unittest.TestCase):
         template = SoftTemplate(prompt, self.tokenizer, self.max_length, self.model.get_input_embeddings())
         expected_tokens = self.tokenizer("分类", add_special_tokens=False)["input_ids"]
         expected_embeds = self.model.get_input_embeddings()(paddle.to_tensor(expected_tokens))
-        self.assertListEqual(template.soft_embeddings.weight[1:].numpy().tolist(), expected_embeds.numpy().tolist())
+        init_embeds = template.soft_embeddings.weight[1:]
+        self.assertTrue(paddle.allclose(init_embeds, expected_embeds, atol=1e-6))
 
     def test_soft_encoder(self):
         prompt = "{'text': 'text_a'}{'soft': '天气', 'encoder': 'lstm', 'hidden_size': 32}{'soft': None, 'length': 2, 'encoder': 'mlp'}"
