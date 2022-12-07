@@ -178,7 +178,7 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str,
     return kwargs
 
 
-def do_standard_config_map(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
+def convert_to_legacy_config(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
     """
     works when there are different fields between huggingface and paddle
 
@@ -191,7 +191,7 @@ def do_standard_config_map(standard_config_map: Dict[str, str], config: Dict[str
     if "init_args" in config:
         args = []
         for init_arg in config["init_args"]:
-            init_arg = do_standard_config_map(standard_config_map, init_arg)
+            init_arg = convert_to_legacy_config(standard_config_map, init_arg)
             args.append(init_arg)
         config["init_args"] = args
 
@@ -711,7 +711,7 @@ class PretrainedConfig:
         config_dict = flatten_model_config(config_dict)
 
         # do standard config map: there are some old-school pretrained-config not refactored.
-        config_dict = do_standard_config_map(cls.standard_config_map, config_dict)
+        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
 
         if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
             logger.warning(

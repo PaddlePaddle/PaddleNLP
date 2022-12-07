@@ -805,35 +805,6 @@ class ErniePretrainedModel(PretrainedModel):
         elif isinstance(layer, nn.LayerNorm):
             layer._epsilon = 1e-12
 
-    @staticmethod
-    def map_hf_config(hf_config: dict) -> dict:
-        """map huggingface configuration to paddle config
-
-        Args:
-            hf_config (dict): the dict data in config.json
-
-        Returns:
-            dict: init_kwargs of paddlenlp model
-        """
-        return dict(
-            vocab_size=hf_config["vocab_size"],
-            hidden_size=hf_config["hidden_size"],
-            num_hidden_layers=hf_config["num_hidden_layers"],
-            num_attention_heads=hf_config["num_attention_heads"],
-            intermediate_size=hf_config["intermediate_size"],
-            hidden_act=hf_config["hidden_act"],
-            hidden_dropout_prob=hf_config["hidden_dropout_prob"],
-            attention_probs_dropout_prob=hf_config["attention_probs_dropout_prob"],
-            max_position_embeddings=hf_config["max_position_embeddings"],
-            type_vocab_size=hf_config["type_vocab_size"],
-            initializer_range=hf_config["initializer_range"],
-            pad_token_id=hf_config["pad_token_id"],
-            task_type_vocab_size=hf_config["task_type_vocab_size"],
-            task_id=hf_config["task_id"],
-            use_task_id=hf_config["use_task_id"],
-            enable_recompute=hf_config["enable_recompute"],
-        )
-
 
 @register_base_model
 class ErnieModel(ErniePretrainedModel):

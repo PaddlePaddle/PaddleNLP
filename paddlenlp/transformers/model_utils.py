@@ -51,7 +51,7 @@ from paddlenlp.utils.downloader import (
 from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
-from .configuration_utils import PretrainedConfig, do_standard_config_map
+from .configuration_utils import PretrainedConfig, convert_to_legacy_config
 from .generation_utils import GenerationMixin
 from .utils import (
     InitTrackerMeta,
@@ -542,7 +542,7 @@ class PretrainedModel(Layer, GenerationMixin):
         else:
             standard_config_map = cls.standard_config_map
 
-        init_kwargs = do_standard_config_map(standard_config_map, init_kwargs)
+        init_kwargs = convert_to_legacy_config(standard_config_map, init_kwargs)
 
         # position args are stored in kwargs, maybe better not include
         init_args = init_kwargs.pop("init_args", ())

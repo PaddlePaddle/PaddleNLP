@@ -22,8 +22,8 @@ from paddlenlp.transformers import BertConfig
 class BertConfigTest(unittest.TestCase):
     def test_load_from_hf(self):
         """test load config from hf"""
-        config = BertConfig.from_pretrained("prajjwal1/bert-tiny", from_hf_hub=True)
-        assert config.hidden_size == 128
+        config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
+        assert config.hidden_size == 32
 
         with tempfile.TemporaryDirectory() as tempdir:
             config.save_pretrained(tempdir)

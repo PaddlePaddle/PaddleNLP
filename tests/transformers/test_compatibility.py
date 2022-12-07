@@ -68,8 +68,7 @@ class TestTokenizerCompatibility(TestCase):
         hf_tokens = hf_tokenizer.convert_ids_to_tokens(random_ids)
         tokens = tokenizer.convert_ids_to_tokens(random_ids)
 
-        for index in range(100):
-            assert hf_tokens[index] == tokens[index]
+        assert hf_tokens == tokens
 
         # 3. convert tokens to string
         hf_string = hf_tokenizer.convert_tokens_to_string(hf_tokens)
