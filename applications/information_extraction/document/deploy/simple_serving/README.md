@@ -44,8 +44,8 @@ uie = Taskflow('information_extration', task_path='../../checkpoint/model_best/'
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码
 ```
-uie1 = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
-uie2 = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
+uie1 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
+uie2 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
 service.register_taskflow('uie', [uie1, uie2])
 ```
 
