@@ -71,17 +71,18 @@ class TestPromptModel(unittest.TestCase):
         self.assertEqual(model_outputs.hidden_states.shape[0], len(examples))
 
     def test_efl_style_no_labels(self):
-        model = AutoModelForSequenceClassification.from_pretrained("__internal_testing__/ernie", num_labels=2)
+        num_labels = 2
+        model = AutoModelForSequenceClassification.from_pretrained("__internal_testing__/ernie", num_labels=num_labels)
         prompt_model = PromptModelForSequenceClassification(model, self.template, verbalizer=None)
         examples = [{"text": "百度飞桨深度学习框架"}, {"text": "这是一个测试"}]
         encoded_examples = [self.template(i) for i in examples]
         logits, hidden_states = prompt_model(**self.data_collator(encoded_examples))
         self.assertEqual(logits.shape[0], len(examples))
-        self.assertEqual(logits.shape[1], len(self.label_words))
+        self.assertEqual(logits.shape[1], num_labels)
         self.assertEqual(hidden_states.shape[0], len(examples))
 
         model_outputs = prompt_model(**self.data_collator(encoded_examples), return_dict=True)
         self.assertIsNone(model_outputs.loss)
         self.assertEqual(model_outputs.logits.shape[0], len(examples))
-        self.assertEqual(model_outputs.logits.shape[1], len(self.label_words))
+        self.assertEqual(model_outputs.logits.shape[1], num_labels)
         self.assertEqual(model_outputs.hidden_states.shape[0], len(examples))
