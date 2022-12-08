@@ -142,7 +142,9 @@ class ModelTesterMixin:
             return
 
         class FakePretrainedConfig(config.__class__):
-            pass
+            standard_config_map = {}
+
+        print(FakePretrainedConfig.standard_config_map)
 
         config_dict = config.to_dict()
 
@@ -162,11 +164,12 @@ class ModelTesterMixin:
 
     def test_pretrained_config_mapping_in_tempdir(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
         if not isinstance(config, PretrainedConfig):
             return
 
         class FakePretrainedConfig(config.__class__):
-            pass
+            standard_config_map = {}
 
         # mapping from local-dir
         with tempfile.TemporaryDirectory() as tempdir:
@@ -179,9 +182,11 @@ class ModelTesterMixin:
             FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
 
             loaded_fake_config = FakePretrainedConfig.from_pretrained(tempdir)
+
             loaded_fake_config_dict = loaded_fake_config.to_dict()
 
             self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
+
             loaded_fake_config_dict.pop("hidden_size")
 
             self.assertEqual(fake_config_dict, loaded_fake_config_dict)
