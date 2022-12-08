@@ -62,7 +62,7 @@ class PromptTrainer(Trainer):
             data_collator = PromptDataCollatorWithPadding(tokenizer, padding=True, return_tensors="pd")
 
         if criterion is None and (args.use_rgl or args.use_rdrop):
-            raise Exception("'To use 'use_rgl', use_rdrop', 'criterion' must be specified")
+            raise Exception("'To use 'use_rgl', 'use_rdrop', 'criterion' must be specified")
 
         super(PromptTrainer, self).__init__(
             model=model,

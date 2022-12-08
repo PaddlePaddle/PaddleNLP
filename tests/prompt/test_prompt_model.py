@@ -27,7 +27,7 @@ from paddlenlp.transformers import (
 )
 
 
-class TestPromptModel(unittest.TestCase):
+class PromptModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/ernie")
