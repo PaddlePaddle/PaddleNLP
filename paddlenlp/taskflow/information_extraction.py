@@ -430,7 +430,7 @@ class UIETask(Task):
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
                 paddle.static.InputSpec(shape=[None, None, 4], dtype="int64", name="bbox"),
-                paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="int64", name="image"),
+                paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="image"),
             ]
         elif self._init_class in ["UIEM"]:
             self._input_spec = [
@@ -825,14 +825,14 @@ class UIETask(Task):
                 elif self._init_class in ["UIEM"]:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
-                        "pos_ids": pos_ids.numpy(),
+                        "position_ids": pos_ids.numpy(),
                     }
                 else:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
                         "token_type_ids": token_type_ids.numpy(),
-                        "pos_ids": pos_ids.numpy(),
-                        "att_mask": att_mask.numpy(),
+                        "position_ids": pos_ids.numpy(),
+                        "attention_mask": att_mask.numpy(),
                     }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
                 start_prob = start_prob.tolist()
