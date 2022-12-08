@@ -30,7 +30,9 @@ test: unit-test
 
 unit-test:
 	# only enable bert-test: there are many failed tests
-	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert
+	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert \
+		tests/prompt \
+		tests/transformers/test_configuration_utils.py
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -48,4 +50,12 @@ deploy-ppdiffusers:
 .PHONY: install-ppdiffusers
 install-ppdiffusers:
 	cd ppdiffusers && make install
+
+.PHONY: deploy-paddle-pipelines
+deploy-paddle-pipelines:
+	cd pipelines && make
+
+.PHONY: install-paddle-pipelines
+install-paddle-pipelines:
+	cd pipelines && make install
 

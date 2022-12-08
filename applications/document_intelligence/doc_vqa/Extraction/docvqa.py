@@ -28,14 +28,7 @@ sys.path.insert(0, "../")
 
 
 class DocVQAExample(object):
-
-    def __init__(self,
-                 question,
-                 doc_tokens,
-                 doc_boxes=[],
-                 answer=None,
-                 labels=None,
-                 image=None):
+    def __init__(self, question, doc_tokens, doc_boxes=[], answer=None, labels=None, image=None):
         self.question = question
         self.doc_tokens = doc_tokens
         self.doc_boxes = doc_boxes
@@ -47,13 +40,7 @@ class DocVQAExample(object):
 class DocVQAFeatures(object):
     """A single set of features of data."""
 
-    def __init__(self,
-                 example_index,
-                 input_ids,
-                 input_mask,
-                 segment_ids,
-                 boxes=None,
-                 label=None):
+    def __init__(self, example_index, input_ids, input_mask, segment_ids, boxes=None, label=None):
         self.example_index = example_index
         self.input_ids = input_ids
         self.input_mask = input_mask
@@ -63,15 +50,9 @@ class DocVQAFeatures(object):
 
 
 class DocVQA(Dataset):
-
-    def __init__(self,
-                 args,
-                 tokenizer,
-                 label2id_map,
-                 max_seq_len=512,
-                 max_query_length=20,
-                 max_doc_length=512,
-                 max_span_num=1):
+    def __init__(
+        self, args, tokenizer, label2id_map, max_seq_len=512, max_query_length=20, max_doc_length=512, max_span_num=1
+    ):
         super(DocVQA, self).__init__()
         self.tokenizer = tokenizer
         self.label2id_map = label2id_map
@@ -113,17 +94,16 @@ class DocVQA(Dataset):
                 continue
             num_left_context = position - doc_span.start
             num_right_context = end - position
-            score = min(num_left_context,
-                        num_right_context) + 0.01 * doc_span.length
+            score = min(num_left_context, num_right_context) + 0.01 * doc_span.length
             if best_score is None or score > best_score:
                 best_score = score
             best_span_index = span_index
 
         return cur_span_index == best_span_index
 
-    def convert_examples_to_features(self, examples, tokenizer, label_map,
-                                     max_seq_length, max_span_num,
-                                     max_doc_length, max_query_length):
+    def convert_examples_to_features(
+        self, examples, tokenizer, label_map, max_seq_length, max_span_num, max_doc_length, max_query_length
+    ):
 
         if "[CLS]" in self.tokenizer.get_vocab():
             start_token = "[CLS]"
@@ -188,8 +168,7 @@ class DocVQA(Dataset):
                 segment_ids.append(0)
                 for i in range(doc_span.length):
                     split_token_index = doc_span.start + i
-                    is_max_context = self.check_is_max_context(
-                        doc_spans, doc_span_index, split_token_index)
+                    is_max_context = self.check_is_max_context(doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[len(tokens)] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     boxes_tokens.append(all_doc_boxes_tokens[split_token_index])
@@ -292,12 +271,10 @@ class DocVQA(Dataset):
             question = sample["question"]
             doc_tokens = sample["document"]
             doc_boxes = sample["document_bbox"]
-            labels = sample['labels'] if not is_test else []
+            labels = sample["labels"] if not is_test else []
 
-            x_min, y_min = min(doc_boxes, key=lambda x: x[0])[0], min(
-                doc_boxes, key=lambda x: x[2])[2]
-            x_max, y_max = max(doc_boxes, key=lambda x: x[1])[1], max(
-                doc_boxes, key=lambda x: x[3])[3]
+            x_min, y_min = min(doc_boxes, key=lambda x: x[0])[0], min(doc_boxes, key=lambda x: x[2])[2]
+            x_max, y_max = max(doc_boxes, key=lambda x: x[1])[1], max(doc_boxes, key=lambda x: x[3])[3]
             width = x_max - x_min
             height = y_max - y_min
 
@@ -308,12 +285,15 @@ class DocVQA(Dataset):
                 scale_x = 1000 / max(width, height)
                 scale_y = 1000 / max(width, height)
 
-            scaled_doc_boxes = [[
-                round((b[0] - x_min) * scale_x),
-                round((b[2] - y_min) * scale_y),
-                round((b[1] - x_min) * scale_x),
-                round((b[3] - y_min) * scale_y)
-            ] for b in doc_boxes]
+            scaled_doc_boxes = [
+                [
+                    round((b[0] - x_min) * scale_x),
+                    round((b[2] - y_min) * scale_y),
+                    round((b[1] - x_min) * scale_x),
+                    round((b[3] - y_min) * scale_y),
+                ]
+                for b in doc_boxes
+            ]
 
             for box, oribox in zip(scaled_doc_boxes, doc_boxes):
                 if box[0] < 0:
@@ -326,10 +306,9 @@ class DocVQA(Dataset):
                     if pos > 1000:
                         print(width, height, box, oribox)
 
-            example = DocVQAExample(question=question,
-                                    doc_tokens=doc_tokens,
-                                    doc_boxes=scaled_doc_boxes,
-                                    labels=labels)
+            example = DocVQAExample(
+                question=question, doc_tokens=doc_tokens, doc_boxes=scaled_doc_boxes, labels=labels
+            )
             examples.append(example)
         return examples
 
@@ -339,7 +318,7 @@ class DocVQA(Dataset):
             dataset = self.args.train_file
         elif self.args.do_test:
             dataset = self.args.test_file
-        with open(dataset, 'r', encoding='utf8') as f:
+        with open(dataset, "r", encoding="utf8") as f:
             for index, line in enumerate(f):
                 data.append(json.loads(line.strip()))
 
@@ -353,30 +332,32 @@ class DocVQA(Dataset):
             max_seq_length=self.max_seq_len,
             max_doc_length=self.max_doc_length,
             max_span_num=self.max_span_num,
-            max_query_length=self.max_query_length)
+            max_query_length=self.max_query_length,
+        )
 
-        all_input_ids = paddle.to_tensor([f.input_ids for f in features],
-                                         dtype="int64")
-        all_input_mask = paddle.to_tensor([f.input_mask for f in features],
-                                          dtype="int64")
-        all_segment_ids = paddle.to_tensor([f.segment_ids for f in features],
-                                           dtype="int64")
-        all_bboxes = paddle.to_tensor([f.boxes for f in features],
-                                      dtype="int64")
-        all_labels = paddle.to_tensor([f.label for f in features],
-                                      dtype="int64")
+        all_input_ids = paddle.to_tensor([f.input_ids for f in features], dtype="int64")
+        all_input_mask = paddle.to_tensor([f.input_mask for f in features], dtype="int64")
+        all_segment_ids = paddle.to_tensor([f.segment_ids for f in features], dtype="int64")
+        all_bboxes = paddle.to_tensor([f.boxes for f in features], dtype="int64")
+        all_labels = paddle.to_tensor([f.label for f in features], dtype="int64")
         self.sample_list = [
             np.array(all_input_ids),
             np.array(all_input_mask),
             np.array(all_segment_ids),
             np.array(all_bboxes),
-            np.array(all_labels)
+            np.array(all_labels),
         ]
 
     def __getitem__(self, idx):
-        return self.sample_list[0][idx], self.sample_list[1][
-            idx], self.sample_list[2][idx], self.sample_list[3][
-                idx], self.sample_list[4][idx]
+        return (
+            self.sample_list[0][idx],
+            self.sample_list[1][idx],
+            self.sample_list[2][idx],
+            self.sample_list[3][idx],
+            self.sample_list[4][idx],
+        )
 
-    def __len__(self, ):
+    def __len__(
+        self,
+    ):
         return self.sample_list[0].shape[0]

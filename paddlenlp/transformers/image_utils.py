@@ -34,10 +34,14 @@ IMAGENET_DEFAULT_STD = [0.229, 0.224, 0.225]
 IMAGENET_STANDARD_MEAN = [0.5, 0.5, 0.5]
 IMAGENET_STANDARD_STD = [0.5, 0.5, 0.5]
 
-ImageInput = Union[PIL.Image.Image, np.ndarray, "paddle.Tensor",
-                   List[PIL.Image.Image], List[np.ndarray],
-                   List["paddle.Tensor"]  # noqa
-                   ]
+ImageInput = Union[
+    PIL.Image.Image,
+    np.ndarray,
+    "paddle.Tensor",
+    List[PIL.Image.Image],
+    List[np.ndarray],
+    List["paddle.Tensor"],  # noqa
+]
 
 
 def load_image(image: Union[str, "PIL.Image.Image"]) -> "PIL.Image.Image":
@@ -77,12 +81,11 @@ class ImageFeatureExtractionMixin:
     """
 
     def _ensure_format_supported(self, image):
-        if not isinstance(
-                image,
-            (PIL.Image.Image, np.ndarray)) and not paddle.is_tensor(image):
+        if not isinstance(image, (PIL.Image.Image, np.ndarray)) and not paddle.is_tensor(image):
             raise ValueError(
                 f"Got type {type(image)} which is not supported, only `PIL.Image.Image`, `np.array` and "
-                "`paddle.Tensor` are.")
+                "`paddle.Tensor` are."
+            )
 
     def to_pil_image(self, image, rescale=None):
         """
@@ -212,12 +215,7 @@ class ImageFeatureExtractionMixin:
         else:
             return (image - mean) / std
 
-    def resize(self,
-               image,
-               size,
-               resample=Resampling.BILINEAR,
-               default_to_square=True,
-               max_size=None):
+    def resize(self, image, size, resample=Resampling.BILINEAR, default_to_square=True, max_size=None):
         """
         Resizes `image`. Enforces conversion of input to PIL.Image.
         Args:
@@ -254,32 +252,28 @@ class ImageFeatureExtractionMixin:
 
         if isinstance(size, int) or len(size) == 1:
             if default_to_square:
-                size = (size, size) if isinstance(size, int) else (size[0],
-                                                                   size[0])
+                size = (size, size) if isinstance(size, int) else (size[0], size[0])
             else:
                 width, height = image.size
                 # specified size only for the smallest edge
-                short, long = (width, height) if width <= height else (height,
-                                                                       width)
+                short, long = (width, height) if width <= height else (height, width)
                 requested_new_short = size if isinstance(size, int) else size[0]
 
                 if short == requested_new_short:
                     return image
 
-                new_short, new_long = requested_new_short, int(
-                    requested_new_short * long / short)
+                new_short, new_long = requested_new_short, int(requested_new_short * long / short)
 
                 if max_size is not None:
                     if max_size <= requested_new_short:
                         raise ValueError(
                             f"max_size = {max_size} must be strictly greater than the requested "
-                            f"size for the smaller edge size = {size}")
+                            f"size for the smaller edge size = {size}"
+                        )
                     if new_long > max_size:
-                        new_short, new_long = int(max_size * new_short /
-                                                  new_long), max_size
+                        new_short, new_long = int(max_size * new_short / new_long), max_size
 
-                size = (new_short, new_long) if width <= height else (new_long,
-                                                                      new_short)
+                size = (new_short, new_long) if width <= height else (new_long, new_short)
 
         return image.resize(size, resample=resample)
 
@@ -305,18 +299,14 @@ class ImageFeatureExtractionMixin:
         if paddle.is_tensor(image) or isinstance(image, np.ndarray):
             if image.ndim == 2:
                 image = self.expand_dims(image)
-            image_shape = image.shape[1:] if image.shape[0] in [
-                1, 3
-            ] else image.shape[:2]
+            image_shape = image.shape[1:] if image.shape[0] in [1, 3] else image.shape[:2]
         else:
             image_shape = (image.size[1], image.size[0])
 
         top = (image_shape[0] - size[0]) // 2
-        bottom = top + size[
-            0]  # In case size is odd, (image_shape[0] + size[0]) // 2 won't give the proper result.
+        bottom = top + size[0]  # In case size is odd, (image_shape[0] + size[0]) // 2 won't give the proper result.
         left = (image_shape[1] - size[1]) // 2
-        right = left + size[
-            1]  # In case size is odd, (image_shape[1] + size[1]) // 2 won't give the proper result.
+        right = left + size[1]  # In case size is odd, (image_shape[1] + size[1]) // 2 won't give the proper result.
 
         # For PIL Images we have a method to crop directly.
         if isinstance(image, PIL.Image.Image):
@@ -333,13 +323,11 @@ class ImageFeatureExtractionMixin:
                 image = image.transpose([2, 0, 1])
 
         # Check if cropped area is within image boundaries
-        if top >= 0 and bottom <= image_shape[
-                0] and left >= 0 and right <= image_shape[1]:
+        if top >= 0 and bottom <= image_shape[0] and left >= 0 and right <= image_shape[1]:
             return image[..., top:bottom, left:right]
 
         # Otherwise, we may need to pad if the image is too small. Oh joy...
-        new_shape = image.shape[:-2] + (max(
-            size[0], image_shape[0]), max(size[1], image_shape[1]))
+        new_shape = image.shape[:-2] + (max(size[0], image_shape[0]), max(size[1], image_shape[1]))
         if isinstance(image, np.ndarray):
             new_image = np.zeros_like(image, shape=new_shape)
         elif paddle.is_tensor(image):
@@ -356,9 +344,9 @@ class ImageFeatureExtractionMixin:
         left += left_pad
         right += left_pad
 
-        new_image = new_image[...,
-                              max(0, top):min(new_image.shape[-2], bottom),
-                              max(0, left):min(new_image.shape[-1], right)]
+        new_image = new_image[
+            ..., max(0, top) : min(new_image.shape[-2], bottom), max(0, left) : min(new_image.shape[-1], right)
+        ]
 
         return new_image
 
@@ -378,14 +366,7 @@ class ImageFeatureExtractionMixin:
 
         return image[::-1, :, :]
 
-    def rotate(self,
-               image,
-               angle,
-               resample=Resampling.NEAREST,
-               expand=0,
-               center=None,
-               translate=None,
-               fillcolor=None):
+    def rotate(self, image, angle, resample=Resampling.NEAREST, expand=0, center=None, translate=None, fillcolor=None):
         """
         Returns a rotated copy of `image`. This method returns a copy of `image`, rotated the given number of degrees
         counter clockwise around its centre.
@@ -401,9 +382,6 @@ class ImageFeatureExtractionMixin:
         if not isinstance(image, PIL.Image.Image):
             image = self.to_pil_image(image)
 
-        return image.rotate(angle,
-                            resample=resample,
-                            expand=expand,
-                            center=center,
-                            translate=translate,
-                            fillcolor=fillcolor)
+        return image.rotate(
+            angle, resample=resample, expand=expand, center=center, translate=translate, fillcolor=fillcolor
+        )

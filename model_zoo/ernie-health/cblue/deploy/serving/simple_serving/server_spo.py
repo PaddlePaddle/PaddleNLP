@@ -16,29 +16,67 @@ from paddlenlp import SimpleServer
 from paddlenlp.server import BasePostHandler, TokenClsModelHandler
 
 label_list = [
-    '预防', '阶段', '就诊科室', '辅助治疗', '化疗', '放射治疗', '手术治疗', '实验室检查', '影像学检查', '辅助检查',
-    '组织学检查', '内窥镜检查', '筛查', '多发群体', '发病率', '发病年龄', '多发地区', '发病性别倾向', '死亡率',
-    '多发季节', '传播途径', '并发症', '病理分型', '相关（导致）', '鉴别诊断', '相关（转化）', '相关（症状）', '临床表现',
-    '治疗后症状', '侵及周围组织转移的症状', '病因', '高危因素', '风险评估因素', '病史', '遗传因素', '发病机制',
-    '病理生理', '药物治疗', '发病部位', '转移部位', '外侵部位', '预后状况', '预后生存率', '同义词'
+    "预防",
+    "阶段",
+    "就诊科室",
+    "辅助治疗",
+    "化疗",
+    "放射治疗",
+    "手术治疗",
+    "实验室检查",
+    "影像学检查",
+    "辅助检查",
+    "组织学检查",
+    "内窥镜检查",
+    "筛查",
+    "多发群体",
+    "发病率",
+    "发病年龄",
+    "多发地区",
+    "发病性别倾向",
+    "死亡率",
+    "多发季节",
+    "传播途径",
+    "并发症",
+    "病理分型",
+    "相关（导致）",
+    "鉴别诊断",
+    "相关（转化）",
+    "相关（症状）",
+    "临床表现",
+    "治疗后症状",
+    "侵及周围组织转移的症状",
+    "病因",
+    "高危因素",
+    "风险评估因素",
+    "病史",
+    "遗传因素",
+    "发病机制",
+    "病理生理",
+    "药物治疗",
+    "发病部位",
+    "转移部位",
+    "外侵部位",
+    "预后状况",
+    "预后生存率",
+    "同义词",
 ]
 
 
 class SPOPostHandler(BasePostHandler):
-
     def __init__(self):
         super().__init__()
 
     @classmethod
     def process(cls, data, parameters):
-        if 'logits' not in data or 'logits_1' not in data:
+        if "logits" not in data or "logits_1" not in data:
             raise ValueError(
                 "The output of model handler do not include the 'logits', "
-                " please check the model handler output. The model handler output:\n{}"
-                .format(data))
-        lengths = np.array(data["attention_mask"], dtype='float32').sum(axis=-1)
-        ent_logits = np.array(data['logits'])
-        spo_logits = np.array(data['logits_1'])
+                " please check the model handler output. The model handler output:\n{}".format(data)
+            )
+        lengths = np.array(data["attention_mask"], dtype="float32").sum(axis=-1)
+        ent_logits = np.array(data["logits"])
+        spo_logits = np.array(data["logits_1"])
         ent_pred_list = []
         ent_idxs_list = []
         for idx, ent_pred in enumerate(ent_logits):
@@ -71,29 +109,33 @@ class SPOPostHandler(BasePostHandler):
             if sub is None:
                 continue
             spo_pred_list[idx].append((tuple(sub), p_id, tuple(obj)))
-        input_data = data['data']['text']
+        input_data = data["data"]["text"]
         ent_list = []
         spo_list = []
         for i, (ent, rel) in enumerate(zip(ent_pred_list, spo_pred_list)):
             cur_ent_list = []
             cur_spo_list = []
             for sid, eid in ent:
-                cur_ent_list.append("".join(
-                    [str(d) for d in input_data[i][sid:eid + 1]]))
+                cur_ent_list.append("".join([str(d) for d in input_data[i][sid : eid + 1]]))
             for s, p, o in rel:
                 cur_spo_list.append(
-                    ("".join([str(d) for d in input_data[i][s[0]:s[1] + 1]
-                              ]), label_list[p],
-                     "".join([str(d) for d in input_data[i][o[0]:o[1] + 1]])))
+                    (
+                        "".join([str(d) for d in input_data[i][s[0] : s[1] + 1]]),
+                        label_list[p],
+                        "".join([str(d) for d in input_data[i][o[0] : o[1] + 1]]),
+                    )
+                )
             ent_list.append(cur_ent_list)
             spo_list.append(cur_spo_list)
 
-        return {"entity": ent_list, 'spo': spo_list}
+        return {"entity": ent_list, "spo": spo_list}
 
 
 app = SimpleServer()
-app.register('cblue_spo',
-             model_path="../../../export",
-             tokenizer_name='ernie-health-chinese',
-             model_handler=TokenClsModelHandler,
-             post_handler=SPOPostHandler)
+app.register(
+    "cblue_spo",
+    model_path="../../../export",
+    tokenizer_name="ernie-health-chinese",
+    model_handler=TokenClsModelHandler,
+    post_handler=SPOPostHandler,
+)

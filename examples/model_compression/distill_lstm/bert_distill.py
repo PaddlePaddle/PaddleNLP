@@ -26,15 +26,10 @@ from args import parse_args
 from small import BiLSTM
 from data import create_distill_loader
 
-METRIC_CLASSES = {
-    "sst-2": Accuracy,
-    "qqp": AccuracyAndF1,
-    "chnsenticorp": Accuracy
-}
+METRIC_CLASSES = {"sst-2": Accuracy, "qqp": AccuracyAndF1, "chnsenticorp": Accuracy}
 
 
 class TeacherModel(object):
-
     def __init__(self, teacher_dir):
         self.model = BertForSequenceClassification.from_pretrained(teacher_dir)
         self.model.eval()
@@ -44,10 +39,9 @@ def evaluate(task_name, model, metric, data_loader):
     model.eval()
     metric.reset()
     for i, batch in enumerate(data_loader):
-        if task_name == 'qqp':
+        if task_name == "qqp":
             _, _, student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2, labels = batch
-            logits = model(student_input_ids_1, seq_len_1, student_input_ids_2,
-                           seq_len_2)
+            logits = model(student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2)
         else:
             _, _, student_input_ids, seq_len, labels = batch
             logits = model(student_input_ids, seq_len)
@@ -56,16 +50,19 @@ def evaluate(task_name, model, metric, data_loader):
         metric.update(correct)
     res = metric.accumulate()
     if isinstance(metric, AccuracyAndF1):
-        print("acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, " % (
-            res[0],
-            res[1],
-            res[2],
-            res[3],
-            res[4],
-        ),
-              end='')
+        print(
+            "acc: %s, precision: %s, recall: %s, f1: %s, acc and f1: %s, "
+            % (
+                res[0],
+                res[1],
+                res[2],
+                res[3],
+                res[4],
+            ),
+            end="",
+        )
     else:
-        print("acc: %s, " % (res), end='')
+        print("acc: %s, " % (res), end="")
     model.train()
 
 
@@ -79,20 +76,26 @@ def do_train(agrs):
         max_seq_length=args.max_seq_length,
         n_iter=args.n_iter,
         whole_word_mask=args.whole_word_mask,
-        seed=args.seed)
+        seed=args.seed,
+    )
 
-    model = BiLSTM(args.emb_dim, args.hidden_size, args.vocab_size,
-                   args.output_dim, args.vocab_path, args.padding_idx,
-                   args.num_layers, args.dropout_prob, args.init_scale,
-                   args.embedding_name)
+    model = BiLSTM(
+        args.emb_dim,
+        args.hidden_size,
+        args.vocab_size,
+        args.output_dim,
+        args.vocab_path,
+        args.padding_idx,
+        args.num_layers,
+        args.dropout_prob,
+        args.init_scale,
+        args.embedding_name,
+    )
 
-    if args.optimizer == 'adadelta':
-        optimizer = paddle.optimizer.Adadelta(learning_rate=args.lr,
-                                              rho=0.95,
-                                              parameters=model.parameters())
+    if args.optimizer == "adadelta":
+        optimizer = paddle.optimizer.Adadelta(learning_rate=args.lr, rho=0.95, parameters=model.parameters())
     else:
-        optimizer = paddle.optimizer.Adam(learning_rate=args.lr,
-                                          parameters=model.parameters())
+        optimizer = paddle.optimizer.Adam(learning_rate=args.lr, parameters=model.parameters())
 
     ce_loss = nn.CrossEntropyLoss()
     mse_loss = nn.MSELoss()
@@ -115,8 +118,16 @@ def do_train(agrs):
         model.train()
         for i, batch in enumerate(train_data_loader):
             global_step += 1
-            if args.task_name == 'qqp':
-                bert_input_ids, bert_segment_ids, student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2, labels = batch
+            if args.task_name == "qqp":
+                (
+                    bert_input_ids,
+                    bert_segment_ids,
+                    student_input_ids_1,
+                    seq_len_1,
+                    student_input_ids_2,
+                    seq_len_2,
+                    labels,
+                ) = batch
             else:
                 bert_input_ids, bert_segment_ids, student_input_ids, seq_len, labels = batch
 
@@ -125,14 +136,12 @@ def do_train(agrs):
                 teacher_logits = teacher.model(bert_input_ids, bert_segment_ids)
 
             # Calculate student model's forward.
-            if args.task_name == 'qqp':
-                logits = model(student_input_ids_1, seq_len_1,
-                               student_input_ids_2, seq_len_2)
+            if args.task_name == "qqp":
+                logits = model(student_input_ids_1, seq_len_1, student_input_ids_2, seq_len_2)
             else:
                 logits = model(student_input_ids, seq_len)
 
-            loss = args.alpha * ce_loss(logits, labels) + (
-                1 - args.alpha) * mse_loss(logits, teacher_logits)
+            loss = args.alpha * ce_loss(logits, labels) + (1 - args.alpha) * mse_loss(logits, teacher_logits)
 
             loss.backward()
             optimizer.step()
@@ -141,8 +150,8 @@ def do_train(agrs):
             if global_step % args.log_freq == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.4f step/s"
-                    % (global_step, epoch, i, loss, args.log_freq /
-                       (time.time() - tic_train)))
+                    % (global_step, epoch, i, loss, args.log_freq / (time.time() - tic_train))
+                )
                 tic_eval = time.time()
                 acc = evaluate(args.task_name, model, metric, dev_data_loader)
                 print("eval done total : %s s" % (time.time() - tic_eval))
@@ -150,16 +159,14 @@ def do_train(agrs):
 
             if global_step % args.save_steps == 0:
                 paddle.save(
-                    model.state_dict(),
-                    os.path.join(args.output_dir,
-                                 "step_" + str(global_step) + ".pdparams"))
+                    model.state_dict(), os.path.join(args.output_dir, "step_" + str(global_step) + ".pdparams")
+                )
                 paddle.save(
-                    optimizer.state_dict(),
-                    os.path.join(args.output_dir,
-                                 "step_" + str(global_step) + ".pdopt"))
+                    optimizer.state_dict(), os.path.join(args.output_dir, "step_" + str(global_step) + ".pdopt")
+                )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     print(args)
     paddle.seed(args.seed)

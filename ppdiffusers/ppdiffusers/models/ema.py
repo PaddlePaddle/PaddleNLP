@@ -1,4 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,20 +31,19 @@ class LitEma(nn.Layer):
     def __init__(self, model, decay=0.9999, use_num_upates=True):
         super().__init__()
         if decay < 0.0 or decay > 1.0:
-            raise ValueError('Decay must be between 0 and 1')
+            raise ValueError("Decay must be between 0 and 1")
 
         self.m_name2s_name = {}
-        self.register_buffer('decay',
-                             paddle.to_tensor(decay, dtype=paddle.float32))
+        self.register_buffer("decay", paddle.to_tensor(decay, dtype=paddle.float32))
         self.register_buffer(
-            'num_updates',
-            paddle.to_tensor(0, dtype=paddle.int64)
-            if use_num_upates else paddle.to_tensor(-1, dtype=paddle.int64))
+            "num_updates",
+            paddle.to_tensor(0, dtype=paddle.int64) if use_num_upates else paddle.to_tensor(-1, dtype=paddle.int64),
+        )
 
         for name, p in model.named_parameters():
             if not p.stop_gradient:
-                #remove as '.'-character is not allowed in buffers
-                s_name = name.replace('.', '')
+                # remove as '.'-character is not allowed in buffers
+                s_name = name.replace(".", "")
                 self.m_name2s_name.update({name: s_name})
                 self.register_buffer(s_name, p.clone().detach())
 
@@ -54,8 +54,7 @@ class LitEma(nn.Layer):
 
         if self.num_updates >= 0:
             self.num_updates += 1
-            decay = min(self.decay,
-                        (1 + self.num_updates) / (10 + self.num_updates))
+            decay = min(self.decay, (1 + self.num_updates) / (10 + self.num_updates))
 
         one_minus_decay = 1.0 - decay
 
@@ -69,7 +68,7 @@ class LitEma(nn.Layer):
                     shadow_params[sname].scale_(decay)
                     shadow_params[sname].add_(m_param[key] * one_minus_decay)
                 else:
-                    assert not key in self.m_name2s_name
+                    assert key not in self.m_name2s_name
 
     def copy_to(self, model):
         m_param = dict(model.named_parameters())
@@ -78,13 +77,13 @@ class LitEma(nn.Layer):
             if not m_param[key].stop_gradient:
                 m_param[key].copy_(shadow_params[self.m_name2s_name[key]], True)
             else:
-                assert not key in self.m_name2s_name
+                assert key not in self.m_name2s_name
 
     def store(self, parameters):
         """
         Save the current parameters for restoring later.
         Args:
-          parameters: Iterable of `paddle.nn.Parameter`; the parameters to be
+          parameters: Iterable of `EagerParamBase`; the parameters to be
             temporarily stored.
         """
         self.collected_params = [param.clone() for param in parameters]
@@ -97,7 +96,7 @@ class LitEma(nn.Layer):
         `copy_to` method. After validation (or model saving), use this to
         restore the former parameters.
         Args:
-          parameters: Iterable of `paddle.nn.Parameter`; the parameters to be
+          parameters: Iterable of `EagerParamBase`; the parameters to be
             updated with the stored parameters.
         """
         for c_param, param in zip(self.collected_params, parameters):

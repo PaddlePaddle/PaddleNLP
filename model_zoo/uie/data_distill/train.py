@@ -44,21 +44,25 @@ def do_train():
     dev_ds = load_dataset(reader, data_path=args.dev_path, lazy=False)
     tokenizer = AutoTokenizer.from_pretrained(args.encoder)
 
-    train_dataloader = create_dataloader(train_ds,
-                                         tokenizer,
-                                         max_seq_len=args.max_seq_len,
-                                         batch_size=args.batch_size,
-                                         label_maps=label_maps,
-                                         mode="train",
-                                         task_type=args.task_type)
+    train_dataloader = create_dataloader(
+        train_ds,
+        tokenizer,
+        max_seq_len=args.max_seq_len,
+        batch_size=args.batch_size,
+        label_maps=label_maps,
+        mode="train",
+        task_type=args.task_type,
+    )
 
-    dev_dataloader = create_dataloader(dev_ds,
-                                       tokenizer,
-                                       max_seq_len=args.max_seq_len,
-                                       batch_size=args.batch_size,
-                                       label_maps=label_maps,
-                                       mode="dev",
-                                       task_type=args.task_type)
+    dev_dataloader = create_dataloader(
+        dev_ds,
+        tokenizer,
+        max_seq_len=args.max_seq_len,
+        batch_size=args.batch_size,
+        label_maps=label_maps,
+        mode="dev",
+        task_type=args.task_type,
+    )
 
     encoder = AutoModel.from_pretrained(args.encoder)
     if args.task_type == "entity_extraction":
@@ -66,27 +70,20 @@ def do_train():
     else:
         model = GPLinkerForRelationExtraction(encoder, label_maps)
 
-    model_config = {
-        "task_type": args.task_type,
-        "label_maps": label_maps,
-        "encoder": args.encoder
-    }
+    model_config = {"task_type": args.task_type, "label_maps": label_maps, "encoder": args.encoder}
 
     num_training_steps = len(train_dataloader) * args.num_epochs
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -97,7 +94,7 @@ def do_train():
 
     criterion = Criterion()
 
-    global_step, best_f1 = 1, 0.
+    global_step, best_f1 = 1, 0.0
     tr_loss, logging_loss = 0.0, 0.0
     tic_train = time.time()
     for epoch in range(1, args.num_epochs + 1):
@@ -121,8 +118,8 @@ def do_train():
                 loss_avg = (tr_loss - logging_loss) / args.logging_steps
                 logger.info(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss_avg,
-                       args.logging_steps / time_diff))
+                    % (global_step, epoch, loss_avg, args.logging_steps / time_diff)
+                )
                 logging_loss = tr_loss
                 tic_train = time.time()
 
@@ -137,23 +134,17 @@ def do_train():
                 tokenizer.save_pretrained(save_dir)
                 logger.enable()
 
-                eval_result = evaluate(model,
-                                       dev_dataloader,
-                                       label_maps,
-                                       task_type=args.task_type)
+                eval_result = evaluate(model, dev_dataloader, label_maps, task_type=args.task_type)
                 logger.info("Evaluation precision: " + str(eval_result))
 
                 f1 = eval_result[criteria_map[args.task_type]]
                 if f1 > best_f1:
-                    logger.info(
-                        f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}"
-                    )
+                    logger.info(f"best F1 performence has been updated: {best_f1:.5f} --> {f1:.5f}")
                     best_f1 = f1
                     save_dir = os.path.join(args.save_dir, "model_best")
                     if not os.path.exists(save_dir):
                         os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   "model_state.pdparams")
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
                     paddle.save(model.state_dict(), save_param_path)
                     save_model_config(save_dir, model_config)
                     logger.disable()

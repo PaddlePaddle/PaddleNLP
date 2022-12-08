@@ -28,9 +28,8 @@ CHAR_DELIMITER = "\002"
 
 
 def load_dataset(datafiles):
-
     def read(data_path):
-        with open(data_path, 'r', encoding='utf-8') as fp:
+        with open(data_path, "r", encoding="utf-8") as fp:
             if "infer" in data_path:
                 next(fp)
             for line in fp:
@@ -42,10 +41,7 @@ def load_dataset(datafiles):
                     words, labels = line.split("\t")
                     words = words.split(CHAR_DELIMITER)
                     labels = labels.split(CHAR_DELIMITER)
-                    assert len(words) == len(
-                        labels
-                    ), "The word %s is not match with the label %s" % (words,
-                                                                       labels)
+                    assert len(words) == len(labels), "The word %s is not match with the label %s" % (words, labels)
                     yield [words, labels]
 
     if isinstance(datafiles, str):
@@ -60,7 +56,7 @@ def load_vocab(dict_path):
     """
     vocab = {}
     reverse = None
-    with open(dict_path, "r", encoding='utf8') as fin:
+    with open(dict_path, "r", encoding="utf8") as fin:
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
@@ -73,8 +69,7 @@ def load_vocab(dict_path):
             elif len(terms) == 1:
                 key, value = terms[0], i
             else:
-                raise ValueError("Error line: %s in file: %s" %
-                                 (line, dict_path))
+                raise ValueError("Error line: %s in file: %s" % (line, dict_path))
             vocab[key] = value
     return vocab
 
@@ -86,14 +81,10 @@ def normalize_token(token, normlize_vocab):
     return token
 
 
-def convert_tokens_to_ids(tokens,
-                          vocab,
-                          oov_replace_token=None,
-                          normlize_vocab=None):
+def convert_tokens_to_ids(tokens, vocab, oov_replace_token=None, normlize_vocab=None):
     """convert tokens to token indexs"""
     token_ids = []
-    oov_replace_token = vocab.get(
-        oov_replace_token) if oov_replace_token else None
+    oov_replace_token = vocab.get(oov_replace_token) if oov_replace_token else None
     for token in tokens:
         token = normalize_token(token, normlize_vocab)
         token_id = vocab.get(token, oov_replace_token)
@@ -102,46 +93,31 @@ def convert_tokens_to_ids(tokens,
     return token_ids
 
 
-def convert_example(example,
-                    max_seq_len,
-                    word_vocab,
-                    label_vocab=None,
-                    normlize_vocab=None):
+def convert_example(example, max_seq_len, word_vocab, label_vocab=None, normlize_vocab=None):
     if len(example) == 2:
         tokens, labels = example
     else:
         tokens, labels = example[0], None
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(tokens,
-                                      word_vocab,
-                                      oov_replace_token="OOV",
-                                      normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, oov_replace_token="OOV", normlize_vocab=normlize_vocab)
     length = len(token_ids)
     if labels is not None:
         labels = labels[:max_seq_len]
-        label_ids = convert_tokens_to_ids(labels,
-                                          label_vocab,
-                                          oov_replace_token="O")
+        label_ids = convert_tokens_to_ids(labels, label_vocab, oov_replace_token="O")
         return token_ids, length, label_ids
     else:
         return token_ids, length
 
 
 def parse_result(words, preds, lengths, word_vocab, label_vocab):
-    """ parse padding result """
+    """parse padding result"""
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
     id2label_dict = dict(zip(label_vocab.values(), label_vocab.keys()))
     for sent_index in range(len(lengths)):
-        sent = [
-            id2word_dict[index]
-            for index in words[sent_index][:lengths[sent_index]]
-        ]
-        tags = [
-            id2label_dict[index]
-            for index in preds[sent_index][:lengths[sent_index]]
-        ]
+        sent = [id2word_dict[index] for index in words[sent_index][: lengths[sent_index]]]
+        tags = [id2label_dict[index] for index in preds[sent_index][: lengths[sent_index]]]
 
         sent_out = []
         tags_out = []
@@ -150,13 +126,13 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
             # for the first word
             if parital_word == "":
                 parital_word = sent[ind]
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 continue
 
             # for the beginning of word
             if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
                 sent_out.append(parital_word)
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 parital_word = sent[ind]
                 continue
 
