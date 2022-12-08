@@ -83,6 +83,7 @@ class ModelArguments:
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.label_names = ["start_positions", "end_positions"]
 
     if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
         model_args.multilingual = True

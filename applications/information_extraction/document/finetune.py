@@ -23,9 +23,9 @@ from utils import convert_example, reader
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.trainer import (
+    CompressionArguments,
     PdArgumentParser,
     Trainer,
-    TrainingArguments,
     get_last_checkpoint,
 )
 from paddlenlp.transformers import UIEX, AutoTokenizer, export_model
@@ -71,8 +71,9 @@ class ModelArguments:
 
 
 def main():
-    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.label_names = ["start_positions", "end_positions"]
 
     # Log model and data config
     training_args.print_config(model_args, "Model")

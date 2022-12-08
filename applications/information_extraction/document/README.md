@@ -105,7 +105,6 @@ python finetune.py  \
     --per_device_eval_batch_size 8 \
     --num_train_epochs 10 \
     --learning_rate 1e-5 \
-    --label_names 'start_positions' 'end_positions' \
     --do_train \
     --do_eval \
     --do_export \
@@ -135,7 +134,6 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
     --per_device_eval_batch_size 8 \
     --num_train_epochs 10 \
     --learning_rate 1e-5 \
-    --label_names 'start_positions' 'end_positions' \
     --do_train \
     --do_eval \
     --do_export \
