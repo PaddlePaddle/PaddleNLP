@@ -708,7 +708,7 @@ class GenerationMixin(object):
                 print(response)
                 # ['是的', '嗯嗯']
         """
-        
+
         assert decode_strategy in [
             "greedy_search",
             "sampling",
