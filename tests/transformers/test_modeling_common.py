@@ -21,7 +21,7 @@ import random
 import shutil
 import tempfile
 import unittest
-from typing import Tuple, Type
+from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
@@ -61,7 +61,7 @@ def check_two_model_parameter(first_model: PretrainedModel, second_model: Pretra
 
 class ModelTesterMixin:
     model_tester = None
-    base_model_class = None
+    base_model_class: Optional[Type[PretrainedModel]] = None
     all_model_classes: Tuple[Type[PretrainedModel]] = ()
     all_generative_model_classes = ()
     test_resize_embeddings = True
@@ -495,17 +495,87 @@ class ModelTesterMixin:
             model = self.base_model_class(**config)
         self.assertTrue(len(model.model_name_list) != 0)
 
+    def test_pretrained_config_save_load(self):
+
+        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
+            return
+
+        config_class = self.base_model_class.config_class
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = config_class()
+
+            config.save_pretrained(tempdir)
+
+            # check the file exist
+            self.assertFalse(os.path.exists(os.path.join(tempdir, LEGACY_CONFIG_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, CONFIG_NAME)))
+
+            # rename the CONFIG_NAME
+            shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
+
+            loaded_config = config.__class__.from_pretrained(tempdir)
+            self.assertEqual(config.hidden_size, loaded_config.hidden_size)
+
+    def test_pretrained_config_mapping_in_dict(self):
+
+        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
+            return
+
+        class FakePretrainedConfig(self.base_model_class.config_class):
+            standard_config_map = {}
+
+        config = FakePretrainedConfig()
+
+        config_dict = config.to_dict()
+
+        # mapping from `from_dict` method
+        fake_config = FakePretrainedConfig.from_dict(config_dict)
+        fake_config_dict = fake_config.to_dict()
+
+        FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
+
+        loaded_fake_config = FakePretrainedConfig.from_dict(config_dict)
+        loaded_fake_config_dict = loaded_fake_config.to_dict()
+
+        self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
+        loaded_fake_config_dict.pop("hidden_size")
+
+        self.assertEqual(fake_config_dict, loaded_fake_config_dict)
+
+    def test_pretrained_config_mapping_in_tempdir(self):
+        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
+            return
+
+        class FakePretrainedConfig(self.base_model_class.config_class):
+            standard_config_map = {}
+
+        config = FakePretrainedConfig()
+
+        # mapping from local-dir
+        with tempfile.TemporaryDirectory() as tempdir:
+            with open(os.path.join(tempdir, CONFIG_NAME), "w", encoding="utf-8") as f:
+                json.dump(config.to_dict(), f, ensure_ascii=False)
+
+            fake_config = FakePretrainedConfig.from_pretrained(tempdir)
+            fake_config_dict = fake_config.to_dict()
+
+            FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
+
+            loaded_fake_config = FakePretrainedConfig.from_pretrained(tempdir)
+
+            loaded_fake_config_dict = loaded_fake_config.to_dict()
+
+            self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
+
+            loaded_fake_config_dict.pop("hidden_size")
+
+            self.assertEqual(fake_config_dict, loaded_fake_config_dict)
+
 
 class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
     hf_remote_test_model_path: str = None
     paddlehub_remote_test_model_path: str = None
-
-    def should_test_with_hf_config(self) -> bool:
-        if self.hf_remote_test_model_path is None or self.base_model_class is None:
-            return False
-
-        return self.base_model_class.constructed_from_pretrained_config()
 
     @slow
     def test_model_from_pretrained_hf_hub(self):
@@ -578,79 +648,3 @@ class ModelTesterPretrainedMixin:
                 new_model = self.base_model_class.from_pretrained(tempdirname)
 
                 check_two_model_parameter(model, new_model)
-
-    def test_pretrained_config_save_load(self):
-
-        if not self.should_test_with_hf_config():
-            return
-
-        config_class = self.base_model_class.config_class
-        with tempfile.TemporaryDirectory() as tempdir:
-            config = config_class()
-
-            config.save_pretrained(tempdir)
-
-            # check the file exist
-            self.assertFalse(os.path.exists(os.path.join(tempdir, LEGACY_CONFIG_NAME)))
-            self.assertTrue(os.path.exists(os.path.join(tempdir, CONFIG_NAME)))
-
-            # rename the CONFIG_NAME
-            shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
-
-            loaded_config = config.__class__.from_pretrained(tempdir)
-            self.assertEqual(config.hidden_size, loaded_config.hidden_size)
-
-    def test_pretrained_config_mapping_in_dict(self):
-
-        if not self.should_test_with_hf_config():
-            return
-
-        class FakePretrainedConfig(self.base_model_class.config_class):
-            standard_config_map = {}
-
-        config = FakePretrainedConfig()
-
-        config_dict = config.to_dict()
-
-        # mapping from `from_dict` method
-        fake_config = FakePretrainedConfig.from_dict(config_dict)
-        fake_config_dict = fake_config.to_dict()
-
-        FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
-
-        loaded_fake_config = FakePretrainedConfig.from_dict(config_dict)
-        loaded_fake_config_dict = loaded_fake_config.to_dict()
-
-        self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
-        loaded_fake_config_dict.pop("hidden_size")
-
-        self.assertEqual(fake_config_dict, loaded_fake_config_dict)
-
-    def test_pretrained_config_mapping_in_tempdir(self):
-        if not self.should_test_with_hf_config():
-            return
-
-        class FakePretrainedConfig(self.base_model_class.config_class):
-            standard_config_map = {}
-
-        config = FakePretrainedConfig()
-
-        # mapping from local-dir
-        with tempfile.TemporaryDirectory() as tempdir:
-            with open(os.path.join(tempdir, CONFIG_NAME), "w", encoding="utf-8") as f:
-                json.dump(config.to_dict(), f, ensure_ascii=False)
-
-            fake_config = FakePretrainedConfig.from_pretrained(tempdir)
-            fake_config_dict = fake_config.to_dict()
-
-            FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
-
-            loaded_fake_config = FakePretrainedConfig.from_pretrained(tempdir)
-
-            loaded_fake_config_dict = loaded_fake_config.to_dict()
-
-            self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
-
-            loaded_fake_config_dict.pop("hidden_size")
-
-            self.assertEqual(fake_config_dict, loaded_fake_config_dict)
