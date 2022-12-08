@@ -306,6 +306,7 @@ class GenerationMixin(object):
         num_beam_groups=1,
         diversity_rate=0.0,
         repetition_penalty=None,
+        no_repeat_ngram_size=None,
         logits_processors=None,
     ):
         processors = LogitsProcessorList()
@@ -533,6 +534,7 @@ class GenerationMixin(object):
         decoder_start_token_id=None,
         forced_bos_token_id=None,
         forced_eos_token_id=None,
+        no_repeat_ngram_size=None,
         num_return_sequences=1,
         diversity_rate=0.0,
         use_cache=True,
