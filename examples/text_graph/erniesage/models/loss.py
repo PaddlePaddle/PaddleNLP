@@ -41,8 +41,7 @@ def LossFactory(config):
 
 
 class SoftmaxWithCrossEntropy(nn.Layer):
-    """ softmax with cross entropy loss
-    """
+    """softmax with cross entropy loss"""
 
     def __init__(self, config):
         super(SoftmaxWithCrossEntropy, self).__init__()
@@ -52,15 +51,14 @@ class SoftmaxWithCrossEntropy(nn.Layer):
 
 
 class HingeLoss(nn.Layer):
-    """ Hinge Loss for the pos and neg.
-    """
+    """Hinge Loss for the pos and neg."""
 
     def __init__(self, margin):
         super(HingeLoss, self).__init__()
         self.margin = margin
 
     def forward(self, pos, neg):
-        """ forward function
+        """forward function
 
         Args:
             pos (Tensor): pos score.

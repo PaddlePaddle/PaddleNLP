@@ -36,14 +36,14 @@ from data_collator import DataCollator
 
 
 def _get_md5(string):
-    """ Get md5 value for string """
+    """Get md5 value for string"""
     hl = hashlib.md5()
     hl.update(string.encode(encoding="utf-8"))
     return hl.hexdigest()
 
 
 def _decode_image(im_base64):
-    """ Decode image """
+    """Decode image"""
     if im_base64 is not None:
         image = base64.b64decode(im_base64.encode("utf-8"))
         im = np.frombuffer(image, dtype="uint8")
@@ -91,17 +91,20 @@ def _scale_same_as_image(boxes, width, height, target_size):
     scale_x = target_size / width
     scale_y = target_size / height
 
-    new_boxes = [[
-        int(max(0, min(box[0] * scale_x, target_size - 1))),
-        int(max(0, min(box[1] * scale_y, target_size - 1))),
-        int(max(0, min(box[2] * scale_x, target_size - 1))),
-        int(max(0, min(box[3] * scale_y, target_size - 1))),
-    ] for box in boxes]
+    new_boxes = [
+        [
+            int(max(0, min(box[0] * scale_x, target_size - 1))),
+            int(max(0, min(box[1] * scale_y, target_size - 1))),
+            int(max(0, min(box[2] * scale_x, target_size - 1))),
+            int(max(0, min(box[3] * scale_y, target_size - 1))),
+        ]
+        for box in boxes
+    ]
     return new_boxes, (scale_x, scale_y)
 
 
 def _permute(im, channel_first=True, to_bgr=False):
-    """ Permute """
+    """Permute"""
     if channel_first:
         im = np.swapaxes(im, 1, 2)
         im = np.swapaxes(im, 1, 0)
@@ -119,10 +122,7 @@ def _str2im(
     # Step1: decode image
     origin_im = _decode_image(im_base64)
     # Step2: resize image
-    im = _resize_image(origin_im,
-                       target_size=target_size,
-                       interp=1,
-                       resize_box=False)
+    im = _resize_image(origin_im, target_size=target_size, interp=1, resize_box=False)
     return im, origin_im
 
 
@@ -161,13 +161,11 @@ def get_label_ld(qas, scheme="bio"):
 
 
 def anls_score(labels, predictions):
-
     def get_anls(prediction, ground_truth):
         prediction = prediction.strip().lower()
         ground_truth = ground_truth.strip().lower()
-        iou = 1 - editdistance.eval(prediction, ground_truth) / max(
-            len(prediction), len(ground_truth), 1e-5)
-        anls = iou if iou >= .5 else 0.
+        iou = 1 - editdistance.eval(prediction, ground_truth) / max(len(prediction), len(ground_truth), 1e-5)
+        anls = iou if iou >= 0.5 else 0.0
         return anls
 
     def metric_max_over_ground_truths(metric_fn, prediction, ground_truths):
@@ -190,15 +188,13 @@ def anls_score(labels, predictions):
                 prediction_text = ""
             ground_truths = labels[_id][question]
             total += 1
-            anls += metric_max_over_ground_truths(get_anls, prediction_text,
-                                                  ground_truths)
+            anls += metric_max_over_ground_truths(get_anls, prediction_text, ground_truths)
 
     anls = 100.0 * anls / total
     return {"anls": anls}
 
 
 class PreProcessor:
-
     def __init__(self):
         pass
 
@@ -215,27 +211,28 @@ class PreProcessor:
                 continue
             num_left_context = position - doc_span["start"]
             num_right_context = end - position
-            score = min(num_left_context,
-                        num_right_context) + 0.01 * doc_span["length"]
+            score = min(num_left_context, num_right_context) + 0.01 * doc_span["length"]
             if best_score is None or score > best_score:
                 best_score = score
                 best_span_index = span_index
         return cur_span_index == best_span_index
 
-    def preprocess_ner(self,
-                       examples,
-                       tokenizer=None,
-                       label_dict=None,
-                       max_seq_length=512,
-                       doc_stride=128,
-                       target_size=1000,
-                       max_size=1000,
-                       other_label="O",
-                       ignore_label_id=-100,
-                       use_segment_box=False,
-                       preprocessing_num_workers=1,
-                       scheme="bio",
-                       lang="en"):
+    def preprocess_ner(
+        self,
+        examples,
+        tokenizer=None,
+        label_dict=None,
+        max_seq_length=512,
+        doc_stride=128,
+        target_size=1000,
+        max_size=1000,
+        other_label="O",
+        ignore_label_id=-100,
+        use_segment_box=False,
+        preprocessing_num_workers=1,
+        scheme="bio",
+        lang="en",
+    ):
         """
         Adapt to NER task.
         """
@@ -269,21 +266,21 @@ class PreProcessor:
             orig_labels = [other_label] * len(example_text)
             for question, answers in zip(qas["question"], qas["answers"]):
                 for answer_start, answer_end in zip(
-                        answers["answer_start"],
-                        answers["answer_end"],
+                    answers["answer_start"],
+                    answers["answer_end"],
                 ):
                     if scheme == "bio":
                         orig_labels[answer_start] = "B-" + question
-                        orig_labels[answer_start +
-                                    1:answer_end] = ["I-" + question] * (
-                                        answer_end - answer_start - 1)
+                        orig_labels[answer_start + 1 : answer_end] = ["I-" + question] * (
+                            answer_end - answer_start - 1
+                        )
                     elif scheme == "bioes":
                         orig_labels[answer_start] = "B-" + question
                         if answer_end - answer_start - 1 > 1:
                             orig_labels[answer_end - 1] = "E-" + question
-                            orig_labels[answer_start + 1:answer_end -
-                                        1] = ["I-" + question] * (
-                                            answer_end - answer_start - 2)
+                            orig_labels[answer_start + 1 : answer_end - 1] = ["I-" + question] * (
+                                answer_end - answer_start - 2
+                            )
                         else:
                             orig_labels[answer_start] = "S-" + question
 
@@ -349,16 +346,13 @@ class PreProcessor:
 
                 for i in range(doc_span["length"]):
                     split_token_index = doc_span["start"] + i
-                    token_to_orig_map[str(
-                        len(tokens))] = tok_to_orig_index[split_token_index]
+                    token_to_orig_map[str(len(tokens))] = tok_to_orig_index[split_token_index]
 
-                    is_max_context = self._check_is_max_context(
-                        doc_spans, doc_span_index, split_token_index)
+                    is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[str(len(tokens))] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     token_boxes.append(all_doc_token_boxes[split_token_index])
-                    token_label_ids.append(
-                        label_dict[all_doc_token_labels[split_token_index]])
+                    token_label_ids.append(label_dict[all_doc_token_labels[split_token_index]])
                     sentence_ids.append(0)
 
                 token_is_max_context[str(len(tokens))] = False
@@ -387,8 +381,7 @@ class PreProcessor:
                 assert len(sentence_ids) == max_seq_length
                 assert len(token_label_ids) == max_seq_length
 
-                feature_id = examples["name"][example_idx] + "__" + str(
-                    examples["page_no"][example_idx])
+                feature_id = examples["name"][example_idx] + "__" + str(examples["page_no"][example_idx])
                 tokenized_examples["id"].append(feature_id)
                 tokenized_examples["tokens"].append(tokens)
                 tokenized_examples["input_ids"].append(input_ids)
@@ -399,22 +392,17 @@ class PreProcessor:
                 tokenized_examples["image"].append(image)
                 # tokenized_examples["orig_image"].append(origin_image)
                 tokenized_examples["labels"].append(token_label_ids)
-                tokenized_examples["token_is_max_context"].append(
-                    token_is_max_context)
-                tokenized_examples["token_to_orig_map"].append(
-                    token_to_orig_map)
+                tokenized_examples["token_is_max_context"].append(token_is_max_context)
+                tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
         return tokenized_examples
 
-    def _improve_answer_span(self, doc_tokens, input_start, input_end,
-                             tokenizer, orig_answer_text):
+    def _improve_answer_span(self, doc_tokens, input_start, input_end, tokenizer, orig_answer_text):
         """Returns tokenized answer spans that better match the annotated answer."""
 
-        tok_answer_text = tokenizer.convert_tokens_to_string(
-            tokenizer.tokenize(orig_answer_text))
+        tok_answer_text = tokenizer.convert_tokens_to_string(tokenizer.tokenize(orig_answer_text))
         for new_start in range(input_start, input_end + 1):
             for new_end in range(input_end, new_start - 1, -1):
-                text_span = tokenizer.convert_tokens_to_string(
-                    doc_tokens[new_start:(new_end + 1)])
+                text_span = tokenizer.convert_tokens_to_string(doc_tokens[new_start : (new_end + 1)])
                 if text_span == tok_answer_text:
                     return (new_start, new_end)
 
@@ -477,13 +465,11 @@ class PreProcessor:
                     all_doc_token_boxes.append(box)
 
             qas = examples["qas"][example_idx]
-            for qid, question, answers in zip(qas["question_id"],
-                                              qas["question"], qas["answers"]):
+            for qid, question, answers in zip(qas["question_id"], qas["question"], qas["answers"]):
 
-                query_tokens = tokenizer.tokenize(question,
-                                                  add_special_tokens=False,
-                                                  truncation=False,
-                                                  max_length=max_query_length)
+                query_tokens = tokenizer.tokenize(
+                    question, add_special_tokens=False, truncation=False, max_length=max_query_length
+                )
 
                 start_offset = 0
                 doc_spans = []
@@ -515,15 +501,12 @@ class PreProcessor:
 
                     for i in range(doc_span["length"]):
                         split_token_index = doc_span["start"] + i
-                        token_to_orig_map[str(
-                            len(tokens))] = tok_to_orig_index[split_token_index]
+                        token_to_orig_map[str(len(tokens))] = tok_to_orig_index[split_token_index]
 
-                        is_max_context = self._check_is_max_context(
-                            doc_spans, doc_span_index, split_token_index)
+                        is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                         token_is_max_context[str(len(tokens))] = is_max_context
                         tokens.append(all_doc_tokens[split_token_index])
-                        token_boxes.append(
-                            all_doc_token_boxes[split_token_index])
+                        token_boxes.append(all_doc_token_boxes[split_token_index])
                         sentence_ids.append(seg_a)
 
                     token_is_max_context[str(len(tokens))] = False
@@ -557,9 +540,9 @@ class PreProcessor:
                     sentence_ids.append(seg_b)
 
                     input_ids = tokenizer.convert_tokens_to_ids(tokens)
-                    position_ids = list(
-                        range(len(tokens) - len(query_tokens) - 1)) + list(
-                            range(len(query_tokens) + 1))
+                    position_ids = list(range(len(tokens) - len(query_tokens) - 1)) + list(
+                        range(len(query_tokens) + 1)
+                    )
 
                     assert len(input_ids) == max_seq_length
                     assert len(input_mask) == max_seq_length
@@ -568,9 +551,9 @@ class PreProcessor:
 
                     answer_rcd = []
                     for answer_text, answer_start, answer_end in zip(
-                            answers["text"],
-                            answers["answer_start"],
-                            answers["answer_end"],
+                        answers["text"],
+                        answers["answer_start"],
+                        answers["answer_end"],
                     ):
 
                         if is_training and answer_start == -1 and answer_end == -1:
@@ -587,22 +570,19 @@ class PreProcessor:
 
                             tok_start_position = orig_to_tok_index[answer_start]
                             if answer_end < len(example_text) - 1:
-                                tok_end_position = orig_to_tok_index[
-                                    answer_end] - 1
+                                tok_end_position = orig_to_tok_index[answer_end] - 1
                             else:
                                 tok_end_position = len(all_doc_tokens) - 1
-                            (tok_start_position,
-                             tok_end_position) = self._improve_answer_span(
-                                 all_doc_tokens, tok_start_position,
-                                 tok_end_position, tokenizer, answer_text)
+                            (tok_start_position, tok_end_position) = self._improve_answer_span(
+                                all_doc_tokens, tok_start_position, tok_end_position, tokenizer, answer_text
+                            )
                             # If the answer is outside the span, set start_position == end_position == 0
 
                             # For training, if our document chunk does not contain an annotation
                             # we throw it out, since there is nothing to predict.
                             doc_start = doc_span["start"]
                             doc_end = doc_span["start"] + doc_span["length"] - 1
-                            if not (tok_start_position >= doc_start
-                                    and tok_end_position <= doc_end):
+                            if not (tok_start_position >= doc_start and tok_end_position <= doc_end):
                                 start_position = 0
                                 end_position = 0
                             else:
@@ -616,28 +596,23 @@ class PreProcessor:
                         end_labels[end_position] = 1
                         answer_rcd.append([start_position, end_position])
 
-                        feature_id = examples["name"][example_idx] + "__" + str(
-                            examples["page_no"][example_idx])
+                        feature_id = examples["name"][example_idx] + "__" + str(examples["page_no"][example_idx])
                         tokenized_examples["id"].append(feature_id)
                         tokenized_examples["question_id"].append(qid)
                         tokenized_examples["questions"].append(question)
                         tokenized_examples["tokens"].append(tokens)
                         tokenized_examples["input_ids"].append(input_ids)
                         tokenized_examples["attention_mask"].append(input_mask)
-                        tokenized_examples["token_type_ids"].append(
-                            sentence_ids)
+                        tokenized_examples["token_type_ids"].append(sentence_ids)
                         tokenized_examples["bbox"].append(token_boxes)
                         tokenized_examples["position_ids"].append(position_ids)
                         tokenized_examples["image"].append(image)
-                        tokenized_examples["start_positions"].append(
-                            start_position)
+                        tokenized_examples["start_positions"].append(start_position)
                         tokenized_examples["end_positions"].append(end_position)
                         tokenized_examples["start_labels"].append(start_labels)
                         tokenized_examples["end_labels"].append(end_labels)
-                        tokenized_examples["token_is_max_context"].append(
-                            token_is_max_context)
-                        tokenized_examples["token_to_orig_map"].append(
-                            token_to_orig_map)
+                        tokenized_examples["token_is_max_context"].append(token_is_max_context)
+                        tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
 
                         if not is_training:
                             break
@@ -744,8 +719,7 @@ class PreProcessor:
                 assert len(token_boxes) == max_seq_length
                 assert len(sentence_ids) == max_seq_length
 
-                feature_id = examples["name"][example_idx] + "__" + str(
-                    examples["page_no"][example_idx])
+                feature_id = examples["name"][example_idx] + "__" + str(examples["page_no"][example_idx])
                 tokenized_examples["id"].append(feature_id)
                 tokenized_examples["tokens"].append(tokens)
                 tokenized_examples["input_ids"].append(input_ids)
@@ -760,17 +734,14 @@ class PreProcessor:
 
 
 class PostProcessor:
-
     def __init__(self):
-        """ init post processor """
+        """init post processor"""
 
         self.examples_cache = collections.defaultdict(list)
         self.features_cache = collections.defaultdict(list)
         self._PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-            "PrelimPrediction", [
-                "feature_index", "start_index", "end_index", "start_logit",
-                "end_logit"
-            ])
+            "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
+        )
 
     def get_predictions(self, pred, label_list, with_crf=False):
         if not with_crf:
@@ -782,37 +753,31 @@ class PostProcessor:
         predictions = [label_list[i] for i in pred_ids]
         return predictions, prediction_score
 
-    def postprocess_ner(self,
-                        examples: datasets.Dataset,
-                        features: datasets.Dataset,
-                        preds,
-                        labels,
-                        label_list,
-                        tokenizer=None,
-                        with_crf=False,
-                        lang="en"):
+    def postprocess_ner(
+        self,
+        examples: datasets.Dataset,
+        features: datasets.Dataset,
+        preds,
+        labels,
+        label_list,
+        tokenizer=None,
+        with_crf=False,
+        lang="en",
+    ):
         if "name" not in self.examples_cache:
             self.examples_cache["name"] = [item for item in examples["name"]]
         if "page_no" not in self.examples_cache:
-            self.examples_cache["page_no"] = [
-                item for item in examples["page_no"]
-            ]
+            self.examples_cache["page_no"] = [item for item in examples["page_no"]]
         if "text" not in self.examples_cache:
             self.examples_cache["text"] = [item for item in examples["text"]]
         if "id" not in self.features_cache:
             self.features_cache["id"] = [item for item in features["id"]]
         if "tokens" not in self.features_cache:
-            self.features_cache["tokens"] = [
-                item for item in features["tokens"]
-            ]
+            self.features_cache["tokens"] = [item for item in features["tokens"]]
         if "token_is_max_context" not in self.features_cache:
-            self.features_cache["token_is_max_context"] = [
-                item for item in features["token_is_max_context"]
-            ]
+            self.features_cache["token_is_max_context"] = [item for item in features["token_is_max_context"]]
         if "token_to_orig_map" not in self.features_cache:
-            self.features_cache["token_to_orig_map"] = [
-                item for item in features["token_to_orig_map"]
-            ]
+            self.features_cache["token_to_orig_map"] = [item for item in features["token_to_orig_map"]]
         separator = "" if lang == "ch" else " "
 
         feature_id_to_features = collections.defaultdict(list)
@@ -825,8 +790,7 @@ class PostProcessor:
         recover_labels = []
 
         for eid, example_id in enumerate(self.examples_cache["name"]):
-            feature_map = example_id + "__" + str(
-                self.examples_cache["page_no"][eid])
+            feature_map = example_id + "__" + str(self.examples_cache["page_no"][eid])
             features_ids = feature_id_to_features[feature_map]
             gather_pred = []
             gather_label = []
@@ -835,26 +799,20 @@ class PostProcessor:
             gather_map = []
             for idx in features_ids:
                 pred, label = preds[idx], labels[idx]
-                prediction, prediction_score = self.get_predictions(
-                    pred, label_list, with_crf=with_crf)
+                prediction, prediction_score = self.get_predictions(pred, label_list, with_crf=with_crf)
 
-                token_is_max_context = self.features_cache[
-                    "token_is_max_context"][idx]
-                token_to_orig_map = self.features_cache["token_to_orig_map"][
-                    idx]
+                token_is_max_context = self.features_cache["token_is_max_context"][idx]
+                token_to_orig_map = self.features_cache["token_to_orig_map"][idx]
                 for token_idx in range(len(token_is_max_context)):
                     token_idx += 1
                     if token_is_max_context[str(token_idx)]:
-                        gather_tokens.append(
-                            self.features_cache["tokens"][idx][token_idx])
+                        gather_tokens.append(self.features_cache["tokens"][idx][token_idx])
                         gather_pred.append(prediction[token_idx])
                         gather_score.append(prediction_score[token_idx])
                         gather_label.append(label[token_idx])
                         gather_map.append(token_to_orig_map[str(token_idx)])
 
-            recover_pred = [
-                p for (p, l) in zip(gather_pred, gather_label) if l != -100
-            ]
+            recover_pred = [p for (p, l) in zip(gather_pred, gather_label) if l != -100]
             recover_label = [label_list[l] for l in gather_label if l != -100]
 
             pred_entities = get_entities(recover_pred)
@@ -863,47 +821,40 @@ class PostProcessor:
             recover_labels.append(recover_label)
 
             for item in pred_entities:
-                entity = tokenizer.convert_tokens_to_string(
-                    gather_tokens[item[1]:(item[2] + 1)]).strip()
+                entity = tokenizer.convert_tokens_to_string(gather_tokens[item[1] : (item[2] + 1)]).strip()
                 orig_doc_start = gather_map[item[1]]
                 orig_doc_end = gather_map[item[2]]
-                orig_tokens = self.examples_cache["text"][eid][orig_doc_start:(
-                    orig_doc_end + 1)]
+                orig_tokens = self.examples_cache["text"][eid][orig_doc_start : (orig_doc_end + 1)]
                 orig_text = separator.join(orig_tokens)
-                final_text = self.get_final_text(entity, orig_text, False,
-                                                 tokenizer)
-                predictions[example_id].append([
-                    item[0], final_text,
-                    sum(gather_score[item[1]:item[2] + 1]) /
-                    (item[2] - item[1] + 1), [item[1], item[2]],
-                    ", ".join(recover_pred[item[1]:item[2] + 1])
-                ])
+                final_text = self.get_final_text(entity, orig_text, False, tokenizer)
+                predictions[example_id].append(
+                    [
+                        item[0],
+                        final_text,
+                        sum(gather_score[item[1] : item[2] + 1]) / (item[2] - item[1] + 1),
+                        [item[1], item[2]],
+                        ", ".join(recover_pred[item[1] : item[2] + 1]),
+                    ]
+                )
 
             for item in gt_entities:
-                entity = tokenizer.convert_tokens_to_string(
-                    gather_tokens[item[1]:(item[2] + 1)]).strip()
+                entity = tokenizer.convert_tokens_to_string(gather_tokens[item[1] : (item[2] + 1)]).strip()
                 orig_doc_start = gather_map[item[1]]
                 orig_doc_end = gather_map[item[2]]
-                orig_tokens = self.examples_cache["text"][eid][orig_doc_start:(
-                    orig_doc_end + 1)]
+                orig_tokens = self.examples_cache["text"][eid][orig_doc_start : (orig_doc_end + 1)]
                 orig_text = separator.join(orig_tokens)
-                final_text = self.get_final_text(entity, orig_text, False,
-                                                 tokenizer)
-                references[example_id].append([
-                    item[0], final_text, 1, [item[1], item[2]],
-                    ", ".join(recover_label[item[1]:item[2] + 1])
-                ])
+                final_text = self.get_final_text(entity, orig_text, False, tokenizer)
+                references[example_id].append(
+                    [item[0], final_text, 1, [item[1], item[2]], ", ".join(recover_label[item[1] : item[2] + 1])]
+                )
             if example_id not in predictions:
                 predictions[example_id].append(["", "", -1, [], ""])
 
-        return predictions, references, EvalPrediction(
-            predictions=recover_preds, label_ids=recover_labels)
+        return predictions, references, EvalPrediction(predictions=recover_preds, label_ids=recover_labels)
 
     def _get_best_indexes(self, logits, n_best_size):
         """Get the n-best logits from a list."""
-        index_and_score = sorted(enumerate(logits),
-                                 key=lambda x: x[1],
-                                 reverse=True)
+        index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
 
         best_indexes = []
         for i in range(len(index_and_score)):
@@ -926,8 +877,7 @@ class PostProcessor:
             ns_text = "".join(ns_chars)
             return (ns_text, ns_to_s_map)
 
-        tok_text = tokenizer.convert_tokens_to_string(
-            tokenizer.tokenize(orig_text))
+        tok_text = tokenizer.convert_tokens_to_string(tokenizer.tokenize(orig_text))
 
         start_position = tok_text.find(pred_text)
         if start_position == -1:
@@ -964,7 +914,7 @@ class PostProcessor:
         if orig_end_position is None:
             return orig_text
 
-        output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+        output_text = orig_text[orig_start_position : (orig_end_position + 1)]
         return output_text
 
     def postprocess_mrc(
@@ -981,9 +931,7 @@ class PostProcessor:
         if "name" not in self.examples_cache:
             self.examples_cache["name"] = [item for item in examples["name"]]
         if "page_no" not in self.examples_cache:
-            self.examples_cache["page_no"] = [
-                item for item in examples["page_no"]
-            ]
+            self.examples_cache["page_no"] = [item for item in examples["page_no"]]
         if "text" not in self.examples_cache:
             self.examples_cache["text"] = [item for item in examples["text"]]
         if "qas" not in self.examples_cache:
@@ -992,25 +940,15 @@ class PostProcessor:
         if "id" not in self.features_cache:
             self.features_cache["id"] = [item for item in features["id"]]
         if "tokens" not in self.features_cache:
-            self.features_cache["tokens"] = [
-                item for item in features["tokens"]
-            ]
+            self.features_cache["tokens"] = [item for item in features["tokens"]]
         if "question_id" not in self.features_cache:
-            self.features_cache["question_id"] = [
-                item for item in features["question_id"]
-            ]
+            self.features_cache["question_id"] = [item for item in features["question_id"]]
         if "questions" not in self.features_cache:
-            self.features_cache["questions"] = [
-                item for item in features["questions"]
-            ]
+            self.features_cache["questions"] = [item for item in features["questions"]]
         if "token_is_max_context" not in self.features_cache:
-            self.features_cache["token_is_max_context"] = [
-                item for item in features["token_is_max_context"]
-            ]
+            self.features_cache["token_is_max_context"] = [item for item in features["token_is_max_context"]]
         if "token_to_orig_map" not in self.features_cache:
-            self.features_cache["token_to_orig_map"] = [
-                item for item in features["token_to_orig_map"]
-            ]
+            self.features_cache["token_to_orig_map"] = [item for item in features["token_to_orig_map"]]
 
         separator = "" if lang == "ch" else " "
 
@@ -1019,11 +957,10 @@ class PostProcessor:
             feature_id_to_features[feature_id].append(idx)
 
         predictions, references = collections.defaultdict(
-            lambda: collections.defaultdict(list)), collections.defaultdict(
-                lambda: collections.defaultdict(list))
+            lambda: collections.defaultdict(list)
+        ), collections.defaultdict(lambda: collections.defaultdict(list))
         for ei, example_id in enumerate(self.examples_cache["name"]):
-            feature_map = example_id + "__" + str(
-                self.examples_cache["page_no"][ei])
+            feature_map = example_id + "__" + str(self.examples_cache["page_no"][ei])
             features_ids = feature_id_to_features[feature_map]
             prelim_predictions = []
             for i, idx in enumerate(features_ids):
@@ -1031,16 +968,13 @@ class PostProcessor:
                 start_logits = preds[0][idx]
                 end_logits = preds[1][idx]
 
-                start_indexes = self._get_best_indexes(start_logits,
-                                                       n_best_size)
+                start_indexes = self._get_best_indexes(start_logits, n_best_size)
                 end_indexes = self._get_best_indexes(end_logits, n_best_size)
-                token_is_max_context = self.features_cache[
-                    "token_is_max_context"][idx]
+                token_is_max_context = self.features_cache["token_is_max_context"][idx]
 
                 for start_index in start_indexes:
                     for end_index in end_indexes:
-                        if not token_is_max_context.get(str(start_index),
-                                                        False):
+                        if not token_is_max_context.get(str(start_index), False):
                             continue
                         if end_index < start_index:
                             continue
@@ -1053,83 +987,71 @@ class PostProcessor:
                                 start_index=start_index,
                                 end_index=end_index,
                                 start_logit=start_logits[start_index],
-                                end_logit=end_logits[end_index]))
+                                end_logit=end_logits[end_index],
+                            )
+                        )
 
-            prelim_predictions = sorted(prelim_predictions,
-                                        key=lambda x:
-                                        (x.start_logit + x.end_logit),
-                                        reverse=True)
+            prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
             for rcd in prelim_predictions:
 
-                question_id = self.features_cache["question_id"][
-                    rcd.feature_index]
+                question_id = self.features_cache["question_id"][rcd.feature_index]
                 question = self.features_cache["questions"][rcd.feature_index]
                 if question_id in predictions[example_id]:
                     continue
 
                 if rcd.start_index > 0:
-                    tok_tokens = self.features_cache["tokens"][
-                        rcd.feature_index][rcd.start_index:(rcd.end_index + 1)]
-                    orig_doc_start = self.features_cache["token_to_orig_map"][
-                        rcd.feature_index][str(rcd.start_index)]
-                    orig_doc_end = self.features_cache["token_to_orig_map"][
-                        rcd.feature_index][str(rcd.end_index)]
-                    orig_tokens = self.examples_cache["text"][ei][
-                        orig_doc_start:(orig_doc_end + 1)]
+                    tok_tokens = self.features_cache["tokens"][rcd.feature_index][
+                        rcd.start_index : (rcd.end_index + 1)
+                    ]
+                    orig_doc_start = self.features_cache["token_to_orig_map"][rcd.feature_index][str(rcd.start_index)]
+                    orig_doc_end = self.features_cache["token_to_orig_map"][rcd.feature_index][str(rcd.end_index)]
+                    orig_tokens = self.examples_cache["text"][ei][orig_doc_start : (orig_doc_end + 1)]
                     orig_text = separator.join(orig_tokens)
 
-                    tok_text = tokenizer.convert_tokens_to_string(
-                        tok_tokens).strip()
-                    final_text = self.get_final_text(tok_text, orig_text, False,
-                                                     tokenizer)
+                    tok_text = tokenizer.convert_tokens_to_string(tok_tokens).strip()
+                    final_text = self.get_final_text(tok_text, orig_text, False, tokenizer)
                 else:
                     continue
                 if question_id in predictions[example_id]:
-                    predictions[example_id][question_id]["answers"].append(
-                        final_text)
+                    predictions[example_id][question_id]["answers"].append(final_text)
                 else:
-                    predictions[example_id][question_id] = {
-                        "question": question,
-                        "answers": [final_text]
-                    }
+                    predictions[example_id][question_id] = {"question": question, "answers": [final_text]}
 
         for example_index, example in enumerate(examples):
             eid = self.examples_cache["name"][example_index]
             qas = self.examples_cache["qas"][example_index]
-            for question_id, question, answers in zip(qas["question_id"],
-                                                      qas["question"],
-                                                      qas["answers"]):
+            for question_id, question, answers in zip(qas["question_id"], qas["question"], qas["answers"]):
                 references[eid][question_id] = {
                     "question": question,
-                    "answers": [answer_text for answer_text in answers["text"]]
+                    "answers": [answer_text for answer_text in answers["text"]],
                 }
                 if eid not in predictions or question_id not in predictions[eid]:
-                    predictions[eid][question_id] = {
-                        "question": question,
-                        "answers": [""]
-                    }
+                    predictions[eid][question_id] = {"question": question, "answers": [""]}
 
-        formatted_predictions = [{
-            "id":
-            k,
-            "annotations": [{
-                "qid": str(qid),
-                "question": qa["question"],
-                "value": qa["answers"]
-            } for qid, qa in v.items()],
-        } for k, v in predictions.items()]
-        formated_references = [{
-            "id":
-            k,
-            "annotations": [{
-                "qid": str(qid),
-                "question": qa["question"],
-                "value": qa["answers"]
-            } for qid, qa in v.items()],
-        } for k, v in references.items()]
-        return predictions, references, EvalPrediction(
-            predictions=formatted_predictions, label_ids=formated_references)
+        formatted_predictions = [
+            {
+                "id": k,
+                "annotations": [
+                    {"qid": str(qid), "question": qa["question"], "value": qa["answers"]} for qid, qa in v.items()
+                ],
+            }
+            for k, v in predictions.items()
+        ]
+        formated_references = [
+            {
+                "id": k,
+                "annotations": [
+                    {"qid": str(qid), "question": qa["question"], "value": qa["answers"]} for qid, qa in v.items()
+                ],
+            }
+            for k, v in references.items()
+        ]
+        return (
+            predictions,
+            references,
+            EvalPrediction(predictions=formatted_predictions, label_ids=formated_references),
+        )
 
     def postprocess_cls(
         self,
@@ -1143,9 +1065,7 @@ class PostProcessor:
         if "name" not in self.examples_cache:
             self.examples_cache["name"] = [item for item in examples["name"]]
         if "page_no" not in self.examples_cache:
-            self.examples_cache["page_no"] = [
-                item for item in examples["page_no"]
-            ]
+            self.examples_cache["page_no"] = [item for item in examples["page_no"]]
         if "id" not in self.features_cache:
             self.features_cache["id"] = [item for item in features["id"]]
 
@@ -1159,8 +1079,7 @@ class PostProcessor:
         recover_labels = []
 
         for eid, example_id in enumerate(self.examples_cache["name"]):
-            feature_map = example_id + "__" + str(
-                self.examples_cache["page_no"][eid])
+            feature_map = example_id + "__" + str(self.examples_cache["page_no"][eid])
             features_ids = feature_id_to_features[feature_map]
 
             max_rcd = [0, -1]
@@ -1175,5 +1094,4 @@ class PostProcessor:
             recover_labels.append(label)
             predictions[example_id] = label_list[max_rcd[1]]
             references[example_id] = label_list[label]
-        return predictions, references, EvalPrediction(
-            predictions=recover_preds, label_ids=recover_labels)
+        return predictions, references, EvalPrediction(predictions=recover_preds, label_ids=recover_labels)

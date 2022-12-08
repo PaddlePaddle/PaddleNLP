@@ -15,10 +15,10 @@
 
 import math
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import numpy as np
 
 
 def finfo(dtype):
@@ -49,12 +49,9 @@ class AttentionBlock(nn.Layer):
         super().__init__()
         self.channels = channels
 
-        self.num_heads = (channels // num_head_channels
-                          if num_head_channels is not None else 1)
+        self.num_heads = channels // num_head_channels if num_head_channels is not None else 1
         self.num_head_size = num_head_channels
-        self.group_norm = nn.GroupNorm(num_channels=channels,
-                                       num_groups=num_groups,
-                                       epsilon=eps)
+        self.group_norm = nn.GroupNorm(num_channels=channels, num_groups=num_groups, epsilon=eps)
 
         # define q,k,v as linear layers
         self.query = nn.Linear(channels, channels)
@@ -67,8 +64,7 @@ class AttentionBlock(nn.Layer):
     def transpose_for_scores(self, projection: paddle.Tensor) -> paddle.Tensor:
         new_projection_shape = projection.shape[:-1] + [self.num_heads, -1]
         # move heads to 2nd position (B, T, H * D) -> (B, T, H, D) -> (B, H, T, D)
-        new_projection = projection.reshape(new_projection_shape).transpose(
-            [0, 2, 1, 3])
+        new_projection = projection.reshape(new_projection_shape).transpose([0, 2, 1, 3])
         return new_projection
 
     def forward(self, hidden_states):
@@ -78,8 +74,7 @@ class AttentionBlock(nn.Layer):
         # norm
         hidden_states = self.group_norm(hidden_states)
 
-        hidden_states = hidden_states.reshape([batch, channel, height * width
-                                               ]).transpose([0, 2, 1])
+        hidden_states = hidden_states.reshape([batch, channel, height * width]).transpose([0, 2, 1])
 
         # proj to q, k, v
         query_proj = self.query(hidden_states)
@@ -93,11 +88,8 @@ class AttentionBlock(nn.Layer):
 
         # get scores
         scale = 1 / math.sqrt(math.sqrt(self.channels / self.num_heads))
-        attention_scores = paddle.matmul(query_states * scale,
-                                         key_states * scale,
-                                         transpose_y=True)
-        attention_probs = F.softmax(attention_scores.astype("float32"),
-                                    axis=-1).astype(attention_scores.dtype)
+        attention_scores = paddle.matmul(query_states * scale, key_states * scale, transpose_y=True)
+        attention_probs = F.softmax(attention_scores.astype("float32"), axis=-1).astype(attention_scores.dtype)
 
         # compute attention output
         context_states = paddle.matmul(attention_probs, value_states)
@@ -110,8 +102,7 @@ class AttentionBlock(nn.Layer):
 
         # compute next hidden_states
         hidden_states = self.proj_attn(context_states)
-        hidden_states = hidden_states.transpose([0, 2, 1]).reshape(
-            [batch, channel, height, width])
+        hidden_states = hidden_states.transpose([0, 2, 1]).reshape([batch, channel, height, width])
 
         # res connect and rescale
         hidden_states = (hidden_states + residual) / self.rescale_output_factor
@@ -124,41 +115,24 @@ class SpatialTransformer(nn.Layer):
     standard transformer action. Finally, reshape to image
     """
 
-    def __init__(self,
-                 in_channels,
-                 n_heads,
-                 d_head,
-                 depth=1,
-                 dropout=0.0,
-                 context_dim=None):
+    def __init__(self, in_channels, n_heads, d_head, depth=1, dropout=0.0, context_dim=None):
         super().__init__()
         self.n_heads = n_heads
         self.d_head = d_head
         self.in_channels = in_channels
         inner_dim = n_heads * d_head
-        self.norm = nn.GroupNorm(num_groups=32,
-                                 num_channels=in_channels,
-                                 epsilon=1e-6)
+        self.norm = nn.GroupNorm(num_groups=32, num_channels=in_channels, epsilon=1e-6)
 
-        self.proj_in = nn.Conv2D(in_channels,
-                                 inner_dim,
-                                 kernel_size=1,
-                                 stride=1,
-                                 padding=0)
+        self.proj_in = nn.Conv2D(in_channels, inner_dim, kernel_size=1, stride=1, padding=0)
 
-        self.transformer_blocks = nn.LayerList([
-            BasicTransformerBlock(inner_dim,
-                                  n_heads,
-                                  d_head,
-                                  dropout=dropout,
-                                  context_dim=context_dim) for d in range(depth)
-        ])
+        self.transformer_blocks = nn.LayerList(
+            [
+                BasicTransformerBlock(inner_dim, n_heads, d_head, dropout=dropout, context_dim=context_dim)
+                for d in range(depth)
+            ]
+        )
 
-        self.proj_out = nn.Conv2D(inner_dim,
-                                  in_channels,
-                                  kernel_size=1,
-                                  stride=1,
-                                  padding=0)
+        self.proj_out = nn.Conv2D(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x, context=None):
         # note: if no context is given, cross-attention defaults to self-attention
@@ -175,13 +149,11 @@ class SpatialTransformer(nn.Layer):
 
 
 class BasicTransformerBlock(nn.Layer):
-
     def __init__(self, dim, n_heads, d_head, dropout=0.0, context_dim=None):
         super().__init__()
-        self.attn1 = CrossAttention(query_dim=dim,
-                                    heads=n_heads,
-                                    dim_head=d_head,
-                                    dropout=dropout)  # is a self-attention
+        self.attn1 = CrossAttention(
+            query_dim=dim, heads=n_heads, dim_head=d_head, dropout=dropout
+        )  # is a self-attention
         self.ff = FeedForward(dim, dropout=dropout)
         self.attn2 = CrossAttention(
             query_dim=dim,
@@ -202,13 +174,7 @@ class BasicTransformerBlock(nn.Layer):
 
 
 class CrossAttention(nn.Layer):
-
-    def __init__(self,
-                 query_dim,
-                 context_dim=None,
-                 heads=8,
-                 dim_head=64,
-                 dropout=0.0):
+    def __init__(self, query_dim, context_dim=None, heads=8, dim_head=64, dropout=0.0):
         super().__init__()
         inner_dim = dim_head * heads
         context_dim = context_dim if context_dim is not None else query_dim
@@ -220,25 +186,20 @@ class CrossAttention(nn.Layer):
         self.to_k = nn.Linear(context_dim, inner_dim, bias_attr=False)
         self.to_v = nn.Linear(context_dim, inner_dim, bias_attr=False)
 
-        self.to_out = nn.Sequential(nn.Linear(inner_dim, query_dim),
-                                    nn.Dropout(dropout))
+        self.to_out = nn.Sequential(nn.Linear(inner_dim, query_dim), nn.Dropout(dropout))
 
     def reshape_heads_to_batch_dim(self, tensor):
         batch_size, seq_len, dim = tensor.shape
         head_size = self.heads
-        tensor = tensor.reshape(
-            [batch_size, seq_len, head_size, dim // head_size])
-        tensor = tensor.transpose([0, 2, 1, 3]).reshape(
-            [batch_size * head_size, seq_len, dim // head_size])
+        tensor = tensor.reshape([batch_size, seq_len, head_size, dim // head_size])
+        tensor = tensor.transpose([0, 2, 1, 3]).reshape([batch_size * head_size, seq_len, dim // head_size])
         return tensor
 
     def reshape_batch_dim_to_heads(self, tensor):
         batch_size, seq_len, dim = tensor.shape
         head_size = self.heads
-        tensor = tensor.reshape(
-            [batch_size // head_size, head_size, seq_len, dim])
-        tensor = tensor.transpose([0, 2, 1, 3]).reshape(
-            [batch_size // head_size, seq_len, dim * head_size])
+        tensor = tensor.reshape([batch_size // head_size, head_size, seq_len, dim])
+        tensor = tensor.transpose([0, 2, 1, 3]).reshape([batch_size // head_size, seq_len, dim * head_size])
         return tensor
 
     def forward(self, x, context=None, mask=None):
@@ -273,15 +234,13 @@ class CrossAttention(nn.Layer):
 
 
 class FeedForward(nn.Layer):
-
     def __init__(self, dim, dim_out=None, mult=4, dropout=0.0):
         super().__init__()
         inner_dim = int(dim * mult)
         dim_out = dim_out if dim_out is not None else dim
         project_in = GEGLU(dim, inner_dim)
 
-        self.net = nn.Sequential(project_in, nn.Dropout(dropout),
-                                 nn.Linear(inner_dim, dim_out))
+        self.net = nn.Sequential(project_in, nn.Dropout(dropout), nn.Linear(inner_dim, dim_out))
 
     def forward(self, x):
         return self.net(x)
@@ -289,7 +248,6 @@ class FeedForward(nn.Layer):
 
 # feedforward
 class GEGLU(nn.Layer):
-
     def __init__(self, dim_in, dim_out):
         super().__init__()
         self.proj = nn.Linear(dim_in, dim_out * 2)

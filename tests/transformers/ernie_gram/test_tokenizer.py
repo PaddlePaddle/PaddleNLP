@@ -51,9 +51,7 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "lowest",
         ]
 
-        self.vocab_file = os.path.join(
-            self.tmpdirname,
-            ErnieGramTokenizer.resource_files_names["vocab_file"])
+        self.vocab_file = os.path.join(self.tmpdirname, ErnieGramTokenizer.resource_files_names["vocab_file"])
 
         with open(self.vocab_file, "w", encoding="utf-8") as vocab_writer:
             vocab_writer.write("".join([x + "\n" for x in vocab_tokens]))
@@ -67,91 +65,69 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         tokenizer = self.tokenizer_class(self.vocab_file)
 
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
-        self.assertListEqual(tokens,
-                             ["un", "##want", "##ed", ",", "runn", "##ing"])
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens),
-                             [9, 6, 7, 12, 10, 11])
+        self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
 
     def test_offsets_mapping(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 text = "这世界很美"
                 pair = "我们需要共同守护"
 
                 # No pair
                 tokens_with_offsets = tokenizer.encode(
-                    text,
-                    return_special_tokens_mask=True,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True)
+                    text, return_special_tokens_mask=True, return_offsets_mapping=True, add_special_tokens=True
+                )
                 added_tokens = tokenizer.num_special_tokens_to_add(False)
                 offsets = tokens_with_offsets["offset_mapping"]
 
                 # Assert there is the same number of tokens and offsets
-                self.assertEqual(len(offsets),
-                                 len(tokens_with_offsets["input_ids"]))
+                self.assertEqual(len(offsets), len(tokens_with_offsets["input_ids"]))
 
                 # Assert there is online added_tokens special_tokens
-                self.assertEqual(
-                    sum(tokens_with_offsets["special_tokens_mask"]),
-                    added_tokens)
+                self.assertEqual(sum(tokens_with_offsets["special_tokens_mask"]), added_tokens)
 
                 # Pairs
                 tokens_with_offsets = tokenizer.encode(
-                    text,
-                    pair,
-                    return_special_tokens_mask=True,
-                    return_offsets_mapping=True,
-                    add_special_tokens=True)
+                    text, pair, return_special_tokens_mask=True, return_offsets_mapping=True, add_special_tokens=True
+                )
                 added_tokens = tokenizer.num_special_tokens_to_add(True)
                 offsets = tokens_with_offsets["offset_mapping"]
 
                 # Assert there is the same number of tokens and offsets
-                self.assertEqual(len(offsets),
-                                 len(tokens_with_offsets["input_ids"]))
+                self.assertEqual(len(offsets), len(tokens_with_offsets["input_ids"]))
 
                 # Assert there is online added_tokens special_tokens
-                self.assertEqual(
-                    sum(tokens_with_offsets["special_tokens_mask"]),
-                    added_tokens)
+                self.assertEqual(sum(tokens_with_offsets["special_tokens_mask"]), added_tokens)
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
 
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
-        self.assertListEqual(
-            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]],
-            [["[UNK]"], [], ["[UNK]"]])
+        self.assertListEqual([tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["[UNK]"], [], ["[UNK]"]])
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-gram-zh")
 
-        text = tokenizer.encode("sequence builders",
-                                return_token_type_ids=None,
-                                add_special_tokens=False)["input_ids"]
-        text_2 = tokenizer.encode("multi-sequence build",
-                                  return_token_type_ids=None,
-                                  add_special_tokens=False)["input_ids"]
+        text = tokenizer.encode("sequence builders", return_token_type_ids=None, add_special_tokens=False)["input_ids"]
+        text_2 = tokenizer.encode("multi-sequence build", return_token_type_ids=None, add_special_tokens=False)[
+            "input_ids"
+        ]
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
 
-        assert encoded_sentence == [tokenizer.cls_token_id
-                                    ] + text + [tokenizer.sep_token_id]
-        assert encoded_pair == [tokenizer.cls_token_id] + text + [
+        assert encoded_sentence == [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id]
+        assert encoded_pair == [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id] + text_2 + [
             tokenizer.sep_token_id
-        ] + text_2 + [tokenizer.sep_token_id]
+        ]
 
     def test_offsets_with_special_characters(self):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"中国的首都 {tokenizer.mask_token} 是北京"
                 tokens = tokenizer.encode(
@@ -175,38 +151,32 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     ((15, 16), "京"),
                     ((0, 0), tokenizer.sep_token),
                 ]
-                self.assertEqual([e[1] for e in expected_results],
-                                 tokenizer.convert_ids_to_tokens(
-                                     tokens["input_ids"]))
+                self.assertEqual(
+                    [e[1] for e in expected_results], tokenizer.convert_ids_to_tokens(tokens["input_ids"])
+                )
 
-                self.assertEqual([e[0] for e in expected_results],
-                                 tokens["offset_mapping"])
+                self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])
 
     def test_change_tokenize_chinese_chars(self):
         list_of_commun_chinese_char = ["的", "人", "有"]
         text_with_chinese_char = "".join(list_of_commun_chinese_char)
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
-            with self.subTest(
-                    f"{tokenizer.__class__.__name__} ({pretrained_name})"):
+            with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
 
                 kwargs["tokenize_chinese_chars"] = True
-                tokenizer = self.tokenizer_class.from_pretrained(
-                    pretrained_name, **kwargs)
+                tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 ids_without_spe_char_p = tokenizer.encode(
-                    text_with_chinese_char,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)["input_ids"]
+                    text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
 
-                tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(
-                    ids_without_spe_char_p)
+                tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
 
                 # it is expected that each Chinese character is not preceded by "##"
-                self.assertListEqual(tokens_without_spe_char_p,
-                                     list_of_commun_chinese_char)
+                self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
 
                 # not yet supported in bert tokenizer
-                '''
+                """
                 kwargs["tokenize_chinese_chars"] = False
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
@@ -219,4 +189,4 @@ class ErnieGramTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                     f"##{token}" if idx != 0 else token for idx, token in enumerate(list_of_commun_chinese_char)
                 ]
                 self.assertListEqual(tokens_without_spe_char_p, expected_tokens)
-                '''
+                """

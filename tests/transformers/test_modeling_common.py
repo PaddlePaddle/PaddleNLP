@@ -48,11 +48,8 @@ def floats_tensor(shape, scale=1.0):
     return scale * paddle.randn(shape, dtype="float32")
 
 
-def check_two_model_parameter(first_model: PretrainedModel,
-                              second_model: PretrainedModel):
-    assert len(
-        set(first_model.state_dict().keys()) -
-        set(second_model.state_dict().keys())) == 0
+def check_two_model_parameter(first_model: PretrainedModel, second_model: PretrainedModel):
+    assert len(set(first_model.state_dict().keys()) - set(second_model.state_dict().keys())) == 0
 
     # random choice the keys to compare
     key = random.choice(list(first_model.state_dict().keys()))
@@ -79,9 +76,9 @@ class ModelTesterMixin:
         inputs_dict = copy.deepcopy(inputs_dict)
         if model_class.__name__.endswith("ForMultipleChoice"):
             inputs_dict = {
-                k: v.unsqueeze(1).expand(
-                    shape=[-1, self.model_tester.num_choices, -1])
-                if isinstance(v, paddle.Tensor) and v.ndim > 1 else v
+                k: v.unsqueeze(1).expand(shape=[-1, self.model_tester.num_choices, -1])
+                if isinstance(v, paddle.Tensor) and v.ndim > 1
+                else v
                 for k, v in inputs_dict.items()
             }
         return inputs_dict
@@ -95,14 +92,12 @@ class ModelTesterMixin:
         return model_class(self.base_model_class(**config))
 
     def test_save_load(self):
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():
-                outputs = model(
-                    **self._prepare_for_class(inputs_dict, model_class))
+                outputs = model(**self._prepare_for_class(inputs_dict, model_class))
 
             out_2 = outputs[0].numpy()
             out_2[np.isnan(out_2)] = 0
@@ -112,8 +107,7 @@ class ModelTesterMixin:
                 model = model_class.from_pretrained(tmpdirname)
                 model.eval()
                 with paddle.no_grad():
-                    after_outputs = model(
-                        **self._prepare_for_class(inputs_dict, model_class))
+                    after_outputs = model(**self._prepare_for_class(inputs_dict, model_class))
 
                 # Make sure we don't have nans
                 out_1 = after_outputs[0].numpy()
@@ -122,16 +116,13 @@ class ModelTesterMixin:
                 self.assertLessEqual(max_diff, 1e-5)
 
     def test_determinism(self):
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():
-                first = model(
-                    **self._prepare_for_class(inputs_dict, model_class))[0]
-                second = model(
-                    **self._prepare_for_class(inputs_dict, model_class))[0]
+                first = model(**self._prepare_for_class(inputs_dict, model_class))[0]
+                second = model(**self._prepare_for_class(inputs_dict, model_class))[0]
 
             out_1 = first.numpy()
             out_2 = second.numpy()
@@ -161,29 +152,21 @@ class ModelTesterMixin:
         pass
 
     def test_attention_outputs(self):
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         seq_len = getattr(self.model_tester, "seq_length", None)
-        decoder_seq_length = getattr(self.model_tester, "decoder_seq_length",
-                                     seq_len)
-        encoder_seq_length = getattr(self.model_tester, "encoder_seq_length",
-                                     seq_len)
-        decoder_key_length = getattr(self.model_tester, "decoder_key_length",
-                                     decoder_seq_length)
-        encoder_key_length = getattr(self.model_tester, "key_length",
-                                     encoder_seq_length)
+        decoder_seq_length = getattr(self.model_tester, "decoder_seq_length", seq_len)
+        encoder_seq_length = getattr(self.model_tester, "encoder_seq_length", seq_len)
+        decoder_key_length = getattr(self.model_tester, "decoder_key_length", decoder_seq_length)
+        encoder_key_length = getattr(self.model_tester, "key_length", encoder_seq_length)
         chunk_length = getattr(self.model_tester, "chunk_length", None)
-        if chunk_length is not None and hasattr(self.model_tester,
-                                                "num_hashes"):
+        if chunk_length is not None and hasattr(self.model_tester, "num_hashes"):
             encoder_seq_length = encoder_seq_length * self.model_tester.num_hashes
 
         for model_class in self.all_model_classes:
             signature = inspect.signature(model_class.forward)
             # signature.parameters is an OrderedDict => so arg_names order is deterministic
             arg_names = [*signature.parameters.keys()]
-            if not all(
-                    name in arg_names for name in
-                ["output_attentions", "output_hidden_states", "return_dict"]):
+            if not all(name in arg_names for name in ["output_attentions", "output_hidden_states", "return_dict"]):
                 continue
             inputs_dict["output_attentions"] = True
             inputs_dict["output_hidden_states"] = False
@@ -191,29 +174,21 @@ class ModelTesterMixin:
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():
-                outputs = model(
-                    **self._prepare_for_class(inputs_dict, model_class))
+                outputs = model(**self._prepare_for_class(inputs_dict, model_class))
             attentions = outputs.encoder_attentions if self.is_encoder_decoder else outputs.attentions
-            self.assertEqual(len(attentions),
-                             self.model_tester.num_hidden_layers)
+            self.assertEqual(len(attentions), self.model_tester.num_hidden_layers)
 
             # TODO(guosheng): check that output_attentions also work using config
 
             if chunk_length is not None:
                 self.assertListEqual(
                     list(attentions[0].shape[-4:]),
-                    [
-                        self.model_tester.num_attention_heads,
-                        encoder_seq_length, chunk_length, encoder_key_length
-                    ],
+                    [self.model_tester.num_attention_heads, encoder_seq_length, chunk_length, encoder_key_length],
                 )
             else:
                 self.assertListEqual(
                     list(attentions[0].shape[-3:]),
-                    [
-                        self.model_tester.num_attention_heads,
-                        encoder_seq_length, encoder_key_length
-                    ],
+                    [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
                 )
             out_len = len(outputs)
 
@@ -234,21 +209,16 @@ class ModelTesterMixin:
                 # decoder attentions
                 decoder_attentions = outputs.decoder_attentions
                 self.assertIsInstance(decoder_attentions, (list, tuple))
-                self.assertEqual(len(decoder_attentions),
-                                 self.model_tester.num_hidden_layers)
+                self.assertEqual(len(decoder_attentions), self.model_tester.num_hidden_layers)
                 self.assertListEqual(
                     list(decoder_attentions[0].shape[-3:]),
-                    [
-                        self.model_tester.num_attention_heads,
-                        decoder_seq_length, decoder_key_length
-                    ],
+                    [self.model_tester.num_attention_heads, decoder_seq_length, decoder_key_length],
                 )
 
                 # cross attentions
                 cross_attentions = outputs.cross_attentions
                 self.assertIsInstance(cross_attentions, (list, tuple))
-                self.assertEqual(len(cross_attentions),
-                                 self.model_tester.num_hidden_layers)
+                self.assertEqual(len(cross_attentions), self.model_tester.num_hidden_layers)
                 self.assertListEqual(
                     list(cross_attentions[0].shape[-3:]),
                     [
@@ -264,8 +234,7 @@ class ModelTesterMixin:
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():
-                outputs = model(
-                    **self._prepare_for_class(inputs_dict, model_class))
+                outputs = model(**self._prepare_for_class(inputs_dict, model_class))
 
             if hasattr(self.model_tester, "num_hidden_states_types"):
                 added_hidden_states = self.model_tester.num_hidden_states_types
@@ -277,47 +246,36 @@ class ModelTesterMixin:
 
             self_attentions = outputs.encoder_attentions if self.is_encoder_decoder else outputs.attentions
 
-            self.assertEqual(len(self_attentions),
-                             self.model_tester.num_hidden_layers)
+            self.assertEqual(len(self_attentions), self.model_tester.num_hidden_layers)
             if chunk_length is not None:
                 self.assertListEqual(
                     list(self_attentions[0].shape[-4:]),
-                    [
-                        self.model_tester.num_attention_heads,
-                        encoder_seq_length, chunk_length, encoder_key_length
-                    ],
+                    [self.model_tester.num_attention_heads, encoder_seq_length, chunk_length, encoder_key_length],
                 )
             else:
                 self.assertListEqual(
                     list(self_attentions[0].shape[-3:]),
-                    [
-                        self.model_tester.num_attention_heads,
-                        encoder_seq_length, encoder_key_length
-                    ],
+                    [self.model_tester.num_attention_heads, encoder_seq_length, encoder_key_length],
                 )
 
     def test_hidden_states_output(self):
-
         def check_hidden_states_output(inputs_dict, config, model_class):
             model = self._make_model_instance(config, model_class)
             model.eval()
 
             with paddle.no_grad():
-                outputs = model(
-                    **self._prepare_for_class(inputs_dict, model_class))
+                outputs = model(**self._prepare_for_class(inputs_dict, model_class))
 
             hidden_states = outputs.encoder_hidden_states if self.is_encoder_decoder else outputs.hidden_states
 
             expected_num_layers = getattr(
-                self.model_tester, "expected_num_hidden_layers",
-                self.model_tester.num_hidden_layers + 1)
+                self.model_tester, "expected_num_hidden_layers", self.model_tester.num_hidden_layers + 1
+            )
             self.assertEqual(len(hidden_states), expected_num_layers)
 
             if hasattr(self.model_tester, "encoder_seq_length"):
                 seq_length = self.model_tester.encoder_seq_length
-                if hasattr(
-                        self.model_tester,
-                        "chunk_length") and self.model_tester.chunk_length > 1:
+                if hasattr(self.model_tester, "chunk_length") and self.model_tester.chunk_length > 1:
                     seq_length = seq_length * self.model_tester.chunk_length
             else:
                 seq_length = self.model_tester.seq_length
@@ -333,24 +291,20 @@ class ModelTesterMixin:
                 self.assertIsInstance(hidden_states, (list, tuple))
                 self.assertEqual(len(hidden_states), expected_num_layers)
                 seq_len = getattr(self.model_tester, "seq_length", None)
-                decoder_seq_length = getattr(self.model_tester,
-                                             "decoder_seq_length", seq_len)
+                decoder_seq_length = getattr(self.model_tester, "decoder_seq_length", seq_len)
 
                 self.assertListEqual(
                     list(hidden_states[0].shape[-2:]),
                     [decoder_seq_length, self.model_tester.hidden_size],
                 )
 
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         inputs_dict["return_dict"] = True
         for model_class in self.all_model_classes:
             signature = inspect.signature(model_class.forward)
             # signature.parameters is an OrderedDict => so arg_names order is deterministic
             arg_names = [*signature.parameters.keys()]
-            if not all(
-                    name in arg_names for name in
-                ["output_attentions", "output_hidden_states", "return_dict"]):
+            if not all(name in arg_names for name in ["output_attentions", "output_hidden_states", "return_dict"]):
                 continue
             inputs_dict["output_hidden_states"] = True
             check_hidden_states_output(inputs_dict, config, model_class)
@@ -380,8 +334,7 @@ class ModelTesterMixin:
 
             # Retrieve the embeddings and clone theme
             if self.is_encoder_decoder:
-                encoder_model_embed, decoder_model_embed = model.get_position_embeddings(
-                )
+                encoder_model_embed, decoder_model_embed = model.get_position_embeddings()
                 encoder_cloned_embeddings = encoder_model_embed.weight.clone()
                 decoder_cloned_embeddings = decoder_model_embed.weight.clone()
             else:
@@ -391,21 +344,16 @@ class ModelTesterMixin:
             # Check that resizing the position embeddings with a larger max_position_embeddings increases
             # the model's postion embeddings size
             model.resize_position_embeddings(max_position_embeddings + 10)
-            self.assertEqual(model.config.max_position_embeddings,
-                             max_position_embeddings + 10)
+            self.assertEqual(model.config.max_position_embeddings, max_position_embeddings + 10)
 
             # Check that it actually resizes the embeddings matrix
             if model.config.is_encoder_decoder:
-                encoder_model_embed, decoder_model_embed = model.get_position_embeddings(
-                )
-                self.assertEqual(encoder_model_embed.weight.shape[0],
-                                 encoder_cloned_embeddings.shape[0] + 10)
-                self.assertEqual(decoder_model_embed.weight.shape[0],
-                                 decoder_cloned_embeddings.shape[0] + 10)
+                encoder_model_embed, decoder_model_embed = model.get_position_embeddings()
+                self.assertEqual(encoder_model_embed.weight.shape[0], encoder_cloned_embeddings.shape[0] + 10)
+                self.assertEqual(decoder_model_embed.weight.shape[0], decoder_cloned_embeddings.shape[0] + 10)
             else:
                 model_embed = model.get_position_embeddings()
-                self.assertEqual(model_embed.weight.shape[0],
-                                 cloned_embeddings.shape[0] + 10)
+                self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] + 10)
 
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
             model(**self._prepare_for_class(inputs_dict, model_class))
@@ -413,21 +361,16 @@ class ModelTesterMixin:
             # Check that resizing the position embeddings with a smaller max_position_embeddings decreases
             # the model's max_position_embeddings
             model.resize_position_embeddings(max_position_embeddings - 5)
-            self.assertEqual(model.base_model.config["max_position_embeddings"],
-                             max_position_embeddings - 5)
+            self.assertEqual(model.base_model.config["max_position_embeddings"], max_position_embeddings - 5)
 
             # Check that it actually resizes the embeddings matrix
             if self.is_encoder_decoder:
-                encoder_model_embed, decoder_model_embed = model.get_position_embeddings(
-                )
-                self.assertEqual(encoder_model_embed.weight.shape[0],
-                                 encoder_cloned_embeddings.shape[0] - 5)
-                self.assertEqual(decoder_model_embed.weight.shape[0],
-                                 decoder_cloned_embeddings.shape[0] - 5)
+                encoder_model_embed, decoder_model_embed = model.get_position_embeddings()
+                self.assertEqual(encoder_model_embed.weight.shape[0], encoder_cloned_embeddings.shape[0] - 5)
+                self.assertEqual(decoder_model_embed.weight.shape[0], decoder_cloned_embeddings.shape[0] - 5)
             else:
                 model_embed = model.get_position_embeddings()
-                self.assertEqual(model_embed.weight.shape[0],
-                                 cloned_embeddings.shape[0] - 5)
+                self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] - 5)
 
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
             model(**self._prepare_for_class(inputs_dict, model_class))
@@ -436,12 +379,10 @@ class ModelTesterMixin:
             models_equal = True
 
             if model.config.is_encoder_decoder:
-                for p1, p2 in zip(encoder_cloned_embeddings,
-                                  encoder_model_embed.weight):
+                for p1, p2 in zip(encoder_cloned_embeddings, encoder_model_embed.weight):
                     if p1.data.ne(p2.data).sum() > 0:
                         models_equal = False
-                for p1, p2 in zip(decoder_cloned_embeddings,
-                                  decoder_model_embed.weight):
+                for p1, p2 in zip(decoder_cloned_embeddings, decoder_model_embed.weight):
                     if p1.data.ne(p2.data).sum() > 0:
                         models_equal = False
             else:
@@ -473,33 +414,27 @@ class ModelTesterMixin:
 
             # Check that resizing the token embeddings with a larger vocab size increases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size + 10)
-            self.assertEqual(model.base_model.config["vocab_size"],
-                             model_vocab_size + 10)
+            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size + 10)
             # Check that it actually resizes the embeddings matrix
-            self.assertEqual(model_embed.weight.shape[0],
-                             cloned_embeddings.shape[0] + 10)
+            self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] + 10)
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
             model(**self._prepare_for_class(inputs_dict, model_class))
 
             # Check that resizing the token embeddings with a smaller vocab size decreases the model's vocab size
             model_embed = model.resize_token_embeddings(model_vocab_size - 15)
-            self.assertEqual(model.base_model.config["vocab_size"],
-                             model_vocab_size - 15)
+            self.assertEqual(model.base_model.config["vocab_size"], model_vocab_size - 15)
             # Check that it actually resizes the embeddings matrix
-            self.assertEqual(model_embed.weight.shape[0],
-                             cloned_embeddings.shape[0] - 15)
+            self.assertEqual(model_embed.weight.shape[0], cloned_embeddings.shape[0] - 15)
 
             # Check that the model can still do a forward pass successfully (every parameter should be resized)
             # Input ids should be clamped to the maximum size of the vocabulary
-            inputs_dict["input_ids"] = paddle.clip(inputs_dict["input_ids"],
-                                                   max=model_vocab_size - 15 -
-                                                   1)
+            inputs_dict["input_ids"] = paddle.clip(inputs_dict["input_ids"], max=model_vocab_size - 15 - 1)
 
             # make sure that decoder_input_ids are resized as well
             if "decoder_input_ids" in inputs_dict:
                 inputs_dict["decoder_input_ids"] = paddle.clip(
-                    inputs_dict["decoder_input_ids"],
-                    max=model_vocab_size - 15 - 1)
+                    inputs_dict["decoder_input_ids"], max=model_vocab_size - 15 - 1
+                )
             model(**self._prepare_for_class(inputs_dict, model_class))
 
             # Check that adding and removing tokens has not modified the first part of the embedding matrix.
@@ -516,15 +451,13 @@ class ModelTesterMixin:
         if not self.use_test_inputs_embeds:
             return
         # get config for model and inputs_dict for model forward
-        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common(
-        )
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
         # test all model classes
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
 
-            inputs = copy.deepcopy(
-                self._prepare_for_class(inputs_dict, model_class))
+            inputs = copy.deepcopy(self._prepare_for_class(inputs_dict, model_class))
 
             with paddle.no_grad():
                 ids_output = model(**inputs)
@@ -534,8 +467,7 @@ class ModelTesterMixin:
                 del inputs["input_ids"]
             else:
                 encoder_input_ids = inputs["input_ids"]
-                decoder_input_ids = inputs.get("decoder_input_ids",
-                                               encoder_input_ids)
+                decoder_input_ids = inputs.get("decoder_input_ids", encoder_input_ids)
                 del inputs["input_ids"]
                 inputs.pop("decoder_input_ids", None)
 
@@ -549,9 +481,7 @@ class ModelTesterMixin:
             with paddle.no_grad():
                 embeds_output = model(**inputs)
 
-            self.assertTrue(
-                paddle.allclose(ids_output, embeds_output, rtol=1e-4,
-                                atol=1e-4))
+            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
     def test_model_name_list(self):
         if not self.use_test_model_name_list:
@@ -573,46 +503,36 @@ class ModelTesterPretrainedMixin:
     def test_model_from_pretrained_hf_hub(self):
         if self.hf_remote_test_model_path is None or self.base_model_class is None:
             return
-        model = self.base_model_class.from_pretrained(
-            self.hf_remote_test_model_path, from_hf_hub=True)
+        model = self.base_model_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
         self.assertIsNotNone(model)
 
     @slow
     def test_model_from_pretrained_paddle_hub(self):
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
-        model = self.base_model_class.from_pretrained(
-            self.paddlehub_remote_test_model_path)
+        model = self.base_model_class.from_pretrained(self.paddlehub_remote_test_model_path)
         self.assertIsNotNone(model)
 
     @slow
     def test_model_from_pretrained_with_cache_dir(self):
-        for model_name in list(
-                self.base_model_class.pretrained_init_configuration)[:1]:
+        for model_name in list(self.base_model_class.pretrained_init_configuration)[:1]:
             with tempfile.TemporaryDirectory() as tempdir:
                 tempdir = str(tempdir)
 
-                model = self.base_model_class.from_pretrained(model_name,
-                                                              cache_dir=tempdir)
+                model = self.base_model_class.from_pretrained(model_name, cache_dir=tempdir)
                 self.assertIsNotNone(model)
                 self.assertTrue(
-                    os.path.isfile(
-                        os.path.join(
-                            tempdir, self.base_model_class.
-                            resource_files_names['model_state'])))
-                self.assertTrue(
-                    os.path.isfile(
-                        os.path.join(tempdir,
-                                     self.base_model_class.model_config_file)))
+                    os.path.isfile(os.path.join(tempdir, self.base_model_class.resource_files_names["model_state"]))
+                )
+                self.assertTrue(os.path.isfile(os.path.join(tempdir, self.base_model_class.model_config_file)))
 
     @slow
     def test_pretrained_save_and_load(self):
         """test the pretrained model save and load with two different ways: url-file-name & model_state name
 
-            eg: `bert-base-uncased.pdparams` and `model_state.pdparams`
+        eg: `bert-base-uncased.pdparams` and `model_state.pdparams`
         """
-        for model_name in list(
-                self.base_model_class.pretrained_init_configuration)[:1]:
+        for model_name in list(self.base_model_class.pretrained_init_configuration)[:1]:
             model = self.base_model_class.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
@@ -621,14 +541,13 @@ class ModelTesterPretrainedMixin:
                 tempdirname = str(tempdir)
                 model.save_pretrained(tempdirname)
 
-                loaded_model = self.base_model_class.from_pretrained(
-                    tempdirname)
+                loaded_model = self.base_model_class.from_pretrained(tempdirname)
 
                 check_two_model_parameter(model, loaded_model)
 
             # 2. convert the weight file name
             with tempfile.TemporaryDirectory() as tempdir:
-                tempdirname = str(tempdir) + '_old'
+                tempdirname = str(tempdir) + "_old"
 
                 shutil.copytree(
                     os.path.join(MODEL_HOME, model_name),
@@ -637,17 +556,15 @@ class ModelTesterPretrainedMixin:
                 files = os.listdir(tempdirname)
 
                 saved_model_state_file = os.path.join(
-                    tempdirname,
-                    self.base_model_class.resource_files_names['model_state'])
+                    tempdirname, self.base_model_class.resource_files_names["model_state"]
+                )
 
                 self.assertTrue(os.path.isfile(saved_model_state_file))
 
                 # rename it to the old style: name of url, eg: model_state.pdparams -> bert-base-uncased.pdparams
-                url = self.base_model_class.pretrained_resource_files_map[
-                    'model_state'][model_name]
+                url = self.base_model_class.pretrained_resource_files_map["model_state"][model_name]
                 pretrained_resource_file_name = os.path.split(url)[-1]
-                target_file_path = os.path.join(tempdirname,
-                                                pretrained_resource_file_name)
+                target_file_path = os.path.join(tempdirname, pretrained_resource_file_name)
 
                 shutil.copyfile(saved_model_state_file, target_file_path)
                 os.remove(saved_model_state_file)

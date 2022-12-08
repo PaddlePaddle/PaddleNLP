@@ -102,8 +102,7 @@ class LogicalFilterClause(ABC):
 
     """
 
-    def __init__(self, conditions: List[Union["LogicalFilterClause",
-                                              "ComparisonOperation"]]):
+    def __init__(self, conditions: List[Union["LogicalFilterClause", "ComparisonOperation"]]):
         self.conditions = conditions
 
     @abstractmethod
@@ -111,9 +110,7 @@ class LogicalFilterClause(ABC):
         pass
 
     @classmethod
-    def parse(
-        cls, filter_term: Union[dict, List[dict]]
-    ) -> Union["LogicalFilterClause", "ComparisonOperation"]:
+    def parse(cls, filter_term: Union[dict, List[dict]]) -> Union["LogicalFilterClause", "ComparisonOperation"]:
         """
         Parses a filter dictionary/list and returns a LogicalFilterClause instance.
 
@@ -163,21 +160,14 @@ class LogicalFilterClause(ABC):
         """
         pass
 
-    def _merge_es_range_queries(
-            self, conditions: List[Dict]) -> List[Dict[str, Dict]]:
+    def _merge_es_range_queries(self, conditions: List[Dict]) -> List[Dict[str, Dict]]:
         """
         Merges Elasticsearch range queries that perform on the same metadata field.
         """
 
-        range_conditions = [
-            cond["range"] for cond in filter(
-                lambda condition: "range" in condition, conditions)
-        ]
+        range_conditions = [cond["range"] for cond in filter(lambda condition: "range" in condition, conditions)]
         if range_conditions:
-            conditions = [
-                condition for condition in conditions
-                if "range" not in condition
-            ]
+            conditions = [condition for condition in conditions if "range" not in condition]
             range_conditions_dict = nested_defaultdict()
             for condition in range_conditions:
                 field_name = list(condition.keys())[0]
@@ -185,12 +175,8 @@ class LogicalFilterClause(ABC):
                 comparison_value = condition[field_name][operation]
                 range_conditions_dict[field_name][operation] = comparison_value
 
-            for field_name, comparison_operations in range_conditions_dict.items(
-            ):
-                conditions.append(
-                    {"range": {
-                        field_name: comparison_operations
-                    }})
+            for field_name, comparison_operations in range_conditions_dict.items():
+                conditions.append({"range": {field_name: comparison_operations}})
 
         return conditions
 
@@ -205,9 +191,7 @@ class LogicalFilterClause(ABC):
 
 
 class ComparisonOperation(ABC):
-
-    def __init__(self, field_name: str, comparison_value: Union[str, int, float,
-                                                                bool, List]):
+    def __init__(self, field_name: str, comparison_value: Union[str, int, float, bool, List]):
         self.field_name = field_name
         self.comparison_value = comparison_value
 
@@ -216,47 +200,34 @@ class ComparisonOperation(ABC):
         pass
 
     @classmethod
-    def parse(
-        cls, field_name, comparison_clause: Union[Dict, List, str, float]
-    ) -> List["ComparisonOperation"]:
+    def parse(cls, field_name, comparison_clause: Union[Dict, List, str, float]) -> List["ComparisonOperation"]:
         comparison_operations: List[ComparisonOperation] = []
 
         if isinstance(comparison_clause, dict):
-            for comparison_operation, comparison_value in comparison_clause.items(
-            ):
+            for comparison_operation, comparison_value in comparison_clause.items():
                 if comparison_operation == "$eq":
-                    comparison_operations.append(
-                        EqOperation(field_name, comparison_value))
+                    comparison_operations.append(EqOperation(field_name, comparison_value))
                 elif comparison_operation == "$in":
-                    comparison_operations.append(
-                        InOperation(field_name, comparison_value))
+                    comparison_operations.append(InOperation(field_name, comparison_value))
                 elif comparison_operation == "$ne":
-                    comparison_operations.append(
-                        NeOperation(field_name, comparison_value))
+                    comparison_operations.append(NeOperation(field_name, comparison_value))
                 elif comparison_operation == "$nin":
-                    comparison_operations.append(
-                        NinOperation(field_name, comparison_value))
+                    comparison_operations.append(NinOperation(field_name, comparison_value))
                 elif comparison_operation == "$gt":
-                    comparison_operations.append(
-                        GtOperation(field_name, comparison_value))
+                    comparison_operations.append(GtOperation(field_name, comparison_value))
                 elif comparison_operation == "$gte":
-                    comparison_operations.append(
-                        GteOperation(field_name, comparison_value))
+                    comparison_operations.append(GteOperation(field_name, comparison_value))
                 elif comparison_operation == "$lt":
-                    comparison_operations.append(
-                        LtOperation(field_name, comparison_value))
+                    comparison_operations.append(LtOperation(field_name, comparison_value))
                 elif comparison_operation == "$lte":
-                    comparison_operations.append(
-                        LteOperation(field_name, comparison_value))
+                    comparison_operations.append(LteOperation(field_name, comparison_value))
 
         # No comparison operator is given, so we use the default operators "$in" if the comparison value is a list and
         # "$eq" in every other case
         elif isinstance(comparison_clause, list):
-            comparison_operations.append(
-                InOperation(field_name, comparison_clause))
+            comparison_operations.append(InOperation(field_name, comparison_clause))
         else:
-            comparison_operations.append((EqOperation(field_name,
-                                                      comparison_clause)))
+            comparison_operations.append((EqOperation(field_name, comparison_clause)))
 
         return comparison_operations
 
@@ -291,8 +262,7 @@ class ComparisonOperation(ABC):
         pass
 
     def _get_weaviate_datatype(
-        self,
-        value: Optional[Union[str, int, float, bool]] = None
+        self, value: Optional[Union[str, int, float, bool]] = None
     ) -> Tuple[str, Union[str, int, float, bool]]:
         """
         Determines the type of the comparison value and converts it to RFC3339 format if it is as date,
@@ -300,8 +270,7 @@ class ComparisonOperation(ABC):
 
         """
         if value is None:
-            assert not isinstance(self.comparison_value,
-                                  list)  # Necessary for mypy
+            assert not isinstance(self.comparison_value, list)  # Necessary for mypy
             value = self.comparison_value
 
         if isinstance(value, str):
@@ -321,7 +290,8 @@ class ComparisonOperation(ABC):
         else:
             raise ValueError(
                 f"Unsupported data type of comparison value for {self.__class__.__name__}."
-                f"Value needs to be of type str, int, float, or bool.")
+                f"Value needs to be of type str, int, float, or bool."
+            )
 
         return data_type, value
 
@@ -332,31 +302,22 @@ class NotOperation(LogicalFilterClause):
     """
 
     def evaluate(self, fields) -> bool:
-        return not any(
-            condition.evaluate(fields) for condition in self.conditions)
+        return not any(condition.evaluate(fields) for condition in self.conditions)
 
     def convert_to_elasticsearch(self) -> Dict[str, Dict]:
-        conditions = [
-            condition.convert_to_elasticsearch()
-            for condition in self.conditions
-        ]
+        conditions = [condition.convert_to_elasticsearch() for condition in self.conditions]
         conditions = self._merge_es_range_queries(conditions)
         return {"bool": {"must_not": conditions}}
 
     def convert_to_sql(self, meta_document_orm):
         conditions = [
-            meta_document_orm.document_id.in_(
-                condition.convert_to_sql(meta_document_orm))
+            meta_document_orm.document_id.in_(condition.convert_to_sql(meta_document_orm))
             for condition in self.conditions
         ]
         return select(meta_document_orm.document_id).filter(~or_(*conditions))
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[str, int, float, bool, List[Dict]]]:
-        conditions = [
-            condition.invert().convert_to_weaviate()
-            for condition in self.conditions
-        ]
+    def convert_to_weaviate(self) -> Dict[str, Union[str, int, float, bool, List[Dict]]]:
+        conditions = [condition.invert().convert_to_weaviate() for condition in self.conditions]
         if len(conditions) > 1:
             # Conditions in self.conditions are by default combined with AND which becomes OR according to DeMorgan
             return {"operator": "Or", "operands": conditions}
@@ -383,30 +344,23 @@ class AndOperation(LogicalFilterClause):
         return all(condition.evaluate(fields) for condition in self.conditions)
 
     def convert_to_elasticsearch(self) -> Dict[str, Dict]:
-        conditions = [
-            condition.convert_to_elasticsearch()
-            for condition in self.conditions
-        ]
+        conditions = [condition.convert_to_elasticsearch() for condition in self.conditions]
         conditions = self._merge_es_range_queries(conditions)
         return {"bool": {"must": conditions}}
 
     def convert_to_sql(self, meta_document_orm):
         conditions = [
-            meta_document_orm.document_id.in_(
-                condition.convert_to_sql(meta_document_orm))
+            meta_document_orm.document_id.in_(condition.convert_to_sql(meta_document_orm))
             for condition in self.conditions
         ]
         return select(meta_document_orm.document_id).filter(and_(*conditions))
 
     def convert_to_weaviate(self) -> Dict[str, Union[str, List[Dict]]]:
-        conditions = [
-            condition.convert_to_weaviate() for condition in self.conditions
-        ]
+        conditions = [condition.convert_to_weaviate() for condition in self.conditions]
         return {"operator": "And", "operands": conditions}
 
     def invert(self) -> "OrOperation":
-        return OrOperation(
-            [condition.invert() for condition in self.conditions])
+        return OrOperation([condition.invert() for condition in self.conditions])
 
 
 class OrOperation(LogicalFilterClause):
@@ -418,30 +372,23 @@ class OrOperation(LogicalFilterClause):
         return any(condition.evaluate(fields) for condition in self.conditions)
 
     def convert_to_elasticsearch(self) -> Dict[str, Dict]:
-        conditions = [
-            condition.convert_to_elasticsearch()
-            for condition in self.conditions
-        ]
+        conditions = [condition.convert_to_elasticsearch() for condition in self.conditions]
         conditions = self._merge_es_range_queries(conditions)
         return {"bool": {"should": conditions}}
 
     def convert_to_sql(self, meta_document_orm):
         conditions = [
-            meta_document_orm.document_id.in_(
-                condition.convert_to_sql(meta_document_orm))
+            meta_document_orm.document_id.in_(condition.convert_to_sql(meta_document_orm))
             for condition in self.conditions
         ]
         return select(meta_document_orm.document_id).filter(or_(*conditions))
 
     def convert_to_weaviate(self) -> Dict[str, Union[str, List[Dict]]]:
-        conditions = [
-            condition.convert_to_weaviate() for condition in self.conditions
-        ]
+        conditions = [condition.convert_to_weaviate() for condition in self.conditions]
         return {"operator": "Or", "operands": conditions}
 
     def invert(self) -> AndOperation:
-        return AndOperation(
-            [condition.invert() for condition in self.conditions])
+        return AndOperation([condition.invert() for condition in self.conditions])
 
 
 class EqOperation(ComparisonOperation):
@@ -454,26 +401,18 @@ class EqOperation(ComparisonOperation):
             return False
         return fields[self.field_name] == self.comparison_value
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Union[str, int, float, bool]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Use '$in' operation for lists as comparison values."
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Union[str, int, float, bool]]]:
+        assert not isinstance(self.comparison_value, list), "Use '$in' operation for lists as comparison values."
         return {"term": {self.field_name: self.comparison_value}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value == self.comparison_value)
+            meta_document_orm.name == self.field_name, meta_document_orm.value == self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, int, float, bool]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, int, float, bool]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        return {
-            "path": [self.field_name],
-            "operator": "Equal",
-            comp_value_type: comp_value
-        }
+        return {"path": [self.field_name], "operator": "Equal", comp_value_type: comp_value}
 
     def invert(self) -> "NeOperation":
         return NeOperation(self.field_name, self.comparison_value)
@@ -491,33 +430,23 @@ class InOperation(ComparisonOperation):
         # is only initialized with lists, but changing the type annotation would mean duplicating __init__
 
     def convert_to_elasticsearch(self) -> Dict[str, Dict[str, List]]:
-        assert isinstance(
-            self.comparison_value,
-            list), "'$in' operation requires comparison value to be a list."
+        assert isinstance(self.comparison_value, list), "'$in' operation requires comparison value to be a list."
         return {"terms": {self.field_name: self.comparison_value}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value.in_(self.comparison_value))
+            meta_document_orm.name == self.field_name, meta_document_orm.value.in_(self.comparison_value)
+        )
 
     def convert_to_weaviate(self) -> Dict[str, Union[str, List[Dict]]]:
-        filter_dict: Dict[str, Union[str, List[Dict]]] = {
-            "operator": "Or",
-            "operands": []
-        }
-        assert isinstance(
-            self.comparison_value,
-            list), "'$in' operation requires comparison value to be a list."
+        filter_dict: Dict[str, Union[str, List[Dict]]] = {"operator": "Or", "operands": []}
+        assert isinstance(self.comparison_value, list), "'$in' operation requires comparison value to be a list."
         for value in self.comparison_value:
             comp_value_type, comp_value = self._get_weaviate_datatype(value)
-            assert isinstance(filter_dict["operands"],
-                              list)  # Necessary for mypy
-            filter_dict["operands"].append({
-                "path": [self.field_name],
-                "operator": "Equal",
-                comp_value_type: comp_value
-            })
+            assert isinstance(filter_dict["operands"], list)  # Necessary for mypy
+            filter_dict["operands"].append(
+                {"path": [self.field_name], "operator": "Equal", comp_value_type: comp_value}
+            )
 
         return filter_dict
 
@@ -535,36 +464,18 @@ class NeOperation(ComparisonOperation):
             return False
         return fields[self.field_name] != self.comparison_value
 
-    def convert_to_elasticsearch(
-        self
-    ) -> Dict[str, Dict[str, Dict[str, Dict[str, Union[str, int, float,
-                                                       bool]]]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Use '$nin' operation for lists as comparison values."
-        return {
-            "bool": {
-                "must_not": {
-                    "term": {
-                        self.field_name: self.comparison_value
-                    }
-                }
-            }
-        }
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Dict[str, Union[str, int, float, bool]]]]]:
+        assert not isinstance(self.comparison_value, list), "Use '$nin' operation for lists as comparison values."
+        return {"bool": {"must_not": {"term": {self.field_name: self.comparison_value}}}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value != self.comparison_value)
+            meta_document_orm.name == self.field_name, meta_document_orm.value != self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, int, float, bool]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, int, float, bool]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        return {
-            "path": [self.field_name],
-            "operator": "NotEqual",
-            comp_value_type: comp_value
-        }
+        return {"path": [self.field_name], "operator": "NotEqual", comp_value_type: comp_value}
 
     def invert(self) -> "EqOperation":
         return EqOperation(self.field_name, self.comparison_value)
@@ -578,47 +489,27 @@ class NinOperation(ComparisonOperation):
     def evaluate(self, fields) -> bool:
         if self.field_name not in fields:
             return False
-        return fields[
-            self.field_name] not in self.comparison_value  # type: ignore
+        return fields[self.field_name] not in self.comparison_value  # type: ignore
         # is only initialized with lists, but changing the type annotation would mean duplicating __init__
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Dict[str, Dict[str, List]]]]:
-        assert isinstance(
-            self.comparison_value,
-            list), "'$nin' operation requires comparison value to be a list."
-        return {
-            "bool": {
-                "must_not": {
-                    "terms": {
-                        self.field_name: self.comparison_value
-                    }
-                }
-            }
-        }
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Dict[str, List]]]]:
+        assert isinstance(self.comparison_value, list), "'$nin' operation requires comparison value to be a list."
+        return {"bool": {"must_not": {"terms": {self.field_name: self.comparison_value}}}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value.notin_(self.comparison_value))
+            meta_document_orm.name == self.field_name, meta_document_orm.value.notin_(self.comparison_value)
+        )
 
     def convert_to_weaviate(self) -> Dict[str, Union[str, List[Dict]]]:
-        filter_dict: Dict[str, Union[str, List[Dict]]] = {
-            "operator": "And",
-            "operands": []
-        }
-        assert isinstance(
-            self.comparison_value,
-            list), "'$nin' operation requires comparison value to be a list."
+        filter_dict: Dict[str, Union[str, List[Dict]]] = {"operator": "And", "operands": []}
+        assert isinstance(self.comparison_value, list), "'$nin' operation requires comparison value to be a list."
         for value in self.comparison_value:
             comp_value_type, comp_value = self._get_weaviate_datatype(value)
-            assert isinstance(filter_dict["operands"],
-                              list)  # Necessary for mypy
-            filter_dict["operands"].append({
-                "path": [self.field_name],
-                "operator": "NotEqual",
-                comp_value_type: comp_value
-            })
+            assert isinstance(filter_dict["operands"], list)  # Necessary for mypy
+            filter_dict["operands"].append(
+                {"path": [self.field_name], "operator": "NotEqual", comp_value_type: comp_value}
+            )
 
         return filter_dict
 
@@ -636,29 +527,19 @@ class GtOperation(ComparisonOperation):
             return False
         return fields[self.field_name] > self.comparison_value
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Comparison value for '$gt' operation must not be a list."
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
+        assert not isinstance(self.comparison_value, list), "Comparison value for '$gt' operation must not be a list."
         return {"range": {self.field_name: {"gt": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
-        return select([meta_document_orm.document_id
-                       ]).where(meta_document_orm.name == self.field_name,
-                                meta_document_orm.value > self.comparison_value)
+        return select([meta_document_orm.document_id]).where(
+            meta_document_orm.name == self.field_name, meta_document_orm.value > self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, float, int]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, float, int]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        assert not isinstance(
-            comp_value,
-            list), "Comparison value for '$gt' operation must not be a list."
-        return {
-            "path": [self.field_name],
-            "operator": "GreaterThan",
-            comp_value_type: comp_value
-        }
+        assert not isinstance(comp_value, list), "Comparison value for '$gt' operation must not be a list."
+        return {"path": [self.field_name], "operator": "GreaterThan", comp_value_type: comp_value}
 
     def invert(self) -> "LteOperation":
         return LteOperation(self.field_name, self.comparison_value)
@@ -674,29 +555,19 @@ class GteOperation(ComparisonOperation):
             return False
         return fields[self.field_name] >= self.comparison_value
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Comparison value for '$gte' operation must not be a list."
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
+        assert not isinstance(self.comparison_value, list), "Comparison value for '$gte' operation must not be a list."
         return {"range": {self.field_name: {"gte": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value >= self.comparison_value)
+            meta_document_orm.name == self.field_name, meta_document_orm.value >= self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, float, int]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, float, int]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        assert not isinstance(
-            comp_value,
-            list), "Comparison value for '$gte' operation must not be a list."
-        return {
-            "path": [self.field_name],
-            "operator": "GreaterThanEqual",
-            comp_value_type: comp_value
-        }
+        assert not isinstance(comp_value, list), "Comparison value for '$gte' operation must not be a list."
+        return {"path": [self.field_name], "operator": "GreaterThanEqual", comp_value_type: comp_value}
 
     def invert(self) -> "LtOperation":
         return LtOperation(self.field_name, self.comparison_value)
@@ -712,29 +583,19 @@ class LtOperation(ComparisonOperation):
             return False
         return fields[self.field_name] < self.comparison_value
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Comparison value for '$lt' operation must not be a list."
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
+        assert not isinstance(self.comparison_value, list), "Comparison value for '$lt' operation must not be a list."
         return {"range": {self.field_name: {"lt": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
-        return select([meta_document_orm.document_id
-                       ]).where(meta_document_orm.name == self.field_name,
-                                meta_document_orm.value < self.comparison_value)
+        return select([meta_document_orm.document_id]).where(
+            meta_document_orm.name == self.field_name, meta_document_orm.value < self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, float, int]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, float, int]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        assert not isinstance(
-            comp_value,
-            list), "Comparison value for '$lt' operation must not be a list."
-        return {
-            "path": [self.field_name],
-            "operator": "LessThan",
-            comp_value_type: comp_value
-        }
+        assert not isinstance(comp_value, list), "Comparison value for '$lt' operation must not be a list."
+        return {"path": [self.field_name], "operator": "LessThan", comp_value_type: comp_value}
 
     def invert(self) -> "GteOperation":
         return GteOperation(self.field_name, self.comparison_value)
@@ -750,29 +611,19 @@ class LteOperation(ComparisonOperation):
             return False
         return fields[self.field_name] <= self.comparison_value
 
-    def convert_to_elasticsearch(
-            self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
-        assert not isinstance(
-            self.comparison_value,
-            list), "Comparison value for '$lte' operation must not be a list."
+    def convert_to_elasticsearch(self) -> Dict[str, Dict[str, Dict[str, Union[str, float, int]]]]:
+        assert not isinstance(self.comparison_value, list), "Comparison value for '$lte' operation must not be a list."
         return {"range": {self.field_name: {"lte": self.comparison_value}}}
 
     def convert_to_sql(self, meta_document_orm):
         return select([meta_document_orm.document_id]).where(
-            meta_document_orm.name == self.field_name,
-            meta_document_orm.value <= self.comparison_value)
+            meta_document_orm.name == self.field_name, meta_document_orm.value <= self.comparison_value
+        )
 
-    def convert_to_weaviate(
-            self) -> Dict[str, Union[List[str], str, float, int]]:
+    def convert_to_weaviate(self) -> Dict[str, Union[List[str], str, float, int]]:
         comp_value_type, comp_value = self._get_weaviate_datatype()
-        assert not isinstance(
-            comp_value,
-            list), "Comparison value for '$lte' operation must not be a list."
-        return {
-            "path": [self.field_name],
-            "operator": "LessThanEqual",
-            comp_value_type: comp_value
-        }
+        assert not isinstance(comp_value, list), "Comparison value for '$lte' operation must not be a list."
+        return {"path": [self.field_name], "operator": "LessThanEqual", comp_value_type: comp_value}
 
     def invert(self) -> "GtOperation":
         return GtOperation(self.field_name, self.comparison_value)

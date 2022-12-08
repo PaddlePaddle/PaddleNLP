@@ -27,7 +27,7 @@ null:null
 ===========================infer_params===========================
 null:null
 null:null
-norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>"
+norm_export:../examples/machine_translation/transformer/export_model.py --config ../examples/machine_translation/transformer/configs/transformer.base.yaml --vocab_file ../examples/machine_translation/transformer/vocab_all.bpe.33708 --bos_token "<s>" --eos_token "<e>"
 quant_export:null
 fpgm_export:null
 distill_export:null

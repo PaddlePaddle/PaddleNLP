@@ -15,23 +15,25 @@
 import paddle
 from paddlenlp.transformers import GPTJTokenizer, GPTJForCausalLM
 
-paddle.set_default_dtype('float16')
-model_name = 'EleutherAI/gpt-j-6B'
+paddle.set_default_dtype("float16")
+model_name = "EleutherAI/gpt-j-6B"
 
 tokenizer = GPTJTokenizer.from_pretrained(model_name)
 model = GPTJForCausalLM.from_pretrained(model_name, load_state_as_np=True)
 model.eval()
 
 inputs = "What is PaddleNLP?"
-input_ids = tokenizer([inputs], return_tensors='pd')['input_ids']
+input_ids = tokenizer([inputs], return_tensors="pd")["input_ids"]
 
-outputs, _ = model.generate(input_ids=input_ids,
-                            max_length=100,
-                            decode_strategy='sampling',
-                            temperature=0.8,
-                            top_p=0.9,
-                            use_fp16_decoding=True,
-                            use_faster=True)
+outputs, _ = model.generate(
+    input_ids=input_ids,
+    max_length=100,
+    decode_strategy="sampling",
+    temperature=0.8,
+    top_p=0.9,
+    use_fp16_decoding=True,
+    use_faster=True,
+)
 
 result = tokenizer.decode(outputs[0])
 

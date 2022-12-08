@@ -29,14 +29,11 @@ from data import read, load_dict, convert_example_to_feature
 
 
 class Predictor(object):
-
     def __init__(self, args):
-        self.predictor, self.input_handles, self.output_handles = self.create_predictor(
-            args)
+        self.predictor, self.input_handles, self.output_handles = self.create_predictor(args)
 
     def create_predictor(self, args):
-        config = paddle.inference.Config(args.model_path + ".pdmodel",
-                                         args.model_path + ".pdiparams")
+        config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
         if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
@@ -57,7 +54,8 @@ class Predictor(object):
                     max_batch_size=args.batch_size,
                     min_subgraph_size=5,
                     use_static=False,
-                    use_calib_mode=False)
+                    use_calib_mode=False,
+                )
             else:
                 config.enable_tensorrt_engine(
                     workspace_size=1 << 30,
@@ -65,38 +63,29 @@ class Predictor(object):
                     max_batch_size=args.batch_size,
                     min_subgraph_size=5,
                     use_static=False,
-                    use_calib_mode=False)
-            print("Enable TensorRT is: {}".format(
-                config.tensorrt_engine_enabled()))
+                    use_calib_mode=False,
+                )
+            print("Enable TensorRT is: {}".format(config.tensorrt_engine_enabled()))
         if args.collect_shape:
             config.collect_shape_range_info(
-                os.path.join(os.path.dirname(args.model_path),
-                             'collect_shape_range_info.pbtxt'))
+                os.path.join(os.path.dirname(args.model_path), "collect_shape_range_info.pbtxt")
+            )
         else:
             config.enable_tuned_tensorrt_dynamic_shape(
-                os.path.join(os.path.dirname(args.model_path),
-                             "collect_shape_range_info.pbtxt"), True)
+                os.path.join(os.path.dirname(args.model_path), "collect_shape_range_info.pbtxt"), True
+            )
 
         predictor = paddle.inference.create_predictor(config)
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handles = [
-            predictor.get_output_handle(name)
-            for name in predictor.get_output_names()
-        ]
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
 
         return predictor, input_handles, output_handles
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy(
-            ) if isinstance(input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy() if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        output = [
-            output_handle.copy_to_cpu() for output_handle in self.output_handles
-        ]
+        output = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
 
         return output
 
@@ -153,29 +142,22 @@ if __name__ == "__main__":
     test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
-    trans_func = partial(convert_example_to_feature,
-                         tokenizer=tokenizer,
-                         label2id=label2id,
-                         max_seq_len=args.max_seq_len,
-                         is_test=False)
+    trans_func = partial(
+        convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len, is_test=False
+    )
     test_ds = test_ds.map(trans_func, lazy=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
         Stack(dtype="int64"),  # seq_len
-        Stack(dtype="int64")  # label
+        Stack(dtype="int64"),  # label
     ): fn(samples)
 
-    batch_sampler = paddle.io.BatchSampler(test_ds,
-                                           batch_size=args.batch_size,
-                                           shuffle=False)
-    data_loader = paddle.io.DataLoader(dataset=test_ds,
-                                       batch_sampler=batch_sampler,
-                                       collate_fn=batchify_fn,
-                                       num_workers=0,
-                                       return_list=True)
+    batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+    data_loader = paddle.io.DataLoader(
+        dataset=test_ds, batch_sampler=batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+    )
 
     predictor = Predictor(args)
 
@@ -191,8 +173,7 @@ if __name__ == "__main__":
     if args.eval:
         print("start to do evaluate task.")
         metric = AccuracyAndF1()
-        outputs, accuracy, precision, recall, F1 = predictor.predict(
-            data_loader, metric)
+        outputs, accuracy, precision, recall, F1 = predictor.predict(data_loader, metric)
         print(
             f"evalute results - accuracy: {accuracy: .5f}, precision: {precision: .5f}, recall: {recall: .5f}, F1: {F1: .5f}"
         )

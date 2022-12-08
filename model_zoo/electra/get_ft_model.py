@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-#from collections import namedtuple
+# from collections import namedtuple
 import os
 import hashlib
 import argparse
@@ -19,16 +19,16 @@ import argparse
 import paddle
 import paddle.nn as nn
 
-#from paddlenlp.transformers import ElectraForTotalPretraining, ElectraDiscriminator, ElectraGenerator, ElectraModel
-#from paddlenlp.transformers import ElectraTokenizer
+# from paddlenlp.transformers import ElectraForTotalPretraining, ElectraDiscriminator, ElectraGenerator, ElectraModel
+# from paddlenlp.transformers import ElectraTokenizer
 #
-#MODEL_CLASSES = {"electra": (ElectraForTotalPretraining, ElectraTokenizer), }
+# MODEL_CLASSES = {"electra": (ElectraForTotalPretraining, ElectraTokenizer), }
 
 
 def get_md5sum(file_path):
     md5sum = None
     if os.path.isfile(file_path):
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             md5_obj = hashlib.md5()
             md5_obj.update(f.read())
             hash_code = md5_obj.hexdigest()
@@ -39,12 +39,12 @@ def get_md5sum(file_path):
 def main(args):
     pretraining_model = os.path.join(args.model_dir, "model_state.pdparams")
     if os.path.islink(pretraining_model):
-        print("%s already contain fine-tuning model, pleace check" %
-              args.model_dir)
+        print("%s already contain fine-tuning model, pleace check" % args.model_dir)
         exit(0)
     print(
         "load Electra pretrain model to get generator/discriminator model : %s \nmodel md5sum : %s"
-        % (pretraining_model, get_md5sum(pretraining_model)))
+        % (pretraining_model, get_md5sum(pretraining_model))
+    )
     # depart total_pretraining_model to generator and discriminator state_dict
     total_pretraining_model = paddle.load(pretraining_model)
     generator_state_dict = {}
@@ -65,29 +65,25 @@ def main(args):
     print("total discriminator keys : ", len(discriminator_state_dict))
 
     # save generator and discriminator model to disk
-    paddle.save(generator_state_dict,
-                os.path.join(args.model_dir, args.generator_output_file))
-    paddle.save(discriminator_state_dict,
-                os.path.join(args.model_dir, args.discriminator_output_file))
+    paddle.save(generator_state_dict, os.path.join(args.model_dir, args.generator_output_file))
+    paddle.save(discriminator_state_dict, os.path.join(args.model_dir, args.discriminator_output_file))
     print("save generator and discriminator model success")
-    os.rename(pretraining_model,
-              os.path.join(args.model_dir, "pretrain_model_state.pdparams"))
-    os.symlink(args.discriminator_output_file,
-               os.path.join(args.model_dir, "model_state.pdparams"))
+    os.rename(pretraining_model, os.path.join(args.model_dir, "pretrain_model_state.pdparams"))
+    os.symlink(args.discriminator_output_file, os.path.join(args.model_dir, "model_state.pdparams"))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--model_dir",
-        required=True,
-        default=None,
-        help="Directory of storing ElectraForTotalPreTraining model")
-    parser.add_argument("--generator_output_file",
-                        default='generator_for_ft.pdparams',
-                        help="Electra generator model for fine-tuning")
-    parser.add_argument("--discriminator_output_file",
-                        default='discriminator_for_ft.pdparams',
-                        help="Electra discriminator model for fine-tuning")
+        "--model_dir", required=True, default=None, help="Directory of storing ElectraForTotalPreTraining model"
+    )
+    parser.add_argument(
+        "--generator_output_file", default="generator_for_ft.pdparams", help="Electra generator model for fine-tuning"
+    )
+    parser.add_argument(
+        "--discriminator_output_file",
+        default="discriminator_for_ft.pdparams",
+        help="Electra discriminator model for fine-tuning",
+    )
     args, unparsed = parser.parse_known_args()
     main(args)
