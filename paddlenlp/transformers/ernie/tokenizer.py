@@ -15,10 +15,11 @@
 
 import os
 import pickle
-import six
 import shutil
+import warnings
 
 import sentencepiece as spm
+import six
 
 from paddlenlp.utils.env import MODEL_HOME
 
@@ -52,6 +53,11 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "ernie-3.0-mini-zh": 2048,
     "ernie-3.0-micro-zh": 2048,
     "ernie-3.0-nano-zh": 2048,
+    "ernie-3.0-tiny-base-v1": 2048,
+    "ernie-3.0-tiny-medium-v1": 2048,
+    "ernie-3.0-tiny-mini-v1": 2048,
+    "ernie-3.0-tiny-micro-v1": 2048,
+    "ernie-3.0-tiny-nano-v1": 2048,
     "rocketqa-zh-base-query-encoder": 2048,
     "rocketqa-zh-base-para-encoder": 2048,
     "rocketqa-zh-medium-query-encoder": 2048,
@@ -72,6 +78,12 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqav2-en-marco-para-encoder": 512,
     "ernie-search-base-dual-encoder-marco-en": 512,
     "ernie-search-large-cross-encoder-marco-en": 512,
+    "ernie-3.0-tiny-base-v2": 2048,
+    "ernie-3.0-tiny-medium-v2": 2048,
+    "ernie-3.0-tiny-mini-v2": 2048,
+    "ernie-3.0-tiny-micro-v2": 2048,
+    "ernie-3.0-tiny-nano-v2": 2048,
+    "ernie-3.0-tiny-pico-v2": 2048,
 }
 
 
@@ -152,6 +164,11 @@ class ErnieTokenizer(PretrainedTokenizer):
             "ernie-3.0-mini-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
             "ernie-3.0-micro-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "ernie-3.0-nano-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "ernie-3.0-tiny-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "ernie-3.0-tiny-medium-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "ernie-3.0-tiny-mini-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "ernie-3.0-tiny-micro-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "ernie-3.0-tiny-nano-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
             "rocketqa-zh-base-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "rocketqa-zh-base-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "rocketqa-zh-medium-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
@@ -172,6 +189,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "rocketqav2-en-marco-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-base-dual-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-large-cross-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
+            "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2_vocab.txt",
+            "ernie-3.0-tiny-medium-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2_vocab.txt",
+            "ernie-3.0-tiny-mini-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2_vocab.txt",
+            "ernie-3.0-tiny-micro-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2_vocab.txt",
+            "ernie-3.0-tiny-nano-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2_vocab.txt",
+            "ernie-3.0-tiny-pico-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -200,6 +223,11 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-3.0-mini-zh": {"do_lower_case": True},
         "ernie-3.0-micro-zh": {"do_lower_case": True},
         "ernie-3.0-nano-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-base-v1": {"do_lower_case": True},
+        "ernie-3.0-tiny-medium-v1": {"do_lower_case": True},
+        "ernie-3.0-tiny-mini-v1": {"do_lower_case": True},
+        "ernie-3.0-tiny-micro-v1": {"do_lower_case": True},
+        "ernie-3.0-tiny-nano-v1": {"do_lower_case": True},
         "rocketqa-zh-base-query-encoder": {"do_lower_case": True},
         "rocketqa-zh-base-para-encoder": {"do_lower_case": True},
         "rocketqa-zh-medium-query-encoder": {"do_lower_case": True},
@@ -220,6 +248,12 @@ class ErnieTokenizer(PretrainedTokenizer):
         "rocketqav2-en-marco-para-encoder": {"do_lower_case": True},
         "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
         "ernie-search-large-cross-encoder-marco-en": {"do_lower_case": True},
+        "ernie-3.0-tiny-base-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-medium-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-mini-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-micro-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-nano-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-pico-v2": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
@@ -389,38 +423,6 @@ class ErnieTokenizer(PretrainedTokenizer):
         _sep = [self.sep_token_id]
         return _cls + token_ids_0 + _sep + token_ids_1 + _sep
 
-    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
-        r"""
-        Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
-        special tokens using the tokenizer ``encode`` methods.
-
-        Args:
-            token_ids_0 (List[int]):
-                List of ids of the first sequence.
-            token_ids_1 (List[int], optinal):
-                Optional second list of IDs for sequence pairs.
-                Defaults to `None`.
-            already_has_special_tokens (str, optional):
-                Whether or not the token list is already formatted with special tokens for the model.
-                Defaults to `False`.
-
-        Returns:
-            List[int]:
-                The list of integers in the range [0, 1]: 1 for a special token, 0 for a sequence token.
-        """
-
-        if already_has_special_tokens:
-            if token_ids_1 is not None:
-                raise ValueError(
-                    "You should not supply a second sequence if the provided sequence of "
-                    "ids is already formatted with special tokens for the model."
-                )
-            return list(map(lambda x: 1 if x in [self.sep_token_id, self.cls_token_id] else 0, token_ids_0))
-
-        if token_ids_1 is not None:
-            return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1]
-
     def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
         Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
@@ -502,11 +504,6 @@ class ErnieTokenizer(PretrainedTokenizer):
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
-
-    def get_vocab(self):
-        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
-        vocab.update(self.added_tokens_encoder)
-        return vocab
 
 
 class ErnieTinyTokenizer(PretrainedTokenizer):
@@ -712,7 +709,7 @@ class ErnieTinyTokenizer(PretrainedTokenizer):
             save_directory (str): Directory to save files into.
         """
         for name, file_name in self.resource_files_names.items():
-            ### TODO: make the name 'ernie-tiny' as a variable
+            # TODO: make the name 'ernie-tiny' as a variable
             source_path = os.path.join(MODEL_HOME, "ernie-tiny", file_name)
             save_path = os.path.join(save_directory, self.resource_files_names[name])
 
