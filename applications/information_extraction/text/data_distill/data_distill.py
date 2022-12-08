@@ -36,7 +36,7 @@ def do_data_distill():
     label_maps_path = os.path.join(args.save_dir, "label_maps.json")
 
     # Save closed-domain label maps file
-    with open(label_maps_path, "w") as fp:
+    with open(label_maps_path, "w", encoding="utf-8") as fp:
         fp.write(json.dumps(label_maps, ensure_ascii=False))
 
     # Load doccano file and convert to distill format

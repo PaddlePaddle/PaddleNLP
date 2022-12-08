@@ -22,6 +22,7 @@ from io import BytesIO
 
 import numpy as np
 import requests
+from packaging.version import Version
 from PIL import Image, ImageDraw
 
 from .image_utils import np2base64
@@ -110,11 +111,12 @@ class DocParser(object):
             self.init_ocr_inference()
         if cls is None:
             cls = self.use_angle_cls
+        remove = False if self.ppocr_version <= Version("2.6.0.1") else True
 
         layout = []
         if not self.layout_analysis:
             ocr_result = self.ocr_infer_model.ocr(image, det, rec, cls)
-            ocr_result = ocr_result[0] if len(ocr_result) == 1 else ocr_result
+            ocr_result = ocr_result[0] if remove else ocr_result
             for segment in ocr_result:
                 box = segment[0]
                 box = _get_box(box)
@@ -234,23 +236,21 @@ class DocParser(object):
             logger.warning("ocr model has already been initialized")
             return
 
+        try:
+            import paddleocr
+        except ImportError:
+            raise RuntimeError(
+                "Need paddleocr to process image input. Please install module by: python3 -m pip install paddleocr"
+            )
+        self.ppocr_version = Version(paddleocr.__version__)
+
         if not self.layout_analysis:
-            try:
-                from paddleocr import PaddleOCR
-            except ImportError:
-                raise RuntimeError(
-                    "Need paddleocr to process image input. "
-                    "Please install module by: python3 -m pip install paddleocr"
-                )
+            from paddleocr import PaddleOCR
+
             self.ocr_infer_model = PaddleOCR(show_log=False, lang=self.ocr_lang)
         else:
-            try:
-                from paddleocr import PPStructure
-            except ImportError:
-                raise RuntimeError(
-                    "Need paddleocr to process image input. "
-                    "Please install module by: python3 -m pip install paddleocr"
-                )
+            from paddleocr import PPStructure
+
             self.layout_analysis_engine = PPStructure(table=True, ocr=True, show_log=False, lang=self.ocr_lang)
 
     @classmethod
