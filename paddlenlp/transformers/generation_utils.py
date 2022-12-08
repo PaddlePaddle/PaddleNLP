@@ -734,6 +734,7 @@ class GenerationMixin(object):
             no_repeat_ngram_size 
             if no_repeat_ngram_size is not None
             else getattr(self, 'no_repeat_ngram_size', None)
+        )
 
         if getattr(self, "_faster_entry", None) is not False and use_faster:
             args = locals()
