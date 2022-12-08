@@ -49,14 +49,15 @@ def install_package_from_bos(package_name, tag: str = "latest"):
         tag: pr number、 version of paddlenlp, or latest
     """
 
-    # eg: https://paddlenlp.bj.bcebos.com/wheels/paddlenlp_py37_latest.whl
+    # eg: https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-latest-py3-none-any.whl
     file_name = f"{package_name}-{tag}-py3-none-any.whl"
-    file_name = "paddlenlp-latest-py3-none-any.whl"
 
     package_url = f"{PACKAGE_SERVER_HOME}/{file_name}"
     if not url_file_exists(package_url):
-        raise ValueError(f"package url is not valid<{package_url}>")
-        # raise ValueError(f"there is not valid package<{package_name}_{get_current_py_version()}_{tag}.whl>")
+        raise ValueError(
+            f"there is not valid package<{package_name}_{get_current_py_version()}_{tag}.whl> "
+            f"from the url<{package_url}>"
+        )
     file_path = os.path.join(PACKAGE_HOME, file_name)
     if not os.path.exists(file_path):
         logger.info(f"start to downloading package<{file_name}> from {package_url}")
@@ -66,5 +67,5 @@ def install_package_from_bos(package_name, tag: str = "latest"):
 
         assert os.path.exists(file_path)
 
-    command = f"python -m pip install -i https://mirror.baidu.com/pypi/simple --force-reinstall {file_path}".split()
+    command = f"python -m pip install -i https://mirror.baidu.com/pypi/simple {file_path} --upgrade".split()
     subprocess.Popen(command)

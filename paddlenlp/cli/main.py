@@ -250,6 +250,14 @@ def install(
         tag = splits[1]
 
     install_package_from_bos(package_name=package_name, tag=tag)
+    # test
+    # new test
+    # new test
+
+
+@app.command()
+def ss():
+    pass
 
 
 def main():
