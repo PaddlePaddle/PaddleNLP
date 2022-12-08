@@ -15,7 +15,6 @@
 
 import copy
 import inspect
-import json
 import os
 import random
 import shutil
@@ -516,60 +515,14 @@ class ModelTesterMixin:
             loaded_config = config.__class__.from_pretrained(tempdir)
             self.assertEqual(config.hidden_size, loaded_config.hidden_size)
 
-    def test_pretrained_config_mapping_in_dict(self):
+    def random_choice_pretrained_config_field(self) -> Optional[str]:
 
         if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
-            return
+            return None
 
-        class FakePretrainedConfig(self.base_model_class.config_class):
-            standard_config_map = {}
-
-        config = FakePretrainedConfig()
-
-        config_dict = config.to_dict()
-
-        # mapping from `from_dict` method
-        fake_config = FakePretrainedConfig.from_dict(config_dict)
-        fake_config_dict = fake_config.to_dict()
-
-        FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
-
-        loaded_fake_config = FakePretrainedConfig.from_dict(config_dict)
-        loaded_fake_config_dict = loaded_fake_config.to_dict()
-
-        self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
-        loaded_fake_config_dict.pop("hidden_size")
-
-        self.assertEqual(fake_config_dict, loaded_fake_config_dict)
-
-    def test_pretrained_config_mapping_in_tempdir(self):
-        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
-            return
-
-        class FakePretrainedConfig(self.base_model_class.config_class):
-            standard_config_map = {}
-
-        config = FakePretrainedConfig()
-
-        # mapping from local-dir
-        with tempfile.TemporaryDirectory() as tempdir:
-            with open(os.path.join(tempdir, CONFIG_NAME), "w", encoding="utf-8") as f:
-                json.dump(config.to_dict(), f, ensure_ascii=False)
-
-            fake_config = FakePretrainedConfig.from_pretrained(tempdir)
-            fake_config_dict = fake_config.to_dict()
-
-            FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
-
-            loaded_fake_config = FakePretrainedConfig.from_pretrained(tempdir)
-
-            loaded_fake_config_dict = loaded_fake_config.to_dict()
-
-            self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
-
-            loaded_fake_config_dict.pop("hidden_size")
-
-            self.assertEqual(fake_config_dict, loaded_fake_config_dict)
+        config = self.base_model_class.config_class()
+        fields = [key for key, value in config.to_dict() if value]
+        return random.choice(fields)
 
 
 class ModelTesterPretrainedMixin:
@@ -577,14 +530,12 @@ class ModelTesterPretrainedMixin:
     hf_remote_test_model_path: str = None
     paddlehub_remote_test_model_path: str = None
 
-    @slow
     def test_model_from_pretrained_hf_hub(self):
         if self.hf_remote_test_model_path is None or self.base_model_class is None:
             return
         model = self.base_model_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
         self.assertIsNotNone(model)
 
-    @slow
     def test_model_from_pretrained_paddle_hub(self):
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
