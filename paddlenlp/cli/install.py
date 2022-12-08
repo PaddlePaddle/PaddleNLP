@@ -20,7 +20,7 @@ from paddlenlp.utils.downloader import get_path_from_url_with_filelock, url_file
 from paddlenlp.utils.env import PACKAGE_HOME
 from paddlenlp.utils.log import logger
 
-PACKAGE_SERVER_HOME = "https://bj.bcebos.com/paddlenlp/wheels"
+PACKAGE_SERVER_HOME = "https://paddlenlp.bj.bcebos.com/wheels"
 PY_VERSIONS = ["py37", "py38", "py39", "py310"]
 
 
@@ -58,14 +58,11 @@ def install_package_from_bos(package_name, tag: str = "latest"):
             f"there is not valid package<{package_name}_{get_current_py_version()}_{tag}.whl> "
             f"from the url<{package_url}>"
         )
+
     file_path = os.path.join(PACKAGE_HOME, file_name)
     if not os.path.exists(file_path):
         logger.info(f"start to downloading package<{file_name}> from {package_url}")
         file_path = get_path_from_url_with_filelock(package_url, PACKAGE_HOME)
-        if not file_path.endswith(".whl"):
-            file_path = file_path + ".whl"
-
-        assert os.path.exists(file_path)
 
     command = f"python -m pip install -i https://mirror.baidu.com/pypi/simple {file_path} --upgrade".split()
     subprocess.Popen(command)
