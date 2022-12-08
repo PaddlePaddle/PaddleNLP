@@ -28,7 +28,6 @@ from paddlenlp.trainer import (
     CompressionArguments,
     PdArgumentParser,
     Trainer,
-    TrainingArguments,
     get_last_checkpoint,
 )
 from paddlenlp.transformers import UIE, UIEM, AutoTokenizer, export_model
@@ -82,7 +81,7 @@ class ModelArguments:
 
 
 def main():
-    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments, CompressionArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
 
     if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
