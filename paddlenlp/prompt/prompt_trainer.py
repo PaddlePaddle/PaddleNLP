@@ -61,6 +61,9 @@ class PromptTrainer(Trainer):
         if data_collator is None:
             data_collator = PromptDataCollatorWithPadding(tokenizer, padding=True, return_tensors="pd")
 
+        if criterion is None and (args.use_rgl or args.use_rdrop):
+            raise Exception("'To use 'use_rgl', use_rdrop', 'criterion' must be specified")
+
         super(PromptTrainer, self).__init__(
             model=model,
             criterion=criterion,
@@ -224,21 +227,21 @@ class PromptTrainer(Trainer):
         labels = inputs["labels"]
 
         input_dict = inputs.copy()
-        input_dict["return_hidden_states"] = True
-        outputs, hidden_states = model(**input_dict)
 
         if self.criterion is not None:
-            loss = self.criterion(outputs, labels)
+            # pop labels to move loss computation out of the model
+            input_dict.pop("labels")
+            outputs = model(**input_dict, return_dict=True)
+            loss = self.criterion(outputs.logits, labels)
 
             if self.args.use_rdrop:
-                loss = self._compute_rdrop_loss(model, input_dict, outputs, loss)
+                loss = self._compute_rdrop_loss(model, input_dict, outputs.logits, loss)
 
             if self.args.use_rgl:
-                loss += self._compute_rgl_loss(hidden_states, labels)
-
-            outputs = (loss, outputs)
-
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+                loss += self._compute_rgl_loss(outputs.hidden_states, labels)
+        else:
+            outputs = model(**input_dict, return_dict=True)
+            loss = outputs.loss
 
         return (loss, outputs) if return_outputs else loss
 

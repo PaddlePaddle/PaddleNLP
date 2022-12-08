@@ -17,7 +17,7 @@ from typing import Any, Dict, Optional
 
 import paddle
 
-from ..transformers.model_outputs import SequenceClassifierOutput
+from ..transformers.model_outputs import MaskedLMOutput, SequenceClassifierOutput
 from .prompt_utils import signature
 from .template import Template
 from .verbalizer import Verbalizer
@@ -76,19 +76,24 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         }
         input_dict = self.template.process_batch(input_dict)
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
+        print(model_inputs["input_ids"].shape)
         if "masked_positions" in model_inputs:
             model_inputs.pop("masked_positions")
-        hidden_states = self.plm(**model_inputs)
-        if self.verbalizer is not None:
-            logits = self.verbalizer.process_outputs(hidden_states, input_dict["masked_positions"])
+        model_outputs = self.plm(**model_inputs, return_dict=True)
+        if isinstance(model_outputs, MaskedLMOutput):
+            if self.verbalizer is not None:
+                logits = self.verbalizer.process_outputs(model_outputs.logits, input_dict["masked_positions"])
+                num_labels = len(self.verbalizer.label_words)
+            else:
+                raise Exception("Verbalizer is required when model uses the MaskedLM head")
+        elif isinstance(model_outputs, SequenceClassifierOutput):
+            logits = model_outputs.logits
+            num_labels = self.plm.num_classes if self.plm.num_classes is not None else self.plm.num_labels
         else:
-            logits = hidden_states
+            raise Exception(f"Model type not support yet: {type(model_outputs)}")
 
         loss = None
         if labels is not None:
-            if self.verbalizer is None:
-                raise ValueError("Verbalizer must be specified when labels are provided")
-            num_labels = len(self.verbalizer.label_words)
             if num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
@@ -100,13 +105,13 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, hidden_states)
+            output = (logits, model_outputs.logits)
             return ((loss,) + output) if loss is not None else output
-
+        print(logits.shape)
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
-            hidden_states=hidden_states,
+            hidden_states=model_outputs.logits,
         )
 
     def prompt_parameters(self):
