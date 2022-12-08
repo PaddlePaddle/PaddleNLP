@@ -318,7 +318,7 @@ class DataConverter(object):
             box1_area = (box1[2] - box1[0]) * (box1[3] - box1[1])
             return (x2 - x1) * (y2 - y1) * 1.0 / box1_area
 
-        def _find_segment_in_box(layouts, box, threshold=0.5):
+        def _find_segment_in_box(layouts, box, threshold=0.7):
             positions = []
             global_offset = 0
             for segment in layouts:
@@ -339,11 +339,11 @@ class DataConverter(object):
                             and cbox[1] < box[1]
                             and cbox[3] > box[3]
                         ):
-                            if c_covered > threshold:
+                            if c_covered > 0.5:
                                 positions.append(global_offset)
                         global_offset += 1
                 else:
-                    cell_covered = _io1(sbox, box)
+                    cell_covered = _io1(box, sbox)
                     if cell_covered >= threshold:
                         for i in range(text_len):
                             positions.append(global_offset)

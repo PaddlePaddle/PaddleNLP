@@ -241,7 +241,7 @@ OCR中识别出来的文字会按照左上到右下进行排序，对于分栏�
 
 >>> doc_parser = DocParser(ocr_lang="en")
 >>> doc_path = "./cases/business_card.png"
->>> parsed_doc = doc_parser.read_image(doc_path)
+>>> parsed_doc = doc_parser.parse({"doc": doc_path})
 >>> doc_parser.write_image_with_results(
         doc_path,
         layout=parsed_doc['layout'],

@@ -63,7 +63,7 @@ rm tax.tar.gz
 python ../label_studio.py \
     --label_studio_file ./data/label_studio.json \
     --save_dir ./data \
-    --splits 0.8 0.2 0\
+    --splits 0.8 0.2 0 \
     --task_type ext
 ```
 
