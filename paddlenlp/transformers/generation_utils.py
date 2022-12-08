@@ -506,7 +506,7 @@ class GenerationMixin(object):
         if kwargs["num_beam_groups"] != 1:
             # not support for group_beam_search yet in the faster version
             raise AttributeError("'num_beam_groups != 1' is not supported yet in the faster version")
-        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] == False:
+        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
