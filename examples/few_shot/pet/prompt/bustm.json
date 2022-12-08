@@ -1,0 +1,14 @@
+{
+    "template": [
+        {"text": "下边两句话说的是一个事情吗？{'mask'}“{'text': 'sentence1'}”和“{'text': 'sentence2'}”"},
+        {"text": "下边两个句子说的是{'mask'}{'mask'}的事情。“{'text': 'sentence1'}”和“{'text': 'sentence2'}”"},
+        {"text": "“{'text': 'sentence1'}”和“{'text': 'sentence2'}”意思{'mask'}{'mask'}。"},
+        {"text": "“{'text':'sentence1'}”和“{'text':'sentence2'}”描述的是{'mask'}{'mask'}的事情。"}
+    ],
+    "verbalizer": [
+        {"0": "不", "1": "是"},
+        {"0": "不同", "1": "相同"},
+        {"0": "不同", "1": "一样"},
+        {"0": "不同", "1": "相同"}
+    ]
+}
