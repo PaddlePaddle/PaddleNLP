@@ -231,17 +231,18 @@ class PromptTrainer(Trainer):
         if self.criterion is not None:
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
-            outputs = model(**input_dict, return_dict=True)
-            loss = self.criterion(outputs.logits, labels)
+            logits, hidden_states = model(**input_dict)
+            loss = self.criterion(logits, labels)
 
             if self.args.use_rdrop:
-                loss = self._compute_rdrop_loss(model, input_dict, outputs.logits, loss)
+                loss = self._compute_rdrop_loss(model, input_dict, logits, loss)
 
             if self.args.use_rgl:
-                loss += self._compute_rgl_loss(outputs.hidden_states, labels)
+                loss += self._compute_rgl_loss(hidden_states, labels)
         else:
-            outputs = model(**input_dict, return_dict=True)
-            loss = outputs.loss
+            loss, logits, _ = model(**input_dict)
+
+        outputs = (loss, logits)
 
         return (loss, outputs) if return_outputs else loss
 
