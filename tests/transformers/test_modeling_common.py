@@ -148,11 +148,17 @@ class ModelTesterMixin:
 
         # mapping from `from_dict` method
         fake_config = FakePretrainedConfig.from_dict(config_dict)
+        fake_config_dict = fake_config.to_dict()
 
-        FakePretrainedConfig.standard_config_map = {"hidden_size": "fake_field"}
+        FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
 
         loaded_fake_config = FakePretrainedConfig.from_dict(config_dict)
-        self.assertEqual(fake_config.hidden_size, loaded_fake_config.fake_field)
+        loaded_fake_config_dict = loaded_fake_config.to_dict()
+
+        self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
+        loaded_fake_config_dict.pop("hidden_size")
+
+        self.assertEqual(fake_config_dict, loaded_fake_config_dict)
 
     def test_pretrained_config_mapping_in_tempdir(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
@@ -168,10 +174,17 @@ class ModelTesterMixin:
                 json.dump(config.to_dict(), f, ensure_ascii=False)
 
             fake_config = FakePretrainedConfig.from_pretrained(tempdir)
+            fake_config_dict = fake_config.to_dict()
 
-            FakePretrainedConfig.standard_config_map = {"hidden_size": "fake_field"}
+            FakePretrainedConfig.standard_config_map.update({"hidden_size": "fake_field"})
+
             loaded_fake_config = FakePretrainedConfig.from_pretrained(tempdir)
-            self.assertEqual(fake_config.hidden_size, loaded_fake_config.fake_field)
+            loaded_fake_config_dict = loaded_fake_config.to_dict()
+
+            self.assertEqual(loaded_fake_config_dict.pop("fake_field"), fake_config_dict.pop("hidden_size"))
+            loaded_fake_config_dict.pop("hidden_size")
+
+            self.assertEqual(fake_config_dict, loaded_fake_config_dict)
 
     def test_determinism(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
