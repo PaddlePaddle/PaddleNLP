@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-dependencies = ['paddle', 'jieba', 'colorlog', 'colorama', 'seqeval']
+dependencies = ["paddle", "jieba", "colorlog", "colorama", "seqeval"]
 
 import os
 
@@ -25,18 +25,23 @@ _BERT_MODEL_CLASSES = {
     "sequence_classification": BertForSequenceClassification,
     "token_classification": BertForTokenClassification,
     "question_answering": BertForQuestionAnswering,
-    "pretraining": BertForPretraining
+    "pretraining": BertForPretraining,
 }
 
 _BERT_PRETRAINED_MODELS = [
-    'bert-base-uncased', 'bert-large-uncased', 'bert-base-multilingual-uncased',
-    'bert-base-cased', 'bert-base-chinese', 'bert-large-cased',
-    'bert-base-multilingual-cased', 'bert-wwm-chinese', 'bert-wwm-ext-chinese'
+    "bert-base-uncased",
+    "bert-large-uncased",
+    "bert-base-multilingual-uncased",
+    "bert-base-cased",
+    "bert-base-chinese",
+    "bert-large-cased",
+    "bert-base-multilingual-cased",
+    "bert-wwm-chinese",
+    "bert-wwm-ext-chinese",
 ]
 
 
-def bert(model_name_or_path='bert-base-uncased',
-         model_select='sequence_classification'):
+def bert(model_name_or_path="bert-base-uncased", model_select="sequence_classification"):
     """
     Returns BERT model and tokenizer from given pretrained model name or path
     and class type of tasks, such as sequence classification.
@@ -55,7 +60,7 @@ def bert(model_name_or_path='bert-base-uncased',
             The document of BERT model could be seen at `bert.modeling
             <https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.transformers.bert.modeling.html>`_
             Default: 'sequence_classification'.
-    
+
     Returns:
         tuple: Returns the pretrained bert model and bert tokenizer.
 
@@ -68,10 +73,12 @@ def bert(model_name_or_path='bert-base-uncased',
           model, tokenizer = hub.load('PaddlePaddle/PaddleNLP:develop', model='bert', model_name_or_path='bert-base-cased')
 
     """
-    assert model_name_or_path in _BERT_PRETRAINED_MODELS or os.path.isdir(model_name_or_path), \
-        "Please check your model name or path. Supported model names are: {}.".format(tuple(_BERT_PRETRAINED_MODELS))
-    assert model_select in _BERT_MODEL_CLASSES.keys(), \
-        "Please check `model_select`, it should be in {}.".format(tuple(_BERT_MODEL_CLASSES.keys()))
+    assert model_name_or_path in _BERT_PRETRAINED_MODELS or os.path.isdir(
+        model_name_or_path
+    ), "Please check your model name or path. Supported model names are: {}.".format(tuple(_BERT_PRETRAINED_MODELS))
+    assert model_select in _BERT_MODEL_CLASSES.keys(), "Please check `model_select`, it should be in {}.".format(
+        tuple(_BERT_MODEL_CLASSES.keys())
+    )
 
     model_class = _BERT_MODEL_CLASSES[model_select]
 

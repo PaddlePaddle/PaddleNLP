@@ -53,41 +53,30 @@ class ModelArguments:
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, CompressionArguments))
-    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
-    )
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses()
     paddle.set_device(compression_args.device)
-    compression_args.strategy = 'dynabert'
+    compression_args.strategy = "dynabert"
     # Log model and data config
     compression_args.print_config(model_args, "Model")
     compression_args.print_config(data_args, "Data")
 
     label_list = {}
-    label_path = os.path.join(data_args.dataset_dir, 'label.txt')
-    train_path = os.path.join(data_args.dataset_dir, 'train.txt')
-    dev_path = os.path.join(data_args.dataset_dir, 'dev.txt')
-    with open(label_path, 'r', encoding='utf-8') as f:
+    label_path = os.path.join(data_args.dataset_dir, "label.txt")
+    train_path = os.path.join(data_args.dataset_dir, "train.txt")
+    dev_path = os.path.join(data_args.dataset_dir, "dev.txt")
+    with open(label_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
 
-    train_ds = load_dataset(read_local_dataset,
-                            path=train_path,
-                            label_list=label_list,
-                            lazy=False)
-    dev_ds = load_dataset(read_local_dataset,
-                          path=dev_path,
-                          label_list=label_list,
-                          lazy=False)
+    train_ds = load_dataset(read_local_dataset, path=train_path, label_list=label_list, lazy=False)
+    dev_ds = load_dataset(read_local_dataset, path=dev_path, label_list=label_list, lazy=False)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.params_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(model_args.params_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_args.params_dir)
 
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=data_args.max_seq_length)
+    trans_func = functools.partial(preprocess_function, tokenizer=tokenizer, max_seq_length=data_args.max_seq_length)
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
 
@@ -101,7 +90,8 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=dev_dataset,
-        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
+        criterion=criterion,
+    )  # Strategy`dynabert` needs arguments `criterion`
 
     compression_args.print_config()
 

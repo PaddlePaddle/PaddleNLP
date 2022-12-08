@@ -29,15 +29,14 @@ from config import collection_name, partition_tag, embedding_name
 
 def recall_result(list_data):
     client = PipelineClient()
-    client.connect(['127.0.0.1:8080'])
+    client.connect(["127.0.0.1:8080"])
     feed = {}
     for i, item in enumerate(list_data):
         feed[str(i)] = item
     start_time = time.time()
     ret = client.predict(feed_dict=feed)
     end_time = time.time()
-    print("Extract feature time to cost :{} seconds".format(end_time -
-                                                            start_time))
+    print("Extract feature time to cost :{} seconds".format(end_time - start_time))
     result = np.array(eval(ret.value[0]))
     return result
 
@@ -45,26 +44,26 @@ def recall_result(list_data):
 def search_in_milvus(embeddings, query_text):
     recall_client = RecallByMilvus()
     start_time = time.time()
-    results = recall_client.search(embeddings,
-                                   embedding_name,
-                                   collection_name,
-                                   partition_names=[partition_tag],
-                                   output_fields=['pk', 'question', 'answer'])
+    results = recall_client.search(
+        embeddings,
+        embedding_name,
+        collection_name,
+        partition_names=[partition_tag],
+        output_fields=["pk", "question", "answer"],
+    )
     end_time = time.time()
-    print('Search milvus time cost is {} seconds '.format(end_time -
-                                                          start_time))
+    print("Search milvus time cost is {} seconds ".format(end_time - start_time))
     list_data = []
     for line in results:
         for item in line:
             idx = item.id
             distance = item.distance
-            question = item.entity.get('question')
-            answer = item.entity.get('answer')
+            question = item.entity.get("question")
+            answer = item.entity.get("answer")
             print(question, answer, distance)
             list_data.append([query_text, question, answer, distance])
-    df = pd.DataFrame(list_data,
-                      columns=['query_text', 'question', 'answer', 'distance'])
-    df.to_csv('faq_result.csv', index=False)
+    df = pd.DataFrame(list_data, columns=["query_text", "question", "answer", "distance"])
+    df.to_csv("faq_result.csv", index=False)
 
 
 if __name__ == "__main__":

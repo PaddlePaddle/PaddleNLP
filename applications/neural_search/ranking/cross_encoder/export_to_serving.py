@@ -14,6 +14,7 @@
 
 import argparse
 import paddle_serving_client.io as serving_io
+
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--dirname", type=str, required=True,
@@ -44,4 +45,5 @@ if __name__ == "__main__":
         params_filename=args.params_filename,
         show_proto=args.show_proto,
         feed_alias_names=args.feed_alias_names,
-        fetch_alias_names=args.fetch_alias_names)
+        fetch_alias_names=args.fetch_alias_names,
+    )

@@ -16,12 +16,9 @@ import sentencepiece as spm
 
 from ..albert.tokenizer import AlbertEnglishTokenizer
 
-__all__ = ['ReformerTokenizer']
+__all__ = ["ReformerTokenizer"]
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "reformer-enwik8": 65536,
-    "reformer-crime-and-punishment": 524288
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"reformer-enwik8": 65536, "reformer-crime-and-punishment": 524288}
 
 
 class ReformerTokenizer(AlbertEnglishTokenizer):
@@ -59,28 +56,27 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
     }
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "reformer-crime-and-punishment":
-            "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-crime-and-punishment/spiece.model",
+            "reformer-crime-and-punishment": "http://paddlenlp.bj.bcebos.com/models/transformers/reformer/reformer-crime-and-punishment/spiece.model",
         },
     }
 
     pretrained_init_configuration = {
-        "reformer-crime-and-punishment": {
-            "do_lower_case": False
-        },
+        "reformer-crime-and-punishment": {"do_lower_case": False},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 sentencepiece_model_file,
-                 do_lower_case=False,
-                 remove_space=True,
-                 keep_accents=False,
-                 eos_token="</s>",
-                 unk_token="<unk>",
-                 pad_token="<unk>",
-                 **kwargs):
+    def __init__(
+        self,
+        sentencepiece_model_file,
+        do_lower_case=False,
+        remove_space=True,
+        keep_accents=False,
+        eos_token="</s>",
+        unk_token="<unk>",
+        pad_token="<unk>",
+        **kwargs
+    ):
 
         self.do_lower_case = do_lower_case
         self.remove_space = remove_space
@@ -89,25 +85,37 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
         self.sp_model = spm.SentencePieceProcessor()
         self.sp_model.Load(sentencepiece_model_file)
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+    def __call__(
+        self,
+        text,
+        text_pair=None,
+        max_seq_len=None,
+        stride=0,
+        is_split_into_words=False,
+        pad_to_max_seq_len=False,
+        truncation_strategy="longest_first",
+        return_position_ids=False,
+        return_token_type_ids=False,
+        return_attention_mask=True,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+    ):
         return super(ReformerTokenizer, self).__call__(
-            text, text_pair, max_seq_len, stride, is_split_into_words,
-            pad_to_max_seq_len, truncation_strategy, return_position_ids,
-            return_token_type_ids, return_attention_mask, return_length,
-            return_overflowing_tokens, return_special_tokens_mask)
+            text,
+            text_pair,
+            max_seq_len,
+            stride,
+            is_split_into_words,
+            pad_to_max_seq_len,
+            truncation_strategy,
+            return_position_ids,
+            return_token_type_ids,
+            return_attention_mask,
+            return_length,
+            return_overflowing_tokens,
+            return_special_tokens_mask,
+        )
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
@@ -132,9 +140,7 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
             return token_ids_0
         return token_ids_0 + token_ids_1
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences.
 
@@ -148,7 +154,7 @@ class ReformerTokenizer(AlbertEnglishTokenizer):
 
         Returns:
             List[int]: List of token_type_id according to the given sequence(s).
-            
+
         """
         if token_ids_1 is None:
             return len(token_ids_0) * [0]

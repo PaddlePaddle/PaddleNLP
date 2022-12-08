@@ -32,29 +32,23 @@ args = parser.parse_args()
 
 
 def main():
-    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path,
-                                         unk_token='[UNK]',
-                                         pad_token='[PAD]')
+    pinyin_vocab = Vocab.load_vocabulary(args.pinyin_vocab_file_path, unk_token="[UNK]", pad_token="[PAD]")
 
     ernie = ErnieModel.from_pretrained(args.model_name_or_path)
 
-    model = ErnieForCSC(ernie,
-                        pinyin_vocab_size=len(pinyin_vocab),
-                        pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
+    model = ErnieForCSC(ernie, pinyin_vocab_size=len(pinyin_vocab), pad_pinyin_id=pinyin_vocab[pinyin_vocab.pad_token])
 
     model_dict = paddle.load(args.params_path)
     model.set_dict(model_dict)
     model.eval()
 
-    model = paddle.jit.to_static(model,
-                                 input_spec=[
-                                     InputSpec(shape=[None, None],
-                                               dtype="int64",
-                                               name='input_ids'),
-                                     InputSpec(shape=[None, None],
-                                               dtype="int64",
-                                               name='pinyin_ids')
-                                 ])
+    model = paddle.jit.to_static(
+        model,
+        input_spec=[
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="pinyin_ids"),
+        ],
+    )
 
     paddle.jit.save(model, args.output_path)
 

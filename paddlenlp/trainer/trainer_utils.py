@@ -51,6 +51,7 @@ __all__ = [
 
 def set_seed(seed: int):
     import paddle
+
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
@@ -107,15 +108,13 @@ _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 def get_last_checkpoint(folder):
     content = os.listdir(folder)
     checkpoints = [
-        path for path in content if _re_checkpoint.search(path) is not None
-        and os.path.isdir(os.path.join(folder, path))
+        path
+        for path in content
+        if _re_checkpoint.search(path) is not None and os.path.isdir(os.path.join(folder, path))
     ]
     if len(checkpoints) == 0:
         return
-    return os.path.join(
-        folder,
-        max(checkpoints,
-            key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IntervalStrategy(ExplicitEnum):
@@ -147,6 +146,7 @@ class ShardingOption(ExplicitEnum):
     FULL_SHARD for sharding optimizer gradient and parameter
     OFFLOAD means offload to cpu.
     """
+
     SHARD_OP = "stage1"
     SHARD_GRAD_OP = "stage2"
     FULL_SHARD = "stage3"
@@ -219,9 +219,7 @@ def get_constant_schedule(learning_rate: float, last_epoch: int = -1):
     return LambdaDecay(learning_rate, lambda _: 1, last_epoch=last_epoch)
 
 
-def get_constant_schedule_with_warmup(learning_rate: float,
-                                      num_warmup_steps: int,
-                                      last_epoch: int = -1):
+def get_constant_schedule_with_warmup(learning_rate: float, num_warmup_steps: int, last_epoch: int = -1):
     """
     Create a schedule with a constant learning rate preceded by a warmup period during which the learning rate
     increases linearly between 0 and the initial lr set in the optimizer.
@@ -244,10 +242,7 @@ def get_constant_schedule_with_warmup(learning_rate: float,
     return LambdaDecay(learning_rate, lr_lambda, last_epoch=last_epoch)
 
 
-def get_linear_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps,
-                                    num_training_steps,
-                                    last_epoch=-1):
+def get_linear_schedule_with_warmup(learning_rate: float, num_warmup_steps, num_training_steps, last_epoch=-1):
     """
     Create a schedule with a learning rate that decreases linearly from the initial lr set in the optimizer to 0, after
     a warmup period during which it increases linearly from 0 to the initial lr set in the optimizer.
@@ -268,18 +263,15 @@ def get_linear_schedule_with_warmup(learning_rate: float,
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         return max(
-            0.0,
-            float(num_training_steps - current_step) /
-            float(max(1, num_training_steps - num_warmup_steps)))
+            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
+        )
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
-def get_cosine_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps: int,
-                                    num_training_steps: int,
-                                    num_cycles: float = 0.5,
-                                    last_epoch: int = -1):
+def get_cosine_schedule_with_warmup(
+    learning_rate: float, num_warmup_steps: int, num_training_steps: int, num_cycles: float = 0.5, last_epoch: int = -1
+):
     """
     Create a schedule with a learning rate that decreases following the values of the cosine function between the
     initial lr set in the optimizer to 0, after a warmup period during which it increases linearly between 0 and the
@@ -303,11 +295,8 @@ def get_cosine_schedule_with_warmup(learning_rate: float,
     def lr_lambda(current_step):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
-        progress = float(current_step - num_warmup_steps) / float(
-            max(1, num_training_steps - num_warmup_steps))
-        return max(
-            0.0, 0.5 *
-            (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+        progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
@@ -347,22 +336,16 @@ def get_scheduler(
 
     # All other schedulers require `num_warmup_steps`
     if num_warmup_steps is None:
-        raise ValueError(
-            f"{name} requires `num_warmup_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_warmup_steps`, please provide that argument.")
 
     if name == SchedulerType.CONSTANT_WITH_WARMUP:
         return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps)
 
     # All other schedulers require `num_training_steps`
     if num_training_steps is None:
-        raise ValueError(
-            f"{name} requires `num_training_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_training_steps`, please provide that argument.")
 
-    return schedule_func(learning_rate,
-                         num_warmup_steps=num_warmup_steps,
-                         num_training_steps=num_training_steps)
+    return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps)
 
 
 def _secs2timedelta(secs):
@@ -416,8 +399,7 @@ def log_metrics(self, split, metrics):
     k_width = max(len(str(x)) for x in metrics_formatted.keys())
     v_width = max(len(str(x)) for x in metrics_formatted.values())
     for key in sorted(metrics_formatted.keys()):
-        logger.info(
-            f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
+        logger.info(f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
 
 
 def save_metrics(self, split, metrics, combined=True):
@@ -480,15 +462,13 @@ def has_length(dataset):
 def get_last_checkpoint(folder):
     content = os.listdir(folder)
     checkpoints = [
-        path for path in content if _re_checkpoint.search(path) is not None
-        and os.path.isdir(os.path.join(folder, path))
+        path
+        for path in content
+        if _re_checkpoint.search(path) is not None and os.path.isdir(os.path.join(folder, path))
     ]
     if len(checkpoints) == 0:
         return
-    return os.path.join(
-        folder,
-        max(checkpoints,
-            key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IterableDatasetShard(IterableDataset):
@@ -552,8 +532,7 @@ class IterableDatasetShard(IterableDataset):
         # ):
         #     self.dataset.generator.manual_seed(self.seed + self.epoch)
         real_batch_size = self.batch_size * self.num_processes
-        process_slice = range(self.process_index * self.batch_size,
-                              (self.process_index + 1) * self.batch_size)
+        process_slice = range(self.process_index * self.batch_size, (self.process_index + 1) * self.batch_size)
 
         first_batch = None
         current_batch = []
@@ -580,12 +559,9 @@ class IterableDatasetShard(IterableDataset):
     def __len__(self):
         # Will raise an error if the underlying dataset is not sized.
         if self.drop_last:
-            return (len(self.dataset) //
-                    (self.batch_size * self.num_processes)) * self.batch_size
+            return (len(self.dataset) // (self.batch_size * self.num_processes)) * self.batch_size
         else:
-            return math.ceil(
-                len(self.dataset) /
-                (self.batch_size * self.num_processes)) * self.batch_size
+            return math.ceil(len(self.dataset) / (self.batch_size * self.num_processes)) * self.batch_size
 
 
 def find_batch_size(tensors):
@@ -630,15 +606,15 @@ class RemoveColumnsCollator:
         if not isinstance(feature, dict):
             return feature
         if not self.message_logged and self.logger and self.model_name:
-            ignored_columns = list(
-                set(feature.keys()) - set(self.signature_columns))
+            ignored_columns = list(set(feature.keys()) - set(self.signature_columns))
             if len(ignored_columns) > 0:
                 dset_description = "" if self.description is None else f"in the {self.description} set"
                 self.logger.info(
                     f"The following columns {dset_description} don't have a corresponding argument in "
                     f"`{self.model_name}.forward` and have been ignored: {', '.join(ignored_columns)}."
                     f" If {', '.join(ignored_columns)} are not expected by `{self.model_name}.forward`, "
-                    " you can safely ignore this message.")
+                    " you can safely ignore this message."
+                )
                 self.message_logged = True
         return {k: v for k, v in feature.items() if k in self.signature_columns}
 

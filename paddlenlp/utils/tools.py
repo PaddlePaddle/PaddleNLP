@@ -70,8 +70,7 @@ def dygraph_params_to_static(model, dygraph_tensor_dict, topo=None):
                 if parm.shape[dim] != v:
                     break
 
-            splited = np.split(tensor, topo.mp_info.size,
-                               axis=dim)[topo.mp_info.rank]
+            splited = np.split(tensor, topo.mp_info.size, axis=dim)[topo.mp_info.rank]
             ret_dict[parm.name] = splited
         else:
             ret_dict[parm.name] = tensor
@@ -115,14 +114,14 @@ def get_env_device():
     Return the device name of running enviroment.
     """
     if paddle.is_compiled_with_cuda():
-        return 'gpu'
+        return "gpu"
     elif paddle.is_compiled_with_npu():
-        return 'npu'
+        return "npu"
     elif paddle.is_compiled_with_rocm():
-        return 'rocm'
+        return "rocm"
     elif paddle.is_compiled_with_xpu():
-        return 'xpu'
-    return 'cpu'
+        return "xpu"
+    return "cpu"
 
 
 def compare_version(version, pair_version):
@@ -135,7 +134,7 @@ def compare_version(version, pair_version):
     Returns:
         int: The result of comparasion. 1 means version > pair_version; 0 means
             version = pair_version; -1 means version < pair_version.
-    
+
     Examples:
         >>> compare_version("2.2.1", "2.2.0")
         >>> 1

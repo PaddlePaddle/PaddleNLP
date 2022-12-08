@@ -19,10 +19,8 @@ from .env import EnvironmentCommand
 
 
 def main():
-    parser = ArgumentParser("PPDiffusers CLI tool",
-                            usage="ppdiffusers-cli <command> [<args>]")
-    commands_parser = parser.add_subparsers(
-        help="ppdiffusers-cli command helpers")
+    parser = ArgumentParser("PPDiffusers CLI tool", usage="ppdiffusers-cli <command> [<args>]")
+    commands_parser = parser.add_subparsers(help="ppdiffusers-cli command helpers")
 
     # Register commands
     EnvironmentCommand.register_subcommand(commands_parser)

@@ -60,8 +60,7 @@ def evaluate(model, criterion, metric, data_loader, phase="dev"):
         correct = metric.compute(probs, labels)
         metric.update(correct)
         accu = metric.accumulate()
-    print("eval {} loss: {:.5}, accu: {:.5}".format(phase, np.mean(losses),
-                                                    accu))
+    print("eval {} loss: {:.5}, accu: {:.5}".format(phase, np.mean(losses), accu))
     model.train()
     metric.reset()
 
@@ -76,30 +75,24 @@ def do_train(args):
 
     train_ds, dev_ds = load_dataset("lcqmc", splits=["train", "dev"])
 
-    pretrained_model = AutoModel.from_pretrained('ernie-3.0-medium-zh')
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
+    pretrained_model = AutoModel.from_pretrained("ernie-3.0-medium-zh")
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_pair_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_pair_segment
-        Stack(dtype="int64")  # label
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     model = PointwiseMatching(pretrained_model)
 
@@ -111,20 +104,17 @@ def do_train(args):
 
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
@@ -144,8 +134,8 @@ def do_train(args):
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, batch: %d, loss: %.5f, accu: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, acc, 10 /
-                       (time.time() - tic_train)))
+                    % (global_step, epoch, step, loss, acc, 10 / (time.time() - tic_train))
+                )
                 tic_train = time.time()
             loss.backward()
             optimizer.step()
@@ -154,12 +144,10 @@ def do_train(args):
 
             if global_step % args.eval_step == 0 and rank == 0:
                 evaluate(model, criterion, metric, dev_data_loader)
-                save_dir = os.path.join(args.save_dir, 'model')
+                save_dir = os.path.join(args.save_dir, "model")
                 tokenizer.save_pretrained(save_dir)
-                model_to_save = model._layers if isinstance(
-                    model, paddle.DataParallel) else model
-                paddle.save(model_to_save.state_dict(),
-                            os.path.join(save_dir, 'model_state.pdparams'))
+                model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
+                paddle.save(model_to_save.state_dict(), os.path.join(save_dir, "model_state.pdparams"))
 
             if global_step > args.max_steps:
                 return
