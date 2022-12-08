@@ -557,7 +557,7 @@ class BartModel(BartPretrainedModel):
         The BartModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -792,7 +792,7 @@ class BartForSequenceClassification(BartPretrainedModel):
         The BartForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.
@@ -950,7 +950,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
         The BartForQuestionAnswering forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.
@@ -1152,7 +1152,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
         The BartForConditionalGeneration forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.

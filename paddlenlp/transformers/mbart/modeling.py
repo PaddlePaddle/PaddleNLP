@@ -624,7 +624,7 @@ class MBartModel(MBartPretrainedModel):
         The MBartModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -720,8 +720,7 @@ class MBartModel(MBartPretrainedModel):
                 )
             decoder_input_ids = shift_tokens_right(input_ids, self.pad_token_id)
         if attention_mask is None and input_ids is not None:
-            # assert input_ids is not None, "input_ids should be " \
-            #                               "specified when generating attention_mask"
+            logger.warning("input_ids should be specified when generating attention_mask")
             attention_mask = (
                 paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
@@ -860,7 +859,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         The MBartForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`MBartModel`.
             attention_mask (Tensor, optional):
                 See :class:`MBartModel`.
@@ -1015,7 +1014,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
         The MBartForQuestionAnswering forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`MBartModel`.
             attention_mask (Tensor, optional):
                 See :class:`MBartModel`.
@@ -1208,7 +1207,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         The MBartForConditionalGeneration forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`MBartModel`.
             attention_mask (Tensor, optional):
                 See :class:`MBartModel`.

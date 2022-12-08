@@ -246,9 +246,9 @@ class UNIMOEmbeddings(nn.Layer):
         if input_ids is None and input_embeddings is None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
-            inputs_sample = input_ids
+            inputs_shape = paddle.shape(input_ids)
         elif input_embeddings is not None:
-            inputs_sample = input_embeddings[:, :, -1]
+            inputs_shape = paddle.shape(input_embeddings)[:-1]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
         if input_embeddings is None:
@@ -256,25 +256,19 @@ class UNIMOEmbeddings(nn.Layer):
 
         if position_ids is None:
             if self.pad_token_id is None:
-                position_ids = paddle.expand_as(
-                    paddle.arange(end=paddle.shape(inputs_sample)[1], dtype="int64"), inputs_sample
-                )
+                position_ids = paddle.expand_as(paddle.arange(end=inputs_shape[1], dtype="int64"), inputs_shape)
             else:
                 if input_ids is not None:
                     num_pad = paddle.sum((input_ids == self.pad_token_id).astype("float32"), axis=-1, keepdim=True)
                     position_ids = F.relu(
-                        paddle.expand_as(
-                            paddle.arange(end=paddle.shape(inputs_sample)[1], dtype="float32"), inputs_sample
-                        )
-                        - num_pad
+                        paddle.expand_as(paddle.arange(end=inputs_shape[1], dtype="int64"), inputs_shape) - num_pad
                     ).astype("int64")
                 else:
                     logger.warning(
-                        "position_ids or pad_token_ids should be provided when input_embeds is specified, otherwise an unexpected result may be returned"
+                        "Position_ids or pad_token_ids should be provided when input_embeds is specified, "
+                        "otherwise an unexpected result may be returned since `[0, 1, ..., sequence length - 1]` will be generated as a default position_ids."
                     )
-                    position_ids = paddle.expand_as(
-                        paddle.arange(end=paddle.shape(inputs_sample)[1], dtype="int64"), inputs_sample
-                    )
+                    position_ids = paddle.expand_as(paddle.arange(end=inputs_shape[1], dtype="int64"), inputs_shape)
             position_ids.stop_gradient = True
         position_embeddings = self.position_embeddings(position_ids)
 
@@ -437,7 +431,7 @@ class UNIMOModel(UNIMOPretrainedModel):
         The UNIMOModel forward method, overrides the special :meth:`__call__` method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 It's data type should be `int64` and has a shape of  [batch_size, sequence_length].
@@ -518,7 +512,9 @@ class UNIMOModel(UNIMOPretrainedModel):
                     (input_ids == self.pad_token_id).astype(paddle.get_default_dtype()) * -1e4
                 ).unsqueeze([1, 2])
             else:
-                logger.warning("provided inputs_embeds without attention_mask")
+                logger.warning(
+                    "Provided inputs_embeds while attention_mask is None, attention weights will not be masked during forwarding."
+                )
 
         if attention_mask is not None:
             attention_mask.stop_gradient = True
@@ -606,7 +602,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         :meth:`__call__` method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`UNIMOModel`.
             token_type_ids (Tensor):
                 See :class:`UNIMOModel`.

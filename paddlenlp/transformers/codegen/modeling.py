@@ -424,7 +424,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         r"""
         The CodeGenModel forward method, overrides the `__call__()` special method.
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -512,7 +512,9 @@ class CodeGenModel(CodeGenPreTrainedModel):
                         * -1e4
                     )
             else:
-                logger.warning("provided inputs_embeds without attention_mask")
+                logger.warning(
+                    "Provided inputs_embeds while attention_mask is None, attention weights will not be masked during forwarding."
+                )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
@@ -665,7 +667,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         r"""
         The CodeGenForCausalLM forward method, overrides the __call__() special method.
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`CodeGenModel`.
             attention_mask (Tensor, optional):
                 See :class:`CodeGenModel`.
