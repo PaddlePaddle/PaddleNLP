@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 import inspect
 from abc import ABC
+from typing import List
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+
 from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
@@ -734,9 +735,7 @@ class GenerationMixin(object):
             else getattr(self, "decoder_start_token_id", None)
         )
         no_repeat_ngram_size = (
-            no_repeat_ngram_size 
-            if no_repeat_ngram_size is not None
-            else getattr(self, 'no_repeat_ngram_size', None)
+            no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
         )
 
         if getattr(self, "_faster_entry", None) is not False and use_faster:
