@@ -76,7 +76,6 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         }
         input_dict = self.template.process_batch(input_dict)
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
-        print(model_inputs["input_ids"].shape)
         if "masked_positions" in model_inputs:
             model_inputs.pop("masked_positions")
         model_outputs = self.plm(**model_inputs, return_dict=True)
@@ -107,7 +106,6 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         if not return_dict:
             output = (logits, model_outputs.logits)
             return ((loss,) + output) if loss is not None else output
-        print(logits.shape)
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
