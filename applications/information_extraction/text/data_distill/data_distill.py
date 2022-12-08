@@ -40,18 +40,20 @@ def do_data_distill():
         fp.write(json.dumps(label_maps, ensure_ascii=False))
 
     # Load doccano file and convert to distill format
-    sample_index = json.loads(open(os.path.join(args.data_path, "sample_index.json")).readline())
+    sample_index = json.loads(
+        open(os.path.join(args.data_path, "sample_index.json"), "r", encoding="utf-8").readline()
+    )
 
     train_ids = sample_index["train_ids"]
     dev_ids = sample_index["dev_ids"]
     test_ids = sample_index["test_ids"]
 
     if args.platform == "label_studio":
-        with open(os.path.join(args.data_path, "label_studio.json")) as fp:
+        with open(os.path.join(args.data_path, "label_studio.json"), "r", encoding="utf-8") as fp:
             json_lines = json.loads(fp.read())
     elif args.platform == "doccano":
         json_lines = []
-        with open(os.path.join(args.data_path, "doccano_ext.json")) as fp:
+        with open(os.path.join(args.data_path, "doccano_ext.json"), "r", encoding="utf-8") as fp:
             for line in fp:
                 json_lines.append(json.loads(line))
     else:
@@ -71,7 +73,7 @@ def do_data_distill():
 
     if args.synthetic_ratio > 0:
         # Generate synthetic data
-        texts = open(os.path.join(args.data_path, "unlabeled_data.txt")).readlines()
+        texts = open(os.path.join(args.data_path, "unlabeled_data.txt"), "r", encoding="utf-8").readlines()
 
         actual_ratio = math.ceil(len(texts) / len(train_lines))
         if actual_ratio <= args.synthetic_ratio or args.synthetic_ratio == -1:

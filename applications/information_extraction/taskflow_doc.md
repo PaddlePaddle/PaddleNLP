@@ -139,7 +139,7 @@
 
 - Delivery Note
 
-对文档进行实体关系抽取，schema构造如下：
+对文档进行实体+关系抽取，schema构造如下：
 
 ```text
 schema = [
