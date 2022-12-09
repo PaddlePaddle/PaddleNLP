@@ -13,24 +13,24 @@
 # limitations under the License.
 
 import collections
-import math
 
-import numpy as np
 import paddle
+import paddle.incubate as incubate
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
+from paddle.distributed import fleet
+from paddle.distributed.fleet.meta_parallel import (
+    LayerDesc,
+    PipelineLayer,
+    SharedLayerDesc,
+    get_rng_state_tracker,
+)
+from paddle.distributed.fleet.utils import recompute
 from paddle.fluid import layers
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
-
-import paddlenlp
-from paddle.distributed import fleet
-from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.meta_parallel import LayerDesc, PipelineLayer, SharedLayerDesc
-import paddle.incubate as incubate
-from paddle.distributed.fleet.utils import recompute
 
 __all__ = [
     "GPTModel",
@@ -46,7 +46,7 @@ def parallel_matmul(lm_output, logit_weights, parallel_output):
     hcg = fleet.get_hybrid_communicate_group()
     model_parallel_group = hcg.get_model_parallel_group()
     world_size = hcg.get_model_parallel_world_size()
-    rank = hcg.get_model_parallel_rank()
+    # rank = hcg.get_model_parallel_rank()
 
     if world_size > 1:
         input_parallel = paddle.distributed.collective._c_identity(lm_output, group=model_parallel_group)
@@ -215,7 +215,7 @@ class MultiHeadAttention(nn.Layer):
         else:
             q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
         # scale dot product attention
-        product = layers.matmul(x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
         # if attn_mask is not None:
         # product = product + attn_mask

@@ -13,17 +13,18 @@
 # limitations under the License.
 
 from typing import Optional, Tuple
-from paddle import Tensor
+
 import paddle
 import paddle.nn as nn
+from paddle import Tensor
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
     tuple_output,
 )
 
@@ -34,6 +35,7 @@ __all__ = [
     "ErnieMForTokenClassification",
     "ErnieMForQuestionAnswering",
     "ErnieMForMultipleChoice",
+    "UIEM",
 ]
 
 
@@ -132,11 +134,37 @@ class ErnieMPretrainedModel(PretrainedModel):
             "vocab_size": 250002,
             "pad_token_id": 1,
         },
+        "uie-m-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "vocab_size": 250002,
+            "pad_token_id": 1,
+        },
+        "uie-m-large": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 1024,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 514,
+            "num_attention_heads": 16,
+            "num_hidden_layers": 24,
+            "vocab_size": 250002,
+            "pad_token_id": 1,
+        },
     }
     pretrained_resource_files_map = {
         "model_state": {
             "ernie-m-base": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_m/ernie_m_base.pdparams",
             "ernie-m-large": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_m/ernie_m_large.pdparams",
+            "uie-m-base": "https://paddlenlp.bj.bcebos.com/models/transformers/uie_m/uie_m_base.pdparams",
+            "uie-m-large": "https://paddlenlp.bj.bcebos.com/models/transformers/uie_m/uie_m_large.pdparams",
         }
     }
     base_model_prefix = "ernie_m"
@@ -853,3 +881,54 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class UIEM(ErnieMPretrainedModel):
+    """
+    Ernie-M Model with two linear layer on top of the hidden-states
+    output to compute `start_prob` and `end_prob`,
+    designed for Universal Information Extraction.
+
+    Args:
+        ernie (`ErnieMModel`):
+            An instance of `ErnieMModel`.
+    """
+
+    def __init__(self, ernie_m):
+        super(UIEM, self).__init__()
+        self.ernie_m = ernie_m
+        hidden_size = self.ernie_m.config["hidden_size"]
+        self.linear_start = paddle.nn.Linear(hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, position_ids=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieMModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieMModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import UIEM, ErnieMTokenizer
+
+                tokenizer = ErnieMTokenizer.from_pretrained('uie-m-base')
+                model = UIEM.from_pretrained('uie-m-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                start_prob, end_prob = model(**inputs)
+        """
+        sequence_output, _ = self.ernie_m(input_ids=input_ids, position_ids=position_ids)
+        start_logits = self.linear_start(sequence_output)
+        start_logits = paddle.squeeze(start_logits, -1)
+        start_prob = self.sigmoid(start_logits)
+        end_logits = self.linear_end(sequence_output)
+        end_logits = paddle.squeeze(end_logits, -1)
+        end_prob = self.sigmoid(end_logits)
+        return start_prob, end_prob

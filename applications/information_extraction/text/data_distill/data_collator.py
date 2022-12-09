@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Union
 from dataclasses import dataclass
+from typing import Dict, List, Optional, Union
 
 import paddle
-from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
+
+from paddlenlp.transformers.tokenizer_utils_base import (
+    PaddingStrategy,
+    PretrainedTokenizerBase,
+)
 
 ignore_list = ["offset_mapping", "text"]
 
