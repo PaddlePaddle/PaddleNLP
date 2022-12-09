@@ -375,25 +375,113 @@ class UIESentaTask(Task):
     }
     # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
     resource_files_urls = {
-        "uie-base": {
+        "uie-senta-base": {
             "model_state": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-base/model_state.pdparams",
-                "9ae5035aacc673dccec7505797fdda59"
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-base/model_state.pdparams",
+                "ad22a73d0065ec6468dda3734532479c"
             ],
             "model_config": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-base/model_config.json",
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-base/model_config.json",
                 "74f033ab874a1acddb3aec9b9c4d9cde"
             ],
             "vocab_file": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-base/vocab.txt",
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-base/vocab.txt",
                 "1c1c1f4fd93c5bed3b4eebec4de976a8"
             ],
             "special_tokens_map": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-base/special_tokens_map.json",
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-base/special_tokens_map.json",
                 "8b3fb1023167bb4ab9d70708eb05f6ec"
             ],
             "tokenizer_config": [
-                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-base/tokenizer_config.json",
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-base/tokenizer_config.json",
+                "3e623b57084882fd73e17f544bdda47d"
+            ]
+        },
+        "uie-senta-medium": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-medium/model_state.pdparams",
+                "cb02c152718526206033d4f8d677afca"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-medium/model_config.json",
+                "4c98a7bc547d60ac94e44e17c47a3488"
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-medium/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-medium/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-medium/tokenizer_config.json",
+                "3e623b57084882fd73e17f544bdda47d"
+            ]
+        },
+        "uie-senta-mini": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-mini/model_state.pdparams",
+                "361180e6e7d81a6b9fa835338eee3473"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-mini/model_config.json",
+                "9628a5c64a1e6ed8278c0344c8ef874a"
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-mini/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-mini/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-mini/tokenizer_config.json",
+                "3e623b57084882fd73e17f544bdda47d"
+            ]
+        },
+        "uie-senta-micro": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-micro/model_state.pdparams",
+                "dbd97fc15e8319ad800fe7eb1d220ce2"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-micro/model_config.json",
+                "058a28845781dbe89a3827bc11355bc8"
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-micro/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-micro/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-micro/tokenizer_config.json",
+                "3e623b57084882fd73e17f544bdda47d"
+            ]
+        },
+        "uie-senta-nano": {
+            "model_state": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-nano/model_state.pdparams",
+                "dcb6540188fcac49d49524422089013e"
+            ],
+            "model_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-nano/model_config.json",
+                "b9f74bdf02f5fb2d208e1535c8a13649"
+            ],
+            "vocab_file": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-nano/vocab.txt",
+                "1c1c1f4fd93c5bed3b4eebec4de976a8"
+            ],
+            "special_tokens_map": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-nano/special_tokens_map.json",
+                "8b3fb1023167bb4ab9d70708eb05f6ec"
+            ],
+            "tokenizer_config": [
+                "https://paddlenlp.bj.bcebos.com/taskflow/sentiment_analysis/uie-senta-nano/tokenizer_config.json",
                 "3e623b57084882fd73e17f544bdda47d"
             ]
         },
@@ -422,7 +510,7 @@ class UIESentaTask(Task):
         self.use_fast = self.kwargs[
             'use_fast'] if 'use_fast' in self.kwargs else False
         self._construct_tokenizer()
-        self.aspects = self.check_aspects(aspects)
+        self.aspects = self._check_aspects(aspects)
 
     def set_schema(self, schema):
         """
@@ -432,7 +520,10 @@ class UIESentaTask(Task):
             schema = [schema]
         self._schema_tree = self._build_tree(schema)
     
-    def check_aspects(self, aspects):
+    def _check_aspects(self, aspects):
+        """
+        Check aspects whether to be valid.
+        """
         if aspects is None:
             return aspects
         elif not isinstance(aspects, list):
