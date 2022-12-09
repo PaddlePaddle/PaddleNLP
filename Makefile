@@ -22,6 +22,7 @@ lint:
 	# if develop branch does not exist locally, create a local develop branch that tracks remote/develop
 	if ! git show-ref --quiet refs/heads/develop; then \
 	    echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"; \
+	    git fetch origin develop; \
 	    git branch develop --track origin/develop; \
 	fi
 
