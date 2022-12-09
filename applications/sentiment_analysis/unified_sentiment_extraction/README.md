@@ -414,7 +414,7 @@ python label_studio.py \
     --prompt_prefix "情感倾向" \
     --options "正向" "负向" "未提及" \
     --separator "##" \
-    -- negative_ratio 5 \
+    --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```

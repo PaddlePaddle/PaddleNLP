@@ -266,7 +266,7 @@ class Convertor(object):
                     inverse_negative = entity_map[object_id]["name"] + "的" + predicate
 
                     if entity_map[subject_id]["name"] not in subject_golden:
-                        if entity_map[subject_id]["name"] in synonyms:
+                        if synonyms and entity_map[subject_id]["name"] in synonyms:
                             subject_synonyms = synonyms[entity_map[subject_id]["name"]]
                             subject_golden.extend(subject_synonyms)
                         else:
@@ -662,8 +662,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--label_studio_file", default="./data/label_studio.json", type=str, help="The annotation file exported from label studio platform.")
-    parser.add_argument("--synonym_file", default="./data/synonyms.txt", type=str, help="The synonmy file of aspect to support aspect aggregation.")
-    parser.add_argument("--implicit_file", default="./data/implicit_opinions.txt", type=str, help="The implicit opinion file whose aspect not be mentioned in text, to support extraction of implicit opinion.")
+    parser.add_argument("--synonym_file", default="", type=str, help="The synonmy file of aspect to support aspect aggregation.")
+    parser.add_argument("--implicit_file", default="", type=str, help="The implicit opinion file whose aspect not be mentioned in text, to support extraction of implicit opinion.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
     parser.add_argument("--negative_ratio", default=5, type=int, help="Used only for the extraction task, the ratio of positive and negative samples, number of negtive samples = negative_ratio * number of positive samples")
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
