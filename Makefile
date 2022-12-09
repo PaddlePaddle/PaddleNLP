@@ -6,7 +6,7 @@
 
 .PHONY: all
 all : lint test
-
+check_dirs := applications examples model_zoo paddlenlp pipelines ppdiffusers scripts tests 
 # # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
 
 format:
@@ -21,7 +21,7 @@ format:
 lint:
 	# if develop branch does not exist locally, create a local develop branch that tracks remote/develop
 	if ! git show-ref --quiet refs/heads/develop; then
-	    echo "develop branch is missing, creating local develop branch"
+	    echo "local develop branch is missing, creating it"
 	    git branch develop
 	fi
 
