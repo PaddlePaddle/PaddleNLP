@@ -13,43 +13,43 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import csv
-import six
-import math
-import copy
-import random
-import traceback
-from datetime import datetime
-import json
-import pickle
-import warnings
 import contextlib
+import copy
+import csv
+import json
+import math
+import os
+import pickle
+import re
+import traceback
+import warnings
+from collections import OrderedDict, namedtuple
 from dataclasses import dataclass
+from datetime import datetime
 from functools import cmp_to_key
-from collections import namedtuple, OrderedDict
-from PIL import Image
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
+import six
 from paddle.dataset.common import md5file
-from ..utils.log import logger
-from ..utils.downloader import get_path_from_url, DownloaderCheck
+from PIL import Image
+
+from ..transformers.tokenizer_utils_base import PaddingStrategy, PretrainedTokenizerBase
+from ..utils.downloader import DownloaderCheck, get_path_from_url
 from ..utils.image_utils import (
-    img2base64,
-    check,
-    two_dimension_sort_layout,
     Bbox,
     DecodeImage,
-    ResizeImage,
-    Permute,
     NormalizeImage,
     PadBatch,
+    Permute,
+    ResizeImage,
+    check,
+    img2base64,
+    two_dimension_sort_layout,
 )
-from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
+from ..utils.log import logger
 
 DOC_FORMAT = r"""
     Examples:
@@ -695,11 +695,8 @@ class Customization(object):
         self.ac = TriedTree()
         with open(filename, "r", encoding="utf8") as f:
             for line in f:
-                if sep == None:
+                if sep is None:
                     words = line.strip().split()
-                else:
-                    sep = strdecode(sep)
-                    words = line.strip().split(sep)
 
                 if len(words) == 0:
                     continue
@@ -725,7 +722,7 @@ class Customization(object):
     def parse_customization(self, query, lac_tags, prefix=False):
         """Use custom vocab to modify the lac results"""
         if not self.ac:
-            logging.warning("customization dict is not load")
+            logger.warning("customization dict is not load")
             return
         ac_res = self.ac.search(query)
 
@@ -786,82 +783,6 @@ class SchemaTree(object):
         self.children.append(node)
 
 
-def get_bool_ids_greater_than(probs, limit=0.5, return_prob=False):
-    """
-    get idx of the last dim in prob arraies, which is greater than a limitation
-    input: [[0.1, 0.1, 0.2, 0.5, 0.1, 0.3], [0.7, 0.6, 0.1, 0.1, 0.1, 0.1]]
-        0.4
-    output: [[3], [0, 1]]
-    """
-    probs = np.array(probs)
-    dim_len = len(probs.shape)
-    if dim_len > 1:
-        result = []
-        for p in probs:
-            result.append(get_bool_ids_greater_than(p, limit, return_prob))
-        return result
-    else:
-        result = []
-        for i, p in enumerate(probs):
-            if p > limit:
-                if return_prob:
-                    result.append((i, p))
-                else:
-                    result.append(i)
-        return result
-
-
-def get_span(start_ids, end_ids, with_prob=False):
-    """
-    every id can only be used once
-    get span set from position start and end list
-    input: [1, 2, 10] [4, 12]
-    output: set((2, 4), (10, 12))
-    """
-    if with_prob:
-        start_ids = sorted(start_ids, key=lambda x: x[0])
-        end_ids = sorted(end_ids, key=lambda x: x[0])
-    else:
-        start_ids = sorted(start_ids)
-        end_ids = sorted(end_ids)
-
-    start_pointer = 0
-    end_pointer = 0
-    len_start = len(start_ids)
-    len_end = len(end_ids)
-    couple_dict = {}
-    while start_pointer < len_start and end_pointer < len_end:
-        if with_prob:
-            if start_ids[start_pointer][0] == end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer][0] < end_ids[end_pointer][0]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer][0] > end_ids[end_pointer][0]:
-                end_pointer += 1
-                continue
-        else:
-            if start_ids[start_pointer] == end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                end_pointer += 1
-                continue
-            if start_ids[start_pointer] < end_ids[end_pointer]:
-                couple_dict[end_ids[end_pointer]] = start_ids[start_pointer]
-                start_pointer += 1
-                continue
-            if start_ids[start_pointer] > end_ids[end_pointer]:
-                end_pointer += 1
-                continue
-    result = [(couple_dict[end], end) for end in couple_dict]
-    result = set(result)
-    return result
-
-
 def get_id_and_prob(span_set, offset_mapping):
     """
     Return text id and probability of predicted spans
@@ -876,9 +797,9 @@ def get_id_and_prob(span_set, offset_mapping):
     """
     prompt_end_token_id = offset_mapping[1:].index([0, 0])
     bias = offset_mapping[prompt_end_token_id][1] + 1
-    for index in range(1, prompt_end_token_id + 1):
-        offset_mapping[index][0] -= bias
-        offset_mapping[index][1] -= bias
+    for idx in range(1, prompt_end_token_id + 1):
+        offset_mapping[idx][0] -= bias
+        offset_mapping[idx][1] -= bias
 
     sentence_id = []
     prob = []
@@ -1998,7 +1919,7 @@ class ImageReader(object):
 
             if not (len(example.doc_tokens) == len(example.boxes) == len(example.segment_ids)):
                 raise ValueError(
-                    f"Incorrect word_boxes, the format should be `List[str, Tuple[float, float, float, float]]`"
+                    "Incorrect word_boxes, the format should be `List[str, Tuple[float, float, float, float]]`"
                 )
 
             examples.append(example)

@@ -37,7 +37,11 @@ from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
 from .text_summarization import TextSummarizationTask
-from .text_to_image import TextToImageDiscoDiffusionTask, TextToImageGenerationTask, TextToImageStableDiffusionTask
+from .text_to_image import (
+    TextToImageDiscoDiffusionTask,
+    TextToImageGenerationTask,
+    TextToImageStableDiffusionTask,
+)
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
@@ -286,6 +290,11 @@ TASKS = {
                 "hidden_size": 1024,
                 "task_flag": "information_extraction-uie-m-large",
             },
+            "uie-x-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-x-base",
+            },
             "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
         },
         "default": {"model": "uie-base"},
@@ -457,6 +466,7 @@ support_schema_list = [
     "wordtag",
     "uie-m-large",
     "uie-m-base",
+    "uie-x-base",
 ]
 
 support_argument_list = [
