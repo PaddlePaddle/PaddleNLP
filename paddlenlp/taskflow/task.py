@@ -246,7 +246,7 @@ class Task(metaclass=abc.ABCMeta):
                 self._param_updated = True
                 if os.path.exists(cache_info_path) and open(cache_info_path).read()[:-8] == md5:
                     self._param_updated = False
-                elif self.task == "information_extraction":
+                elif self.task == "information_extraction" and self.model != "uie-data-distill-gp":
                     # UIE related models are moved to paddlenlp.transformers after v2.4.5
                     # So we convert the parameter key names for compatibility
                     # This check will be discard in future
