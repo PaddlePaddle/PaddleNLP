@@ -20,10 +20,10 @@ import contextlib
 import json
 import math
 import os
-from dataclasses import asdict, dataclass, field
-import warnings
-from enum import Enum
 import types
+import warnings
+from dataclasses import asdict, dataclass, field
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 import paddle
@@ -31,9 +31,9 @@ from paddle.distributed import fleet
 
 from ..utils.log import logger
 from .trainer_utils import (
-    SchedulerType,
     IntervalStrategy,
     OptimizerNames,
+    SchedulerType,
     ShardingOption,
 )
 
