@@ -13,19 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import argparse
 import json
 import math
+import os
 import random
-import argparse
-from tqdm import tqdm
 
-import numpy as np
-import paddle
+from tqdm import tqdm
+from utils import anno2distill, schema2label_maps, set_seed, synthetic2distill
+
 from paddlenlp import Taskflow
 from paddlenlp.utils.log import logger
-
-from utils import set_seed, build_tree, schema2label_maps, doccano2distill, synthetic2distill
 
 
 def do_data_distill():
@@ -38,36 +36,44 @@ def do_data_distill():
     label_maps_path = os.path.join(args.save_dir, "label_maps.json")
 
     # Save closed-domain label maps file
-    with open(label_maps_path, "w") as fp:
+    with open(label_maps_path, "w", encoding="utf-8") as fp:
         fp.write(json.dumps(label_maps, ensure_ascii=False))
 
     # Load doccano file and convert to distill format
-    sample_index = json.loads(open(os.path.join(args.data_path, "sample_index.json")).readline())
+    sample_index = json.loads(
+        open(os.path.join(args.data_path, "sample_index.json"), "r", encoding="utf-8").readline()
+    )
 
     train_ids = sample_index["train_ids"]
     dev_ids = sample_index["dev_ids"]
     test_ids = sample_index["test_ids"]
 
-    json_lines = []
-    with open(os.path.join(args.data_path, "doccano_ext.json")) as fp:
-        for line in fp:
-            json_lines.append(json.loads(line))
+    if args.platform == "label_studio":
+        with open(os.path.join(args.data_path, "label_studio.json"), "r", encoding="utf-8") as fp:
+            json_lines = json.loads(fp.read())
+    elif args.platform == "doccano":
+        json_lines = []
+        with open(os.path.join(args.data_path, "doccano_ext.json"), "r", encoding="utf-8") as fp:
+            for line in fp:
+                json_lines.append(json.loads(line))
+    else:
+        raise ValueError("Unsupported annotation platform!")
 
     train_lines = [json_lines[i] for i in train_ids]
-    train_lines = doccano2distill(train_lines, args.task_type, label_maps)
+    train_lines = anno2distill(train_lines, args.task_type, label_maps, args.platform)
 
     dev_lines = [json_lines[i] for i in dev_ids]
-    dev_lines = doccano2distill(dev_lines, args.task_type, label_maps)
+    dev_lines = anno2distill(dev_lines, args.task_type, label_maps, args.platform)
 
     test_lines = [json_lines[i] for i in test_ids]
-    test_lines = doccano2distill(test_lines, args.task_type, label_maps)
+    test_lines = anno2distill(test_lines, args.task_type, label_maps, args.platform)
 
     # Load trained UIE model
     uie = Taskflow("information_extraction", schema=args.schema, task_path=args.model_path)
 
     if args.synthetic_ratio > 0:
         # Generate synthetic data
-        texts = open(os.path.join(args.data_path, "unlabeled_data.txt")).readlines()
+        texts = open(os.path.join(args.data_path, "unlabeled_data.txt"), "r", encoding="utf-8").readlines()
 
         actual_ratio = math.ceil(len(texts) / len(train_lines))
         if actual_ratio <= args.synthetic_ratio or args.synthetic_ratio == -1:
@@ -109,12 +115,13 @@ if __name__ == "__main__":
     parser.add_argument("--synthetic_ratio", default=10, type=int, help="The ratio of labeled and synthetic samples.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
+    parser.add_argument("--platform", choices=['doccano', 'label_studio'], type=str, default="label_studio", help="Select the annotation platform.")
 
     args = parser.parse_args()
     # yapf: enable
 
     # Define your schema here
-    schema = {"疾病": ["手术治疗", "实验室检查", "影像学检查"]}
+    schema = {"武器名称": ["产国", "类型", "研发单位"]}
 
     args.schema = schema
 

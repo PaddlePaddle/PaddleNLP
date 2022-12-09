@@ -32,26 +32,26 @@ python client.py
 #### schema替换
 ```python
 # Default schema
-schema = ['出发地', '目的地', '费用', '时间']
+schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', '金额', '价税合计', 'No', '税率', '地址、电话', '税额']
 ```
 
 #### 设置模型路径
 ```
 # Default task_path
-uie = Taskflow('information_extration', task_path='../../../checkpoint/model_best/', schema=schema)
+uie = Taskflow('information_extration', task_path='../../checkpoint/model_best/', schema=schema)
 ```
 
 #### 多卡服务化预测
 PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，下面是示例代码
 ```
-uie1 = Taskflow('information_extration', task_path='../../../checkpoint/model_best/', schema=schema, device_id=0)
-uie2 = Taskflow('information_extration', task_path='../../../checkpoint/model_best/', schema=schema, device_id=1)
+uie1 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=0)
+uie2 = Taskflow('information_extraction', task_path='../../checkpoint/model_best/', schema=schema, device_id=1)
 service.register_taskflow('uie', [uie1, uie2])
 ```
 
 ### Client 自定义参数
 
 ```python
-# Changed to input texts you wanted
-texts = ['城市内交通费7月5日金额114广州至佛山', '5月9日交通费29元从北苑到望京搜后']
+# Changed to image paths you wanted
+image_paths = ['../../data/images/b1.jpg']
 ```
