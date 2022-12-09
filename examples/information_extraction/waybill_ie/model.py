@@ -26,23 +26,13 @@ else:
 
 
 class BiGRUWithCRF(nn.Layer):
-
-    def __init__(self,
-                 emb_size,
-                 hidden_size,
-                 word_num,
-                 label_num,
-                 use_w2v_emb=False):
+    def __init__(self, emb_size, hidden_size, word_num, label_num, use_w2v_emb=False):
         super(BiGRUWithCRF, self).__init__()
         if use_w2v_emb:
-            self.word_emb = TokenEmbedding(
-                extended_vocab_path='./data/word.dic', unknown_token='OOV')
+            self.word_emb = TokenEmbedding(extended_vocab_path="./data/word.dic", unknown_token="OOV")
         else:
             self.word_emb = nn.Embedding(word_num, emb_size)
-        self.gru = nn.GRU(emb_size,
-                          hidden_size,
-                          num_layers=2,
-                          direction='bidirect')
+        self.gru = nn.GRU(emb_size, hidden_size, num_layers=2, direction="bidirect")
         # We need `label_num + 2` for appending BOS and EOS tag
         self.fc = nn.Linear(hidden_size * 2, label_num + 2)
         self.crf = LinearChainCrf(label_num)
@@ -62,28 +52,20 @@ class BiGRUWithCRF(nn.Layer):
 
 
 class ErnieCrfForTokenClassification(nn.Layer):
-
     def __init__(self, ernie, crf_lr=100):
         super().__init__()
         self.num_classes = ernie.num_classes
         self.ernie = ernie  # allow ernie to be config
-        self.crf = LinearChainCrf(self.num_classes,
-                                  crf_lr=crf_lr,
-                                  with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_classes, crf_lr=crf_lr, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
-    def forward(self,
-                input_ids,
-                token_type_ids=None,
-                lengths=None,
-                position_ids=None,
-                attention_mask=None,
-                labels=None):
-        logits = self.ernie(input_ids,
-                            token_type_ids=token_type_ids,
-                            attention_mask=attention_mask,
-                            position_ids=position_ids)
+    def forward(
+        self, input_ids, token_type_ids=None, lengths=None, position_ids=None, attention_mask=None, labels=None
+    ):
+        logits = self.ernie(
+            input_ids, token_type_ids=token_type_ids, attention_mask=attention_mask, position_ids=position_ids
+        )
 
         if labels is not None:
             loss = self.crf_loss(logits, lengths, labels)

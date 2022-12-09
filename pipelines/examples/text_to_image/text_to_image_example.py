@@ -34,19 +34,20 @@ args = parser.parse_args()
 
 
 def text_to_image():
-    erine_image_generator = ErnieTextToImageGenerator(ak=args.api_key,
-                                                      sk=args.secret_key)
+    erine_image_generator = ErnieTextToImageGenerator(ak=args.api_key, sk=args.secret_key)
     pipe = TextToImagePipeline(erine_image_generator)
-    prediction = pipe.run(query=args.prompt_text,
-                          params={
-                              "TextToImageGenerator": {
-                                  "topk": args.topk,
-                                  "style": args.style,
-                                  "resolution": args.size,
-                                  "output_dir": args.output_dir
-                              }
-                          })
-    pipe.save_to_yaml('text_to_image.yaml')
+    prediction = pipe.run(
+        query=args.prompt_text,
+        params={
+            "TextToImageGenerator": {
+                "topk": args.topk,
+                "style": args.style,
+                "resolution": args.size,
+                "output_dir": args.output_dir,
+            }
+        },
+    )
+    pipe.save_to_yaml("text_to_image.yaml")
 
 
 if __name__ == "__main__":

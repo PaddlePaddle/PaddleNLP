@@ -33,8 +33,7 @@ import collections
 class TrainingInstance(object):
     """A single training instance (sentence pair)."""
 
-    def __init__(self, tokens, segment_ids, masked_lm_positions,
-                 masked_lm_labels, is_random_next):
+    def __init__(self, tokens, segment_ids, masked_lm_positions, masked_lm_labels, is_random_next):
         self.tokens = tokens
         self.segment_ids = segment_ids
         self.is_random_next = is_random_next
@@ -42,24 +41,18 @@ class TrainingInstance(object):
         self.masked_lm_labels = masked_lm_labels
 
 
-def write_instance_to_example_file(instances, tokenizer, max_seq_length,
-                                   max_predictions_per_seq, output_file):
+def write_instance_to_example_file(instances, tokenizer, max_seq_length, max_predictions_per_seq, output_file):
     """Create example files from `TrainingInstance`s."""
 
     total_written = 0
     features = collections.OrderedDict()
 
     num_instances = len(instances)
-    features["input_ids"] = np.zeros([num_instances, max_seq_length],
-                                     dtype="int32")
-    features["input_mask"] = np.zeros([num_instances, max_seq_length],
-                                      dtype="int32")
-    features["segment_ids"] = np.zeros([num_instances, max_seq_length],
-                                       dtype="int32")
-    features["masked_lm_positions"] = np.zeros(
-        [num_instances, max_predictions_per_seq], dtype="int32")
-    features["masked_lm_ids"] = np.zeros(
-        [num_instances, max_predictions_per_seq], dtype="int32")
+    features["input_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")
+    features["input_mask"] = np.zeros([num_instances, max_seq_length], dtype="int32")
+    features["segment_ids"] = np.zeros([num_instances, max_seq_length], dtype="int32")
+    features["masked_lm_positions"] = np.zeros([num_instances, max_predictions_per_seq], dtype="int32")
+    features["masked_lm_ids"] = np.zeros([num_instances, max_predictions_per_seq], dtype="int32")
     features["next_sentence_labels"] = np.zeros(num_instances, dtype="int32")
 
     for inst_index, instance in enumerate(tqdm(instances)):
@@ -78,8 +71,7 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
         assert len(segment_ids) == max_seq_length
 
         masked_lm_positions = list(instance.masked_lm_positions)
-        masked_lm_ids = tokenizer.convert_tokens_to_ids(
-            instance.masked_lm_labels)
+        masked_lm_ids = tokenizer.convert_tokens_to_ids(instance.masked_lm_labels)
         masked_lm_weights = [1.0] * len(masked_lm_ids)
 
         while len(masked_lm_positions) < max_predictions_per_seq:
@@ -99,38 +91,20 @@ def write_instance_to_example_file(instances, tokenizer, max_seq_length,
         total_written += 1
 
     print("saving data")
-    f = h5py.File(output_file, 'w')
-    f.create_dataset("input_ids",
-                     data=features["input_ids"],
-                     dtype='i4',
-                     compression='gzip')
-    f.create_dataset("input_mask",
-                     data=features["input_mask"],
-                     dtype='i1',
-                     compression='gzip')
-    f.create_dataset("segment_ids",
-                     data=features["segment_ids"],
-                     dtype='i1',
-                     compression='gzip')
-    f.create_dataset("masked_lm_positions",
-                     data=features["masked_lm_positions"],
-                     dtype='i4',
-                     compression='gzip')
-    f.create_dataset("masked_lm_ids",
-                     data=features["masked_lm_ids"],
-                     dtype='i4',
-                     compression='gzip')
-    f.create_dataset("next_sentence_labels",
-                     data=features["next_sentence_labels"],
-                     dtype='i1',
-                     compression='gzip')
+    f = h5py.File(output_file, "w")
+    f.create_dataset("input_ids", data=features["input_ids"], dtype="i4", compression="gzip")
+    f.create_dataset("input_mask", data=features["input_mask"], dtype="i1", compression="gzip")
+    f.create_dataset("segment_ids", data=features["segment_ids"], dtype="i1", compression="gzip")
+    f.create_dataset("masked_lm_positions", data=features["masked_lm_positions"], dtype="i4", compression="gzip")
+    f.create_dataset("masked_lm_ids", data=features["masked_lm_ids"], dtype="i4", compression="gzip")
+    f.create_dataset("next_sentence_labels", data=features["next_sentence_labels"], dtype="i1", compression="gzip")
     f.flush()
     f.close()
 
 
-def create_training_instances(input_files, tokenizer, max_seq_length,
-                              dupe_factor, short_seq_prob, masked_lm_prob,
-                              max_predictions_per_seq, rng):
+def create_training_instances(
+    input_files, tokenizer, max_seq_length, dupe_factor, short_seq_prob, masked_lm_prob, max_predictions_per_seq, rng
+):
     """Create `TrainingInstance`s from raw text."""
     all_documents = [[]]
 
@@ -166,20 +140,32 @@ def create_training_instances(input_files, tokenizer, max_seq_length,
     for _ in range(dupe_factor):
         for document_index in range(len(all_documents)):
             instances.extend(
-                create_instances_from_document(all_documents, document_index,
-                                               max_seq_length, short_seq_prob,
-                                               masked_lm_prob,
-                                               max_predictions_per_seq,
-                                               vocab_words, rng))
+                create_instances_from_document(
+                    all_documents,
+                    document_index,
+                    max_seq_length,
+                    short_seq_prob,
+                    masked_lm_prob,
+                    max_predictions_per_seq,
+                    vocab_words,
+                    rng,
+                )
+            )
 
     rng.shuffle(instances)
     return instances
 
 
-def create_instances_from_document(all_documents, document_index,
-                                   max_seq_length, short_seq_prob,
-                                   masked_lm_prob, max_predictions_per_seq,
-                                   vocab_words, rng):
+def create_instances_from_document(
+    all_documents,
+    document_index,
+    max_seq_length,
+    short_seq_prob,
+    masked_lm_prob,
+    max_predictions_per_seq,
+    vocab_words,
+    rng,
+):
     """Creates `TrainingInstance`s for a single document."""
     document = all_documents[document_index]
 
@@ -234,13 +220,11 @@ def create_instances_from_document(all_documents, document_index,
                     # the random document is not the same as the document
                     # we're processing.
                     for _ in range(10):
-                        random_document_index = rng.randint(
-                            0,
-                            len(all_documents) - 1)
+                        random_document_index = rng.randint(0, len(all_documents) - 1)
                         if random_document_index != document_index:
                             break
 
-                    #If picked random document is the same as the current document
+                    # If picked random document is the same as the current document
                     if random_document_index == document_index:
                         is_random_next = False
 
@@ -281,16 +265,16 @@ def create_instances_from_document(all_documents, document_index,
                 tokens.append("[SEP]")
                 segment_ids.append(1)
 
-                (tokens, masked_lm_positions,
-                 masked_lm_labels) = create_masked_lm_predictions(
-                     tokens, masked_lm_prob, max_predictions_per_seq,
-                     vocab_words, rng)
+                (tokens, masked_lm_positions, masked_lm_labels) = create_masked_lm_predictions(
+                    tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng
+                )
                 instance = TrainingInstance(
                     tokens=tokens,
                     segment_ids=segment_ids,
                     is_random_next=is_random_next,
                     masked_lm_positions=masked_lm_positions,
-                    masked_lm_labels=masked_lm_labels)
+                    masked_lm_labels=masked_lm_labels,
+                )
                 instances.append(instance)
             current_chunk = []
             current_length = 0
@@ -299,12 +283,10 @@ def create_instances_from_document(all_documents, document_index,
     return instances
 
 
-MaskedLmInstance = collections.namedtuple("MaskedLmInstance",
-                                          ["index", "label"])
+MaskedLmInstance = collections.namedtuple("MaskedLmInstance", ["index", "label"])
 
 
-def create_masked_lm_predictions(tokens, masked_lm_prob,
-                                 max_predictions_per_seq, vocab_words, rng):
+def create_masked_lm_predictions(tokens, masked_lm_prob, max_predictions_per_seq, vocab_words, rng):
     """Creates the predictions for the masked LM objective."""
 
     cand_indexes = []
@@ -317,8 +299,7 @@ def create_masked_lm_predictions(tokens, masked_lm_prob,
 
     output_tokens = list(tokens)
 
-    num_to_predict = min(max_predictions_per_seq,
-                         max(1, int(round(len(tokens) * masked_lm_prob))))
+    num_to_predict = min(max_predictions_per_seq, max(1, int(round(len(tokens) * masked_lm_prob))))
 
     masked_lms = []
     covered_indexes = set()
@@ -383,30 +364,30 @@ def main():
         default=None,
         type=str,
         required=True,
-        help=
-        "The input train corpus. can be directory with .txt files or a path to a single file"
+        help="The input train corpus. can be directory with .txt files or a path to a single file",
     )
     parser.add_argument(
         "--output_file",
         default=None,
         type=str,
         required=True,
-        help="The output file where created hdf5 formatted data will be written."
+        help="The output file where created hdf5 formatted data will be written.",
     )
-    parser.add_argument("--vocab_file",
-                        default=None,
-                        type=str,
-                        required=False,
-                        help="The vocabulary the BERT model will train on. "
-                        "Use bert_model argument would ignore this. "
-                        "The bert_model argument is recommended.")
+    parser.add_argument(
+        "--vocab_file",
+        default=None,
+        type=str,
+        required=False,
+        help="The vocabulary the BERT model will train on. "
+        "Use bert_model argument would ignore this. "
+        "The bert_model argument is recommended.",
+    )
     parser.add_argument(
         "--do_lower_case",
-        action='store_true',
+        action="store_true",
         default=True,
-        help=
-        "Whether to lower case the input text. True for uncased models, False for cased models. "
-        "Use bert_model argument would ignore this. The bert_model argument is recommended."
+        help="Whether to lower case the input text. True for uncased models, False for cased models. "
+        "Use bert_model argument would ignore this. The bert_model argument is recommended.",
     )
     parser.add_argument(
         "--bert_model",
@@ -416,46 +397,39 @@ def main():
         help="Bert pre-trained model selected in the list: bert-base-uncased, "
         "bert-large-uncased, bert-base-cased, bert-base-multilingual, bert-base-chinese."
         "If provided, use the pre-trained model used tokenizer to create data "
-        "and ignore vocab_file and do_lower_case.")
+        "and ignore vocab_file and do_lower_case.",
+    )
 
     ## Other parameters
-    #int
+    # int
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after WordPiece tokenization. \n"
+        help="The maximum total input sequence length after WordPiece tokenization. \n"
         "Sequences longer than this will be truncated, and sequences shorter \n"
-        "than this will be padded.")
+        "than this will be padded.",
+    )
     parser.add_argument(
         "--dupe_factor",
         default=10,
         type=int,
-        help=
-        "Number of times to duplicate the input data (with different masks).")
+        help="Number of times to duplicate the input data (with different masks).",
+    )
     parser.add_argument(
-        "--max_predictions_per_seq",
-        default=20,
-        type=int,
-        help="Maximum number of masked LM predictions per sequence.")
+        "--max_predictions_per_seq", default=20, type=int, help="Maximum number of masked LM predictions per sequence."
+    )
 
     # floats
-    parser.add_argument("--masked_lm_prob",
-                        default=0.15,
-                        type=float,
-                        help="Masked LM probability.")
+    parser.add_argument("--masked_lm_prob", default=0.15, type=float, help="Masked LM probability.")
     parser.add_argument(
         "--short_seq_prob",
         default=0.1,
         type=float,
-        help=
-        "Probability to create a sequence shorter than maximum sequence length")
+        help="Probability to create a sequence shorter than maximum sequence length",
+    )
 
-    parser.add_argument('--random_seed',
-                        type=int,
-                        default=12345,
-                        help="random seed for initialization")
+    parser.add_argument("--random_seed", type=int, default=12345, help="random seed for initialization")
 
     args = parser.parse_args()
     print(args)
@@ -463,10 +437,8 @@ def main():
     if args.bert_model:
         tokenizer = BertTokenizer.from_pretrained(args.bert_model)
     else:
-        assert args.vocab_file, (
-            "vocab_file must be set If bert_model is not provided.")
-        tokenizer = BertTokenizer(args.vocab_file,
-                                  do_lower_case=args.do_lower_case)
+        assert args.vocab_file, "vocab_file must be set If bert_model is not provided."
+        tokenizer = BertTokenizer(args.vocab_file, do_lower_case=args.do_lower_case)
 
     input_files = []
     if os.path.isfile(args.input_file):
@@ -475,23 +447,28 @@ def main():
         input_files = [
             os.path.join(args.input_file, f)
             for f in os.listdir(args.input_file)
-            if (os.path.isfile(os.path.join(args.input_file, f))
-                and f.endswith('.txt'))
+            if (os.path.isfile(os.path.join(args.input_file, f)) and f.endswith(".txt"))
         ]
     else:
         raise ValueError("{} is not a valid path".format(args.input_file))
 
     rng = random.Random(args.random_seed)
-    instances = create_training_instances(input_files, tokenizer,
-                                          args.max_seq_length, args.dupe_factor,
-                                          args.short_seq_prob,
-                                          args.masked_lm_prob,
-                                          args.max_predictions_per_seq, rng)
+    instances = create_training_instances(
+        input_files,
+        tokenizer,
+        args.max_seq_length,
+        args.dupe_factor,
+        args.short_seq_prob,
+        args.masked_lm_prob,
+        args.max_predictions_per_seq,
+        rng,
+    )
 
     output_file = args.output_file
 
-    write_instance_to_example_file(instances, tokenizer, args.max_seq_length,
-                                   args.max_predictions_per_seq, output_file)
+    write_instance_to_example_file(
+        instances, tokenizer, args.max_seq_length, args.max_predictions_per_seq, output_file
+    )
 
 
 if __name__ == "__main__":

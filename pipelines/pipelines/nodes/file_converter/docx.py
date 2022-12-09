@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 
 class DocxToTextConverter(BaseConverter):
-
     def __init__(
         self,
         remove_numeric_tables: bool = False,
@@ -53,13 +52,12 @@ class DocxToTextConverter(BaseConverter):
         """
 
         # Save init parameters to enable export of component config as YAML
-        self.set_config(remove_numeric_tables=remove_numeric_tables,
-                        valid_languages=valid_languages)
+        self.set_config(remove_numeric_tables=remove_numeric_tables, valid_languages=valid_languages)
 
         self.remove_numeric_tables = remove_numeric_tables
         self.valid_languages = valid_languages
 
-        self.desc_path = 'parse_files'
+        self.desc_path = "parse_files"
         os.makedirs(self.desc_path, exist_ok=True)
 
     def convert(
@@ -94,13 +92,9 @@ class DocxToTextConverter(BaseConverter):
         if valid_languages is None:
             valid_languages = self.valid_languages
         if remove_numeric_tables is True:
-            raise Exception(
-                "'remove_numeric_tables' is not supported by DocxToTextConverter."
-            )
+            raise Exception("'remove_numeric_tables' is not supported by DocxToTextConverter.")
         if valid_languages is True:
-            raise Exception(
-                "Language validation using 'valid_languages' is not supported by DocxToTextConverter."
-            )
+            raise Exception("Language validation using 'valid_languages' is not supported by DocxToTextConverter.")
         # Creating word reader object.
         file = docx.Document(file_path)
         documents = []
@@ -112,38 +106,34 @@ class DocxToTextConverter(BaseConverter):
             image_list = self.get_image_list(file, paragraph)
             # Extracting text from the paragraph
             # If there is text, Adding the text to text_dict
-            if (paragraph.text != ""):
+            if paragraph.text != "":
                 text = paragraph.text
-                if (bool(text_dict) == False):
-                    text_dict = {'text': [text], 'images': []}
+                if bool(text_dict) == False:
+                    text_dict = {"text": [text], "images": []}
                 else:
-                    text_dict['text'].append(text)
-                if (image_list is not None):
+                    text_dict["text"].append(text)
+                if image_list is not None:
                     image_names = self.save_images(image_list)
-                    text_dict['images'] += image_names
+                    text_dict["images"] += image_names
             else:
                 # If there are not text and images, adding text_dict to documents
-                if (image_list is None and bool(text_dict)):
-                    raw_text = ''.join(text_dict['text'])
+                if image_list is None and bool(text_dict):
+                    raw_text = "".join(text_dict["text"])
                     # If the extracted text is "", skip it
-                    if (raw_text == ''):
+                    if raw_text == "":
                         continue
                     meta_data = {}
-                    if (meta is not None and 'name' in meta):
-                        meta_data['name'] = meta['name']
-                    meta_data['images'] = text_dict['images']
-                    document = {
-                        "content": raw_text,
-                        "content_type": "text",
-                        "meta": meta_data
-                    }
+                    if meta is not None and "name" in meta:
+                        meta_data["name"] = meta["name"]
+                    meta_data["images"] = text_dict["images"]
+                    document = {"content": raw_text, "content_type": "text", "meta": meta_data}
                     documents.append(document)
 
                     text = paragraph.text
-                    text_dict = {'text': [text], 'images': []}
-                elif (image_list is not None):
+                    text_dict = {"text": [text], "images": []}
+                elif image_list is not None:
                     image_names = self.save_images(image_list)
-                    text_dict['images'] += image_names
+                    text_dict["images"] += image_names
                 else:
                     continue
         return documents
@@ -161,7 +151,7 @@ class DocxToTextConverter(BaseConverter):
                 # Using md5 to generate image name and save image into desc_path
                 md5hash = hashlib.md5(blob)
                 md5_name = md5hash.hexdigest()
-                image_name = '{}_{}.{}'.format(md5_name, i, ext)
+                image_name = "{}_{}.{}".format(md5_name, i, ext)
                 image_path = os.path.join(self.desc_path, image_name)
                 Image.open(BytesIO(blob)).save(image_path)
                 # Adding image_name into the text_dict as the image for the text
@@ -177,13 +167,13 @@ class DocxToTextConverter(BaseConverter):
         """
         result_list = []
         # Looking up the images of the paragraph
-        img_list = paragraph._element.xpath('.//pic:pic')
+        img_list = paragraph._element.xpath(".//pic:pic")
         if len(img_list) == 0 or not img_list:
             return
         # Extracting images from the document
         for i in range(len(img_list)):
             img: CT_Picture = img_list[i]
-            embed = img.xpath('.//a:blip/@r:embed')[0]
+            embed = img.xpath(".//a:blip/@r:embed")[0]
             related_part: ImagePart = document.part.related_parts[embed]
             image: Image = related_part.image
             result_list.append(image)

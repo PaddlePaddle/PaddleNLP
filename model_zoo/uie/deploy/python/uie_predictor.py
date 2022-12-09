@@ -26,18 +26,14 @@ from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
 
 
 class InferBackend(object):
-
-    def __init__(self,
-                 model_path_prefix,
-                 device='cpu',
-                 use_fp16=False,
-                 device_id=0):
+    def __init__(self, model_path_prefix, device="cpu", use_fp16=False, device_id=0):
         print(">>> [InferBackend] Creating Engine ...")
         onnx_model = paddle2onnx.command.c_paddle_to_onnx(
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
-            enable_onnx_checker=True)
+            enable_onnx_checker=True,
+        )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
 
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
@@ -45,33 +41,32 @@ class InferBackend(object):
             f.write(onnx_model)
 
         if device == "gpu":
-            providers = [('CUDAExecutionProvider', {'device_id': device_id})]
+            providers = [("CUDAExecutionProvider", {"device_id": device_id})]
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
                 print(">>> [InferBackend] Use FP16 to inference ...")
                 from onnxconverter_common import float16
                 import onnx
-                fp16_model_file = os.path.join(infer_model_dir,
-                                               "fp16_model.onnx")
+
+                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
         else:
-            providers = ['CPUExecutionProvider']
+            providers = ["CPUExecutionProvider"]
             print(">>> [InferBackend] Use CPU to inference ...")
 
         sess_options = ort.SessionOptions()
 
-        self.predictor = ort.InferenceSession(onnx_model,
-                                              sess_options=sess_options,
-                                              providers=providers)
+        self.predictor = ort.InferenceSession(onnx_model, sess_options=sess_options, providers=providers)
         if device == "gpu":
-            assert 'CUDAExecutionProvider' in self.predictor.get_providers(), f"The environment for GPU inference is not set properly. " \
-                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. " \
-                "Please run the following commands to reinstall: \n " \
+            assert "CUDAExecutionProvider" in self.predictor.get_providers(), (
+                f"The environment for GPU inference is not set properly. "
+                "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
+                "Please run the following commands to reinstall: \n "
                 "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
+            )
         print(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
@@ -80,17 +75,12 @@ class InferBackend(object):
 
 
 class UIEPredictor(object):
-
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
-            print(
-                ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(args.device))
+            print(">>> [InferBackend] The type of device must be string, but the type you set is: ", type(args.device))
             exit(0)
-        if args.device not in ['cpu', 'gpu']:
-            print(
-                ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
-                type(args.device))
+        if args.device not in ["cpu", "gpu"]:
+            print(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(args.device))
             exit(0)
 
         self._tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-base-zh")
@@ -99,13 +89,14 @@ class UIEPredictor(object):
         self._batch_size = args.batch_size
         self._schema_tree = None
         self.set_schema(args.schema)
-        if args.device == 'cpu':
+        if args.device == "cpu":
             args.use_fp16 = False
         self.inference_backend = InferBackend(
             args.model_path_prefix,
             device=args.device,
             use_fp16=args.use_fp16,
-            device_id=args.device_id if args.device == 'gpu' else 0)
+            device_id=args.device_id if args.device == "gpu" else 0,
+        )
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -113,7 +104,7 @@ class UIEPredictor(object):
         self._schema_tree = self._build_tree(schema)
 
     @classmethod
-    def _build_tree(cls, schema, name='root'):
+    def _build_tree(cls, schema, name="root"):
         """
         Build the schema tree.
         """
@@ -130,12 +121,11 @@ class UIEPredictor(object):
                     else:
                         raise TypeError(
                             "Invalid schema, value for each key:value pairs should be list or string"
-                            "but {} received".format(type(v)))
+                            "but {} received".format(type(v))
+                        )
                     schema_tree.add_child(cls._build_tree(child, name=k))
             else:
-                raise TypeError(
-                    "Invalid schema, element should be string or dict, "
-                    "but {} received".format(type(s)))
+                raise TypeError("Invalid schema, element should be string or dict, " "but {} received".format(type(s)))
         return schema_tree
 
     def _single_stage_predict(self, inputs):
@@ -146,31 +136,31 @@ class UIEPredictor(object):
             prompts.append(inputs[i]["prompt"])
         # max predict length should exclude the length of prompt and summary tokens
         max_predict_len = self._max_seq_len - len(max(prompts)) - 3
-        short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len, split_sentence=False)
+        short_input_texts, self.input_mapping = self._auto_splitter(input_texts, max_predict_len, split_sentence=False)
 
         short_texts_prompts = []
         for k, v in self.input_mapping.items():
             short_texts_prompts.extend([prompts[k] for i in range(len(v))])
-        short_inputs = [{
-            "text": short_input_texts[i],
-            "prompt": short_texts_prompts[i]
-        } for i in range(len(short_input_texts))]
+        short_inputs = [
+            {"text": short_input_texts[i], "prompt": short_texts_prompts[i]} for i in range(len(short_input_texts))
+        ]
 
         prompts = []
         texts = []
         for s in short_inputs:
-            prompts.append(s['prompt'])
-            texts.append(s['text'])
-        encoded_inputs = self._tokenizer(text=prompts,
-                                         text_pair=texts,
-                                         truncation=True,
-                                         max_seq_len=self._max_seq_len,
-                                         pad_to_max_seq_len=True,
-                                         return_attention_mask=True,
-                                         return_position_ids=True,
-                                         return_tensors='np',
-                                         return_offsets_mapping=True)
+            prompts.append(s["prompt"])
+            texts.append(s["text"])
+        encoded_inputs = self._tokenizer(
+            text=prompts,
+            text_pair=texts,
+            truncation=True,
+            max_seq_len=self._max_seq_len,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_tensors="np",
+            return_offsets_mapping=True,
+        )
         offset_maps = encoded_inputs["offset_mapping"]
 
         start_probs = []
@@ -178,44 +168,33 @@ class UIEPredictor(object):
         for idx in range(0, len(texts), self._batch_size):
             l, r = idx, idx + self._batch_size
             input_dict = {
-                "input_ids":
-                encoded_inputs['input_ids'][l:r].astype('int64'),
-                "token_type_ids":
-                encoded_inputs['token_type_ids'][l:r].astype('int64'),
-                "pos_ids":
-                encoded_inputs['position_ids'][l:r].astype('int64'),
-                "att_mask":
-                encoded_inputs["attention_mask"][l:r].astype('int64')
+                "input_ids": encoded_inputs["input_ids"][l:r].astype("int64"),
+                "token_type_ids": encoded_inputs["token_type_ids"][l:r].astype("int64"),
+                "pos_ids": encoded_inputs["position_ids"][l:r].astype("int64"),
+                "att_mask": encoded_inputs["attention_mask"][l:r].astype("int64"),
             }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()
             end_prob = end_prob.tolist()
             start_probs.extend(start_prob)
             end_probs.extend(end_prob)
-        start_ids_list = get_bool_ids_greater_than(start_probs,
-                                                   limit=self._position_prob,
-                                                   return_prob=True)
-        end_ids_list = get_bool_ids_greater_than(end_probs,
-                                                 limit=self._position_prob,
-                                                 return_prob=True)
+        start_ids_list = get_bool_ids_greater_than(start_probs, limit=self._position_prob, return_prob=True)
+        end_ids_list = get_bool_ids_greater_than(end_probs, limit=self._position_prob, return_prob=True)
 
         sentence_ids = []
         probs = []
-        for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list,
-                                                  offset_maps.tolist()):
+        for start_ids, end_ids, offset_map in zip(start_ids_list, end_ids_list, offset_maps.tolist()):
             span_list = get_span(start_ids, end_ids, with_prob=True)
             sentence_id, prob = get_id_and_prob(span_list, offset_map)
             sentence_ids.append(sentence_id)
             probs.append(prob)
 
-        results = self._convert_ids_to_results(short_inputs, sentence_ids,
-                                               probs)
-        results = self._auto_joiner(results, short_input_texts,
-                                    self.input_mapping)
+        results = self._convert_ids_to_results(short_inputs, sentence_ids, probs)
+        results = self._auto_joiner(results, short_input_texts, self.input_mapping)
         return results
 
     def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
-        '''
+        """
         Split the raw texts automatically for model inference.
         Args:
             input_texts (List[str]): input raw texts.
@@ -224,7 +203,7 @@ class UIEPredictor(object):
         return:
             short_input_texts (List[str]): the short input texts for model inference.
             input_mapping (dict): mapping between raw text and short input texts.
-        '''
+        """
         input_mapping = {}
         short_input_texts = []
         cnt_org = 0
@@ -244,16 +223,11 @@ class UIEPredictor(object):
                         input_mapping[cnt_org].append(cnt_short)
                     cnt_short += 1
                 else:
-                    temp_text_list = [
-                        sen[i:i + max_text_len]
-                        for i in range(0, lens, max_text_len)
-                    ]
+                    temp_text_list = [sen[i : i + max_text_len] for i in range(0, lens, max_text_len)]
                     short_input_texts.extend(temp_text_list)
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
-                    temp_text_id = [
-                        short_idx + i for i in range(cnt_short - short_idx)
-                    ]
+                    temp_text_id = [short_idx + i for i in range(cnt_short - short_idx)]
                     if cnt_org not in input_mapping.keys():
                         input_mapping[cnt_org] = temp_text_id
                     else:
@@ -267,8 +241,7 @@ class UIEPredictor(object):
         for short_result in short_results:
             if short_result == []:
                 continue
-            elif 'start' not in short_result[0].keys(
-            ) and 'end' not in short_result[0].keys():
+            elif "start" not in short_result[0].keys() and "end" not in short_result[0].keys():
                 is_cls_task = True
                 break
             else:
@@ -280,23 +253,14 @@ class UIEPredictor(object):
                 for v in vs:
                     if len(short_results[v]) == 0:
                         continue
-                    if short_results[v][0]['text'] not in cls_options.keys():
-                        cls_options[short_results[v][0]['text']] = [
-                            1, short_results[v][0]['probability']
-                        ]
+                    if short_results[v][0]["text"] not in cls_options.keys():
+                        cls_options[short_results[v][0]["text"]] = [1, short_results[v][0]["probability"]]
                     else:
-                        cls_options[short_results[v][0]['text']][0] += 1
-                        cls_options[short_results[v][0]['text']][
-                            1] += short_results[v][0]['probability']
+                        cls_options[short_results[v][0]["text"]][0] += 1
+                        cls_options[short_results[v][0]["text"]][1] += short_results[v][0]["probability"]
                 if len(cls_options) != 0:
-                    cls_res, cls_info = max(cls_options.items(),
-                                            key=lambda x: x[1])
-                    concat_results.append([{
-                        'text':
-                        cls_res,
-                        'probability':
-                        cls_info[1] / cls_info[0]
-                    }])
+                    cls_res, cls_info = max(cls_options.items(), key=lambda x: x[1])
+                    concat_results.append([{"text": cls_res, "probability": cls_info[1] / cls_info[0]}])
                 else:
                     concat_results.append([])
             else:
@@ -308,11 +272,10 @@ class UIEPredictor(object):
                         offset += len(short_inputs[v])
                     else:
                         for i in range(len(short_results[v])):
-                            if 'start' not in short_results[v][
-                                    i] or 'end' not in short_results[v][i]:
+                            if "start" not in short_results[v][i] or "end" not in short_results[v][i]:
                                 continue
-                            short_results[v][i]['start'] += offset
-                            short_results[v][i]['end'] += offset
+                            short_results[v][i]["start"] += offset
+                            short_results[v][i]["end"] += offset
                         offset += len(short_inputs[v])
                         single_results.extend(short_results[v])
                 concat_results.append(single_results)
@@ -335,17 +298,12 @@ class UIEPredictor(object):
                 if start < 0 and end >= 0:
                     continue
                 if end < 0:
-                    start += (len(prompt) + 1)
-                    end += (len(prompt) + 1)
+                    start += len(prompt) + 1
+                    end += len(prompt) + 1
                     result = {"text": prompt[start:end], "probability": prob[i]}
                     result_list.append(result)
                 else:
-                    result = {
-                        "text": text[start:end],
-                        "start": start,
-                        "end": end,
-                        "probability": prob[i]
-                    }
+                    result = {"text": text[start:end], "start": start, "end": end, "probability": prob[i]}
                     result_list.append(result)
             results.append(result_list)
         return results
@@ -374,10 +332,7 @@ class UIEPredictor(object):
             idx = 0
             if not node.prefix:
                 for one_data in data:
-                    examples.append({
-                        "text": one_data,
-                        "prompt": dbc2sbc(node.name)
-                    })
+                    examples.append({"text": one_data, "prompt": dbc2sbc(node.name)})
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
@@ -387,10 +342,7 @@ class UIEPredictor(object):
                         input_map[cnt] = []
                     else:
                         for p in pre:
-                            examples.append({
-                                "text": one_data,
-                                "prompt": dbc2sbc(p + node.name)
-                            })
+                            examples.append({"text": one_data, "prompt": dbc2sbc(p + node.name)})
                         input_map[cnt] = [i + idx for i in range(len(pre))]
                         idx += len(pre)
                     cnt += 1
@@ -418,26 +370,17 @@ class UIEPredictor(object):
                         if len(result_list[v[i]]) == 0:
                             continue
                         if "relations" not in relations[k][i].keys():
-                            relations[k][i]["relations"] = {
-                                node.name: result_list[v[i]]
-                            }
-                        elif node.name not in relations[k][i]["relations"].keys(
-                        ):
-                            relations[k][i]["relations"][
-                                node.name] = result_list[v[i]]
+                            relations[k][i]["relations"] = {node.name: result_list[v[i]]}
+                        elif node.name not in relations[k][i]["relations"].keys():
+                            relations[k][i]["relations"][node.name] = result_list[v[i]]
                         else:
-                            relations[k][i]["relations"][node.name].extend(
-                                result_list[v[i]])
+                            relations[k][i]["relations"][node.name].extend(result_list[v[i]])
                 new_relations = [[] for i in range(len(data))]
                 for i in range(len(relations)):
                     for j in range(len(relations[i])):
-                        if "relations" in relations[i][j].keys(
-                        ) and node.name in relations[i][j]["relations"].keys():
-                            for k in range(
-                                    len(relations[i][j]["relations"][
-                                        node.name])):
-                                new_relations[i].append(
-                                    relations[i][j]["relations"][node.name][k])
+                        if "relations" in relations[i][j].keys() and node.name in relations[i][j]["relations"].keys():
+                            for k in range(len(relations[i][j]["relations"][node.name])):
+                                new_relations[i].append(relations[i][j]["relations"][node.name][k])
                 relations = new_relations
 
             prefix = [[] for _ in range(len(data))]
@@ -465,7 +408,7 @@ class SchemaTree(object):
     Implementataion of SchemaTree
     """
 
-    def __init__(self, name='root', children=None):
+    def __init__(self, name="root", children=None):
         self.name = name
         self.children = []
         self.prefix = None
@@ -478,9 +421,7 @@ class SchemaTree(object):
         return self.name
 
     def add_child(self, node):
-        assert isinstance(
-            node, SchemaTree
-        ), "The children of a node should be an instacne of SchemaTree."
+        assert isinstance(node, SchemaTree), "The children of a node should be an instacne of SchemaTree."
         self.children.append(node)
 
 
@@ -491,8 +432,8 @@ def dbc2sbc(s):
         if code == 0x3000:
             code = 0x0020
         else:
-            code -= 0xfee0
-        if not (0x0021 <= code and code <= 0x7e):
+            code -= 0xFEE0
+        if not (0x0021 <= code and code <= 0x7E):
             rs += char
             continue
         rs += chr(code)
@@ -501,13 +442,13 @@ def dbc2sbc(s):
 
 def cut_chinese_sent(para):
     """
-    Cut the Chinese sentences more precisely, reference to 
+    Cut the Chinese sentences more precisely, reference to
     "https://blog.csdn.net/blmoistawinde/article/details/82379256".
     """
-    para = re.sub(r'([。！？\?])([^”’])', r'\1\n\2', para)
-    para = re.sub(r'(\.{6})([^”’])', r'\1\n\2', para)
-    para = re.sub(r'(\…{2})([^”’])', r'\1\n\2', para)
-    para = re.sub(r'([。！？\?][”’])([^，。！？\?])', r'\1\n\2', para)
+    para = re.sub(r"([。！？\?])([^”’])", r"\1\n\2", para)
+    para = re.sub(r"(\.{6})([^”’])", r"\1\n\2", para)
+    para = re.sub(r"(\…{2})([^”’])", r"\1\n\2", para)
+    para = re.sub(r"([。！？\?][”’])([^，。！？\?])", r"\1\n\2", para)
     para = para.rstrip()
     return para.split("\n")
 
@@ -516,11 +457,11 @@ def get_id_and_prob(span_set, offset_mapping):
     """
     Return text id and probability of predicted spans
 
-    Args: 
+    Args:
         span_set (set): set of predicted spans.
         offset_mapping (list[int]): list of pair preserving the
                 index of start and end char in original text pair (prompt + text) for each token.
-    Returns: 
+    Returns:
         sentence_id (list[tuple]): index of start and end char in original text.
         prob (list[float]): probabilities of predicted spans.
     """

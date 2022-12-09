@@ -26,7 +26,7 @@ from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 
-sys.path.append('./')
+sys.path.append("./")
 
 from sequence_classification import convert_example
 
@@ -48,16 +48,17 @@ args = parser.parse_args()
 
 
 class Predictor(object):
-
-    def __init__(self,
-                 model_dir,
-                 device="gpu",
-                 max_seq_length=128,
-                 batch_size=32,
-                 use_tensorrt=False,
-                 precision="fp32",
-                 cpu_threads=10,
-                 enable_mkldnn=False):
+    def __init__(
+        self,
+        model_dir,
+        device="gpu",
+        max_seq_length=128,
+        batch_size=32,
+        use_tensorrt=False,
+        precision="fp32",
+        cpu_threads=10,
+        enable_mkldnn=False,
+    ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
@@ -76,14 +77,14 @@ class Predictor(object):
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "int8": inference.PrecisionType.Int8,
             }
             precision_mode = precision_map[precision]
 
             if use_tensorrt:
-                config.enable_tensorrt_engine(max_batch_size=batch_size,
-                                              min_subgraph_size=30,
-                                              precision_mode=precision_mode)
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                )
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -99,19 +100,15 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
     def predict(self, data, tokenizer, label_map):
         """
         Predicts the data labels.
         Args:
             data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
             label_map(obj:`dict`): The label id (key) to label str (value) map.
         Returns:
@@ -120,10 +117,7 @@ class Predictor(object):
         examples = []
         for text in data:
             example = {"text": text}
-            ret = convert_example(example,
-                                  tokenizer,
-                                  max_seq_length=self.max_seq_length,
-                                  is_test=True)
+            ret = convert_example(example, tokenizer, max_seq_length=self.max_seq_length, is_test=True)
             examples.append((ret["input_ids"], ret["token_type_ids"]))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -147,24 +141,28 @@ class Predictor(object):
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
-                          args.batch_size, args.use_tensorrt, args.precision,
-                          args.cpu_threads, args.enable_mkldnn)
+    predictor = Predictor(
+        args.model_dir,
+        args.device,
+        args.max_seq_length,
+        args.batch_size,
+        args.use_tensorrt,
+        args.precision,
+        args.cpu_threads,
+        args.enable_mkldnn,
+    )
 
-    tokenizer = AutoTokenizer.from_pretrained('ernie-1.0')
+    tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
     test_ds = load_dataset("chnsenticorp", splits=["test"])
     data = [d["text"] for d in test_ds]
-    batches = [
-        data[idx:idx + args.batch_size]
-        for idx in range(0, len(data), args.batch_size)
-    ]
-    label_map = {0: 'negative', 1: 'positive'}
+    batches = [data[idx : idx + args.batch_size] for idx in range(0, len(data), args.batch_size)]
+    label_map = {0: "negative", 1: "positive"}
 
     results = []
     for batch_data in batches:
         results.extend(predictor.predict(batch_data, tokenizer, label_map))
     for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+        print("Data: {} \t Label: {}".format(text, results[idx]))
 
     # Just for benchmark
     if args.benchmark:
@@ -175,7 +173,6 @@ if __name__ == "__main__":
             for batch in batches:
                 labels = predictor.predict(batch, tokenizer, label_map)
             epoch_end = time.time()
-            print("Epoch {} predict time {:.4f} s".format(
-                epoch, (epoch_end - epoch_start)))
+            print("Epoch {} predict time {:.4f} s".format(epoch, (epoch_end - epoch_start)))
         end = time.time()
         print("Predict time {:.4f} s/epoch".format((end - start) / epochs))

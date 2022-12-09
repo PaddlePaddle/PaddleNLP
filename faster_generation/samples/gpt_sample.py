@@ -15,20 +15,17 @@
 from paddlenlp.transformers import GPTLMHeadModel, GPTChineseTokenizer
 import paddle
 
-model_name = 'gpt-cpm-small-cn-distill'
+model_name = "gpt-cpm-small-cn-distill"
 
 tokenizer = GPTChineseTokenizer.from_pretrained(model_name)
 model = GPTLMHeadModel.from_pretrained(model_name)
 model.eval()
 
-inputs = '花间一壶酒，独酌无相亲。举杯邀明月，'
+inputs = "花间一壶酒，独酌无相亲。举杯邀明月，"
 inputs_ids = tokenizer(inputs)["input_ids"]
-inputs_ids = paddle.to_tensor(inputs_ids, dtype='int64').unsqueeze(0)
+inputs_ids = paddle.to_tensor(inputs_ids, dtype="int64").unsqueeze(0)
 
-outputs, _ = model.generate(input_ids=inputs_ids,
-                            max_length=10,
-                            decode_strategy='greedy_search',
-                            use_faster=True)
+outputs, _ = model.generate(input_ids=inputs_ids, max_length=10, decode_strategy="greedy_search", use_faster=True)
 
 result = tokenizer.convert_ids_to_string(outputs[0].numpy().tolist())
 

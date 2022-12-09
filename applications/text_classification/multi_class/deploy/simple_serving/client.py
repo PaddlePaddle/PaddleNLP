@@ -27,18 +27,12 @@ url = "http://0.0.0.0:8189/models/cls_multi_class"
 headers = {"Content-Type": "application/json"}
 
 if __name__ == "__main__":
-    texts = [
-        '黑苦荞茶的功效与作用及食用方法', '交界痣会凸起吗', '检查是否能怀孕挂什么科', '鱼油怎么吃咬破吃还是直接咽下去',
-        '幼儿挑食的生理原因是'
-    ]
+    texts = ["黑苦荞茶的功效与作用及食用方法", "交界痣会凸起吗", "检查是否能怀孕挂什么科", "鱼油怎么吃咬破吃还是直接咽下去", "幼儿挑食的生理原因是"]
     data = {
-        'data': {
-            'text': texts,
+        "data": {
+            "text": texts,
         },
-        'parameters': {
-            'max_seq_len': args.max_seq_len,
-            'batch_size': args.batch_size
-        }
+        "parameters": {"max_seq_len": args.max_seq_len, "batch_size": args.batch_size},
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
     result_json = json.loads(r.text)

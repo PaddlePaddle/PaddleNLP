@@ -22,10 +22,9 @@ import unittest
 
 
 class TestJiebaTokenizer(CpuCommonTest):
-
     def setUp(self):
         test_data_file = create_test_data(__file__)
-        self.vocab = Vocab.load_vocabulary(test_data_file, unk_token='[UNK]')
+        self.vocab = Vocab.load_vocabulary(test_data_file, unk_token="[UNK]")
         self.tokenizer = JiebaTokenizer(self.vocab)
 
     def test_jieba(self):
@@ -42,8 +41,7 @@ class TestJiebaTokenizer(CpuCommonTest):
     def test_unk(self):
         text = "中国"
         idx_arr = self.tokenizer.encode(text)
-        self.check_output_equal(self.vocab[self.vocab.unk_token] in idx_arr,
-                                True)
+        self.check_output_equal(self.vocab[self.vocab.unk_token] in idx_arr, True)
 
 
 if __name__ == "__main__":

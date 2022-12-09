@@ -40,28 +40,28 @@ class TestModeling(unittest.TestCase):
     @slow
     def test_from_pretrained_with_load_as_state_np_params(self):
         """init model with `load_state_as_np` params"""
-        model = TinyBertModel.from_pretrained("tinybert-4l-312d",
-                                              load_state_as_np=True)
+        model = TinyBertModel.from_pretrained("tinybert-4l-312d", load_state_as_np=True)
         self.assertIsNotNone(model)
 
     @slow
     def test_multiprocess_downloading(self):
         """test downloading with multi-process. Some errors may be triggered when downloading model
-            weight file with multiprocess, so this test code was born.
+        weight file with multiprocess, so this test code was born.
 
-            `num_process_in_pool` is the number of process in Pool.
-            And the `num_jobs` is the number of total process to download file.
+        `num_process_in_pool` is the number of process in Pool.
+        And the `num_jobs` is the number of total process to download file.
         """
         num_process_in_pool, num_jobs = 10, 20
-        small_model_path = "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/bert/model_state.pdparams"
+        small_model_path = (
+            "https://paddlenlp.bj.bcebos.com/models/community/__internal_testing__/bert/model_state.pdparams"
+        )
 
         from paddlenlp.transformers.model_utils import get_path_from_url_with_filelock
+
         with TemporaryDirectory() as tempdir:
 
             with Pool(num_process_in_pool) as pool:
-                pool.starmap(get_path_from_url_with_filelock,
-                             [(small_model_path, tempdir)
-                              for _ in range(num_jobs)])
+                pool.starmap(get_path_from_url_with_filelock, [(small_model_path, tempdir) for _ in range(num_jobs)])
 
     @slow
     def test_model_from_pretrained_with_multiprocessing(self):
@@ -79,5 +79,4 @@ class TestModeling(unittest.TestCase):
 
         # 2. downloaing tinybert modeling using multi-processing
         with Pool(num_process_in_pool) as pool:
-            pool.starmap(download_bert_model,
-                         [(model_name, ) for _ in range(num_jobs)])
+            pool.starmap(download_bert_model, [(model_name,) for _ in range(num_jobs)])

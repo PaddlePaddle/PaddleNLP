@@ -15,7 +15,11 @@
 import os
 import argparse
 import paddle
-from paddlenlp.transformers import SkepForTokenClassification, SkepForSequenceClassification, PPMiniLMForSequenceClassification
+from paddlenlp.transformers import (
+    SkepForTokenClassification,
+    SkepForSequenceClassification,
+    PPMiniLMForSequenceClassification,
+)
 
 if __name__ == "__main__":
     # yapf: disable
