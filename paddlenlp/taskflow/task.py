@@ -257,7 +257,9 @@ class Task(metaclass=abc.ABCMeta):
                     prefix_map = {"UIE": "ernie", "UIEM": "ernie_m", "UIEX": "ernie_layout"}
                     new_state_dict = {}
                     for name, param in model_state.items():
-                        if "encoder.encoder" in name:
+                        if "ernie" in name:
+                            new_state_dict[name] = param
+                        elif "encoder.encoder" in name:
                             trans_name = name.replace("encoder.encoder", prefix_map[self._init_class] + ".encoder")
                             new_state_dict[trans_name] = param
                         elif "encoder" in name:
