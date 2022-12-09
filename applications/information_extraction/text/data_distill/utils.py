@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
 import copy
 import json
 import os
 import random
-from itertools import groupby
-from tqdm import tqdm
 
 import numpy as np
 import paddle
-from paddlenlp.utils.log import logger
-from paddlenlp.taskflow.utils import SchemaTree
-
 from data_collator import DataCollator
+
+from paddlenlp.taskflow.utils import SchemaTree
+from paddlenlp.utils.log import logger
 
 criteria_map = {
     "entity_extraction": "entity_f1",
@@ -305,6 +303,87 @@ def schema2label_maps(task_type, schema=None):
     return label_maps
 
 
+def anno2distill(json_lines, task_type, label_maps=None, platform="label_studio"):
+    if platform == "label_studio":
+        return label_studio2distill(json_lines, task_type, label_maps)
+    else:
+        return doccano2distill(json_lines, task_type, label_maps)
+
+
+def label_studio2distill(json_lines, task_type, label_maps=None):
+    """Convert label-studio to distill format"""
+    if task_type == "opinion_extraction":
+        outputs = []
+        for json_line in json_lines:
+            id2ent = {}
+            text = json_line["data"]["text"]
+            output = {"text": text}
+            entity_list = []
+            aso_list = []
+            annos = json_line["annotations"][0]["result"]
+            for anno in annos:
+                if anno["type"] == "labels":
+                    ent_text = text[anno["value"]["start"] : anno["value"]["end"]]
+                    ent_type_gather = anno["value"]["labels"][0].split("##")
+                    if len(ent_type_gather) == 2:
+                        ent_type, ent_senti = ent_type_gather
+                    else:
+                        ent_type = ent_type_gather[0]
+                        ent_senti = None
+                    ent = {"text": ent_text, "type": ent_type, "start_index": anno["value"]["start"]}
+                    id2ent[anno["id"]] = ent
+                    id2ent[anno["id"]]["sentiment"] = ent_senti
+                    entity_list.append(ent)
+                else:
+                    _aspect = id2ent[anno["from_id"]]
+                    if _aspect["sentiment"]:
+                        _opinion = id2ent[anno["to_id"]]
+                        rel = {
+                            "aspect": _aspect["text"],
+                            "sentiment": _aspect["sentiment"],
+                            "opinion": _opinion["text"],
+                            "aspect_start_index": _aspect["start_index"],
+                            "opinion_start_index": _opinion["start_index"],
+                        }
+                        aso_list.append(rel)
+                    output["aso_list"] = aso_list
+            output["entity_list"] = entity_list
+            output["aso_list"] = aso_list
+            outputs.append(output)
+    else:
+        outputs = []
+        for json_line in json_lines:
+            id2ent = {}
+            text = json_line["data"]["text"]
+            output = {"text": text}
+            entity_list = []
+            spo_list = []
+            annos = json_line["annotations"][0]["result"]
+            for anno in annos:
+                if anno["type"] == "labels":
+                    ent_text = text[anno["value"]["start"] : anno["value"]["end"]]
+                    ent_label = anno["value"]["labels"][0]
+                    ent_type = "object" if ent_label not in label_maps["entity2id"].keys() else ent_label
+                    ent = {"text": ent_text, "type": ent_type, "start_index": anno["value"]["start"]}
+                    id2ent[anno["id"]] = ent
+                    entity_list.append(ent)
+                else:
+                    _subject = id2ent[anno["from_id"]]
+                    _object = id2ent[anno["to_id"]]
+                    rel = {
+                        "subject": _subject["text"],
+                        "predicate": anno["labels"][0],
+                        "object": _object["text"],
+                        "subject_start_index": _subject["start_index"],
+                        "object_start_index": _object["start_index"],
+                    }
+                    spo_list.append(rel)
+            output["entity_list"] = entity_list
+            output["spo_list"] = spo_list
+            outputs.append(output)
+    return outputs
+
+
 def doccano2distill(json_lines, task_type, label_maps=None):
     """Convert doccano to distill format"""
     if task_type == "opinion_extraction":
@@ -313,33 +392,21 @@ def doccano2distill(json_lines, task_type, label_maps=None):
             id2ent = {}
             text = json_line["text"]
             output = {"text": text}
-
             entity_list = []
             entities = json_line["entities"]
             for entity in entities:
                 ent_text = text[entity["start_offset"] : entity["end_offset"]]
-
                 ent_type_gather = entity["label"].split("##")
                 if len(ent_type_gather) == 2:
                     ent_type, ent_senti = ent_type_gather
                 else:
                     ent_type = ent_type_gather[0]
                     ent_senti = None
-
-                ent_start_idx = entity["start_offset"]
-
-                id2ent[entity["id"]] = {
-                    "text": ent_text,
-                    "type": ent_type,
-                    "start_index": ent_start_idx,
-                    "sentiment": ent_senti,
-                }
-
-                ent = {"text": ent_text, "type": ent_type, "start_index": ent_start_idx}
-
+                ent = {"text": ent_text, "type": ent_type, "start_index": entity["start_offset"]}
+                id2ent[entity["id"]] = ent
+                id2ent[entity["id"]]["sentiment"] = ent_senti
                 entity_list.append(ent)
             output["entity_list"] = entity_list
-
             aso_list = []
             relations = json_line["relations"]
             for relation in relations:
@@ -362,21 +429,15 @@ def doccano2distill(json_lines, task_type, label_maps=None):
             id2ent = {}
             text = json_line["text"]
             output = {"text": text}
-
             entity_list = []
             entities = json_line["entities"]
             for entity in entities:
                 ent_text = text[entity["start_offset"] : entity["end_offset"]]
                 ent_type = "object" if entity["label"] not in label_maps["entity2id"].keys() else entity["label"]
-                ent_start_idx = entity["start_offset"]
-
-                id2ent[entity["id"]] = {"text": ent_text, "type": ent_type, "start_index": ent_start_idx}
-
-                ent = {"text": ent_text, "type": ent_type, "start_index": ent_start_idx}
-
+                ent = {"text": ent_text, "type": ent_type, "start_index": entity["start_offset"]}
+                id2ent[entity["id"]] = ent
                 entity_list.append(ent)
             output["entity_list"] = entity_list
-
             spo_list = []
             relations = json_line["relations"]
             for relation in relations:
