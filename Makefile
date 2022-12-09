@@ -19,7 +19,11 @@ format:
 
 .PHONY: lint
 lint:
-	git diff --numstat upstream/develop |awk '\''{print $NF}'\''
+	# if develop branch does not exist locally, create a local develop branch that tracks remote/develop
+	if ! git show-ref --quiet refs/heads/develop; then
+	    echo "develop branch is missing, creating local develop branch"
+	    git branch develop
+	fi
 
 	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
 	@if test -n "$(modified_py_files)"; then \
