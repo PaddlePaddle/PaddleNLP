@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
 from dataclasses import dataclass, field
 from functools import partial
@@ -82,9 +83,15 @@ class ModelArguments:
 def main():
     parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    training_args.label_names = ["start_positions", "end_positions"]
 
     if model_args.model_name_or_path in ["uie-m-base", "uie-m-large"]:
         model_args.multilingual = True
+    elif os.path.exists(os.path.join(model_args.model_name_or_path, "model_config.json")):
+        with open(os.path.join(model_args.model_name_or_path, "model_config.json")) as f:
+            init_class = json.load(f)["init_class"]
+        if init_class == "UIEM":
+            model_args.multilingual = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
