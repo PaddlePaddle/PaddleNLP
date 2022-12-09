@@ -43,7 +43,7 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 ### **2.1 运行环境**
 - python >= 3.7
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.4
+- paddlenlp >= 2.4.4
 - wordcloud >= 1.8.2
 
 **安装PaddlePaddle**：
@@ -741,3 +741,28 @@ paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件�
 
 
 ### **2.7 模型部署**
+
+本项目支持基于PaddleNLP SimpleServing进行服务化部署，可以在`deploy`目录下执行以下命令启动服务和请求。
+
+**启动服务**
+```
+paddlenlp server server:app --workers 1 --host 0.0.0.0 --port 8189
+```
+**Client发送请求**
+
+服务启动后， 通过 `client.py` 脚本发送请求：
+```
+python client.py
+```
+
+**多卡服务化预测**
+
+PaddleNLP SimpleServing 支持多卡负载均衡预测，主要在服务化注册的时候，注册两个Taskflow的task即可，代码示例如下：
+
+```python
+senta1 = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base", device_id=0)
+senta2 = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base", device_id=1)
+
+app.register_taskflow('senta', [senta1, senta2])
+```
+
