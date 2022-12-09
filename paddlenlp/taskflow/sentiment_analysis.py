@@ -402,7 +402,6 @@ class UIESentaTask(Task):
     def __init__(self, task, model, schema, aspects=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
         self._schema_tree = None
-        self.save_path = None
         self.set_schema(schema)
         self._check_task_files()
         self._check_predictor_type()
@@ -490,15 +489,7 @@ class UIESentaTask(Task):
         """
         Read and analyze inputs.        
         """
-        if isinstance(inputs[0], str) and os.path.isfile(inputs[0]):
-            examples = []
-            with open(inputs[0], "r", encoding="utf-8") as f:
-                for line in f.readlines():
-                    examples.append(line.strip())
-            if len(inputs) == 2:
-                self.save_path = inputs[1]
-        else:
-            examples = self._check_input_text(inputs)
+        examples = self._check_input_text(inputs)
 
         outputs = {}
         outputs['text'] = examples
@@ -843,15 +834,4 @@ class UIESentaTask(Task):
         """
         This function will convert the model output to raw text.
         """
-        if self.save_path is not None:
-            dir_name = os.path.dirname(self.save_path)
-            if not os.path.exists(dir_name):
-                os.makedirs(dir_name)
-            with open(self.save_path, "w", encoding="utf-8") as f:
-                for result in inputs['result']:
-                    line = json.dumps(result, ensure_ascii=False) + "\n"
-                    f.write(line)
-            logger.info("The result of sentiment analysis has been saved to : {}".format(self.save_path))
-            self.save_path = None
-            return ''
         return inputs['result']
