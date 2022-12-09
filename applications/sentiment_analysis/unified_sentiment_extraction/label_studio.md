@@ -44,13 +44,13 @@ label-studio start
 点击创建（Create）开始创建一个新的项目，填写项目名称、描述。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/202995157-9caa0b26-202d-46d2-832a-f1cdf3f9a9b6.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/202995157-9caa0b26-202d-46d2-832a-f1cdf3f9a9b6.png />
 </div>
 
 开始导入数据
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/202995686-954cc001-4478-46e1-8329-ab3ab02e8a35.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/202995686-954cc001-4478-46e1-8329-ab3ab02e8a35.png />
 </div>
 
 配置标注任务，点击 `Natural Language Processing`，然后选择待标注任务。
@@ -58,13 +58,13 @@ label-studio start
 - 语句级情感分类任务请选择``Text Classification`。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/202996231-a4cf809d-000e-4693-b7c8-70ff2fae22ae.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/202996231-a4cf809d-000e-4693-b7c8-70ff2fae22ae.png />
 </div>
 
 - A-O、A-S、A-S-O等属性级的信息抽取任务请选择``Relation Extraction`。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/202997005-e8b0e865-584e-460e-8e68-a41532b6ef1b.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/202997005-e8b0e865-584e-460e-8e68-a41532b6ef1b.png />
 </div>
 
 最后点击保存即可。
@@ -83,12 +83,12 @@ schema = '情感倾向[正向，负向]'
 首先需要设定正向和负向的标签，然后保存即可。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199724082-ee82dceb-dab0-496d-a930-a8ecb284d8b2.png height=370 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199724082-ee82dceb-dab0-496d-a930-a8ecb284d8b2.png />
 </div>
 
 设定好标签后，即可开始进行标注，选择正向或负向，最后点击提交，便标注好一条数据。
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/203003559-f51f9b89-5065-4c5b-8a0c-1c69d308bf24.png height=370 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/203003559-f51f9b89-5065-4c5b-8a0c-1c69d308bf24.png />
 </div>
 
 #### 2.2.2 属性+情感极性+观点抽取任务
@@ -110,20 +110,20 @@ schema = {
 这里为方便标注和后续处理，可以设定`评价维度##正向`用于定位情感倾向为正向的属性，`评价维度##负向`用于定位情感倾向为负向的属性，利用`观点词`标签定位语句中的观点词。
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/202999690-c76948cf-45ba-42a2-85ed-ee55e6a0907f.png height=480 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/202999690-c76948cf-45ba-42a2-85ed-ee55e6a0907f.png />
 </div>
 
 - Relation类型标签
 点击Code，然后配置关系名称，最后点击保存即可
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/203000684-c7ce1483-6e1c-4399-9d43-369eae2f8684.png height=620 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/203000684-c7ce1483-6e1c-4399-9d43-369eae2f8684.png />
 </div>
 
 在设置好Span类型和Rlation标签之后，便可以开始进行标注数据了
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png height=620 width=1200 />
+    <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png />
 </div>
 
 
@@ -134,7 +134,7 @@ schema = {
 勾选已标注文本ID，选择导出的文件类型为``JSON``，导出数据：
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/199891344-023736e2-6f9d-454b-b72a-dec6689f8436.png height=180 width=1200 />
+    <img src=https://user-images.githubusercontent.com/40840292/199891344-023736e2-6f9d-454b-b72a-dec6689f8436.png />
 </div>
 
 
