@@ -118,7 +118,7 @@ def get_configurations():
         # So same config would map more than one tokenizer
         if MAPPING_NAMES.get(name, None) is None:
             MAPPING_NAMES[name] = []
-        # (tokenizer_name, is_faster)
+        # (tokenizer_name, is_fast)
         MAPPING_NAMES[name].append((tokenizer_name, fast_name != ""))
     return MAPPING_NAMES
 
@@ -218,7 +218,7 @@ class AutoTokenizer:
                 print(type(tokenizer))
                 # <class 'paddlenlp.transformers.bert.tokenizer.BertTokenizer'>
         """
-        # Default not to use faster tokenizer
+        # Default not to use fast tokenizer
         use_fast = kwargs.pop("use_fast", False)
         if "use_fast" in kwargs:
             use_fast = kwargs.pop("use_fast", False)
@@ -266,7 +266,7 @@ class AutoTokenizer:
                                         break
                                 if not is_support_fast_tokenizer:
                                     logger.warning(
-                                        f"The tokenizer {actual_tokenizer_class} doesn't have the faster version."
+                                        f"The tokenizer {actual_tokenizer_class} doesn't have the fast version."
                                         " Please check the map `paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES`"
                                         " to see which fast tokenizers are currently supported."
                                     )
