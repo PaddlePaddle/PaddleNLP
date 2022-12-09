@@ -14,16 +14,15 @@
 # limitations under the License.
 """ Modeling classes for ErnieLayout model."""
 
-import copy
 import math
+
 import paddle
 import paddle.nn as nn
-import paddle.tensor as tensor
 import paddle.nn.functional as F
 from paddle.nn import Layer
-from paddle.nn import CrossEntropyLoss
 
 from paddlenlp.utils.log import logger
+
 from .. import PretrainedModel, register_base_model
 from .visual_backbone import ResNet
 
@@ -398,7 +397,7 @@ class ErnieLayoutEncoder(nn.Layer):
         rel_pos = paddle.nn.functional.one_hot(rel_pos, num_classes=self.rel_pos_onehot_size).astype(
             hidden_states.dtype
         )
-        rel_pos = paddle.fluid.layers.matmul(rel_pos, self.rel_pos_bias).transpose([0, 3, 1, 2])
+        rel_pos = paddle.matmul(rel_pos, self.rel_pos_bias).transpose([0, 3, 1, 2])
         return rel_pos
 
     def _cal_2d_pos_emb(self, hidden_states, bbox):
@@ -418,8 +417,8 @@ class ErnieLayoutEncoder(nn.Layer):
         )
         rel_pos_x = F.one_hot(rel_pos_x, num_classes=self.rel_2d_pos_onehot_size).astype(hidden_states.dtype)
         rel_pos_y = F.one_hot(rel_pos_y, num_classes=self.rel_2d_pos_onehot_size).astype(hidden_states.dtype)
-        rel_pos_x = paddle.fluid.layers.matmul(rel_pos_x, self.rel_pos_x_bias).transpose([0, 3, 1, 2])
-        rel_pos_y = paddle.fluid.layers.matmul(rel_pos_y, self.rel_pos_y_bias).transpose([0, 3, 1, 2])
+        rel_pos_x = paddle.matmul(rel_pos_x, self.rel_pos_x_bias).transpose([0, 3, 1, 2])
+        rel_pos_y = paddle.matmul(rel_pos_y, self.rel_pos_y_bias).transpose([0, 3, 1, 2])
         rel_2d_pos = rel_pos_x + rel_pos_y
         return rel_2d_pos
 
