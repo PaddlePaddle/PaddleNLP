@@ -909,7 +909,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_hidden_layers": 12,
             "task_type_vocab_size": 3,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
         "ernie-3.0-tiny-medium-v2": {
@@ -924,7 +924,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_hidden_layers": 6,
             "task_type_vocab_size": 16,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
         "ernie-3.0-tiny-mini-v2": {
@@ -939,7 +939,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_hidden_layers": 6,
             "task_type_vocab_size": 16,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
         "ernie-3.0-tiny-micro-v2": {
@@ -954,7 +954,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_hidden_layers": 4,
             "task_type_vocab_size": 16,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
         "ernie-3.0-tiny-nano-v2": {
@@ -969,7 +969,7 @@ class ErniePretrainedModel(PretrainedModel):
             "num_hidden_layers": 4,
             "task_type_vocab_size": 16,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
         "ernie-3.0-tiny-pico-v2": {
@@ -977,14 +977,14 @@ class ErniePretrainedModel(PretrainedModel):
             "hidden_act": "gelu",
             "hidden_dropout_prob": 0.1,
             "hidden_size": 128,
-            "intermediate_size": 1248,
+            "intermediate_size": 512,
             "initializer_range": 0.02,
             "max_position_embeddings": 2048,
             "num_attention_heads": 2,
             "num_hidden_layers": 3,
             "task_type_vocab_size": 16,
             "type_vocab_size": 4,
-            "use_task_id": True,
+            "use_task_id": False,
             "vocab_size": 40000,
         },
     }
