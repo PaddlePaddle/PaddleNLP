@@ -13,15 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import math
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-import paddle.tensor as tensor
-from paddle.nn import Layer, Embedding
+from paddle.nn import Embedding
 
 from .. import PretrainedModel, register_base_model
 
