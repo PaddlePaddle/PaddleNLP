@@ -14,4 +14,5 @@
 
 from pipelines.nodes.sentiment_analysis.senta import UIESenta
 from pipelines.nodes.sentiment_analysis.senta_preprocessor import SentaProcessor
+from pipelines.nodes.sentiment_analysis.senta_visualization import SentaVisualization
 

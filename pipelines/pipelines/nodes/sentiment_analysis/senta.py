@@ -17,9 +17,7 @@ import logging
 import os
 from typing import List
 
-import paddle
 from paddlenlp import Taskflow
-
 from pipelines.nodes.base import BaseComponent
 
 logger = logging.getLogger(__name__)
@@ -29,10 +27,7 @@ class UIESenta(BaseComponent):
     """
     Senta: sentiment analysis for user's comments based on Taskflow
     """
-    return_no_answers: bool
     outgoing_edges = 1
-    query_count = 0
-    query_time = 0
     
     def __init__(self,
                  model,
@@ -62,7 +57,6 @@ class UIESenta(BaseComponent):
         :use_fast: whether to fast tokenizer for UIE.
         """
         
-        # save init parameters to enable export of component config as YAML
         self.set_config(
             model = model,
             schema = schema,
@@ -90,16 +84,13 @@ class UIESenta(BaseComponent):
             for result in results:
                 line = json.dumps(result, ensure_ascii=False) + "\n"
                 f.write(line)
-        logger.info("The result of sentiment analysis has been saved to : {}".format(save_path))
-    
-    
-    def run(self,  examples: List[str], save_path: str = None):
-        if not isinstance(examples, list):
-            raise TypeError("The type of the inputing examples is expected to be list[str], but {} received!".format(type(examples)))
 
+    def run(self,  examples: List[str], sr_save_path: str):        
+        # predict with taskflow
         results = self._predict(examples)
-        if save_path is not None:
-            self._save_json_file(save_path, results)
-
-        outputs = {"results":results, "save_path":save_path}
+        # save the result of sentiment analysis
+        if sr_save_path:
+            self._save_json_file(sr_save_path, results)
+            logger.info("The result of sentiment analysis has been saved to : {}".format(sr_save_path))
+        outputs = {"sr_save_path": sr_save_path}
         return outputs, "output_1"

@@ -328,7 +328,7 @@ class SentaPipeline(BaseStandardPipeline):
     Pipeline for document intelligence.
     """
 
-    def __init__(self, preprocessor: BaseComponent, senta: BaseComponent):
+    def __init__(self, preprocessor: BaseComponent, senta: BaseComponent, visualization: BaseComponent):
         """
         :param preprocessor: file preprocessor instance
         :param senta: senta model instance
@@ -336,10 +336,13 @@ class SentaPipeline(BaseStandardPipeline):
         self.pipeline = Pipeline()
         self.pipeline.add_node(component=preprocessor,
                                name="PreProcessor",
-                               inputs=["Query"])
+                               inputs=["File"])
         self.pipeline.add_node(component=senta,
-                               name="senta",
+                               name="Senta",
                                inputs=["PreProcessor"])
+        self.pipeline.add_node(component=visualization,
+                               name="Visualization",
+                               inputs=["Senta"])
 
     def run(self,
             meta: dict,
@@ -355,4 +358,6 @@ class SentaPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        if "examples" in output:
+            output.pop("examples")
         return output

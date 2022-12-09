@@ -18,6 +18,7 @@ from pipelines.pipelines.standard_pipelines import (
     BaseStandardPipeline,
     ExtractiveQAPipeline,
     SemanticSearchPipeline,
+    SentaPipeline,
     DocPipeline,
     TextToImagePipeline,
     QAGenerationPipeline,

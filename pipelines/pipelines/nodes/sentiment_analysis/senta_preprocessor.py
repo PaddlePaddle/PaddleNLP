@@ -13,37 +13,20 @@
 # limitations under the License.
 
 import os
-import logging
-from typing import List, Dict
-import numpy as np
-import base64
-import sys
-sys.path.insert(1, "./../..")
-sys.path.insert(2, "./../../..")
-
-import paddle
-from paddleocr import PaddleOCR
-from pathlib import Path
-from paddlenlp.taskflow.utils import download_file
 
 from pipelines.nodes.base import BaseComponent
-
-logger = logging.getLogger(__name__)
 
 
 class SentaProcessor(BaseComponent):
     """
     Read and preprocess texts that you wanna perform sentiment analysis.
     """
-    return_no_answers: bool
     outgoing_edges = 1
-    query_count = 0
-    query_time = 0
 
-    def __init__(self, max_examples: int = None):
+    def __init__(self, max_examples: int = -1):
         """
         Init Senta Preprocessor.
-        :param max_examples: Maximum amount of examples to process. if you set to be None, it will keep all examples to analyze.
+        :param max_examples: Maximum amount of examples to process. if you set to be -1, it will keep all examples to analyze.
         """
         self.max_examples = max_examples
 
@@ -54,8 +37,6 @@ class SentaProcessor(BaseComponent):
             raise ValueError("a file path is needed, which you wanna perform sentiment analysis, you can set it by `file_path`.")
         if not os.path.exists(inputs["file_path"]):
             raise ValueError("the file does not exist: {}".format(inputs["file_path"]))
-        if "save_path" in inputs and not isinstance(inputs["save_path"], str):
-            raise TypeError("a str expected for save_path, but received {}!".format(type(inputs["save_path"])))
 
     def _read_text_file(self, file_path):
         examples = []
@@ -70,10 +51,11 @@ class SentaProcessor(BaseComponent):
         self._check_input_params(meta)
         # read texts
         examples = self._read_text_file(meta["file_path"])
-        examples = examples[:self.max_examples]
-
-        output = {"examples": examples}
-        if "save_path" in meta and meta["save_path"]:
-            output["save_path"] = meta["save_path"]
+        if self.max_examples != -1:
+            examples = examples[:self.max_examples]
+        # define output for SentaProcessor
+        sr_file_name = "sr_" + os.path.basename(meta["file_path"]).split(".")[0] + ".json"
+        sr_save_path = os.path.join(os.path.dirname(meta["file_path"]), "images", sr_file_name)
+        output = {"examples": examples, "sr_save_path": sr_save_path}
 
         return output, "output_1"

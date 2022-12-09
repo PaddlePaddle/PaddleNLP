@@ -15,43 +15,56 @@
 import argparse
 import logging
 import os
-import sys
-sys.path.insert(1, "./../..")
-sys.path.insert(2, "./../../..")
 
 import paddle
-from pipelines.nodes import SentaProcessor, UIESenta
+from pipelines.nodes import SentaProcessor, UIESenta, SentaVisualization
 from pipelines import SentaPipeline
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to run docprompt system, defaults to gpu.")
-parser.add_argument("--batch_size", default=4, type=int, help="The batch size of prompt for one image.")
-args = parser.parse_args()
-# yapf: enable
+
+def format_print(results):
+    """
+    Print Information in results.
+    """
+    if "sr_save_path" in results:
+        print("\nText Result: ", results["sr_save_path"])
+    if "img_dict" in results:
+        print("Visualization Result: ")
+        for img_name in results["img_dict"]:
+            print("\t{}:{}".format(img_name, results["img_dict"][img_name]))
 
 
-def senta_pipeline():
+def senta_pipeline(args):
+    """
+    Sentiment Analysis with Pipeline.
+    """
 
-    preprocessor = SentaProcessor(max_examples=10)
-    schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
-    senta = UIESenta(schema=schema, model="uie-base")
+    # initializing SentaPipeline
+    preprocessor = SentaProcessor(max_examples=args.max_examples)
+    if not args.aspects:
+        schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
+        senta = UIESenta(schema=schema, model="uie-base", batch_size=args.batch_size, aspects=args.aspects)
+    else:
+        schema = ['观点词', '情感倾向[正向,负向,未提及]']
+        senta = UIESenta(schema=schema, model="uie-base", batch_size=args.batch_size)
+    visualization = SentaVisualization(font_name="SimHei")
+    senta_pipeline = SentaPipeline(preprocessor=preprocessor, senta=senta, visualization=visualization)
 
-    pipe = SentaPipeline(preprocessor=preprocessor, senta=senta)
-    
-    # image link input
-    text = "蛋糕味道不错，店家服务也很好"
-    meta = {
-        "file_path": "/wangqinghui/mynlp/PaddleNLP/applications/sentiment_analysis/unified_sentiment_extraction/data/test_hotel.txt",
-        "save_path": ""
-    }
-    # image local path input
-    # meta = {"doc": "./invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}
-
-    prediction = pipe.run(meta=meta)
-    print(prediction)
-    print(prediction["results"][0])
+    # run SentaPipeline for inputting file.
+    meta = {"file_path": args.file_path}
+    results = senta_pipeline.run(meta=meta)
+    format_print(results)
 
 
 if __name__ == "__main__":
-    senta_pipeline()
+    # yapf: disable
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--file_path", default="/wangqinghui/mynlp/PaddleNLP/applications/sentiment_analysis/unified_sentiment_extraction/data/test_hotel.txt", type=str, help="The file that you want to perform sentiment analysis on.")
+    parser.add_argument("--max_examples", default=-1, type=int, help="The maxinum number of examples processed by pipline.")
+    parser.add_argument("--model", choices=['uie-base', 'uie-medium', 'uie-mini', 'uie-micro', 'uie-nano'], default="uie-base", help="Fhe model name that you wanna use for sentiment analysis.")
+    parser.add_argument("--aspects", default=None, type=str, nargs="+", help="A list of pre-given aspects, that is to say, Pipeline only perform sentiment analysis on these pre-given aspects if you input it.")
+    parser.add_argument("--batch_size", default=4, type=int, help="Number of samples the model receives in one batch for sentiment inference.")
+
+    args = parser.parse_args()
+    # yapf: enable
+
+    senta_pipeline(args)

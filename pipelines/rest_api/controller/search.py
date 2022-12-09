@@ -35,6 +35,8 @@ from rest_api.schema import (
     QueryImageResponse,
     QueryQAPairResponse,
     QueryQAPairRequest,
+    SentaRequest,
+    SentaResponse
 )
 from rest_api.controller.utils import RequestLimiter
 
@@ -53,6 +55,7 @@ try:
     QA_PAIR_PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_QA_PAIRS_NAME)
 except Exception as e:
     logger.warning(f"Request pipeline ('{QUERY_QA_PAIRS_NAME}: is null'). ")
+
 DOCUMENT_STORE = PIPELINE.get_document_store()
 logging.info(f"Loaded pipeline nodes: {PIPELINE.graph.nodes.keys()}")
 
@@ -122,6 +125,20 @@ def query_documents(request: DocumentRequest):
     params = request.params or {}
     res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
     result["results"] = res["results"]
+    return result
+
+
+@router.post("/senta_file", response_model=DocumentResponse, response_model_exclude_none=True)
+def senta_file(request: DocumentRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    result = {}
+    result["meta"] = request.meta
+    params = request.params or {}
+    res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
+    result["meta"]["img_dict"] = res["img_dict"]
     return result
 
 

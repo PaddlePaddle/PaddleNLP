@@ -100,6 +100,20 @@ class DocumentResponse(BaseModel):
     results: List[List[dict]] = []
     debug: Optional[Dict] = Field(None, alias="_debug")
 
+class SentaRequest(BaseModel):
+    meta: dict
+    params: Optional[dict] = None
+    debug: Optional[bool] = False
+
+    class Config:
+        # Forbid any extra fields in the request to avoid silent failures
+        extra = Extra.forbid
+
+
+class SentaResponse(BaseModel):
+    img_dict: dict = []
+    debug: Optional[bool] = False
+
 
 class QueryImageResponse(BaseModel):
     query: str
