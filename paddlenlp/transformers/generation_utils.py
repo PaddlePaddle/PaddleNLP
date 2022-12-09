@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 import inspect
 from abc import ABC
+from typing import List
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+
 from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
@@ -306,6 +307,7 @@ class GenerationMixin(object):
         num_beam_groups=1,
         diversity_rate=0.0,
         repetition_penalty=None,
+        no_repeat_ngram_size=None,
         logits_processors=None,
     ):
         processors = LogitsProcessorList()
@@ -320,6 +322,8 @@ class GenerationMixin(object):
             )
         if repetition_penalty is not None and repetition_penalty != 1.0:
             processors.append(RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty))
+        if no_repeat_ngram_size is not None and no_repeat_ngram_size > 0:
+            processors.append(NoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
         if forced_bos_token_id is not None:
             processors.append(ForcedBOSTokenLogitsProcessor(forced_bos_token_id))
         if forced_eos_token_id is not None:
@@ -503,7 +507,7 @@ class GenerationMixin(object):
         if kwargs["num_beam_groups"] != 1:
             # not support for group_beam_search yet in the faster version
             raise AttributeError("'num_beam_groups != 1' is not supported yet in the faster version")
-        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] == False:
+        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
@@ -531,6 +535,7 @@ class GenerationMixin(object):
         decoder_start_token_id=None,
         forced_bos_token_id=None,
         forced_eos_token_id=None,
+        no_repeat_ngram_size=None,
         num_return_sequences=1,
         diversity_rate=0.0,
         use_cache=True,
@@ -729,6 +734,9 @@ class GenerationMixin(object):
             if decoder_start_token_id is not None
             else getattr(self, "decoder_start_token_id", None)
         )
+        no_repeat_ngram_size = (
+            no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
+        )
 
         if getattr(self, "_faster_entry", None) is not False and use_faster:
             args = locals()
@@ -804,6 +812,7 @@ class GenerationMixin(object):
             num_beam_groups=num_beam_groups,
             diversity_rate=diversity_rate,
             repetition_penalty=repetition_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             logits_processors=model_kwargs["logits_processors"]
             if "logits_processors" in model_kwargs
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
@@ -1335,6 +1344,64 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
         input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
+
+
+def _get_ngrams(ngram_size, prev_input_ids, num_hypos):
+    generated_ngrams = [{} for _ in range(num_hypos)]
+    for idx in range(num_hypos):
+        gen_tokens = prev_input_ids[idx].tolist()
+        generated_ngram = generated_ngrams[idx]
+        for ngram in zip(*[gen_tokens[i:] for i in range(ngram_size)]):
+            prev_ngram_tuple = tuple(ngram[:-1])
+            generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
+    return generated_ngrams
+
+
+def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
+    # Before decoding the next token, prevent decoding of ngrams that have already appeared
+    start_idx = cur_len + 1 - ngram_size
+    ngram_idx = tuple(prev_input_ids[start_idx:cur_len].tolist())
+    return banned_ngrams.get(ngram_idx, [])
+
+
+def _calc_banned_ngram_tokens(ngram_size, prev_input_ids, num_hypos, cur_len):
+    """Copied from fairseq for no_repeat_ngram in beam_search"""
+    if cur_len + 1 < ngram_size:
+        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
+        return [[] for _ in range(num_hypos)]
+
+    generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
+
+    banned_tokens = [
+        _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
+        for hypo_idx in range(num_hypos)
+    ]
+    return banned_tokens
+
+
+class NoRepeatNGramLogitsProcessor(LogitsProcessor):
+    r"""
+    [`LogitsProcessor`] that enforces no repetition of n-grams. See
+    [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
+    Args:
+        ngram_size (`int`):
+            All ngrams of size `ngram_size` can only occur once.
+    """
+
+    def __init__(self, ngram_size):
+        if not isinstance(ngram_size, int) or ngram_size <= 0:
+            raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
+        self.ngram_size = ngram_size
+
+    def __call__(self, input_ids, scores):
+        num_batch_hypotheses = scores.shape[0]
+        cur_len = input_ids.shape[-1]
+        banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
+
+        for i, banned_tokens in enumerate(banned_batch_tokens):
+            scores[i, banned_tokens] = -float("inf")
+
+        return scores
 
 
 class HammingDiversityLogitsProcessor(LogitsProcessor):

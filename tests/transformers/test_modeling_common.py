@@ -20,13 +20,14 @@ import random
 import shutil
 import tempfile
 import unittest
+from typing import Optional, Tuple, Type
 
 import numpy as np
 import paddle
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME, MODEL_HOME
 
 from ..testing_utils import slow
 
@@ -59,8 +60,8 @@ def check_two_model_parameter(first_model: PretrainedModel, second_model: Pretra
 
 class ModelTesterMixin:
     model_tester = None
-    base_model_class = None
-    all_model_classes = ()
+    base_model_class: Optional[Type[PretrainedModel]] = None
+    all_model_classes: Tuple[Type[PretrainedModel]] = ()
     all_generative_model_classes = ()
     test_resize_embeddings = True
     test_resize_position_embeddings = False
@@ -493,12 +494,43 @@ class ModelTesterMixin:
             model = self.base_model_class(**config)
         self.assertTrue(len(model.model_name_list) != 0)
 
+    def test_pretrained_config_save_load(self):
+
+        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
+            return
+
+        config_class = self.base_model_class.config_class
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = config_class()
+
+            config.save_pretrained(tempdir)
+
+            # check the file exist
+            self.assertFalse(os.path.exists(os.path.join(tempdir, LEGACY_CONFIG_NAME)))
+            self.assertTrue(os.path.exists(os.path.join(tempdir, CONFIG_NAME)))
+
+            # rename the CONFIG_NAME
+            shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
+
+            loaded_config = config.__class__.from_pretrained(tempdir)
+            self.assertEqual(config.hidden_size, loaded_config.hidden_size)
+
+    def random_choice_pretrained_config_field(self) -> Optional[str]:
+
+        if self.base_model_class is None or not self.base_model_class.constructed_from_pretrained_config():
+            return None
+
+        config = self.base_model_class.config_class()
+        fields = [key for key, value in config.to_dict() if value]
+        return random.choice(fields)
+
 
 class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
     hf_remote_test_model_path: str = None
     paddlehub_remote_test_model_path: str = None
 
+    # Download from HF doesn't work in CI yet
     @slow
     def test_model_from_pretrained_hf_hub(self):
         if self.hf_remote_test_model_path is None or self.base_model_class is None:
@@ -506,7 +538,6 @@ class ModelTesterPretrainedMixin:
         model = self.base_model_class.from_pretrained(self.hf_remote_test_model_path, from_hf_hub=True)
         self.assertIsNotNone(model)
 
-    @slow
     def test_model_from_pretrained_paddle_hub(self):
         if self.paddlehub_remote_test_model_path is None or self.base_model_class is None:
             return
@@ -553,8 +584,6 @@ class ModelTesterPretrainedMixin:
                     os.path.join(MODEL_HOME, model_name),
                     tempdirname,
                 )
-                files = os.listdir(tempdirname)
-
                 saved_model_state_file = os.path.join(
                     tempdirname, self.base_model_class.resource_files_names["model_state"]
                 )
