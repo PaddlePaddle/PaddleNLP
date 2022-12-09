@@ -529,7 +529,7 @@ class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
     hf_remote_test_model_path: str = None
     paddlehub_remote_test_model_path: str = None
-    
+
     # Download from HF doesn't work in CI yet
     @slow
     def test_model_from_pretrained_hf_hub(self):
