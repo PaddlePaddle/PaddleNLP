@@ -20,7 +20,6 @@ from paddle.io import Dataset
 
 from .trainer import Trainer
 from .trainer_utils import PredictionOutput
-from ..utils.log import logger
 
 __all__ = [
     "Seq2SeqTrainer",
