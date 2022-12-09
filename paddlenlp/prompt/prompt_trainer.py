@@ -12,27 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import os
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ..data import DataCollator
 from ..datasets import MapDataset
-from ..utils.log import logger
+from ..losses import RDropLoss
 from ..trainer import Trainer, TrainerCallback
 from ..trainer.trainer_utils import EvalPrediction, get_scheduler
-from ..data import DataCollator
-from ..losses import RDropLoss
 from ..transformers import PretrainedTokenizer, export_model
-
+from ..utils.log import logger
+from .prompt_args import PromptTuningArguments
+from .prompt_utils import PromptDataCollatorWithPadding
 from .template import AutoTemplate
 from .verbalizer import SoftVerbalizer
-from .prompt_utils import signature, PromptDataCollatorWithPadding
-from .prompt_args import PromptTuningArguments
-
-__all__ = ["PromptTrainer", "PromptModelForSequenceClassification"]
 
 
 class PromptTrainer(Trainer):
@@ -43,10 +40,10 @@ class PromptTrainer(Trainer):
 
     def __init__(
         self,
-        model: Union[nn.Layer],
+        model: nn.Layer,
         tokenizer: PretrainedTokenizer,
-        criterion: Union[nn.Layer],
-        args: PromptTuningArguments = None,
+        criterion: Optional[nn.Layer] = None,
+        args: Optional[PromptTuningArguments] = None,
         data_collator: Optional[DataCollator] = None,
         train_dataset: Optional[MapDataset] = None,
         eval_dataset: Optional[MapDataset] = None,
@@ -63,6 +60,9 @@ class PromptTrainer(Trainer):
 
         if data_collator is None:
             data_collator = PromptDataCollatorWithPadding(tokenizer, padding=True, return_tensors="pd")
+
+        if criterion is None and (args.use_rgl or args.use_rdrop):
+            raise Exception("'To use 'use_rgl', 'use_rdrop', 'criterion' must be specified")
 
         super(PromptTrainer, self).__init__(
             model=model,
@@ -175,7 +175,6 @@ class PromptTrainer(Trainer):
             decay_parameters = [
                 p.name for n, p in self._get_model().named_parameters() if not any(nd in n for nd in ["bias", "norm"])
             ]
-            apply_decay_param_fun = lambda x: x in decay_parameters
 
             if len(plm_parameters) > 0:
                 ppt_lr = self.args.ppt_learning_rate / self.args.learning_rate
@@ -210,7 +209,7 @@ class PromptTrainer(Trainer):
 
             self.optimizer = optim_cls(
                 learning_rate=lr,
-                apply_decay_param_fun=apply_decay_param_fun,
+                apply_decay_param_fun=lambda x: x in decay_parameters,
                 parameters=params,
                 weight_decay=self.args.weight_decay,
                 grad_clip=nn.ClipGradByGlobalNorm(self.args.max_grad_norm),
@@ -228,21 +227,22 @@ class PromptTrainer(Trainer):
         labels = inputs["labels"]
 
         input_dict = inputs.copy()
-        input_dict["return_hidden_states"] = True
-        outputs, hidden_states = model(**input_dict)
 
         if self.criterion is not None:
-            loss = self.criterion(outputs, labels)
+            # pop labels to move loss computation out of the model
+            input_dict.pop("labels")
+            logits, hidden_states = model(**input_dict)
+            loss = self.criterion(logits, labels)
 
             if self.args.use_rdrop:
-                loss = self._compute_rdrop_loss(model, input_dict, outputs, loss)
+                loss = self._compute_rdrop_loss(model, input_dict, logits, loss)
 
             if self.args.use_rgl:
                 loss += self._compute_rgl_loss(hidden_states, labels)
+        else:
+            loss, logits, _ = model(**input_dict)
 
-            outputs = (loss, outputs)
-
-        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+        outputs = (loss, logits)
 
         return (loss, outputs) if return_outputs else loss
 
@@ -294,69 +294,3 @@ class PromptTrainer(Trainer):
         if self.verbalizer is not None:
             self.verbalizer.save(export_path)
         export_model(self.model, input_spec, export_path, export_type)
-
-
-class PromptModelForSequenceClassification(nn.Layer):
-    """
-    PromptModel for classification tasks.
-    """
-
-    def __init__(self, model, template, verbalizer=None, freeze_plm: bool = False, freeze_dropout: bool = False):
-        super(PromptModelForSequenceClassification, self).__init__()
-        self.plm = model
-        self.template = template
-        self.verbalizer = verbalizer
-        self.freeze_plm = freeze_plm
-        self.freeze_dropout = freeze_dropout
-        if self.freeze_plm:
-            for param in self.plm.parameters():
-                param.stop_gradient = True
-            if self.freeze_dropout:
-                self.plm.eval()
-        self.forward_keys = signature(self.plm.forward)
-        self._mask_token_id = self.template.tokenizer.mask_token_id
-        self._pad_token_id = self.template.tokenizer.pad_token_id
-
-    def forward(
-        self,
-        input_ids,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        masked_positions=None,
-        soft_token_ids=None,
-        encoder_ids=None,
-        **kwargs
-    ):
-        input_dict = {
-            "input_ids": input_ids,
-            "token_type_ids": token_type_ids,
-            "position_ids": position_ids,
-            "masked_positions": masked_positions,
-            "soft_token_ids": soft_token_ids,
-            "attention_mask": attention_mask,
-            "encoder_ids": encoder_ids,
-        }
-        input_dict = self.template.process_batch(input_dict)
-        model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
-        if "masked_positions" in model_inputs:
-            model_inputs.pop("masked_positions")
-        outputs = self.plm(**model_inputs)
-        if self.verbalizer is not None:
-            label_outputs = self.verbalizer.process_outputs(outputs, input_dict["masked_positions"])
-        else:
-            label_outputs = outputs
-
-        if kwargs.pop("return_hidden_states", False):
-            return label_outputs, outputs
-        else:
-            return label_outputs
-
-    def prompt_parameters(self):
-        """
-        Get the parameters of template and verbalizer.
-        """
-        params = [p for p in self.template.parameters()]
-        if self.verbalizer is not None:
-            params += [p for p in self.verbalizer.parameters()]
-        return params
