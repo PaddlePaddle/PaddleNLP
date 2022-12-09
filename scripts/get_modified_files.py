@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 
-modified_files = subprocess.check_output(f"git diff --name-only develop".split()).decode("utf-8").split()
+modified_files = subprocess.check_output("git diff --name-only develop".split()).decode("utf-8").split()
 
 valid_dirs = "|".join(sys.argv[1:])
 regex = re.compile(rf"^({valid_dirs}).*?\.py$")
