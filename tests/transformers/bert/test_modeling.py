@@ -34,7 +34,6 @@ from paddlenlp.transformers import (
     BertForSequenceClassification,
     BertForTokenClassification,
     BertModel,
-    BertPretrainedModel,
 )
 from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
@@ -42,7 +41,12 @@ from paddlenlp.utils import install_package, uninstall_package
 
 from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import ModelTesterMixin, ModelTesterPretrainedMixin, ids_tensor, random_attention_mask
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class BertModelTester:
