@@ -16,8 +16,10 @@ import re
 from io import BytesIO
 
 import numpy as np
+import paddle
 from PIL import Image
 
+from ..metrics import SpanEvaluator
 from .image_utils import NormalizeImage, Permute, ResizeImage
 
 resize_func = ResizeImage(target_size=224, interp=1)
@@ -112,3 +114,29 @@ def get_relation_type_dict(relation_data, schema_lang="ch"):
                     relation_type = prefix
                 relation_type_dict.setdefault(relation_type, []).append(relation_data[i][1])
     return relation_type_dict
+
+
+def uie_loss_func(outputs, labels):
+    criterion = paddle.nn.BCELoss()
+    start_ids, end_ids = labels
+    start_prob, end_prob = outputs
+    start_ids = paddle.cast(start_ids, "float32")
+    end_ids = paddle.cast(end_ids, "float32")
+    loss_start = criterion(start_prob, start_ids)
+    loss_end = criterion(end_prob, end_ids)
+    loss = (loss_start + loss_end) / 2.0
+    return loss
+
+
+def compute_metrics(p):
+    metric = SpanEvaluator()
+    start_prob, end_prob = p.predictions
+    start_ids, end_ids = p.label_ids
+    metric.reset()
+
+    num_correct, num_infer, num_label = metric.compute(start_prob, end_prob, start_ids, end_ids)
+    metric.update(num_correct, num_infer, num_label)
+    precision, recall, f1 = metric.accumulate()
+    metric.reset()
+
+    return {"precision": precision, "recall": recall, "f1": f1}

@@ -31,6 +31,7 @@ from paddlenlp.trainer import (
     get_last_checkpoint,
 )
 from paddlenlp.transformers import UIE, UIEM, AutoTokenizer, export_model
+from paddlenlp.utils.ie_utils import compute_metrics, uie_loss_func
 from paddlenlp.utils.log import logger
 
 
@@ -140,31 +141,6 @@ def main():
     dev_ds = dev_ds.map(trans_fn)
 
     data_collator = DataCollatorWithPadding(tokenizer)
-
-    criterion = paddle.nn.BCELoss()
-
-    def uie_loss_func(outputs, labels):
-        start_ids, end_ids = labels
-        start_prob, end_prob = outputs
-        start_ids = paddle.cast(start_ids, "float32")
-        end_ids = paddle.cast(end_ids, "float32")
-        loss_start = criterion(start_prob, start_ids)
-        loss_end = criterion(end_prob, end_ids)
-        loss = (loss_start + loss_end) / 2.0
-        return loss
-
-    def compute_metrics(p):
-        metric = SpanEvaluator()
-        start_prob, end_prob = p.predictions
-        start_ids, end_ids = p.label_ids
-        metric.reset()
-
-        num_correct, num_infer, num_label = metric.compute(start_prob, end_prob, start_ids, end_ids)
-        metric.update(num_correct, num_infer, num_label)
-        precision, recall, f1 = metric.accumulate()
-        metric.reset()
-
-        return {"precision": precision, "recall": recall, "f1": f1}
 
     trainer = Trainer(
         model=model,
