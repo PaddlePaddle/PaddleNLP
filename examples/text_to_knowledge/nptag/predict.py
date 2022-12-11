@@ -35,33 +35,26 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def do_predict(data,
-               model,
-               tokenizer,
-               batch_size=1,
-               max_cls_len=5,
-               summary_num=2):
+def do_predict(data, model, tokenizer, batch_size=1, max_cls_len=5, summary_num=2):
     examples = []
     for text in data:
         example = {"text": text}
         input_ids, token_type_ids, label_indices = convert_example(
-            example, tokenizer, max_seq_len=args.max_seq_len, is_test=True)
+            example, tokenizer, max_seq_len=args.max_seq_len, is_test=True
+        )
         examples.append((input_ids, token_type_ids, label_indices))
 
-    batches = [
-        examples[idx:idx + batch_size]
-        for idx in range(0, len(examples), batch_size)
-    ]
+    batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
-        Stack(dtype='int64'),  # label_indices
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+        Stack(dtype="int64"),  # label_indices
     ): fn(samples)
 
     name_dict, bk_tree, id_vocabs, vocab_ids = construct_dict_map(
-        tokenizer, os.path.join(args.data_dir, "name_category_map.json"))
+        tokenizer, os.path.join(args.data_dir, "name_category_map.json")
+    )
 
     all_scores_can = []
     all_preds_can = []
@@ -75,7 +68,7 @@ def do_predict(data,
         token_type_ids = paddle.to_tensor(token_type_ids)
         logits = model(input_ids, token_type_ids).numpy()
         for i, l in zip(label_indices, logits):
-            score = l[i[0]:i[-1] + 1, vocab_ids]
+            score = l[i[0] : i[-1] + 1, vocab_ids]
             # Find topk candidates of scores and predicted indices.
             score_can, pred_id_can = find_topk(score, k=4, axis=-1)
 
@@ -88,8 +81,8 @@ def do_predict(data,
         label = decode(pred_ids[i], id_vocabs)
 
         result = {
-            'text': d,
-            'label': label,
+            "text": d,
+            "label": label,
         }
 
         if label not in name_dict:
@@ -100,15 +93,15 @@ def do_predict(data,
             for labels in labels_can:
                 cls_label_can = decode(labels[0], id_vocabs)
                 if cls_label_can in name_dict:
-                    result['label'] = cls_label_can
+                    result["label"] = cls_label_can
                     break
                 else:
                     labels_can = bk_tree.search_similar_word(label)
                     if len(labels_can) != 0:
-                        result['label'] = labels_can[0][0]
+                        result["label"] = labels_can[0][0]
 
-        if result['label'] in name_dict:
-            result['category'] = name_dict[result['label']]
+        if result["label"] in name_dict:
+            result["category"] = name_dict[result["label"]]
         results.append(result)
     return results
 
@@ -117,9 +110,9 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     data = [
-        '刘德华',
-        '快乐薯片',
-        '自适应共振理论映射',
+        "刘德华",
+        "快乐薯片",
+        "自适应共振理论映射",
     ]
 
     model = ErnieCtmNptagModel.from_pretrained("nptag")

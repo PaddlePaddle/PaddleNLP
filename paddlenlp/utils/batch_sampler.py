@@ -25,13 +25,13 @@ __all__ = ["DistributedBatchSampler"]
 class DistributedBatchSampler(paddle.io.BatchSampler):
     """Sampler that restricts data loading to a subset of the dataset.
 
-    In such case, each process can pass a DistributedBatchSampler instance 
-    as a DataLoader sampler, and load a subset of the original dataset that 
+    In such case, each process can pass a DistributedBatchSampler instance
+    as a DataLoader sampler, and load a subset of the original dataset that
     is exclusive to it.
 
     .. note::
         Dataset is assumed to be of constant size.
-        
+
     Args:
         dataset(paddle.io.Dataset): this could be a `paddle.io.Dataset` implement
                      or other python object which implemented
@@ -61,15 +61,15 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
             class RandomDataset(Dataset):
                 def __init__(self, num_samples):
                     self.num_samples = num_samples
-            
+
                 def __getitem__(self, idx):
                     image = np.random.random([784]).astype('float32')
                     label = np.random.randint(0, 9, (1, )).astype('int64')
                     return image, label
-                
+
                 def __len__(self):
                     return self.num_samples
-  
+
             dataset = RandomDataset(100)
             sampler = DistributedBatchSampler(dataset, batch_size=64)
 
@@ -78,37 +78,27 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
                 break
     """
 
-    def __init__(self,
-                 dataset,
-                 batch_size,
-                 num_replicas=None,
-                 rank=None,
-                 shuffle=False,
-                 drop_last=False,
-                 consumed_samples=0):
+    def __init__(
+        self, dataset, batch_size, num_replicas=None, rank=None, shuffle=False, drop_last=False, consumed_samples=0
+    ):
         self.dataset = dataset
 
-        assert isinstance(batch_size, int) and batch_size > 0, \
-                "batch_size should be a positive integer"
+        assert isinstance(batch_size, int) and batch_size > 0, "batch_size should be a positive integer"
         self.batch_size = batch_size
-        assert isinstance(shuffle, bool), \
-                "shuffle should be a boolean value"
+        assert isinstance(shuffle, bool), "shuffle should be a boolean value"
         self.shuffle = shuffle
-        assert isinstance(drop_last, bool), \
-                "drop_last should be a boolean number"
+        assert isinstance(drop_last, bool), "drop_last should be a boolean number"
 
         from paddle.distributed import ParallelEnv
 
         if num_replicas is not None:
-            assert isinstance(num_replicas, int) and num_replicas > 0, \
-                    "num_replicas should be a positive integer"
+            assert isinstance(num_replicas, int) and num_replicas > 0, "num_replicas should be a positive integer"
             self.nranks = num_replicas
         else:
             self.nranks = ParallelEnv().nranks
 
         if rank is not None:
-            assert isinstance(rank, int) and rank >= 0, \
-                    "rank should be a non-negative integer"
+            assert isinstance(rank, int) and rank >= 0, "rank should be a non-negative integer"
             self.local_rank = rank
         else:
             self.local_rank = ParallelEnv().local_rank
@@ -126,12 +116,13 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
         return start_idx, end_idx
 
     def __iter__(self):
-        assert self.consumed_samples % self.nranks == 0, \
-            "The consumed_samples should be divided by nranks. consumed_samples=%d, nranks=%s" % (
-            self.consumed_samples, nranks)
-        self.remain_num_samples = int(
-            math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 /
-                      self.nranks))
+        assert (
+            self.consumed_samples % self.nranks == 0
+        ), "The consumed_samples should be divided by nranks. consumed_samples=%d, nranks=%s" % (
+            self.consumed_samples,
+            nranks,
+        )
+        self.remain_num_samples = int(math.ceil((len(self.dataset) - self.consumed_samples) * 1.0 / self.nranks))
         self.remain_total_size = self.remain_num_samples * self.nranks
         self.batch_size_times_rank_size = self.batch_size * self.nranks
 
@@ -163,25 +154,25 @@ class DistributedBatchSampler(paddle.io.BatchSampler):
 
         Examples:
             .. code-block:: python
-    
+
                 from paddle.io import Dataset, DistributedBatchSampler
-    
+
                 # init with dataset
                 class RandomDataset(Dataset):
                     def __init__(self, num_samples):
                         self.num_samples = num_samples
-                
+
                     def __getitem__(self, idx):
                         image = np.random.random([784]).astype('float32')
                         label = np.random.randint(0, 9, (1, )).astype('int64')
                         return image, label
-                    
+
                     def __len__(self):
                         return self.num_samples
-      
+
                 dataset = RandomDataset(100)
                 sampler = DistributedBatchSampler(dataset, batch_size=64)
-    
+
                 for epoch in range(10):
                     sampler.set_epoch(epoch)
         """

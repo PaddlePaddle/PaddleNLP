@@ -27,7 +27,7 @@ def decode(s_arc, s_rel, mask, tree=True):
     lens = np.sum(mask, -1)
     # Prevent self-loops
     arc_preds = paddle.argmax(s_arc, axis=-1).numpy()
-    bad = [not istree(seq[:i + 1]) for i, seq in zip(lens, arc_preds)]
+    bad = [not istree(seq[: i + 1]) for i, seq in zip(lens, arc_preds)]
     if tree and any(bad):
         arc_preds[bad] = eisner(s_arc.numpy()[bad], mask[bad])
     arc_preds = paddle.to_tensor(arc_preds)
@@ -57,7 +57,7 @@ def pad_sequence_paddle(inputs, lens, pad_index=0):
     sequences = []
     idx = 0
     for l in lens:
-        sequences.append(np.array(inputs[idx:idx + l]))
+        sequences.append(np.array(inputs[idx : idx + l]))
         idx += l
     outputs = Pad(pad_val=pad_index)(sequences)
     output_tensor = paddle.to_tensor(outputs)
@@ -80,12 +80,14 @@ def fill_diagonal(x, value, offset=0, dim1=0, dim2=1):
         diagonal = np.lib.stride_tricks.as_strided(
             x[:, offset:] if dim_sum == 1 else x[:, :, offset:],
             shape=(shape[dim3], shape[dim1] - offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+            strides=(strides[dim3], strides[dim1] + strides[dim2]),
+        )
     else:
         diagonal = np.lib.stride_tricks.as_strided(
             x[-offset:, :] if dim_sum in [1, 2] else x[:, -offset:],
             shape=(shape[dim3], shape[dim1] + offset),
-            strides=(strides[dim3], strides[dim1] + strides[dim2]))
+            strides=(strides[dim3], strides[dim1] + strides[dim2]),
+        )
 
     diagonal[...] = value
     return x
@@ -132,21 +134,20 @@ def stripe(x, n, w, offset=(0, 0), dim=1):
     tensor([[ 0,  5, 10],
             [ 6, 11, 16]])
     """
-    if not x.flags['C_CONTIGUOUS']:
+    if not x.flags["C_CONTIGUOUS"]:
         x = np.ascontiguousarray(x)
     strides = x.strides
     m = strides[0] + strides[1]
     k = strides[1] if dim == 1 else strides[0]
-    return np.lib.stride_tricks.as_strided(x[offset[0]:, offset[1]:],
-                                           shape=[n, w] + list(x.shape[2:]),
-                                           strides=[m, k] + list(strides[2:]))
+    return np.lib.stride_tricks.as_strided(
+        x[offset[0] :, offset[1] :], shape=[n, w] + list(x.shape[2:]), strides=[m, k] + list(strides[2:])
+    )
 
 
 def flat_words(words, pad_index=0):
     mask = words != pad_index
     lens = paddle.sum(paddle.cast(mask, "int64"), axis=-1)
-    position = paddle.cumsum(lens + paddle.cast(
-        (lens == 0), "int64"), axis=1) - 1
+    position = paddle.cumsum(lens + paddle.cast((lens == 0), "int64"), axis=1) - 1
     select = paddle.nonzero(mask)
     words = paddle.gather_nd(words, select)
     lens = paddle.sum(lens, axis=-1)
@@ -159,7 +160,7 @@ def flat_words(words, pad_index=0):
 def index_sample(x, index):
     """
     Select input value according to index
-    
+
     Arags：
         input: input matrix
         index: index matrix
@@ -210,7 +211,7 @@ def index_sample(x, index):
 def mask_fill(input, mask, value):
     """
     Fill value to input according to mask
-    
+
     Args:
         input: input matrix
         mask: mask matrix
@@ -235,14 +236,13 @@ def mask_fill(input, mask, value):
         [4, 0, 0]
     ]
     """
-    return input * paddle.logical_not(mask) + paddle.cast(mask,
-                                                          input.dtype) * value
+    return input * paddle.logical_not(mask) + paddle.cast(mask, input.dtype) * value
 
 
 def kmeans(x, k):
     """
     kmeans algorithm, put sentence id into k buckets according to sentence length
-    
+
     Args:
         x: list, sentence length
         k: int, k clusters
@@ -307,9 +307,9 @@ def eisner(scores, mask):
     batch_size, seq_len, _ = scores.shape
     scores = scores.transpose(2, 1, 0)
     # Score for incomplete span
-    s_i = np.full_like(scores, float('-inf'))
+    s_i = np.full_like(scores, float("-inf"))
     # Score for complete span
-    s_c = np.full_like(scores, float('-inf'))
+    s_c = np.full_like(scores, float("-inf"))
     # Incompelte span position for backtrack
     p_i = np.zeros((seq_len, seq_len, batch_size), dtype=np.int64)
     # Compelte span position for backtrack
@@ -351,7 +351,7 @@ def eisner(scores, mask):
         cr = cr.transpose(2, 0, 1)
         cr_span, cr_path = cr.max(-1), cr.argmax(-1)
         s_c = fill_diagonal(s_c, cr_span, offset=w)
-        s_c[0, w][np.not_equal(lens, w)] = float('-inf')
+        s_c[0, w][np.not_equal(lens, w)] = float("-inf")
         p_c = fill_diagonal(p_c, cr_path + starts + 1, offset=w)
 
     predicts = []
@@ -391,9 +391,7 @@ class DepTree:
 
     def build_tree(self):
         """Build the tree"""
-        self.nodes = [
-            Node(index, p_index) for index, p_index in enumerate(self.sentence)
-        ]
+        self.nodes = [Node(index, p_index) for index, p_index in enumerate(self.sentence)]
         # set root
         self.root = self.nodes[0]
         for node in self.nodes[1:]:

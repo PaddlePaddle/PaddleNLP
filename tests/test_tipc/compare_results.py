@@ -22,14 +22,11 @@ def parse_args():
 
 
 def run_shell_command(cmd):
-    p = subprocess.Popen(cmd,
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         shell=True)
+    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
     out, err = p.communicate()
 
     if p.returncode == 0:
-        return out.decode('utf-8')
+        return out.decode("utf-8")
     else:
         return None
 
@@ -54,7 +51,7 @@ def parser_results_from_log_by_name(log_path, names_list):
 def load_gt_from_file(gt_file):
     if not os.path.exists(gt_file):
         raise ValueError("The log file {} does not exists!".format(gt_file))
-    with open(gt_file, 'r') as f:
+    with open(gt_file, "r") as f:
         data = f.readlines()
         f.close()
     parser_gt = {}
@@ -120,11 +117,7 @@ if __name__ == "__main__":
 
         try:
             testing_assert_allclose(gt_dict, pred_dict)
-            print(
-                "Assert allclose passed! The results of {} and {} are consistent!"
-                .format(filename, gt_filename))
+            print("Assert allclose passed! The results of {} and {} are consistent!".format(filename, gt_filename))
         except Exception as E:
             print(E)
-            raise ValueError(
-                "The results of {} and the results of {} are inconsistent!".
-                format(filename, gt_filename))
+            raise ValueError("The results of {} and the results of {} are inconsistent!".format(filename, gt_filename))

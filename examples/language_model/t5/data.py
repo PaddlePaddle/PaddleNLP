@@ -21,34 +21,61 @@ from paddlenlp.datasets import load_dataset
 from utils import load_pickle, save_pickle
 import collections
 
-GLUE_PROCESSED = collections.OrderedDict([
-    ("cola", (["cola sentence: "], ["not_acceptable", "acceptable"])),
-    ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
-    (
-        "mrpc",
-        (["mrpc sentence1: ", " sentence2: "], ["not_equivalent",
-                                                "equivalent"]),
-    ),
-    ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
-    ("qqp", (["qqp question1: ",
-              " question2: "], ["not_duplicate", "duplicate"])),
-    (
-        "mnli",
+GLUE_PROCESSED = collections.OrderedDict(
+    [
+        ("cola", (["cola sentence: "], ["not_acceptable", "acceptable"])),
+        ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
         (
-            ["mnli hypothesis: ", " premise: "],
-            ["contradiction", "entailment", "neutral"],
+            "mrpc",
+            (["mrpc sentence1: ", " sentence2: "], ["not_equivalent", "equivalent"]),
         ),
-    ),
-    (
-        "qnli",
-        (["qnli question: ", " sentence: "], ["entailment", "not_entailment"]),
-    ),
-    (
-        "rte",
-        (["rte sentence1: ",
-          " rte sentence2: "], ["entailment", "not_entailment"]),
-    ),
-])
+        ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
+        ("qqp", (["qqp question1: ", " question2: "], ["not_duplicate", "duplicate"])),
+        (
+            "mnli",
+            (
+                ["mnli hypothesis: ", " premise: "],
+                ["contradiction", "entailment", "neutral"],
+            ),
+        ),
+        (
+            "qnli",
+            (["qnli question: ", " sentence: "], ["entailment", "not_entailment"]),
+        ),
+        (
+            "rte",
+            (["rte sentence1: ", " rte sentence2: "], ["entailment", "not_entailment"]),
+        ),
+    ]
+)
+
+GLUE_1_1_PROCESSED = collections.OrderedDict(
+    [
+        ("cola", (["cola sentence: "], ["outrageous", "acceptable"])),
+        ("sst-2", (["sst2 sentence: "], ["negative", "positive"])),
+        (
+            "mrpc",
+            (["mrpc sentence1: ", " sentence2: "], ["nonidentical", "equivalent"]),
+        ),
+        ("sts-b", (["stsb sentence1: ", " sentence2: "], None)),
+        ("qqp", (["qqp question1: ", " question2: "], ["inequable", "duplicate"])),
+        (
+            "mnli",
+            (
+                ["mnli hypothesis: ", " premise: "],
+                ["contradiction", "entailment", "neutral"],
+            ),
+        ),
+        (
+            "qnli",
+            (["qnli question: ", " sentence: "], ["entailment", "contradiction"]),
+        ),
+        (
+            "rte",
+            (["rte sentence1: ", " rte sentence2: "], ["entailment", "contradiction"]),
+        ),
+    ]
+)
 
 
 def trans_func(example, tokenizer, args):
@@ -64,15 +91,12 @@ def trans_func(example, tokenizer, args):
             label_text = id2label[example["labels"]]
         else:
             label_text = str(example["labels"])
-        target = tokenizer(label_text,
-                           return_token_type_ids=False,
-                           return_attention_mask=True)
+        target = tokenizer(label_text, return_token_type_ids=False, return_attention_mask=True)
 
     if len(processed) == 1:
         text = processed[0] + example["sentence"]
     else:
-        text = processed[0] + example["sentence1"] + processed[1] + example[
-            "sentence2"]
+        text = processed[0] + example["sentence1"] + processed[1] + example["sentence2"]
 
     source = tokenizer(
         text,
@@ -106,17 +130,13 @@ def get_train_dataloader(tokenizer, args):
         )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(ds,
-                                 batch_size=args.train_batch_size,
-                                 shuffle=True)
+    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=True)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(
@@ -144,17 +164,13 @@ def get_dev_dataloader(tokenizer, args):
         )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(ds,
-                                 batch_size=args.train_batch_size,
-                                 shuffle=False)
+    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(
@@ -185,17 +201,13 @@ def get_mnli_dev_dataloader(tokenizer, args, matched=True):
         )
         save_pickle(ds, filename)
 
-    batch_sampler = BatchSampler(ds,
-                                 batch_size=args.train_batch_size,
-                                 shuffle=False)
+    batch_sampler = BatchSampler(ds, batch_size=args.train_batch_size, shuffle=False)
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # attention_mask
         Pad(axis=0, pad_val=-100, dtype="int64"),  # lm_labels
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # decoder_attention_mask
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # decoder_attention_mask
     ): fn(samples)
 
     data_loader = DataLoader(

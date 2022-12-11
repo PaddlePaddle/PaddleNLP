@@ -15,18 +15,17 @@
 import os
 
 from paddlenlp.datasets import load_dataset
-from paddlenlp.prompt import InputExample
 
 
 def load_local_dataset(data_path, splits, label_list):
     """
     Load dataset for hierachical classification from files, where
-    there is one example per line. Text and label are seperated 
+    there is one example per line. Text and label are seperated
     by '\t', and multiple labels are delimited by ','.
 
     Args:
         data_path (str):
-            Path to the dataset directory, including label.txt, train.txt, 
+            Path to the dataset directory, including label.txt, train.txt,
             dev.txt (and data.txt).
         splits (list):
             Which file(s) to load, such as ['train', 'dev', 'test'].
@@ -39,22 +38,16 @@ def load_local_dataset(data_path, splits, label_list):
             for idx, line in enumerate(fp):
                 data = line.strip().split("\t")
                 if len(data) == 1:
-                    yield InputExample(text_a=data[0])
+                    yield {"text_a": data[0]}
                 else:
                     text, label = data
                     label = label.strip().split(",")
-                    label = [
-                        float(1) if x in label else float(0) for x in label_list
-                    ]
-                    yield InputExample(text_a=text, labels=label)
+                    label = [float(1) if x in label else float(0) for x in label_list]
+                    yield {"text_a": text, "labels": label}
 
     split_map = {"train": "train.txt", "dev": "dev.txt", "test": "test.txt"}
     datasets = []
     for split in splits:
         data_file = os.path.join(data_path, split_map[split])
-        datasets.append(
-            load_dataset(_reader,
-                         data_file=data_file,
-                         label_list=label_list,
-                         lazy=False))
+        datasets.append(load_dataset(_reader, data_file=data_file, label_list=label_list, lazy=False))
     return datasets

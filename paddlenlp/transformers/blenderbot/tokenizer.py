@@ -17,12 +17,12 @@
 from .. import GPTTokenizer, AddedToken
 from paddle.utils import try_import
 
-__all__ = ['BlenderbotTokenizer']
+__all__ = ["BlenderbotTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "blenderbot-3B": 128,
     "blenderbot-400M-distill": 128,
-    "blenderbot-1B-distill": 128
+    "blenderbot-1B-distill": 128,
 }
 
 
@@ -60,75 +60,63 @@ class BlenderbotTokenizer(GPTTokenizer):
             # {'input_ids': [863, 1329, 366, 1449, 373, 382, 1861, 618, 847, 911, 1372, 21, 2],
             # 'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]}
     """
-    resource_files_names = {
-        "vocab_file": "vocab.json",
-        "merges_file": "merges.txt"
-    }
+    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "blenderbot-400M-distill":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
-            "blenderbot-3B":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-vocab.json",
-            "blenderbot-1B-distill":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json"
+            "blenderbot-400M-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-vocab.json",
+            "blenderbot-3B": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-vocab.json",
+            "blenderbot-1B-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-vocab.json",
         },
         "merges_file": {
-            "blenderbot-400M-distill":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
-            "blenderbot-3B":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-merges.txt",
-            "blenderbot-1B-distill":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt"
-        }
+            "blenderbot-400M-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-400M-distill-merges.txt",
+            "blenderbot-3B": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-3B-merges.txt",
+            "blenderbot-1B-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/blenderbot/blenderbot-1B-distill-merges.txt",
+        },
     }
     pretrained_init_configuration = {
-        "blenderbot-3B": {
-            "add_prefix": True
-        },
-        "blenderbot-400M-distill": {
-            "add_prefix": True
-        },
-        "blenderbot-1B-distill": {
-            "add_prefix": True
-        }
+        "blenderbot-3B": {"add_prefix": True},
+        "blenderbot-400M-distill": {"add_prefix": True},
+        "blenderbot-1B-distill": {"add_prefix": True},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 max_len=None,
-                 special_tokens=None,
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 cls_token="<s>",
-                 sep_token="</s>",
-                 pad_token="<pad>",
-                 unk_token="<unk>",
-                 mask_token="<mask>",
-                 eol_token='\u010a',
-                 add_prefix=True,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        max_len=None,
+        special_tokens=None,
+        bos_token="<s>",
+        eos_token="</s>",
+        cls_token="<s>",
+        sep_token="</s>",
+        pad_token="<pad>",
+        unk_token="<unk>",
+        mask_token="<mask>",
+        eol_token="\u010a",
+        add_prefix=True,
+        **kwargs
+    ):
 
-        sep_token = AddedToken(sep_token,
-                               lstrip=False,
-                               rstrip=False,
-                               single_word=False,
-                               normalized=True) if isinstance(
-                                   sep_token, str) else sep_token
+        sep_token = (
+            AddedToken(sep_token, lstrip=False, rstrip=False, single_word=False, normalized=True)
+            if isinstance(sep_token, str)
+            else sep_token
+        )
 
         self._build_special_tokens_map_extended(sep_token=sep_token)
 
-        super(BlenderbotTokenizer, self).__init__(vocab_file=vocab_file,
-                                                  merges_file=merges_file,
-                                                  errors=errors,
-                                                  max_len=max_len,
-                                                  special_tokens=special_tokens,
-                                                  pad_token=pad_token,
-                                                  eos_token=eos_token,
-                                                  eol_token=eol_token)
+        super(BlenderbotTokenizer, self).__init__(
+            vocab_file=vocab_file,
+            merges_file=merges_file,
+            errors=errors,
+            max_len=max_len,
+            special_tokens=special_tokens,
+            pad_token=pad_token,
+            eos_token=eos_token,
+            eol_token=eol_token,
+        )
         self.add_prefix = add_prefix
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -160,15 +148,11 @@ class BlenderbotTokenizer(GPTTokenizer):
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
-    def prepare_for_tokenization(self,
-                                 text,
-                                 is_split_into_words=False,
-                                 **kwargs):
+    def prepare_for_tokenization(self, text, is_split_into_words=False, **kwargs):
         add_prefix = kwargs.pop("add_prefix", self.add_prefix)
         if is_split_into_words or add_prefix:
             text = " " + text

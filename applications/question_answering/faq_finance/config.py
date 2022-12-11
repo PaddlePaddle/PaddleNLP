@@ -12,27 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-search_param = {'nprobe': 20}
-collection_name = 'faq_finance'
-partition_tag = 'partition_1'
+search_param = {"nprobe": 20}
+collection_name = "faq_finance"
+partition_tag = "partition_1"
 
-MILVUS_HOST = '10.21.226.175'
+MILVUS_HOST = "10.21.226.175"
 MILVUS_PORT = 8530
 data_dim = 256
 top_k = 10
-embedding_name = 'embeddings'
+embedding_name = "embeddings"
 
 index_config = {
     "index_type": "IVF_FLAT",
     "metric_type": "L2",
-    "params": {
-        "nlist": 1000
-    },
+    "params": {"nlist": 1000},
 }
 
 search_params = {
     "metric_type": "L2",
-    "params": {
-        "nprobe": top_k
-    },
+    "params": {"nprobe": top_k},
 }

@@ -59,15 +59,11 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
             "<|endoftext|>",
         ]
         vocab_tokens = dict(zip(vocab, range(len(vocab))))
-        merges = [
-            "#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r", ""
-        ]
+        merges = ["#version: 0.2", "\u0120 l", "\u0120l o", "\u0120lo w", "e r", ""]
         self.special_tokens_map = {"unk_token": "<unk>"}
 
-        self.vocab_file = os.path.join(self.tmpdirname,
-                                       VOCAB_FILES_NAMES["vocab_file"])
-        self.merges_file = os.path.join(self.tmpdirname,
-                                        VOCAB_FILES_NAMES["merges_file"])
+        self.vocab_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["vocab_file"])
+        self.merges_file = os.path.join(self.tmpdirname, VOCAB_FILES_NAMES["merges_file"])
         with open(self.vocab_file, "w", encoding="utf-8") as fp:
             fp.write(json.dumps(vocab_tokens) + "\n")
         with open(self.merges_file, "w", encoding="utf-8") as fp:
@@ -83,8 +79,7 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return input_text, output_text
 
     def test_full_tokenizer(self):
-        tokenizer = CodeGenTokenizer(self.vocab_file, self.merges_file,
-                                     **self.special_tokens_map)
+        tokenizer = CodeGenTokenizer(self.vocab_file, self.merges_file, **self.special_tokens_map)
         text = "lower newer"
         bpe_tokens = ["\u0120low", "er", "\u0120", "n", "e", "w", "er"]
         tokens = tokenizer.tokenize(text, add_prefix_space=True)
@@ -92,8 +87,7 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         input_tokens = tokens + [tokenizer.unk_token]
         input_bpe_tokens = [14, 15, 10, 9, 3, 2, 15, 19]
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens),
-                             input_bpe_tokens)
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(input_tokens), input_bpe_tokens)
 
     def test_pretokenized_inputs(self, *args, **kwargs):
         # It's very difficult to mix/test pretokenization with byte-level
@@ -101,8 +95,7 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         pass
 
     def test_padding_if_pad_token_set_slow(self):
-        tokenizer = CodeGenTokenizer.from_pretrained(self.tmpdirname,
-                                                     pad_token="<pad>")
+        tokenizer = CodeGenTokenizer.from_pretrained(self.tmpdirname, pad_token="<pad>")
 
         # Simple input
         s = "This is a simple input"
@@ -115,26 +108,10 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         pad_token_id = tokenizer.pad_token_id
 
-        out_s = tokenizer(s,
-                          padding="max_length",
-                          max_length=30,
-                          return_tensors="np",
-                          return_attention_mask=True)
-        out_s2 = tokenizer(s2,
-                           padding=True,
-                           truncate=True,
-                           return_tensors="np",
-                           return_attention_mask=True)
-        out_p = tokenizer(*p,
-                          padding="max_length",
-                          max_length=60,
-                          return_tensors="np",
-                          return_attention_mask=True)
-        out_p2 = tokenizer(p2,
-                           padding=True,
-                           truncate=True,
-                           return_tensors="np",
-                           return_attention_mask=True)
+        out_s = tokenizer(s, padding="max_length", max_length=30, return_tensors="np", return_attention_mask=True)
+        out_s2 = tokenizer(s2, padding=True, truncate=True, return_tensors="np", return_attention_mask=True)
+        out_p = tokenizer(*p, padding="max_length", max_length=60, return_tensors="np", return_attention_mask=True)
+        out_p2 = tokenizer(p2, padding=True, truncate=True, return_tensors="np", return_attention_mask=True)
 
         # s
         # test single string max_length padding
@@ -170,9 +147,7 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_add_bos_token_slow(self):
         bos_token = "$$$"
-        tokenizer = CodeGenTokenizer.from_pretrained(self.tmpdirname,
-                                                     bos_token=bos_token,
-                                                     add_bos_token=True)
+        tokenizer = CodeGenTokenizer.from_pretrained(self.tmpdirname, bos_token=bos_token, add_bos_token=True)
 
         s = "This is a simple input"
         s2 = ["This is a simple input 1", "This is a simple input 2"]
@@ -193,18 +168,14 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     @slow
     def test_truncation(self):
-        tokenizer = CodeGenTokenizer.from_pretrained(
-            "Salesforce/codegen-350M-mono")
+        tokenizer = CodeGenTokenizer.from_pretrained("Salesforce/codegen-350M-mono")
 
         text = "\nif len_a > len_b:\n    result = a\nelse:\n    result = b\n\n\n\n#"
         expected_trucated_text = "\nif len_a > len_b:      result = a\nelse:      result = b"
 
         input_ids = tokenizer.encode(text)["input_ids"]
-        truncation_pattern = [
-            "^#", re.escape("<|endoftext|>"), "^'''", '^"""', "\n\n\n"
-        ]
-        decoded_text = tokenizer.decode(
-            input_ids, truncate_before_pattern=truncation_pattern)
+        truncation_pattern = ["^#", re.escape("<|endoftext|>"), "^'''", '^"""', "\n\n\n"]
+        decoded_text = tokenizer.decode(input_ids, truncate_before_pattern=truncation_pattern)
         self.assertEqual(decoded_text, expected_trucated_text)
 
     # tokenizer has no padding token
@@ -214,20 +185,15 @@ class CodeGenTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
     def test_pretrained_model_lists(self):
         # We should have at least one default checkpoint for each tokenizer
         # We should specify the max input length as well (used in some part to list the pretrained checkpoints)
-        self.assertGreaterEqual(
-            len(self.tokenizer_class.pretrained_resource_files_map), 1)
+        self.assertGreaterEqual(len(self.tokenizer_class.pretrained_resource_files_map), 1)
         self.assertEqual(
-            len(
-                list(
-                    self.tokenizer_class.pretrained_resource_files_map.values())
-                [0]),
+            len(list(self.tokenizer_class.pretrained_resource_files_map.values())[0]),
             len(self.tokenizer_class.max_model_input_sizes),
         )
 
         weights_list = list(self.tokenizer_class.max_model_input_sizes.keys())
         weights_lists_2 = []
-        for file_id, map_list in self.tokenizer_class.pretrained_resource_files_map.items(
-        ):
+        for file_id, map_list in self.tokenizer_class.pretrained_resource_files_map.items():
             weights_lists_2.append(list(map_list.keys()))
 
         for weights_list_2 in weights_lists_2:

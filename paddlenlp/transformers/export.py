@@ -23,24 +23,22 @@ __all__ = ["export_model"]
 
 
 def export_model(
-        model: "PretrainedModel",
-        input_spec=None,
-        path: Optional[str] = None,
-        model_format: Optional[str] = "paddle") -> Tuple[List[str], List[str]]:
+    model: "PretrainedModel", input_spec=None, path: Optional[str] = None, model_format: Optional[str] = "paddle"
+) -> Tuple[List[str], List[str]]:
     """
     Export paddle inference model or onnx model.
-    
+
     Args:
         model ([`PretrainedModel`]:
             The model to export.
         input_spec (paddle.static.InputSpec, optional):
-            Describes the input of the saved model’s forward method, which can be described 
+            Describes the input of the saved model’s forward method, which can be described
             by InputSpec or example Tensor.  Default None.
         path (Optional[str], optional):
             Output dir to save the exported model. Defaults to None.
-        model_format (Optional[str], optional): 
+        model_format (Optional[str], optional):
             Export model format. There are two options: paddle or onnx, defaults to paddle.
-            
+
     """
     if path is None:
         path = "./"
@@ -67,6 +65,4 @@ def export_model(
         paddle.onnx.export(model, save_path, input_spec=input_spec)
         logger.info("ONNX model exported.")
     else:
-        logger.info(
-            "This export format is not supported, please select paddle or onnx!"
-        )
+        logger.info("This export format is not supported, please select paddle or onnx!")

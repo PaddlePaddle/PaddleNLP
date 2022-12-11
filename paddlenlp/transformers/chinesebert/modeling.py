@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,14 +54,12 @@ __all__ = [
 
 
 class PinyinEmbedding(nn.Layer):
-
-    def __init__(self, pinyin_map_len: int, embedding_size: int,
-                 pinyin_out_dim: int):
+    def __init__(self, pinyin_map_len: int, embedding_size: int, pinyin_out_dim: int):
         """
         Pinyin Embedding Layer.
 
         Args:
-            pinyin_map_len (int): the size of pinyin map, which about 26 Romanian characters and 6 numbers. 
+            pinyin_map_len (int): the size of pinyin map, which about 26 Romanian characters and 6 numbers.
             embedding_size (int): the size of each embedding vector.
             pinyin_out_dim (int): kernel number of conv.
 
@@ -88,23 +86,18 @@ class PinyinEmbedding(nn.Layer):
 
         """
         # input pinyin ids for 1-D conv
-        embed = self.embedding(
-            pinyin_ids)  # [bs,sentence_length*pinyin_locs,embed_size]
+        embed = self.embedding(pinyin_ids)  # [bs,sentence_length*pinyin_locs,embed_size]
         bs, sentence_length, pinyin_locs, embed_size = embed.shape
         view_embed = embed.reshape(
-            shape=[-1, pinyin_locs,
-                   embed_size])  # [(bs*sentence_length),pinyin_locs,embed_size]
-        input_embed = view_embed.transpose(
-            [0, 2, 1])  # [(bs*sentence_length), embed_size, pinyin_locs]
+            shape=[-1, pinyin_locs, embed_size]
+        )  # [(bs*sentence_length),pinyin_locs,embed_size]
+        input_embed = view_embed.transpose([0, 2, 1])  # [(bs*sentence_length), embed_size, pinyin_locs]
         # conv + max_pooling
-        pinyin_conv = self.conv(
-            input_embed)  # [(bs*sentence_length),pinyin_out_dim,H]
-        pinyin_embed = F.max_pool1d(
-            pinyin_conv,
-            pinyin_conv.shape[-1])  # [(bs*sentence_length),pinyin_out_dim,1]
+        pinyin_conv = self.conv(input_embed)  # [(bs*sentence_length),pinyin_out_dim,H]
+        pinyin_embed = F.max_pool1d(pinyin_conv, pinyin_conv.shape[-1])  # [(bs*sentence_length),pinyin_out_dim,1]
         return pinyin_embed.reshape(
-            shape=[bs, sentence_length,
-                   self.pinyin_out_dim])  # [bs,sentence_length,pinyin_out_dim]
+            shape=[bs, sentence_length, self.pinyin_out_dim]
+        )  # [bs,sentence_length,pinyin_out_dim]
 
 
 class GlyphEmbedding(nn.Layer):
@@ -112,8 +105,7 @@ class GlyphEmbedding(nn.Layer):
 
     def __init__(self, num_embeddings, embedding_dim):
         super(GlyphEmbedding, self).__init__()
-        self.embedding = nn.Embedding(num_embeddings=num_embeddings,
-                                      embedding_dim=embedding_dim)
+        self.embedding = nn.Embedding(num_embeddings=num_embeddings, embedding_dim=embedding_dim)
 
     def forward(self, input_ids):
         """
@@ -124,7 +116,7 @@ class GlyphEmbedding(nn.Layer):
 
         Returns:
             images (Tensor): Its shape is [batch, sentence_length, self.font_num*self.font_size*self.font_size].
-        
+
         """
         # return self.embedding(input_ids).reshape([-1, self.font_num, self.font_size, self.font_size])
         return self.embedding(input_ids)
@@ -148,11 +140,8 @@ class FusionBertEmbeddings(nn.Layer):
         hidden_dropout_prob=0.1,
     ):
         super(FusionBertEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(vocab_size,
-                                            hidden_size,
-                                            padding_idx=pad_token_id)
-        self.position_embeddings = nn.Embedding(max_position_embeddings,
-                                                hidden_size)
+        self.word_embeddings = nn.Embedding(vocab_size, hidden_size, padding_idx=pad_token_id)
+        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
         self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
         self.pinyin_embeddings = PinyinEmbedding(
             pinyin_map_len=pinyin_map_len,
@@ -169,15 +158,10 @@ class FusionBertEmbeddings(nn.Layer):
         # position_ids (1, len position emb) is contiguous in memory and exported when serialized
         self.register_buffer(
             "position_ids",
-            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"),
-                          shape=[1, -1]),
+            paddle.expand(paddle.arange(max_position_embeddings, dtype="int64"), shape=[1, -1]),
         )
 
-    def forward(self,
-                input_ids,
-                pinyin_ids,
-                token_type_ids=None,
-                position_ids=None):
+    def forward(self, input_ids, pinyin_ids, token_type_ids=None, position_ids=None):
 
         input_shape = input_ids.shape
         seq_length = input_shape[1]
@@ -191,14 +175,12 @@ class FusionBertEmbeddings(nn.Layer):
         word_embeddings = self.word_embeddings(input_ids)  # [bs,l,hidden_size]
 
         pinyin_embeddings = self.pinyin_embeddings(
-            pinyin_ids.reshape(
-                shape=[input_shape[0], seq_length, 8]))  # [bs,l,hidden_size]
+            pinyin_ids.reshape(shape=[input_shape[0], seq_length, 8])
+        )  # [bs,l,hidden_size]
 
-        glyph_embeddings = self.glyph_map(
-            self.glyph_embeddings(input_ids))  # [bs,l,hidden_size]
+        glyph_embeddings = self.glyph_map(self.glyph_embeddings(input_ids))  # [bs,l,hidden_size]
         # fusion layer
-        concat_embeddings = paddle.concat(
-            (word_embeddings, pinyin_embeddings, glyph_embeddings), axis=2)
+        concat_embeddings = paddle.concat((word_embeddings, pinyin_embeddings, glyph_embeddings), axis=2)
         inputs_embeds = self.map_fc(concat_embeddings)
 
         position_embeddings = self.position_embeddings(position_ids)
@@ -260,10 +242,8 @@ class ChineseBertPretrainedModel(PretrainedModel):
 
     pretrained_resource_files_map = {
         "model_state": {
-            "ChineseBERT-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
-            "ChineseBERT-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
+            "ChineseBERT-base": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-base/model_state.pdparams",
+            "ChineseBERT-large": "https://bj.bcebos.com/paddlenlp/models/transformers/chinese_bert/chinesebert-large/model_state.pdparams",
         }
     }
 
@@ -277,15 +257,16 @@ class ChineseBertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else
-                        self.chinesebert.config["initializer_range"],
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.chinesebert.config["initializer_range"],
                         shape=layer.weight.shape,
-                    ))
+                    )
+                )
         elif isinstance(layer, nn.LayerNorm):
-            layer._epsilon = (self.layer_norm_eps if hasattr(
-                self, "layer_norm_eps") else
-                              self.chinesebert.config["layer_norm_eps"])
+            layer._epsilon = (
+                self.layer_norm_eps if hasattr(self, "layer_norm_eps") else self.chinesebert.config["layer_norm_eps"]
+            )
 
 
 @register_base_model
@@ -348,7 +329,7 @@ class ChineseBertModel(ChineseBertPretrainedModel):
         pooled_act (str, optional):
             The non-linear activation function in the pooling layer.
             Defaults to `"tanh"`.
-        
+
         layer_norm_eps
             The epsilon of layernorm.
             Defaults to `1e-12`.
@@ -356,7 +337,7 @@ class ChineseBertModel(ChineseBertPretrainedModel):
         glyph_embedding_dim (int, optional):
             The dim of glyph_embedding.
             Defaults to `1728`.
-        
+
         pinyin_map_len=32 (int, optional):
             The length of pinyin map.
             Defaults to `32`.
@@ -410,14 +391,16 @@ class ChineseBertModel(ChineseBertPretrainedModel):
         self.pooler = BertPooler(hidden_size, pool_act)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                pinyin_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                output_hidden_states=False):
-        r'''
+    def forward(
+        self,
+        input_ids,
+        pinyin_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        output_hidden_states=False,
+    ):
+        r"""
         The ChineseBert forward method, overrides the `__call__()` special method.
 
         Args:
@@ -428,7 +411,7 @@ class ChineseBertModel(ChineseBertPretrainedModel):
             pinyin_ids (Tensor, optional):
                 Indices of input sequence tokens pinyin. We apply a CNN model with width 2 on the pinyin
                 sequence, followed by max-pooling to derive the resulting pinyin embedding. This makes output
-                dimensionality immune to the length of the input pinyin sequence. The length of the input pinyin 
+                dimensionality immune to the length of the input pinyin sequence. The length of the input pinyin
                 sequence is fixed at 8.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length, 8].
                 Defaults to `None`, which means we don't add pinyin embeddings.
@@ -491,12 +474,11 @@ class ChineseBertModel(ChineseBertPretrainedModel):
                 inputs = tokenizer("欢迎使用百度飞桨!")
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == self.pad_token_id).astype(
-                    self.pooler.dense.weight.dtype) * -1e4,
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4,
                 axis=[1, 2],
             )
 
@@ -537,7 +519,7 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
             The dropout probability for output of ChineseBert.
             If None, use the same value as `hidden_dropout_prob` of `ChineseBertModel`
             instance `chinesebert`. Defaults to `None`.
-        """
+    """
 
     def __init__(self, chinesebert):
         super(ChineseBertForQuestionAnswering, self).__init__()
@@ -587,10 +569,7 @@ class ChineseBertForQuestionAnswering(ChineseBertPretrainedModel):
                 start_logits = outputs[0]
                 end_logits = outputs[1]
         """
-        sequence_output, _ = self.chinesebert(input_ids,
-                                              pinyin_ids,
-                                              token_type_ids=token_type_ids,
-                                              position_ids=None)
+        sequence_output, _ = self.chinesebert(input_ids, pinyin_ids, token_type_ids=token_type_ids, position_ids=None)
 
         logits = self.classifier(sequence_output)
         logits = paddle.transpose(logits, perm=[2, 0, 1])
@@ -619,18 +598,11 @@ class ChineseBertForSequenceClassification(ChineseBertPretrainedModel):
         super(ChineseBertForSequenceClassification, self).__init__()
         self.num_classes = num_classes
         self.chinesebert = chinesebert  # allow chinesebert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  chinesebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"],
-                                    self.num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.chinesebert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"], self.num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                pinyin_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The ChineseBertForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -702,18 +674,11 @@ class ChineseBertForTokenClassification(ChineseBertPretrainedModel):
         super(ChineseBertForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.chinesebert = chinesebert  # allow chinesebert to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.
-                                  chinesebert.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"],
-                                    self.num_classes)
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.chinesebert.config["hidden_dropout_prob"])
+        self.classifier = nn.Linear(self.chinesebert.config["hidden_size"], self.num_classes)
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                pinyin_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None):
+    def forward(self, input_ids, pinyin_ids=None, token_type_ids=None, position_ids=None, attention_mask=None):
         r"""
         The ChineseBertForTokenClassification forward method, overrides the __call__() special method.
 
@@ -781,19 +746,20 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
             self.chinesebert.config["hidden_size"],
             self.chinesebert.config["vocab_size"],
             self.chinesebert.config["hidden_act"],
-            embedding_weights=self.chinesebert.embeddings.word_embeddings.
-            weight,
+            embedding_weights=self.chinesebert.embeddings.word_embeddings.weight,
         )
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                pinyin_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None):
+    def forward(
+        self,
+        input_ids,
+        pinyin_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        masked_positions=None,
+    ):
         r"""
 
         Args:
@@ -834,8 +800,7 @@ class ChineseBertForPretraining(ChineseBertPretrainedModel):
                 attention_mask=attention_mask,
             )
             sequence_output, pooled_output = outputs[:2]
-            prediction_scores, seq_relationship_score = self.cls(
-                sequence_output, pooled_output, masked_positions)
+            prediction_scores, seq_relationship_score = self.cls(sequence_output, pooled_output, masked_positions)
             return prediction_scores, seq_relationship_score
 
 
@@ -855,8 +820,9 @@ class ChineseBertPretrainingCriterion(nn.Layer):
         self.loss_fn = nn.loss.CrossEntropyLoss(ignore_index=-1)
         self.vocab_size = vocab_size
 
-    def forward(self, prediction_scores, seq_relationship_score,
-                masked_lm_labels, next_sentence_labels, masked_lm_scale):
+    def forward(
+        self, prediction_scores, seq_relationship_score, masked_lm_labels, next_sentence_labels, masked_lm_scale
+    ):
         """
         Args:
             prediction_scores(Tensor):
@@ -885,12 +851,7 @@ class ChineseBertPretrainingCriterion(nn.Layer):
 
         """
         with paddle.static.amp.fp16_guard():
-            masked_lm_loss = F.cross_entropy(prediction_scores,
-                                             masked_lm_labels,
-                                             reduction="none",
-                                             ignore_index=-1)
+            masked_lm_loss = F.cross_entropy(prediction_scores, masked_lm_labels, reduction="none", ignore_index=-1)
             masked_lm_loss = masked_lm_loss / masked_lm_scale
-            next_sentence_loss = F.cross_entropy(seq_relationship_score,
-                                                 next_sentence_labels,
-                                                 reduction="none")
+            next_sentence_loss = F.cross_entropy(seq_relationship_score, next_sentence_labels, reduction="none")
         return paddle.sum(masked_lm_loss) + paddle.mean(next_sentence_loss)

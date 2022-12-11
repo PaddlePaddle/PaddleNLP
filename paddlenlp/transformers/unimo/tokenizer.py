@@ -25,12 +25,12 @@ from ...data.vocab import Vocab
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
-__all__ = ['UNIMOTokenizer']
+__all__ = ["UNIMOTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "unimo-text-1.0": 513,
     "unimo-text-1.0-lcsts-new": 513,
-    "unimo-text-1.0-large": 512
+    "unimo-text-1.0-large": 512,
 }
 
 
@@ -45,7 +45,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
     please refer to this superclass.
 
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
         do_lower_case (str, optional):
@@ -85,72 +85,49 @@ class UNIMOTokenizer(PretrainedTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "unimo-text-1.0":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-lcsts-new":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
-            "unimo-text-1.0-summary":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-dureader_qg":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-question-generation":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-question-generation-full_domain":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
-            "unimo-text-1.0-question-generation-dureader_qg":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-lcsts-new": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-large": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-large-vocab.txt",
+            "unimo-text-1.0-summary": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-dureader_qg": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation-full_domain": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
+            "unimo-text-1.0-question-generation-dureader_qg": "https://bj.bcebos.com/paddlenlp/models/transformers/unimo/unimo-text-1.0-vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "unimo-text-1.0": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-lcsts-new": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-large": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-summary": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-dureader_qg": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-question-generation": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-question-generation-full_domain": {
-            "do_lower_case": True
-        },
-        "unimo-text-1.0-question-generation-dureader_qg": {
-            "do_lower_case": True
-        },
+        "unimo-text-1.0": {"do_lower_case": True},
+        "unimo-text-1.0-lcsts-new": {"do_lower_case": True},
+        "unimo-text-1.0-large": {"do_lower_case": True},
+        "unimo-text-1.0-summary": {"do_lower_case": True},
+        "unimo-text-1.0-dureader_qg": {"do_lower_case": True},
+        "unimo-text-1.0-question-generation": {"do_lower_case": True},
+        "unimo-text-1.0-question-generation-full_domain": {"do_lower_case": True},
+        "unimo-text-1.0-question-generation-dureader_qg": {"do_lower_case": True},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(vocab_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = UNIMOTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(vocab_file))
+                "`tokenizer = UNIMOTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(vocab_file)
+            )
         self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.basic_tokenizer = BasicTokenizer(do_lower_case=do_lower_case)
-        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab,
-                                                      unk_token=unk_token)
+        self.wordpiece_tokenizer = WordpieceTokenizer(vocab=self.vocab, unk_token=unk_token)
 
     @property
     def vocab_size(self):
@@ -163,30 +140,19 @@ class UNIMOTokenizer(PretrainedTokenizer):
         return len(self.vocab)
 
     @staticmethod
-    def load_vocabulary(filepath,
-                        unk_token=None,
-                        pad_token=None,
-                        bos_token=None,
-                        eos_token=None,
-                        **kwargs):
+    def load_vocabulary(filepath, unk_token=None, pad_token=None, bos_token=None, eos_token=None, **kwargs):
         token_to_idx = {}
-        with open(filepath, 'r', encoding='utf-8') as f:
+        with open(filepath, "r", encoding="utf-8") as f:
             for line in f:
-                token, index = line.rstrip('\n').split('\t')
+                token, index = line.rstrip("\n").split("\t")
                 token_to_idx[token] = int(index)
-        vocab = Vocab.from_dict(token_to_idx,
-                                unk_token=unk_token,
-                                pad_token=pad_token,
-                                bos_token=bos_token,
-                                eos_token=eos_token,
-                                **kwargs)
+        vocab = Vocab.from_dict(
+            token_to_idx, unk_token=unk_token, pad_token=pad_token, bos_token=bos_token, eos_token=eos_token, **kwargs
+        )
         return vocab
 
     def get_vocab(self):
-        vocab = {
-            self.convert_ids_to_tokens(i): i
-            for i in range(self.vocab_size)
-        }
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
         return vocab
 
     def _tokenize(self, text):
@@ -248,9 +214,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         r"""
@@ -302,9 +266,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
 
         return ret
 
-    def build_offset_mapping_with_special_tokens(self,
-                                                 offset_mapping_0,
-                                                 offset_mapping_1=None):
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
         r"""
         Build offset map from a pair of offset map by concatenating and adding
         offsets of special tokens.
@@ -328,12 +290,9 @@ class UNIMOTokenizer(PretrainedTokenizer):
         if offset_mapping_1 is None:
             return [(0, 0)] + offset_mapping_0 + [(0, 0)]
 
-        return [(0, 0)] + offset_mapping_0 + [(0, 0)
-                                              ] + offset_mapping_1 + [(0, 0)]
+        return [(0, 0)] + offset_mapping_0 + [(0, 0)] + offset_mapping_1 + [(0, 0)]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         r"""
         Create a mask from the two sequences passed to be used in a sequence-pair
         classification task.
@@ -361,25 +320,26 @@ class UNIMOTokenizer(PretrainedTokenizer):
         _cls = [self.cls_token_id]
         if token_ids_1 is None:
             return len(_cls + token_ids_0 + _sep) * [0]
-        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 +
-                                                          _sep) * [1]
+        return len(_cls + token_ids_0 + _sep) * [0] + len(token_ids_1 + _sep) * [1]
 
-    def gen_encode(self,
-                   source,
-                   title=None,
-                   target=None,
-                   max_seq_len=512,
-                   max_title_len=128,
-                   max_target_len=128,
-                   return_position_ids=True,
-                   return_token_type_ids=True,
-                   return_attention_mask=True,
-                   return_length=False,
-                   add_start_token_for_decoding=False,
-                   pad_to_max_seq_len=False,
-                   return_tensors=False,
-                   is_split_into_words=False,
-                   continuous_position=False):
+    def gen_encode(
+        self,
+        source,
+        title=None,
+        target=None,
+        max_seq_len=512,
+        max_title_len=128,
+        max_target_len=128,
+        return_position_ids=True,
+        return_token_type_ids=True,
+        return_attention_mask=True,
+        return_length=False,
+        add_start_token_for_decoding=False,
+        pad_to_max_seq_len=False,
+        return_tensors=False,
+        is_split_into_words=False,
+        continuous_position=False,
+    ):
         """
         Main method for encoding the source for generation. It will return a
         dictionary containing the encoded sequence and other relative informations
@@ -474,40 +434,40 @@ class UNIMOTokenizer(PretrainedTokenizer):
         """
 
         # Input type checking for clearer error
-        assert isinstance(source, str), (
-            "The input `source` must be with type `str` (single context). "
-            " But received: {}".format(source))
-        assert target is None or isinstance(target, str), (
-            "The input `target` must of be with type `str`. But received: {}".
-            format(target))
-        assert title is None or isinstance(title, str), (
-            "The input `title` must of be with type `str`. But received: {}".
-            format(title))
+        assert isinstance(
+            source, str
+        ), "The input `source` must be with type `str` (single context). " " But received: {}".format(source)
+        assert target is None or isinstance(
+            target, str
+        ), "The input `target` must of be with type `str`. But received: {}".format(target)
+        assert title is None or isinstance(
+            title, str
+        ), "The input `title` must of be with type `str`. But received: {}".format(title)
         assert max_seq_len > max_title_len + max_target_len, (
             "`max_seq_len` must be greater than the sum of `max_target_len` "
             "and `max_title_len`. But received `max_seq_len` is {}, "
-            "`max_target_len` is {}, `max_title_len` is {}.".format(
-                max_seq_len, max_title_len, max_target_len))
+            "`max_target_len` is {}, `max_title_len` is {}.".format(max_seq_len, max_title_len, max_target_len)
+        )
         assert target is None or not add_start_token_for_decoding, (
             "`add_start_token_for_decoding` only works when `target` is "
             "`None`. But received `add_start_token_for_decoding`: `{}`, "
-            "`target`: {}.".format(add_start_token_for_decoding, target))
+            "`target`: {}.".format(add_start_token_for_decoding, target)
+        )
 
         title_ids = []
         if title is not None:
             tokens = self._tokenize(title)
             title_ids = self.convert_tokens_to_ids(tokens)
             if len(title_ids) > max_title_len - 1:
-                title_ids = title_ids[:max_title_len - 1]
+                title_ids = title_ids[: max_title_len - 1]
             title_ids += [self.sep_token_id]
 
         target_ids = []
         if target is not None:
             tokens = self._tokenize(target)
-            target_ids = [self.cls_token_id
-                          ] + self.convert_tokens_to_ids(tokens)
+            target_ids = [self.cls_token_id] + self.convert_tokens_to_ids(tokens)
             if len(target_ids) > max_target_len - 1:
-                target_ids = target_ids[:max_target_len - 1]
+                target_ids = target_ids[: max_target_len - 1]
             target_ids += [self.mask_token_id]
         elif add_start_token_for_decoding:
             target_ids = [self.cls_token_id]
@@ -520,7 +480,7 @@ class UNIMOTokenizer(PretrainedTokenizer):
         source_ids = self.convert_tokens_to_ids(tokens)
 
         if len(source_ids) > max_source_len - 1:
-            source_ids = source_ids[:max_source_len - 1]
+            source_ids = source_ids[: max_source_len - 1]
 
         source_ids += [self.sep_token_id]
         source_ids = title_ids + source_ids
@@ -537,25 +497,18 @@ class UNIMOTokenizer(PretrainedTokenizer):
         # avoid the last time step being a pad, so take padding on the left.
         pad_length = max_seq_len - sequence_length if pad_to_max_seq_len else 0
         if pad_length > 0:
-            encoded_inputs["input_ids"] = [
-                self.pad_token_id
-            ] * pad_length + encoded_inputs["input_ids"]
+            encoded_inputs["input_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["input_ids"]
         if return_tensors:
             # Add dimention for batch_size
-            encoded_inputs["input_ids"] = paddle.to_tensor(
-                encoded_inputs["input_ids"]).unsqueeze(0)
+            encoded_inputs["input_ids"] = paddle.to_tensor(encoded_inputs["input_ids"]).unsqueeze(0)
 
         if return_token_type_ids:
-            encoded_inputs["token_type_ids"] = [0] * len(
-                source_ids) + [1] * len(target_ids)
+            encoded_inputs["token_type_ids"] = [0] * len(source_ids) + [1] * len(target_ids)
             if pad_length > 0:
-                encoded_inputs["token_type_ids"] = [
-                    self.pad_token_id
-                ] * pad_length + encoded_inputs["token_type_ids"]
+                encoded_inputs["token_type_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["token_type_ids"]
             if return_tensors:
                 # Add dimention for batch_size
-                encoded_inputs["token_type_ids"] = paddle.to_tensor(
-                    encoded_inputs["token_type_ids"]).unsqueeze(0)
+                encoded_inputs["token_type_ids"] = paddle.to_tensor(encoded_inputs["token_type_ids"]).unsqueeze(0)
 
         if return_length:
             encoded_inputs["seq_len"] = sequence_length
@@ -564,36 +517,28 @@ class UNIMOTokenizer(PretrainedTokenizer):
             if continuous_position:
                 encoded_inputs["position_ids"] = list(range(sequence_length))
             else:
-                encoded_inputs["position_ids"] = list(range(
-                    len(source_ids))) + list(range(len(target_ids)))
+                encoded_inputs["position_ids"] = list(range(len(source_ids))) + list(range(len(target_ids)))
             if pad_length > 0:
-                encoded_inputs["position_ids"] = [
-                    self.pad_token_id
-                ] * pad_length + encoded_inputs["position_ids"]
+                encoded_inputs["position_ids"] = [self.pad_token_id] * pad_length + encoded_inputs["position_ids"]
             if return_tensors:
                 # Add dimention for batch_size
-                encoded_inputs["position_ids"] = paddle.to_tensor(
-                    encoded_inputs["position_ids"]).unsqueeze(0)
+                encoded_inputs["position_ids"] = paddle.to_tensor(encoded_inputs["position_ids"]).unsqueeze(0)
 
         if return_attention_mask:
-            attention_mask = np.ones(
-                (sequence_length, sequence_length), dtype='float32') * -1e4
+            attention_mask = np.ones((sequence_length, sequence_length), dtype="float32") * -1e4
             start = len(source_ids)
             end = sequence_length
             attention_mask[:end, :start] = 0.0
             # Generate the lower triangular matrix using the slice of matrix
-            tmp = np.triu(
-                np.ones([end - start, end - start], dtype='float32') * -1e4, 1)
+            tmp = np.triu(np.ones([end - start, end - start], dtype="float32") * -1e4, 1)
             attention_mask[start:end, start:end] = tmp
             encoded_inputs["attention_mask"] = attention_mask
             if pad_length > 0:
-                new_mask = np.ones(
-                    (max_seq_len, max_seq_len), dtype='float32') * -1e4
+                new_mask = np.ones((max_seq_len, max_seq_len), dtype="float32") * -1e4
                 new_mask[-sequence_length:, -sequence_length:] = attention_mask
                 encoded_inputs["attention_mask"] = new_mask
             if return_tensors:
                 # Add dimentions for batch_size and num_heads
-                encoded_inputs["attention_mask"] = paddle.to_tensor(
-                    encoded_inputs["attention_mask"]).unsqueeze((0, 1))
+                encoded_inputs["attention_mask"] = paddle.to_tensor(encoded_inputs["attention_mask"]).unsqueeze((0, 1))
 
         return encoded_inputs
