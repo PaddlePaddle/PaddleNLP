@@ -18,6 +18,7 @@
                * [CPU 性能](#CPU性能)
                * [GPU 性能](#CPU性能)
    * [使用 FastTokenizer 加速](#使用FastTokenizer加速)
+   * [模型导出](#模型导出)
    * [部署](#部署)
        * [Python 部署](#Python部署)
        * [服务化部署](#服务化部署)
@@ -1561,6 +1562,22 @@ fast_tokenizer.set_thread_num(4)
 from paddlenlp.transformers import AutoTokenizer
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
+
+<a name="模型导出"></a>
+## 模型导出
+使用动态图训练结束之后，还可以将动态图参数导出成静态图参数，静态图模型将用于后续的推理部署工作。具体代码见[静态图导出脚本](export_model.py)，静态图参数保存在output_path指定路径中。目前支持文本分类、序列标注任务的模型导出，
+
+```shell
+python export_model.py --params_path ./best_clue_model/ --output_path ./tnews --task_type seq_cls
+```
+
+
+| 参数                       | 参数说明    |
+| -------------------------- | ------------- |
+| --params_path              | 动态图训练保存的参数路径。默认为"./checkpoint/"。 |
+| --output_path              | 静态图保存的参数路径；默认为"./export"。 |
+| --task_type                | 任务类型。默认为"seq_cls"。可选列表：["seq_cls", "token_cls"] |
+
 
 <a name="部署"></a>
 
