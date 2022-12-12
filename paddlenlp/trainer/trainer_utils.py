@@ -16,25 +16,25 @@
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
 """
-Utilities for the Trainer class. 
+Utilities for the Trainer class.
 """
 import datetime
 import json
+import math
 import os
 import random
 import re
 import time
-import math
 from enum import Enum
-from typing import Dict, NamedTuple, Optional, Tuple, Union, List
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
-from ..utils.log import logger
 from ..transformers.tokenizer_utils_base import BatchEncoding
+from ..utils.log import logger
 
 __all__ = [
     "TrainOutput",
@@ -457,18 +457,6 @@ def has_length(dataset):
     except (TypeError, ValueError, RuntimeError):
         # TypeError: len() of unsized object
         return False
-
-
-def get_last_checkpoint(folder):
-    content = os.listdir(folder)
-    checkpoints = [
-        path
-        for path in content
-        if _re_checkpoint.search(path) is not None and os.path.isdir(os.path.join(folder, path))
-    ]
-    if len(checkpoints) == 0:
-        return
-    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IterableDatasetShard(IterableDataset):
