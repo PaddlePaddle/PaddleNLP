@@ -619,7 +619,7 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
     if multilingual:
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
+            "position_ids": encoded_inputs["position_ids"],
             "start_positions": start_ids,
             "end_positions": end_ids,
         }
@@ -627,8 +627,8 @@ def convert_example(example, tokenizer, max_seq_len, multilingual=False):
         tokenized_output = {
             "input_ids": encoded_inputs["input_ids"],
             "token_type_ids": encoded_inputs["token_type_ids"],
-            "pos_ids": encoded_inputs["position_ids"],
-            "att_mask": encoded_inputs["attention_mask"],
+            "position_ids": encoded_inputs["position_ids"],
+            "attention_mask": encoded_inputs["attention_mask"],
             "start_positions": start_ids,
             "end_positions": end_ids,
         }
