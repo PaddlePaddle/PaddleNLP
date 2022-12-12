@@ -34,9 +34,9 @@
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
 </div>
 
-#### UIE-X 🧾
+#### News 📢: UIE-X 🧾
 
-**全新升级UIE-X，新增文档抽取功能**，欢迎体验 👉 [信息抽取应用](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/#readme)
+**全新升级UIE-X，除已有纯文本抽取的全部功能外，新增文档抽取能力**，欢迎体验 👉 [信息抽取应用](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/#readme)
 
 #### UIE的优势
 

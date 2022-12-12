@@ -45,10 +45,10 @@ def evaluate(model, metric, data_loader, multilingual=False):
     metric.reset()
     for batch in data_loader:
         if multilingual:
-            start_prob, end_prob = model(batch["input_ids"], batch["pos_ids"])
+            start_prob, end_prob = model(batch["input_ids"], batch["position_ids"])
         else:
             start_prob, end_prob = model(
-                batch["input_ids"], batch["token_type_ids"], batch["pos_ids"], batch["att_mask"]
+                batch["input_ids"], batch["token_type_ids"], batch["position_ids"], batch["attention_mask"]
             )
 
         start_ids = paddle.cast(batch["start_positions"], "float32")
