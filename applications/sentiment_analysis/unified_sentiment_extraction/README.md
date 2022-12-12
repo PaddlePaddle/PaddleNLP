@@ -20,7 +20,7 @@
 
 <a name="1"></a>
 
-## **1. 应用简介**
+## **1. 情感分析应用简介**
 
 PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需求，同时针对情感分析领域的痛点和难点，基于前沿模型开源了细粒度的情感分析解决方案，助力开发者快速分析业务相关产品或服务的用户感受。本项目以通用信息抽取模型UIE为训练底座，同时利用大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，并通过信息抽取的方式解决情感分析相应问题。
 
@@ -28,23 +28,26 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
     <img src="https://user-images.githubusercontent.com/35913314/199965793-f0933baa-5b82-47da-9271-ba36642119f8.png" />
 </div>
 
-**方案亮点**：
-
-- **提供强大训练基座，覆盖情感分析多项基础能力🏃**： 本项目以通用信息抽取模型UIE为训练底座，并基于大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，同时支持常见的基础情感分析能力。
-- **用户友好的情感分析方案，从输入数据直达分析结果可视化✊**： 打通了从数据输入到情感分析结果可视化的流程，帮助开发者可以更轻松地获取情感分析结果，更聚焦于业务分析。
-- **支持定制面向垂域的情感分析能力，解决同义属性聚合以及隐性观点抽取👶**： 在某项产品/服务垂域场景中，业务方可能比较关注的属性有限的。本项目支持根据预先给定的属性集进行情感分析，同时支持解决常见情感分析过程中的同义属性聚合以及隐性观点抽取功能。
-
 <a name="2"></a>
 
-## **2. 快速开始**
+## **2. 特色介绍**
 
-<a name="2.1"></a>
+- **功能丰富🎓**：提供情感分析训练模型作为底座，支持语句级情感分析和评价维度级情感分析，覆盖情感分类、评价维度与观点抽取、同义评价维度聚合、隐性观点抽取、可视化分析等常见情感分析任务。
+- **效果领先✊**： 以通用信息抽取模型UIE为训练底座，具有较强的零样本预测和小样本微调能力。
+- **开箱即用👶**：打通Taskflow使用流程，3行代码获取分析结果，同时提供了情感分析结果可视化能力。
+- **定制模型🏃**：支持针对特定业务场景进行全流程定制，包括数据标注、样本构建、模型训练和模型测试，同时通过融合业务相关的同义评价维度词和隐性观点词，可进一步提高模型针对业务场景的情感分析能力。
 
-### **2.1 运行环境**
-- python >= 3.7
-- paddlepaddle >= 2.3
-- paddlenlp >= 2.4.4
-- wordcloud >= 1.8.2
+
+<a name="3"></a>
+
+## **3. 运行环境**
+
+**安装依赖**
+
+- python == 3.9.12
+- paddlepaddle == 2.3.2
+- paddlenlp == 2.4.5
+- wordcloud == 1.8.2.2
 
 **安装PaddlePaddle**：
 
@@ -67,20 +70,92 @@ python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simp
 python3 -m pip install wordcloud==1.8.2.2
 ```
 
-<a name="2.2"></a>
-
-### **2.2 代码结构**
+**代码结构**
 ```
 unified_sentiment_extraction/
-├── train.py # 训练评估脚本
-├── model.py # 模型定义脚本
+├── batch_predict.py # 以文件的形式输入，进行批量预测的脚本
+├── evaluate.py # 模型评估脚本
 ├── finetune.py # 模型微调脚本
-├── predict.py # 预测脚本
-├── export_model.py # 静态图模型导出脚本
+├── label_studio.py # 将label-studio导出数据转换为模型输入数据的脚本
+├── label_studio.md # 将label-studio标注说明
 ├── utils.py # 工具函数脚本
 ├── visual_analysis.py # 情感分析结果可视化脚本
 └── README.md # 使用说明
 ```
+
+<a name="4"></a>
+
+## **4. 整体功能介绍与Taskflow快速体验**
+
+本项目以通用信息抽取模型UIE为训练底座，并基于大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，同时支持常见的基础情感分析能力。从使用方式来看，可分为两类：预先给定属性集和不给定属性集，如果预先给定了属性集，则只会在该属性集上进行情感分析。默认情况下可不给定属性集。
+
+### **4.1 语句级情感分析**
+整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
+
+```python
+>>> from paddlenlp import Taskflow
+
+>>> schema = ['情感倾向[正向，负向]']
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
+```
+
+
+
+
+
+对给定的文本评论，直接进行情感分析。可以在`predict/predict.py`或`predict/batch_predict.py`文件中，通过设置不同的Schema进行相应信息的抽取。其中`predict/predict.py`即时运行情感分析功能，`predict/batch_predict.py`会接收文件，同时将结果保存相应文件中。
+
+**（1）整句情感分析**  
+整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
+
+```python
+>>> from paddlenlp import Taskflow
+
+>>> schema = ['情感倾向[正向，负向]']
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
+```
+
+**（2）属性级情感分析**  
+除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取，其调用示例如下。
+
+```python
+>>> from paddlenlp import Taskflow
+
+>>> # Aspect Term Extraction
+>>> # schema =  ["评价维度"]
+>>> # Aspect - Opinion Extraction
+>>> # schema =  [{"评价维度":["观点词"]}]
+>>> # Aspect - Sentiment Extraction
+>>> # schema =  [{"评价维度":["情感倾向[正向，负向]"]}]
+>>> # Aspect - Sentiment - Opinion Extraction
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向，负向]"]}]
+
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很好'))
+```
+
+<a name="2.4.2"></a>
+
+#### **2.4.2 预先给定属性集**
+
+本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。
+
+```python
+>>> # define schema for pre-defined aspects, schema
+>>> schema = ["观点词", "情感倾向[正向,负向,未提及]"]
+>>> aspects = ["房间", "位置", "隔音"]
+>>> # set aspects for Taskflow
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, aspects=aspects)
+>>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
+```
+
+
+
+
+
+
 
 <a name="2.3"></a>
 ### **2.3 开箱即用：从输入数据到分析结果可视化**
