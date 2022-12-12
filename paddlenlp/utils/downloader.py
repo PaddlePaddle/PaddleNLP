@@ -471,17 +471,12 @@ def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = 
     """Check whether the HF file exists
 
     Args:
-        repo_id (`str`):
-            A namespace (user or an organization) name and a repo name separated
-            by a `/`.
-        filename (`str`):
-            The name of the file in the repo.
-        token (`str` or `bool`, *optional*):
-            A token to be used for the download.
-                - If `True`, the token is read from the HuggingFace config
-                  folder.
-                - If `False` or `None`, no token is provided.
-                - If a string, it's used as the authentication token.
+        repo_id (`str`): A namespace (user or an organization) name and a repo name separated by a `/`.
+        filename (`str`): The name of the file in the repo.
+        token (`str` or `bool`, *optional*): A token to be used for the download.
+            - If `True`, the token is read from the HuggingFace config folder.
+            - If `False` or `None`, no token is provided.
+            - If a string, it's used as the authentication token.
     Returns:
         bool: whether the HF file exists
     """
