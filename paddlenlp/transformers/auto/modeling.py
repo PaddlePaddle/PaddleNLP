@@ -19,11 +19,13 @@ import os
 from collections import OrderedDict
 
 from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import EntryNotFoundError
 
 from paddlenlp import __version__
-from paddlenlp.transformers import *
+from paddlenlp.transformers import *  # noqa
+from paddlenlp.transformers.configuration_utils import is_standard_config
 from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = [
@@ -166,7 +168,8 @@ class _BaseAutoModelClass:
     _pretrained_model_dict = None
     _name_mapping = None
     _task_choice = False
-    model_config_file = "model_config.json"
+    model_config_file = "config.json"
+    legacy_model_config_file = "model_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -174,13 +177,18 @@ class _BaseAutoModelClass:
             f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
         )
 
-    # TODO: same logic also used in paddlenlp cli. We can potential refactor as a common method
+    # TODO: Refactor into AutoConfig when available
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
         with io.open(config_file_path, encoding="utf-8") as f:
-            init_kwargs = json.load(f)
-        # class name corresponds to this configuration
-        init_class = init_kwargs.pop("init_class", None)
+            config = json.load(f)
+
+        # Get class name corresponds to this configuration
+        if is_standard_config(config):
+            architectures = config["architectures"]
+            init_class = architectures.pop() if len(architectures) > 0 else None
+        else:
+            init_class = config.pop("init_class", None)
         init_class = init_class[:-5] if init_class.endswith("Model") else init_class
         if init_class:
             for model_flag, name in MAPPING_NAMES.items():
@@ -227,13 +235,23 @@ class _BaseAutoModelClass:
 
         # From HF
         if from_hf_hub:
-            config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=cls.model_config_file,
-                cache_dir=MODEL_HOME,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
+            try:
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.model_config_file,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
+            except EntryNotFoundError:
+                logger.info("Standard config do not exist, loading from legacy config")
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.legacy_model_config_file,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
                 logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
@@ -270,31 +288,44 @@ class _BaseAutoModelClass:
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
+            legacy_config_file = os.path.join(pretrained_model_name_or_path, cls.legacy_model_config_file)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
+                logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            elif os.path.exists(legacy_config_file):
+                logger.info("Standard config do not exist, loading from legacy config")
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
                 logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = "/".join(
-                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
-            )
-
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-
+            # nested try/except block to try both config.json and model_config.json
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
-            except RuntimeError as err:
-                logger.error(err)
-                raise RuntimeError(
-                    f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
-                    f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
-                    "- a correct model-identifier of built-in pretrained models,\n"
-                    "- or a correct model-identifier of community-contributed pretrained models,\n"
-                    "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
+                community_config_path = "/".join(
+                    [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
                 )
+                default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+            except RuntimeError:
+                try:
+                    logger.info("Standard config do not exist, loading from legacy config")
+                    community_config_path = "/".join(
+                        [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
+                    )
+                    default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+                    resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                except RuntimeError as err:
+                    logger.error(err)
+                    raise RuntimeError(
+                        f"Can't load weights for '{pretrained_model_name_or_path}'.\n"
+                        f"Please make sure that '{pretrained_model_name_or_path}' is:\n"
+                        "- a correct model-identifier of built-in pretrained models,\n"
+                        "- or a correct model-identifier of community-contributed pretrained models,\n"
+                        "- or the correct path to a directory containing relevant modeling files(model_weights and model_config).\n"
+                    )
 
             if os.path.exists(resolved_vocab_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, resolved_vocab_file)
