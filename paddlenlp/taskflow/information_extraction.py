@@ -13,17 +13,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import os
+import base64
 import json
+import os
+import re
+
 import numpy as np
 import paddle
+
 from ..datasets import load_dataset
-from ..transformers import AutoTokenizer, AutoModel
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-from .models import UIE, UIEM
+from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
+from ..utils.doc_parser import DocParser
+from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
-from .utils import SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc, gp_decode, DataCollatorGP
+from .utils import DataCollatorGP, SchemaTree, dbc2sbc, get_id_and_prob, gp_decode
 
 usage = r"""
             from paddlenlp import Taskflow
@@ -92,6 +97,8 @@ usage = r"""
             '''
          """
 
+MODEL_MAP = {"UIE": UIE, "UIEM": UIEM, "UIEX": UIEX}
+
 
 class UIETask(Task):
     """
@@ -113,8 +120,8 @@ class UIETask(Task):
     resource_files_urls = {
         "uie-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
-                "aeca0ed2ccf003f4e9c6160363327c9b",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.1/model_state.pdparams",
+                "47b93cf6a85688791699548210048085",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
@@ -135,8 +142,8 @@ class UIETask(Task):
         },
         "uie-medium": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.1/model_state.pdparams",
+                "c34475665eb05e25f3c9cd9b020b331a",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
@@ -157,8 +164,8 @@ class UIETask(Task):
         },
         "uie-mini": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
-                "f7b493aae84be3c107a6b4ada660ce2e",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.1/model_state.pdparams",
+                "9a0805762c41b104d590c15fbe9b19fd",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
@@ -179,8 +186,8 @@ class UIETask(Task):
         },
         "uie-micro": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
-                "80baf49c7f853ab31ac67802104f3f15",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.1/model_state.pdparams",
+                "da67287bca2906864929e16493f748e4",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
@@ -201,8 +208,8 @@ class UIETask(Task):
         },
         "uie-nano": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
-                "ba934463c5cd801f46571f2588543700",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.1/model_state.pdparams",
+                "48db5206232e89ef16b66467562d90e5",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
@@ -224,11 +231,11 @@ class UIETask(Task):
         # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
         "uie-tiny": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
-                "15874e4e76d05bc6de64cc69717f172e",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.1/model_state.pdparams",
+                "c34475665eb05e25f3c9cd9b020b331a",
             ],
             "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
                 "6f1ee399398d4f218450fbbf5f212b15",
             ],
             "vocab_file": [
@@ -246,8 +253,8 @@ class UIETask(Task):
         },
         "uie-medical-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.1/model_state.pdparams",
-                "569b4bc1abf80eedcdad5a6e774d46bf",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.2/model_state.pdparams",
+                "7582d3b01f6faf00b7000111ea853796",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
@@ -268,8 +275,8 @@ class UIETask(Task):
         },
         "uie-base-en": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.1/model_state.pdparams",
-                "2baf0647774d6309e4b2be726ad4283a",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.2/model_state.pdparams",
+                "8c5d5c8faa76681a0aad58f982cd6141",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
@@ -290,8 +297,8 @@ class UIETask(Task):
         },
         "uie-m-base": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.0/model_state.pdparams",
-                "ed96cb17b4b3283a65ad0846ada7799e",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.1/model_state.pdparams",
+                "eb00c06bd7144e76343d750f5bf36ff6",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
@@ -316,8 +323,8 @@ class UIETask(Task):
         },
         "uie-m-large": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.0/model_state.pdparams",
-                "75f3989c515f05f6842e314d3f75ee27",
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.1/model_state.pdparams",
+                "9db83a67f34a9c2483dbe57d2510b4c2",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
@@ -340,31 +347,71 @@ class UIETask(Task):
                 "bf25eb5120ad92ef5c7d8596b5dc4046",
             ],
         },
+        "uie-x-base": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v1.0/model_state.pdparams",
+                "a953b55f7639ae73d1df6c2c5f7667dd",
+            ],
+            "model_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
+                "50be05e78aec34d37596513870fa050e",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/vocab.txt",
+                "e6e1091c984592e72c4460e8eb25045e",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/special_tokens_map.json",
+                "ba000b17745bb5b5b40236789318847f",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/tokenizer_config.json",
+                "09456ba644dac6f9d0b367353a36abe7",
+            ],
+            "sentencepiece_model_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/sentencepiece.bpe.model",
+                "bf25eb5120ad92ef5c7d8596b5dc4046",
+            ],
+        },
     }
 
-    def __init__(self, task, model, schema, schema_lang="zh", **kwargs):
+    def __init__(self, task, model, schema, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
-        if model in ["uie-m-base", "uie-m-large"]:
-            self._multilingual = True
+
+        self._max_seq_len = kwargs.get("max_seq_len", 512)
+        self._batch_size = kwargs.get("batch_size", 16)
+        self._split_sentence = kwargs.get("split_sentence", False)
+        self._position_prob = kwargs.get("position_prob", 0.5)
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
+        self.use_fast = kwargs.get("use_fast", False)
+        self._layout_analysis = kwargs.get("layout_analysis", False)
+        self._ocr_lang = kwargs.get("ocr_lang", "ch")
+        self._schema_lang = kwargs.get("schema_lang", "ch")
+        self._expand_to_a4_size = False if self._custom_model else True
+
+        if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
-        else:
-            self._multilingual = False
+        self._check_task_files()
+        with open(os.path.join(self._task_path, "model_config.json")) as f:
+            self._init_class = json.load(f)["init_class"]
+
+        if self._init_class not in ["UIEX", "UIEM"]:
             if "sentencepiece_model_file" in self.resource_files_names.keys():
                 del self.resource_files_names["sentencepiece_model_file"]
+        self._is_en = True if model in ["uie-base-en"] or self._schema_lang == "en" else False
+
+        if self._init_class in ["UIEX"]:
+            self._summary_token_num = 4  # [CLS] prompt [SEP] [SEP] text [SEP] for UIE-X
+        else:
+            self._summary_token_num = 3  # [CLS] prompt [SEP] text [SEP]
+
+        self._doc_parser = None
         self._schema_tree = None
         self.set_schema(schema)
-        self._check_task_files()
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
-        self._is_en = True if model in ["uie-base-en"] or schema_lang == "en" else False
-        self._max_seq_len = self.kwargs["max_seq_len"] if "max_seq_len" in self.kwargs else 512
-        self._batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 64
-        self._split_sentence = self.kwargs["split_sentence"] if "split_sentence" in self.kwargs else False
-        self._position_prob = self.kwargs["position_prob"] if "position_prob" in self.kwargs else 0.5
-        self._lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
-        self._num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        self.use_fast = self.kwargs["use_fast"] if "use_fast" in self.kwargs else False
         self._construct_tokenizer()
 
     def set_schema(self, schema):
@@ -376,27 +423,33 @@ class UIETask(Task):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
-        if self._multilingual:
+        if self._init_class in ["UIEX"]:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pos_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
+                paddle.static.InputSpec(shape=[None, None, 4], dtype="int64", name="bbox"),
+                paddle.static.InputSpec(shape=[None, 3, 224, 224], dtype="float32", name="image"),
+            ]
+        elif self._init_class in ["UIEM"]:
+            self._input_spec = [
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
             ]
         else:
             self._input_spec = [
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
                 paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="pos_ids"),
-                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="att_mask"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+                paddle.static.InputSpec(shape=[None, None], dtype="int64", name="attention_mask"),
             ]
 
     def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        if self._multilingual:
-            model_instance = UIEM.from_pretrained(self._task_path)
-        else:
-            model_instance = UIE.from_pretrained(self._task_path)
+        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 
@@ -417,27 +470,94 @@ class UIETask(Task):
         outputs["text"] = inputs
         return outputs
 
-    def _single_stage_predict(self, inputs):
-        input_texts = []
-        prompts = []
-        for i in range(len(inputs)):
-            input_texts.append(inputs[i]["text"])
-            prompts.append(inputs[i]["prompt"])
-        # max predict length should exclude the length of prompt and summary tokens
-        max_predict_len = self._max_seq_len - len(max(prompts)) - 3
+    def _check_input_text(self, inputs):
+        """
+        Check whether the input meet the requirement.
+        """
+        inputs = inputs[0]
+        if isinstance(inputs, dict) or isinstance(inputs, str):
+            inputs = [inputs]
+        if isinstance(inputs, list):
+            input_list = []
+            for example in inputs:
+                data = {}
+                if isinstance(example, dict):
+                    if "doc" in example.keys():
+                        if not self._doc_parser:
+                            self._doc_parser = DocParser(
+                                ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
+                            )
+                        if "layout" in example.keys():
+                            data = self._doc_parser.parse(
+                                {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
+                            )
+                            data["layout"] = example["layout"]
+                        else:
+                            data = self._doc_parser.parse(
+                                {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
+                            )
+                    elif "text" in example.keys():
+                        if not isinstance(example["text"], str):
+                            raise TypeError(
+                                "Invalid inputs, the input text should be string. but type of {} found!".format(
+                                    type(example["text"])
+                                )
+                            )
+                        data["text"] = example["text"]
+                    else:
+                        raise ValueError("Invalid inputs, the input should contain a doc or a text.")
+                    input_list.append(data)
+                elif isinstance(example, str):
+                    input_list.append(example)
+                else:
+                    raise TypeError(
+                        "Invalid inputs, the input should be dict or list of dict, but type of {} found!".format(
+                            type(example)
+                        )
+                    )
+        else:
+            raise TypeError("Invalid input format!")
+        return input_list
 
-        short_input_texts, self.input_mapping = self._auto_splitter(
-            input_texts, max_predict_len, split_sentence=self._split_sentence
-        )
+    def _single_stage_predict(self, inputs):
+        input_texts = [d["text"] for d in inputs]
+        prompts = [d["prompt"] for d in inputs]
+
+        # max predict length should exclude the length of prompt and summary tokens
+        max_predict_len = self._max_seq_len - len(max(prompts)) - self._summary_token_num
+
+        if self._init_class in ["UIEX"]:
+            bbox_list = [d["bbox"] for d in inputs]
+            short_input_texts, short_bbox_list, input_mapping = self._auto_splitter(
+                input_texts, max_predict_len, bbox_list=bbox_list, split_sentence=self._split_sentence
+            )
+        else:
+            short_input_texts, input_mapping = self._auto_splitter(
+                input_texts, max_predict_len, split_sentence=self._split_sentence
+            )
 
         short_texts_prompts = []
-        for k, v in self.input_mapping.items():
-            short_texts_prompts.extend([prompts[k] for i in range(len(v))])
-        short_inputs = [
-            {"text": short_input_texts[i], "prompt": short_texts_prompts[i]} for i in range(len(short_input_texts))
-        ]
+        for k, v in input_mapping.items():
+            short_texts_prompts.extend([prompts[k] for _ in range(len(v))])
+        if self._init_class in ["UIEX"]:
+            image_list = []
+            for k, v in input_mapping.items():
+                image_list.extend([inputs[k]["image"] for _ in range(len(v))])
+            short_inputs = [
+                {
+                    "text": short_input_texts[i],
+                    "prompt": short_texts_prompts[i],
+                    "bbox": short_bbox_list[i],
+                    "image": image_list[i],
+                }
+                for i in range(len(short_input_texts))
+            ]
+        else:
+            short_inputs = [
+                {"text": short_input_texts[i], "prompt": short_texts_prompts[i]} for i in range(len(short_input_texts))
+            ]
 
-        def read(inputs):
+        def text_reader(inputs):
             for example in inputs:
                 encoded_inputs = self._tokenizer(
                     text=[example["prompt"]],
@@ -449,7 +569,7 @@ class UIETask(Task):
                     return_position_ids=True,
                     return_offsets_mapping=True,
                 )
-                if self._multilingual:
+                if self._init_class in ["UIEM"]:
                     tokenized_output = [
                         encoded_inputs["input_ids"][0],
                         encoded_inputs["position_ids"][0],
@@ -466,7 +586,198 @@ class UIETask(Task):
                 tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
                 yield tuple(tokenized_output)
 
-        infer_ds = load_dataset(read, inputs=short_inputs, lazy=self._lazy_load)
+        def doc_reader(inputs, pad_id=1, c_sep_id=2):
+            def _process_bbox(tokens, bbox_lines, offset_mapping, offset_bias):
+                bbox_list = [[0, 0, 0, 0] for x in range(len(tokens))]
+
+                for index, bbox in enumerate(bbox_lines):
+                    index_token = map_offset(index + offset_bias, offset_mapping)
+                    if 0 <= index_token < len(bbox_list):
+                        bbox_list[index_token] = bbox
+                return bbox_list
+
+            def _encode_doc(
+                tokenizer, offset_mapping, last_offset, prompt, this_text_line, inputs_ids, q_sep_index, max_seq_len
+            ):
+                if len(offset_mapping) == 0:
+                    content_encoded_inputs = tokenizer(
+                        text=[prompt],
+                        text_pair=[this_text_line],
+                        max_seq_len=max_seq_len,
+                        return_dict=False,
+                        return_offsets_mapping=True,
+                    )
+
+                    content_encoded_inputs = content_encoded_inputs[0]
+                    inputs_ids = content_encoded_inputs["input_ids"][:-1]
+                    sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
+                    q_sep_index = content_encoded_inputs["input_ids"].index(2, 1)
+
+                    bias = 0
+                    for index in range(len(sub_offset_mapping)):
+                        if index == 0:
+                            continue
+                        mapping = sub_offset_mapping[index]
+                        if mapping[0] == 0 and mapping[1] == 0 and bias == 0:
+                            bias = sub_offset_mapping[index - 1][-1] + 1
+                        if mapping[0] == 0 and mapping[1] == 0:
+                            continue
+                        sub_offset_mapping[index][0] += bias
+                        sub_offset_mapping[index][1] += bias
+
+                    offset_mapping = sub_offset_mapping[:-1]
+                    last_offset = offset_mapping[-1][-1]
+                else:
+                    content_encoded_inputs = tokenizer(
+                        text=this_text_line, max_seq_len=max_seq_len, return_dict=False, return_offsets_mapping=True
+                    )
+                    inputs_ids += content_encoded_inputs["input_ids"][1:-1]
+                    sub_offset_mapping = [list(x) for x in content_encoded_inputs["offset_mapping"]]
+
+                    for i, sub_list in enumerate(sub_offset_mapping[1:-1]):
+                        if i == 0:
+                            org_offset = sub_list[1]
+                        else:
+                            if sub_list[0] != org_offset:
+                                last_offset += 1
+                            org_offset = sub_list[1]
+                        offset_mapping += [[last_offset, sub_list[1] - sub_list[0] + last_offset]]
+                        last_offset = offset_mapping[-1][-1]
+                return offset_mapping, last_offset, q_sep_index, inputs_ids
+
+            for example in inputs:
+                content = example["text"]
+                prompt = example["prompt"]
+                bbox_lines = example.get("bbox", None)
+                image_buff_string = example.get("image", None)
+                # Text
+                if bbox_lines is None:
+                    encoded_inputs = self._tokenizer(
+                        text=[example["prompt"]],
+                        text_pair=[example["text"]],
+                        truncation=True,
+                        max_seq_len=self._max_seq_len,
+                        pad_to_max_seq_len=True,
+                        return_attention_mask=True,
+                        return_position_ids=True,
+                        return_offsets_mapping=True,
+                        return_dict=False,
+                    )
+
+                    encoded_inputs = encoded_inputs[0]
+
+                    inputs_ids = encoded_inputs["input_ids"]
+                    position_ids = encoded_inputs["position_ids"]
+                    attention_mask = encoded_inputs["attention_mask"]
+
+                    q_sep_index = inputs_ids.index(2, 1)
+                    c_sep_index = attention_mask.index(0)
+
+                    offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
+
+                    bbox_list = [[0, 0, 0, 0] for x in range(len(inputs_ids))]
+                    token_type_ids = [
+                        1 if token_index <= q_sep_index or token_index > c_sep_index else 0
+                        for token_index in range(self._max_seq_len)
+                    ]
+                    padded_image = np.zeros([3, 224, 224])
+                # Doc
+                else:
+                    inputs_ids = []
+                    prev_bbox = [-1, -1, -1, -1]
+                    this_text_line = ""
+                    q_sep_index = -1
+                    offset_mapping = []
+                    last_offset = 0
+                    for char_index, (char, bbox) in enumerate(zip(content, bbox_lines)):
+                        if char_index == 0:
+                            prev_bbox = bbox
+                            this_text_line = char
+                            continue
+
+                        if all([bbox[x] == prev_bbox[x] for x in range(4)]):
+                            this_text_line += char
+                        else:
+                            offset_mapping, last_offset, q_sep_index, inputs_ids = _encode_doc(
+                                self._tokenizer,
+                                offset_mapping,
+                                last_offset,
+                                prompt,
+                                this_text_line,
+                                inputs_ids,
+                                q_sep_index,
+                                self._max_seq_len,
+                            )
+                            this_text_line = char
+                        prev_bbox = bbox
+                    if len(this_text_line) > 0:
+                        offset_mapping, last_offset, q_sep_index, inputs_ids = _encode_doc(
+                            self._tokenizer,
+                            offset_mapping,
+                            last_offset,
+                            prompt,
+                            this_text_line,
+                            inputs_ids,
+                            q_sep_index,
+                            self._max_seq_len,
+                        )
+                    if len(inputs_ids) > self._max_seq_len:
+                        inputs_ids = inputs_ids[: (self._max_seq_len - 1)] + [c_sep_id]
+                        offset_mapping = offset_mapping[: (self._max_seq_len - 1)] + [[0, 0]]
+                    else:
+                        inputs_ids += [c_sep_id]
+                        offset_mapping += [[0, 0]]
+
+                    if len(offset_mapping) > 1:
+                        offset_bias = offset_mapping[q_sep_index - 1][-1] + 1
+                    else:
+                        offset_bias = 0
+
+                    seq_len = len(inputs_ids)
+                    inputs_ids += [pad_id] * (self._max_seq_len - seq_len)
+                    token_type_ids = [1] * (q_sep_index + 1) + [0] * (seq_len - q_sep_index - 1)
+                    token_type_ids += [pad_id] * (self._max_seq_len - seq_len)
+
+                    bbox_list = _process_bbox(inputs_ids, bbox_lines, offset_mapping, offset_bias)
+
+                    offset_mapping += [[0, 0]] * (self._max_seq_len - seq_len)
+
+                    # Reindex the text
+                    text_start_idx = offset_mapping[1:].index([0, 0]) + self._summary_token_num - 1
+                    for idx in range(text_start_idx, self._max_seq_len):
+                        offset_mapping[idx][0] -= offset_bias
+                        offset_mapping[idx][1] -= offset_bias
+
+                    position_ids = list(range(seq_len))
+
+                    position_ids = position_ids + [0] * (self._max_seq_len - seq_len)
+                    attention_mask = [1] * seq_len + [0] * (self._max_seq_len - seq_len)
+
+                    image_data = base64.b64decode(image_buff_string.encode("utf8"))
+                    padded_image = pad_image_data(image_data)
+
+                input_list = [
+                    inputs_ids,
+                    token_type_ids,
+                    position_ids,
+                    attention_mask,
+                    bbox_list,
+                    padded_image,
+                    offset_mapping,
+                ]
+                input_list = [inputs_ids, token_type_ids, position_ids, attention_mask, bbox_list]
+                return_list = [np.array(x, dtype="int64") for x in input_list]
+                return_list.append(np.array(padded_image, dtype="float32"))
+                return_list.append(np.array(offset_mapping, dtype="int64"))
+                assert len(inputs_ids) == self._max_seq_len
+                assert len(token_type_ids) == self._max_seq_len
+                assert len(position_ids) == self._max_seq_len
+                assert len(attention_mask) == self._max_seq_len
+                assert len(bbox_list) == self._max_seq_len
+                yield tuple(return_list)
+
+        reader = doc_reader if self._init_class in ["UIEX"] else text_reader
+        infer_ds = load_dataset(reader, inputs=short_inputs, lazy=self._lazy_load)
         batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
         infer_data_loader = paddle.io.DataLoader(
@@ -476,12 +787,21 @@ class UIETask(Task):
         sentence_ids = []
         probs = []
         for batch in infer_data_loader:
-            if self._multilingual:
+            if self._init_class in ["UIEX"]:
+                input_ids, token_type_ids, pos_ids, att_mask, bbox, image, offset_maps = batch
+            elif self._init_class in ["UIEM"]:
                 input_ids, pos_ids, offset_maps = batch
             else:
                 input_ids, token_type_ids, pos_ids, att_mask, offset_maps = batch
             if self._predictor_type == "paddle-inference":
-                if self._multilingual:
+                if self._init_class in ["UIEX"]:
+                    self.input_handles[0].copy_from_cpu(input_ids.numpy())
+                    self.input_handles[1].copy_from_cpu(token_type_ids.numpy())
+                    self.input_handles[2].copy_from_cpu(pos_ids.numpy())
+                    self.input_handles[3].copy_from_cpu(att_mask.numpy())
+                    self.input_handles[4].copy_from_cpu(bbox.numpy())
+                    self.input_handles[5].copy_from_cpu(image.numpy())
+                elif self._init_class in ["UIEM"]:
                     self.input_handles[0].copy_from_cpu(input_ids.numpy())
                     self.input_handles[1].copy_from_cpu(pos_ids.numpy())
                 else:
@@ -493,17 +813,26 @@ class UIETask(Task):
                 start_prob = self.output_handle[0].copy_to_cpu().tolist()
                 end_prob = self.output_handle[1].copy_to_cpu().tolist()
             else:
-                if self._multilingual:
+                if self._init_class in ["UIEX"]:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
-                        "pos_ids": pos_ids.numpy(),
+                        "token_type_ids": token_type_ids.numpy(),
+                        "position_ids": pos_ids.numpy(),
+                        "attention_mask": att_mask.numpy(),
+                        "bbox": bbox.numpy(),
+                        "image": image.numpy(),
+                    }
+                elif self._init_class in ["UIEM"]:
+                    input_dict = {
+                        "input_ids": input_ids.numpy(),
+                        "position_ids": pos_ids.numpy(),
                     }
                 else:
                     input_dict = {
                         "input_ids": input_ids.numpy(),
                         "token_type_ids": token_type_ids.numpy(),
-                        "pos_ids": pos_ids.numpy(),
-                        "att_mask": att_mask.numpy(),
+                        "position_ids": pos_ids.numpy(),
+                        "attention_mask": att_mask.numpy(),
                     }
                 start_prob, end_prob = self.predictor.run(None, input_dict)
                 start_prob = start_prob.tolist()
@@ -518,7 +847,7 @@ class UIETask(Task):
                 sentence_ids.append(sentence_id)
                 probs.append(prob)
         results = self._convert_ids_to_results(short_inputs, sentence_ids, probs)
-        results = self._auto_joiner(results, short_input_texts, self.input_mapping)
+        results = self._auto_joiner(results, short_input_texts, input_mapping)
         return results
 
     def _auto_joiner(self, short_results, short_inputs, input_mapping):
@@ -569,9 +898,37 @@ class UIETask(Task):
 
     def _run_model(self, inputs):
         raw_inputs = inputs["text"]
-        results = self._multi_stage_predict(raw_inputs)
+        _inputs = self._parse_inputs(raw_inputs)
+        results = self._multi_stage_predict(_inputs)
         inputs["result"] = results
         return inputs
+
+    def _parse_inputs(self, inputs):
+        _inputs = []
+        for d in inputs:
+            if isinstance(d, dict):
+                if "doc" in d.keys():
+                    text = ""
+                    bbox = []
+                    img_w, img_h = d["img_w"], d["img_h"]
+                    offset_x, offset_y = d["offset_x"], d["offset_x"]
+                    for segment in d["layout"]:
+                        org_box = segment[0]  # bbox before expand to A4 size
+                        box = [
+                            org_box[0] + offset_x,
+                            org_box[1] + offset_y,
+                            org_box[2] + offset_x,
+                            org_box[3] + offset_y,
+                        ]
+                        box = self._doc_parser._normalize_box(box, [img_w, img_h], [1000, 1000])
+                        text += segment[1]
+                        bbox.extend([box] * len(segment[1]))
+                    _inputs.append({"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"]})
+                else:
+                    _inputs.append({"text": d["text"], "bbox": None, "image": None})
+            else:
+                _inputs.append({"text": d, "bbox": None, "image": None})
+        return _inputs
 
     def _multi_stage_predict(self, data):
         """
@@ -585,11 +942,11 @@ class UIETask(Task):
                 equals to the length of `data`
         """
         results = [{} for _ in range(len(data))]
-        # input check to early return
+        # Input check to early return
         if len(data) < 1 or self._schema_tree is None:
             return results
 
-        # copy to stay `self._schema_tree` unchanged
+        # Copy to stay `self._schema_tree` unchanged
         schema_list = self._schema_tree.children[:]
         while len(schema_list) > 0:
             node = schema_list.pop(0)
@@ -599,7 +956,14 @@ class UIETask(Task):
             idx = 0
             if not node.prefix:
                 for one_data in data:
-                    examples.append({"text": one_data, "prompt": dbc2sbc(node.name)})
+                    examples.append(
+                        {
+                            "text": one_data["text"],
+                            "bbox": one_data["bbox"],
+                            "image": one_data["image"],
+                            "prompt": dbc2sbc(node.name),
+                        }
+                    )
                     input_map[cnt] = [idx]
                     idx += 1
                     cnt += 1
@@ -619,7 +983,14 @@ class UIETask(Task):
                                     prompt = node.name + p
                             else:
                                 prompt = p + node.name
-                            examples.append({"text": one_data, "prompt": dbc2sbc(prompt)})
+                            examples.append(
+                                {
+                                    "text": one_data["text"],
+                                    "bbox": one_data["bbox"],
+                                    "image": one_data["image"],
+                                    "prompt": dbc2sbc(prompt),
+                                }
+                            )
                         input_map[cnt] = [i + idx for i in range(len(pre))]
                         idx += len(pre)
                     cnt += 1
@@ -673,7 +1044,56 @@ class UIETask(Task):
                 child.prefix = prefix
                 child.parent_relations = relations
                 schema_list.append(child)
+        results = self._add_bbox_info(results, data)
         return results
+
+    def _add_bbox_info(self, results, data):
+        def _add_bbox(result, char_boxes):
+            for vs in result.values():
+                for v in vs:
+                    if "start" in v.keys():
+                        boxes = []
+                        for i in range(v["start"], v["end"]):
+                            cur_box = char_boxes[i][1]
+                            if i == v["start"]:
+                                box = cur_box
+                                continue
+                            _, cur_y1, cur_x2, cur_y2 = cur_box
+                            if cur_y1 == box[1] and cur_y2 == box[3]:
+                                box[2] = cur_x2
+                            else:
+                                boxes.append(box)
+                                box = cur_box
+                        if box:
+                            boxes.append(box)
+                        boxes = [[int(b) for b in box] for box in boxes]
+                        v["bbox"] = boxes
+                    if v.get("relations"):
+                        _add_bbox(v["relations"], char_boxes)
+            return result
+
+        new_results = []
+        for result, one_data in zip(results, data):
+            if "layout" in one_data.keys():
+                layout = one_data["layout"]
+                char_boxes = []
+                for segment in layout:
+                    sbox = segment[0]
+                    text_len = len(segment[1])
+                    if text_len == 0:
+                        continue
+                    if len(segment) == 2 or (len(segment) == 3 and segment[2] != "table"):
+                        char_w = (sbox[2] - sbox[0]) * 1.0 / text_len
+                        for i in range(text_len):
+                            cbox = [sbox[0] + i * char_w, sbox[1], sbox[0] + (i + 1) * char_w, sbox[3]]
+                            char_boxes.append((segment[1][i], cbox))
+                    else:
+                        cell_bbox = [(segment[1][i], sbox) for i in range(text_len)]
+                        char_boxes.extend(cell_bbox)
+
+                result = _add_bbox(result, char_boxes)
+            new_results.append(result)
+        return new_results
 
     def _convert_ids_to_results(self, examples, sentence_ids, probs):
         """
@@ -757,10 +1177,11 @@ class GPTask(Task):
         self._load_config()
         self._construct_tokenizer()
         self._get_inference_model()
-        self._max_seq_len = self.kwargs["max_seq_len"] if "max_seq_len" in self.kwargs else 256
-        self._batch_size = self.kwargs["batch_size"] if "batch_size" in self.kwargs else 64
-        self._lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
-        self._num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
+
+        self._max_seq_len = kwargs.get("max_seq_len", 256)
+        self._batch_size = kwargs.get("batch_size", 64)
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
 
     def _load_config(self):
         model_config_file = os.path.join(self._task_path, self.resource_files_names["model_config"])

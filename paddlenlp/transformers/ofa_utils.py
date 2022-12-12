@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -30,7 +30,7 @@ __all__ = [
 
 def prepare_qkv_ofa(self, query, key, value, cache=None):
     q = self.q_proj(query)
-    if hasattr(self.q_proj, "fn") and self.q_proj.fn.cur_config["expand_ratio"] != None:
+    if hasattr(self.q_proj, "fn") and self.q_proj.fn.cur_config["expand_ratio"] is not None:
         self.num_heads = int(self.num_heads * self.q_proj.fn.cur_config["expand_ratio"])
     q = paddle.reshape(x=q, shape=[0, 0, self.num_heads, self.head_dim])
     q = paddle.transpose(x=q, perm=[0, 2, 1, 3])
@@ -64,8 +64,7 @@ def mha_ofa_forward(self, query, key, value, attn_mask=None, cache=None):
         q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
     # scale dot product attention
-    # TODO: use paddle.matmul, however it doesn't support `alpha`
-    product = paddle.fluid.layers.matmul(x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+    product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
     if attn_mask[0] is not None:
         # TODO(guosheng): support bool mask
         product = product + attn_mask[0]
@@ -91,7 +90,7 @@ def mha_ofa_forward(self, query, key, value, attn_mask=None, cache=None):
     if cache is not None:
         outs.append(cache)
 
-    if hasattr(self.q_proj, "fn") and self.q_proj.fn.cur_config["expand_ratio"] != None:
+    if hasattr(self.q_proj, "fn") and self.q_proj.fn.cur_config["expand_ratio"] is not None:
         self.num_heads = int(float(self.num_heads) / self.q_proj.fn.cur_config["expand_ratio"])
     return out if len(outs) == 1 else tuple(outs)
 

@@ -4,10 +4,14 @@ on: [push, pull_request]
 
 jobs:
   Lint:
-    name: Install Environment
+    name: Lint
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+      - name: checkout develop
+        run: |
+          git fetch origin develop
+          git branch develop --track origin/develop
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8
