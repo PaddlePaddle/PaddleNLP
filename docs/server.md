@@ -79,6 +79,28 @@ print(datas)
 ```
 通过上述代码配置即可发送POST请求，同时注意在`data`这个key填入相关请求
 
+同时可以支持定义 `schema` 传入到client请求中，可以快速切换 `schema`
+
+```python
+import requests
+import json
+
+url = "http://0.0.0.0:8189/taskflow/uie"
+headers = {"Content-Type": "application/json"}
+texts = ["城市内交通费7月5日金额114广州至佛山", "5月9日交通费29元从北苑到望京搜后"]
+data = {
+    "data": {
+        "text": texts,
+    },
+    "parameters": {
+        "schema": [] # 自定义schema
+    }
+}
+r = requests.post(url=url, headers=headers, data=json.dumps(data))
+datas = json.loads(r.text)
+print(datas)
+```
+
 ## 预训练模型部署
 PaddleNLP SimpleServing 除了能支持Taskflow的服务化部署，也能支持预训练模型的部署，通过简单的配置即可加载预训练模型来进行服务化，同时在接口层面也能支持服务化的扩展，支持模型前后处理的定制化需求。
 
