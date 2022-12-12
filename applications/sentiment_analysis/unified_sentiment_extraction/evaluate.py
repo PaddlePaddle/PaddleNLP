@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import argparse
-import os
-from tqdm import tqdm
 from functools import partial
+import os
+import re
+from tqdm import tqdm
 
 import paddle
 from paddlenlp.datasets import load_dataset, MapDataset
@@ -66,6 +67,8 @@ def do_eval():
         for data in test_ds:
             class_name = unify_prompt_name(data['prompt'])
             # Only positive examples are evaluated in debug mode
+            if re.search(r'\[.*?\]$', data['prompt']) and data['result_list'][0]["text"] == "未提及":
+                continue
             if len(data['result_list']) != 0:
                 if "的" not in data['prompt']:
                     class_dict.setdefault(class_name, []).append(data)
