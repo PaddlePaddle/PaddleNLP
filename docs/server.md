@@ -17,7 +17,7 @@ Taskflow 是 PaddleNLP 预训练模型工具，具备开箱即用的特性，同
 schema = ['出发地', '目的地', '费用', '时间']
 uie = Taskflow("information_extraction", schema=schema)
 app = SimpleServer()
-app.register_taskflow('uie', uie)
+app.register_taskflow('taskflow/uie', uie)
 ```
 这里主要是使用 `SimpleServer` 服务类来注册 Taskflow Server，下面我们具体介绍一下 `register_taskflow` 相关参数
 
@@ -28,7 +28,7 @@ def register_taskflow(
     taskflow_handler=None)
 
 task_name(str)：
-      服务化的名称，最终的服务化的URL: https://host:port/taskflow/{task_name}
+      服务化的名称，最终的服务化的URL: https://host:port/{task_name}
 task(paddlenlp.Taskflow or list(paddlenlp.Taskflow)):
       Taskflow的实例对象，将想要注册的Taskflow任务注册进去，可以是多个Taskflow实例来支持多卡服务化
 taskflow_handler(paddlenlp.server.BaseTaskflowHandler, 可选):
@@ -108,7 +108,7 @@ def register(task_name,
              precision='fp32',
              device_id=0)
 task_name(str)：
-      服务化的名称，最终的服务化的URL: https://host:port/models/{task_name}
+      服务化的名称，最终的服务化的URL: https://host:port/{task_name}
 model_path(str):
       需要部署的模型路径，这里的路径必须是动转静后的模型路径
 model_handler(paddlenlp.server.BaseModelHandler):
@@ -147,7 +147,7 @@ from paddlenlp import SimpleServer
 from paddlenlp.server import CustomModelHandler, MultiClassificationPostHandler
 
 app = SimpleServer()
-app.register('cls_multi_class',
+app.register('models/cls_multi_class',
              model_path="../../export",
              tokenizer_name='ernie-3.0-medium-zh',
              model_handler=CustomModelHandler,
