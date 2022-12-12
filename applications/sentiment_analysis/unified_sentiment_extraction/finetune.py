@@ -20,11 +20,10 @@ from functools import partial
 import paddle
 from paddle.utils.download import get_path_from_url
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, AutoModel
+from paddlenlp.transformers import AutoTokenizer, UIE
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
-from model import UIE
 from evaluate import evaluate
 from utils import set_seed, convert_example, reader, MODEL_MAP, create_data_loader
 
@@ -36,15 +35,7 @@ def do_train():
 
     set_seed(args.seed)
 
-    resource_file_urls = MODEL_MAP[args.model]['resource_file_urls']
-
-    logger.info("Downloading resource files...")
-    for key, val in resource_file_urls.items():
-        file_path = os.path.join(args.model, key)
-        if not os.path.exists(file_path):
-            get_path_from_url(val, args.model)
-
-    tokenizer = AutoTokenizer.from_pretrained("uie-base")
+    tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(reader,

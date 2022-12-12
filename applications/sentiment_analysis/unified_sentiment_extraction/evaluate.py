@@ -20,11 +20,10 @@ from tqdm import tqdm
 
 import paddle
 from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import AutoTokenizer, UIE
 from paddlenlp.metrics import SpanEvaluator
 from paddlenlp.utils.log import logger
 
-from model import UIE
 from utils import convert_example, reader, unify_prompt_name, get_relation_type_dict, create_data_loader
 
 
