@@ -36,17 +36,27 @@ from paddlenlp.transformers import (
     AutoModelForTokenClassification,
 )
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--params_path", type=str, default='./checkpoint/', help="The path to model parameters to be loaded.")
-parser.add_argument("--output_path", type=str, default='./export', help="The path of model parameter in static graph to be saved.")
-parser.add_argument("--task_type", type=str, default='seq_cls', choices=["seq_cls", "token_cls"], help="The task type of ernie 3.0")
-args = parser.parse_args()
-# yapf: enable
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--params_path", type=str, default="./checkpoint/", help="The path to model parameters to be loaded."
+    )
+    parser.add_argument(
+        "--output_path", type=str, default="./export", help="The path of model parameter in static graph to be saved."
+    )
+    parser.add_argument(
+        "--task_type", type=str, default="seq_cls", choices=["seq_cls", "token_cls"], help="The task type of ernie 3.0"
+    )
+    args = parser.parse_args()
+    return args
+
 
 model_class_dict = {"seq_cls": AutoModelForSequenceClassification, "token_cls": AutoModelForTokenClassification}
 
 if __name__ == "__main__":
+    args = parse_args()
+
     model_class = model_class_dict[args.task_type]
     model = model_class.from_pretrained(args.params_path)
     model.eval()
