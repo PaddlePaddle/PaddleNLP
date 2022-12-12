@@ -48,8 +48,8 @@ def parse_arguments():
         "--backend",
         type=str,
         default="paddle",
-        # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
+        # Note(zhoushunjie): Will support 'tensorrt' soon.
+        choices=["onnx_runtime", "paddle", "paddlelite", "paddle-tensorrt"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -95,7 +95,7 @@ def create_ort_runtime(model_dir, model_prefix, model_format, device_id=0):
 
 
 def create_paddle_inference_runtime(
-    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0
+    model_dir, model_prefix, use_trt=False, dynamic_shape=None, use_fp16=False, device_id=0, disable_paddle_trt_ops=[]
 ):
     option = fd.RuntimeOption()
     option.use_paddle_backend()
@@ -104,6 +104,7 @@ def create_paddle_inference_runtime(
     else:
         option.use_gpu(device_id)
     if use_trt:
+        option.disable_paddle_trt_ops(disable_paddle_trt_ops)
         option.use_trt_backend()
         option.enable_paddle_to_trt()
         if use_fp16:
@@ -198,7 +199,7 @@ if __name__ == "__main__":
     scheduler = get_scheduler(args)
 
     # 2. Init tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
+    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
 
     # 3. Set dynamic shape for trt backend
     vae_dynamic_shape = {
@@ -227,6 +228,14 @@ if __name__ == "__main__":
         },
     }
 
+    text_encoder_shape = {
+        "input_ids": {
+            "min_shape": [1, 77],
+            "max_shape": [2, 77],
+            "opt_shape": [2, 77],
+        }
+    }
+
     # 4. Init runtime
     device_id = args.device_id
     if args.device == "cpu":
@@ -246,8 +255,11 @@ if __name__ == "__main__":
     elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
         use_trt = True if args.backend == "paddle-tensorrt" else False
         # Note(zhoushunjie): Will change to paddle runtime later
-        text_encoder_runtime = create_ort_runtime(
-            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
+        text_encoder_runtime = create_paddle_inference_runtime(
+            args.model_dir,
+            args.text_encoder_model_prefix,
+            False,
+            device_id=args.device_id,
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
@@ -264,7 +276,8 @@ if __name__ == "__main__":
             use_trt,
             unet_dynamic_shape,
             use_fp16=args.use_fp16,
-            device_id=device_id,
+            device_id=args.device_id,
+            disable_paddle_trt_ops=["sin", "cos"],
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
     elif args.backend == "tensorrt":
