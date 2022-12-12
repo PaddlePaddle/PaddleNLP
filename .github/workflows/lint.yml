@@ -10,8 +10,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: checkout develop
         run: |
-          git fetch origin develop
-          git branch develop --track origin/develop
+          if ! git show-ref --quiet refs/heads/develop; then \
+              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
+              git fetch origin develop
+              git branch develop --track origin/develop
+          else
+            echo "local develop branch exist, skipping"
+          fi
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8

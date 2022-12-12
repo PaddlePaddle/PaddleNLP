@@ -23,4 +23,12 @@ class TaskflowHandler(BaseTaskflowHandler):
     def process(cls, predictor, data, parameters):
         if data is None:
             return {}
-        return predictor(data)
+        text = None
+        if "text" in data:
+            text = data["text"]
+        else:
+            return {}
+        if "schema" in parameters:
+            schema = parameters["schema"]
+            predictor.set_schema(schema)
+        return predictor(text)
