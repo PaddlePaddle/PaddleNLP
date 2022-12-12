@@ -68,5 +68,5 @@ if __name__ == "__main__":
     model = paddle.jit.to_static(model, input_spec=input_spec)
 
     # Save in static graph model.
-    save_path = os.path.join(args.output_path, "inference")
+    save_path = os.path.join(args.output_path, "infer")
     paddle.jit.save(model, save_path)
