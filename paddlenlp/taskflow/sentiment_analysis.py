@@ -26,11 +26,12 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from ..datasets import load_dataset, MapDataset
 from ..data import Stack, Pad, Tuple, Vocab, JiebaTokenizer
-from ..transformers import SkepTokenizer, AutoTokenizer, AutoModel
+from ..transformers import SkepTokenizer, AutoTokenizer, AutoModel, UIE
 from .task import Task
-from .models import BoWModel, LSTMModel, SkepSequenceModel, UIE
+from .models import BoWModel, LSTMModel, SkepSequenceModel
 from ..utils.log import logger
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard, SchemaTree, get_span, get_id_and_prob, get_bool_ids_greater_than, dbc2sbc
+from ..utils.tools import get_bool_ids_greater_than, get_span
+from .utils import download_file, add_docstrings, static_mode_guard, SchemaTree, get_id_and_prob, dbc2sbc
 
 usage = r"""
             from paddlenlp import Taskflow 
