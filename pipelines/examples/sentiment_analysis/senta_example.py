@@ -42,10 +42,10 @@ def senta_pipeline(args):
     preprocessor = SentaProcessor(max_examples=args.max_examples)
     if not args.aspects:
         schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
-        senta = UIESenta(schema=schema, model="uie-base", batch_size=args.batch_size, aspects=args.aspects)
+        senta = UIESenta(schema=schema, model=args.model, batch_size=args.batch_size, aspects=args.aspects)
     else:
         schema = ['观点词', '情感倾向[正向,负向,未提及]']
-        senta = UIESenta(schema=schema, model="uie-base", batch_size=args.batch_size)
+        senta = UIESenta(schema=schema, model=args.model, batch_size=args.batch_size)
     visualization = SentaVisualization(font_name="SimHei")
     senta_pipeline = SentaPipeline(preprocessor=preprocessor, senta=senta, visualization=visualization)
 
@@ -60,7 +60,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--file_path", default="/wangqinghui/mynlp/PaddleNLP/applications/sentiment_analysis/unified_sentiment_extraction/data/test_hotel.txt", type=str, help="The file that you want to perform sentiment analysis on.")
     parser.add_argument("--max_examples", default=-1, type=int, help="The maxinum number of examples processed by pipline.")
-    parser.add_argument("--model", choices=['uie-base', 'uie-medium', 'uie-mini', 'uie-micro', 'uie-nano'], default="uie-base", help="Fhe model name that you wanna use for sentiment analysis.")
+    parser.add_argument("--model", choices=['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano'], default="uie-senta-base", help="The model name that you wanna use for sentiment analysis.")
     parser.add_argument("--aspects", default=None, type=str, nargs="+", help="A list of pre-given aspects, that is to say, Pipeline only perform sentiment analysis on these pre-given aspects if you input it.")
     parser.add_argument("--batch_size", default=4, type=int, help="Number of samples the model receives in one batch for sentiment inference.")
 
