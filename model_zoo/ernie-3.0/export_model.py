@@ -34,6 +34,7 @@ import paddle
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoModelForTokenClassification,
+    AutoTokenizer,
 )
 
 
@@ -70,3 +71,10 @@ if __name__ == "__main__":
     # Save in static graph model.
     save_path = os.path.join(args.output_path, "infer")
     paddle.jit.save(model, save_path)
+
+    # Save tokenizer if tokenizer.json exists
+    try:
+        tokenizer = AutoTokenizer.from_pretrained(args.params_path)
+        tokenizer.save_pretrained(args.output_path)
+    except IOError:
+        print(f"`tokenizer.json` doesn't exist in {args.params_path}")
