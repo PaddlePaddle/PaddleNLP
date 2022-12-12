@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import argparse
-import math
 from pprint import pprint
 
-import paddle
 from uie_predictor import UIEPredictor
 
 
@@ -35,6 +33,7 @@ def parse_args():
         type=float,
         help="Probability threshold for start/end index probabiliry.",
     )
+    parser.add_argument("--multilingual", action="store_true", help="Whether is the multilingual model.")
     parser.add_argument(
         "--max_seq_len",
         default=512,
