@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2022 The HuggingFace Inc. team.
+# Copyright 2022 The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ def enable_full_determinism(seed: int):
 def set_seed(seed: int = None):
     """
     Args:
-    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `torch`.
+    Helper function for reproducible behavior to set the seed in `random`, `numpy`, `paddle`.
         seed (`int`): The seed to set.
     """
     if seed is not None:
@@ -59,13 +59,7 @@ class EMAModel:
     Exponential Moving Average of models weights
     """
 
-    def __init__(self,
-                 model,
-                 update_after_step=0,
-                 inv_gamma=1.0,
-                 power=2 / 3,
-                 min_value=0.0,
-                 max_value=0.9999):
+    def __init__(self, model, update_after_step=0, inv_gamma=1.0, power=2 / 3, min_value=0.0, max_value=0.9999):
         """
         @crowsonkb's notes on EMA Warmup:
             If gamma=1 and power=1, implements a simple average. gamma=1, power=2/3 are good values for models you plan
@@ -78,7 +72,8 @@ class EMAModel:
             min_value (float): The minimum EMA decay rate. Default: 0.
         """
 
-        self.averaged_model = copy.deepcopy(model).eval()
+        self.averaged_model = copy.deepcopy(model)
+        self.averaged_model.eval()
         for params in self.averaged_model.parameters():
             params.stop_gradient = True
 
@@ -96,7 +91,7 @@ class EMAModel:
         Compute the decay factor for the exponential moving average.
         """
         step = max(0, optimization_step - self.update_after_step - 1)
-        value = 1 - (1 + step / self.inv_gamma)**-self.power
+        value = 1 - (1 + step / self.inv_gamma) ** -self.power
 
         if step <= 0:
             return 0.0
@@ -116,16 +111,15 @@ class EMAModel:
             try:
                 ema_param = ema_params[key]
             except KeyError:
-                ema_param = param.astype("float32").clone(
-                ) if param.ndim == 1 else copy.deepcopy(param)
+                ema_param = param.cast("float32").clone() if param.ndim == 1 else copy.deepcopy(param)
                 ema_params[key] = ema_param
 
-            if not param.stop_gradient:
-                ema_params[key].copy_(param.astype(ema_param.dtype), True)
+            if param.stop_gradient:
+                ema_params[key].copy_(param.cast(ema_param.dtype), True)
                 ema_param = ema_params[key]
             else:
-                ema_param = ema_param.multiply(self.decay)
-                ema_param.add_(param.astype(ema_param.dtype) * (1 - self.decay))
+                ema_param.scale_(self.decay)
+                ema_param.add_(param.cast(ema_param.dtype) * (1 - self.decay))
 
             ema_state_dict[key] = ema_param
 
@@ -146,17 +140,13 @@ def main_process_first(desc="work"):
         try:
             if not is_main_process:
                 # tell all replicas to wait
-                logger.debug(
-                    f"{rank}: waiting for the {main_process_desc} to perform {desc}"
-                )
+                logger.debug(f"{rank}: waiting for the {main_process_desc} to perform {desc}")
                 paddle.distributed.barrier()
             yield
         finally:
             if is_main_process:
                 # the wait is over
-                logger.debug(
-                    f"{rank}: {main_process_desc} completed {desc}, releasing all replicas"
-                )
+                logger.debug(f"{rank}: {main_process_desc} completed {desc}, releasing all replicas")
                 paddle.distributed.barrier()
     else:
         yield

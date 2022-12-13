@@ -23,12 +23,7 @@ class TestUtils(unittest.TestCase):
 
     def test_find_transformer_model_type(self):
         """test for `find_transformer_model_type`"""
-        self.assertEqual(utils.find_transformer_model_type(AlbertModel),
-                         'albert')
-        self.assertEqual(
-            utils.find_transformer_model_type(AlbertForTokenClassification),
-            'albert')
-        self.assertEqual(utils.find_transformer_model_type(BertModel), 'bert')
-        self.assertEqual(
-            utils.find_transformer_model_type(BertForTokenClassification),
-            'bert')
+        self.assertEqual(utils.find_transformer_model_type(AlbertModel), "albert")
+        self.assertEqual(utils.find_transformer_model_type(AlbertForTokenClassification), "albert")
+        self.assertEqual(utils.find_transformer_model_type(BertModel), "bert")
+        self.assertEqual(utils.find_transformer_model_type(BertForTokenClassification), "bert")

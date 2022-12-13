@@ -155,11 +155,7 @@ class Anonymizer:
         else:
             return -1
 
-    def anonymize(self,
-                  sequence,
-                  tok_to_entity_dict,
-                  key,
-                  add_new_anon_toks=False):
+    def anonymize(self, sequence, tok_to_entity_dict, key, add_new_anon_toks=False):
         """Anonymizes a sequence.
 
         Args:
@@ -173,8 +169,7 @@ class Anonymizer:
             `list`: The anonymized sequence.
         """
         # Sort the token-tok-entity dict by the length of the modality.
-        sorted_dict = sorted(tok_to_entity_dict.items(),
-                             key=lambda k: len(k[1][key]))[::-1]
+        sorted_dict = sorted(tok_to_entity_dict.items(), key=lambda k: len(k[1][key]))[::-1]
 
         anonymized_sequence = copy.deepcopy(sequence)
 
@@ -194,53 +189,54 @@ class Anonymizer:
             # sequence.
             while util.subsequence(our_modality, anonymized_sequence):
                 found = False
-                for startidx in range(
-                        len(anonymized_sequence) - len(our_modality) + 1):
-                    if anonymized_sequence[startidx:startidx +
-                                           len(our_modality)] == our_modality:
-                        anonymized_sequence = anonymized_sequence[:startidx] + [
-                            token
-                        ] + anonymized_sequence[startidx + len(our_modality):]
+                for startidx in range(len(anonymized_sequence) - len(our_modality) + 1):
+                    if anonymized_sequence[startidx : startidx + len(our_modality)] == our_modality:
+                        anonymized_sequence = (
+                            anonymized_sequence[:startidx]
+                            + [token]
+                            + anonymized_sequence[startidx + len(our_modality) :]
+                        )
                         found = True
                         break
-                assert found, "Thought " \
-                    + str(our_modality) + " was in [" \
-                    + str(anonymized_sequence) + "] but could not find it"
+                assert found, (
+                    "Thought " + str(our_modality) + " was in [" + str(anonymized_sequence) + "] but could not find it"
+                )
 
         # Now add new keys if they are present.
         if add_new_anon_toks:
 
             # For every span in the sequence, check whether it is in the anon map
             # for this modality
-            sorted_anon_map = sorted(self.anonymization_map,
-                                     key=lambda k: len(k[key]))[::-1]
+            sorted_anon_map = sorted(self.anonymization_map, key=lambda k: len(k[key]))[::-1]
 
             for pair in sorted_anon_map:
                 our_modality = pair[key]
 
                 token_type = pair["type"]
-                new_token = token_type + SEPARATOR + \
-                    str(type_counts[token_type])
+                new_token = token_type + SEPARATOR + str(type_counts[token_type])
 
                 while util.subsequence(our_modality, anonymized_sequence):
                     found = False
-                    for startidx in range(
-                            len(anonymized_sequence) - len(our_modality) + 1):
-                        if anonymized_sequence[startidx:startidx + \
-                            len(our_modality)] == our_modality:
+                    for startidx in range(len(anonymized_sequence) - len(our_modality) + 1):
+                        if anonymized_sequence[startidx : startidx + len(our_modality)] == our_modality:
                             if new_token not in tok_to_entity_dict:
                                 type_counts[token_type] += 1
                                 tok_to_entity_dict[new_token] = pair
 
-                            anonymized_sequence = anonymized_sequence[:startidx] + [
-                                new_token
-                            ] + anonymized_sequence[startidx +
-                                                    len(our_modality):]
+                            anonymized_sequence = (
+                                anonymized_sequence[:startidx]
+                                + [new_token]
+                                + anonymized_sequence[startidx + len(our_modality) :]
+                            )
                             found = True
                             break
-                    assert found, "Thought " \
-                        + str(our_modality) + " was in [" \
-                        + str(anonymized_sequence) + "] but could not find it"
+                    assert found, (
+                        "Thought "
+                        + str(our_modality)
+                        + " was in ["
+                        + str(anonymized_sequence)
+                        + "] but could not find it"
+                    )
 
             # Also replace integers with constants
             for index, token in enumerate(anonymized_sequence):
@@ -265,8 +261,7 @@ class Anonymizer:
                             break
 
                     if not found:
-                        new_token = entity_type + SEPARATOR + \
-                            str(type_counts[entity_type])
+                        new_token = entity_type + SEPARATOR + str(type_counts[entity_type])
                         new_dict = {}
                         for tempkey in self.keys:
                             new_dict[tempkey] = [token]

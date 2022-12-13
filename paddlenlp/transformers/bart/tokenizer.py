@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 import os
+import shutil
 from functools import lru_cache
 
-import json
-import shutil
 from paddle.utils import try_import
-from .. import PretrainedTokenizer, AddedToken
 
-__all__ = ['BartTokenizer']
+from .. import AddedToken, PretrainedTokenizer
+
+__all__ = ["BartTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "bart-base": 1024,
@@ -41,11 +42,9 @@ def bytes_to_unicode():
     And avoids mapping to whitespace/control characters the bpe code barfs on.
     """
     _chr = chr
-    bs = list(range(ord("!"),
-                    ord("~") + 1)) + list(range(
-                        ord("¡"),
-                        ord("¬") + 1)) + list(range(ord("®"),
-                                                    ord("ÿ") + 1))
+    bs = (
+        list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+    )
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -132,78 +131,61 @@ class BartTokenizer(PretrainedTokenizer):
 
     """
     # merges and vocab same as GPT2
-    resource_files_names = {
-        "vocab_file": "vocab.json",
-        "merges_file": "merges.txt"
-    }
+    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "bart-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-vocab.json",
-            "bart-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large-vocab.json",
+            "bart-base": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-vocab.json",
+            "bart-large": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large-vocab.json",
         },
         "merges_file": {
-            "bart-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-merges.txt",
-            "bart-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large-merges.txt",
-        }
+            "bart-base": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-base-merges.txt",
+            "bart-large": "https://bj.bcebos.com/paddlenlp/models/transformers/bart/bart-large-merges.txt",
+        },
     }
     pretrained_init_configuration = {"bart-base": {}, "bart-large": {}}
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 cls_token="<s>",
-                 sep_token="</s>",
-                 unk_token="<unk>",
-                 pad_token="<pad>",
-                 mask_token="<mask>",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        bos_token="<s>",
+        eos_token="</s>",
+        cls_token="<s>",
+        sep_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        mask_token="<mask>",
+        **kwargs
+    ):
 
-        bos_token = AddedToken(bos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   bos_token, str) else bos_token
-        eos_token = AddedToken(eos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   eos_token, str) else eos_token
-        sep_token = AddedToken(sep_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   sep_token, str) else sep_token
-        cls_token = AddedToken(cls_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   cls_token, str) else cls_token
-        unk_token = AddedToken(unk_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
-        self._build_special_tokens_map_extended(bos_token=bos_token,
-                                                eos_token=eos_token,
-                                                sep_token=sep_token,
-                                                cls_token=cls_token,
-                                                unk_token=unk_token,
-                                                pad_token=pad_token,
-                                                mask_token=mask_token)
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token,
+        )
 
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.num_command_tokens = 2
         self.num_type_tokens = 2
 
-        with open(vocab_file, 'r', encoding='utf-8') as f:
+        with open(vocab_file, "r", encoding="utf-8") as f:
             self.encoder = json.load(f)
 
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -214,24 +196,21 @@ class BartTokenizer(PretrainedTokenizer):
         self.byte_encoder = bytes_to_unicode()
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
 
-        with open(merges_file, encoding='utf-8') as f:
-            bpe_data = f.read().split('\n')[1:-1]
+        with open(merges_file, encoding="utf-8") as f:
+            bpe_data = f.read().split("\n")[1:-1]
 
         bpe_merges = [tuple(merge.split()) for merge in bpe_data]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
         self.cache = {}
         re = try_import("regex")
-        self.pat = re.compile(
-            r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+"""
-        )
+        self.pat = re.compile(r"""'s|'t|'re|'ve|'m|'ll|'d| ?\p{L}+| ?\p{N}+| ?[^\s\p{L}\p{N}]+|\s+(?!\S)|\s+""")
 
     def _bpe_encode(self, text):
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
@@ -245,27 +224,20 @@ class BartTokenizer(PretrainedTokenizer):
             return _cls + token_ids_0 + _sep
         return _cls + token_ids_0 + _sep + _sep + token_ids_1 + _sep
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is
         called when adding special tokens using the tokenizer ``encode`` methods.
         """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0,
-                token_ids_1=token_ids_1,
-                already_has_special_tokens=True)
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
         """
@@ -307,8 +279,7 @@ class BartTokenizer(PretrainedTokenizer):
             return token
 
         while True:
-            bigram = min(
-                pairs, key=lambda pair: self.bpe_ranks.get(pair, float('inf')))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -319,12 +290,11 @@ class BartTokenizer(PretrainedTokenizer):
                     j = word.index(first, i)
                     new_word.extend(word[i:j])
                     i = j
-                except:
+                except:  # noqa: E722
                     new_word.extend(word[i:])
                     break
 
-                if word[i] == first and i < len(word) - 1 and word[i +
-                                                                   1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -336,18 +306,17 @@ class BartTokenizer(PretrainedTokenizer):
                 break
             else:
                 pairs = get_pairs(word)
-        word = ' '.join(word)
+        word = " ".join(word)
         self.cache[token] = word
         return word
 
     def _tokenize(self, text):
-        """ Tokenize a string. """
+        """Tokenize a string."""
         bpe_tokens = []
         re = try_import("regex")
         for token in re.findall(self.pat, text):
-            token = ''.join(self.byte_encoder[b] for b in token.encode('utf-8'))
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(' '))
+            token = "".join(self.byte_encoder[b] for b in token.encode("utf-8"))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def _convert_token_to_id(self, token):
@@ -378,9 +347,8 @@ class BartTokenizer(PretrainedTokenizer):
 
         """
 
-        text = ''.join([self.decoder[id] for id in ids])
-        text = bytearray([self.byte_decoder[c]
-                          for c in text]).decode('utf-8', errors=self.errors)
+        text = "".join([self.decoder[id] for id in ids])
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
         return text
 
     def save_resources(self, save_directory):
@@ -403,6 +371,28 @@ class BartTokenizer(PretrainedTokenizer):
         Converts a sequence of tokens (string) in a single string.
         """
         text = "".join(tokens)
-        text = bytearray([self.byte_decoder[c]
-                          for c in text]).decode('utf-8', errors=self.errors)
+        text = bytearray([self.byte_decoder[c] for c in text]).decode("utf-8", errors=self.errors)
         return text
+
+    def build_offset_mapping_with_special_tokens(self, offset_mapping_0, offset_mapping_1=None):
+        """
+        Build offset map from a pair of offset map by concatenating and adding offsets of special tokens.
+
+        A BERT offset_mapping has the following format:
+
+        - single sequence:      ``(0,0) X (0,0)``
+        - pair of sequences:        ``(0,0) A (0,0) B (0,0)``
+
+        Args:
+            offset_mapping_ids_0 (List[tuple]):
+                List of wordpiece offsets to which the special tokens will be added.
+            offset_mapping_ids_1 (List[tuple], optional):
+                Optional second list of wordpiece offsets for offset mapping pairs. Defaults to None.
+
+        Returns:
+            List[tuple]: A list of wordpiece offsets with the appropriate offsets of special tokens.
+        """
+        if offset_mapping_1 is None:
+            return [(0, 0)] + offset_mapping_0 + [(0, 0)]
+
+        return [(0, 0)] + offset_mapping_0 + [(0, 0), (0, 0)] + offset_mapping_1 + [(0, 0)]

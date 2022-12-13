@@ -13,21 +13,20 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
-from functools import partial
 from dataclasses import dataclass, field
+from functools import partial
 
 import paddle
-from paddle.io import DataLoader
 
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import GPTForTokenClassification, GPTChineseTokenizer, PretrainedTokenizer
-from paddlenlp.data import Stack, Pad, Dict, DataCollatorForTokenClassification
-from paddlenlp.trainer import Trainer, TrainingArguments, PdArgumentParser
-from args import get_device
+from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.transformers import (
+    GPTChineseTokenizer,
+    GPTForTokenClassification,
+    LinearDecayWithWarmup,
+)
 
 parser = argparse.ArgumentParser()
 
@@ -56,39 +55,33 @@ def evaluate(model, loss_fct, metric, data_loader):
         loss = loss_fct(logits, labels)
         avg_loss = paddle.mean(loss)
         preds = logits.argmax(axis=2)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            length, preds, labels)
-        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
-                      num_correct_chunks.numpy())
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(length, preds, labels)
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
     precision, recall, f1_score = metric.accumulate()
-    print("eval loss: %f, precision: %f, recall: %f, f1: %f" %
-          (avg_loss, precision, recall, f1_score))
+    print("eval loss: %f, precision: %f, recall: %f, f1: %f" % (avg_loss, precision, recall, f1_score))
     model.train()
 
 
-def tokenize_and_align_labels(example,
-                              tokenizer,
-                              no_entity_id,
-                              max_seq_len=512):
-    labels = example['labels']
-    example = example['tokens']
-    tokenized_input = tokenizer.encode(example, padding=True, return_token_type_ids=False, max_seq_len=128, pad_to_max_seq_len=True)
-    tokenized_input['labels'] = labels[:len(tokenized_input["input_ids"])]
+def tokenize_and_align_labels(example, tokenizer, no_entity_id, max_seq_len=512):
+    labels = example["labels"]
+    example = example["tokens"]
+    tokenized_input = tokenizer(
+        example, return_length=True, is_split_into_words="token", max_seq_len=max_seq_len, return_token_type_ids=False
+    )
+
+    tokenized_input["labels"] = labels[: len(tokenized_input["input_ids"])]
     return tokenized_input
 
 
 def do_train():
-    training_args, model_args  = PdArgumentParser([TrainingArguments, ModelArguments]).parse_args_into_dataclasses()
+    training_args, model_args = PdArgumentParser([TrainingArguments, ModelArguments]).parse_args_into_dataclasses()
 
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
     # Create dataset, tokenizer and dataloader.
-    train_ds, test_ds = load_dataset('msra_ner',
-                                     splits=('train', 'test'),
-                                     lazy=False)
-    ignore_label = -100
+    train_ds, test_ds = load_dataset("msra_ner", splits=("train", "test"), lazy=False)
 
     tokenizer = GPTChineseTokenizer.from_pretrained(model_args.model_name_or_path)
 
@@ -101,10 +94,11 @@ def do_train():
     label_num = len(label_list)
     no_entity_id = label_num - 1
 
-    batchify_fn = partial(tokenize_and_align_labels,
-                         tokenizer=tokenizer,
-                         no_entity_id=no_entity_id,
-                         max_seq_len=model_args.max_seq_length)
+    batchify_fn = partial(
+        tokenize_and_align_labels,
+        tokenizer=tokenizer,
+        no_entity_id=no_entity_id,
+        max_seq_len=model_args.max_seq_length)
 
     train_ds = train_ds.map(batchify_fn)
     test_ds = test_ds.map(batchify_fn)
@@ -123,16 +117,14 @@ def do_train():
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         epsilon=training_args.adam_epsilon,
         parameters=model.parameters(),
         weight_decay=training_args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     metric = ChunkEvaluator(label_list=label_list)
 
@@ -144,7 +136,7 @@ def do_train():
             max_length=model_args.max_seq_length
         ),
         args=training_args,
-        criterion=paddle.nn.loss.CrossEntropyLoss(ignore_index=ignore_label),
+        criterion=paddle.nn.loss.CrossEntropyLoss(ignore_index=-100),
         train_dataset=train_ds,
         eval_dataset=test_ds,
         tokenizer=tokenizer,
@@ -158,7 +150,6 @@ def do_train():
         trainer.save_model()
         trainer.log_metrics("train", metrics)
         trainer.save_state()
-
 
 
 if __name__ == "__main__":

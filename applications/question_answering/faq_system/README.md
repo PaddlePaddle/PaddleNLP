@@ -108,7 +108,15 @@
 
 ## 4. 动手实践——搭建自己的端到端检索式问答系统
 
-### 4.1 无监督训练
+### 4.1 环境安装
+
+在运行下面的代码之前，安装相关的依赖，运行下面的命令：
+
+```
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+```
+
+### 4.2 无监督训练
 
 ```
 python -u -m paddle.distributed.launch --gpus '0' \
@@ -146,7 +154,7 @@ python -u -m paddle.distributed.launch --gpus '0' \
 sh scripts/train.sh
 ```
 
-### 4.2  评估
+### 4.3  评估
 
 效果评估分为 4 个步骤:
 
@@ -229,7 +237,7 @@ recall@10=96.997
 * `recall_result_file`: 针对评估集中第一列文本 *Source Text* 的召回结果
 * `recall_num`: 对 1 个文本召回的相似文本数量
 
-## 4.3 模型部署
+## 4.4 模型部署
 
 模型部署模块首先要把动态图转换成静态图，然后转换成serving的格式。
 
@@ -328,7 +336,7 @@ list_data = [
 python rpc_client.py
 ```
 
-## 4.4 问答系统整个流程
+## 4.5 问答系统整个流程
 
 问答系统使用了Client Server的模式，即抽取向量的模型部署在服务端，然后启动客户端（Client）端去访问。
 

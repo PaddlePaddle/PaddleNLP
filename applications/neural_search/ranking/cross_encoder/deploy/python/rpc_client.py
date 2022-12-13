@@ -17,12 +17,9 @@ import numpy as np
 from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()
-client.connect(['127.0.0.1:8089'])
+client.connect(["127.0.0.1:8089"])
 
-list_data = [{
-    "query": "加强科研项目管理有效促进医学科研工作",
-    "title": "科研项目管理策略科研项目,项目管理,实施,必要性,策略"
-}]
+list_data = [{"query": "加强科研项目管理有效促进医学科研工作", "title": "科研项目管理策略科研项目,项目管理,实施,必要性,策略"}]
 feed = {}
 for i, item in enumerate(list_data):
     feed[str(i)] = str(item)

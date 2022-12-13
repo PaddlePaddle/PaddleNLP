@@ -42,28 +42,26 @@ def evaluate(model, criterion, metric, data_loader):
         metric.update(probs, labels)
 
     micro_f1_score, macro_f1_score = metric.accumulate()
-    logger.info("eval loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f" %
-                (np.mean(losses), micro_f1_score, macro_f1_score))
+    logger.info(
+        "eval loss: %.5f, micro f1 score: %.5f, macro f1 score: %.5f"
+        % (np.mean(losses), micro_f1_score, macro_f1_score)
+    )
     model.train()
     metric.reset()
 
     return micro_f1_score, macro_f1_score
 
 
-def preprocess_function(examples,
-                        tokenizer,
-                        max_seq_length,
-                        label_nums,
-                        is_test=False):
+def preprocess_function(examples, tokenizer, max_seq_length, label_nums, is_test=False):
     """
     Builds model inputs from a sequence for sequence classification tasks
     by concatenating and adding special tokens.
-        
+
     Args:
         examples(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_length(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_length(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         label_nums(obj:`int`): The number of the labels.
     Returns:
@@ -72,10 +70,7 @@ def preprocess_function(examples,
     result = tokenizer(text=examples["sentence"], max_seq_len=max_seq_length)
     # One-Hot label
     if not is_test:
-        result["labels"] = [
-            float(1) if i in examples["label"] else float(0)
-            for i in range(label_nums)
-        ]
+        result["labels"] = [float(1) if i in examples["label"] else float(0) for i in range(label_nums)]
     return result
 
 
@@ -83,21 +78,21 @@ def read_local_dataset(path, label_list=None, is_test=False):
     """
     Read dataset
     """
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
             if is_test:
-                items = line.strip().split('\t')
-                sentence = ''.join(items)
-                yield {'sentence': sentence}
+                items = line.strip().split("\t")
+                sentence = "".join(items)
+                yield {"sentence": sentence}
             else:
-                items = line.strip().split('\t')
+                items = line.strip().split("\t")
                 if len(items) == 0:
                     continue
                 elif len(items) == 1:
                     sentence = items[0]
                     labels = []
                 else:
-                    sentence = ''.join(items[:-1])
+                    sentence = "".join(items[:-1])
                     label = items[-1]
-                    labels = [label_list[l] for l in label.split(',')]
-                yield {'sentence': sentence, 'label': labels}
+                    labels = [label_list[l] for l in label.split(",")]
+                yield {"sentence": sentence, "label": labels}

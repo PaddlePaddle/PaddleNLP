@@ -20,15 +20,13 @@ import paddlenlp
 from .predictor import Predictor
 from ..utils.tools import get_env_device
 from ..transformers import AutoTokenizer
-from .handlers import BaseModelHandler, PostModelHandler
+from .handlers import BaseModelHandler, BasePostHandler
 from .utils import lock_predictor
 from ..utils.log import logger
 
 
 class ModelManager:
-
-    def __init__(self, task_name, model_path, tokenizer_name, model_handler,
-                 post_handler, precision, device_id, batch_size):
+    def __init__(self, task_name, model_path, tokenizer_name, model_handler, post_handler, precision, device_id):
         self._task_name = task_name
         self._model_path = model_path
         self._tokenizer_name = tokenizer_name
@@ -47,28 +45,30 @@ class ModelManager:
             )
         self._model_handler = self._model_handler.process
 
-        if not issubclass(self._post_handler, PostModelHandler):
+        if not issubclass(self._post_handler, BasePostHandler):
             raise TypeError(
-                "The post_handler must be subclass of paddlenlp.server.handlers.PostModelHandler, please check the type."
+                "The post_handler must be subclass of paddlenlp.server.handlers.BasePostHandler, please check the type."
             )
         self._post_handler = self._post_handler.process
 
         # Create the model predictor
         device = get_env_device()
         predictor_list = []
-        if device == 'cpu' or self._device_id == -1:
-            predictor = Predictor(self._model_path, self._precision, 'cpu')
+        if device == "cpu" or self._device_id == -1:
+            predictor = Predictor(self._model_path, self._precision, "cpu")
             predictor_list.append(predictor)
         elif isinstance(self._device_id, int):
-            predictor = Predictor(self._model_path, self._precision,
-                                  'gpu:' + str(self._device_id))
+            predictor = Predictor(self._model_path, self._precision, "gpu:" + str(self._device_id))
             predictor_list.append(predictor)
         elif isinstance(self._device_id, list):
             for device in device_id:
-                predictor = Predictor(self._model_path,
-                                      self._model_class_or_name,
-                                      self._input_spec, self._precision,
-                                      'gpu:' + str(device))
+                predictor = Predictor(
+                    self._model_path,
+                    self._model_class_or_name,
+                    self._input_spec,
+                    self._precision,
+                    "gpu:" + str(device),
+                )
                 predictor_list.append(predictor)
         self._predictor_list = predictor_list
 
@@ -78,28 +78,21 @@ class ModelManager:
     def _get_tokenizer(self):
         if self._tokenizer_name is not None:
             if isinstance(self._tokenizer_name, str):
-                self._tokenizer = AutoTokenizer.from_pretrained(
-                    self._tokenizer_name)
+                self._tokenizer = AutoTokenizer.from_pretrained(self._tokenizer_name)
             else:
-                logger.error(
-                    'The argrument of `tokenizer_name`  must be the name of tokenizer.'
-                )
-        assert self._tokenizer is not None, 'The tokenizer must be not register, you could set the class of Tokenizer'
+                logger.error("The argrument of `tokenizer_name`  must be the name of tokenizer.")
+        assert self._tokenizer is not None, "The tokenizer must be not register, you could set the class of Tokenizer"
 
     def _get_predict_id(self):
         t = time.time()
         t = int(round(t * 1000))
         predictor_id = t % len(self._predictor_list)
-        logger.info(
-            "The predictor id: {} is selected by running the model.".format(
-                predictor_id))
+        logger.info("The predictor id: {} is selected by running the model.".format(predictor_id))
         return predictor_id
 
     def predict(self, data, parameters):
         predictor_id = self._get_predict_id()
         with lock_predictor(self._predictor_list[predictor_id]._lock):
-            model_output = self._model_handler(
-                self._predictor_list[predictor_id], self._tokenizer, data,
-                parameters)
+            model_output = self._model_handler(self._predictor_list[predictor_id], self._tokenizer, data, parameters)
             final_output = self._post_handler(model_output, parameters)
             return final_output

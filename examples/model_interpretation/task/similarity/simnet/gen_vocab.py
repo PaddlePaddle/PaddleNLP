@@ -21,14 +21,13 @@ from paddlenlp.datasets import load_dataset
 from collections import defaultdict
 import spacy
 
-if sys.argv[1] == 'ch':
-    train_ds, dev_ds, test_ds = load_dataset("lcqmc",
-                                             splits=["train", "dev", "test"])
+if sys.argv[1] == "ch":
+    train_ds, dev_ds, test_ds = load_dataset("lcqmc", splits=["train", "dev", "test"])
 
     vocab = defaultdict(int)
     for example in train_ds.data:
-        query = example['query']
-        title = example['title']
+        query = example["query"]
+        title = example["title"]
         for c in query:
             vocab[c] += 1
         for c in title:
@@ -36,17 +35,17 @@ if sys.argv[1] == 'ch':
     with open("vocab.char", "w") as f:
         for k, v in vocab.items():
             if v > 3:
-                f.write(k + '\n')
+                f.write(k + "\n")
 
 else:
-    tokenizer = spacy.load('en_core_web_sm')
+    tokenizer = spacy.load("en_core_web_sm")
     vocab = defaultdict(int)
 
-    with open('../data/QQP/train/train.tsv', 'r') as f_dataset:
+    with open("../data/QQP/train/train.tsv", "r") as f_dataset:
         for idx, line in enumerate(f_dataset.readlines()):
             if idx == 0:
                 continue
-            line_split = line.strip().split('\t')
+            line_split = line.strip().split("\t")
             query = [token.text for token in tokenizer(line_split[0])]
             title = [token.text for token in tokenizer(line_split[1])]
 
@@ -58,4 +57,4 @@ else:
     with open("vocab_QQP", "w") as f:
         for k, v in vocab.items():
             if v > 3:
-                f.write(k + '\n')
+                f.write(k + "\n")

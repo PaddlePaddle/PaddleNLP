@@ -18,7 +18,6 @@ from abc import ABCMeta, abstractmethod
 
 
 class BaseModelHandler(metaclass=ABCMeta):
-
     def __init__(self):
         super().__init__()
 
@@ -28,12 +27,21 @@ class BaseModelHandler(metaclass=ABCMeta):
         pass
 
 
-class PostModelHandler(metaclass=ABCMeta):
-
+class BasePostHandler(metaclass=ABCMeta):
     def __init__(self):
         super().__init__()
 
     @classmethod
     @abstractmethod
-    def process(data, parameters):
+    def process(cls, data, parameters):
+        pass
+
+
+class BaseTaskflowHandler(metaclass=ABCMeta):
+    def __init__(self):
+        super().__init__()
+
+    @classmethod
+    @abstractmethod
+    def process(cls, data, parameters):
         pass

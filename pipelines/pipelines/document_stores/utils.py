@@ -34,10 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 def eval_data_from_json(
-        filename: str,
-        max_docs: Union[int, bool] = None,
-        preprocessor: PreProcessor = None,
-        open_domain: bool = False) -> Tuple[List[Document], List[Label]]:
+    filename: str, max_docs: Union[int, bool] = None, preprocessor: PreProcessor = None, open_domain: bool = False
+) -> Tuple[List[Document], List[Label]]:
     """
     Read Documents + Labels from a SQuAD-style file.
     Document and Labels can then be indexed to the DocumentStore and be used for evaluation.
@@ -53,9 +51,7 @@ def eval_data_from_json(
     with open(filename, "r", encoding="utf-8") as file:
         data = json.load(file)
         if "title" not in data["data"][0]:
-            logger.warning(
-                f"No title information found for documents in QA file: {filename}"
-            )
+            logger.warning(f"No title information found for documents in QA file: {filename}")
 
         for document in data["data"]:
             if max_docs:
@@ -63,14 +59,16 @@ def eval_data_from_json(
                     break
             # Extracting paragraphs and their labels from a SQuAD document dict
             cur_docs, cur_labels, cur_problematic_ids = _extract_docs_and_labels_from_dict(
-                document, preprocessor, open_domain)
+                document, preprocessor, open_domain
+            )
             docs.extend(cur_docs)
             labels.extend(cur_labels)
             problematic_ids.extend(cur_problematic_ids)
     if len(problematic_ids) > 0:
         logger.warning(
             f"Could not convert an answer for {len(problematic_ids)} questions.\n"
-            f"There were conversion errors for question ids: {problematic_ids}")
+            f"There were conversion errors for question ids: {problematic_ids}"
+        )
     return docs, labels
 
 
@@ -105,7 +103,8 @@ def eval_data_from_jsonl(
             # Extracting paragraphs and their labels from a SQuAD document dict
             document_dict = json.loads(document)
             cur_docs, cur_labels, cur_problematic_ids = _extract_docs_and_labels_from_dict(
-                document_dict, preprocessor, open_domain)
+                document_dict, preprocessor, open_domain
+            )
             docs.extend(cur_docs)
             labels.extend(cur_labels)
             problematic_ids.extend(cur_problematic_ids)
@@ -131,8 +130,7 @@ def squad_json_to_jsonl(squad_file: str, output_file: str):
     :param squad_file: SQuAD-file in json format.
     :param output_file: Name of output file (SQuAD in jsonl format)
     """
-    with open(squad_file, encoding="utf-8") as json_file, open(
-            output_file, "w", encoding="utf-8") as jsonl_file:
+    with open(squad_file, encoding="utf-8") as json_file, open(output_file, "w", encoding="utf-8") as jsonl_file:
         squad_json = json.load(json_file)
 
         for doc in squad_json["data"]:
@@ -140,9 +138,9 @@ def squad_json_to_jsonl(squad_file: str, output_file: str):
             jsonl_file.write("\n")
 
 
-def _extract_docs_and_labels_from_dict(document_dict: Dict,
-                                       preprocessor: PreProcessor = None,
-                                       open_domain: bool = False):
+def _extract_docs_and_labels_from_dict(
+    document_dict: Dict, preprocessor: PreProcessor = None, open_domain: bool = False
+):
     """
     Set open_domain to True if you are trying to load open_domain labels (i.e. labels without doc id or start idx)
     """
@@ -151,18 +149,12 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
     problematic_ids = []
 
     # get all extra fields from document level (e.g. title)
-    meta_doc = {
-        k: v
-        for k, v in document_dict.items() if k not in ("paragraphs", "title")
-    }
+    meta_doc = {k: v for k, v in document_dict.items() if k not in ("paragraphs", "title")}
     for paragraph in document_dict["paragraphs"]:
         ## Create Metadata
         cur_meta = {"name": document_dict.get("title", None)}
         # all other fields from paragraph level
-        meta_paragraph = {
-            k: v
-            for k, v in paragraph.items() if k not in ("qas", "context")
-        }
+        meta_paragraph = {k: v for k, v in paragraph.items() if k not in ("qas", "context")}
         cur_meta.update(meta_paragraph)
         # meta from parent document
         cur_meta.update(meta_doc)
@@ -208,9 +200,7 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                         # cur_id = '0'
                         label = Label(
                             query=qa["question"],
-                            answer=Answer(answer=ans,
-                                          type="extractive",
-                                          score=0.0),
+                            answer=Answer(answer=ans, type="extractive", score=0.0),
                             document=None,  # type: ignore
                             is_correct_answer=True,
                             is_correct_document=True,
@@ -219,9 +209,7 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                         )
                         labels.append(label)
                     else:
-                        ans_position = cur_full_doc.content[
-                            answer["answer_start"]:answer["answer_start"] +
-                            len(ans)]
+                        ans_position = cur_full_doc.content[answer["answer_start"] : answer["answer_start"] + len(ans)]
                         if ans != ans_position:
                             # do not use answer
                             problematic_ids.append(qa.get("id", "missing"))
@@ -234,17 +222,13 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                         else:
                             for s in splits:
                                 # If answer start offset is contained in passage we assign the label to that passage
-                                if (answer["answer_start"] >=
-                                        s.meta["_split_offset"]) and (
-                                            answer["answer_start"] <
-                                            (s.meta["_split_offset"] +
-                                             len(s.content))):
+                                if (answer["answer_start"] >= s.meta["_split_offset"]) and (
+                                    answer["answer_start"] < (s.meta["_split_offset"] + len(s.content))
+                                ):
                                     cur_doc = s
-                                    cur_ans_start = answer[
-                                        "answer_start"] - s.meta["_split_offset"]
+                                    cur_ans_start = answer["answer_start"] - s.meta["_split_offset"]
                                     # If a document is splitting an answer we add the whole answer text to the document
-                                    if s.content[cur_ans_start:cur_ans_start +
-                                                 len(ans)] != ans:
+                                    if s.content[cur_ans_start : cur_ans_start + len(ans)] != ans:
                                         s.content = s.content[:cur_ans_start] + ans
                                     break
                         cur_answer = Answer(
@@ -252,14 +236,8 @@ def _extract_docs_and_labels_from_dict(document_dict: Dict,
                             type="extractive",
                             score=0.0,
                             context=cur_doc.content,
-                            offsets_in_document=[
-                                Span(start=cur_ans_start,
-                                     end=cur_ans_start + len(ans))
-                            ],
-                            offsets_in_context=[
-                                Span(start=cur_ans_start,
-                                     end=cur_ans_start + len(ans))
-                            ],
+                            offsets_in_document=[Span(start=cur_ans_start, end=cur_ans_start + len(ans))],
+                            offsets_in_context=[Span(start=cur_ans_start, end=cur_ans_start + len(ans))],
                             document_id=cur_doc.id,
                         )
                         label = Label(
@@ -411,19 +389,12 @@ def es_index_to_document_store(
     # Iterate over each individual record
     query: Dict[str, Dict] = {"query": {"bool": {"must": [{"match_all": {}}]}}}
     if existing_ids:
-        filters = LogicalFilterClause.parse({
-            "_id": {
-                "$nin": existing_ids
-            }
-        }).convert_to_elasticsearch()
+        filters = LogicalFilterClause.parse({"_id": {"$nin": existing_ids}}).convert_to_elasticsearch()
         query["query"]["bool"]["filter"] = filters
     records = scan(client=es_client, query=query, index=original_index_name)
-    number_of_records = es_client.count(index=original_index_name,
-                                        body=query)["count"]
+    number_of_records = es_client.count(index=original_index_name, body=query)["count"]
     pipelines_documents: List[Dict] = []
-    for idx, record in enumerate(
-            tqdm(records, total=number_of_records,
-                 desc="Converting ES Records")):
+    for idx, record in enumerate(tqdm(records, total=number_of_records, desc="Converting ES Records")):
         # Write batch_size number of documents to pipelines DocumentStore
         if (idx + 1) % batch_size == 0:
             document_store.write_documents(pipelines_documents, index=index)
@@ -436,14 +407,12 @@ def es_index_to_document_store(
 
             if original_name_field is not None:
                 if original_name_field in record["_source"]:
-                    record_doc["meta"]["name"] = record["_source"].pop(
-                        original_name_field)
+                    record_doc["meta"]["name"] = record["_source"].pop(original_name_field)
             # Only add selected metadata fields
             if included_metadata_fields is not None:
                 for metadata_field in included_metadata_fields:
                     if metadata_field in record["_source"]:
-                        record_doc["meta"][metadata_field] = record["_source"][
-                            metadata_field]
+                        record_doc["meta"][metadata_field] = record["_source"][metadata_field]
             # Add all metadata fields except for those in excluded_metadata_fields
             else:
                 if excluded_metadata_fields is not None:
@@ -455,8 +424,7 @@ def es_index_to_document_store(
                 record_doc["meta"]["_original_es_id"] = record["_id"]
 
             # Apply preprocessor if provided
-            preprocessed_docs = preprocessor.process(
-                record_doc) if preprocessor is not None else [record_doc]
+            preprocessed_docs = preprocessor.process(record_doc) if preprocessor is not None else [record_doc]
 
             pipelines_documents.extend(preprocessed_docs)
 

@@ -24,15 +24,18 @@ import numpy as np
 
 BiEncoderPassage = collections.namedtuple("BiEncoderPassage", ["text", "title"])
 
-BiENcoderBatch = collections.namedtuple("BiEncoderInput", [
-    "questions_ids",
-    "question_segments",
-    "context_ids",
-    "ctx_segments",
-    "is_positive",
-    "hard_negatives",
-    "encoder_type",
-])
+BiENcoderBatch = collections.namedtuple(
+    "BiEncoderInput",
+    [
+        "questions_ids",
+        "question_segments",
+        "context_ids",
+        "ctx_segments",
+        "is_positive",
+        "hard_negatives",
+        "encoder_type",
+    ],
+)
 
 
 def normalize_question(question: str) -> str:
@@ -86,8 +89,7 @@ class NQdataSetForDPR(Dataset):
 
         positive_ctxs = json_sample_data["positive_ctxs"]
 
-        negative_ctxs = json_sample_data[
-            "negative_ctxs"] if "negative_ctxs" in json_sample_data else []
+        negative_ctxs = json_sample_data["negative_ctxs"] if "negative_ctxs" in json_sample_data else []
         hard_negative_ctxs = json_sample_data["hard_negative_ctxs"] if "hard_negative_ctxs" in json_sample_data else []
 
         for ctx in positive_ctxs + negative_ctxs + hard_negative_ctxs:
@@ -95,22 +97,18 @@ class NQdataSetForDPR(Dataset):
                 ctx["title"] = None
 
         def create_passage(ctx):
-            return BiEncoderPassage(normalize_passage(ctx["text"]),
-                                    ctx["title"])
+            return BiEncoderPassage(normalize_passage(ctx["text"]), ctx["title"])
 
         r.positive_passages = [create_passage(ctx) for ctx in positive_ctxs]
         r.negative_passages = [create_passage(ctx) for ctx in negative_ctxs]
-        r.hard_negative_passages = [
-            create_passage(ctx) for ctx in hard_negative_ctxs
-        ]
+        r.hard_negative_passages = [create_passage(ctx) for ctx in hard_negative_ctxs]
 
         return r
 
     def _porcess_query(self, query):
         query = normalize_question(query)
 
-        if self.query_special_suffix and not query.endswith(
-                self.query_special_suffix):
+        if self.query_special_suffix and not query.endswith(self.query_special_suffix):
             query += self.query_special_suffix
 
         return query
@@ -119,7 +117,7 @@ class NQdataSetForDPR(Dataset):
         return len(self.data)
 
 
-class DataUtil():
+class DataUtil:
     """
     Class for working with datasets
     """
@@ -127,16 +125,18 @@ class DataUtil():
     def __init__(self):
         self.tensorizer = BertTensorizer()
 
-    def create_biencoder_input(self,
-                               samples: List[BiEncoderSample],
-                               inserted_title,
-                               num_hard_negatives=0,
-                               num_other_negatives=0,
-                               shuffle=True,
-                               shuffle_positives=False,
-                               hard_neg_positives=False,
-                               hard_neg_fallback=True,
-                               query_token=None):
+    def create_biencoder_input(
+        self,
+        samples: List[BiEncoderSample],
+        inserted_title,
+        num_hard_negatives=0,
+        num_other_negatives=0,
+        shuffle=True,
+        shuffle_positives=False,
+        hard_neg_positives=False,
+        hard_neg_fallback=True,
+        query_token=None,
+    ):
 
         question_tensors = []
         ctx_tensors = []
@@ -147,8 +147,7 @@ class DataUtil():
 
             if shuffle and shuffle_positives:
                 positive_ctxs = sample.positive_passages
-                positive_ctx = positive_ctxs[np.random.choice(
-                    len(positive_ctxs))]
+                positive_ctx = positive_ctxs[np.random.choice(len(positive_ctxs))]
             else:
                 positive_ctx = sample.positive_passages[0]
 
@@ -173,18 +172,19 @@ class DataUtil():
             current_ctxs_len = len(ctx_tensors)
 
             sample_ctxs_tensors = [
-                self.tensorizer.text_to_tensor(
-                    ctx.text,
-                    title=ctx.title if (inserted_title and ctx.title) else None)
+                self.tensorizer.text_to_tensor(ctx.text, title=ctx.title if (inserted_title and ctx.title) else None)
                 for ctx in all_ctxs
             ]
 
             ctx_tensors.extend(sample_ctxs_tensors)
             positive_ctx_indices.append(current_ctxs_len)
-            hard_neg_ctx_indices.append(i for i in range(
-                current_ctxs_len + hard_negative_start_idx,
-                current_ctxs_len + hard_negative_end_idx,
-            ))
+            hard_neg_ctx_indices.append(
+                i
+                for i in range(
+                    current_ctxs_len + hard_negative_start_idx,
+                    current_ctxs_len + hard_negative_end_idx,
+                )
+            )
             """if query_token:
                 if query_token == "[START_END]":
                     query_span = _select_span
@@ -194,10 +194,8 @@ class DataUtil():
 
             question_tensors.append(self.tensorizer.text_to_tensor(question))
 
-        ctxs_tensor = paddle.concat(
-            [paddle.reshape(ctx, [1, -1]) for ctx in ctx_tensors], axis=0)
-        questions_tensor = paddle.concat(
-            [paddle.reshape(q, [1, -1]) for q in question_tensors], axis=0)
+        ctxs_tensor = paddle.concat([paddle.reshape(ctx, [1, -1]) for ctx in ctx_tensors], axis=0)
+        questions_tensor = paddle.concat([paddle.reshape(q, [1, -1]) for q in question_tensors], axis=0)
 
         ctx_segments = paddle.zeros_like(ctxs_tensor)
         question_segments = paddle.zeros_like(questions_tensor)
@@ -213,8 +211,7 @@ class DataUtil():
         )
 
 
-class BertTensorizer():
-
+class BertTensorizer:
     def __init__(self, pad_to_max=True, max_length=256):
         self.tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
         self.max_length = max_length
@@ -245,8 +242,7 @@ class BertTensorizer():
 
         seq_len = self.max_length
         if self.pad_to_max and len(token_ids) < seq_len:
-            token_ids = token_ids + [self.tokenizer.pad_token_type_id
-                                     ] * (seq_len - len(token_ids))
+            token_ids = token_ids + [self.tokenizer.pad_token_type_id] * (seq_len - len(token_ids))
         if len(token_ids) >= seq_len:
             token_ids = token_ids[0:seq_len]
             token_ids[-1] = 102

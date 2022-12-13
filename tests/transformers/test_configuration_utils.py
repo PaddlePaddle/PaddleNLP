@@ -12,15 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+import shutil
+import tempfile
 import unittest
-from typing import Optional, Union, Dict
-from paddlenlp.transformers.configuration_utils import attribute_map, parse_config, PretrainedConfig
+from typing import Dict, Optional
+
+from paddlenlp.transformers import BertConfig
+from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
 from paddlenlp.transformers.model_utils import PretrainedModel
+from paddlenlp.utils import CONFIG_NAME
+from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 
 
 class FakeSimplePretrainedModelConfig(PretrainedConfig):
-    """simple fake Pretrained Model Config
-    """
+    """simple fake Pretrained Model Config"""
 
     def __init__(self, a=0, b=1, c=2):
         self.a = a
@@ -29,8 +35,8 @@ class FakeSimplePretrainedModelConfig(PretrainedConfig):
 
 
 class FakePretrainedModelConfig(PretrainedConfig):
-    """Fake Pretrained Model which is similar with actual situation
-    """
+    """Fake Pretrained Model which is similar with actual situation"""
+
     attribute_map: Dict[str, str] = {
         "num_classes": "num_labels",
     }
@@ -42,20 +48,8 @@ class FakePretrainedModelConfig(PretrainedConfig):
 
 
 class FakeLayer:
-
-    def __init__(self,
-                 config: Optional[FakeSimplePretrainedModelConfig] = None,
-                 *args,
-                 **kwargs):
+    def __init__(self, config: Optional[FakeSimplePretrainedModelConfig] = None, *args, **kwargs):
         super(FakeLayer, self).__init__()
-
-        config: FakeSimplePretrainedModelConfig = parse_config(
-            config_or_model=config,
-            config_class=FakeSimplePretrainedModelConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=["a", "b", "c"],
-        )
 
         self.a = config.a
         self.b = config.b
@@ -63,39 +57,23 @@ class FakeLayer:
 
 
 class FakeModel(PretrainedModel):
-
-    def __init__(self,
-                 config_or_model: Optional[Union[
-                     FakeLayer, FakeSimplePretrainedModelConfig]] = None,
-                 *args,
-                 **kwargs):
+    def __init__(self, config: FakeSimplePretrainedModelConfig):
         """fake `__init__`, the source of parameters is:
-
             def __init__(self, model, a, b):
                 self.model = model
                 self.a = a
                 self.b = b
-
         Args:
             config_or_model (Optional[Union[FakeLayer, FakeSimplePretrainedModelConfig]], optional): config or model instance. Defaults to None.
         """
         super().__init__()
 
-        config, model = parse_config(
-            config_or_model=config_or_model,
-            config_class=FakeSimplePretrainedModelConfig,
-            args=args,
-            kwargs=kwargs,
-            fields=["a", ("b", 2)],
-        )
-
-        self.model: FakeLayer = model
+        self.model: FakeLayer = FakeLayer(config)
         self.a = config.a
         self.b = config.b
 
 
-class ConfigurationUtilsTest(unittest.TestCase):
-
+class ConfigurationUtilsTest:
     def test_parse_config_with_single_config(self):
         # 1. single config
         config = FakeSimplePretrainedModelConfig(a=10, b=11, c=12)
@@ -155,3 +133,55 @@ class ConfigurationUtilsTest(unittest.TestCase):
 
         assert model.model.a == 10
         assert model.model.b == 11
+
+    def test_get_value_with_default_from_config(self):
+        config = FakeSimplePretrainedModelConfig(a=10)
+        assert config.get("a", None) == 10
+        assert config.get("a", None) == config.a
+        assert config.get("no_name", 0) == 0
+
+
+class StandardConfigMappingTest(unittest.TestCase):
+    def test_bert_config_mapping(self):
+        # create new fake-bert class to prevent static-attributed modified by this test
+        class FakeBertConfig(BertConfig):
+            pass
+
+        config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
+        hidden_size = config.hidden_size
+
+        FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+        loaded_config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
+        fake_field = loaded_config.fake_field
+        self.assertEqual(fake_field, hidden_size)
+
+    def test_load_from_hf(self):
+        """test load config from hf"""
+        config = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel", from_hf_hub=True)
+        self.assertEqual(config.hidden_size, 32)
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config.save_pretrained(tempdir)
+
+            self.assertTrue(os.path.exists(os.path.join(tempdir, CONFIG_NAME)))
+
+            loaded_config = BertConfig.from_pretrained(tempdir)
+            self.assertEqual(loaded_config.hidden_size, 32)
+
+    def test_config_mapping(self):
+        # create new fake-bert class to prevent static-attributed modified by this test
+        class FakeBertConfig(BertConfig):
+            pass
+
+        with tempfile.TemporaryDirectory() as tempdir:
+            config = FakeBertConfig.from_pretrained("bert-base-uncased")
+            config.save_pretrained(tempdir)
+
+            # rename `config.json` -> `model_config.json`
+            shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
+
+            FakeBertConfig.standard_config_map = {"hidden_size": "fake_field"}
+
+            loaded_config = FakeBertConfig.from_pretrained(tempdir)
+            self.assertEqual(loaded_config.fake_field, config.hidden_size)

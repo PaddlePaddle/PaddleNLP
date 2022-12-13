@@ -58,10 +58,8 @@ _CITATION = """\
 """
 
 
-@datasets.utils.file_utils.add_start_docstrings(_DESCRIPTION,
-                                                _KWARGS_DESCRIPTION)
+@datasets.utils.file_utils.add_start_docstrings(_DESCRIPTION, _KWARGS_DESCRIPTION)
 class Accuracy(datasets.Metric):
-
     def _info(self):
         return datasets.MetricInfo(
             description=_DESCRIPTION,
@@ -71,23 +69,19 @@ class Accuracy(datasets.Metric):
                 {
                     "predictions": datasets.Sequence(datasets.Value("int32")),
                     "references": datasets.Sequence(datasets.Value("int32")),
-                } if self.config_name == "multilabel" else {
+                }
+                if self.config_name == "multilabel"
+                else {
                     "predictions": datasets.Value("int32"),
                     "references": datasets.Value("int32"),
-                }),
-            reference_urls=[
-                "https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html"
-            ],
+                }
+            ),
+            reference_urls=["https://scikit-learn.org/stable/modules/generated/sklearn.metrics.accuracy_score.html"],
         )
 
-    def _compute(self,
-                 predictions,
-                 references,
-                 normalize=True,
-                 sample_weight=None):
+    def _compute(self, predictions, references, normalize=True, sample_weight=None):
         return {
-            "accuracy":
-            accuracy_score(
+            "accuracy": accuracy_score(
                 references,
                 predictions,
                 normalize=normalize,

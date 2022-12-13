@@ -22,7 +22,7 @@ word_segmenter = Taskflow("word_segmentation", mode="fast")
 
 def convert_example(example, tokenizer, is_test=False):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
 
     Args:
@@ -37,8 +37,8 @@ def convert_example(example, tokenizer, is_test=False):
     """
 
     input_ids = tokenizer.encode(example["text"])
-    valid_length = np.array(len(input_ids), dtype='int64')
-    input_ids = np.array(input_ids, dtype='int64')
+    valid_length = np.array(len(input_ids), dtype="int64")
+    input_ids = np.array(input_ids, dtype="int64")
 
     if not is_test:
         label = np.array(example["label"], dtype="int64")
@@ -67,12 +67,7 @@ def preprocess_prediction_data(data, tokenizer):
     return examples
 
 
-def build_vocab(texts,
-                stopwords=[],
-                num_words=None,
-                min_freq=10,
-                unk_token="[UNK]",
-                pad_token="[PAD]"):
+def build_vocab(texts, stopwords=[], num_words=None, min_freq=10, unk_token="[UNK]", pad_token="[PAD]"):
     """
     According to the texts, it is to build vocabulary.
 
@@ -106,7 +101,7 @@ def build_vocab(texts,
     wcounts.sort(key=lambda x: x[1], reverse=True)
     # -2 for the pad_token and unk_token which will be added to vocab.
     if num_words is not None and len(wcounts) > (num_words - 2):
-        wcounts = wcounts[:(num_words - 2)]
+        wcounts = wcounts[: (num_words - 2)]
     # add the special pad_token and unk_token to the vocabulary
     sorted_voc = [pad_token, unk_token]
     sorted_voc.extend(wc[0] for wc in wcounts)
