@@ -487,6 +487,11 @@ support_schema_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "uie-senta-base",
+    "uie-senta-medium",
+    "uie-senta-mini",
+    "uie-senta-micro",
+    "uie-senta-nano",
 ]
 
 support_argument_list = [
