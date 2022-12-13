@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import random
 import argparse
-import matplotlib.pyplot as plt
 from collections import Counter, defaultdict
+import json
+import logging
+import matplotlib.pyplot as plt
+import os
+import random
 
 import wordcloud
 
@@ -27,6 +28,7 @@ from utils import load_json_file, write_json_file
 plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
 
+logger = logging.getLogger(__file__)
 
 class VisualSentiment(object):
     """
@@ -527,7 +529,7 @@ def parse_args():
     )
     parser.add_argument(
         "--sentiment_name",
-        default="情感倾向[正向,负向]",
+        default="情感倾向[正向,负向,未提及]",
         type=str,
         help=
         "The prompt for sentiment polarity prediction in the result of sentiment analysis.",
@@ -622,3 +624,5 @@ if __name__ == "__main__":
     # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="wordcloud")
     # save_path = os.path.join(args.save_dir, "opinions_for_aspect_hist.png")
     # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="histogram")
+
+    logger.info("Images has been saved to: {}".format(args.save_dir))
