@@ -17,6 +17,7 @@
 #include "fastdeploy/runtime.h"
 #include "fastdeploy/utils/path.h"
 #include "gflags/gflags.h"
+#include <array>
 #include <iostream>
 #include <sstream>
 #include <vector>
@@ -224,6 +225,23 @@ struct ErnieForSequenceClassificationPredictor {
   }
 };
 
+void PrintResult(const std::vector<SeqClsResult>& seq_cls_results,
+                 const std::vector<std::string>& data) {
+  constexpr int LABEL_NUM = 15;
+  std::array<std::string, LABEL_NUM> label_list{
+      "news_story",   "news_culture",     "news_entertainment", "news_sports",
+      "news_finance", "news_house",       "news_car",           "news_edu",
+      "news_tech",    "news_military",    "news_travel",        "news_world",
+      "news_stock",   "news_agriculture", "news_game"};
+  for (int i = 0; i < data.size(); ++i) {
+    std::cout << "input data: " << data[i] << std::endl;
+    std::cout << "seq cls result: " << std::endl;
+    std::cout << "label: " << label_list[seq_cls_results[i].label]
+              << " confidence:" << seq_cls_results[i].confidence << std::endl;
+    std::cout << "-----------------------------" << std::endl;
+  }
+}
+
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
   auto option = fastdeploy::RuntimeOption();
@@ -247,23 +265,14 @@ int main(int argc, char* argv[]) {
   ErnieForSequenceClassificationPredictor predictor(option, tokenizer);
 
   std::vector<SeqClsResult> seq_cls_results;
-  std::vector<std::string> texts_ds = {"花呗收款额度限制",
-                                       "花呗支持高铁票支付吗"};
-  std::vector<std::string> texts_pair_ds = {"收钱码，对花呗支付的金额有限制吗",
-                                            "为什么友付宝不支持花呗付款"};
-  std::vector<std::vector<std::string>> batch_texts, batch_texts_pair;
+  std::vector<std::string> texts_ds = {
+      "未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？",
+      "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"};
+  std::vector<std::vector<std::string>> batch_texts;
   BatchFyTexts(texts_ds, FLAGS_batch_size, &batch_texts);
-  BatchFyTexts(texts_pair_ds, FLAGS_batch_size, &batch_texts_pair);
   for (int bs = 0; bs < batch_texts.size(); ++bs) {
-    predictor.Predict(batch_texts[bs], batch_texts_pair[bs], &seq_cls_results);
-    for (int i = 0; i < batch_texts[bs].size(); ++i) {
-      std::cout << "Batch id: " << bs << ", example id: " << i
-                << ", sentence 1: " << batch_texts[bs][i]
-                << ", sentence 2: " << batch_texts_pair[bs][i]
-                << ", label: " << seq_cls_results[i].label
-                << ", confidence:  " << seq_cls_results[i].confidence
-                << std::endl;
-    }
+    predictor.Predict(batch_texts[bs], /* text_pair = */ {}, &seq_cls_results);
+    PrintResult(seq_cls_results, batch_texts[bs]);
   }
   return 0;
 }
