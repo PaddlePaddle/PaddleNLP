@@ -117,7 +117,7 @@ class P_ErnieModel(ErnieModel):
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(mean=0.0, std=self.initializer_range)
         )
-        self.embeddings = p_ErnieEmbeddings(
+        self.embeddings = P_ErnieEmbeddings(
             vocab_size,
             hidden_size,
             hidden_dropout_prob,
