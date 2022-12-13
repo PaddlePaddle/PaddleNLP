@@ -20,6 +20,7 @@ import matplotlib.pyplot as plt
 import os
 import random
 
+from paddlenlp.taskflow.utils import download_file
 import wordcloud
 
 from utils import load_json_file, write_json_file
@@ -30,14 +31,30 @@ plt.rcParams["axes.unicode_minus"] = False
 
 logger = logging.getLogger(__file__)
 
+URLS = {
+    "SimHei": [
+        "https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/SimHei.ttf",
+        "c9c9de86d3fa7c4af0d3f1269bb2dff2",
+    ],
+}
+
 class VisualSentiment(object):
     """
     A tool class for visualing sentiment analysis results. 
     """
 
     def __init__(self, font_path=None):
-        self.font_path = font_path
-        self.wc = wordcloud.WordCloud(font_path=font_path,
+        if font_path is not None:
+            if not os.path.isfile(font_path):
+                raise ValueError("The param font_path passed in may not be a file: {}".format(font_path))
+            self.font_path = font_path
+        else:
+            default_name = "SimHei"
+            save_dir = os.path.dirname(__file__)
+            download_file(save_dir, default_name + ".ttf", URLS[default_name][0], URLS[default_name][1])
+            self.font_path = os.path.join(save_dir, default_name + ".ttf")
+
+        self.wc = wordcloud.WordCloud(font_path=self.font_path,
                                       background_color="white",
                                       width=800,
                                       height=400)
@@ -513,40 +530,17 @@ class SentimentResult():
         self.descend_aspects = descend_aspects
 
 
-def parse_args():
+if __name__ == "__main__":
+    # ypdf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--font_path",
-        default="SimHei.ttf",
-        type=str,
-        help="The font Path for showing Chinese in wordcloud.",
-    )
-    parser.add_argument(
-        "--file_path",
-        default="./outputs/test_hotel.json",
-        type=str,
-        help="The result path of sentiment analysis.",
-    )
-    parser.add_argument(
-        "--sentiment_name",
-        default="情感倾向[正向,负向,未提及]",
-        type=str,
-        help=
-        "The prompt for sentiment polarity prediction in the result of sentiment analysis.",
-    )
-    parser.add_argument(
-        "--save_dir",
-        default="./images",
-        type=str,
-        help="The saving path of images.",
-    )
+    parser.add_argument("--file_path", default="./outputs/test_hotel.json", type=str, help="The result path of sentiment analysis.",)
+    parser.add_argument("--save_dir", default="./images", type=str, help="The saving path of images.",)
+    parser.add_argument("--font_path", default=None, type=str, help="The font Path for showing Chinese in wordcloud.",)
+    parser.add_argument("--sentiment_name", default="情感倾向[正向,负向,未提及]", type=str, help="The prompt for sentiment polarity prediction in the result of sentiment analysis.",)
 
     args = parser.parse_args()
-    return args
+    # ypdf: enable
 
-
-if __name__ == "__main__":
-    args = parse_args()
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
     if not args.font_path:
