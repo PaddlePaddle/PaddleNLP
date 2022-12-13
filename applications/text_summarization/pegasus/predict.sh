@@ -15,19 +15,10 @@
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 unset CUDA_VISIBLE_DEVICES
 
-python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" run_summarization.py \
-    --model_name_or_path=IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese \
-    --train_file train.json \
-    --eval_file test.json \
-    --output_dir pegesus_out \
+python predict.py \
+    --init_checkpoint_dir=pegasus_out \
+    --prefict_file data/valid.json \
     --max_source_length 128 \
     --max_target_length 64 \
-    --num_train_epochs 20 \
-    --logging_steps 1 \
-    --save_steps 10000 \
-    --train_batch_size 128 \
-    --eval_batch_size 128 \
-    --learning_rate 5e-5 \
-    --warmup_proportion 0.02 \
-    --weight_decay=0.01 \
+    --batch_size 128 \
     --device=gpu \

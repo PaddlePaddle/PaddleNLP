@@ -1,4 +1,4 @@
-# 生成式文本摘要应用
+
 
 **目录**
 - [生成式文本摘要应用](#生成式文本摘要应用)
@@ -90,6 +90,9 @@ PaddleNLP提供开箱即用的产业级NLP预置任务能力，无需训练，�
 
 ```text
 text_summarization/
+├── data # 数据
+│   ├── train.json # 训练数据集文件
+│   └── test.json # 可选，待预测数据文件
 ├── deploy # 部署
 │   ├── paddle_inference # PaddleInference高性能推理部署
 │   │   ├── inference_pegasus.py # 推理部署脚本
@@ -100,12 +103,13 @@ text_summarization/
 │       ├── pipeline_service.py # 服务器程序
 │       ├── export_serving.sh # serving模型导出脚本
 │       └── README.md # 说明文档
+├── run_prepare.py # 小数据集获取脚本
 ├── export_model.py # 动态图参数导出静态图参数脚本
 ├── export_model.sh # 动态图参数导出静态图参数shell脚本
-├── run_summarization.py # 训练评估脚本
-├── run_train.sh # 训练评估shell脚本
-├── run_generate.py # 预测脚本
-├── run_generate.sh # 预测shell脚本
+├── predict.py    # 预测脚本
+├── predict.sh    # 预测shell脚本
+├── train.py # 训练评估脚本
+├── train.sh # 训练评估shell脚本
 ├── utils.py # 工具函数脚本
 ├── requirements.txt # 依赖包
 └── README.md # 说明文档
@@ -133,6 +137,10 @@ data/
 "content": "“北京的保障房市场就像一个巨大的赌场，每个人都在期待中奖。”面对中国目前现行的保障性住房政策，华远地产董事长任志强再次语出惊人。（分享自@第一财经-中国房地产金融）"
 }
 ```
+这里提供小数据集供测试，运行下面命令即可下载:
+```bash
+python run_prepare.py
+```
 
 更多数据集读取格式详见[数据集加载](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_load.html#)和[自定义数据集](https://paddlenlp.readthedocs.io/zh/latest/data_prepare/dataset_self_defined.html)。
 
@@ -144,14 +152,14 @@ data/
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 unset CUDA_VISIBLE_DEVICES
 
-python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" run_summarization.py \
+python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" train.py \
     --model_name_or_path=IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese \
-    --train_file train.json \
-    --eval_file test.json \
+    --train_file data/train.json \
+    --eval_file data/test.json \
     --output_dir pegesus_out \
     --max_source_length 128 \
     --max_target_length 64 \
-    --num_train_epochs 20 \
+    --epoch 20 \
     --logging_steps 1 \
     --save_steps 10000 \
     --train_batch_size 128 \
@@ -161,7 +169,6 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" run_summarization.py \
     --weight_decay=0.01 \
     --device=gpu \
 ```
-也可以直接使用`run_train.sh`.
 
 关键参数释义如下：
 - `gpus` 指示了训练所用的GPU卡号。
@@ -193,14 +200,12 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" run_summarization.py \
 程序运行时将会自动进行训练和验证，训练过程中会自动保存模型在指定的`output_dir`中。
 如：
 ```text
-./pegeaus_model/
-├── pegeaus_model_10000
-│   ├── model_config.json
-│   ├── model_state.pdparams
-│   ├── special_tokens_map.json
-│   ├── tokenizer_config.json
-│   └── vocab.txt
-└── ...
+./pegesus_out/
+├── model_config.json
+├── model_state.pdparams
+├── special_tokens_map.json
+├── tokenizer_config.json
+└── vocab.txt
 ```
 
 **NOTE:** 如需恢复模型训练，`model_name_or_path`配置本地模型的目录地址即可。
@@ -213,13 +218,12 @@ python -m paddle.distributed.launch --gpus "2,3,4,5,6,7" run_summarization.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 
-python run_generate.py \
-    --model_name_or_path=pegesus_out/pegeaus_model_10000 \
-    --prefict_file valid.json \
+python predict.py \
+    --init_checkpoint_dir=pegesus_out \
+    --prefict_file data/valid.json \
     --max_source_length 128 \
     --max_target_length 64 \
     --batch_size 128 \
-    --output_path generate.txt \
     --device=gpu \
 ```
 
@@ -243,13 +247,13 @@ Finetuned baseline的模型在[LCSTS](https://aclanthology.org/D15-1229/)测试�
 python export_model.py \
     --model_name_or_path IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese \
     --decoding_strategy beam_search \
-    --inference_model_dir ./inference_model \
+    --export_output_dir ./inference_model \
     --max_out_len 30 \
 ```
 关键参数释义如下：
 
 * `model_name_or_path`：动态图训练保存的参数路径；默认为"IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese"。
-* `inference_model_dir`：静态图图保存的参数路径；默认为"./inference_model"。
+* `export_output_dir`：静态图图保存的参数路径；默认为"./inference_model"。
 * `max_out_len`：最大输出长度。
 
 执行命令后将会自动导出模型到指定的 `inference_model` 中，保存模型文件结构如下所示：
