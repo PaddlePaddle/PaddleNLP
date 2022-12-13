@@ -62,12 +62,13 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
-class ErnieForSequenceClassificationPredictor(object):
+class ErnieForTokenClassificationPredictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
+        self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
@@ -108,8 +109,13 @@ class ErnieForSequenceClassificationPredictor(object):
             option.set_trt_cache_file(trt_file)
         return fd.Runtime(option)
 
-    def preprocess(self, data):
-        data = self.tokenizer(data, max_length=self.max_length, padding=True, truncation=True)
+    def preprocess(self, texts):
+        is_split_into_words = False
+        if isinstance(texts[0], list):
+            is_split_into_words = True
+        data = self.tokenizer(
+            texts, max_length=self.max_length, padding=True, truncation=True, is_split_into_words=is_split_into_words
+        )
         input_ids_name = self.runtime.get_input_info(0).name
         token_type_ids_name = self.runtime.get_input_info(1).name
         input_map = {
@@ -122,53 +128,63 @@ class ErnieForSequenceClassificationPredictor(object):
         results = self.runtime.infer(input_map)
         return results
 
-    def postprocess(self, infer_data):
-        logits = np.array(infer_data[0])
-        max_value = np.max(logits, axis=1, keepdims=True)
-        exp_data = np.exp(logits - max_value)
-        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
-        out_dict = {"label": probs.argmax(axis=-1), "confidence": probs.max(axis=-1)}
+    def postprocess(self, infer_data, input_data):
+        result = np.array(infer_data[0])
+        tokens_label = result.argmax(axis=-1).tolist()
+        value = []
+        for batch, token_label in enumerate(tokens_label):
+            start = -1
+            label_name = ""
+            items = []
+            for i, label in enumerate(token_label):
+                if (self.label_names[label] == "O" or "B-" in self.label_names[label]) and start >= 0:
+                    entity = input_data[batch][start : i - 1]
+                    if isinstance(entity, list):
+                        entity = "".join(entity)
+                    items.append(
+                        {
+                            "pos": [start, i - 2],
+                            "entity": entity,
+                            "label": label_name,
+                        }
+                    )
+                    start = -1
+                if "B-" in self.label_names[label]:
+                    start = i - 1
+                    label_name = self.label_names[label][2:]
+            if start >= 0:
+                items.append(
+                    {
+                        "pos": [start, len(token_label) - 1],
+                        "entity": input_data[batch][start : len(token_label) - 1],
+                        "label": "",
+                    }
+                )
+            value.append(items)
+
+        out_dict = {"value": value, "tokens_label": tokens_label}
         return out_dict
 
-    def predict(self, data):
-        input_map = self.preprocess(data)
+    def predict(self, texts):
+        input_map = self.preprocess(texts)
         infer_result = self.infer(input_map)
-        output = self.postprocess(infer_result)
+        output = self.postprocess(infer_result, texts)
         return output
 
 
-def seq_cls_print_ret(infer_result, input_data):
-    label_list = [
-        "news_story",
-        "news_culture",
-        "news_entertainment",
-        "news_sports",
-        "news_finance",
-        "news_house",
-        "news_car",
-        "news_edu",
-        "news_tech",
-        "news_military",
-        "news_travel",
-        "news_world",
-        "news_stock",
-        "news_agriculture",
-        "news_game",
-    ]
-    label = infer_result["label"].tolist()
-    confidence = infer_result["confidence"].tolist()
-    for i, ret in enumerate(label):
+def token_cls_print_ret(infer_result, input_data):
+    rets = infer_result["value"]
+    for i, ret in enumerate(rets):
         print("input data:", input_data[i])
-        print("seq cls result:")
-        print("label:", label_list[label[i]], "  confidence:", confidence[i])
+        print("The model detects all entities:")
+        for iterm in ret:
+            print("entity:", iterm["entity"], "  label:", iterm["label"], "  pos:", iterm["pos"])
         print("-----------------------------")
 
 
 if __name__ == "__main__":
     args = parse_arguments()
-    predictor = ErnieForSequenceClassificationPredictor(args)
-    data = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
-    batch_data = batchfy_text(data, args.batch_size)
-    for data in batch_data:
-        outputs = predictor.predict(data)
-        seq_cls_print_ret(outputs, data)
+    predictor = ErnieForTokenClassificationPredictor(args)
+    texts = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
+    outputs = predictor.predict(texts)
+    token_cls_print_ret(outputs, texts)

@@ -30,11 +30,10 @@
 
 ## 下载微调模型
 
-### 分类任务
+为了方便开发者的测试，下面分别提供了在文本分类[TNEWS数据集](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)以及序列标注任务[MSRA_NER](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上微调的ERNIE 3.0-Medium模型，开发者可直接下载体验。
 
-为了方便开发者的测试，下面提供了在文本分类[AFQMC数据集](https://bj.bcebos.com/paddlenlp/datasets/afqmc_public.zip)上微调的ERNIE 3.0-Medium模型，开发者可直接下载体验。
-
-- [ERNIE 3.0 Medium AFQMC](https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-afqmc.tgz)
+- [ERNIE 3.0 Medium TNEWS](https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-tnews.tgz)
+- [ERNIE 3.0 Medium MSRA_NER](https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-msra.tgz)
 
 ## 详细部署文档
 

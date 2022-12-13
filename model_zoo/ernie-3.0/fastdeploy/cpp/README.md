@@ -2,15 +2,14 @@
 
 在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy C++ SDK。
 
-本目录下提供`seq_cls_infer.cc`快速完成在CPU/GPU的文本分类任务的C++部署示例。
+本目录下分别提供`seq_cls_infer.cc`以及`token_cls_infer.cc`快速完成在CPU/GPU的文本分类任务以及序列标注任务的C++部署示例。
 
 
 ## 文本分类任务
 
 ### 快速开始
 
-以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark的[AFQMC数据集](https://bj.bcebos.com/paddlenlp/datasets/afqmc_public.zip)上进行文本分类任务的C++预测部署。支持此模型需保证FastDeploy版本0.7.0以上(x.x.x>=0.7.0)
-
+以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark 的[TNEWS数据集](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)上进行文本分类任务的C++预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。
 
 ```bash
 mkdir build
@@ -22,14 +21,14 @@ cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
 # 下载AFQMC数据集的微调后的ERNIE 3.0模型以及词表
-wget https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-afqmc.tgz
-tar xvfz ernie-3.0-medium-zh-afqmc.tgz
+wget https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-tnews.tgz
+tar xvfz ernie-3.0-medium-zh-tnews.tgz
 
 # CPU 推理
-./seq_cls_infer_demo --device cpu --model_dir ernie-3.0-medium-zh-afqmc
+./seq_cls_infer_demo --device cpu --model_dir ernie-3.0-medium-zh-tnews
 
 # GPU 推理
-./seq_cls_infer_demo --device gpu --model_dir ernie-3.0-medium-zh-afqmc
+./seq_cls_infer_demo --device gpu --model_dir ernie-3.0-medium-zh-tnews
 
 ```
 
