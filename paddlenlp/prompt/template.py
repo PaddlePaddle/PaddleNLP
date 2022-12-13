@@ -78,14 +78,17 @@ class Template(nn.Layer):
             setattr(self, key, value)
         self.tokenizer = tokenizer
         self.prompt_tokenizer = MLMPromptTokenizer(tokenizer, max_length)
-        self.prompt = prompt
+        self.set_prompt(prompt)
 
     @property
     def prompt(self):
         return self._prompt
 
     @prompt.setter
-    def prompt(self, prompt: str):
+    def prompt(self, prompt):
+        logger.warning("Prompt can not be modified once set.")
+
+    def set_prompt(self, prompt: str):
         if prompt is not None:
             if isinstance(prompt, str):
                 self._prompt = self.parse_template_string(prompt)
@@ -215,11 +218,6 @@ class Template(nn.Layer):
         for part in prompt:
             if "truncate" in part:
                 do_truncate.append(part["truncate"])
-                prompt_tokens = set(part.keys()) - set(["text"])
-                if len(prompt_tokens) > 0 and part["truncate"]:
-                    logger.warning(
-                        "{} in template will be truncated, ".format(prompt_tokens) + "which might degrade performance."
-                    )
             elif "text" in part:
                 do_truncate.append(True)
             else:
@@ -228,11 +226,13 @@ class Template(nn.Layer):
 
     def create_example_keys_from_prompt(self):
         example_keys = set()
-        for part in self._prompt:
+        for part in self.prompt:
             if "text" in part:
                 example_keys.add(part["text"])
             if "options" in part and isinstance(part["options"], list):
                 example_keys.update(set(part["options"]))
+        if len(example_keys) == 0:
+            raise ValueError('No `text` keyword in template: "{}", please check it again.'.format(self.prompt))
         return example_keys
 
     def encode(self, example: Dict[str, Any]):
@@ -599,7 +599,7 @@ class SoftTemplate(Template):
             weight = self.soft_embeddings.weight.clone().detach()
             for soft_id, word_id in soft2word.items():
                 word_id = paddle.to_tensor(word_id)
-                weight[soft_id] = self.word_embeddings(word_id)
+                weight[soft_id] = self.word_embeddings(word_id)[0]
             self.soft_embeddings.weight.set_value(weight)
 
     def _create_soft_encoders(self, output_size: int = None, activation: nn.Layer = None):
@@ -679,7 +679,7 @@ class PrefixTemplate(SoftTemplate):
         prefix_dropout: float = 0.1,
     ):
         self.n_layer, self.n_heads = self._get_config(model)
-        super(PrefixTemplate).__init__(prompt, tokenizer, max_length, model.get_input_embeddings())
+        super(PrefixTemplate, self).__init__(prompt, tokenizer, max_length, model.get_input_embeddings())
         self.dropout = nn.Dropout(p=prefix_dropout)
 
     @staticmethod

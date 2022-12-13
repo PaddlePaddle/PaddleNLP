@@ -35,7 +35,7 @@ args = parser.parse_args()
 
 def dense_qa_pipeline():
 
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
 
     faiss_document_store = "faiss_document_store.db"
     if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
@@ -55,17 +55,14 @@ def dense_qa_pipeline():
         doc_dir = "data/baike"
         city_data = "https://paddlenlp.bj.bcebos.com/applications/baike.zip"
         fetch_archive_from_http(url=city_data, output_dir=doc_dir)
-        dicts = convert_files_to_dicts(dir_path=doc_dir,
-                                       split_paragraphs=True,
-                                       encoding='utf-8')
+        dicts = convert_files_to_dicts(dir_path=doc_dir, split_paragraphs=True, encoding="utf-8")
 
         if os.path.exists(args.index_name):
             os.remove(args.index_name)
         if os.path.exists(faiss_document_store):
             os.remove(faiss_document_store)
 
-        document_store = FAISSDocumentStore(embedding_dim=768,
-                                            faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
         retriever = DensePassageRetriever(
@@ -86,31 +83,18 @@ def dense_qa_pipeline():
         document_store.save(args.index_name)
 
     ### Ranker
-    ranker = ErnieRanker(
-        model_name_or_path="rocketqa-zh-dureader-cross-encoder",
-        use_gpu=use_gpu)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
     reader = ErnieReader(
-        model_name_or_path="ernie-gram-zh-finetuned-dureader-robust",
-        use_gpu=use_gpu,
-        num_processes=1)
+        model_name_or_path="ernie-gram-zh-finetuned-dureader-robust", use_gpu=use_gpu, num_processes=1
+    )
 
     # ### Pipeline
     from pipelines import ExtractiveQAPipeline
 
     pipe = ExtractiveQAPipeline(reader, ranker, retriever)
 
-    pipeline_params = {
-        "Retriever": {
-            "top_k": 50
-        },
-        "Ranker": {
-            "top_k": 1
-        },
-        "Reader": {
-            "top_k": 1
-        }
-    }
+    pipeline_params = {"Retriever": {"top_k": 50}, "Ranker": {"top_k": 1}, "Reader": {"top_k": 1}}
 
     prediction = pipe.run(query="北京市有多少个行政区？", params=pipeline_params)
     print_answers(prediction, details="minimum")

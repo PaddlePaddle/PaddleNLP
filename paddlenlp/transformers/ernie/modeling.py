@@ -12,25 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from dataclasses import dataclass
 from typing import Optional, Tuple
-from paddle import Tensor
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
     BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
     MaskedLMOutput,
     ModelOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
 )
 
 __all__ = [
@@ -43,6 +41,7 @@ __all__ = [
     "ErniePretrainingCriterion",
     "ErnieForMaskedLM",
     "ErnieForMultipleChoice",
+    "UIE",
 ]
 
 
@@ -450,6 +449,80 @@ class ErniePretrainedModel(PretrainedModel):
             "use_task_id": True,
             "vocab_size": 40000,
         },
+        "ernie-3.0-tiny-base-v1": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-medium-v1": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-mini-v1": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-micro-v1": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-nano-v1": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
         "rocketqa-base-cross-encoder": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
@@ -711,6 +784,93 @@ class ErniePretrainedModel(PretrainedModel):
             "vocab_size": 30522,
             "pad_token_id": 0,
         },
+        "uie-base": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "uie-medium": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "uie-mini": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "uie-micro": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "uie-nano": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": True,
+            "vocab_size": 40000,
+        },
+        "uie-base-en": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 512,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "type_vocab_size": 4,
+            "vocab_size": 30522,
+            "pad_token_id": 0,
+        },
         "ernie-search-base-dual-encoder-marco-en": {
             "attention_probs_dropout_prob": 0.1,
             "hidden_act": "gelu",
@@ -737,6 +897,95 @@ class ErniePretrainedModel(PretrainedModel):
             "type_vocab_size": 4,
             "vocab_size": 30522,
             "pad_token_id": 0,
+        },
+        "ernie-3.0-tiny-base-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 12,
+            "task_type_vocab_size": 3,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-medium-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 768,
+            "intermediate_size": 3072,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-mini-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 6,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-micro-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 384,
+            "intermediate_size": 1536,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-nano-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 312,
+            "intermediate_size": 1248,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 12,
+            "num_hidden_layers": 4,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
+        },
+        "ernie-3.0-tiny-pico-v2": {
+            "attention_probs_dropout_prob": 0.1,
+            "hidden_act": "gelu",
+            "hidden_dropout_prob": 0.1,
+            "hidden_size": 128,
+            "intermediate_size": 512,
+            "initializer_range": 0.02,
+            "max_position_embeddings": 2048,
+            "num_attention_heads": 2,
+            "num_hidden_layers": 3,
+            "task_type_vocab_size": 16,
+            "type_vocab_size": 4,
+            "use_task_id": False,
+            "vocab_size": 40000,
         },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
@@ -765,6 +1014,11 @@ class ErniePretrainedModel(PretrainedModel):
             "ernie-3.0-mini-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
             "ernie-3.0-micro-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
             "ernie-3.0-nano-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
+            "ernie-3.0-tiny-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams",
+            "ernie-3.0-tiny-medium-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams",
+            "ernie-3.0-tiny-mini-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
+            "ernie-3.0-tiny-micro-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
+            "ernie-3.0-tiny-nano-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
             "rocketqa-zh-base-query-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-query-encoder.pdparams",
             "rocketqa-zh-base-para-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-para-encoder.pdparams",
             "rocketqa-zh-medium-query-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-query-encoder.pdparams",
@@ -783,8 +1037,20 @@ class ErniePretrainedModel(PretrainedModel):
             "rocketqav2-en-marco-cross-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqav2_en_marco_cross_encoder.pdparams",
             "rocketqav2-en-marco-query-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqav2_en_marco_query_encoder.pdparams",
             "rocketqav2-en-marco-para-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqav2_en_marco_para_encoder.pdparams",
+            "uie-base": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_base.pdparams",
+            "uie-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_medium.pdparams",
+            "uie-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_mini.pdparams",
+            "uie-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_micro.pdparams",
+            "uie-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_nano.pdparams",
+            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_base_en.pdparams",  
             "ernie-search-base-dual-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_base_dual_encoder_marco_en.pdparams",
             "ernie-search-large-cross-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_large_cross_encoder_marco_en.pdparams",
+            "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams",
+            "ernie-3.0-tiny-medium-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams",
+            "ernie-3.0-tiny-mini-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2.pdparams",
+            "ernie-3.0-tiny-micro-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
+            "ernie-3.0-tiny-nano-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
+            "ernie-3.0-tiny-pico-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
         }
     }
     base_model_prefix = "ernie"
@@ -1931,3 +2197,63 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class UIE(ErniePretrainedModel):
+    """
+    Ernie Model with two linear layer on top of the hidden-states
+    output to compute `start_prob` and `end_prob`,
+    designed for Universal Information Extraction.
+
+    Args:
+        ernie (`ErnieModel`):
+            An instance of `ErnieModel`.
+    """
+
+    def __init__(self, ernie):
+        super(UIE, self).__init__()
+        self.ernie = ernie
+        hidden_size = self.ernie.config["hidden_size"]
+        self.linear_start = paddle.nn.Linear(hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids, position_ids=None, attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+
+        Example:
+            .. code-block::
+
+                import paddle
+                from paddlenlp.transformers import UIE, ErnieTokenizer
+
+                tokenizer = ErnieTokenizer.from_pretrained('uie-base')
+                model = UIE.from_pretrained('uie-base')
+
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                start_prob, end_prob = model(**inputs)
+        """
+        sequence_output, _ = self.ernie(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
+        start_logits = self.linear_start(sequence_output)
+        start_logits = paddle.squeeze(start_logits, -1)
+        start_prob = self.sigmoid(start_logits)
+        end_logits = self.linear_end(sequence_output)
+        end_logits = paddle.squeeze(end_logits, -1)
+        end_prob = self.sigmoid(end_logits)
+        return start_prob, end_prob

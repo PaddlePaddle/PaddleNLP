@@ -60,39 +60,33 @@ def set_hyrbid_parallel_seed(basic_seed, data_world_rank, mp_rank, pp_rank):
     paddle.seed(basic_seed + data_world_rank)
 
     from paddle.distributed.fleet import meta_parallel
-    meta_parallel.model_parallel_random_seed(basic_seed + data_world_rank +
-                                             1000 * mp_rank)
+
+    meta_parallel.model_parallel_random_seed(basic_seed + data_world_rank + 1000 * mp_rank)
 
     # local_seed/ global_seed is used to control dropout in ModelParallel
     local_seed = basic_seed + 123 + mp_rank * 10 + pp_rank * 1000
     global_seed = basic_seed + data_world_rank
     tracker = get_rng_state_tracker()
-    tracker.add('global_seed', global_seed)
-    tracker.add('local_seed', local_seed)
+    tracker.add("global_seed", global_seed)
+    tracker.add("local_seed", local_seed)
 
 
 @paddle.no_grad()
-def run_evaluate(args,
-                 data_loader,
-                 model,
-                 criterion,
-                 iter_steps,
-                 log_writer,
-                 global_step,
-                 epoch,
-                 task_name="valid"):
+def run_evaluate(args, data_loader, model, criterion, iter_steps, log_writer, global_step, epoch, task_name="valid"):
     model.eval()
     all_loss = []
     local_time = time.time()
     for eval_step, batch in enumerate(data_loader):
         tokens, loss_mask, labels = batch
-        with paddle.amp.auto_cast(args.use_pure_fp16,
-                                  custom_black_list=[
-                                      "reduce_sum",
-                                      "c_softmax_with_cross_entropy",
-                                      "elementwise_div",
-                                  ],
-                                  level='O2'):
+        with paddle.amp.auto_cast(
+            args.use_pure_fp16,
+            custom_black_list=[
+                "reduce_sum",
+                "c_softmax_with_cross_entropy",
+                "elementwise_div",
+            ],
+            level="O2",
+        ):
             preds = model(tokens)
         preds = paddle.cast(preds, dtype="float32")
         loss = criterion(preds, labels, loss_mask)
@@ -103,21 +97,18 @@ def run_evaluate(args,
 
     average_loss = sum(all_loss) / len(all_loss)
     logger.info(
-        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s" %
-        (task_name, global_step, epoch, eval_step, average_loss, iter_steps /
-         (time.time() - local_time)))
+        "%s step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
+        % (task_name, global_step, epoch, eval_step, average_loss, iter_steps / (time.time() - local_time))
+    )
     log_writer.add_scalar(task_name + "_loss", average_loss, global_step)
     model.train()
 
 
 def initialize_model_and_expert_group(hcg):
-
     def get_expert_parallel_world_size(self):
-        return self.get_data_parallel_world_size(
-        ) * self.get_model_parallel_world_size()
+        return self.get_data_parallel_world_size() * self.get_model_parallel_world_size()
 
-    hcg.get_expert_parallel_world_size = types.MethodType(
-        get_expert_parallel_world_size, hcg)
+    hcg.get_expert_parallel_world_size = types.MethodType(get_expert_parallel_world_size, hcg)
 
     # need create mp_dp group for expert parallel group in advance
     _, mp_dp_comm_group = hcg._set_check_group(parallel_method="pipe")
@@ -125,8 +116,7 @@ def initialize_model_and_expert_group(hcg):
     def get_expert_parallel_group(self):
         return mp_dp_comm_group
 
-    hcg.get_expert_parallel_group = types.MethodType(get_expert_parallel_group,
-                                                     hcg)
+    hcg.get_expert_parallel_group = types.MethodType(get_expert_parallel_group, hcg)
 
 
 def initialize_mp_dp_parameters(model, hcg):
@@ -140,27 +130,20 @@ def initialize_mp_dp_parameters(model, hcg):
         if "expert_" in param.name:
             continue
         if not param.is_distributed:
-            paddle.distributed.broadcast(param.detach(),
-                                         src=mp_src_rank,
-                                         group=mp_group,
-                                         sync_op=True)
+            paddle.distributed.broadcast(param.detach(), src=mp_src_rank, group=mp_group, sync_op=True)
 
-        paddle.distributed.broadcast(param.detach(),
-                                     src=dp_src_rank,
-                                     group=dp_group,
-                                     sync_op=True)
+        paddle.distributed.broadcast(param.detach(), src=dp_src_rank, group=dp_group, sync_op=True)
 
 
 def unscale_method(self, optimizer):
     if not self._enable:
         return
 
-    if getattr(optimizer, '_param_groups', None) and isinstance(
-            optimizer._param_groups[0], dict):
+    if getattr(optimizer, "_param_groups", None) and isinstance(optimizer._param_groups[0], dict):
         param_grads_fp16 = []
         param_grads_fp32 = []
         for group in optimizer._param_groups:
-            for param in group['params']:
+            for param in group["params"]:
                 if param._grad_ivar() is not None:
                     if param._grad_ivar().dtype == core.VarDesc.VarType.FP16:
                         param_grads_fp16.append(param._grad_ivar())
@@ -168,33 +151,27 @@ def unscale_method(self, optimizer):
                         param_grads_fp32.append(param._grad_ivar())
     else:
         param_grads_fp16 = [
-            param._grad_ivar() for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None) and (
-                param._grad_ivar().dtype == core.VarDesc.VarType.FP16)
+            param._grad_ivar()
+            for param in optimizer._parameter_list
+            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP16)
         ]
         param_grads_fp32 = [
-            param._grad_ivar() for param in optimizer._parameter_list
-            if (param._grad_ivar() is not None) and (
-                param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
+            param._grad_ivar()
+            for param in optimizer._parameter_list
+            if (param._grad_ivar() is not None) and (param._grad_ivar().dtype == core.VarDesc.VarType.FP32)
         ]
     temp_found_inf_fp16 = paddle.to_tensor(np.array([0]).astype(np.bool))
     temp_found_inf_fp32 = paddle.to_tensor(np.array([0]).astype(np.bool))
 
     if len(param_grads_fp16):
-        _legacy_C_ops.check_finite_and_unscale(param_grads_fp16, self._scale,
-                                               param_grads_fp16,
-                                               temp_found_inf_fp16)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp16, self._scale, param_grads_fp16, temp_found_inf_fp16)
     if len(param_grads_fp32):
-        _legacy_C_ops.check_finite_and_unscale(param_grads_fp32, self._scale,
-                                               param_grads_fp32,
-                                               temp_found_inf_fp32)
+        _legacy_C_ops.check_finite_and_unscale(param_grads_fp32, self._scale, param_grads_fp32, temp_found_inf_fp32)
     self._found_inf = 1 if temp_found_inf_fp16 or temp_found_inf_fp32 else 0
 
     if dist.get_world_size() > 1:
         is_found_inf = paddle.to_tensor([self._found_inf], dtype="int32")
-        paddle.distributed.all_reduce(is_found_inf,
-                                      op=paddle.distributed.ReduceOp.MAX,
-                                      group=None)
+        paddle.distributed.all_reduce(is_found_inf, op=paddle.distributed.ReduceOp.MAX, group=None)
         self._found_inf = is_found_inf.numpy()[0]
 
 
@@ -238,11 +215,15 @@ def parameters_classify(model, use_sharding=False):
 
     print("all parameters length:", len(model.parameters()))
     print(
-        "decay_gate_params len: {}, decay_expert_params len: {}, decay_other_params len: {}"
-        .format(len(decay_gate_params), len(decay_expert_params),
-                len(decay_other_params)))
-    print("gate_params len: {}, expert_params len: {}, other_params len: {}".
-          format(len(gate_params), len(expert_params), len(other_params)))
+        "decay_gate_params len: {}, decay_expert_params len: {}, decay_other_params len: {}".format(
+            len(decay_gate_params), len(decay_expert_params), len(decay_other_params)
+        )
+    )
+    print(
+        "gate_params len: {}, expert_params len: {}, other_params len: {}".format(
+            len(gate_params), len(expert_params), len(other_params)
+        )
+    )
 
     d_gate = obtain_storage(decay_gate_params)
     gate = obtain_storage(gate_params)
@@ -250,8 +231,7 @@ def parameters_classify(model, use_sharding=False):
     d_expert = obtain_storage(decay_expert_params)
     expert = obtain_storage(expert_params)
 
-    d_other = decay_other_params if use_sharding else obtain_storage(
-        decay_other_params)
+    d_other = decay_other_params if use_sharding else obtain_storage(decay_other_params)
     other = other_params if use_sharding else obtain_storage(other_params)
 
     opt_fused_tensors = []
@@ -284,37 +264,37 @@ def timer_log(log_freq):
         if name in timers.timers:
             timers_to_log.append(name)
 
-    add_to_logging('forward-compute')
-    add_to_logging('forward-recv')
-    add_to_logging('forward-send')
-    add_to_logging('forward-send-backward-recv')
-    add_to_logging('backward-compute')
-    add_to_logging('backward-recv')
-    add_to_logging('backward-send')
-    add_to_logging('backward-send-forward-recv')
-    add_to_logging('backward-params-all-reduce')
-    add_to_logging('backward-embedding-all-reduce')
-    add_to_logging('optimizer-copy-to-main-grad')
-    add_to_logging('optimizer-unscale-and-check-inf')
-    add_to_logging('optimizer-clip-main-grad')
-    add_to_logging('optimizer-copy-main-to-model-params')
-    add_to_logging('optimizer')
-    add_to_logging('batch-generator')
-    add_to_logging('Prepare Forward')
-    add_to_logging('Gate Computation')
-    add_to_logging('Limit_By_Capacity')
-    add_to_logging('Prune_Gate_By_Cap')
-    add_to_logging('Random Routing')
-    add_to_logging('Base Operation')
-    add_to_logging('AllGather in Limit')
-    add_to_logging('MOEScatter')
-    add_to_logging('Expert Computation')
-    add_to_logging('MOEGather')
-    add_to_logging('Score BMM')
-    add_to_logging('AllReduce')
-    add_to_logging('AllGather')
-    add_to_logging('lec reduce')
-    add_to_logging('lec reduce2')
+    add_to_logging("forward-compute")
+    add_to_logging("forward-recv")
+    add_to_logging("forward-send")
+    add_to_logging("forward-send-backward-recv")
+    add_to_logging("backward-compute")
+    add_to_logging("backward-recv")
+    add_to_logging("backward-send")
+    add_to_logging("backward-send-forward-recv")
+    add_to_logging("backward-params-all-reduce")
+    add_to_logging("backward-embedding-all-reduce")
+    add_to_logging("optimizer-copy-to-main-grad")
+    add_to_logging("optimizer-unscale-and-check-inf")
+    add_to_logging("optimizer-clip-main-grad")
+    add_to_logging("optimizer-copy-main-to-model-params")
+    add_to_logging("optimizer")
+    add_to_logging("batch-generator")
+    add_to_logging("Prepare Forward")
+    add_to_logging("Gate Computation")
+    add_to_logging("Limit_By_Capacity")
+    add_to_logging("Prune_Gate_By_Cap")
+    add_to_logging("Random Routing")
+    add_to_logging("Base Operation")
+    add_to_logging("AllGather in Limit")
+    add_to_logging("MOEScatter")
+    add_to_logging("Expert Computation")
+    add_to_logging("MOEGather")
+    add_to_logging("Score BMM")
+    add_to_logging("AllReduce")
+    add_to_logging("AllGather")
+    add_to_logging("lec reduce")
+    add_to_logging("lec reduce2")
 
     timers.log(timers_to_log, normalizer=log_freq)
 
@@ -326,14 +306,11 @@ def do_train(args):
         "dp_degree": args.dp_degree,
         "mp_degree": args.mp_degree,
         "pp_degree": args.pp_degree,
-        "sharding_degree": args.sharding_degree
+        "sharding_degree": args.sharding_degree,
     }
 
     accumulate_steps = args.local_batch_size // args.micro_batch_size
-    strategy.pipeline_configs = {
-        "accumulate_steps": accumulate_steps,
-        "micro_batch_size": args.micro_batch_size
-    }
+    strategy.pipeline_configs = {"accumulate_steps": accumulate_steps, "micro_batch_size": args.micro_batch_size}
 
     fleet.init(is_collective=True, strategy=strategy)
 
@@ -349,7 +326,9 @@ def do_train(args):
     sharding_group = hcg.get_sharding_parallel_group()
 
     if args.sharding_degree > 1:
-        assert args.dp_degree == args.mp_degree == args.pp_degree == 1, "sharding stage2 will support hybrid parallel later"
+        assert (
+            args.dp_degree == args.mp_degree == args.pp_degree == 1
+        ), "sharding stage2 will support hybrid parallel later"
 
     sharding_size = hcg.get_sharding_parallel_world_size()
     data_world_rank = dp_rank * sharding_size + sharding_rank
@@ -366,58 +345,57 @@ def do_train(args):
 
     # Define log writer
     log_writer_path = os.path.join(
-        args.output_dir, "train_log",
+        args.output_dir,
+        "train_log",
         "{}_globalbsz_{}_pure_fp16_{}_recompute_{}_card_{}".format(
-            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16,
-            False, global_rank).lower())
+            args.model_name_or_path, args.global_batch_size, args.use_pure_fp16, False, global_rank
+        ).lower(),
+    )
 
     if os.path.exists(log_writer_path):
         import shutil
+
         shutil.rmtree(log_writer_path)
 
     log_writer = LogWriter(log_writer_path)
 
-    pretrained_models_list = list(
-        model_class.pretrained_init_configuration.keys())
+    pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
     if args.model_name_or_path in pretrained_models_list:
-        model_config = model_class.pretrained_init_configuration[
-            args.model_name_or_path]
+        model_config = model_class.pretrained_init_configuration[args.model_name_or_path]
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
-        model_config[
-            "attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
+        model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
 
-        model_config['num_partitions'] = args.mp_degree
+        model_config["num_partitions"] = args.mp_degree
 
         # MOE config
         initialize_model_and_expert_group(hcg)
 
-        model_config['expert_mode'] = args.expert_mode
-        model_config['hcg'] = hcg
-        model_config['num_experts'] = args.num_experts
-        model_config['top_k'] = args.top_k
+        model_config["expert_mode"] = args.expert_mode
+        model_config["hcg"] = hcg
+        model_config["num_experts"] = args.num_experts
+        model_config["top_k"] = args.top_k
         if args.expert_mode:
-            model_config['gate'] = args.gate
+            model_config["gate"] = args.gate
 
         if args.pp_degree == 1:
             model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model_config["recompute_partition"] = args.recompute_partition
             model_config["recompute_offload"] = args.recompute_offload
             if args.use_recompute and args.recompute_partition:
-                raise Exception(
-                    "when use_recompute is True, recompute_partition must be False in MoE."
-                )
+                raise Exception("when use_recompute is True, recompute_partition must be False in MoE.")
 
             model = GPTForPretraining(GPTModel(**model_config))
         else:
-            model_config['topology'] = hcg.topology()
+            model_config["topology"] = hcg.topology()
             model_config["recompute_interval"] = 1 if args.use_recompute else 0
             model = GPTForPretrainingPipe(**model_config)
     else:
         model = GPTForPretraining.from_pretrained(
             args.model_name_or_path,
             hidden_dropout_prob=args.hidden_dropout_prob,
-            attention_probs_dropout_prob=args.attention_probs_dropout_prob)
+            attention_probs_dropout_prob=args.attention_probs_dropout_prob,
+        )
 
     # Create the critrion for the gpt model
     criterion = GPTPretrainingCriterion()
@@ -432,10 +410,8 @@ def do_train(args):
         lr_scheduler = None
     elif args.lr_decay_style == "cosine":
         lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=args.max_lr,
-            min_lr=args.min_lr,
-            warmup_step=warmup_step,
-            decay_step=args.decay_steps)
+            max_lr=args.max_lr, min_lr=args.min_lr, warmup_step=warmup_step, decay_step=args.decay_steps
+        )
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
@@ -445,25 +421,28 @@ def do_train(args):
             scaler = fleet.distributed_scaler(scaler)
             scaler._unscale = MethodType(unscale_method, scaler)
         else:
-            wrap_scale_func = GroupShardedScaler if in_dygraph_mode(
-            ) else ShardingScaler
+            wrap_scale_func = GroupShardedScaler if in_dygraph_mode() else ShardingScaler
             scaler = wrap_scale_func(scaler)
 
-        model = paddle.amp.decorate(models=model,
-                                    optimizers=None,
-                                    level='O2',
-                                    save_dtype='float32')
+        model = paddle.amp.decorate(models=model, optimizers=None, level="O2", save_dtype="float32")
 
-    opt_fused_tensors, decay_fused_tensors, reduce_fused_tensors, gate_fused_tensors, \
-        expert_fusion_names = parameters_classify(model, use_sharding=(args.sharding_degree > 1))
+    (
+        opt_fused_tensors,
+        decay_fused_tensors,
+        reduce_fused_tensors,
+        gate_fused_tensors,
+        expert_fusion_names,
+    ) = parameters_classify(model, use_sharding=(args.sharding_degree > 1))
     decay_params = [p.name for p in decay_fused_tensors]
 
     clip = None
     if args.grad_clip > 0:
         is_expert_param_fun = lambda param: param.name in expert_fusion_names
-        clip = moe.ClipGradByGlobalNorm(clip_norm=args.grad_clip, \
-                                        is_expert_param_func = is_expert_param_fun, \
-                                        moe_group = hcg.get_expert_parallel_group())
+        clip = moe.ClipGradByGlobalNorm(
+            clip_norm=args.grad_clip,
+            is_expert_param_func=is_expert_param_fun,
+            moe_group=hcg.get_expert_parallel_group(),
+        )
 
     optimizer = AdamW(
         learning_rate=lr_scheduler if lr_scheduler is not None else args.max_lr,
@@ -473,10 +452,11 @@ def do_train(args):
         parameters=opt_fused_tensors,
         weight_decay=args.weight_decay,
         grad_clip=clip,
-        apply_decay_param_fun=lambda x: x in decay_params,  #decay_params,
-        multi_precision=args.use_pure_fp16)
+        apply_decay_param_fun=lambda x: x in decay_params,  # decay_params,
+        multi_precision=args.use_pure_fp16,
+    )
 
-    #in order to restore reader.
+    # in order to restore reader.
     pass_num = 0
     file_id = 0
     start_epoch = 0
@@ -485,14 +465,9 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1 and args.resume_dir is None:
         print(">> initialize....")
         if args.sharding_degree > 1:
-            model, optimizer = group_sharded_parallel(model, optimizer,
-                                                      sharding_group,
-                                                      args.sharding_offload)
+            model, optimizer = group_sharded_parallel(model, optimizer, sharding_group, args.sharding_offload)
             for p in gate_fused_tensors:
-                dist.broadcast(p,
-                               src=sharding_group.ranks[0],
-                               group=sharding_group,
-                               sync_op=True)
+                dist.broadcast(p, src=sharding_group.ranks[0], group=sharding_group, sync_op=True)
             # Multi stream operation will be supported later
             dist.wait(tensor=p, group=sharding_group, use_calc_stream=True)
         else:
@@ -500,8 +475,8 @@ def do_train(args):
 
     if args.resume_dir is not None:
         global_step, loss_scale, data_meta = load_checkpoint(
-            args, model, optimizer, lr_scheduler, tokenizer, dp_rank, mp_rank,
-            pp_rank)
+            args, model, optimizer, lr_scheduler, tokenizer, dp_rank, mp_rank, pp_rank
+        )
         pass_num = data_meta["pass_num"]
         file_id = data_meta["file_id"]
         start_epoch = data_meta["start_epoch"]
@@ -513,17 +488,16 @@ def do_train(args):
             opt_dict = paddle.load(opt_path)
             optimizer.set_state_dict(opt_dict)
         else:
-            logger.warning("No optimizer checkpoint file found in %s." %
-                           opt_path)
+            logger.warning("No optimizer checkpoint file found in %s." % opt_path)
 
     global_step = 0 if args.resume_dir is None else global_step
     timers = get_timers()
     tic_train = time.time()
     for epoch in range(start_epoch, args.num_train_epochs):
         files = [
-            os.path.join(args.input_dir, f) for f in os.listdir(args.input_dir)
-            if (os.path.isfile(os.path.join(args.input_dir, f))
-                and "npz_" not in str(f))
+            os.path.join(args.input_dir, f)
+            for f in os.listdir(args.input_dir)
+            if (os.path.isfile(os.path.join(args.input_dir, f)) and "npz_" not in str(f))
         ]
         files.sort()
         num_files = len(files)
@@ -535,7 +509,8 @@ def do_train(args):
                 local_rank=local_rank,
                 data_world_size=data_world_size,
                 data_world_rank=data_world_rank,
-                eos_id=tokenizer.eos_token_id)
+                eos_id=tokenizer.eos_token_id,
+            )
 
             # Bug fix, if not call valid_data_loader, the enumerate will call valid_data_loader
             # many times. and start a new random dataloader.
@@ -544,7 +519,8 @@ def do_train(args):
 
             for step, batch in enumerate(train_data_loader()):
                 # to remove the train data that has been studyed.
-                if step < global_step - pass_num: continue
+                if step < global_step - pass_num:
+                    continue
 
                 global_step += 1
                 tokens, loss_mask, labels = batch
@@ -556,20 +532,21 @@ def do_train(args):
                 for i in range(accumulate_steps):
                     start_index = i * args.micro_batch_size
                     end_index = start_index + args.micro_batch_size
-                    timers('forward-compute').start()
+                    timers("forward-compute").start()
                     with paddle.amp.auto_cast(
-                            args.use_pure_fp16,
-                            custom_black_list=[
-                                "reduce_sum",
-                                "c_softmax_with_cross_entropy",
-                                "elementwise_div",
-                            ],
-                            level='O2'):
+                        args.use_pure_fp16,
+                        custom_black_list=[
+                            "reduce_sum",
+                            "c_softmax_with_cross_entropy",
+                            "elementwise_div",
+                        ],
+                        level="O2",
+                    ):
                         preds = model(tokens[start_index:end_index, :])
                         loss_mbs = criterion(
-                            preds, labels[start_index:end_index, :],
-                            loss_mask[start_index:end_index, :])
-                    timers('forward-compute').stop()
+                            preds, labels[start_index:end_index, :], loss_mask[start_index:end_index, :]
+                        )
+                    timers("forward-compute").stop()
 
                     if args.gate != "naive" and args.balance_loss_weight:
                         aux_loss_list = [
@@ -579,27 +556,24 @@ def do_train(args):
                         ]
                         bal_loss = paddle.concat(aux_loss_list)
                         if bal_loss.dtype == paddle.float16:
-                            bal_loss = paddle.cast(bal_loss,
-                                                   dtype=paddle.float32)
+                            bal_loss = paddle.cast(bal_loss, dtype=paddle.float32)
                         bal_loss = bal_loss.mean()
                         loss_mbs += bal_loss * args.balance_loss_weight
                     loss_mbs = loss_mbs / accumulate_steps
 
-                    timers('backward-compute').start()
+                    timers("backward-compute").start()
                     if args.use_pure_fp16:
                         scaler.scale(loss_mbs).backward()
                     else:
                         loss_mbs.backward()
-                    timers('backward-compute').stop()
+                    timers("backward-compute").stop()
                     loss = loss + loss_mbs
 
-                timers('backward-params-all-reduce').start()
-                all_reduce_parameters(gate_fused_tensors,
-                                      hcg.get_expert_parallel_group())
+                timers("backward-params-all-reduce").start()
+                all_reduce_parameters(gate_fused_tensors, hcg.get_expert_parallel_group())
                 if args.sharding_degree == 1:
-                    all_reduce_parameters(reduce_fused_tensors,
-                                          hcg.get_data_parallel_group())
-                timers('backward-params-all-reduce').stop()
+                    all_reduce_parameters(reduce_fused_tensors, hcg.get_data_parallel_group())
+                timers("backward-params-all-reduce").stop()
 
                 if args.use_pure_fp16:
                     scaler.step(optimizer)
@@ -621,37 +595,69 @@ def do_train(args):
                         bal_loss = -1
                     logger.info(
                         "global step %d, epoch: %d, batch: %d, loss: %.9f, bal_loss: %.9f, speed: %.2f step/s, ips_total: %.0f tokens/s, ips: %.0f tokens/s, learning rate: %.5e"
-                        % (global_step, epoch, step, avg_loss, bal_loss, speed,
-                           speed * default_global_tokens_num, speed *
-                           default_global_tokens_num / nranks, learning_rate))
+                        % (
+                            global_step,
+                            epoch,
+                            step,
+                            avg_loss,
+                            bal_loss,
+                            speed,
+                            speed * default_global_tokens_num,
+                            speed * default_global_tokens_num / nranks,
+                            learning_rate,
+                        )
+                    )
                     log_writer.add_scalar("loss", float(loss), global_step)
-                    log_writer.add_scalar("learning_rate", learning_rate,
-                                          global_step)
+                    log_writer.add_scalar("learning_rate", learning_rate, global_step)
 
                     tic_train = time.time()
                     timer_log(args.logging_freq)
 
-                if (global_step % args.save_steps == 0
-                        or global_step >= args.max_steps):
+                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
                     loss_scale = scaler._scale if args.use_pure_fp16 else None
-                    save_checkpoint(args, global_step, model, optimizer,
-                                    lr_scheduler, tokenizer, loss_scale,
-                                    dp_rank, mp_rank, pp_rank, pass_num,
-                                    file_id, epoch)
-                    print(
-                        "save checkpoint for step_{} successfully...loss_scale = {}"
-                        .format(global_step, loss_scale))
+                    save_checkpoint(
+                        args,
+                        global_step,
+                        model,
+                        optimizer,
+                        lr_scheduler,
+                        tokenizer,
+                        loss_scale,
+                        dp_rank,
+                        mp_rank,
+                        pp_rank,
+                        pass_num,
+                        file_id,
+                        epoch,
+                    )
+                    print("save checkpoint for step_{} successfully...loss_scale = {}".format(global_step, loss_scale))
 
                 if global_step % args.eval_freq == 0:
                     # Since the valid data broardcast to all devices, we do evaluate on all device.
-                    run_evaluate(args, valid_data_loader, model, criterion,
-                                 args.eval_iters, log_writer, global_step,
-                                 epoch, "valid")
+                    run_evaluate(
+                        args,
+                        valid_data_loader,
+                        model,
+                        criterion,
+                        args.eval_iters,
+                        log_writer,
+                        global_step,
+                        epoch,
+                        "valid",
+                    )
 
                 if global_step >= args.max_steps:
-                    run_evaluate(args, test_data_loader, model, criterion,
-                                 args.test_iters, log_writer, global_step,
-                                 epoch, "test")
+                    run_evaluate(
+                        args,
+                        test_data_loader,
+                        model,
+                        criterion,
+                        args.test_iters,
+                        log_writer,
+                        global_step,
+                        epoch,
+                        "test",
+                    )
                     logger.info("The training process is complete.")
                     del train_data_loader
                     return

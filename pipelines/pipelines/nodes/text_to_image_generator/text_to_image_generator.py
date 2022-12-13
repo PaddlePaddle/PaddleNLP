@@ -28,7 +28,7 @@ from pipelines.nodes.base import BaseComponent
 
 class ErnieTextToImageGenerator(BaseComponent):
     """
-    ErnieTextToImageGenerator that uses a Ernie Vilg for text to image generation.    
+    ErnieTextToImageGenerator that uses a Ernie Vilg for text to image generation.
     """
 
     def __init__(self, ak=None, sk=None):
@@ -36,13 +36,11 @@ class ErnieTextToImageGenerator(BaseComponent):
         :param ak: ak for applying token to request wenxin api.
         :param sk: sk for applying token to request wenxin api.
         """
-        if (ak is None or sk is None):
-            raise Exception(
-                "Please apply api_key and secret_key from https://wenxin.baidu.com/moduleApi/ernieVilg"
-            )
+        if ak is None or sk is None:
+            raise Exception("Please apply api_key and secret_key from https://wenxin.baidu.com/moduleApi/ernieVilg")
         self.ak = ak
         self.sk = sk
-        self.token_host = 'https://wenxin.baidu.com/younger/portal/api/oauth/token'
+        self.token_host = "https://wenxin.baidu.com/younger/portal/api/oauth/token"
         self.token = self._apply_token(self.ak, self.sk)
 
         # save init parameters to enable export of component config as YAML
@@ -55,29 +53,28 @@ class ErnieTextToImageGenerator(BaseComponent):
         if ak is None or sk is None:
             ak = self.ak
             sk = self.sk
-        response = requests.get(self.token_host,
-                                params={
-                                    'grant_type': 'client_credentials',
-                                    'client_id': ak,
-                                    'client_secret': sk
-                                })
+        response = requests.get(
+            self.token_host, params={"grant_type": "client_credentials", "client_id": ak, "client_secret": sk}
+        )
         if response:
             res = response.json()
-            if res['code'] != 0:
-                print('Request access token error.')
+            if res["code"] != 0:
+                print("Request access token error.")
                 raise RuntimeError("Request access token error.")
         else:
-            print('Request access token error.')
+            print("Request access token error.")
             raise RuntimeError("Request access token error.")
-        return res['data']
+        return res["data"]
 
-    def generate_image(self,
-                       text_prompts,
-                       style: Optional[str] = "探索无限",
-                       resolution: Optional[str] = "1024*1024",
-                       topk: Optional[int] = 6,
-                       visualization: Optional[bool] = True,
-                       output_dir: Optional[str] = 'ernievilg_output'):
+    def generate_image(
+        self,
+        text_prompts,
+        style: Optional[str] = "探索无限",
+        resolution: Optional[str] = "1024*1024",
+        topk: Optional[int] = 6,
+        visualization: Optional[bool] = True,
+        output_dir: Optional[str] = "ernievilg_output",
+    ):
         """
         Create image by text prompts using ErnieVilG model.
         :param text_prompts: Phrase, sentence, or string of words and phrases describing what the image should look like.
@@ -91,59 +88,49 @@ class ErnieTextToImageGenerator(BaseComponent):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir, exist_ok=True)
         token = self.token
-        create_url = 'https://wenxin.baidu.com/younger/portal/api/rest/1.0/ernievilg/v1/txt2img?from=paddlehub'
-        get_url = 'https://wenxin.baidu.com/younger/portal/api/rest/1.0/ernievilg/v1/getImg?from=paddlehub'
+        create_url = "https://wenxin.baidu.com/younger/portal/api/rest/1.0/ernievilg/v1/txt2img?from=paddlehub"
+        get_url = "https://wenxin.baidu.com/younger/portal/api/rest/1.0/ernievilg/v1/getImg?from=paddlehub"
         if isinstance(text_prompts, str):
             text_prompts = [text_prompts]
         taskids = []
         for text_prompt in text_prompts:
             res = requests.post(
                 create_url,
-                headers={'Content-Type': 'application/x-www-form-urlencoded'},
-                data={
-                    'access_token': token,
-                    "text": text_prompt,
-                    "style": style,
-                    "resolution": resolution
-                })
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+                data={"access_token": token, "text": text_prompt, "style": style, "resolution": resolution},
+            )
             res = res.json()
-            if res['code'] == 4001:
-                print('请求参数错误')
+            if res["code"] == 4001:
+                print("请求参数错误")
                 raise RuntimeError("请求参数错误")
-            elif res['code'] == 4002:
-                print('请求参数格式错误，请检查必传参数是否齐全，参数类型等')
+            elif res["code"] == 4002:
+                print("请求参数格式错误，请检查必传参数是否齐全，参数类型等")
                 raise RuntimeError("请求参数格式错误，请检查必传参数是否齐全，参数类型等")
-            elif res['code'] == 4003:
-                print('请求参数中，图片风格不在可选范围内')
+            elif res["code"] == 4003:
+                print("请求参数中，图片风格不在可选范围内")
                 raise RuntimeError("请求参数中，图片风格不在可选范围内")
-            elif res['code'] == 4004:
-                print('API服务内部错误，可能引起原因有请求超时、模型推理错误等')
+            elif res["code"] == 4004:
+                print("API服务内部错误，可能引起原因有请求超时、模型推理错误等")
                 raise RuntimeError("API服务内部错误，可能引起原因有请求超时、模型推理错误等")
-            elif res['code'] == 100 or res['code'] == 110 or res['code'] == 111:
+            elif res["code"] == 100 or res["code"] == 110 or res["code"] == 111:
                 token = self._apply_token(self.ak, self.sk)
-                res = requests.post(create_url,
-                                    headers={
-                                        'Content-Type':
-                                        'application/x-www-form-urlencoded'
-                                    },
-                                    data={
-                                        'access_token': token,
-                                        "text": text_prompt,
-                                        "style": style,
-                                        "resolution": resolution
-                                    })
+                res = requests.post(
+                    create_url,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    data={"access_token": token, "text": text_prompt, "style": style, "resolution": resolution},
+                )
                 res = res.json()
-                if res['code'] != 0:
+                if res["code"] != 0:
                     print("Token失效重新请求后依然发生错误，请检查输入的参数")
                     raise RuntimeError("Token失效重新请求后依然发生错误，请检查输入的参数")
-            if res['msg'] == 'success':
-                taskids.append(res['data']["taskId"])
+            if res["msg"] == "success":
+                taskids.append(res["data"]["taskId"])
             else:
-                print(res['msg'])
-                raise RuntimeError(res['msg'])
+                print(res["msg"])
+                raise RuntimeError(res["msg"])
 
         start_time = time.time()
-        process_bar = tqdm(total=100, unit='%')
+        process_bar = tqdm(total=100, unit="%")
         results = {}
         total_time = 60 * len(taskids)
         while True:
@@ -172,95 +159,84 @@ class ErnieTextToImageGenerator(BaseComponent):
                 break
             has_done = []
             for taskid in taskids:
-                res = requests.post(get_url,
-                                    headers={
-                                        'Content-Type':
-                                        'application/x-www-form-urlencoded'
-                                    },
-                                    data={
-                                        'access_token': token,
-                                        'taskId': {taskid}
-                                    })
+                res = requests.post(
+                    get_url,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    data={"access_token": token, "taskId": {taskid}},
+                )
                 res = res.json()
-                if res['code'] == 4001:
-                    print('请求参数错误')
+                if res["code"] == 4001:
+                    print("请求参数错误")
                     raise RuntimeError("请求参数错误")
-                elif res['code'] == 4002:
-                    print('请求参数格式错误，请检查必传参数是否齐全，参数类型等')
+                elif res["code"] == 4002:
+                    print("请求参数格式错误，请检查必传参数是否齐全，参数类型等")
                     raise RuntimeError("请求参数格式错误，请检查必传参数是否齐全，参数类型等")
-                elif res['code'] == 4003:
-                    print('请求参数中，图片风格不在可选范围内')
+                elif res["code"] == 4003:
+                    print("请求参数中，图片风格不在可选范围内")
                     raise RuntimeError("请求参数中，图片风格不在可选范围内")
-                elif res['code'] == 4004:
-                    print('API服务内部错误，可能引起原因有请求超时、模型推理错误等')
+                elif res["code"] == 4004:
+                    print("API服务内部错误，可能引起原因有请求超时、模型推理错误等")
                     raise RuntimeError("API服务内部错误，可能引起原因有请求超时、模型推理错误等")
-                elif res['code'] == 100 or res['code'] == 110 or res[
-                        'code'] == 111:
+                elif res["code"] == 100 or res["code"] == 110 or res["code"] == 111:
                     token = self._apply_token(self.ak, self.sk)
-                    res = requests.post(get_url,
-                                        headers={
-                                            'Content-Type':
-                                            'application/x-www-form-urlencoded'
-                                        },
-                                        data={
-                                            'access_token': token,
-                                            'taskId': {taskid}
-                                        })
+                    res = requests.post(
+                        get_url,
+                        headers={"Content-Type": "application/x-www-form-urlencoded"},
+                        data={"access_token": token, "taskId": {taskid}},
+                    )
                     res = res.json()
-                    if res['code'] != 0:
+                    if res["code"] != 0:
                         print("Token失效重新请求后依然发生错误，请检查输入的参数")
                         raise RuntimeError("Token失效重新请求后依然发生错误，请检查输入的参数")
-                if res['msg'] == 'success':
-                    if res['data']['status'] == 1:
-                        has_done.append(res['data']['taskId'])
-                    results[res['data']['text']] = {
-                        'imgUrls': res['data']['imgUrls'],
-                        'waiting': res['data']['waiting'],
-                        'taskId': res['data']['taskId']
+                if res["msg"] == "success":
+                    if res["data"]["status"] == 1:
+                        has_done.append(res["data"]["taskId"])
+                    results[res["data"]["text"]] = {
+                        "imgUrls": res["data"]["imgUrls"],
+                        "waiting": res["data"]["waiting"],
+                        "taskId": res["data"]["taskId"],
                     }
                 else:
-                    print(res['msg'])
-                    raise RuntimeError(res['msg'])
+                    print(res["msg"])
+                    raise RuntimeError(res["msg"])
             for taskid in has_done:
                 taskids.remove(taskid)
-        print('Saving Images...')
+        print("Saving Images...")
         result_images = []
         for text, data in results.items():
-            for idx, imgdata in enumerate(data['imgUrls']):
+            for idx, imgdata in enumerate(data["imgUrls"]):
                 try:
-                    image = Image.open(
-                        BytesIO(requests.get(imgdata['image']).content))
+                    image = Image.open(BytesIO(requests.get(imgdata["image"]).content))
                 except Exception as e:
-                    print('Download generated images error, retry one time')
+                    print("Download generated images error, retry one time")
                     try:
-                        image = Image.open(
-                            BytesIO(requests.get(imgdata['image']).content))
+                        image = Image.open(BytesIO(requests.get(imgdata["image"]).content))
                     except Exception:
-                        raise RuntimeError('Download generated images failed.')
+                        raise RuntimeError("Download generated images failed.")
                 if visualization:
-                    ext = 'png'
+                    ext = "png"
                     md5hash = hashlib.md5(image.tobytes())
                     md5_name = md5hash.hexdigest()
-                    image_name = '{}.{}'.format(md5_name, ext)
+                    image_name = "{}.{}".format(md5_name, ext)
                     image_path = os.path.join(output_dir, image_name)
                     image.save(image_path)
                     result_images.append(image_path)
                 if idx + 1 >= topk:
                     break
-        print('Done')
+        print("Done")
         return result_images
 
-    def run(self,
-            query: Document,
-            style: Optional[str] = None,
-            topk: Optional[int] = None,
-            resolution: Optional[str] = "1024*1024",
-            output_dir: Optional[str] = 'ernievilg_output'):
+    def run(
+        self,
+        query: Document,
+        style: Optional[str] = None,
+        topk: Optional[int] = None,
+        resolution: Optional[str] = "1024*1024",
+        output_dir: Optional[str] = "ernievilg_output",
+    ):
 
-        result_images = self.generate_image(query,
-                                            style=style,
-                                            topk=topk,
-                                            resolution=resolution,
-                                            output_dir=output_dir)
+        result_images = self.generate_image(
+            query, style=style, topk=topk, resolution=resolution, output_dir=output_dir
+        )
         results = {"results": result_images}
         return results, "output_1"

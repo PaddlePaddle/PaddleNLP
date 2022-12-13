@@ -64,20 +64,20 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 
 def read_local_dataset(path):
     """
     Read dataset file
     """
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            items = line.strip().split('\t')
+            items = line.strip().split("\t")
             if len(items) == 2:
-                yield {'text': items[0], 'label': items[1]}
+                yield {"text": items[0], "label": items[1]}
             elif len(items) == 1:
-                yield {'text': items[0]}
+                yield {"text": items[0]}
             else:
                 logger.info(line.strip())
                 raise ValueError("{} should be in fixed format.".format(path))
@@ -113,8 +113,7 @@ def get_sparse_data(analysis_result, sparse_num):
         idx_scores[i] = sum(scores) / len(scores)
         preds.append(analysis_result[i].pred_label)
 
-    idx_socre_list = list(sorted(idx_scores.items(),
-                                 key=lambda x: x[1]))[:sparse_num]
+    idx_socre_list = list(sorted(idx_scores.items(), key=lambda x: x[1]))[:sparse_num]
     ret_idxs, ret_scores = list(zip(*idx_socre_list))
     return ret_idxs, ret_scores, preds
 
@@ -127,14 +126,12 @@ def find_sparse_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if os.path.exists(os.path.join(
-            args.params_path, "model_state.pdparams")) and os.path.exists(
-                os.path.join(args.params_path,
-                             "model_config.json")) and os.path.exists(
-                                 os.path.join(args.params_path,
-                                              "tokenizer_config.json")):
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.params_path)
+    if (
+        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
+        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
+        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
+    ):
+        model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
@@ -145,57 +142,41 @@ def find_sparse_data():
     dev_path = os.path.join(args.dataset_dir, args.dev_file)
 
     label_list = {}
-    with open(label_path, 'r', encoding='utf-8') as f:
+    with open(label_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
 
     train_ds = load_dataset(read_local_dataset, path=train_path, lazy=False)
     dev_ds = load_dataset(read_local_dataset, path=dev_path, lazy=False)
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length)
+    trans_func = functools.partial(preprocess_function, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func)
     dev_ds = dev_ds.map(trans_func)
 
     # Batchify dataset
     collate_fn = LocalDataCollatorWithPadding(tokenizer)
-    train_batch_sampler = BatchSampler(train_ds,
-                                       batch_size=args.batch_size,
-                                       shuffle=False)
-    dev_batch_sampler = BatchSampler(dev_ds,
-                                     batch_size=args.batch_size,
-                                     shuffle=False)
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=collate_fn)
-    dev_data_loader = DataLoader(dataset=dev_ds,
-                                 batch_sampler=dev_batch_sampler,
-                                 collate_fn=collate_fn)
+    train_batch_sampler = BatchSampler(train_ds, batch_size=args.batch_size, shuffle=False)
+    dev_batch_sampler = BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    train_data_loader = DataLoader(dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=collate_fn)
+    dev_data_loader = DataLoader(dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=collate_fn)
 
     # Classifier_layer_name is the layer name of the last output layer
-    feature_sim = FeatureSimilarityModel(model,
-                                         train_data_loader,
-                                         classifier_layer_name="classifier")
+    feature_sim = FeatureSimilarityModel(model, train_data_loader, classifier_layer_name="classifier")
     # Feature similarity analysis & select sparse data
     analysis_result = []
     for batch in dev_data_loader:
-        analysis_result += feature_sim(batch,
-                                       sample_num=args.rationale_num_sparse)
-    sparse_indexs, sparse_scores, preds = get_sparse_data(
-        analysis_result, args.sparse_num)
+        analysis_result += feature_sim(batch, sample_num=args.rationale_num_sparse)
+    sparse_indexs, sparse_scores, preds = get_sparse_data(analysis_result, args.sparse_num)
 
     # Save the sparse data
-    with open(os.path.join(args.dataset_dir, args.sparse_file), 'w') as f:
+    with open(os.path.join(args.dataset_dir, args.sparse_file), "w") as f:
         for idx in sparse_indexs:
             data = dev_ds.data[idx]
-            f.write(data['text'] + '\t' + str(data['label']) + '\n')
+            f.write(data["text"] + "\t" + str(data["label"]) + "\n")
     f.close()
-    logger.info("Sparse data saved in {}".format(
-        os.path.join(args.dataset_dir, args.sparse_file)))
-    logger.info("Average score in sparse data: {:.4f}".format(
-        sum(sparse_scores) / len(sparse_scores)))
+    logger.info("Sparse data saved in {}".format(os.path.join(args.dataset_dir, args.sparse_file)))
+    logger.info("Average score in sparse data: {:.4f}".format(sum(sparse_scores) / len(sparse_scores)))
     return os.path.join(args.dataset_dir, args.sparse_file)
 
 
@@ -236,8 +217,7 @@ def find_support_data():
 
     # Define model & tokenizer
     if os.path.exists(args.params_path):
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.params_path)
+        model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
@@ -250,81 +230,61 @@ def find_support_data():
 
     sparse_path = os.path.join(args.dataset_dir, args.sparse_file)
     support_path = os.path.join(args.dataset_dir, args.support_file)
-    candidate_ds = load_dataset(read_local_dataset,
-                                path=candidate_path,
-                                lazy=False)
+    candidate_ds = load_dataset(read_local_dataset, path=candidate_path, lazy=False)
     sparse_ds = load_dataset(read_local_dataset, path=sparse_path, lazy=False)
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length)
+    trans_func = functools.partial(preprocess_function, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
     candidate_ds = candidate_ds.map(trans_func)
     sparse_ds = sparse_ds.map(trans_func)
 
     # Batchify dataset
     collate_fn = LocalDataCollatorWithPadding(tokenizer)
-    candidate_batch_sampler = BatchSampler(candidate_ds,
-                                           batch_size=args.batch_size,
-                                           shuffle=False)
-    sparse_batch_sampler = BatchSampler(sparse_ds,
-                                        batch_size=args.batch_size,
-                                        shuffle=False)
-    candidate_data_loader = DataLoader(dataset=candidate_ds,
-                                       batch_sampler=candidate_batch_sampler,
-                                       collate_fn=collate_fn)
-    sparse_data_loader = DataLoader(dataset=sparse_ds,
-                                    batch_sampler=sparse_batch_sampler,
-                                    collate_fn=collate_fn)
+    candidate_batch_sampler = BatchSampler(candidate_ds, batch_size=args.batch_size, shuffle=False)
+    sparse_batch_sampler = BatchSampler(sparse_ds, batch_size=args.batch_size, shuffle=False)
+    candidate_data_loader = DataLoader(
+        dataset=candidate_ds, batch_sampler=candidate_batch_sampler, collate_fn=collate_fn
+    )
+    sparse_data_loader = DataLoader(dataset=sparse_ds, batch_sampler=sparse_batch_sampler, collate_fn=collate_fn)
 
     # Classifier_layer_name is the layer name of the last output layer
-    feature_sim = FeatureSimilarityModel(model,
-                                         candidate_data_loader,
-                                         classifier_layer_name="classifier")
+    feature_sim = FeatureSimilarityModel(model, candidate_data_loader, classifier_layer_name="classifier")
     # Feature similarity analysis
     analysis_result = []
     for batch in sparse_data_loader:
-        analysis_result += feature_sim(batch,
-                                       sample_num=args.rationale_num_support)
+        analysis_result += feature_sim(batch, sample_num=args.rationale_num_support)
 
-    support_indexs, support_scores = get_support_data(analysis_result,
-                                                      args.support_num,
-                                                      args.support_threshold)
+    support_indexs, support_scores = get_support_data(analysis_result, args.support_num, args.support_threshold)
 
     # Save the support data
     if args.annotate or args.aug_strategy == "duplicate":
-        with open(support_path, 'w') as f:
+        with open(support_path, "w") as f:
             for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
-                if 'label' in data:
-                    f.write(data['text'] + '\t' + data['label'] + '\n')
+                if "label" in data:
+                    f.write(data["text"] + "\t" + data["label"] + "\n")
                 else:
-                    f.write(data['text'] + '\n')
+                    f.write(data["text"] + "\n")
         f.close()
     else:
         create_n = 1
         aug_percent = 0.1
         if args.aug_strategy == "substitute":
-            aug = WordSubstitute('synonym',
-                                 create_n=create_n,
-                                 aug_percent=aug_percent)
+            aug = WordSubstitute("synonym", create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "insert":
-            aug = WordInsert('synonym',
-                             create_n=create_n,
-                             aug_percent=aug_percent)
+            aug = WordInsert("synonym", create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "delete":
             aug = WordDelete(create_n=create_n, aug_percent=aug_percent)
         elif args.aug_strategy == "swap":
             aug = WordSwap(create_n=create_n, aug_percent=aug_percent)
 
-        with open(support_path, 'w') as f:
+        with open(support_path, "w") as f:
             for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
-                augs = aug.augment(data['text'])
+                augs = aug.augment(data["text"])
                 for a in augs:
-                    f.write(a + '\t' + data['label'] + '\n')
+                    f.write(a + "\t" + data["label"] + "\n")
         f.close()
     logger.info("support data saved in {}".format(support_path))
-    logger.info("support average scores: {:.4f}".format(
-        float(sum(support_scores)) / len(support_scores)))
+    logger.info("support average scores: {:.4f}".format(float(sum(support_scores)) / len(support_scores)))
 
 
 if __name__ == "__main__":

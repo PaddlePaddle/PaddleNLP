@@ -290,6 +290,11 @@ TASKS = {
                 "hidden_size": 1024,
                 "task_flag": "information_extraction-uie-m-large",
             },
+            "uie-x-base": {
+                "task_class": UIETask,
+                "hidden_size": 768,
+                "task_flag": "information_extraction-uie-x-base",
+            },
             "uie-data-distill-gp": {"task_class": GPTask, "task_flag": "information_extraction-uie-data-distill-gp"},
         },
         "default": {"model": "uie-base"},
@@ -465,6 +470,7 @@ support_schema_list = [
     "wordtag",
     "uie-m-large",
     "uie-m-base",
+    "uie-x-base",
 ]
 
 support_argument_list = [

@@ -23,15 +23,14 @@ import unittest
 
 
 class TestVocab(CpuCommonTest):
-
     def create_counter(self):
         counter = Counter()
-        counter['一万七千多'] = 2
-        counter['一万七千余'] = 3
-        counter['一万万'] = 1
-        counter['一万七千多户'] = 3
-        counter['一万七千'] = 4
-        counter['一万七'] = 0
+        counter["一万七千多"] = 2
+        counter["一万七千余"] = 3
+        counter["一万万"] = 1
+        counter["一万七千多户"] = 3
+        counter["一万七千"] = 4
+        counter["一万七"] = 0
         self.counter = counter
 
     def setUp(self):
@@ -39,55 +38,43 @@ class TestVocab(CpuCommonTest):
 
     @util.assert_raises(ValueError)
     def test_invalid_specail_token(self):
-        Vocab(wrong_kwarg='')
+        Vocab(wrong_kwarg="")
 
     @util.assert_raises(ValueError)
     def test_invalid_identifier(self):
-        Vocab(counter=self.counter, _special_token='')
+        Vocab(counter=self.counter, _special_token="")
 
     @util.assert_raises(ValueError)
     def test_sort_index_value_error1(self):
-        token_to_idx = {'一万七千多': 1, '一万七千余': 2, 'IP地址': 3}
-        vocab = Vocab(counter=self.counter,
-                      unk_token='[UNK]',
-                      token_to_idx=token_to_idx)
+        token_to_idx = {"一万七千多": 1, "一万七千余": 2, "IP地址": 3}
+        vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
     @util.assert_raises(ValueError)
     def test_sort_index_value_error2(self):
-        token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万七千': 2}
-        Vocab(counter=self.counter,
-              unk_token='[UNK]',
-              token_to_idx=token_to_idx)
+        token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万七千": 2}
+        Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
     @util.assert_raises(ValueError)
     def test_sort_index_value_error3(self):
-        token_to_idx = {'一万七千多': -1, '一万七千余': 2, '一万七千': 3}
-        Vocab(counter=self.counter,
-              unk_token='[UNK]',
-              token_to_idx=token_to_idx)
+        token_to_idx = {"一万七千多": -1, "一万七千余": 2, "一万七千": 3}
+        Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
 
     @util.assert_raises(ValueError)
     def test_to_token_excess_size(self):
-        token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万万': 3}
-        vocab = Vocab(counter=self.counter,
-                      unk_token='[UNK]',
-                      token_to_idx=token_to_idx)
+        token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万万": 3}
+        vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
         vocab.to_tokens(len(vocab))
 
     def test_counter(self):
-        token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万万': 3}
-        vocab = Vocab(counter=self.counter,
-                      unk_token='[UNK]',
-                      token_to_idx=token_to_idx)
-        self.check_output_equal(vocab.to_tokens(1), '一万七千多')
-        self.check_output_equal(vocab.to_tokens(2), '一万七千余')
-        self.check_output_equal(vocab.to_tokens(3), '一万万')
+        token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万万": 3}
+        vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
+        self.check_output_equal(vocab.to_tokens(1), "一万七千多")
+        self.check_output_equal(vocab.to_tokens(2), "一万七千余")
+        self.check_output_equal(vocab.to_tokens(3), "一万万")
 
     def test_json(self):
-        token_to_idx = {'一万七千多': 1, '一万七千余': 2, '一万万': 3}
-        vocab = Vocab(counter=self.counter,
-                      unk_token='[UNK]',
-                      token_to_idx=token_to_idx)
+        token_to_idx = {"一万七千多": 1, "一万七千余": 2, "一万万": 3}
+        vocab = Vocab(counter=self.counter, unk_token="[UNK]", token_to_idx=token_to_idx)
         json_str = vocab.to_json()
         copied_vocab = Vocab.from_json(json_str)
         for key, value in copied_vocab.token_to_idx.items():

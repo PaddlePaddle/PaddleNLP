@@ -13,11 +13,16 @@
 # limitations under the License.
 
 import numpy as np
-
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.fluid.layers.utils import map_structure
+from paddle.nn import (
+    TransformerDecoder,
+    TransformerDecoderLayer,
+    TransformerEncoder,
+    TransformerEncoderLayer,
+)
 
 __all__ = [
     "position_encoding_init",
@@ -28,6 +33,7 @@ __all__ = [
     "TransformerBeamSearchDecoder",
     "TransformerModel",
     "InferTransformerModel",
+    "LabelSmoothedCrossEntropyCriterion",
 ]
 
 
@@ -286,6 +292,50 @@ class CrossEntropyCriterion(nn.Layer):
         token_num.stop_gradient = True
         avg_cost = sum_cost / token_num
         return sum_cost, avg_cost, token_num
+
+
+def label_smoothed_nll_loss(lprobs, target, epsilon, ignore_index=None, reduce=True):
+    if target.dim() == lprobs.dim() - 1:
+        target = target.unsqueeze(-1)
+
+    num_tokens = paddle.shape(lprobs)[0]
+    index = paddle.arange(0, num_tokens, dtype="int64").unsqueeze(-1)
+    index = paddle.concat([index, target], axis=-1)
+    index.stop_gradient = True
+
+    log_probs = -lprobs
+
+    nll_loss = paddle.gather_nd(log_probs, index=index).unsqueeze(-1)
+    smooth_loss = log_probs.sum(axis=-1, keepdim=True)
+
+    pad_mask = paddle.cast(target != ignore_index, dtype=paddle.get_default_dtype())
+    nll_loss = nll_loss * pad_mask
+    smooth_loss = smooth_loss * pad_mask
+    if reduce:
+        nll_loss = nll_loss.sum()
+        smooth_loss = smooth_loss.sum()
+    eps_i = epsilon / (lprobs.shape[-1] - 1)
+    loss = (1.0 - epsilon - eps_i) * nll_loss + eps_i * smooth_loss
+    token_num = paddle.sum(pad_mask)
+    return loss, loss / token_num, token_num
+
+
+class LabelSmoothedCrossEntropyCriterion(nn.Layer):
+    def __init__(self, label_smoothing, padding_idx=0):
+        super().__init__()
+        self.eps = label_smoothing
+        self.padding_idx = padding_idx
+
+    def forward(self, predict, label, reduce=True):
+        return self.compute_loss(predict, label, reduce=reduce)
+
+    def get_lprobs_and_target(self, predict, label):
+        lprobs = paddle.nn.functional.log_softmax(predict, axis=-1)
+        return lprobs.reshape([-1, lprobs.shape[-1]]), label.reshape([-1])
+
+    def compute_loss(self, predict, label, reduce=True):
+        lprobs, label = self.get_lprobs_and_target(predict, label)
+        return label_smoothed_nll_loss(lprobs, label, self.eps, ignore_index=self.padding_idx, reduce=reduce)
 
 
 class TransformerDecodeCell(nn.Layer):
@@ -650,8 +700,12 @@ class TransformerModel(nn.Layer):
             The start token id and also be used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         activation (str, optional):
             The activation used in FFN. Defaults to "relu".
+        normalize_before (bool, optional):
+            Whether to apply pre-normalization. Defaults to True.
     """
 
     def __init__(
@@ -670,16 +724,19 @@ class TransformerModel(nn.Layer):
         act_dropout=None,
         bos_id=0,
         eos_id=1,
+        pad_id=None,
         activation="relu",
+        normalize_before=True,
     ):
         super(TransformerModel, self).__init__()
         self.trg_vocab_size = trg_vocab_size
         self.emb_dim = d_model
         self.bos_id = bos_id
         self.eos_id = eos_id
+        self.pad_id = pad_id if pad_id is not None else self.bos_id
         self.dropout = dropout
 
-        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
+        self.src_word_embedding = WordEmbedding(vocab_size=src_vocab_size, emb_dim=d_model, bos_id=self.pad_id)
         self.src_pos_embedding = PositionalEmbedding(emb_dim=d_model, max_length=max_length)
         if weight_sharing:
             assert (
@@ -688,8 +745,33 @@ class TransformerModel(nn.Layer):
             self.trg_word_embedding = self.src_word_embedding
             self.trg_pos_embedding = self.src_pos_embedding
         else:
-            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.bos_id)
+            self.trg_word_embedding = WordEmbedding(vocab_size=trg_vocab_size, emb_dim=d_model, bos_id=self.pad_id)
             self.trg_pos_embedding = PositionalEmbedding(emb_dim=d_model, max_length=max_length)
+
+        if not normalize_before:
+            encoder_layer = TransformerEncoderLayer(
+                d_model=d_model,
+                nhead=n_head,
+                dim_feedforward=d_inner_hid,
+                dropout=dropout,
+                activation=activation,
+                attn_dropout=attn_dropout,
+                act_dropout=act_dropout,
+                normalize_before=normalize_before,
+            )
+            encoder_with_post_norm = TransformerEncoder(encoder_layer, num_encoder_layers)
+
+            decoder_layer = TransformerDecoderLayer(
+                d_model=d_model,
+                nhead=n_head,
+                dim_feedforward=d_inner_hid,
+                dropout=dropout,
+                activation=activation,
+                attn_dropout=attn_dropout,
+                act_dropout=act_dropout,
+                normalize_before=normalize_before,
+            )
+            decoder_with_post_norm = TransformerDecoder(decoder_layer, num_decoder_layers)
 
         self.transformer = paddle.nn.Transformer(
             d_model=d_model,
@@ -701,7 +783,9 @@ class TransformerModel(nn.Layer):
             attn_dropout=attn_dropout,
             act_dropout=act_dropout,
             activation=activation,
-            normalize_before=True,
+            normalize_before=normalize_before,
+            custom_encoder=None if normalize_before else encoder_with_post_norm,
+            custom_decoder=None if normalize_before else decoder_with_post_norm,
         )
 
         if weight_sharing:
@@ -761,16 +845,16 @@ class TransformerModel(nn.Layer):
         src_max_len = paddle.shape(src_word)[-1]
         trg_max_len = paddle.shape(trg_word)[-1]
         src_slf_attn_bias = (
-            paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
         src_slf_attn_bias.stop_gradient = True
         trg_slf_attn_bias = self.transformer.generate_square_subsequent_mask(trg_max_len)
         trg_slf_attn_bias.stop_gradient = True
         trg_src_attn_bias = src_slf_attn_bias
-        src_pos = paddle.cast(src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+        src_pos = paddle.cast(src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
             start=0, end=src_max_len, dtype=src_word.dtype
         )
-        trg_pos = paddle.cast(trg_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+        trg_pos = paddle.cast(trg_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
             start=0, end=trg_max_len, dtype=trg_word.dtype
         )
 
@@ -835,6 +919,8 @@ class InferTransformerModel(TransformerModel):
             The start token id and also is used as padding id. Defaults to 0.
         eos_id (int, optional):
             The end token id. Defaults to 1.
+        pad_id (int, optional):
+            The pad token id. Defaults to None. If it's None, the bos_id will be used as pad_id.
         beam_size (int, optional):
             The beam width for beam search. Defaults to 4.
         max_out_len (int, optional):
@@ -851,6 +937,8 @@ class InferTransformerModel(TransformerModel):
             penalty. Default to `v1`.
         activation (str, optional):
             The activation used in FFN. Defaults to "relu".
+        normalize_before (bool, optional):
+            Whether to apply pre-normalization. Defaults to True.
         kwargs:
             The key word arguments can be `rel_len` and `alpha`:
 
@@ -880,11 +968,13 @@ class InferTransformerModel(TransformerModel):
         act_dropout=None,
         bos_id=0,
         eos_id=1,
+        pad_id=None,
         beam_size=4,
         max_out_len=256,
         output_time_major=False,
         beam_search_version="v1",
         activation="relu",
+        normalize_before=True,
         **kwargs
     ):
         args = dict(locals())
@@ -955,17 +1045,17 @@ class InferTransformerModel(TransformerModel):
                     src_word=paddle.randint(low=3, high=30000, shape=[batch_size, seq_len]))
         """
         if trg_word is not None:
-            trg_length = paddle.sum(paddle.cast(trg_word != self.bos_id, dtype="int32"), axis=-1)
+            trg_length = paddle.sum(paddle.cast(trg_word != self.pad_id, dtype="int32"), axis=-1)
         else:
             trg_length = None
 
         if self.beam_search_version == "v1":
             src_max_len = paddle.shape(src_word)[-1]
             src_slf_attn_bias = (
-                paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+                paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
             trg_src_attn_bias = src_slf_attn_bias
-            src_pos = paddle.cast(src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+            src_pos = paddle.cast(src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
                 start=0, end=src_max_len, dtype=src_word.dtype
             )
 
@@ -1036,10 +1126,10 @@ class InferTransformerModel(TransformerModel):
         # run encoder
         src_max_len = paddle.shape(src_word)[-1]
         src_slf_attn_bias = (
-            paddle.cast(src_word == self.bos_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            paddle.cast(src_word == self.pad_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
         src_slf_attn_bias.stop_gradient = True
-        src_pos = paddle.cast(src_word != self.bos_id, dtype=src_word.dtype) * paddle.arange(
+        src_pos = paddle.cast(src_word != self.pad_id, dtype=src_word.dtype) * paddle.arange(
             start=0, end=src_max_len, dtype=src_word.dtype
         )
         src_emb = self.src_word_embedding(src_word)
@@ -1058,8 +1148,8 @@ class InferTransformerModel(TransformerModel):
             else (enc_output.shape[1] + max_len if self.rel_len else max_len)
         )
 
-        ### initialize states of beam search ###
-        ## init for the alive ##
+        # initialize states of beam search
+        # init for the alive
         initial_log_probs = paddle.assign(np.array([[0.0] + [-inf] * (beam_size - 1)], dtype="float32"))
         alive_log_probs = paddle.tile(initial_log_probs, [batch_size, 1])
 
@@ -1067,7 +1157,7 @@ class InferTransformerModel(TransformerModel):
             paddle.cast(paddle.assign(np.array([[[self.bos_id]]])), src_word.dtype), [batch_size, beam_size, 1]
         )
 
-        ## init for the finished ##
+        # init for the finished
         finished_scores = paddle.assign(np.array([[-inf] * beam_size], dtype="float32"))
         finished_scores = paddle.tile(finished_scores, [batch_size, 1])
 
@@ -1076,14 +1166,14 @@ class InferTransformerModel(TransformerModel):
         )
         finished_flags = paddle.zeros_like(finished_scores)
 
-        ### initialize inputs and states of transformer decoder ###
-        ## init inputs for decoder, shaped `[batch_size*beam_size, ...]`
+        # initialize inputs and states of transformer decoder
+        # init inputs for decoder, shaped `[batch_size*beam_size, ...]`
         pre_word = paddle.reshape(alive_seq[:, :, -1], [batch_size * beam_size, 1])
         trg_src_attn_bias = src_slf_attn_bias
         trg_src_attn_bias = merge_beam_dim(expand_to_beam_size(trg_src_attn_bias, beam_size))
         enc_output = merge_beam_dim(expand_to_beam_size(enc_output, beam_size))
 
-        ## init states (caches) for transformer, need to be updated according to selected beam
+        # init states (caches) for transformer, need to be updated according to selected beam
         caches = self.transformer.decoder.gen_cache(enc_output, do_zip=False)
 
         if trg_word is not None:

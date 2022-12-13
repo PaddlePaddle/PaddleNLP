@@ -23,33 +23,28 @@ agg_sql_dict = {0: "", 1: "AVG", 2: "MAX", 3: "MIN", 4: "COUNT", 5: "SUM"}
 conn_sql_dict = {0: "", 1: "and", 2: "or"}
 
 ### from IRNet keywords, need to be simplify
-CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit',
-                   'intersect', 'union', 'except')
-JOIN_KEYWORDS = ('join', 'on', 'as')
+CLAUSE_KEYWORDS = ("select", "from", "where", "group", "order", "limit", "intersect", "union", "except")
+JOIN_KEYWORDS = ("join", "on", "as")
 
-COND_OPS = ('not_in', 'between', '==', '>', '<', '>=', '<=', '!=', 'in', 'like')
-UNIT_OPS = ('none', '-', '+', "*", '/')
-AGG_OPS = ('none', 'max', 'min', 'count', 'sum', 'avg')
+COND_OPS = ("not_in", "between", "==", ">", "<", ">=", "<=", "!=", "in", "like")
+UNIT_OPS = ("none", "-", "+", "*", "/")
+AGG_OPS = ("none", "max", "min", "count", "sum", "avg")
 TABLE_TYPE = {
-    'sql': "sql",
-    'table_unit': "table_unit",
+    "sql": "sql",
+    "table_unit": "table_unit",
 }
 
-LOGIC_AND_OR = ('and', 'or')
-SQL_OPS = ('intersect', 'union', 'except')
-ORDER_OPS = ('desc', 'asc')
+LOGIC_AND_OR = ("and", "or")
+SQL_OPS = ("intersect", "union", "except")
+ORDER_OPS = ("desc", "asc")
 
-CONST_COLUMN = set(['time_now'])
+CONST_COLUMN = set(["time_now"])
 
-EXPECT_BRACKET_PRE_TOKENS = set(AGG_OPS + SQL_OPS + COND_OPS + CLAUSE_KEYWORDS +
-                                ('from', ','))
+EXPECT_BRACKET_PRE_TOKENS = set(AGG_OPS + SQL_OPS + COND_OPS + CLAUSE_KEYWORDS + ("from", ","))
 
 g_empty_sql = {
     "select": [],
-    "from": {
-        "conds": [],
-        "table_units": []
-    },
+    "from": {"conds": [], "table_units": []},
     "where": [],
     "groupBy": [],
     "having": [],
@@ -57,7 +52,7 @@ g_empty_sql = {
     "limit": None,
     "except": None,
     "intersect": None,
-    "union": None
+    "union": None,
 }
 
 
@@ -92,7 +87,7 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
     Returns:
     """
 
-    string = string.replace("\'", "\"").lower()
+    string = string.replace("'", '"').lower()
     assert string.count('"') % 2 == 0, "Unexpected quote"
 
     re_cols = [i.lower() for i in cols]
@@ -112,7 +107,7 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
             token = token.strip()
             if fn_omit(token):
                 new_tokens.append(token)
-            elif re.match(r'\d\d\d\d-\d\d(-\d\d)?', token):
+            elif re.match(r"\d\d\d\d-\d\d(-\d\d)?", token):
                 new_tokens.append('"%s"' % (token))
             else:
                 new_tokens.extend(fn_split(token))
@@ -122,22 +117,22 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
         """split aggs in select"""
         new_toks = []
         for i, tok in enumerate(tmp_tokens):
-            if tok in ('from', 'where'):
+            if tok in ("from", "where"):
                 new_toks.extend(tmp_tokens[i:])
                 break
-            if not ((tok.endswith(')') or tok.endswith('),')) and len(tok) > 5):
-                new_toks.extend(tok.split(','))
+            if not ((tok.endswith(")") or tok.endswith("),")) and len(tok) > 5):
+                new_toks.extend(tok.split(","))
                 continue
 
-            extra = ''
-            if tok.endswith(','):
-                extra = ','
+            extra = ""
+            if tok.endswith(","):
+                extra = ","
                 tok = tok[:-1]
 
-            if tok[:4] in ('sum(', 'avg(', 'max(', 'min('):
-                new_toks.extend([tok[:3], '(', tok[4:-1], ')'])
-            elif tok[:6] == 'count(':
-                new_toks.extend(['count', '(', tok[6:-1], ')'])
+            if tok[:4] in ("sum(", "avg(", "max(", "min("):
+                new_toks.extend([tok[:3], "(", tok[4:-1], ")"])
+            elif tok[:6] == "count(":
+                new_toks.extend(["count", "(", tok[6:-1], ")"])
             else:
                 new_toks.append(tok)
 
@@ -153,8 +148,8 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
         while i < _len - 1:
             merge = False
             for j in range(10):
-                if ''.join(toks[i:i + j]) in cols:
-                    new_toks.append(''.join(toks[i:i + j]))
+                if "".join(toks[i : i + j]) in cols:
+                    new_toks.append("".join(toks[i : i + j]))
                     i += j
                     merge = True
             if not merge:
@@ -165,45 +160,39 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
 
     tokens_tmp = _extract_value(string)
 
-    two_bytes_op = ['==', '!=', '>=', '<=', '<>', '<in>']
+    two_bytes_op = ["==", "!=", ">=", "<=", "<>", "<in>"]
     if single_equal:
         if math:
-            sep1 = re.compile(r'([ \+\-\*/\(\)=,><;])')  # 单字节运算符
+            sep1 = re.compile(r"([ \+\-\*/\(\)=,><;])")  # 单字节运算符
         else:
-            sep1 = re.compile(r'([ \(\)=,><;])')
+            sep1 = re.compile(r"([ \(\)=,><;])")
     else:
         if math:
-            sep1 = re.compile(r'([ \+\-\*/\(\),><;])')  # 单字节运算符
+            sep1 = re.compile(r"([ \+\-\*/\(\),><;])")  # 单字节运算符
         else:
-            sep1 = re.compile(r'([ \(\),><;])')
-    sep2 = re.compile('(' + '|'.join(two_bytes_op) + ')')  # 多字节运算符
-    tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(' '),
-                          lambda x: x.startswith('"'))
-    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep2, x),
-                          lambda x: x.startswith('"'))
+            sep1 = re.compile(r"([ \(\),><;])")
+    sep2 = re.compile("(" + "|".join(two_bytes_op) + ")")  # 多字节运算符
+    tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(" "), lambda x: x.startswith('"'))
+    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep2, x), lambda x: x.startswith('"'))
     tokens_tmp = _split_aggs(tokens_tmp)
-    tokens = list(filter(lambda x: x.strip() != '', tokens_tmp))
+    tokens = list(filter(lambda x: x.strip() != "", tokens_tmp))
 
     tokens = join_by_col(tokens, re_cols)
 
     def _post_merge(tokens):
         """merge:
-              * col name with "(", ")"
-              * values with +/-
+        * col name with "(", ")"
+        * values with +/-
         """
         idx = 1
         while idx < len(tokens):
-            if tokens[idx] == '(' and tokens[
-                    idx -
-                    1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx -
-                                                                   1] != '=':
+            if tokens[idx] == "(" and tokens[idx - 1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx - 1] != "=":
                 while idx < len(tokens):
                     tmp_tok = tokens.pop(idx)
                     tokens[idx - 1] += tmp_tok
-                    if tmp_tok == ')':
+                    if tmp_tok == ")":
                         break
-            elif tokens[idx] in ('+', '-') and tokens[
-                    idx - 1] in COND_OPS and idx + 1 < len(tokens):
+            elif tokens[idx] in ("+", "-") and tokens[idx - 1] in COND_OPS and idx + 1 < len(tokens):
                 tokens[idx] += tokens[idx + 1]
                 tokens.pop(idx + 1)
                 idx += 1
@@ -213,23 +202,21 @@ def tokenize_NL2SQL(string, cols, single_equal=False, math=True):
 
     tokens = _post_merge(tokens)
     if single_equal:
-        tokens = [i if i != '=' else '==' for i in tokens]
+        tokens = [i if i != "=" else "==" for i in tokens]
     return tokens
 
 
 def sql2query(sql, cols):
     """
-    transform sql json to sql query, this is only for NL2SQL, eg. select a, b where a op val1 
+    transform sql json to sql query, this is only for NL2SQL, eg. select a, b where a op val1
     """
 
-    sels = sql['sel']
-    aggs = sql['agg']
+    sels = sql["sel"]
+    aggs = sql["agg"]
     op = sql["cond_conn_op"]
     conds = sql["conds"]
 
-    condstrs = [
-        f'{cols[cond[0]]} {op_sql_dict[cond[1]]} "{cond[2]}"' for cond in conds
-    ]
+    condstrs = [f'{cols[cond[0]]} {op_sql_dict[cond[1]]} "{cond[2]}"' for cond in conds]
     cond_str = f" {conn_sql_dict[op]} ".join(condstrs)
 
     def agg_col(agg, col):
@@ -239,7 +226,7 @@ def sql2query(sql, cols):
             return f"{agg_sql_dict[agg]} ( {cols[col]} )"
 
     selstrs = [agg_col(i, j) for i, j in zip(aggs, sels)]
-    sel_str = ' , '.join(selstrs)
+    sel_str = " , ".join(selstrs)
 
     return f"SELECT {sel_str} WHERE {cond_str}"
 
@@ -262,14 +249,14 @@ def query2sql(query, cols, single_equal=False, with_value=True):
         sql_conn_dict[v.lower()] = k
 
     query = tokenize_NL2SQL(query, cols, single_equal=single_equal, math=False)
-    assert query[0] == 'select'
+    assert query[0] == "select"
 
     def parse_cols(toks, start_idx):
         """
-            :returns next idx, (agg, col)
+        :returns next idx, (agg, col)
         """
-        if 'from' in toks:
-            toks = toks[:toks.index('from')]
+        if "from" in toks:
+            toks = toks[: toks.index("from")]
         idx = start_idx
         len_ = len(toks)
         outs = []
@@ -277,40 +264,39 @@ def query2sql(query, cols, single_equal=False, with_value=True):
             if toks[idx] in AGG_OPS:
                 agg_id = sql_agg_dict[toks[idx]]
                 idx += 1
-                assert idx < len_ and toks[idx] == '(', toks[idx]
+                assert idx < len_ and toks[idx] == "(", toks[idx]
                 idx += 1
                 agg, col = toks[start_idx], toks[idx]
                 idx += 1
-                assert idx < len_ and toks[idx] == ')', toks[idx] + ''.join(
-                    toks)
+                assert idx < len_ and toks[idx] == ")", toks[idx] + "".join(toks)
                 idx += 1
                 outs.append((agg, col))
-            elif toks[idx] == ',':
+            elif toks[idx] == ",":
                 idx += 1
             else:
-                agg, col = '', toks[idx]
+                agg, col = "", toks[idx]
                 idx += 1
-                outs.append(('', col))
+                outs.append(("", col))
         return outs
 
     def _format_col(old_col):
         """format"""
-        if old_col.lower().startswith('table_'):
-            return old_col.split('.', 1)[1]
+        if old_col.lower().startswith("table_"):
+            return old_col.split(".", 1)[1]
         else:
             return old_col
 
-    if 'where' not in query:
+    if "where" not in query:
         cond_index = len(query)
-        conn = ''
+        conn = ""
         conds = []
     else:
         cond_index = query.index("where")
-        condstr = query[cond_index + 1:]
+        condstr = query[cond_index + 1 :]
         conn = [i for i in condstr[3::4]]
         assert len(set(conn)) < 2, conn
-        conn = list(set(conn))[0] if conn else ''
-        conds = [condstr[i:i + 3] for i in range(len(condstr))[::4]]
+        conn = list(set(conn))[0] if conn else ""
+        conds = [condstr[i : i + 3] for i in range(len(condstr))[::4]]
     sels = parse_cols(query[:cond_index], 1)
 
     sql = {}
@@ -319,16 +305,11 @@ def query2sql(query, cols, single_equal=False, with_value=True):
     sql["cond_conn_op"] = sql_conn_dict[conn]
     sql["sel"] = [cols.index(_format_col(i[1])) for i in sels]
     if with_value:
-        sql["conds"] = [[
-            cols.index(_format_col(c[0])), sql_op_dict[c[1]],
-            '"' + c[2].strip('\"') + '"'
-        ] for c in conds]
+        sql["conds"] = [[cols.index(_format_col(c[0])), sql_op_dict[c[1]], '"' + c[2].strip('"') + '"'] for c in conds]
     else:
-        sql["conds"] = [[cols.index(_format_col(c[0])), sql_op_dict[c[1]], "1"]
-                        for c in conds]
+        sql["conds"] = [[cols.index(_format_col(c[0])), sql_op_dict[c[1]], "1"] for c in conds]
 
-    sql_sels = [(sql_agg_dict[i[0]], cols.index(_format_col(i[1])))
-                for i in sels]
+    sql_sels = [(sql_agg_dict[i[0]], cols.index(_format_col(i[1]))) for i in sels]
     return sql, sql_sels
 
 
@@ -341,16 +322,14 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
         table_list = json.load(ifs)
         table_dict = {}
         for table in table_list:
-            table_dict[table['db_id']] = table
+            table_dict[table["db_id"]] = table
 
     # load qa
-    with open(gold, 'r', encoding='utf-8') as f1, open(predict,
-                                                       'r',
-                                                       encoding='utf-8') as f2:
-        gold_list = [l.strip().split('\t') for l in f1 if len(l.strip()) > 0]
+    with open(gold, "r", encoding="utf-8") as f1, open(predict, "r", encoding="utf-8") as f2:
+        gold_list = [l.strip().split("\t") for l in f1 if len(l.strip()) > 0]
         gold_dict = dict([(x[0], x[1:]) for x in gold_list])
 
-        pred_list = [l.strip().split('\t') for l in f2 if len(l.strip()) > 0]
+        pred_list = [l.strip().split("\t") for l in f2 if len(l.strip()) > 0]
         pred_dict = dict([(x[0], x[1]) for x in pred_list])
 
     right = total = 0
@@ -375,7 +354,7 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
         total += 1
         if qid not in pred_dict:
             continue
-        sql_gold, db_id = ''.join(item[0:-1]), item[-1]
+        sql_gold, db_id = "".join(item[0:-1]), item[-1]
 
         db = table_dict[db_id]
         cols = [i[1] for i in db["column_names"]]
@@ -383,22 +362,16 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
         sql_pred = pred_dict[qid]
 
         try:
-            sql_gold = sql_gold.replace('==', '=')
-            sql_pred = sql_pred.replace('==', '=')
-            components_gold, sels_gold = query2sql(sql_gold,
-                                                   cols,
-                                                   single_equal=single_equal)
-            components_pred, sels_pred = query2sql(sql_pred,
-                                                   cols,
-                                                   single_equal=single_equal)
+            sql_gold = sql_gold.replace("==", "=")
+            sql_pred = sql_pred.replace("==", "=")
+            components_gold, sels_gold = query2sql(sql_gold, cols, single_equal=single_equal)
+            components_pred, sels_pred = query2sql(sql_pred, cols, single_equal=single_equal)
 
             cnt, pred_total, gold_total = compare_set(sels_gold, sels_pred)
             score_sels, _, _ = get_scores(cnt, pred_total, gold_total)
-            cnt, pred_total, gold_total = compare_set(components_gold["conds"],
-                                                      components_pred["conds"])
+            cnt, pred_total, gold_total = compare_set(components_gold["conds"], components_pred["conds"])
             score_conds, _, _ = get_scores(cnt, pred_total, gold_total)
-            score_conn = components_gold["cond_conn_op"] == components_pred[
-                "cond_conn_op"]
+            score_conn = components_gold["cond_conn_op"] == components_pred["cond_conn_op"]
 
             if score_sels:
                 cnt_sel += 1
@@ -409,40 +382,28 @@ def evaluate_NL2SQL(table, gold, predict, single_equal=False, mode=None):
             if score_sels and score_conds and score_conn:
                 right += 1
             else:
-                logging.debug("error instance %s:\npred: %s\ngold: %s" %
-                              (qid, sql_pred, sql_gold))
+                logging.debug("error instance %s:\npred: %s\ngold: %s" % (qid, sql_pred, sql_gold))
         except Exception as e:
             ##traceback.print_exc()
-            logging.warning('parse sql error, error sql:')
-            logging.warning(sql_gold + '|||' + sql_pred)
+            logging.warning("parse sql error, error sql:")
+            logging.warning(sql_gold + "|||" + sql_pred)
             ##raise e
             continue
 
-    scores["all"] = dict([("count", total), ("exact", right),
-                          ("acc", right * 1.0 / total)])
-    scores["select"] = dict([("count", total), ("exact", cnt_sel),
-                             ("acc", cnt_sel * 1.0 / total)])
-    scores["condition"] = dict([("count", total), ("exact", cnt_cond),
-                                ("acc", cnt_cond * 1.0 / total)])
-    scores["connection"] = dict([("count", total), ("exact", cnt_conn),
-                                 ("acc", cnt_conn * 1.0 / total)])
+    scores["all"] = dict([("count", total), ("exact", right), ("acc", right * 1.0 / total)])
+    scores["select"] = dict([("count", total), ("exact", cnt_sel), ("acc", cnt_sel * 1.0 / total)])
+    scores["condition"] = dict([("count", total), ("exact", cnt_cond), ("acc", cnt_cond * 1.0 / total)])
+    scores["connection"] = dict([("count", total), ("exact", cnt_conn), ("acc", cnt_conn * 1.0 / total)])
 
     return scores, scores_novalue
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(query2sql("SELECT 所在省份 , 产线名称 WHERE 日熔量（吨） < 600", []))
-    print(
-        query2sql(
-            "SELECT MAX ( 货币资金（亿元） ) WHERE 总资产（亿元） > 100 or 净资产（亿元） > 100", []))
-    print(
-        query2sql("SELECT 股价 , EPS17A WHERE 铁路公司 = 广深铁路",
-                  ["股价", "铁路公司", "EPS17A"], True))
+    print(query2sql("SELECT MAX ( 货币资金（亿元） ) WHERE 总资产（亿元） > 100 or 净资产（亿元） > 100", []))
+    print(query2sql("SELECT 股价 , EPS17A WHERE 铁路公司 = 广深铁路", ["股价", "铁路公司", "EPS17A"], True))
     cols = ["公司", "2014（亿元）", "2015（亿元）", "2016（亿元）"]
-    print(
-        query2sql(
-            "SELECT COUNT ( 公司 ) WHERE 2014（亿元） > 20 and 2015（亿元） > 20 and 2016（亿元） > 20",
-            cols))
+    print(query2sql("SELECT COUNT ( 公司 ) WHERE 2014（亿元） > 20 and 2015（亿元） > 20 and 2016（亿元） > 20", cols))
 
     # print(query2sql("SELECT 书名/Title WHERE 索书号/CallNo. == BF637.U53C555=12010 or ISBN == 9.78142212482e+12", ["书名/Title","索书号/CallNo.",'ISBN']))
     # print(tokenize("SELECT 标称生产企业名称 WHERE 规格(包装规格） == 187.2g/盒 and 标称产品名称 == 富兰克牌西洋参含片", math=False))

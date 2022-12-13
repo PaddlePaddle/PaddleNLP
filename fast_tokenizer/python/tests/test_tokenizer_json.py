@@ -20,11 +20,10 @@ from paddlenlp.transformers import AutoTokenizer
 import fast_tokenizer
 from fast_tokenizer import ErnieFastTokenizer, models
 
-logger.logger.setLevel('ERROR')
+logger.logger.setLevel("ERROR")
 
 
 class TestTokenizerJson(unittest.TestCase):
-
     def setUp(self):
         wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
         ernie_vocab = wordpiece_tokenizer.vocab.token_to_idx
@@ -32,24 +31,20 @@ class TestTokenizerJson(unittest.TestCase):
 
 
 class TestNormalizerJson(TestTokenizerJson):
-
     def check_normalizer_json(self, normalizer):
         self.fast_tokenizer.normalizer = normalizer
         json_file = str(normalizer.__class__) + ".json"
         self.fast_tokenizer.save(json_file)
         tokenizer = ErnieFastTokenizer.from_file(json_file)
         os.remove(json_file)
-        self.assertEqual(normalizer.__getstate__(),
-                         tokenizer.normalizer.__getstate__())
+        self.assertEqual(normalizer.__getstate__(), tokenizer.normalizer.__getstate__())
 
     def test_replace(self):
-        replace_normalizer = fast_tokenizer.normalizers.ReplaceNormalizer(
-            "''", "\"")
+        replace_normalizer = fast_tokenizer.normalizers.ReplaceNormalizer("''", '"')
         self.check_normalizer_json(replace_normalizer)
 
     def test_strip(self):
-        strip_normalizer = fast_tokenizer.normalizers.StripNormalizer(
-            True, True)
+        strip_normalizer = fast_tokenizer.normalizers.StripNormalizer(True, True)
         self.check_normalizer_json(strip_normalizer)
 
     def test_strip_accent(self):
@@ -82,8 +77,7 @@ class TestNormalizerJson(TestTokenizerJson):
 
     def test_sequence(self):
         lowercase_normalizer = fast_tokenizer.normalizers.LowercaseNormalizer()
-        sequence_normalizer = fast_tokenizer.normalizers.SequenceNormalizer(
-            normalizers=[lowercase_normalizer])
+        sequence_normalizer = fast_tokenizer.normalizers.SequenceNormalizer(normalizers=[lowercase_normalizer])
         self.check_normalizer_json(sequence_normalizer)
 
 

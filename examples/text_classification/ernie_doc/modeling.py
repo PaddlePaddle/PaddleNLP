@@ -19,33 +19,20 @@ from paddlenlp.transformers.attention_utils import _convert_param_attr_to_list
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
-    'ErnieDocModel',
-    'ErnieDocPretrainedModel',
-    'ErnieDocForSequenceClassification',
-    'ErnieDocForTokenClassification',
-    'ErnieDocForQuestionAnswering',
+    "ErnieDocModel",
+    "ErnieDocPretrainedModel",
+    "ErnieDocForSequenceClassification",
+    "ErnieDocForTokenClassification",
+    "ErnieDocForQuestionAnswering",
 ]
 
 
 class PointwiseFFN(nn.Layer):
-
-    def __init__(self,
-                 d_inner_hid,
-                 d_hid,
-                 dropout_rate,
-                 hidden_act,
-                 weight_attr=None,
-                 bias_attr=None):
+    def __init__(self, d_inner_hid, d_hid, dropout_rate, hidden_act, weight_attr=None, bias_attr=None):
         super(PointwiseFFN, self).__init__()
-        self.linear1 = nn.Linear(d_hid,
-                                 d_inner_hid,
-                                 weight_attr,
-                                 bias_attr=bias_attr)
+        self.linear1 = nn.Linear(d_hid, d_inner_hid, weight_attr, bias_attr=bias_attr)
         self.dropout = nn.Dropout(dropout_rate, mode="upscale_in_train")
-        self.linear2 = nn.Linear(d_inner_hid,
-                                 d_hid,
-                                 weight_attr,
-                                 bias_attr=bias_attr)
+        self.linear2 = nn.Linear(d_inner_hid, d_hid, weight_attr, bias_attr=bias_attr)
         self.activation = getattr(F, hidden_act)
 
     def forward(self, x):
@@ -53,18 +40,19 @@ class PointwiseFFN(nn.Layer):
 
 
 class MultiHeadAttention(nn.Layer):
-
-    def __init__(self,
-                 d_key,
-                 d_value,
-                 d_model,
-                 n_head=1,
-                 r_w_bias=None,
-                 r_r_bias=None,
-                 r_t_bias=None,
-                 dropout_rate=0.,
-                 weight_attr=None,
-                 bias_attr=None):
+    def __init__(
+        self,
+        d_key,
+        d_value,
+        d_model,
+        n_head=1,
+        r_w_bias=None,
+        r_r_bias=None,
+        r_t_bias=None,
+        dropout_rate=0.0,
+        weight_attr=None,
+        bias_attr=None,
+    ):
         super(MultiHeadAttention, self).__init__()
         self.d_key = d_key
         self.d_value = d_value
@@ -73,35 +61,16 @@ class MultiHeadAttention(nn.Layer):
 
         assert d_key * n_head == d_model, "d_model must be divisible by n_head"
 
-        self.q_proj = nn.Linear(d_model,
-                                d_key * n_head,
-                                weight_attr=weight_attr,
-                                bias_attr=bias_attr)
-        self.k_proj = nn.Linear(d_model,
-                                d_key * n_head,
-                                weight_attr=weight_attr,
-                                bias_attr=bias_attr)
-        self.v_proj = nn.Linear(d_model,
-                                d_value * n_head,
-                                weight_attr=weight_attr,
-                                bias_attr=bias_attr)
-        self.r_proj = nn.Linear(d_model,
-                                d_key * n_head,
-                                weight_attr=weight_attr,
-                                bias_attr=bias_attr)
-        self.t_proj = nn.Linear(d_model,
-                                d_key * n_head,
-                                weight_attr=weight_attr,
-                                bias_attr=bias_attr)
-        self.out_proj = nn.Linear(d_model,
-                                  d_model,
-                                  weight_attr=weight_attr,
-                                  bias_attr=bias_attr)
+        self.q_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.k_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.v_proj = nn.Linear(d_model, d_value * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.r_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.t_proj = nn.Linear(d_model, d_key * n_head, weight_attr=weight_attr, bias_attr=bias_attr)
+        self.out_proj = nn.Linear(d_model, d_model, weight_attr=weight_attr, bias_attr=bias_attr)
         self.r_w_bias = r_w_bias
         self.r_r_bias = r_r_bias
         self.r_t_bias = r_t_bias
-        self.dropout = nn.Dropout(
-            dropout_rate, mode="upscale_in_train") if dropout_rate else None
+        self.dropout = nn.Dropout(dropout_rate, mode="upscale_in_train") if dropout_rate else None
 
     def _compute_qkv(self, queries, keys, values, rel_pos, rel_task):
         q = self.q_proj(queries)
@@ -152,7 +121,8 @@ class MultiHeadAttention(nn.Layer):
         sign = len(x.shape) == 3
         # Directly using len(tensor.shape) as an if condition
         # would not act functionally when applying paddle.jit.save api to save static graph.
-        if sign: return x
+        if sign:
+            return x
         sign = len(x.shape) != 4
         if sign:
             raise ValueError("Input(x) should be a 4-D Tensor.")
@@ -161,8 +131,7 @@ class MultiHeadAttention(nn.Layer):
         # target shape:[B, T, H]
         return x.reshape([0, 0, x.shape[2] * x.shape[3]])
 
-    def forward(self, queries, keys, values, rel_pos, rel_task, memory,
-                attn_mask):
+    def forward(self, queries, keys, values, rel_pos, rel_task, memory, attn_mask):
         sign = memory is not None and len(memory.shape) > 1
         if sign:
             cat = paddle.concat([memory, queries], 1)
@@ -170,62 +139,60 @@ class MultiHeadAttention(nn.Layer):
             cat = queries
         keys, values = cat, cat
 
-        sign = (len(queries.shape) == len(keys.shape) == len(values.shape) \
-                == len(rel_pos.shape) == len(
-                    rel_task.shape) == 3)
+        sign = (
+            len(queries.shape)
+            == len(keys.shape)
+            == len(values.shape)
+            == len(rel_pos.shape)
+            == len(rel_task.shape)
+            == 3
+        )
 
         if not sign:
-            raise ValueError(
-                "Inputs: quries, keys, values, rel_pos and rel_task should all be 3-D tensors."
-            )
+            raise ValueError("Inputs: quries, keys, values, rel_pos and rel_task should all be 3-D tensors.")
 
-        q, k, v, r, t = self._compute_qkv(queries, keys, values, rel_pos,
-                                          rel_task)
-        q_w, q_r, q_t = list(
-            map(lambda x: q + x.unsqueeze([0, 1]),
-                [self.r_w_bias, self.r_r_bias, self.r_t_bias]))
-        q_w, q_r, q_t = list(
-            map(lambda x: self._split_heads(x, self.d_model, self.n_head),
-                [q_w, q_r, q_t]))
-        k, v, r, t = list(
-            map(lambda x: self._split_heads(x, self.d_model, self.n_head),
-                [k, v, r, t]))
-        ctx_multiheads = self._scaled_dot_product_attention([q_w, q_r, q_t], \
-                                                            k, v, r, t, attn_mask)
+        q, k, v, r, t = self._compute_qkv(queries, keys, values, rel_pos, rel_task)
+        q_w, q_r, q_t = list(map(lambda x: q + x.unsqueeze([0, 1]), [self.r_w_bias, self.r_r_bias, self.r_t_bias]))
+        q_w, q_r, q_t = list(map(lambda x: self._split_heads(x, self.d_model, self.n_head), [q_w, q_r, q_t]))
+        k, v, r, t = list(map(lambda x: self._split_heads(x, self.d_model, self.n_head), [k, v, r, t]))
+        ctx_multiheads = self._scaled_dot_product_attention([q_w, q_r, q_t], k, v, r, t, attn_mask)
         out = self._combine_heads(ctx_multiheads)
         out = self.out_proj(out)
         return out
 
 
 class ErnieDocEncoderLayer(nn.Layer):
-
-    def __init__(self,
-                 n_head,
-                 d_key,
-                 d_value,
-                 d_model,
-                 d_inner_hid,
-                 prepostprocess_dropout,
-                 attention_dropout,
-                 relu_dropout,
-                 hidden_act,
-                 normalize_before=False,
-                 epsilon=1e-5,
-                 rel_pos_params_sharing=False,
-                 r_w_bias=None,
-                 r_r_bias=None,
-                 r_t_bias=None,
-                 weight_attr=None,
-                 bias_attr=None):
+    def __init__(
+        self,
+        n_head,
+        d_key,
+        d_value,
+        d_model,
+        d_inner_hid,
+        prepostprocess_dropout,
+        attention_dropout,
+        relu_dropout,
+        hidden_act,
+        normalize_before=False,
+        epsilon=1e-5,
+        rel_pos_params_sharing=False,
+        r_w_bias=None,
+        r_r_bias=None,
+        r_t_bias=None,
+        weight_attr=None,
+        bias_attr=None,
+    ):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
         super(ErnieDocEncoderLayer, self).__init__()
         if not rel_pos_params_sharing:
-            r_w_bias, r_r_bias, r_t_bias = \
-                list(map(lambda x: self.create_parameter(
-                    shape=[n_head * d_key], dtype="float32"),
-                         ["r_w_bias", "r_r_bias", "r_t_bias"]))
+            r_w_bias, r_r_bias, r_t_bias = list(
+                map(
+                    lambda x: self.create_parameter(shape=[n_head * d_key], dtype="float32"),
+                    ["r_w_bias", "r_r_bias", "r_t_bias"],
+                )
+            )
 
         weight_attrs = _convert_param_attr_to_list(weight_attr, 2)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 2)
@@ -241,18 +208,13 @@ class ErnieDocEncoderLayer(nn.Layer):
             weight_attr=weight_attrs[0],
             bias_attr=bias_attrs[0],
         )
-        self.ffn = PointwiseFFN(d_inner_hid,
-                                d_model,
-                                relu_dropout,
-                                hidden_act,
-                                weight_attr=weight_attrs[1],
-                                bias_attr=bias_attrs[1])
+        self.ffn = PointwiseFFN(
+            d_inner_hid, d_model, relu_dropout, hidden_act, weight_attr=weight_attrs[1], bias_attr=bias_attrs[1]
+        )
         self.norm1 = nn.LayerNorm(d_model, epsilon=epsilon)
         self.norm2 = nn.LayerNorm(d_model, epsilon=epsilon)
-        self.dropout1 = nn.Dropout(prepostprocess_dropout,
-                                   mode="upscale_in_train")
-        self.dropout2 = nn.Dropout(prepostprocess_dropout,
-                                   mode="upscale_in_train")
+        self.dropout1 = nn.Dropout(prepostprocess_dropout, mode="upscale_in_train")
+        self.dropout2 = nn.Dropout(prepostprocess_dropout, mode="upscale_in_train")
         self.d_model = d_model
         self.epsilon = epsilon
         self.normalize_before = normalize_before
@@ -261,8 +223,7 @@ class ErnieDocEncoderLayer(nn.Layer):
         residual = enc_input
         if self.normalize_before:
             enc_input = self.norm1(enc_input)
-        attn_output = self.attn(enc_input, enc_input, enc_input, rel_pos,
-                                rel_task, memory, attn_mask)
+        attn_output = self.attn(enc_input, enc_input, enc_input, rel_pos, rel_task, memory, attn_mask)
         attn_output = residual + self.dropout1(attn_output)
         if not self.normalize_before:
             attn_output = self.norm1(attn_output)
@@ -277,13 +238,11 @@ class ErnieDocEncoderLayer(nn.Layer):
 
 
 class ErnieDocEncoder(nn.Layer):
-
     def __init__(self, num_layers, encoder_layer, mem_len):
         super(ErnieDocEncoder, self).__init__()
-        self.layers = nn.LayerList([
-            (encoder_layer if i == 0 else type(encoder_layer)(
-                **encoder_layer._config)) for i in range(num_layers)
-        ])
+        self.layers = nn.LayerList(
+            [(encoder_layer if i == 0 else type(encoder_layer)(**encoder_layer._config)) for i in range(num_layers)]
+        )
         self.num_layers = num_layers
         self.normalize_before = self.layers[0].normalize_before
         self.mem_len = mem_len
@@ -292,10 +251,9 @@ class ErnieDocEncoder(nn.Layer):
         if self.mem_len is None or self.mem_len == 0:
             return None
         if prev_mem is None:
-            new_mem = curr[:, -self.mem_len:, :]
+            new_mem = curr[:, -self.mem_len :, :]
         else:
-            new_mem = paddle.concat([prev_mem, curr_out], 1)[:,
-                                                             -self.mem_len:, :]
+            new_mem = paddle.concat([prev_mem, curr_out], 1)[:, -self.mem_len :, :]
         new_mem.stop_gradient = True
         return new_mem
 
@@ -306,28 +264,19 @@ class ErnieDocEncoder(nn.Layer):
         for _, encoder_layer in enumerate(self.layers):
             # Since in static mode, the memories should be set as tensor,
             # so we use paddle.slice to free the old memories explicitly to save gpu memory.
-            enc_input = encoder_layer(enc_input, memories[0], rel_pos, rel_task,
-                                      attn_mask)
+            enc_input = encoder_layer(enc_input, memories[0], rel_pos, rel_task, attn_mask)
             if new_mem is None:
-                new_mem = paddle.unsqueeze(self._cache_mem(
-                    enc_input, memories[0]),
-                                           axis=0)
+                new_mem = paddle.unsqueeze(self._cache_mem(enc_input, memories[0]), axis=0)
             else:
-                new_mem = paddle.concat([
-                    new_mem,
-                    paddle.unsqueeze(self._cache_mem(enc_input, memories[0]),
-                                     axis=0)
-                ],
-                                        axis=0)
+                new_mem = paddle.concat(
+                    [new_mem, paddle.unsqueeze(self._cache_mem(enc_input, memories[0]), axis=0)], axis=0
+                )
             sign = memories.shape[0]
             if sign > 1:
                 axis = [0]
                 start = [1]
                 end = [memories.shape[0]]
-                memories = paddle.slice(memories,
-                                        axes=axis,
-                                        starts=start,
-                                        ends=end)
+                memories = paddle.slice(memories, axes=axis, starts=start, ends=end)
             else:
                 memories = None
         return enc_input, new_mem
@@ -341,6 +290,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
     and loading pretrained models.
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
+
     model_config_file = "model_config.json"
     pretrained_init_configuration = {
         "ernie-doc-base-en": {
@@ -357,7 +307,7 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "vocab_size": 50265,
             "memory_len": 128,
             "epsilon": 1e-12,
-            "pad_token_id": 1
+            "pad_token_id": 1,
         },
         "ernie-doc-base-zh": {
             "attention_dropout_prob": 0.1,
@@ -373,16 +323,14 @@ class ErnieDocPretrainedModel(PretrainedModel):
             "vocab_size": 28000,
             "memory_len": 128,
             "epsilon": 1e-12,
-            "pad_token_id": 0
-        }
+            "pad_token_id": 0,
+        },
     }
     resource_files_names = {"model_state": "model_state.pdparams"}
     pretrained_resource_files_map = {
         "model_state": {
-            "ernie-doc-base-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
-            "ernie-doc-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
+            "ernie-doc-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-en/ernie-doc-base-en.pdparams",
+            "ernie-doc-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie-doc-base-zh/ernie-doc-base-zh.pdparams",
         }
     }
     base_model_prefix = "ernie_doc"
@@ -396,30 +344,31 @@ class ErnieDocPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range if hasattr(
-                            self, "initializer_range") else
-                        self.ernie_doc.config["initializer_range"],
-                        shape=layer.weight.shape))
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.ernie_doc.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
 
 
 class ErnieDocEmbeddings(nn.Layer):
-
-    def __init__(self,
-                 vocab_size,
-                 d_model,
-                 hidden_dropout_prob,
-                 memory_len,
-                 max_position_embeddings=512,
-                 type_vocab_size=3,
-                 padding_idx=0):
+    def __init__(
+        self,
+        vocab_size,
+        d_model,
+        hidden_dropout_prob,
+        memory_len,
+        max_position_embeddings=512,
+        type_vocab_size=3,
+        padding_idx=0,
+    ):
         super(ErnieDocEmbeddings, self).__init__()
         self.word_emb = nn.Embedding(vocab_size, d_model)
-        self.pos_emb = nn.Embedding(max_position_embeddings * 2 + memory_len,
-                                    d_model)
+        self.pos_emb = nn.Embedding(max_position_embeddings * 2 + memory_len, d_model)
         self.token_type_emb = nn.Embedding(type_vocab_size, d_model)
         self.memory_len = memory_len
-        self.dropouts = nn.LayerList(
-            [nn.Dropout(hidden_dropout_prob) for i in range(3)])
+        self.dropouts = nn.LayerList([nn.Dropout(hidden_dropout_prob) for i in range(3)])
         self.norms = nn.LayerList([nn.LayerNorm(d_model) for i in range(3)])
 
     def forward(self, input_ids, token_type_ids, position_ids):
@@ -428,11 +377,13 @@ class ErnieDocEmbeddings(nn.Layer):
         # position_embeddings: [B, 2 * T + M, H]
         position_embeddings = self.pos_emb(position_ids.squeeze(-1))
         batch_size = input_ids.shape[0]
-        token_type_ids = paddle.concat([
-            paddle.zeros(shape=[batch_size, self.memory_len, 1], dtype="int64")
-            + token_type_ids[0, 0, 0], token_type_ids
-        ],
-                                       axis=1)
+        token_type_ids = paddle.concat(
+            [
+                paddle.zeros(shape=[batch_size, self.memory_len, 1], dtype="int64") + token_type_ids[0, 0, 0],
+                token_type_ids,
+            ],
+            axis=1,
+        )
         token_type_ids.stop_gradient = True
         # token_type_embeddings: [B, M + T, H]
         token_type_embeddings = self.token_type_emb(token_type_ids.squeeze(-1))
@@ -521,32 +472,36 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             The token id of [CLS] token. Defaults to `-1`.
     """
 
-    def __init__(self,
-                 num_hidden_layers,
-                 num_attention_heads,
-                 hidden_size,
-                 hidden_dropout_prob,
-                 attention_dropout_prob,
-                 relu_dropout,
-                 hidden_act,
-                 memory_len,
-                 vocab_size,
-                 max_position_embeddings,
-                 task_type_vocab_size=3,
-                 normalize_before=False,
-                 epsilon=1e-5,
-                 rel_pos_params_sharing=False,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 cls_token_idx=-1):
+    def __init__(
+        self,
+        num_hidden_layers,
+        num_attention_heads,
+        hidden_size,
+        hidden_dropout_prob,
+        attention_dropout_prob,
+        relu_dropout,
+        hidden_act,
+        memory_len,
+        vocab_size,
+        max_position_embeddings,
+        task_type_vocab_size=3,
+        normalize_before=False,
+        epsilon=1e-5,
+        rel_pos_params_sharing=False,
+        initializer_range=0.02,
+        pad_token_id=0,
+        cls_token_idx=-1,
+    ):
         super(ErnieDocModel, self).__init__()
 
         r_w_bias, r_r_bias, r_t_bias = None, None, None
         if rel_pos_params_sharing:
-            r_w_bias, r_r_bias, r_t_bias = \
-                list(map(lambda x: self.create_parameter(
-                    shape=[num_attention_heads * d_key], dtype="float32"),
-                         ["r_w_bias", "r_r_bias", "r_t_bias"]))
+            r_w_bias, r_r_bias, r_t_bias = list(
+                map(
+                    lambda x: self.create_parameter(shape=[num_attention_heads * d_key], dtype="float32"),
+                    ["r_w_bias", "r_r_bias", "r_t_bias"],
+                )
+            )
         d_key = hidden_size // num_attention_heads
         d_value = hidden_size // num_attention_heads
         d_inner_hid = hidden_size * 4
@@ -565,38 +520,39 @@ class ErnieDocModel(ErnieDocPretrainedModel):
             rel_pos_params_sharing=rel_pos_params_sharing,
             r_w_bias=r_w_bias,
             r_r_bias=r_r_bias,
-            r_t_bias=r_t_bias)
+            r_t_bias=r_t_bias,
+        )
         self.n_head = num_attention_heads
         self.d_model = hidden_size
         self.memory_len = memory_len
-        self.encoder = ErnieDocEncoder(num_hidden_layers, encoder_layer,
-                                       memory_len)
+        self.encoder = ErnieDocEncoder(num_hidden_layers, encoder_layer, memory_len)
         self.pad_token_id = pad_token_id
-        self.embeddings = ErnieDocEmbeddings(vocab_size, hidden_size,
-                                             hidden_dropout_prob, memory_len,
-                                             max_position_embeddings,
-                                             task_type_vocab_size, pad_token_id)
+        self.embeddings = ErnieDocEmbeddings(
+            vocab_size,
+            hidden_size,
+            hidden_dropout_prob,
+            memory_len,
+            max_position_embeddings,
+            task_type_vocab_size,
+            pad_token_id,
+        )
         self.pooler = ErnieDocPooler(hidden_size, cls_token_idx)
 
     def _create_n_head_attn_mask(self, attn_mask, batch_size):
         # attn_mask shape: [B, T, 1]
         # concat an data_mask, shape: [B, M + T, 1]
-        data_mask = paddle.concat([
-            paddle.ones(shape=[batch_size, self.memory_len, 1],
-                        dtype=attn_mask.dtype), attn_mask
-        ],
-                                  axis=1)
+        data_mask = paddle.concat(
+            [paddle.ones(shape=[batch_size, self.memory_len, 1], dtype=attn_mask.dtype), attn_mask], axis=1
+        )
         data_mask.stop_gradient = True
         # create a self_attn_mask, shape: [B, T, M + T]
         self_attn_mask = paddle.matmul(attn_mask, data_mask, transpose_y=True)
         self_attn_mask = (self_attn_mask - 1) * 1e8
-        n_head_self_attn_mask = paddle.stack([self_attn_mask] * self.n_head,
-                                             axis=1)
+        n_head_self_attn_mask = paddle.stack([self_attn_mask] * self.n_head, axis=1)
         n_head_self_attn_mask.stop_gradient = True
         return n_head_self_attn_mask
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
         The ErnieDocModel forward method, overrides the `__call__()` special method.
 
@@ -687,19 +643,21 @@ class ErnieDocModel(ErnieDocPretrainedModel):
                 new_mem = outputs[2]
 
         """
-        input_embeddings, position_embeddings, token_embeddings = \
-            self.embeddings(input_ids, token_type_ids, position_ids)
+        input_embeddings, position_embeddings, token_embeddings = self.embeddings(
+            input_ids, token_type_ids, position_ids
+        )
 
         batch_size = input_embeddings.shape[0]
         # [B, N, T, M + T]
-        n_head_self_attn_mask = self._create_n_head_attn_mask(
-            attn_mask, batch_size)
+        n_head_self_attn_mask = self._create_n_head_attn_mask(attn_mask, batch_size)
         # memories contain n_layer memory whose shape is [B, M, H]
-        encoder_output, new_mem = self.encoder(enc_input=input_embeddings,
-                                               memories=memories,
-                                               rel_pos=position_embeddings,
-                                               rel_task=token_embeddings,
-                                               attn_mask=n_head_self_attn_mask)
+        encoder_output, new_mem = self.encoder(
+            enc_input=input_embeddings,
+            memories=memories,
+            rel_pos=position_embeddings,
+            rel_task=token_embeddings,
+            attn_mask=n_head_self_attn_mask,
+        )
         pooled_output = self.pooler(encoder_output)
         return encoder_output, pooled_output, new_mem
 
@@ -721,13 +679,11 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
     def __init__(self, ernie_doc, num_classes, dropout=0.1):
         super(ErnieDocForSequenceClassification, self).__init__()
         self.ernie_doc = ernie_doc
-        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
-                                num_classes)
+        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], num_classes)
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
         The ErnieDocForSequenceClassification forward method, overrides the `__call__()` special method.
 
@@ -791,9 +747,7 @@ class ErnieDocForSequenceClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        _, pooled_output, mem = self.ernie_doc(input_ids, memories,
-                                               token_type_ids, position_ids,
-                                               attn_mask)
+        _, pooled_output, mem = self.ernie_doc(input_ids, memories, token_type_ids, position_ids, attn_mask)
         pooled_output = self.dropout(pooled_output)
         logits = self.linear(pooled_output)
         return logits, mem
@@ -818,12 +772,10 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
         self.num_classes = num_classes
         self.ernie_doc = ernie_doc  # allow ernie_doc to be config
         self.dropout = nn.Dropout(dropout, mode="upscale_in_train")
-        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"],
-                                num_classes)
+        self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
         The ErnieDocForTokenClassification forward method, overrides the `__call__()` special method.
 
@@ -888,9 +840,7 @@ class ErnieDocForTokenClassification(ErnieDocPretrainedModel):
                 mem = outputs[1]
 
         """
-        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
-                                                 token_type_ids, position_ids,
-                                                 attn_mask)
+        sequence_output, _, mem = self.ernie_doc(input_ids, memories, token_type_ids, position_ids, attn_mask)
         sequence_output = self.dropout(sequence_output)
         logits = self.linear(sequence_output)
         return logits, mem
@@ -916,8 +866,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
         self.linear = nn.Linear(self.ernie_doc.config["hidden_size"], 2)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, memories, token_type_ids, position_ids,
-                attn_mask):
+    def forward(self, input_ids, memories, token_type_ids, position_ids, attn_mask):
         r"""
         The ErnieDocForQuestionAnswering forward method, overrides the `__call__()` special method.
 
@@ -986,9 +935,7 @@ class ErnieDocForQuestionAnswering(ErnieDocPretrainedModel):
                 mem = outputs[2]
 
         """
-        sequence_output, _, mem = self.ernie_doc(input_ids, memories,
-                                                 token_type_ids, position_ids,
-                                                 attn_mask)
+        sequence_output, _, mem = self.ernie_doc(input_ids, memories, token_type_ids, position_ids, attn_mask)
         sequence_output = self.dropout(sequence_output)
         logits = self.linear(sequence_output)
         start_logits, end_logits = paddle.transpose(logits, perm=[2, 0, 1])
