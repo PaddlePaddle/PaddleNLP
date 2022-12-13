@@ -12,20 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import os
 import sys
 import time
-
-import yaml
-import argparse
-import numpy as np
 from pprint import pprint
-from attrdict import AttrDict
 
+import numpy as np
 import paddle
 import paddle.distributed as dist
+import yaml
+from attrdict import AttrDict
+from modeling import CrossEntropyCriterion, TransformerModel
 
-from modeling import TransformerModel, CrossEntropyCriterion
 from paddlenlp.utils.log import logger
 
 sys.path.append(
@@ -33,8 +32,8 @@ sys.path.append(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, "examples", "machine_translation", "transformer")
     )
 )
-import reader
-from tls.record import AverageStatistical
+import reader  # noqa: E402
+from tls.record import AverageStatistical  # noqa: E402
 
 paddle.set_default_dtype("float64")
 
@@ -51,18 +50,24 @@ def parse_args():
     )
     parser.add_argument("--max_iter", default=None, type=int, help="The maximum iteration for training. ")
     parser.add_argument(
+        "--data_dir",
+        default=None,
+        type=str,
+        help="The dir of train, dev and test datasets. If data_dir is given, train_file and dev_file and test_file will be replaced by data_dir/[train|dev|test].\{src_lang\}-\{trg_lang\}.[\{src_lang\}|\{trg_lang\}]. ",
+    )
+    parser.add_argument(
         "--train_file",
         nargs="+",
         default=None,
         type=str,
-        help="The files for training, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to train. ",
+        help="The files for training, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--dev_file",
         nargs="+",
         default=None,
         type=str,
-        help="The files for validation, including [source language file, target language file]. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used to do validation. ",
+        help="The files for validation, including [source language file, target language file]. If it's None, the default WMT14 en-de dataset will be used. ",
     )
     parser.add_argument(
         "--vocab_file",
@@ -70,6 +75,20 @@ def parse_args():
         type=str,
         help="The vocab file. Normally, it shouldn't be set and in this case, the default WMT14 dataset will be used.",
     )
+    parser.add_argument(
+        "--src_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for source language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument(
+        "--trg_vocab",
+        default=None,
+        type=str,
+        help="The vocab file for target language. If --vocab_file is given, the --vocab_file will be used. ",
+    )
+    parser.add_argument("-s", "--src_lang", default=None, type=str, help="Source language. ")
+    parser.add_argument("-t", "--trg_lang", default=None, type=str, help="Target language. ")
     parser.add_argument(
         "--unk_token",
         default=None,
@@ -81,6 +100,12 @@ def parse_args():
     )
     parser.add_argument(
         "--eos_token", default=None, type=str, help="The eos token. It should be provided when use custom vocab_file. "
+    )
+    parser.add_argument(
+        "--pad_token",
+        default=None,
+        type=str,
+        help="The pad token. It should be provided when use custom vocab_file. And if it's None, bos_token will be used. ",
     )
     parser.add_argument(
         "--device", default="gpu", choices=["gpu", "cpu", "xpu", "npu"], help="Device selected for inference."
@@ -331,12 +356,44 @@ if __name__ == "__main__":
     args.benchmark = ARGS.benchmark
     if ARGS.max_iter:
         args.max_iter = ARGS.max_iter
+    args.data_dir = ARGS.data_dir
     args.train_file = ARGS.train_file
     args.dev_file = ARGS.dev_file
-    args.vocab_file = ARGS.vocab_file
+
+    if ARGS.vocab_file is not None:
+        args.src_vocab = ARGS.vocab_file
+        args.trg_vocab = ARGS.vocab_file
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is not None and ARGS.trg_vocab is None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.src_vocab
+        args.joined_dictionary = True
+    elif ARGS.src_vocab is None and ARGS.trg_vocab is not None:
+        args.vocab_file = args.trg_vocab = args.src_vocab = ARGS.trg_vocab
+        args.joined_dictionary = True
+    else:
+        args.src_vocab = ARGS.src_vocab
+        args.trg_vocab = ARGS.trg_vocab
+        args.joined_dictionary = not (
+            args.src_vocab is not None and args.trg_vocab is not None and args.src_vocab != args.trg_vocab
+        )
+    if args.weight_sharing != args.joined_dictionary:
+        if args.weight_sharing:
+            raise ValueError("The src_vocab and trg_vocab must be consistency when weight_sharing is True. ")
+        else:
+            raise ValueError(
+                "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
+            )
+
+    if ARGS.src_lang is not None:
+        args.src_lang = ARGS.src_lang
+    if ARGS.trg_lang is not None:
+        args.trg_lang = ARGS.trg_lang
+
     args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
+    args.pad_token = ARGS.pad_token
+
     args.device = ARGS.device
     pprint(args)
 

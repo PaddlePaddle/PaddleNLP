@@ -31,7 +31,7 @@ def deprecate(*args, take_from: Optional[Union[Dict, Any]] = None, standard_warn
     for attribute, version_name, message in args:
         if version.parse(version.parse(__version__).base_version) >= version.parse(version_name):
             raise ValueError(
-                f"The deprecation tuple {(attribute, version_name, message)} should be removed since diffusers'"
+                f"The deprecation tuple {(attribute, version_name, message)} should be removed since ppdiffusers'"
                 f" version {__version__} is >= {version_name}"
             )
 
@@ -47,7 +47,7 @@ def deprecate(*args, take_from: Optional[Union[Dict, Any]] = None, standard_warn
 
         if warning is not None:
             warning = warning + " " if standard_warn else ""
-            warnings.warn(warning + message, DeprecationWarning)
+            warnings.warn(warning + message, FutureWarning, stacklevel=2)
 
     if isinstance(deprecated_kwargs, dict) and len(deprecated_kwargs) > 0:
         call_frame = inspect.getouterframes(inspect.currentframe())[1]

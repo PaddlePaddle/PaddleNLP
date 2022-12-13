@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 """
 This code is based on https://github.com/pytorch/pytorch/blob/master/torch/nn/init.py
 Ths copyright of pytorch/pytorch is a BSD-style license, as found in the LICENSE file.
 """
 
 import math
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 

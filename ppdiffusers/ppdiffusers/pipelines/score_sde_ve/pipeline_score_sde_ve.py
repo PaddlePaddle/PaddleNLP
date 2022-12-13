@@ -26,7 +26,7 @@ class ScoreSdeVePipeline(DiffusionPipeline):
     r"""
     Parameters:
     This model inherits from [`DiffusionPipeline`]. Check the superclass documentation for the generic methods the
-    library implements for all the pipelines (such as downloading or saving, running on a particular device, etc.)
+    library implements for all the pipelines (such as downloading or saving, running on a particular xxxx, etc.)
         unet ([`UNet2DModel`]): U-Net architecture to denoise the encoded image. scheduler ([`SchedulerMixin`]):
             The [`ScoreSdeVeScheduler`] scheduler to be used in combination with `unet` to denoise the encoded image.
     """
@@ -42,7 +42,7 @@ class ScoreSdeVePipeline(DiffusionPipeline):
         self,
         batch_size: int = 1,
         num_inference_steps: int = 2000,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         **kwargs,
@@ -51,8 +51,8 @@ class ScoreSdeVePipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A [paddle generator] to make generation deterministic.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -64,30 +64,28 @@ class ScoreSdeVePipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        if seed is not None:
-            paddle.seed(seed)
 
         img_size = self.unet.config.sample_size
         shape = (batch_size, 3, img_size, img_size)
 
         model = self.unet
 
-        sample = paddle.randn(shape) * self.scheduler.init_noise_sigma
+        sample = paddle.randn(shape, generator=generator) * self.scheduler.init_noise_sigma
 
         self.scheduler.set_timesteps(num_inference_steps)
         self.scheduler.set_sigmas(num_inference_steps)
 
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
-            sigma_t = self.scheduler.sigmas[i] * paddle.ones(shape[0])
+            sigma_t = self.scheduler.sigmas[i] * paddle.ones((shape[0],))
 
             # correction step
             for _ in range(self.scheduler.config.correct_steps):
                 model_output = self.unet(sample, sigma_t).sample
-                sample = self.scheduler.step_correct(model_output, sample).prev_sample
+                sample = self.scheduler.step_correct(model_output, sample, generator=generator).prev_sample
 
             # prediction step
             model_output = model(sample, sigma_t).sample
-            output = self.scheduler.step_pred(model_output, t, sample)
+            output = self.scheduler.step_pred(model_output, t, sample, generator=generator)
 
             sample, sample_mean = output.prev_sample, output.prev_sample_mean
 

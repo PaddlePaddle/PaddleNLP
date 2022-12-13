@@ -50,7 +50,7 @@ class KarrasVePipeline(DiffusionPipeline):
         self,
         batch_size: int = 1,
         num_inference_steps: int = 50,
-        seed: Optional[int] = None,
+        generator: Optional[paddle.Generator] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
         **kwargs,
@@ -59,8 +59,8 @@ class KarrasVePipeline(DiffusionPipeline):
         Args:
             batch_size (`int`, *optional*, defaults to 1):
                 The number of images to generate.
-            seed (`int`, *optional*):
-                A random seed.
+            generator (`paddle.Generator`, *optional*):
+                A [paddle generator] to make generation deterministic.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.
@@ -75,15 +75,14 @@ class KarrasVePipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
-        if seed is not None:
-            paddle.seed(seed)
+
         img_size = self.unet.config.sample_size
         shape = (batch_size, 3, img_size, img_size)
 
         model = self.unet
 
         # sample x_0 ~ N(0, sigma_0^2 * I)
-        sample = paddle.randn(shape) * self.scheduler.init_noise_sigma
+        sample = paddle.randn(shape, generator=generator) * self.scheduler.init_noise_sigma
 
         self.scheduler.set_timesteps(num_inference_steps)
 
@@ -94,7 +93,7 @@ class KarrasVePipeline(DiffusionPipeline):
 
             # 1. Select temporarily increased noise level sigma_hat
             # 2. Add new noise to move from sample_i to sample_hat
-            sample_hat, sigma_hat = self.scheduler.add_noise_to_input(sample, sigma)
+            sample_hat, sigma_hat = self.scheduler.add_noise_to_input(sample, sigma, generator=generator)
 
             # 3. Predict the noise residual given the noise magnitude `sigma_hat`
             # The model inputs and output are adjusted by following eq. (213) in [1].
@@ -121,7 +120,7 @@ class KarrasVePipeline(DiffusionPipeline):
         sample = (sample / 2 + 0.5).clip(0, 1)
         image = sample.transpose([0, 2, 3, 1]).numpy()
         if output_type == "pil":
-            image = self.numpy_to_pil(sample)
+            image = self.numpy_to_pil(image)
 
         if not return_dict:
             return (image,)

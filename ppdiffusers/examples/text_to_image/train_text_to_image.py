@@ -14,32 +14,37 @@
 # limitations under the License.
 
 import argparse
+import contextlib
 import math
 import os
 import random
+import sys
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import contextlib
-import sys
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
-
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import set_seed
-from ppdiffusers import AutoencoderKL, DDPMScheduler, StableDiffusionPipeline, UNet2DConditionModel
-from ppdiffusers.optimization import get_scheduler
-from ppdiffusers.modeling_utils import unwrap_model, freeze_params
-from ppdiffusers.training_utils import main_process_first
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-
 from datasets import load_dataset
-
-from paddle.vision import transforms, BaseTransform
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from paddle.optimizer import AdamW
+from paddle.vision import BaseTransform, transforms
 from tqdm.auto import tqdm
-from paddlenlp.transformers import CLIPTextModel, AutoTokenizer, BertModel
+
+from paddlenlp.trainer import set_seed
+from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from paddlenlp.utils.log import logger
+from ppdiffusers import (
+    AutoencoderKL,
+    DDPMScheduler,
+    StableDiffusionPipeline,
+    UNet2DConditionModel,
+)
+from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.optimization import get_scheduler
+from ppdiffusers.training_utils import main_process_first
 
 
 class Lambda(BaseTransform):

@@ -48,16 +48,16 @@ _tqdm_active = True
 
 def _get_default_logging_level():
     """
-    If DIFFUSERS_VERBOSITY env var is set to one of the valid choices return that as the new default level. If it is
+    If PPDIFFUSERS_VERBOSITY env var is set to one of the valid choices return that as the new default level. If it is
     not - fall back to `_default_log_level`
     """
-    env_level_str = os.getenv("DIFFUSERS_VERBOSITY", None)
+    env_level_str = os.getenv("PPDIFFUSERS_VERBOSITY", None)
     if env_level_str:
         if env_level_str in log_levels:
             return log_levels[env_level_str]
         else:
             logging.getLogger().warning(
-                f"Unknown option DIFFUSERS_VERBOSITY={env_level_str}, "
+                f"Unknown option PPDIFFUSERS_VERBOSITY={env_level_str}, "
                 f"has to be one of: { ', '.join(log_levels.keys()) }"
             )
     return _default_log_level
@@ -121,14 +121,14 @@ def get_logger(name: Optional[str] = None) -> logging.Logger:
 
 def get_verbosity() -> int:
     """
-    Return the current level for the paddlenlp Diffusers Paddle' root logger as an int.
+    Return the current level for the PaddleNLP PPDiffusers' root logger as an int.
 
     Returns:
         `int`: The logging level.
 
     <Tip>
 
-    paddlenlp Diffusers Paddle has following logging levels:
+    PaddleNLP PPDiffusers has following logging levels:
 
     - 50: `ppdiffusers.logging.CRITICAL` or `ppdiffusers.logging.FATAL`
     - 40: `ppdiffusers.logging.ERROR`
@@ -144,7 +144,7 @@ def get_verbosity() -> int:
 
 def set_verbosity(verbosity: int) -> None:
     """
-    Set the verbosity level for the paddlenlp Diffusers Paddle' root logger.
+    Set the verbosity level for the PaddleNLP PPDiffusers' root logger.
 
     Args:
         verbosity (`int`):
@@ -182,7 +182,7 @@ def set_verbosity_error():
 
 
 def disable_default_handler() -> None:
-    """Disable the default handler of the paddlenlp Diffusers Paddle' root logger."""
+    """Disable the default handler of the PaddleNLP PPDiffusers' root logger."""
 
     _configure_library_root_logger()
 
@@ -191,7 +191,7 @@ def disable_default_handler() -> None:
 
 
 def enable_default_handler() -> None:
-    """Enable the default handler of the paddlenlp Diffusers Paddle' root logger."""
+    """Enable the default handler of the PaddleNLP PPDiffusers' root logger."""
 
     _configure_library_root_logger()
 
@@ -200,7 +200,7 @@ def enable_default_handler() -> None:
 
 
 def add_handler(handler: logging.Handler) -> None:
-    """adds a handler to the paddlenlp Diffusers Paddle' root logger."""
+    """adds a handler to the PaddleNLP PPDiffusers' root logger."""
 
     _configure_library_root_logger()
 
@@ -209,7 +209,7 @@ def add_handler(handler: logging.Handler) -> None:
 
 
 def remove_handler(handler: logging.Handler) -> None:
-    """removes given handler from the paddlenlp Diffusers Paddle' root logger."""
+    """removes given handler from the PaddleNLP PPDiffusers' root logger."""
 
     _configure_library_root_logger()
 
@@ -228,7 +228,7 @@ def disable_propagation() -> None:
 
 def enable_propagation() -> None:
     """
-    Enable propagation of the library log outputs. Please disable the paddlenlp Diffusers Paddle' default handler to prevent
+    Enable propagation of the library log outputs. Please disable the PaddleNLP PPDiffusers' default handler to prevent
     double logging if the root logger has been configured.
     """
 
@@ -238,7 +238,7 @@ def enable_propagation() -> None:
 
 def enable_explicit_format() -> None:
     """
-    Enable explicit formatting for every paddlenlp Diffusers Paddle' logger. The explicit formatter is as follows:
+    Enable explicit formatting for every PaddleNLP PPDiffusers' logger. The explicit formatter is as follows:
     ```
         [LEVELNAME|FILENAME|LINE NUMBER] TIME >> MESSAGE
     ```
@@ -253,7 +253,7 @@ def enable_explicit_format() -> None:
 
 def reset_format() -> None:
     """
-    Resets the formatting for paddlenlp Diffusers Paddle' loggers.
+    Resets the formatting for PaddleNLP PPDiffusers' loggers.
 
     All handlers currently bound to the root logger are affected by this method.
     """
@@ -265,10 +265,10 @@ def reset_format() -> None:
 
 def warning_advice(self, *args, **kwargs):
     """
-    This method is identical to `logger.warning()`, but if env var DIFFUSERS_NO_ADVISORY_WARNINGS=1 is set, this
+    This method is identical to `logger.warning()`, but if env var PPDIFFUSERS_NO_ADVISORY_WARNINGS=1 is set, this
     warning will not be printed
     """
-    no_advisory_warnings = os.getenv("DIFFUSERS_NO_ADVISORY_WARNINGS", False)
+    no_advisory_warnings = os.getenv("PPDIFFUSERS_NO_ADVISORY_WARNINGS", False)
     if no_advisory_warnings:
         return
     self.warning(*args, **kwargs)

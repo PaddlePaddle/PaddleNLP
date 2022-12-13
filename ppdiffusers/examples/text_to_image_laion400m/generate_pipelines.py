@@ -12,12 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import paddle
 import argparse
-from ppdiffusers import AutoencoderKL, UNet2DConditionModel, DDIMScheduler, LDMBertModel, LDMTextToImagePipeline
+import json
+
+import paddle
+
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
+from ppdiffusers import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LDMBertModel,
+    LDMTextToImagePipeline,
+    UNet2DConditionModel,
+)
+
+paddle.set_device("cpu")
 
 
 def parse_args():
@@ -47,26 +57,26 @@ def parse_args():
     return parser.parse_args()
 
 
-def extract_paramaters(model_file="model_state.pdparams"):
-    state_dict = paddle.load(model_file, return_numpy=True)
+def extract_paramaters(model_file="model_state.pdparams", dtype="float32"):
+    state_dict = paddle.load(model_file)
     unet = {}
     vae = {}
     bert = {}
     for k, v in state_dict.items():
         unet_key = "unet."
         if k.startswith(unet_key):
-            unet[k.replace(unet_key, "")] = v
+            unet[k.replace(unet_key, "")] = v.astype(dtype)
 
         vae_key = "vae."
         vqvae_key = "vqvae."
         if k.startswith(vae_key):
-            vae[k.replace(vae_key, "")] = v
+            vae[k.replace(vae_key, "")] = v.astype(dtype)
         elif k.startswith(vqvae_key):
-            vae[k.replace(vqvae_key, "")] = v
+            vae[k.replace(vqvae_key, "")] = v.astype(dtype)
 
         bert_key = "text_encoder."
         if k.startswith(bert_key):
-            bert[k.replace(bert_key, "")] = v
+            bert[k.replace(bert_key, "")] = v.astype(dtype)
 
     return unet, vae, bert
 
@@ -78,6 +88,7 @@ def read_json(file):
 
 
 def check_keys(model, state_dict):
+    cls_name = model.__class__.__name__
     missing_keys = []
     mismatched_keys = []
     for k, v in model.state_dict().items():
@@ -86,11 +97,11 @@ def check_keys(model, state_dict):
         if list(v.shape) != list(state_dict[k].shape):
             mismatched_keys.append(k)
     if len(missing_keys):
-        missing_keys_str = ",".join(missing_keys)
-        print(f"Found missing_keys {missing_keys_str}!")
+        missing_keys_str = ", ".join(missing_keys)
+        print(f"{cls_name} Found missing_keys {missing_keys_str}!")
     if len(mismatched_keys):
-        mismatched_keys_str = ",".join(mismatched_keys)
-        print(f"Found mismatched_keys {mismatched_keys_str}!")
+        mismatched_keys_str = ", ".join(mismatched_keys)
+        print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
 
 
 def build_pipelines(
@@ -121,7 +132,13 @@ def build_pipelines(
         text_encoder_config["max_position_embeddings"] = tokenizer.model_max_length
     text_encoder = LDMBertModel(**text_encoder_config)
     scheduler = DDIMScheduler(
-        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", clip_sample=False, set_alpha_to_one=False
+        beta_start=0.00085,
+        beta_end=0.012,
+        beta_schedule="scaled_linear",
+        # Make sure the scheduler compatible with DDIM
+        clip_sample=False,
+        set_alpha_to_one=False,
+        steps_offset=1,
     )
     unet_dict, vae_dict, text_encoder_dict = extract_paramaters(model_file)
     check_keys(unet, unet_dict)

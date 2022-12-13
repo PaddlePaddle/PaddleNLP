@@ -13,12 +13,11 @@
 # limitations under the License.
 """Transformer encoder."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import, division, print_function
 
 from functools import partial
 
+import paddle
 import paddle.fluid as fluid
 import paddle.fluid.layers as layers
 
@@ -111,7 +110,7 @@ def multi_head_attention(
         Scaled Dot-Product Attention
         """
         scaled_q = layers.scale(x=q, scale=d_key**-0.5)
-        product = layers.matmul(x=scaled_q, y=k, transpose_y=True)
+        product = paddle.matmul(x=scaled_q, y=k, transpose_y=True)
         if attn_bias:
             product += attn_bias
         weights = layers.softmax(product)
@@ -119,7 +118,7 @@ def multi_head_attention(
             weights = layers.dropout(
                 weights, dropout_prob=dropout_rate, dropout_implementation="upscale_in_train", is_test=False
             )
-        out = layers.matmul(weights, v)
+        out = paddle.matmul(weights, v)
         return out
 
     q, k, v = __compute_qkv(queries, keys, values, n_head, d_key, d_value)
