@@ -304,7 +304,12 @@ class Task(metaclass=abc.ABCMeta):
         ), "The input spec must be created before converting the dygraph model to static model."
         logger.info("Converting to the inference model cost a little time.")
         static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
-        save_path = os.path.join(self._task_path, "static", "inference")
+        if self.from_hf_hub:
+            # since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way
+            save_path = os.path.join(self._home_path, "taskflow", self.task, self.model, "static", "inference")
+        else:
+            save_path = os.path.join(self._task_path, "static", "inference")
+
         paddle.jit.save(static_model, save_path)
         logger.info("The inference model save in the path:{}".format(save_path))
 
