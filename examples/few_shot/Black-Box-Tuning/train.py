@@ -24,7 +24,7 @@ import cma
 import numpy as np
 import paddle
 from data import convert_example, create_dataloader, load_data, transform_data
-from model import p_ErnieForMaskedLM
+from model import P_ErnieForMaskedLM
 from sklearn.metrics import f1_score
 from utils import file_path, label2text
 
@@ -54,7 +54,7 @@ parser.add_argument("--parallel", action="store_true", help="Whether to allow pa
 args = parser.parse_args()
 
 # below are free hyper-params
-model_name = "ernie-3.0-medium-zh"
+model_name = args.model_name
 
 n_prompt_tokens = args.n_prompt_tokens
 intrinsic_dim = args.intrinsic_dim
@@ -90,7 +90,7 @@ paddle.seed(seed)
 class LMForwardAPI:
     def __init__(self, model_name="ernie-3.0-medium-zh", n_prompt_tokens=50, loss_type="ce"):
 
-        self.model = p_ErnieForMaskedLM.from_pretrained("ernie-3.0-medium-zh", n_prompt_tokens=n_prompt_tokens)
+        self.model = P_ErnieForMaskedLM.from_pretrained("ernie-3.0-medium-zh", n_prompt_tokens=n_prompt_tokens)
         self.tokenizer = ErnieTokenizer.from_pretrained("ernie-3.0-medium-zh")
         self.n_prompt_tokens = n_prompt_tokens
 

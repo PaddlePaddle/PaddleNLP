@@ -37,7 +37,7 @@ class ErniePooler(nn.Layer):
         return pooled_output
 
 
-class p_ErnieEmbeddings(ErnieEmbeddings):
+class P_ErnieEmbeddings(ErnieEmbeddings):
     def __init__(
         self,
         vocab_size,
@@ -70,7 +70,7 @@ class p_ErnieEmbeddings(ErnieEmbeddings):
         self.position_embedding_type = "absolute"
 
 
-class p_ErnieModel(ErnieModel):
+class P_ErnieModel(ErnieModel):
 
     # _keys_to_ignore_on_load_missing = [r"position_ids"]
 
@@ -242,7 +242,7 @@ class ErnieLMHead(nn.Layer):
         return x
 
 
-class p_ErnieForMaskedLM(ErniePretrainedModel):
+class P_ErnieForMaskedLM(ErniePretrainedModel):
     # _keys_to_ignore_on_load_missing = [r"position_ids", r"predictions.decoder.bias"]
     # _keys_to_ignore_on_load_unexpected = [r"pooler"]
 
@@ -265,7 +265,7 @@ class p_ErnieForMaskedLM(ErniePretrainedModel):
         use_task_id = self.ernie.config["use_task_id"]
         enable_recompute = self.ernie.config["enable_recompute"]
         vocab_size = self.ernie.config["vocab_size"]
-        self.ernie_model = p_ErnieModel(
+        self.ernie_model = P_ErnieModel(
             vocab_size=vocab_size,
             hidden_size=hidden_size,
             num_hidden_layers=num_hidden_layers,

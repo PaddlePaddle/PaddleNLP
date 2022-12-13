@@ -1,0 +1,1 @@
+python train.py --n_prompt_tokens 50 --batch_size 16 --device "GPU:0"
