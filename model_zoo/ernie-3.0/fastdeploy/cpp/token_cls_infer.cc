@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
-#include "fastdeploy/function/reduce.h"
-#include "fastdeploy/function/softmax.h"
+#include "fastdeploy/function/functions.h"
 #include "fastdeploy/runtime.h"
 #include "fastdeploy/utils/path.h"
 #include "gflags/gflags.h"
@@ -118,39 +118,56 @@ bool BatchFyTexts(const std::vector<std::string>& texts, int batch_size,
   return true;
 }
 
-struct SeqClsResult {
-  int label;
-  float confidence;
+struct TokenClsResult {
+  struct TokenResult {
+    std::string token_label;
+    std::string entity;
+    std::pair<int, int> pos;
+    friend std::ostream& operator<<(std::ostream& os,
+                                    const TokenResult& result);
+  };
+  std::vector<TokenResult> token_results;
 };
 
-struct ErnieForSequenceClassificationPredictor {
+std::ostream& operator<<(std::ostream& os,
+                         const typename TokenClsResult::TokenResult& result) {
+  os << "entity: " << result.entity << ", label: " << result.token_label
+     << ", pos: [" << result.pos.first << ", " << result.pos.second << "]";
+  return os;
+}
+
+void PrintResult(const std::vector<TokenClsResult>& token_cls_results,
+                 const std::vector<std::string>& data) {
+  for (int i = 0; i < data.size(); ++i) {
+    std::cout << "input data: " << data[i] << std::endl;
+    std::cout << "The model detects all entities:" << std::endl;
+    auto& curr_results = token_cls_results[i];
+    for (auto& token_result : curr_results.token_results) {
+      std::cout << token_result << std::endl;
+    }
+    std::cout << "-----------------------------" << std::endl;
+  }
+}
+
+struct ErnieForTokenClassificationPredictor {
   fastdeploy::Runtime runtime_;
   ErnieFastTokenizer tokenizer_;
-  ErnieForSequenceClassificationPredictor(
-      const fastdeploy::RuntimeOption& option,
-      const ErnieFastTokenizer& tokenizer)
+  std::vector<std::string> label_list_;
+
+  ErnieForTokenClassificationPredictor(const fastdeploy::RuntimeOption& option,
+                                       const ErnieFastTokenizer& tokenizer)
       : tokenizer_(tokenizer) {
     runtime_.Init(option);
+    label_list_ = {"O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"};
   }
 
   bool Preprocess(const std::vector<std::string>& texts,
-                  const std::vector<std::string>& texts_pair,
                   std::vector<fastdeploy::FDTensor>* inputs) {
     std::vector<fast_tokenizer::core::Encoding> encodings;
     std::vector<fast_tokenizer::core::EncodeInput> text_pair_input;
     // 1. Tokenize the text or (text, text_pair)
-    if (texts_pair.empty()) {
-      for (int i = 0; i < texts.size(); ++i) {
-        text_pair_input.emplace_back(texts[i]);
-      }
-    } else {
-      if (texts.size() != texts_pair.size()) {
-        return false;
-      }
-      for (int i = 0; i < texts.size(); ++i) {
-        text_pair_input.emplace_back(
-            std::pair<std::string, std::string>(texts[i], texts_pair[i]));
-      }
+    for (int i = 0; i < texts.size(); ++i) {
+      text_pair_input.emplace_back(texts[i]);
     }
     tokenizer_.EncodeBatchStrings(text_pair_input, &encodings);
     // 2. Construct the input vector tensor
@@ -185,61 +202,69 @@ struct ErnieForSequenceClassificationPredictor {
   }
 
   bool Postprocess(const std::vector<fastdeploy::FDTensor>& outputs,
-                   std::vector<SeqClsResult>* seq_cls_results) {
-    const auto& logits = outputs[0];
-    fastdeploy::FDTensor probs;
-    fastdeploy::function::Softmax(logits, &probs);
+                   const std::vector<std::string>& texts,
+                   std::vector<TokenClsResult>* results) {
+    fastdeploy::FDTensor batch_preds;
+    auto& logits = outputs[0];
+    fastdeploy::function::ArgMax(logits, &batch_preds, -1);
+    for (int i = 0; i < results->size(); ++i) {
+      fastdeploy::FDTensor preds;
+      fastdeploy::function::Slice(batch_preds, {0}, {i}, &preds);
+      int start = -1;
+      std::string label_name = "";
+      std::vector<typename TokenClsResult::TokenResult> items;
 
-    fastdeploy::FDTensor labels, confidences;
-    fastdeploy::function::Max(probs, &confidences, {-1});
-    fastdeploy::function::ArgMax(probs, &labels, -1);
-    if (labels.Numel() != confidences.Numel()) {
-      return false;
-    }
+      int seq_len = preds.Shape()[0];
 
-    seq_cls_results->resize(labels.Numel());
-    int64_t* label_ptr = reinterpret_cast<int64_t*>(labels.Data());
-    float* confidence_ptr = reinterpret_cast<float*>(confidences.Data());
-    for (int i = 0; i < labels.Numel(); ++i) {
-      (*seq_cls_results)[i].label = label_ptr[i];
-      (*seq_cls_results)[i].confidence = confidence_ptr[i];
+      fast_tokenizer::pretokenizers::CharToBytesOffsetConverter convertor(
+          texts[i]);
+      fast_tokenizer::core::Offset curr_offset;
+      for (int j = 0; j < seq_len; ++j) {
+        int64_t label_id = (reinterpret_cast<int64_t*>(preds.Data()))[j];
+        const std::string& curr_label = label_list_[label_id];
+        if ((curr_label == "O" || curr_label.find("B-") != std::string::npos) &&
+            start >= 0) {
+          convertor.convert({start, j - 1}, &curr_offset);
+          items.emplace_back(typename TokenClsResult::TokenResult{
+              label_name,
+              texts[i].substr(curr_offset.first,
+                              curr_offset.second - curr_offset.first),
+              {start, j - 2}});
+          start = -1;
+        }
+        if (curr_label.find("B-") != std::string::npos) {
+          start = j - 1;
+          label_name = curr_label.substr(2);
+        }
+      }
+      if (start >= 0) {
+        convertor.convert({start, seq_len}, &curr_offset);
+        items.emplace_back(typename TokenClsResult::TokenResult{
+            "",
+            texts[i].substr(curr_offset.first,
+                            curr_offset.second - curr_offset.first),
+            {start, seq_len - 1}});
+      }
+      (*results)[i].token_results = std::move(items);
     }
     return true;
   }
-
   bool Predict(const std::vector<std::string>& texts,
-               const std::vector<std::string>& texts_pair,
-               std::vector<SeqClsResult>* seq_cls_results) {
+               std::vector<TokenClsResult>* results) {
     std::vector<fastdeploy::FDTensor> inputs;
-    if (!Preprocess(texts, texts_pair, &inputs)) {
+    if (!Preprocess(texts, &inputs)) {
       return false;
     }
 
     std::vector<fastdeploy::FDTensor> outputs(runtime_.NumOutputs());
     runtime_.Infer(inputs, &outputs);
-
-    if (!Postprocess(outputs, seq_cls_results)) {
+    results->resize(texts.size());
+    if (!Postprocess(outputs, texts, results)) {
       return false;
     }
     return true;
   }
 };
-
-void PrintResult(const std::vector<SeqClsResult>& seq_cls_results,
-                 const std::vector<std::string>& data) {
-  static std::vector<std::string> label_list{
-      "news_story",   "news_culture",     "news_entertainment", "news_sports",
-      "news_finance", "news_house",       "news_car",           "news_edu",
-      "news_tech",    "news_military",    "news_travel",        "news_world",
-      "news_stock",   "news_agriculture", "news_game"};
-  for (int i = 0; i < data.size(); ++i) {
-    std::cout << "input data: " << data[i] << std::endl;
-    std::cout << "seq cls result: " << std::endl;
-    std::cout << "label: " << label_list[seq_cls_results[i].label]
-              << " confidence:" << seq_cls_results[i].confidence << std::endl;
-    std::cout << "-----------------------------" << std::endl;
-  }
-}
 
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -264,17 +289,16 @@ int main(int argc, char* argv[]) {
       FLAGS_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
 
-  ErnieForSequenceClassificationPredictor predictor(option, tokenizer);
-
-  std::vector<SeqClsResult> seq_cls_results;
+  ErnieForTokenClassificationPredictor predictor(option, tokenizer);
+  std::vector<TokenClsResult> token_cls_results;
   std::vector<std::string> texts_ds = {
-      "未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？",
-      "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"};
+      "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",
+      "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"};
   std::vector<std::vector<std::string>> batch_texts;
   BatchFyTexts(texts_ds, FLAGS_batch_size, &batch_texts);
   for (int bs = 0; bs < batch_texts.size(); ++bs) {
-    predictor.Predict(batch_texts[bs], /* text_pair = */ {}, &seq_cls_results);
-    PrintResult(seq_cls_results, batch_texts[bs]);
+    predictor.Predict(batch_texts[bs], &token_cls_results);
+    PrintResult(token_cls_results, batch_texts[bs]);
   }
   return 0;
 }
