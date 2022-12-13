@@ -1,4 +1,4 @@
-# FasterGenerartion 使用
+# FasterGeneration 使用
 
 ## 使用环境说明
 
