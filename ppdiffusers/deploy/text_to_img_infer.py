@@ -199,7 +199,7 @@ if __name__ == "__main__":
     scheduler = get_scheduler(args)
 
     # 2. Init tokenizer
-    tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+    tokenizer = CLIPTokenizer.from_pretrained(os.path.join(args.model_dir, "tokenizer"))
 
     # 3. Set dynamic shape for trt backend
     vae_dynamic_shape = {
