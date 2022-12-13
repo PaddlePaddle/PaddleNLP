@@ -13,9 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import abc
 import math
+import os
 from abc import abstractmethod
 from multiprocessing import cpu_count
 
@@ -24,7 +24,7 @@ from paddle.dataset.common import md5file
 
 from ..utils.env import PPNLP_HOME
 from ..utils.log import logger
-from .utils import download_check, static_mode_guard, dygraph_mode_guard, download_file, cut_chinese_sent
+from .utils import cut_chinese_sent, download_check, download_file, dygraph_mode_guard
 
 
 class Task(metaclass=abc.ABCMeta):
@@ -49,6 +49,7 @@ class Task(metaclass=abc.ABCMeta):
         # The static model instance
         self._input_spec = None
         self._config = None
+        self._init_class = None
         self._custom_model = False
         self._param_updated = False
 
@@ -140,17 +141,28 @@ class Task(metaclass=abc.ABCMeta):
             logger.warning("The inference precision is change to 'fp32', 'fp16' inference only takes effect on gpu.")
         else:
             if self._infer_precision == "fp16":
-                try:
-                    import onnx
-                    import onnxruntime as ort
-                    import paddle2onnx
-                    from onnxconverter_common import float16
+                self._predictor_type = "onnxruntime"
 
-                    self._predictor_type = "onnxruntime"
-                except:
-                    logger.warning(
-                        "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
-                    )
+    def _construct_ocr_engine(self, lang="ch", use_angle_cls=True):
+        """
+        Construct the OCR engine
+        """
+        try:
+            from paddleocr import PaddleOCR
+        except ImportError:
+            raise ImportError("Please install the dependencies first, pip install paddleocr")
+        use_gpu = False if paddle.get_device() == "cpu" else True
+        self._ocr = PaddleOCR(use_angle_cls=use_angle_cls, show_log=False, use_gpu=use_gpu, lang=lang)
+
+    def _construce_layout_analysis_engine(self):
+        """
+        Construct the layout analysis engine
+        """
+        try:
+            from paddleocr import PPStructure
+        except ImportError:
+            raise ImportError("Please install the dependencies first, pip install paddleocr")
+        self._layout_analysis_engine = PPStructure(table=False, ocr=True, show_log=False)
 
     def _prepare_static_mode(self):
         """
@@ -167,18 +179,29 @@ class Task(metaclass=abc.ABCMeta):
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()
         self._config.enable_memory_optim()
+
+        # TODO(linjieccc): some temporary settings and will be remove in future
+        # after fixed
         if self.task in ["document_intelligence", "knowledge_mining"]:
             self._config.switch_ir_optim(False)
+        if self.model == "uie-data-distill-gp":
+            self._config.enable_memory_optim(False)
+
         self.predictor = paddle.inference.create_predictor(self._config)
         self.input_names = [name for name in self.predictor.get_input_names()]
         self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
         self.output_handle = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
 
     def _prepare_onnx_mode(self):
-        import onnx
-        import onnxruntime as ort
-        import paddle2onnx
-        from onnxconverter_common import float16
+        try:
+            import onnx
+            import onnxruntime as ort
+            import paddle2onnx
+            from onnxconverter_common import float16
+        except ImportError:
+            logger.warning(
+                "The inference precision is change to 'fp32', please install the dependencies that required for 'fp16' inference, pip install onnxruntime-gpu onnx onnxconverter-common"
+            )
 
         onnx_dir = os.path.join(self._task_path, "onnx")
         if not os.path.exists(onnx_dir):
@@ -204,7 +227,7 @@ class Task(metaclass=abc.ABCMeta):
         sess_options.inter_op_num_threads = self._num_threads
         self.predictor = ort.InferenceSession(fp16_model_file, sess_options=sess_options, providers=providers)
         assert "CUDAExecutionProvider" in self.predictor.get_providers(), (
-            f"The environment for GPU inference is not set properly. "
+            "The environment for GPU inference is not set properly. "
             "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
             "Please run the following commands to reinstall: \n "
             "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -216,15 +239,38 @@ class Task(metaclass=abc.ABCMeta):
         """
         if self._custom_model:
             param_path = os.path.join(self._task_path, "model_state.pdparams")
+
             if os.path.exists(param_path):
                 cache_info_path = os.path.join(self._task_path, ".cache_info")
                 md5 = md5file(param_path)
                 self._param_updated = True
-                if os.path.exists(cache_info_path) and open(cache_info_path).read() == md5:
+                if os.path.exists(cache_info_path) and open(cache_info_path).read()[:-8] == md5:
                     self._param_updated = False
+                elif self.task == "information_extraction" and self.model != "uie-data-distill-gp":
+                    # UIE related models are moved to paddlenlp.transformers after v2.4.5
+                    # So we convert the parameter key names for compatibility
+                    # This check will be discard in future
+                    fp = open(cache_info_path, "w")
+                    fp.write(md5 + "taskflow")
+                    fp.close()
+                    model_state = paddle.load(param_path)
+                    prefix_map = {"UIE": "ernie", "UIEM": "ernie_m", "UIEX": "ernie_layout"}
+                    new_state_dict = {}
+                    for name, param in model_state.items():
+                        if "ernie" in name:
+                            new_state_dict[name] = param
+                        elif "encoder.encoder" in name:
+                            trans_name = name.replace("encoder.encoder", prefix_map[self._init_class] + ".encoder")
+                            new_state_dict[trans_name] = param
+                        elif "encoder" in name:
+                            trans_name = name.replace("encoder", prefix_map[self._init_class])
+                            new_state_dict[trans_name] = param
+                        else:
+                            new_state_dict[name] = param
+                    paddle.save(new_state_dict, param_path)
                 else:
                     fp = open(cache_info_path, "w")
-                    fp.write(md5)
+                    fp.write(md5 + "taskflow")
                     fp.close()
 
         # When the user-provided model path is already a static model, skip to_static conversion
@@ -263,21 +309,18 @@ class Task(metaclass=abc.ABCMeta):
         logger.info("The inference model save in the path:{}".format(save_path))
 
     def _check_input_text(self, inputs):
+        """
+        Check whether the input text meet the requirement.
+        """
         inputs = inputs[0]
         if isinstance(inputs, str):
             if len(inputs) == 0:
-                raise ValueError(
-                    "Invalid inputs, input text should not be empty text, please check your input.".format(
-                        type(inputs)
-                    )
-                )
+                raise ValueError("Invalid inputs, input text should not be empty text, please check your input.")
             inputs = [inputs]
         elif isinstance(inputs, list):
             if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
                 raise TypeError(
-                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text.".format(
-                        type(inputs[0])
-                    )
+                    "Invalid inputs, input text should be list of str, and first element of list should not be empty text."
                 )
         else:
             raise TypeError(
@@ -285,13 +328,15 @@ class Task(metaclass=abc.ABCMeta):
             )
         return inputs
 
-    def _auto_splitter(self, input_texts, max_text_len, split_sentence=False):
+    def _auto_splitter(self, input_texts, max_text_len, bbox_list=None, split_sentence=False):
         """
         Split the raw texts automatically for model inference.
         Args:
             input_texts (List[str]): input raw texts.
             max_text_len (int): cutting length.
+            bbox_list (List[float, float,float, float]): bbox for document input.
             split_sentence (bool): If True, sentence-level split will be performed.
+                `split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document.
         return:
             short_input_texts (List[str]): the short input texts for model inference.
             input_mapping (dict): mapping between raw text and short input texts.
@@ -300,32 +345,44 @@ class Task(metaclass=abc.ABCMeta):
         short_input_texts = []
         cnt_org = 0
         cnt_short = 0
-        for text in input_texts:
+        with_bbox = False
+        if bbox_list:
+            with_bbox = True
+            short_bbox_list = []
+            if split_sentence:
+                logger.warning(
+                    "`split_sentence` will be set to False if bbox_list is not None since sentence-level split is not support for document."
+                )
+                split_sentence = False
+
+        for idx in range(len(input_texts)):
             if not split_sentence:
-                sens = [text]
+                sens = [input_texts[idx]]
             else:
-                sens = cut_chinese_sent(text)
+                sens = cut_chinese_sent(input_texts[idx])
             for sen in sens:
                 lens = len(sen)
                 if lens <= max_text_len:
                     short_input_texts.append(sen)
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = [cnt_short]
-                    else:
-                        input_mapping[cnt_org].append(cnt_short)
+                    if with_bbox:
+                        short_bbox_list.append(bbox_list[idx])
+                    input_mapping.setdefault(cnt_org, []).append(cnt_short)
                     cnt_short += 1
                 else:
                     temp_text_list = [sen[i : i + max_text_len] for i in range(0, lens, max_text_len)]
                     short_input_texts.extend(temp_text_list)
+                    if with_bbox:
+                        temp_bbox_list = [bbox_list[idx][i : i + max_text_len] for i in range(0, lens, max_text_len)]
+                        short_bbox_list.extend(temp_bbox_list)
                     short_idx = cnt_short
                     cnt_short += math.ceil(lens / max_text_len)
                     temp_text_id = [short_idx + i for i in range(cnt_short - short_idx)]
-                    if cnt_org not in input_mapping.keys():
-                        input_mapping[cnt_org] = temp_text_id
-                    else:
-                        input_mapping[cnt_org].extend(temp_text_id)
+                    input_mapping.setdefault(cnt_org, []).extend(temp_text_id)
             cnt_org += 1
-        return short_input_texts, input_mapping
+        if with_bbox:
+            return short_input_texts, short_bbox_list, input_mapping
+        else:
+            return short_input_texts, input_mapping
 
     def _auto_joiner(self, short_results, input_mapping, is_dict=False):
         """

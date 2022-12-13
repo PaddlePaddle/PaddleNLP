@@ -23,9 +23,11 @@ import time
 import uuid
 import zipfile
 from collections import OrderedDict
-from typing import Optional
+from typing import Optional, Union
 
 import requests
+from huggingface_hub import get_hf_file_metadata, hf_hub_url
+from huggingface_hub.utils import EntryNotFoundError
 
 from .env import DOWNLOAD_SERVER, FAILED_STATUS, SUCCESS_STATUS
 from .file_lock import FileLock
@@ -463,3 +465,28 @@ def url_file_exists(url: str) -> bool:
 
     result = requests.head(url)
     return result.status_code == requests.codes.ok
+
+
+def hf_file_exists(repo_id: str, filename: str, token: Union[bool, str, None] = None) -> bool:
+    """Check whether the HF file exists
+
+    Args:
+        repo_id (`str`): A namespace (user or an organization) name and a repo name separated by a `/`.
+        filename (`str`): The name of the file in the repo.
+        token (`str` or `bool`, *optional*): A token to be used for the download.
+            - If `True`, the token is read from the HuggingFace config folder.
+            - If `False` or `None`, no token is provided.
+            - If a string, it's used as the authentication token.
+    Returns:
+        bool: whether the HF file exists
+    """
+
+    url = hf_hub_url(repo_id, filename)
+    try:
+        _ = get_hf_file_metadata(
+            url=url,
+            token=token,
+        )
+        return True
+    except EntryNotFoundError:
+        return False
