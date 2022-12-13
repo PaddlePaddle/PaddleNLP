@@ -13,6 +13,8 @@
 # limitations under the License.
 import functools
 import os
+import shutil
+from asyncio.log import logger
 from typing import Any, Callable, Dict, List
 
 import numpy as np
@@ -80,7 +82,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _default_training_argument(self) -> TrainingArguments:
         return TrainingArguments(
-            output_dir="trained_model",
+            output_dir="training",
             num_train_epochs=1,
             learning_rate=1e-5,
             per_device_train_batch_size=2,
@@ -97,7 +99,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _default_prompt_tuning_arguments(self) -> PromptTuningArguments:
         return PromptTuningArguments(
-            output_dir="trained_model",
+            output_dir="training",
             num_train_epochs=1,
             learning_rate=1e-5,
             per_device_train_batch_size=2,
@@ -217,7 +219,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     callbacks=callbacks,
                 )
                 trainer.train()
-                trainer.save_model()
+                trainer.save_model("export")
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             elif config["trainer_type"] == "PromptTrainer":
@@ -256,7 +258,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     compute_metrics=self._compute_metrics,
                 )
                 trainer.train()
-                trainer.save_model()
+                trainer.save_model("export")
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             else:
@@ -326,20 +328,20 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
-        saved_model_path = os.path.join(model_result.log_dir, "trained_model")
-        tokenizer = AutoTokenizer.from_pretrained(saved_model_path)
-        model = AutoModelForSequenceClassification.from_pretrained(saved_model_path, num_classes=len(self.id2label))
-        tokenizer.save_pretrained(export_path)
-        model.save_pretrained(export_path)
+        exported_model_path = os.path.join(model_result.log_dir, "export")
+        shutil.copytree(exported_model_path, export_path)
+        logger.info(f"Exported to {export_path}")
 
     def to_taskflow(self, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
-        print()
         model_config = model_result.metrics["config"]["candidates"]
-        saved_model_path = os.path.join(model_result.log_dir, "trained_model")
-        return Taskflow(
-            "text_classification",
-            task_path=saved_model_path,
-            id2label=self.id2label,
-            max_length=model_config.get("PreprocessArguments.max_length", 128),
-        )
+        if model_config["trainer_type"] == "PromptTrainer":
+            raise NotImplementedError("'Taskflow' inference does not yet support models trained with PromptTrainer.")
+        else:
+            exported_model_path = os.path.join(model_result.log_dir, "export")
+            return Taskflow(
+                "text_classification",
+                task_path=exported_model_path,
+                id2label=self.id2label,
+                max_length=model_config.get("PreprocessArguments.max_length", 128),
+            )

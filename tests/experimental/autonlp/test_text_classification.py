@@ -138,6 +138,15 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertIsInstance(results_df, DataFrame)
             self.assertEqual(len(results_df), num_models)
 
+            # test export
+            temp_export_path = os.path.join(temp_dir_path, "test_export")
+            auto_trainer.export(export_path=temp_export_path)
+            reloaded_model = AutoModelForSequenceClassification.from_pretrained(temp_export_path)
+            reloaded_tokenizer = AutoTokenizer.from_pretrained(temp_export_path)
+            input_features = reloaded_tokenizer(dev_ds[0]["sentence"], return_tensors="pd")
+            model_outputs = reloaded_model(**input_features)
+            self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
+
     def test_multilabel_finetune(self):
         with TemporaryDirectory() as temp_dir_path:
             fixture_path = get_tests_dir(os.path.join("fixtures", "dummy"))
