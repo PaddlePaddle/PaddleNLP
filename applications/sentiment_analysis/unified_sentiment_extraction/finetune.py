@@ -141,8 +141,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_path", default=None, type=str, help="The path of train set.")
     parser.add_argument("--dev_path", default=None, type=str, help="The path of dev set.")
     parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The output directory where the model checkpoints will be written.")
-    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. "
-        "Sequences longer than this will be split automatically.")
+    parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum input sequence length. Sequences longer than this will be split automatically.")
     parser.add_argument("--num_epochs", default=100, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--seed", default=1000, type=int, help="Random seed for initialization")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
