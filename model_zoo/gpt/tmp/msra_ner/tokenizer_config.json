@@ -1,0 +1,1 @@
+{"max_len": 512, "unk_token": "<unk>", "bos_token": "<bod>", "eos_token": "<eod>", "eol_token": "▃", "tokenizer_class": "GPTChineseTokenizer", "special_tokens_map_file": "/root/.paddlenlp/models/__internal_testing__/gpt_cn/special_tokens_map.json"}

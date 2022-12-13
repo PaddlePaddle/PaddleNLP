@@ -563,8 +563,6 @@ class GenerationTesterMixin:
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
 
-            model = self._make_model_instance(config, model_class)
-
             if isinstance(config, PretrainedConfig):
                 model = model_class(config)
             else:

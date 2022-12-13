@@ -456,8 +456,6 @@ class GPTPretrainedModel(PretrainedModel):
 
     def init_weights(self, layer):
         """Initialization hook"""
-        # no hook
-        return
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.

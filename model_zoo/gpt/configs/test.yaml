@@ -1,0 +1,5 @@
+model_name: bos-smalle-model
+epoch: 1
+max_step: 10
+max_seq_length: 20
+dataset: small-msra-ner
