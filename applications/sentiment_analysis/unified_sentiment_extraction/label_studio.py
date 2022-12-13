@@ -650,9 +650,9 @@ def do_convert():
                 count += 1
         logger.info("Save %d examples to %s." % (count, save_path))
 
-    _save_examples(args.save_dir, "train.txt", train_examples)
-    _save_examples(args.save_dir, "dev.txt", dev_examples)
-    _save_examples(args.save_dir, "test.txt", test_examples)
+    _save_examples(args.save_dir, "train.json", train_examples)
+    _save_examples(args.save_dir, "dev.json", dev_examples)
+    _save_examples(args.save_dir, "test.json", test_examples)
 
     logger.info('Finished! It takes %.2f seconds' % (time.time() - tic_time))
 
