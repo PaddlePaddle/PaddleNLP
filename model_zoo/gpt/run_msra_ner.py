@@ -66,7 +66,7 @@ def tokenize_and_align_labels(example, tokenizer, no_entity_id, max_seq_len=512)
     labels = example["labels"]
     example = example["tokens"]
     tokenized_input = tokenizer(
-        example, return_length=True, is_split_into_words="token", max_seq_len=max_seq_len, return_token_type_ids=False
+        example, is_split_into_words="token", max_seq_len=max_seq_len, return_token_type_ids=False
     )
 
     tokenized_input["labels"] = labels[: len(tokenized_input["input_ids"])]
