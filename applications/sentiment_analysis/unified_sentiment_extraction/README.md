@@ -18,11 +18,14 @@
     - [2.6.4 预测及效果展示](#2.6.4)
   - [2.7 模型部署](#2.7)
 
+
 <a name="1"></a>
 
 ## **1. 情感分析应用简介**
 
-PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需求，同时针对情感分析领域的痛点和难点，基于前沿模型开源了细粒度的情感分析解决方案，助力开发者快速分析业务相关产品或服务的用户感受。本项目以通用信息抽取模型UIE为训练底座，同时利用大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，并通过信息抽取的方式解决情感分析相应问题。
+PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需求，针对情感分析领域的痛点和难点，提供基于前沿模型的情感分析解决方案，助力开发者快速分析业务相关产品或服务的用户感受。
+
+本项目以通用信息抽取模型UIE为训练底座，提供了语句级情感分析和评价维度级情感分析能力、覆盖情感分类、评价维度抽取、观点抽取等常用情感分析能力，如下图所示。同时提供了可视化能力，支持从输入数据到情感分析结果可视化，帮助用户快速分析业务数据。更进一步地，本项目同时支持基于业务数据进行定制训练，同时支持引入业务侧积累的经验和知识，包括同义评价维度和隐性观点词表，加强模型进行维度聚合和隐性观点抽取的能力，进一步提高模型对于业务场景数据的分析能力。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/35913314/199965793-f0933baa-5b82-47da-9271-ba36642119f8.png" />
@@ -41,6 +44,19 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 <a name="3"></a>
 
 ## **3. 运行环境**
+
+**代码结构**
+```
+unified_sentiment_extraction/
+├── batch_predict.py # 以文件的形式输入，进行批量预测的脚本
+├── evaluate.py # 模型评估脚本
+├── finetune.py # 模型微调脚本
+├── label_studio.py # 将label-studio导出数据转换为模型输入数据的脚本
+├── label_studio.md # 将label-studio标注说明
+├── utils.py # 工具函数脚本
+├── visual_analysis.py # 情感分析结果可视化脚本
+└── README.md # 使用说明
+```
 
 **安装依赖**
 
@@ -70,26 +86,26 @@ python3 -m pip install --upgrade paddlenlp -i https://mirror.baidu.com/pypi/simp
 python3 -m pip install wordcloud==1.8.2.2
 ```
 
-**代码结构**
-```
-unified_sentiment_extraction/
-├── batch_predict.py # 以文件的形式输入，进行批量预测的脚本
-├── evaluate.py # 模型评估脚本
-├── finetune.py # 模型微调脚本
-├── label_studio.py # 将label-studio导出数据转换为模型输入数据的脚本
-├── label_studio.md # 将label-studio标注说明
-├── utils.py # 工具函数脚本
-├── visual_analysis.py # 情感分析结果可视化脚本
-└── README.md # 使用说明
-```
-
 <a name="4"></a>
 
 ## **4. 整体功能介绍与Taskflow快速体验**
 
-本项目以通用信息抽取模型UIE为训练底座，并基于大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，同时支持常见的基础情感分析能力。从使用方式来看，可分为两类：预先给定属性集和不给定属性集，如果预先给定了属性集，则只会在该属性集上进行情感分析。默认情况下可不给定属性集。
+本项目以通用信息抽取模型UIE为训练底座，基于大量情感分析数据进一步训练，增强了模型对于情感知识的处理能力，支持语句级情感分类、评价维度抽取、观点词抽取、评价维度级情感分类等基础情感分析能力。下表展示了通用UIE `uie-base` 和情感知识增强的UIE `uie-senta-base` 在测试集上的效果对比。
 
-### **4.1 语句级情感分析**
+|  模型 | Precision | Recall | F1 |
+|  :---: | :--------: | :--------: | :--------: |
+| `uie-base` | 0.86759 | 0.83696 | 0.85200 |
+| `uie-senta-base` | 0.93403 | 0.92795 | 0.93098 |
+
+另外，为方便用户体验和使用，本项目提供的情感分析能力已经集成到了 Taskflow，可以通过Taskflow开箱即用的的能力快速体验情感分析的功能。
+
+<a name="4.1"></a>
+
+### **4.1 开箱即用的情感分析能力**
+
+<a name="4.1.1"></a>
+
+#### **4.1.1 语句级情感分析**
 整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
 
 ```python
@@ -98,27 +114,24 @@ unified_sentiment_extraction/
 >>> schema = ['情感倾向[正向，负向]']
 >>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
 >>> print(senta('蛋糕味道不错，店家服务也很好'))
+
+[
+    {
+        '情感倾向[正向,负向]': [
+            {
+                'text': '正向',
+                'probability': 0.996646058824652
+            }
+        ]
+    }
+]
 ```
 
+<a name="4.1.2"></a>
 
+#### **4.1.2 评价维度级情感分析**
 
-
-
-对给定的文本评论，直接进行情感分析。可以在`predict/predict.py`或`predict/batch_predict.py`文件中，通过设置不同的Schema进行相应信息的抽取。其中`predict/predict.py`即时运行情感分析功能，`predict/batch_predict.py`会接收文件，同时将结果保存相应文件中。
-
-**（1）整句情感分析**  
-整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
-
-```python
->>> from paddlenlp import Taskflow
-
->>> schema = ['情感倾向[正向，负向]']
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> print(senta('蛋糕味道不错，店家服务也很好'))
-```
-
-**（2）属性级情感分析**  
-除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取，其调用示例如下。
+除语句级情感分析之外，本项目同时支持评价维度级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取，其调用示例如下。
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -128,45 +141,94 @@ unified_sentiment_extraction/
 >>> # Aspect - Opinion Extraction
 >>> # schema =  [{"评价维度":["观点词"]}]
 >>> # Aspect - Sentiment Extraction
->>> # schema =  [{"评价维度":["情感倾向[正向，负向]"]}]
+>>> # schema =  [{"评价维度":["情感倾向[正向,负向,未提及]"]}]
 >>> # Aspect - Sentiment - Opinion Extraction
->>> schema =  [{"评价维度":["观点词", "情感倾向[正向，负向]"]}]
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
 
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> print(senta('蛋糕味道不错，店家服务也很好'))
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> print(senta('蛋糕味道不错，店家服务也很热情'))
+
+[
+    {
+        '评价维度': [
+            {
+                'text': '服务',
+                'start': 9,
+                'end': 11,
+                'probability': 0.9709093024793489,
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '热情',
+                            'start': 13,
+                            'end': 15,
+                            'probability': 0.9897222206316556
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '正向',
+                            'probability': 0.9999327669598301
+                        }
+                    ]
+                }
+            },
+            {
+                'text': '味道',
+                'start': 2,
+                'end': 4,
+                'probability': 0.9105472387838915,
+                'relations': {
+                    '观点词': [
+                        {
+                            'text': '不错',
+                            'start': 4,
+                            'end': 6,
+                            'probability': 0.9946981266891619
+                        }
+                    ],
+                    '情感倾向[正向,负向,未提及]': [
+                        {
+                            'text': '正向',
+                            'probability': 0.9998829392709467
+                        }
+                    ]
+                }
+            }
+        ]
+    }
+]
 ```
 
-<a name="2.4.2"></a>
+<a name="4.1.3"></a>
 
-#### **2.4.2 预先给定属性集**
+#### **4.1.3 多版本模型选择**
+为方便用户实际业务应用情况，本项目多个版本的模型，可以根据业务对于精度和速度方面的要求进行选择，下表展示了不同版本模型的结构以及在测试集上的指标。
 
-本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。
+|  模型 |  结构  | Precision | Recall | F1 |
+|  :---: | :--------: | :--------: | :--------: | :--------: |
+|  `uie-senta-base` (默认) | 12-layers, 768-hidden, 12-heads | 0.93403 | 0.92795 | 0.93098 |
+| `uie-senta-medium` | 6-layers, 768-hidden, 12-heads | 0.93146 | 0.92137 | 0.92639 |
+| `uie-senta-mini` | 6-layers, 384-hidden, 12-heads | 0.91799 | 0.92028 | 0.91913 |
+| `uie-senta-micro` | 4-layers, 384-hidden, 12-heads | 0.91542 | 0.90957 | 0.91248 |
+| `uie-senta-nano` | 4-layers, 312-hidden, 12-heads | 0.90817 | 0.90878 | 0.90847 |
+
+在Taskflow中，可以直接指定相应模型名称进行使用，使用`uie-senta-mini`版本的示例如下：
 
 ```python
->>> # define schema for pre-defined aspects, schema
->>> schema = ["观点词", "情感倾向[正向,负向,未提及]"]
->>> aspects = ["房间", "位置", "隔音"]
->>> # set aspects for Taskflow
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, aspects=aspects)
->>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
+>>> from paddlenlp import Taskflow
+
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-mini", schema=schema)
 ```
 
 
-
-
-
-
-
-<a name="2.3"></a>
-### **2.3 开箱即用：从输入数据到分析结果可视化**
-
+### **4.2 批量处理：从数据到情感分析可视化**
 为增强通用信息抽取模型UIE对于情感分析知识的处理能力，本项目基于大量情感分析数据进行了训练，以更好地支持常见的基础情感分析能力。同时该模型集成到了 Taskflow 中，可以通过 TaskFlow 提供的API直接进行情感分析。
 
 另外，在分析结果可视化时，如果需要在词云中显示中文，需要指定字体路径，这里可以使用黑体进行显示，点击[这里](https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/SimHei.ttf)进行下载。
 
-<a name="2.3.1"></a>
-
-#### **2.3.1 数据描述**
+#### **4.2.1 数据描述**
 输入数据如下方式进行组织，每行表示一个文本评论。
 
 ```
@@ -177,101 +239,34 @@ unified_sentiment_extraction/
 总台服务很差，房间一般
 ```
 
-<a name="2.3.2"></a>
+#### **4.2.2 批量情感分析**
 
-#### **2.3.2 开箱即用：情感分析**
+当数据规模较大时，可以以文件的形式传入数据，同时将分析结果保存至指定的文件中，示例如下：
 
-基于UIE的情感分析功能已经集成到了 Taskflow，可以通过 Taskflow 直接进行情感分析预测。为自动分析文本评论中的属性、观点词和情感极性，定义 schema 如下：
-```
-[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
-```
-
-调用示例如下：
-
-```python
->>> from paddlenlp import Taskflow
-
->>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> print(senta('蛋糕味道不错，店家服务也很好'))
-
-[
-    {
-        '评价维度': [
-            {
-                'end': 11,
-                'probability': 0.9978359659431995,
-                'relations': {
-                    '情感倾向[正向,负向,未提及]': [
-                        {
-                            'probability': 0.9999209657300412,
-                            'text': '正向'
-                        }
-                    ],
-                    '观点词': [
-                        {
-                            'end': 14,
-                            'probability': 0.9998056980106895,
-                            'start': 13,
-                            'text': '好'
-                        }
-                    ]
-                },
-                'start': 9,
-                'text': '服务'
-            },
-            {
-                'end': 4,
-                'probability': 0.9152585827976623,
-                'relations': {
-                    '情感倾向[正向,负向,未提及]': [
-                        {
-                            'probability': 0.9998750722759127,
-                            'text': '正向'
-                        }
-                    ],
-                    '观点词': [
-                        {
-                            'end': 6,
-                            'probability': 0.9855414084471477,
-                            'start': 4,
-                            'text': '不错'
-                        }
-                    ]
-                },
-                'start': 2,
-                'text': '味道'
-            }
-        ]
-    }
-]
+```shell
+python batch_predict.py \
+    --file_path "./data/test_hotel.txt" \
+    --save_path "./data/sentiment_analysis.json" \
+    --model "uie-senta-base" \
+    --schema "[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]" \
+    --batch_size 4 \
+    --max_seq_len 512
 ```
 
-当数据规模较大时，可以以文件的形式传入数据，同时将分析结果保存至指定的文件中，文件内容可以按照如下方式进行组织，每行表示一条样本:
-```
-酒店环境很好，安静，周边餐饮很方便
-环境美，房间不大，但舒适温馨，老板服务周到贴心
-房间整洁，设施完好，客服人员不错
-```
-
-支持以文件形式批量传入的代码示例如下：
-```python
->>> from paddlenlp import Taskflow
-
->>> file_path = './data/test_hotel.txt'
->>> save_path = './outputs/test_hotel.json'
->>> schema = [{'评价维度': ['观点词', '情感倾向[正向,负向]']}]
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> senta(file_path, save_path)
-
-```
-
-在执行完以上命令后，情感分析的结果将被保存至 `save_path` 指定的文件中。
+参数说明：  
+- ``file_path``: 用于进行情感分析的文件路径。
+- ``save_path``: 情感分析结果的保存路径。
+- ``model``: 进行情感分析的模型名称，可以在这些模型中进行选择：['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano']。
+- ``schema``: 基于UIE模型进行信息抽取的Schema描述。
+- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
+- ``batch_size``: 预测过程中的批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
+- ``max_seq_len``: 模型支持处理的最大序列长度，默认为512。
+- ``aspects``: 预先给定的评价维度，如果设置，模型将只针对这些评价维度进行情感分析，比如分析这些评价维度的观点词。
 
 
-<a name="2.3.3"></a>
+#### **4.2.3 情感分析可视化**
+**(1) 一键生成情感分析结果**
 
-#### **2.3.3 情感分析结果可视化**
 
 基于以上生成的情感分析结果，可以使用`visual_analysis.py`脚本对情感分析结果进行可视化，命令如下。
 
@@ -295,70 +290,9 @@ python visual_analysis.py \
 </div>
 <br>
 
-<a name="2.4"></a>
+**(2) 情感分析详细展示**
 
-### **2.4 通用情感分析能力**
-
-本项目以通用信息抽取模型UIE为训练底座，并基于大量情感分析数据进行训练，增强了模型对于情感知识的处理能力，同时支持常见的基础情感分析能力。从使用方式来看，可分为两类：预先给定属性集和不给定属性集，如果预先给定了属性集，则只会在该属性集上进行情感分析。默认情况下可不给定属性集。
-
-<a name="2.4.1"></a>
-
-#### **2.4.1 不给定属性集**
-
-对给定的文本评论，直接进行情感分析。可以在`predict/predict.py`或`predict/batch_predict.py`文件中，通过设置不同的Schema进行相应信息的抽取。其中`predict/predict.py`即时运行情感分析功能，`predict/batch_predict.py`会接收文件，同时将结果保存相应文件中。
-
-**（1）整句情感分析**  
-整句情感分析功能当前支持二分类：正向和负向，调用示例如下：
-
-```python
->>> from paddlenlp import Taskflow
-
->>> schema = ['情感倾向[正向，负向]']
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> print(senta('蛋糕味道不错，店家服务也很好'))
-```
-
-**（2）属性级情感分析**  
-除整句情感分析之外，本项目同时支持属性级情感分析，包括属性抽取（Aspect Term Extraction）、观点抽取（Opinion Term Extraction）、属性级情感分析（Aspect Based Sentiment Classification）等等。可以通过设置相应的schema进行对应信息的抽取，其调用示例如下。
-
-```python
->>> from paddlenlp import Taskflow
-
->>> # Aspect Term Extraction
->>> # schema =  ["评价维度"]
->>> # Aspect - Opinion Extraction
->>> # schema =  [{"评价维度":["观点词"]}]
->>> # Aspect - Sentiment Extraction
->>> # schema =  [{"评价维度":["情感倾向[正向，负向]"]}]
->>> # Aspect - Sentiment - Opinion Extraction
->>> schema =  [{"评价维度":["观点词", "情感倾向[正向，负向]"]}]
-
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema)
->>> print(senta('蛋糕味道不错，店家服务也很好'))
-```
-
-<a name="2.4.2"></a>
-
-#### **2.4.2 预先给定属性集**
-
-本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。
-
-```python
->>> # define schema for pre-defined aspects, schema
->>> schema = ["观点词", "情感倾向[正向,负向,未提及]"]
->>> aspects = ["房间", "位置", "隔音"]
->>> # set aspects for Taskflow
->>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, aspects=aspects)
->>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
-```
-
-<a name="2.5"></a>
-
-### **2.5 情感分析可视化使用介绍**
-
-基于情感分析的预测结果，本项目提供了结果可视化功能。默认情况下，可视化功能支持围绕属性、观点、属性+观点、属性+情感、固定属性+观点分析功能。在各项分析中，均支持词云和直方图两类图像展示。以下各项功能介绍中，以酒店场景数据为例进行展示。
-
-**(1) 属性分析**
+**属性分析**
 通过属性信息，可以查看客户对于产品/服务的重点关注方面. 可以通过`plot_aspect_with_frequency`函数对属性进行可视化，当前可通过参数`image_type`分别指定`wordcloud`和'histogram'，通过词云和直方图的形式进行可视化。
 
 ```python
@@ -379,7 +313,7 @@ vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histog
 </div>
 <br>
 
- **(2) 观点分析**
+ **观点分析**
 通过观点信息，可以查看客户对于产品/服务整体的直观印象。可以通过`plot_opinion_with_frequency`函数对观点进行可视化。
 
 ```python
@@ -393,7 +327,7 @@ vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="word
 </div>
 <br>
 
-**(3) 属性+观点分析**
+**属性+观点分析**
 结合属性和观点两者信息，可以更加具体的展现客户对于产品/服务的详细观点，分析某个属性的优劣，从而能够帮助商家更有针对性地改善或提高自己的产品/服务质量。可以通过`plot_aspect_with_opinion`函数对属性+观点进行可视化，同时可通过设置参数`sentiment`按照情感倾向展示不同分析结果，以更好进行情感分析，若设置为`all`，则会展示正向和负向所有的属性；若为`positive`，则会仅展示正向的属性；若为`negative`，则会仅展示负向的属性。如果在绘制直方图时，通过设置参数`top_n`，可以展示频率最高的top n个属性。
 
 ```python
@@ -409,7 +343,7 @@ vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram"
 </div>
 
 
- **(4) 属性+情感分析**
+ **属性+情感分析**
 挖掘客户对于产品/服务针对属性的情感极性，帮助商家直观地查看客户对于产品/服务的某些属性的印象。可以通过`plot_aspect_with_sentiment`函数对属性+情感进行可视化。如果在绘制直方图时，通过设置参数`top_n`，可以展示频率最高的top n个属性。
 
 ```python
@@ -424,7 +358,7 @@ vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="histog
     <img src="https://user-images.githubusercontent.com/35913314/200213177-0342bec4-5955-4ab9-9e98-5e4ef8e1a35e.png"/>
 </div>
 
-**(5) 对给定属性进行观点分析**
+**对给定属性进行观点分析**
 通过指定属性，更加细致查看客户对于产品/服务某个属性的观点。可以帮助商家更加细粒度地分析客户对于产品/服务的某个属性的印象。下面图片示例中，展示了客户对于属性"房间"的观点。可以通过`plot_opinion_with_aspect`函数，对给定的属性进行观点分析。默认情况下，不会自动生成该类图像，需要开发者手动调用`plot_opinion_with_aspect`进行可视化分析。
 
 ```python
@@ -439,16 +373,44 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
     <img src="https://user-images.githubusercontent.com/35913314/200213998-e646c422-7ab5-48ae-9e28-d6068cdf7b8f.png"/>
 </div>
 
-<a name="2.6"></a>
 
-### **2.6 支持定制面向垂域的情感分析能力，解决同义属性聚合以及隐性观点抽取**
+
+### **4.3 更进一步: 属性聚合和隐性观点抽取能力**
+#### 4.3.1 针对固定属性进行情感分析
+#### **2.4.2 预先给定属性集**
+
+本项目支持在预先给定的属性集上进行情感分析，需要注意的是，如果预先给定了属性集，则只会在该属性集上进行情感分析，分析和抽取该属性级中各个属性的信息。在给定属性级的模式下，在进行情感倾向预测是需要设置prompt为`"情感倾向[正向,负向,未提及]"`，其中通过`未提及`来指明某些属性在当前文本评论中并未涉及。
+
+```
+
+```python
+>>> # define schema for pre-defined aspects, schema
+>>> schema = ["观点词", "情感倾向[正向,负向,未提及]"]
+>>> aspects = ["房间", "位置", "隔音"]
+>>> # set aspects for Taskflow
+>>> senta = Taskflow("sentiment_analysis", model="uie-base", schema=schema, aspects=aspects)
+>>> senta("这家点的房间很大，店家服务也很热情，就是房间隔音不好")
+```
+
+```
+
+#### 4.3.2 属性聚合分析
+
+#### 4.3.3 隐性观点抽取能力分析
+
+
+
+
+
+
+## **5. 定制情感分析，加强同义属性聚合以及隐性观点抽取能力**
 考虑到用户在对业务数据进行情感分析时，往往聚焦于某个特定场景或领域，为满足用户更高的情感分析要求，本项目除了预先设定的通用情感分析能力之外，同时支持进一步地微调，以在当前业务侧获取更好的效果。
 
 本节以酒店场景为例，讲解定制酒店垂域的情感分析能力。接下来，将从数据标注及样本构建 - 模型训练 - 模型测试 - 模型预测及效果展示等全流程展开介绍。
 
 <a name="2.6.1"></a>
 
-#### **2.6.1 打通数据标注到训练样本构建**
+### **5.1 打通数据标注到训练样本构建**
 本项目打通了标注平台 label-studio， 支持用户自己标注业务侧数据进行模型训练，同时支持将label-studio平台导出数据一键转换成模型训练样本形式，如下图所示。如果对label-studio数据标注规则尚不清楚，请参考[情感分析任务Label Studio使用指南](./label_studio.md)。
 
 在利用 label-studio 导出标注好的json数据之后，本项目提供了`label_studio.py`文件，用于将导出数据一键转换为模型训练数据。
@@ -456,7 +418,6 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
 </div>
-
 
 #### **2.6.1.1 语句级情感分类任务**
 
@@ -567,10 +528,7 @@ python label_studio.py \
 - 在模型训练阶段推荐构造一些负例以提升模型效果，在数据转换阶段内置了这一功能。可通过`negative_ratio`控制自动构造的负样本比例；负样本数量 = negative_ratio * 样本数量。
 - 对于从label_studio导出的文件，默认文件中的每条数据都是经过人工正确标注的。
 
-
-<a name="2.6.2"></a>
-
-#### **2.6.2 模型微调**
+### **5.2 模型训练**
 在生成酒店场景的训练数据后，可以通过以下命令启动模型微调。
 
 ```shell
@@ -604,9 +562,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
 * `seed`：全局随机种子，默认为 42。
 * `device`: 训练设备，可选择 'cpu'、'gpu' 其中的一种；默认为 GPU 训练。
 
-
-#### **2.6.3 模型测试**
-
+### **5.3 模型测试**
 通过运行以下命令进行对酒店场景的测试集进行评估：
 
 ```
@@ -652,7 +608,7 @@ python evaluate.py \
 * `max_seq_len`：文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 * `debug`： 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
 
-#### **2.6.4 定制预测及效果展示**
+### **5.4 预测及效果展示**
 
 paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件的路径，路径下需要包含训练好的模型权重文件model_state.pdparams。
 
@@ -842,7 +798,7 @@ paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件�
 </div>
 
 
-### **2.7 模型部署**
+## **6. 模型部署**
 
 本项目支持基于PaddleNLP SimpleServing进行服务化部署，可以在`deploy`目录下执行以下命令启动服务和请求。
 
@@ -867,4 +823,3 @@ senta2 = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base", d
 
 app.register_taskflow('senta', [senta1, senta2])
 ```
-
