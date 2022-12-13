@@ -458,7 +458,6 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        print(self._task_path)
         model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._model = model_instance
         self._model.eval()
