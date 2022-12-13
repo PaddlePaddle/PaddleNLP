@@ -132,6 +132,10 @@ class PromptTrainer(Trainer):
     def _save(self, output_dir: Optional[str] = None, state_dict: Dict[str, Any] = None):
         super(PromptTrainer, self)._save(output_dir, state_dict)
         output_dir = output_dir if output_dir is not None else self.args.output_dir
+
+        # explicitly save self.model.plm
+        # Since self.model is not a PretrainedModel, Trainer._save will only save the state_dict and miss the model config
+        self.model.plm.save_pretrained(output_dir)
         if self.template:
             self.template.save(output_dir)
         if self.verbalizer is not None:
