@@ -542,7 +542,7 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         loss = None
         if tag_labels is not None:
             crf_loss = self.crf_loss(seq_logits, lengths, tag_labels)
-            seq_loss = F.cross_entropy(seq_logits.reshape((-1, self.num_tags)), tag_labels.reslape((-1)))
+            seq_loss = F.cross_entropy(seq_logits.reshape((-1, self.num_tag)), tag_labels.reshape((-1,)))
             loss = crf_loss + seq_loss
         else:
             _, seq_logits = self.viterbi_decoder(seq_logits, lengths)
