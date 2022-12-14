@@ -50,8 +50,15 @@ def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
 
 
 def test_pretrain():
-    init_argv("./configs/pretrain.json")
+    init_argv("pretrain", config_file="./configs/test.yaml")
     from run_pretrain import do_train
+
+    do_train()
+
+
+def test_run_eval():
+    init_argv("eval", config_file="./configs/test.yaml")
+    from run_glue import do_train
 
     do_train()
 
@@ -70,4 +77,4 @@ def test_msra_ner():
     do_train()
 
 
-test_run_glue()
+test_pretrain()
