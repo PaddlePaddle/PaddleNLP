@@ -39,6 +39,9 @@ class AutoTrainerBase(metaclass=ABCMeta):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
+    training_path = "training"
+    export_path = "exported_model"
+
     def __init__(
         self,
         metric_for_best_model: str,

@@ -82,7 +82,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _default_training_argument(self) -> TrainingArguments:
         return TrainingArguments(
-            output_dir="training",
+            output_dir=self.training_path,
             num_train_epochs=1,
             learning_rate=1e-5,
             per_device_train_batch_size=2,
@@ -99,7 +99,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _default_prompt_tuning_arguments(self) -> PromptTuningArguments:
         return PromptTuningArguments(
-            output_dir="training",
+            output_dir=self.training_path,
             num_train_epochs=1,
             learning_rate=1e-5,
             per_device_train_batch_size=2,
@@ -219,7 +219,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     callbacks=callbacks,
                 )
                 trainer.train()
-                trainer.save_model("export")
+                trainer.save_model(self.export_path)
+                if os.path.exists(self.training_path):
+                    logger.info("Removing training checkpoints to conserve disk space")
+                    shutil.rmtree(self.training_path)
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             elif config["trainer_type"] == "PromptTrainer":
@@ -258,7 +261,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     compute_metrics=self._compute_metrics,
                 )
                 trainer.train()
-                trainer.save_model("export")
+                trainer.save_model(self.export_path)
+                if os.path.exists(self.training_path):
+                    logger.info("Removing training checkpoints to conserve disk space")
+                    shutil.rmtree(self.training_path)
                 eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             else:
@@ -328,7 +334,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
-        exported_model_path = os.path.join(model_result.log_dir, "export")
+        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
         shutil.copytree(exported_model_path, export_path)
         logger.info(f"Exported to {export_path}")
 
@@ -338,7 +344,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if model_config["trainer_type"] == "PromptTrainer":
             raise NotImplementedError("'Taskflow' inference does not yet support models trained with PromptTrainer.")
         else:
-            exported_model_path = os.path.join(model_result.log_dir, "export")
+            exported_model_path = os.path.join(model_result.log_dir, self.export_path)
             return Taskflow(
                 "text_classification",
                 task_path=exported_model_path,
