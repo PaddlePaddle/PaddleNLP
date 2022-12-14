@@ -145,10 +145,9 @@ class VisualSentiment(object):
         """
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         if image_type == "wordcloud":
             self._plot_wordcloud(content_freq, save_path)
@@ -180,14 +179,12 @@ class VisualSentiment(object):
         """
 
         if not aspect_freq:
-            print("aspect_freq is empty, please check it.")
-            exit(0)
+            raise ValueError("aspect_freq is empty, please check it.")
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         if image_type == "wordcloud":
             self._plot_content_with_frequency(aspect_freq,
@@ -226,14 +223,12 @@ class VisualSentiment(object):
         """
 
         if not opinion_freq:
-            print("opinion_freq is empty, please check it.")
-            exit(0)
+            raise ValueError("opinion_freq is empty, please check it.")
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         if image_type == "wordcloud":
             self._plot_content_with_frequency(opinion_freq,
@@ -275,20 +270,17 @@ class VisualSentiment(object):
         """
 
         if not aspect_opinion:
-            print("aspect_opinion is empty, please check it.")
-            exit(0)
+            raise ValueError("aspect_opinion is empty, please check it.")
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         if sentiment not in ["all", "positive", "negative"]:
-            print(
+            raise ValueError(
                 "Only 'all', 'positive' and 'negative' are received for sentiment, that is, you should set be in [all, positive, negative]."
             )
-            exit(0)
 
         if sentiment == "all":
             new_aspect_opinion = {}
@@ -340,14 +332,12 @@ class VisualSentiment(object):
         """
 
         if not aspect_sentiment:
-            print("aspect_sentiment is empty, please check it.")
-            exit(0)
+            raise ValueError("aspect_sentiment is empty, please check it.")
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         if image_type == "wordcloud":
             new_aspect_opinion = {}
@@ -359,10 +349,9 @@ class VisualSentiment(object):
             self._plot_wordcloud(new_aspect_opinion, save_path)
         else:
             if top_n != 0 and descend_aspects is None:
-                print(
+                raise ValueError(
                     "You should input the param descend_aspects when top_n != 0."
                 )
-                exit(0)
 
             if top_n != 0:
                 keep_aspects = set(descend_aspects[:top_n])
@@ -420,18 +409,15 @@ class VisualSentiment(object):
         """
 
         if not aspect_opinion:
-            print("aspect_opinion is empty, please check it.")
-            exit(0)
+            raise ValueError("aspect_opinion is empty, please check it.")
 
         if aspect not in aspect:
-            print("{} not in aspect_opinion, please check it.")
-            exit(0)
+            raise ValueError("{} not in aspect_opinion, please check it.")
 
         if image_type not in ["wordcloud", "histogram"]:
-            print(
+            raise ValueError(
                 "Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram]."
             )
-            exit(0)
 
         opinions = aspect_opinion[aspect]
         opinion_items = sorted(opinions.items(),
