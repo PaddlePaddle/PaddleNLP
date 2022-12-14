@@ -73,9 +73,7 @@ def main():
             )
 
     raw_datasets = load_dataset(data_args.dataset)
-    print("This flag", raw_datasets["train"])
     label_list = getattr(raw_datasets["train"], "label_list", None)
-    print("label list:{}".format(label_list))
     data_args.label_list = label_list
     data_args.ignore_label = -100
     data_args.no_entity_id = len(data_args.label_list) - 1
@@ -214,8 +212,7 @@ def main():
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
             paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
         ]
-        if model_args.export_model_dir is None:
-            model_args.export_model_dir = os.path.join(training_args.output_dir, "export")
+        model_args.export_model_dir = os.path.join(training_args.output_dir, data_args.dataset, "export")
         paddlenlp.transformers.export_model(
             model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir
         )
