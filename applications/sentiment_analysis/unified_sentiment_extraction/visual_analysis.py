@@ -532,7 +532,7 @@ if __name__ == "__main__":
     if not args.font_path:
         args.font_path = None
 
-    # you should set sentiment_name="情感倾向[正向,负向]" if you do not use the analysis result of given aspects.
+    
     sr = SentimentResult(args.file_path, sentiment_name=args.sentiment_name)
     vs = VisualSentiment(font_path=args.font_path)
 
