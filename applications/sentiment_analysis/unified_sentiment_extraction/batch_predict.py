@@ -33,7 +33,10 @@ def main(args):
 
     # define Taskflow for sentiment analysis
     schema = eval(args.schema)
-    senta = Taskflow("sentiment_analysis", model=args.model, schema=schema, aspects=args.aspects, batch_size=args.batch_size, max_seq_len=args.max_seq_len)
+    if args.load_from_dir:
+        senta = Taskflow("sentiment_analysis", model=args.model, schema=schema, aspects=args.aspects, batch_size=args.batch_size, max_seq_len=args.max_seq_len, task_path=args.load_from_dir)
+    else:
+        senta = Taskflow("sentiment_analysis", model=args.model, schema=schema, aspects=args.aspects, batch_size=args.batch_size, max_seq_len=args.max_seq_len)
     
     # predict with Taskflow
     results = senta(examples)
@@ -54,6 +57,7 @@ if __name__ == "__main__":
     parser.add_argument("--file_path", type=str, default="./data/test_hotel.txt", help="The file path that you want to perform sentiment analysis on.")
     parser.add_argument("--save_path", type=str, default="./data/sentiment_analysis.json", help="The saving path for the results of sentiment analysis.")
     parser.add_argument("--model", choices=['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano'], default="uie-senta-base", help="The model name that you wanna use for sentiment analysis.")
+    parser.add_argument("--load_from_dir", default=None, type=str, help="The directory path for the finetuned model to predict, if set None, it will download model according to model_name.")
     parser.add_argument("--schema", default="[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]", type=str, help="The schema for UIE to extract infomation.")
     parser.add_argument("--aspects", default=None, type=str, nargs="+", help="A list of pre-given aspects, that is to say, Pipeline only perform sentiment analysis on these pre-given aspects if you input it.")
     parser.add_argument("--batch_size", type=int, default=4, help="Batch size per GPU/CPU for training.")

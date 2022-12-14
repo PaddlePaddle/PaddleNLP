@@ -332,7 +332,7 @@ python batch_predict.py \
     --file_path "./data/test_hotel.txt" \
     --save_path "./data/sentiment_analysis.json" \
     --model "uie-senta-base" \
-    --schema "[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]" \
+    --schema "[{'评价维度': ['观点词']}]" \
     --batch_size 4 \
     --max_seq_len 512
 ```
@@ -341,6 +341,7 @@ python batch_predict.py \
 - ``file_path``: 用于进行情感分析的文件路径。
 - ``save_path``: 情感分析结果的保存路径。
 - ``model``: 进行情感分析的模型名称，可以在这些模型中进行选择：['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano']。
+- ``load_from_dir``: 指定需要加载的离线模型目录，比如训练后保存的模型，如果不进行指定，则默认根据 `model` 指定的模型名称自动下载相应模型。
 - ``schema``: 基于UIE模型进行信息抽取的Schema描述。
 - ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``batch_size``: 预测过程中的批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
