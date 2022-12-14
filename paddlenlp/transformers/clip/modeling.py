@@ -665,7 +665,7 @@ class TextTransformer(nn.Layer):
             last_hidden_state = encoder_outputs[0]
 
         last_hidden_state = self.ln_final(last_hidden_state)
-        pooled_output = last_hidden_state.gather_nd(paddle.stack([paddle.arange(bs), input_ids.argmax(-1)], axis=-1))
+        pooled_output = last_hidden_state.gather_nd(paddle.stack([paddle.arange(bs, dtype='int32'), input_ids.argmax(-1,dtype='int32')], axis=-1))
 
         if isinstance(encoder_outputs, type(embedding_output)):
             return (last_hidden_state, pooled_output)
