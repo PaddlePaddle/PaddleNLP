@@ -88,7 +88,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
                 raise Exception("Verbalizer is required when model uses the MaskedLM head")
         elif isinstance(model_outputs, SequenceClassifierOutput):
             logits = model_outputs.logits
-            num_labels = self.plm.num_classes if self.plm.num_classes is not None else self.plm.num_labels
+            num_labels = self.plm.num_labels if self.plm.num_labels is not None else self.plm.num_labels
         else:
             raise Exception(f"Model type not support yet: {type(model_outputs)}")
 
