@@ -34,7 +34,7 @@ DEFINE_string(model_dir, "", "Directory of the inference model.");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
 DEFINE_string(device, "cpu",
               "Type of inference device, support 'cpu' or 'gpu'.");
-DEFINE_string(backend, "onnx_runtime",
+DEFINE_string(backend, "paddle",
               "The inference runtime backend, support: ['onnx_runtime', "
               "'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']");
 DEFINE_int32(batch_size, 1, "The batch size of data.");

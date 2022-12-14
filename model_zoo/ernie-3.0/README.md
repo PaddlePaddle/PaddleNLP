@@ -1593,7 +1593,9 @@ python export_model.py --params_path ./best_clue_model/ --output_path ./tnews --
 ### FastDeploy 部署
 ⚡️FastDeploy是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
 
-目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，在GPU端支持`PaddleInference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU端支持`PaddleInference`、`ONNX Runtime`以及`OpenVINO`后端，可以满足开发者不同的部署需求。详情请参考：[FastDeploy 部署指南](./fastdeploy/README.md)
+目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，在GPU端支持`PaddleInference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU端支持`PaddleInference`、`ONNX Runtime`以及`OpenVINO`后端，可以满足开发者不同的部署需求。
+
+详情请参考：[FastDeploy 部署指南](./fastdeploy/README.md)
 
 <a name="Python部署"></a>
 
