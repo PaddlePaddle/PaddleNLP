@@ -275,17 +275,23 @@ class Task(metaclass=abc.ABCMeta):
 
         # When the user-provided model path is already a static model, skip to_static conversion
         if self.is_static_model:
-            inference_model_path = self._task_path
+            self.inference_model_path = self._task_path
         else:
-            inference_model_path = os.path.join(self._task_path, "static", "inference")
-        if not os.path.exists(inference_model_path + ".pdiparams") or self._param_updated:
+            # Since 'self._task_path' is used to load the HF Hub path when 'from_hf_hub=True', we construct the static model path in a different way
+            _base_path = (
+                self._task_path
+                if not self.from_hf_hub
+                else os.path.join(self._home_path, "taskflow", self.task, self.model)
+            )
+            self.inference_model_path = os.path.join(_base_path, "static", "inference")
+        if not os.path.exists(self.inference_model_path + ".pdiparams") or self._param_updated:
             with dygraph_mode_guard():
                 self._construct_model(self.model)
                 self._construct_input_spec()
                 self._convert_dygraph_to_static()
 
-        self._static_model_file = inference_model_path + ".pdmodel"
-        self._static_params_file = inference_model_path + ".pdiparams"
+        self._static_model_file = self.inference_model_path + ".pdmodel"
+        self._static_params_file = self.inference_model_path + ".pdiparams"
         if self._predictor_type == "paddle-inference":
             self._config = paddle.inference.Config(self._static_model_file, self._static_params_file)
             self._prepare_static_mode()
@@ -304,9 +310,9 @@ class Task(metaclass=abc.ABCMeta):
         ), "The input spec must be created before converting the dygraph model to static model."
         logger.info("Converting to the inference model cost a little time.")
         static_model = paddle.jit.to_static(self._model, input_spec=self._input_spec)
-        save_path = os.path.join(self._task_path, "static", "inference")
-        paddle.jit.save(static_model, save_path)
-        logger.info("The inference model save in the path:{}".format(save_path))
+
+        paddle.jit.save(static_model, self.inference_model_path)
+        logger.info("The inference model save in the path:{}".format(self.inference_model_path))
 
     def _check_input_text(self, inputs):
         """

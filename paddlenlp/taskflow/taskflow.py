@@ -355,7 +355,11 @@ TASKS = {
         "models": {
             "multi_class": {
                 "task_class": TextClassificationTask,
-                "task_flag": "text_classification-text_classification",
+                "task_flag": "text_classification-multi_class",
+            },
+            "multi_label": {
+                "task_class": TextClassificationTask,
+                "task_flag": "text_classification-multi_label",
             },
         },
         "default": {"model": "multi_class"},
