@@ -22,6 +22,7 @@ import sentencepiece as spm
 import six
 
 from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.utils.log import logger
 
 from .. import BasicTokenizer, PretrainedTokenizer, WordpieceTokenizer
 
@@ -76,6 +77,12 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "rocketqav2-en-marco-cross-encoder": 512,
     "rocketqav2-en-marco-query-encoder": 512,
     "rocketqav2-en-marco-para-encoder": 512,
+    "uie-base": 512,
+    "uie-medium": 512,
+    "uie-mini": 512,
+    "uie-micro": 512,
+    "uie-nano": 512,
+    "uie-base-en": 512,
     "ernie-search-base-dual-encoder-marco-en": 512,
     "ernie-search-large-cross-encoder-marco-en": 512,
     "ernie-3.0-tiny-base-v2": 2048,
@@ -187,6 +194,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "rocketqav2-en-marco-cross-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "rocketqav2-en-marco-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "rocketqav2-en-marco-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "uie-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "uie-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "uie-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "uie-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "uie-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",        
             "ernie-search-base-dual-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-large-cross-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
             "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2_vocab.txt",
@@ -246,6 +259,12 @@ class ErnieTokenizer(PretrainedTokenizer):
         "rocketqav2-en-marco-cross-encoder": {"do_lower_case": True},
         "rocketqav2-en-marco-query-encoder": {"do_lower_case": True},
         "rocketqav2-en-marco-para-encoder": {"do_lower_case": True},
+        "uie-base": {"do_lower_case": True},
+        "uie-medium": {"do_lower_case": True},
+        "uie-mini": {"do_lower_case": True},
+        "uie-micro": {"do_lower_case": True},
+        "uie-nano": {"do_lower_case": True},
+        "uie-base-en": {"do_lower_case": True},        
         "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
         "ernie-search-large-cross-encoder-marco-en": {"do_lower_case": True},
         "ernie-3.0-tiny-base-v2": {"do_lower_case": True},
@@ -308,7 +327,7 @@ class ErnieTokenizer(PretrainedTokenizer):
                 if new_char not in vocab_set:
                     extend_list.append(new_char)
         if len(self.vocab) + len(extend_list) > 2**16:
-            warnings.warn("The vocab size is larger than uint16")
+            logger.warnings("The vocab size is larger than uint16")
         new_tokens = [str(tok) for tok in extend_list]
 
         tokens_to_add = []

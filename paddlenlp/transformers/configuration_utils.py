@@ -843,6 +843,9 @@ class PretrainedConfig:
         # Those arguments may be passed along for our internal telemetry.
         # We remove them so they don't appear in `return_unused_kwargs`.
 
+        # convert local config to legacy config
+        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
+
         config = cls(**config_dict)
 
         if hasattr(config, "pruned_heads"):
