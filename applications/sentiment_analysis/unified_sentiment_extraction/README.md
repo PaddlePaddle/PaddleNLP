@@ -337,7 +337,7 @@ python batch_predict.py \
     --max_seq_len 512
 ```
 
-参数说明：  
+参数说明：
 - ``file_path``: 用于进行情感分析的文件路径。
 - ``save_path``: 情感分析结果的保存路径。
 - ``model``: 进行情感分析的模型名称，可以在这些模型中进行选择：['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano']。
@@ -369,7 +369,7 @@ schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]'
 ```
 python visual_analysis.py \
     --file_path "./outputs/test_hotel.json" \
-    --save_dir "./outputs/images" 
+    --save_dir "./outputs/images"
 ```
 
 参数说明：
@@ -533,7 +533,7 @@ python label_studio.py \
     --seed 1000
 ```
 
-参数介绍：  
+参数介绍：
 - ``label_studio_file``: 从label studio导出的数据标注文件。
 - ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
@@ -638,7 +638,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
   --batch_size 16 \
   --max_seq_len 512 \
   --num_epochs 10 \
-  --model uie-base \
+  --model uie-senta-base \
   --seed 1000 \
   --logging_steps 10 \
   --valid_steps 100 \
@@ -654,7 +654,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
 * `batch_size`：训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
 * `max_seq_len`：模型支持处理的最大序列长度，默认为512。
 * `num_epochs`：模型训练的轮次，可以视任务情况进行调整，默认为10。
-* `model`：训练使用的预训练模型。可选择的有"uie-base"、 "uie-medium", "uie-mini", "uie-micro", "uie-nano", "uie-m-base", "uie-m-large"。
+* `model`：训练使用的预训练模型。可选择的有`uie-senta-base`, `uie-senta-medium`, `uie-senta-mini`, `uie-senta-micro`, `uie-senta-nano`，默认为`uie-senta-base`。
 * `logging_steps`: 训练过程中日志打印的间隔 steps 数，默认10。
 * `valid_steps`: 训练过程中模型评估的间隔 steps 数，默认100。
 * `seed`：全局随机种子，默认为 42。

@@ -16,7 +16,6 @@
 import os
 import pickle
 import shutil
-import warnings
 
 import sentencepiece as spm
 import six
@@ -83,6 +82,11 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "uie-micro": 512,
     "uie-nano": 512,
     "uie-base-en": 512,
+    "uie-senta-base": 512,
+    "uie-senta-medium": 512,
+    "uie-senta-mini": 512,
+    "uie-senta-micro": 512,
+    "uie-senta-nano": 512,
     "ernie-search-base-dual-encoder-marco-en": 512,
     "ernie-search-large-cross-encoder-marco-en": 512,
     "ernie-3.0-tiny-base-v2": 2048,
@@ -199,7 +203,12 @@ class ErnieTokenizer(PretrainedTokenizer):
             "uie-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
             "uie-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "uie-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",        
+            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
+            "uie-senta-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
+            "uie-senta-medium": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
+            "uie-senta-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "uie-senta-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "uie-senta-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
             "ernie-search-base-dual-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-large-cross-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
             "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2_vocab.txt",
@@ -264,7 +273,12 @@ class ErnieTokenizer(PretrainedTokenizer):
         "uie-mini": {"do_lower_case": True},
         "uie-micro": {"do_lower_case": True},
         "uie-nano": {"do_lower_case": True},
-        "uie-base-en": {"do_lower_case": True},        
+        "uie-base-en": {"do_lower_case": True},
+        "uie-senta-base": {"do_lower_case": True},
+        "uie-senta-medium": {"do_lower_case": True},
+        "uie-senta-mini": {"do_lower_case": True},
+        "uie-senta-micro": {"do_lower_case": True},
+        "uie-senta-nano": {"do_lower_case": True},
         "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
         "ernie-search-large-cross-encoder-marco-en": {"do_lower_case": True},
         "ernie-3.0-tiny-base-v2": {"do_lower_case": True},
