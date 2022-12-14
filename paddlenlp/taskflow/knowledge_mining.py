@@ -410,6 +410,7 @@ class WordTagTask(Task):
                     continue
             else:
                 target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
+            high_priority = False
             for target_type_raw in target_type_can:
                 target_type_ = target_type_raw.split("|")
                 target_src = None
@@ -436,7 +437,11 @@ class WordTagTask(Task):
                     d].termtype == target_type or target_type in self._termtree[
                         d].subtype, self._termtree[d].term == item["item"]),
                              reverse=True)
-                item["termid"] = term_id[0]
+                if self._termtree[term_id[0]] == item["item"]:
+                    high_priority = True
+                    item["termid"] = term_id[0]
+                if high_priority:
+                    break
 
     def _construct_input_spec(self):
         """
