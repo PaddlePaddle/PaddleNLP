@@ -422,6 +422,8 @@ class PretrainedModel(Layer, GenerationMixin):
             for file_id, file_name in cls.resource_files_names.items():
                 full_file_name = os.path.join(pretrained_model_name_or_path, file_name)
                 resource_files[file_id] = full_file_name
+                if file_id == "model_state" and not os.path.isfile(full_file_name):
+                    resource_files[file_id] = None
             resource_files["model_config_file"] = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
         else:
             # Assuming from community-contributed pretrained models
@@ -545,7 +547,7 @@ class PretrainedModel(Layer, GenerationMixin):
             model.save_model_config(default_root)
 
         # Maybe need more ways to load resources.
-        weight_path = resolved_resource_files["model_state"]
+        weight_path = resolved_resource_files.get("model_state", None)
         if weight_path is None:
             logger.warning(
                 "No model weight found for %s, return with random initialization !!!" % pretrained_model_name_or_path
