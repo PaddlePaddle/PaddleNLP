@@ -288,9 +288,11 @@ class PromptTrainer(Trainer):
 
         return loss
 
-    def export_model(self, export_path, input_spec, export_type="paddle"):
+    def export_model(self, export_path, input_spec=None, export_type="paddle"):
         os.makedirs(export_path, exist_ok=True)
         self.template.save(export_path)
         if self.verbalizer is not None:
             self.verbalizer.save(export_path)
+        if input_spec is None:
+            input_spec = self.model.get_input_spec()
         export_model(self.model, input_spec, export_path, export_type)
