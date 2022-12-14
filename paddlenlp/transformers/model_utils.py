@@ -244,7 +244,7 @@ class PretrainedModel(Layer, GenerationMixin):
         # extract config from kwargs
         if "config" not in kwargs:
             raise ValueError(
-                "PretarinedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
+                "PretrainedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
             )
 
         config = kwargs["config"]

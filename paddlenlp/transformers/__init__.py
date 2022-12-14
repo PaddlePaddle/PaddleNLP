@@ -63,6 +63,7 @@ from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
+from .ernie.configuration import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .ernie_ctm.modeling import *
