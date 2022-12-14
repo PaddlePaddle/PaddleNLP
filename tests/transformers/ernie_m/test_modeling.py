@@ -396,6 +396,9 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
 
 
 class ErnieMModelIntegrationTest(unittest.TestCase):
+    base_model_class = ErnieMPretrainedModel
+    hf_remote_test_model_path = "PaddleCI/tiny-random-ernie-m"
+
     @slow
     def test_inference_no_attention(self):
         model = ErnieMModel.from_pretrained("ernie-m-base")
