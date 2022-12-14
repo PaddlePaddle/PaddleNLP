@@ -13,28 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
 from .. import PretrainedModel, register_base_model
-from ..stable_diffusion_utils import (
-    StableDiffusionMixin,
-    AutoencoderKL,
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    DDIMScheduler,
-    UNet2DConditionModel,
-)
 from ..guided_diffusion_utils import (
     DiscoDiffusionMixin,
     create_gaussian_diffusion,
-    create_unet_model,
     create_secondary_model,
+    create_unet_model,
+)
+from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
+from ..stable_diffusion_utils import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    StableDiffusionMixin,
+    UNet2DConditionModel,
 )
 
 __all__ = [
@@ -665,7 +665,9 @@ class TextTransformer(nn.Layer):
             last_hidden_state = encoder_outputs[0]
 
         last_hidden_state = self.ln_final(last_hidden_state)
-        pooled_output = last_hidden_state.gather_nd(paddle.stack([paddle.arange(bs, dtype='int32'), input_ids.argmax(-1,dtype='int32')], axis=-1))
+        pooled_output = last_hidden_state.gather_nd(
+            paddle.stack([paddle.arange(bs, dtype="int32"), input_ids.argmax(-1, dtype="int32")], axis=-1)
+        )
 
         if isinstance(encoder_outputs, type(embedding_output)):
             return (last_hidden_state, pooled_output)
