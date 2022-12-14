@@ -14,13 +14,13 @@
 ```bash
 mkdir build
 cd build
-# 下载FastDeploy预编译库，用户可在上文提到的`FastDeploy预编译库`中自行选择合适的版本使用
+# 下载FastDeploy预编译库，用户可在上文提到的`FastDeploy SDK安装文档`中自行选择合适的版本使用
 wget https://bj.bcebos.com/fastdeploy/release/cpp/fastdeploy-linux-x64-x.x.x.tgz
 tar xvf fastdeploy-linux-x64-x.x.x.tgz
 cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
-# 下载AFQMC数据集的微调后的ERNIE 3.0模型以及词表
+# 下载TNEWS数据集的微调后的ERNIE 3.0模型以及词表
 wget https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-tnews.tgz
 tar xvfz ernie-3.0-medium-zh-tnews.tgz
 

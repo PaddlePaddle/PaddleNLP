@@ -81,10 +81,10 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, FLAGS_max_length},
+    option->SetTrtInputShape("input_ids", {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
-    option->SetTrtInputShape("token_type_ids", {1, FLAGS_max_length},
+    option->SetTrtInputShape("token_type_ids", {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
@@ -154,11 +154,12 @@ struct ErnieForTokenClassificationPredictor {
   ErnieFastTokenizer tokenizer_;
   std::vector<std::string> label_list_;
 
-  ErnieForTokenClassificationPredictor(const fastdeploy::RuntimeOption& option,
-                                       const ErnieFastTokenizer& tokenizer)
-      : tokenizer_(tokenizer) {
+  ErnieForTokenClassificationPredictor(
+      const fastdeploy::RuntimeOption& option,
+      const ErnieFastTokenizer& tokenizer,
+      const std::vector<std::string>& label_list)
+      : tokenizer_(tokenizer), label_list_(label_list) {
     runtime_.Init(option);
-    label_list_ = {"O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"};
   }
 
   bool Preprocess(const std::vector<std::string>& texts,
@@ -224,6 +225,7 @@ struct ErnieForTokenClassificationPredictor {
         const std::string& curr_label = label_list_[label_id];
         if ((curr_label == "O" || curr_label.find("B-") != std::string::npos) &&
             start >= 0) {
+          // Convert the unicode character offset to byte offset.
           convertor.convert({start, j - 1}, &curr_offset);
           items.emplace_back(typename TokenClsResult::TokenResult{
               label_name,
@@ -284,12 +286,15 @@ int main(int argc, char* argv[]) {
       return -1;
     }
   }
+  uint32_t max_length = FLAGS_max_length;
   ErnieFastTokenizer tokenizer(vocab_path);
   tokenizer.EnableTruncMethod(
-      FLAGS_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      max_length, 0, fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
 
-  ErnieForTokenClassificationPredictor predictor(option, tokenizer);
+  std::vector<std::string> label_list = {"O",     "B-PER", "I-PER", "B-ORG",
+                                         "I-ORG", "B-LOC", "I-LOC"};
+  ErnieForTokenClassificationPredictor predictor(option, tokenizer, label_list);
   std::vector<TokenClsResult> token_cls_results;
   std::vector<std::string> texts_ds = {
       "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",

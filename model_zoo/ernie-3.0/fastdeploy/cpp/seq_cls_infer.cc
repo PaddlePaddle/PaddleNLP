@@ -81,10 +81,10 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, FLAGS_max_length},
+    option->SetTrtInputShape("input_ids", {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
-    option->SetTrtInputShape("token_type_ids", {1, FLAGS_max_length},
+    option->SetTrtInputShape("token_type_ids", {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
