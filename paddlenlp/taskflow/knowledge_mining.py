@@ -437,7 +437,7 @@ class WordTagTask(Task):
                     d].termtype == target_type or target_type in self._termtree[
                         d].subtype, self._termtree[d].term == item["item"]),
                              reverse=True)
-                if self._termtree[term_id[0]] == item["item"]:
+                if self._termtree[term_id[0]].term == item["item"]:
                     high_priority = True
                     item["termid"] = term_id[0]
                 if high_priority:
