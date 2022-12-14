@@ -137,8 +137,6 @@ class Convertor(object):
         # List[List[str]]
         # List of entity prompt for each example
         entity_prompt_list = []
-        # List of relation prompt for each example
-        # relation_prompt_list = []
         # Golden subject label for each example
         subject_golden_list = []
         # List of inverse relation for each example
@@ -242,7 +240,6 @@ class Convertor(object):
                     if synonyms and implicit_subject in synonyms:
                         subject_golden.extend(synonyms[implicit_subject])
                 relation_example = []
-                # relation_prompt = []
                 relation_example_map = {}
                 inverse_relation = []
                 predicates = []
@@ -296,13 +293,11 @@ class Convertor(object):
 
                     if predicate not in predicate_set:
                         predicate_set.append(predicate)
-                    # relation_prompt.append(prompt)
 
                 for v in relation_example_map.values():
                     relation_example.append(v)
 
                 relation_examples.append(relation_example)
-                # relation_prompt_list.append(relation_prompt)
                 subject_golden_list.append(subject_golden)
                 inverse_relation_list.append(inverse_relation)
                 predicate_list.append(predicates)
