@@ -125,9 +125,8 @@ def main():
 
     # Export static model.
     if training_args.do_export:
-        input_spec = prompt_model.get_input_spec()
         export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
+        trainer.export_model(export_path, export_type=model_args.export_type)
 
 
 if __name__ == "__main__":
