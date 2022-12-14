@@ -20,6 +20,7 @@ import re
 
 import numpy as np
 import paddle
+from huggingface_hub import hf_hub_download
 
 from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
@@ -392,9 +393,17 @@ class UIETask(Task):
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
-        self._check_task_files()
-        with open(os.path.join(self._task_path, "model_config.json")) as f:
-            self._init_class = json.load(f)["init_class"]
+
+        # TODO: temporary solution to support HF Hub due to lack of AutoModel
+        # change this logic to use AutoConfig when available
+        if self.from_hf_hub:
+            config_file_path = hf_hub_download(repo_id=self._task_path, filename="model_config.json")
+            with open(config_file_path) as f:
+                self._init_class = json.load(f)["init_class"]
+        else:
+            self._check_task_files()
+            with open(os.path.join(self._task_path, "model_config.json")) as f:
+                self._init_class = json.load(f)["init_class"]
 
         if self._init_class not in ["UIEX", "UIEM"]:
             if "sentencepiece_model_file" in self.resource_files_names.keys():
@@ -449,7 +458,7 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path)
+        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._model = model_instance
         self._model.eval()
 
@@ -457,7 +466,9 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, use_fast=self.use_fast)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._task_path, use_fast=self.use_fast, from_hf_hub=self.from_hf_hub
+        )
 
     def _preprocess(self, inputs):
         """
