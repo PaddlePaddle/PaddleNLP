@@ -34,11 +34,9 @@ def parse_args():
 
 def do_predict(args):
     paddle.set_device(args.device)
-    wordtag = Taskflow("knowledge_mining",
-                       model="wordtag",
-                       batch_size=args.batch_size,
-                       max_seq_length=args.max_seq_len,
-                       linking=True)
+    wordtag = Taskflow(
+        "knowledge_mining", model="wordtag", batch_size=args.batch_size, max_seq_length=args.max_seq_len, linking=True
+    )
     txts = ["《孤女》是2010年九州出版社出版的小说，作者是余兼羽。", "热梅茶是一道以梅子为主要原料制作的茶饮"]
     res = wordtag(txts)
     print(res)
@@ -46,10 +44,10 @@ def do_predict(args):
 
 def print_arguments(args):
     """print arguments"""
-    print('-----------  Configuration Arguments -----------')
+    print("-----------  Configuration Arguments -----------")
     for arg, value in sorted(vars(args).items()):
-        print('%s: %s' % (arg, value))
-    print('------------------------------------------------')
+        print("%s: %s" % (arg, value))
+    print("------------------------------------------------")
 
 
 if __name__ == "__main__":

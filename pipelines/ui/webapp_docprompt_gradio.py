@@ -1,4 +1,4 @@
-#-*- coding: UTF-8 -*-
+# -*- coding: UTF-8 -*-
 # Copyright 2022 The Impira Team and the HuggingFace Team.
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
@@ -92,7 +92,7 @@ def process_upload(file):
 
 
 def np2base64(image_np):
-    image = cv2.imencode('.jpg', image_np)[1]
+    image = cv2.imencode(".jpg", image_np)[1]
     base64_str = str(base64.b64encode(image))[2:-1]
     return base64_str
 
@@ -116,17 +116,13 @@ def process_prompt(prompt, document):
 
     url = f"http://{args.serving_name}:{args.serving_port}/query_documents"
     base64_str = get_base64(document)
-    r = requests.post(url,
-                      json={"meta": {
-                          "doc": base64_str,
-                          "prompt": [prompt]
-                      }})
+    r = requests.post(url, json={"meta": {"doc": base64_str, "prompt": [prompt]}})
     response = r.json()
-    predictions = response['results'][0]
+    predictions = response["results"][0]
 
     pages = [Image.open(BytesIO(base64.b64decode(base64_str)))]
 
-    text_value = predictions[0]['result'][0]['value']
+    text_value = predictions[0]["result"][0]["value"]
 
     return (
         gr.update(visible=True, value=pages),
@@ -139,9 +135,8 @@ def process_prompt(prompt, document):
 
 
 def read_content(file_path: str) -> str:
-    """read the content of target file
-    """
-    with open(file_path, 'r', encoding='utf-8') as f:
+    """read the content of target file"""
+    with open(file_path, "r", encoding="utf-8") as f:
         content = f.read()
 
     return content
@@ -239,10 +234,7 @@ with gr.Blocks(css=CSS) as demo:
         with gr.Column():
             with gr.Row():
                 gr.Markdown("## 1. Select a file", elem_id="select-a-file")
-                img_clear_button = gr.Button("Clear",
-                                             variant="secondary",
-                                             elem_id="file-clear",
-                                             visible=False)
+                img_clear_button = gr.Button("Clear", variant="secondary", elem_id="file-clear", visible=False)
             image = gr.Gallery(visible=False)
             with gr.Row(equal_height=True):
                 with gr.Column():
@@ -263,15 +255,12 @@ with gr.Blocks(css=CSS) as demo:
                         label="Error",
                     )
             gr.Markdown("— or —")
-            upload = gr.File(label=None,
-                             interactive=True,
-                             elem_id="short-upload-box")
+            upload = gr.File(label=None, interactive=True, elem_id="short-upload-box")
 
         with gr.Column() as col:
             gr.Markdown("## 2. Make a request")
             prompt = gr.Textbox(
-                label=
-                "Prompt (No restrictions on the setting of prompt. You can type any prompt.)",
+                label="Prompt (No restrictions on the setting of prompt. You can type any prompt.)",
                 placeholder="e.g. 校验码是多少？",
                 lines=1,
                 max_lines=1,
@@ -279,13 +268,9 @@ with gr.Blocks(css=CSS) as demo:
 
             with gr.Row():
                 clear_button = gr.Button("Clear", variant="secondary")
-                submit_button = gr.Button("Submit",
-                                          variant="primary",
-                                          elem_id="submit-button")
+                submit_button = gr.Button("Submit", variant="primary", elem_id="submit-button")
             with gr.Column():
-                output_text = gr.Textbox(label="Top Answer",
-                                         visible=False,
-                                         elem_id="answer")
+                output_text = gr.Textbox(label="Top Answer", visible=False, elem_id="answer")
                 output = gr.JSON(label="Output", visible=False)
 
     for cb in [img_clear_button, clear_button]:
@@ -320,16 +305,12 @@ with gr.Blocks(css=CSS) as demo:
     upload.change(
         fn=process_upload,
         inputs=[upload],
-        outputs=[
-            document, image, img_clear_button, output, output_text, url_error
-        ],
+        outputs=[document, image, img_clear_button, output, output_text, url_error],
     )
     submit.click(
         fn=process_path,
         inputs=[url],
-        outputs=[
-            document, image, img_clear_button, output, output_text, url_error
-        ],
+        outputs=[document, image, img_clear_button, output, output_text, url_error],
     )
 
     prompt.submit(

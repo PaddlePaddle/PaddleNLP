@@ -15,7 +15,7 @@
 
 from ..bert.tokenizer import BertTokenizer
 
-__all__ = ['TinyBertTokenizer']
+__all__ = ["TinyBertTokenizer"]
 
 
 class TinyBertTokenizer(BertTokenizer):
@@ -27,39 +27,21 @@ class TinyBertTokenizer(BertTokenizer):
 
     pretrained_resource_files_map = {
         "vocab_file": {
-            "tinybert-4l-312d":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-vocab.txt",
-            "tinybert-6l-768d":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-vocab.txt",
-            "tinybert-4l-312d-v2":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2-vocab.txt",
-            "tinybert-6l-768d-v2":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2-vocab.txt",
-            "tinybert-4l-312d-zh":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh-vocab.txt",
-            "tinybert-6l-768d-zh":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh-vocab.txt",
+            "tinybert-4l-312d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-vocab.txt",
+            "tinybert-6l-768d": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-vocab.txt",
+            "tinybert-4l-312d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-v2-vocab.txt",
+            "tinybert-6l-768d-v2": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-v2-vocab.txt",
+            "tinybert-4l-312d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-4l-312d-zh-vocab.txt",
+            "tinybert-6l-768d-zh": "http://bj.bcebos.com/paddlenlp/models/transformers/tinybert/tinybert-6l-768d-zh-vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "tinybert-4l-312d": {
-            "do_lower_case": True
-        },
-        "tinybert-6l-768d": {
-            "do_lower_case": True
-        },
-        "tinybert-4l-312d-v2": {
-            "do_lower_case": True
-        },
-        "tinybert-6l-768d-v2": {
-            "do_lower_case": True
-        },
-        "tinybert-4l-312d-zh": {
-            "do_lower_case": True
-        },
-        "tinybert-6l-768d-zh": {
-            "do_lower_case": True
-        },
+        "tinybert-4l-312d": {"do_lower_case": True},
+        "tinybert-6l-768d": {"do_lower_case": True},
+        "tinybert-4l-312d-v2": {"do_lower_case": True},
+        "tinybert-6l-768d-v2": {"do_lower_case": True},
+        "tinybert-4l-312d-zh": {"do_lower_case": True},
+        "tinybert-6l-768d-zh": {"do_lower_case": True},
     }
     max_model_input_sizes = {
         "tinybert-4l-312d": 512,
@@ -67,5 +49,5 @@ class TinyBertTokenizer(BertTokenizer):
         "tinybert-4l-312d-v2": 512,
         "tinybert-6l-768d-v2": 512,
         "tinybert-4l-312d-zh": 512,
-        "tinybert-6l-768d-zh": 512
+        "tinybert-6l-768d-zh": 512,
     }

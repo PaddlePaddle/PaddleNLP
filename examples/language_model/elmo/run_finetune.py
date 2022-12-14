@@ -57,12 +57,12 @@ def clean_str(string):
     Original taken from https://github.com/yoonkim/CNN_sentence/blob/master/process_data.py
     """
     string = re.sub(r"[^A-Za-z0-9(),!?\'\`]", " ", string)
-    string = re.sub(r"\'s", " \'s", string)
-    string = re.sub(r"\'ve", " \'ve", string)
-    string = re.sub(r"n\'t", " n\'t", string)
-    string = re.sub(r"\'re", " \'re", string)
-    string = re.sub(r"\'d", " \'d", string)
-    string = re.sub(r"\'ll", " \'ll", string)
+    string = re.sub(r"\'s", " 's", string)
+    string = re.sub(r"\'ve", " 've", string)
+    string = re.sub(r"n\'t", " n't", string)
+    string = re.sub(r"\'re", " 're", string)
+    string = re.sub(r"\'d", " 'd", string)
+    string = re.sub(r"\'ll", " 'll", string)
     string = re.sub(r",", " , ", string)
     string = re.sub(r"!", " ! ", string)
     string = re.sub(r"\(", " \( ", string)
@@ -78,11 +78,9 @@ def load_data_and_labels(positive_data_file, negative_data_file):
     Returns split sentences and labels.
     """
     # Load data from files
-    positive_examples = list(
-        open(positive_data_file, 'r', encoding='latin-1').readlines())
+    positive_examples = list(open(positive_data_file, "r", encoding="latin-1").readlines())
     positive_examples = [s.strip() for s in positive_examples]
-    negative_examples = list(
-        open(negative_data_file, 'r', encoding='latin-1').readlines())
+    negative_examples = list(open(negative_data_file, "r", encoding="latin-1").readlines())
     negative_examples = [s.strip() for s in negative_examples]
     # Split by words
     x_text = positive_examples + negative_examples
@@ -96,9 +94,7 @@ def load_data_and_labels(positive_data_file, negative_data_file):
 
 
 class ELMoBowTextClassification(nn.Layer):
-
-    def __init__(self, params_file, batch_size, sent_embedding_dim, dropout,
-                 num_labels):
+    def __init__(self, params_file, batch_size, sent_embedding_dim, dropout, num_labels):
         super(ELMoBowTextClassification, self).__init__()
 
         self._elmo = get_elmo_layer(params_file, batch_size, trainable=True)
@@ -110,8 +106,8 @@ class ELMoBowTextClassification(nn.Layer):
     def forward(self, inputs):
         """
         Parameters:
-            inputs (Tuple): It is a Tuple contains 2 tensor with shape 
-                `[batch_size, max_seq_len, max_characters_per_token]`. 
+            inputs (Tuple): It is a Tuple contains 2 tensor with shape
+                `[batch_size, max_seq_len, max_characters_per_token]`.
         """
         mask = paddle.any(inputs[0] > 0, axis=2)
         # [batch_size, 3, max_seq_len, word_embedding_dim]
@@ -134,8 +130,8 @@ class ELMoBowTextClassification(nn.Layer):
         """
         Computes a mixture of elmo_out. At present, we simply take the last one.
         Parameters:
-            elmo_out (Tensor): It is a Tensor with shape 
-                `[batch_size, 3, max_seq_len, word_embedding_dim]`. 
+            elmo_out (Tensor): It is a Tensor with shape
+                `[batch_size, 3, max_seq_len, word_embedding_dim]`.
         """
         # [batch_size, max_seq_len, word_embedding_dim]
         word_emb = elmo_out[:, 2, :, :]
@@ -161,7 +157,6 @@ class ELMoBowTextClassification(nn.Layer):
 
 
 class SentencePolarityDatasetV1(Dataset):
-
     def __init__(self, x, y, vocab, max_seq_len):
         super(SentencePolarityDatasetV1, self).__init__()
 
@@ -173,8 +168,7 @@ class SentencePolarityDatasetV1(Dataset):
     def convert_to_ids(self):
         data = []
         for sentence, label in self._text:
-            ids, ids_reverse = self._vocab.encode_chars(
-                sentence[:self._max_seq_len - 2], split=False)
+            ids, ids_reverse = self._vocab.encode_chars(sentence[: self._max_seq_len - 2], split=False)
             data.append([ids, ids_reverse, label])
         return data
 
@@ -191,13 +185,10 @@ class SentencePolarityDatasetV1(Dataset):
 def generate_batch(batch):
     batch_ids, batch_ids_reverse, batch_label = zip(*batch)
     max_len = max([ids.shape[0] for ids in batch_ids])
-    new_batch_ids = np.zeros([len(batch_ids), max_len, batch_ids[0].shape[1]],
-                             dtype=np.int64)
-    new_batch_ids_reverse = np.zeros(
-        [len(batch_ids), max_len, batch_ids[0].shape[1]], dtype=np.int64)
+    new_batch_ids = np.zeros([len(batch_ids), max_len, batch_ids[0].shape[1]], dtype=np.int64)
+    new_batch_ids_reverse = np.zeros([len(batch_ids), max_len, batch_ids[0].shape[1]], dtype=np.int64)
     new_batch_label = []
-    for i, (ids, ids_reverse,
-            label) in enumerate(zip(batch_ids, batch_ids_reverse, batch_label)):
+    for i, (ids, ids_reverse, label) in enumerate(zip(batch_ids, batch_ids_reverse, batch_label)):
         seq_len = ids.shape[0]
         new_batch_ids[i, :seq_len, :] = ids
         new_batch_ids_reverse[i, :seq_len, :] = ids_reverse
@@ -210,47 +201,44 @@ def finetune(args):
     if dist.get_world_size() > 1:
         dist.init_parallel_env()
 
-    pos_file = os.path.join(args.data_dir, 'rt-polarity.pos')
-    neg_file = os.path.join(args.data_dir, 'rt-polarity.neg')
+    pos_file = os.path.join(args.data_dir, "rt-polarity.pos")
+    neg_file = os.path.join(args.data_dir, "rt-polarity.neg")
     x_text, y = load_data_and_labels(pos_file, neg_file)
-    x_train, x_test, y_train, y_test = train_test_split(x_text,
-                                                        y,
-                                                        test_size=0.1,
-                                                        random_state=args.seed)
+    x_train, x_test, y_train, y_test = train_test_split(x_text, y, test_size=0.1, random_state=args.seed)
 
     if not args.init_from_ckpt:
-        raise ValueError('`init_from_ckpt` should be set.')
-    model = ELMoBowTextClassification(args.init_from_ckpt, args.batch_size,
-                                      args.sent_embedding_dim, args.dropout,
-                                      args.num_classes)
+        raise ValueError("`init_from_ckpt` should be set.")
+    model = ELMoBowTextClassification(
+        args.init_from_ckpt, args.batch_size, args.sent_embedding_dim, args.dropout, args.num_classes
+    )
     if dist.get_world_size() > 1:
         model = paddle.DataParallel(model)
     model.train()
 
-    adam = paddle.optimizer.Adam(parameters=model.parameters(),
-                                 learning_rate=args.lr,
-                                 weight_decay=args.weight_decay)
+    adam = paddle.optimizer.Adam(parameters=model.parameters(), learning_rate=args.lr, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()
 
     vocab = load_vocab()
 
-    train_dataset = SentencePolarityDatasetV1(x_train, y_train, vocab,
-                                              args.max_seq_len)
-    test_dataset = SentencePolarityDatasetV1(x_test, y_test, vocab,
-                                             args.max_seq_len)
-    train_loader = DataLoader(train_dataset,
-                              batch_size=args.batch_size,
-                              return_list=True,
-                              shuffle=True,
-                              collate_fn=lambda batch: generate_batch(batch))
-    test_loader = DataLoader(test_dataset,
-                             batch_size=args.batch_size,
-                             return_list=True,
-                             shuffle=False,
-                             collate_fn=lambda batch: generate_batch(batch))
+    train_dataset = SentencePolarityDatasetV1(x_train, y_train, vocab, args.max_seq_len)
+    test_dataset = SentencePolarityDatasetV1(x_test, y_test, vocab, args.max_seq_len)
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=args.batch_size,
+        return_list=True,
+        shuffle=True,
+        collate_fn=lambda batch: generate_batch(batch),
+    )
+    test_loader = DataLoader(
+        test_dataset,
+        batch_size=args.batch_size,
+        return_list=True,
+        shuffle=False,
+        collate_fn=lambda batch: generate_batch(batch),
+    )
 
     for epoch in range(args.epochs):
-        print('Epoch {}/{}'.format(epoch + 1, args.epochs))
+        print("Epoch {}/{}".format(epoch + 1, args.epochs))
         for step, batch_data in enumerate(train_loader, start=1):
             ids, ids_reverse, label = batch_data
 
@@ -261,10 +249,10 @@ def finetune(args):
             adam.clear_grad()
 
             if step % args.logging_step == 0:
-                print('step {}, loss {}'.format(step, loss.numpy()[0]))
+                print("step {}, loss {}".format(step, loss.numpy()[0]))
 
     acc = test(model, test_loader)
-    print('\ntest acc {}\n'.format(acc))
+    print("\ntest acc {}\n".format(acc))
 
 
 @paddle.no_grad()
@@ -280,12 +268,11 @@ def test(model, test_loader):
         num += label.shape[0]
         predict = paddle.argmax(output, axis=1)
         label = paddle.cast(label, dtype=predict.dtype)
-        correct += paddle.sum(paddle.cast(predict == label,
-                                          dtype='int64')).numpy()[0]
+        correct += paddle.sum(paddle.cast(predict == label, dtype="int64")).numpy()[0]
     model.train()
     return correct * 1.0 / num
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
     finetune(args)

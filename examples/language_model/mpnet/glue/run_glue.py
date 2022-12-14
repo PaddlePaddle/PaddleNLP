@@ -75,15 +75,13 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="The name of the task to train selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()),
+        help="The name of the task to train selected in the list: " + ", ".join(METRIC_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_type",
         default="convbert",
         type=str,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
+        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_name_or_path",
@@ -92,19 +90,16 @@ def parse_args():
         help="Path to pre-trained model or shortcut name selected in the list: "
         + ", ".join(
             sum(
-                [
-                    list(classes[-1].pretrained_init_configuration.keys())
-                    for classes in MODEL_CLASSES.values()
-                ],
+                [list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()],
                 [],
-            )),
+            )
+        ),
     )
     parser.add_argument(
         "--output_dir",
         default=None,
         type=str,
-        help=
-        "The output directory where the model predictions and checkpoints will be written.",
+        help="The output directory where the model predictions and checkpoints will be written.",
     )
     parser.add_argument(
         "--scheduler_type",
@@ -116,8 +111,7 @@ def parse_args():
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
+        help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
@@ -126,20 +120,14 @@ def parse_args():
         type=float,
         help="The initial learning rate for Adam.",
     )
-    parser.add_argument("--layer_lr_decay",
-                        default=1.0,
-                        type=float,
-                        help="layer_lr_decay")
+    parser.add_argument("--layer_lr_decay", default=1.0, type=float, help="layer_lr_decay")
     parser.add_argument(
         "--num_train_epochs",
         default=3,
         type=int,
         help="Total number of training epochs to perform.",
     )
-    parser.add_argument("--logging_steps",
-                        type=int,
-                        default=100,
-                        help="Log every X updates steps.")
+    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
     parser.add_argument(
         "--save_steps",
         type=int,
@@ -162,8 +150,7 @@ def parse_args():
         "--warmup_steps",
         default=0,
         type=int,
-        help=
-        "Linear warmup over warmup_steps. If > 0: Override warmup_proportion",
+        help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion",
     )
     parser.add_argument(
         "--warmup_proportion",
@@ -171,21 +158,14 @@ def parse_args():
         type=float,
         help="Linear warmup proportion over total steps.",
     )
-    parser.add_argument("--adam_epsilon",
-                        default=1e-6,
-                        type=float,
-                        help="Epsilon for Adam optimizer.")
+    parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument(
         "--max_steps",
         default=-1,
         type=int,
-        help=
-        "If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
     )
-    parser.add_argument("--seed",
-                        default=42,
-                        type=int,
-                        help="random seed for initialization")
+    parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
         default="gpu",
@@ -199,18 +179,17 @@ def parse_args():
 
 def _get_layer_lr_radios(layer_decay=0.8, n_layers=12):
     """Have lower learning rates for layers closer to the input."""
-    key_to_depths = OrderedDict({
-        "mpnet.embeddings.": 0,
-        "mpnet.encoder.relative_attention_bias.": 0,
-        "mpnet.pooler.": n_layers + 2,
-        "mpnet.classifier.": n_layers + 2,
-    })
+    key_to_depths = OrderedDict(
+        {
+            "mpnet.embeddings.": 0,
+            "mpnet.encoder.relative_attention_bias.": 0,
+            "mpnet.pooler.": n_layers + 2,
+            "mpnet.classifier.": n_layers + 2,
+        }
+    )
     for layer in range(n_layers):
         key_to_depths[f"mpnet.encoder.layer.{str(layer)}."] = layer + 1
-    return {
-        key: (layer_decay**(n_layers + 2 - depth))
-        for key, depth in key_to_depths.items()
-    }
+    return {key: (layer_decay ** (n_layers + 2 - depth)) for key, depth in key_to_depths.items()}
 
 
 def set_seed(args):
@@ -244,7 +223,8 @@ def evaluate(model, loss_fct, metric, data_loader):
                 res[2],
                 res[3],
                 res[4],
-            ))
+            )
+        )
     elif isinstance(metric, Mcc):
         print("eval loss: %f, mcc: %s, " % (loss.numpy(), res[0]))
     elif isinstance(metric, PearsonAndSpearman):
@@ -258,11 +238,7 @@ def evaluate(model, loss_fct, metric, data_loader):
     model.train()
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
+def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
@@ -308,8 +284,7 @@ def do_train(args):
         max_seq_length=args.max_seq_length,
     )
     train_ds = train_ds.map(trans_func, lazy=True)
-    train_batch_sampler = paddle.io.DistributedBatchSampler(
-        train_ds, batch_size=args.batch_size, shuffle=True)
+    train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -324,12 +299,14 @@ def do_train(args):
     )
     if args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
-            "glue", args.task_name, splits=["dev_matched", "dev_mismatched"])
+            "glue", args.task_name, splits=["dev_matched", "dev_mismatched"]
+        )
 
         dev_ds_matched = dev_ds_matched.map(trans_func, lazy=True)
         dev_ds_mismatched = dev_ds_mismatched.map(trans_func, lazy=True)
         dev_batch_sampler_matched = paddle.io.BatchSampler(
-            dev_ds_matched, batch_size=args.batch_size * 2, shuffle=False)
+            dev_ds_matched, batch_size=args.batch_size * 2, shuffle=False
+        )
         dev_data_loader_matched = DataLoader(
             dataset=dev_ds_matched,
             batch_sampler=dev_batch_sampler_matched,
@@ -338,7 +315,8 @@ def do_train(args):
             return_list=True,
         )
         dev_batch_sampler_mismatched = paddle.io.BatchSampler(
-            dev_ds_mismatched, batch_size=args.batch_size * 2, shuffle=False)
+            dev_ds_mismatched, batch_size=args.batch_size * 2, shuffle=False
+        )
         dev_data_loader_mismatched = DataLoader(
             dataset=dev_ds_mismatched,
             batch_sampler=dev_batch_sampler_mismatched,
@@ -349,10 +327,7 @@ def do_train(args):
     else:
         dev_ds = load_dataset("glue", args.task_name, splits="dev")
         dev_ds = dev_ds.map(trans_func, lazy=True)
-        dev_batch_sampler = paddle.io.BatchSampler(dev_ds,
-                                                   batch_size=args.batch_size *
-                                                   2,
-                                                   shuffle=False)
+        dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size * 2, shuffle=False)
         dev_data_loader = DataLoader(
             dataset=dev_ds,
             batch_sampler=dev_batch_sampler,
@@ -362,15 +337,13 @@ def do_train(args):
         )
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
-    model = model_class.from_pretrained(args.model_name_or_path,
-                                        num_classes=num_classes)
+    model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     # layer_lr for base
     if args.layer_lr_decay != 1.0:
-        layer_lr_radios_map = _get_layer_lr_radios(args.layer_lr_decay,
-                                                   n_layers=12)
+        layer_lr_radios_map = _get_layer_lr_radios(args.layer_lr_decay, n_layers=12)
         for name, parameter in model.named_parameters():
             layer_lr_radio = 1.0
             for k, radio in layer_lr_radios_map.items():
@@ -379,25 +352,18 @@ def do_train(args):
                     break
             parameter.optimize_attr["learning_rate"] *= layer_lr_radio
 
-    num_training_steps = (args.max_steps if args.max_steps > 0 else
-                          (len(train_data_loader) * args.num_train_epochs))
-    args.num_train_epochs = math.ceil(num_training_steps /
-                                      len(train_data_loader))
+    num_training_steps = args.max_steps if args.max_steps > 0 else (len(train_data_loader) * args.num_train_epochs)
+    args.num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
     if args.scheduler_type == "linear":
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate,
-                                             num_training_steps, warmup)
+        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
     elif args.scheduler_type == "cosine":
-        lr_scheduler = CosineDecayWithWarmup(args.learning_rate,
-                                             num_training_steps, warmup)
+        lr_scheduler = CosineDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
@@ -409,8 +375,7 @@ def do_train(args):
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 
-    loss_fct = (paddle.nn.loss.CrossEntropyLoss()
-                if train_ds.label_list else paddle.nn.loss.MSELoss())
+    loss_fct = paddle.nn.loss.CrossEntropyLoss() if train_ds.label_list else paddle.nn.loss.MSELoss()
 
     metric = metric_class()
 
@@ -432,8 +397,7 @@ def do_train(args):
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
-            if (global_step % args.logging_steps == 0
-                    or global_step == num_training_steps):
+            if global_step % args.logging_steps == 0 or global_step == num_training_steps:
                 print(
                     "global step %d/%d, epoch: %d, batch: %d, rank_id: %s, loss: %f, lr: %.10f, speed: %.4f step/s"
                     % (
@@ -445,14 +409,14 @@ def do_train(args):
                         loss,
                         optimizer.get_lr(),
                         args.logging_steps / (time.time() - tic_train),
-                    ))
+                    )
+                )
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
                 if args.task_name == "mnli":
                     evaluate(model, loss_fct, metric, dev_data_loader_matched)
-                    evaluate(model, loss_fct, metric,
-                             dev_data_loader_mismatched)
+                    evaluate(model, loss_fct, metric, dev_data_loader_mismatched)
                     print("eval done total : %s s" % (time.time() - tic_eval))
                 else:
                     evaluate(model, loss_fct, metric, dev_data_loader)
@@ -461,14 +425,12 @@ def do_train(args):
                 if paddle.distributed.get_rank() == 0:
                     output_dir = os.path.join(
                         args.output_dir,
-                        "%s_ft_model_%d.pdparams" %
-                        (args.task_name, global_step),
+                        "%s_ft_model_%d.pdparams" % (args.task_name, global_step),
                     )
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
-                    model_to_save = (model._layers if isinstance(
-                        model, paddle.DataParallel) else model)
+                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
                     model_to_save.save_pretrained(output_dir)
                     tokenizer.save_pretrained(output_dir)
 
@@ -491,6 +453,6 @@ if __name__ == "__main__":
     print_arguments(args)
     n_gpu = len(os.getenv("CUDA_VISIBLE_DEVICES", "").split(","))
     if args.device in "gpu" and n_gpu > 1:
-        paddle.distributed.spawn(do_train, args=(args, ), nprocs=n_gpu)
+        paddle.distributed.spawn(do_train, args=(args,), nprocs=n_gpu)
     else:
         do_train(args)

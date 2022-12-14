@@ -24,19 +24,17 @@ class TaskflowManager:
     The TaskflowManager could predict the raw text.
     """
 
-    def __init__(self, task, func=None):
+    def __init__(self, task, taskflow_handler=None):
         self._task = task
-        if func is None:
+        if taskflow_handler is None:
             self._handler_func = TaskflowHandler.process
         else:
-            self._handler_func = func
+            self._handler_func = taskflow_handler.process
 
     def predict(self, data, parameters):
         t = time.time()
         t = int(round(t * 1000))
         task_index = t % len(self._task)
-        logger.info(
-            "The predictor id: {} is selected by running the taskflow.".format(
-                task_index))
+        logger.info("The predictor id: {} is selected by running the taskflow.".format(task_index))
         with lock_predictor(self._task[task_index]._lock):
             return self._handler_func(self._task[task_index], data, parameters)

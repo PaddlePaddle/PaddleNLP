@@ -23,8 +23,7 @@ def print_ret(rets, input_data):
         print("input data:", input_data[i])
         print("The model detects all entities:")
         for iterm in ret:
-            print("entity:", iterm["entity"], "  label:", iterm["label"],
-                  "  pos:", iterm["pos"])
+            print("entity:", iterm["entity"], "  label:", iterm["label"], "  pos:", iterm["pos"])
         print("-----------------------------")
 
 
@@ -34,7 +33,7 @@ def label_pad(label_list, preds):
     for label, pred in zip(label_list, preds):
         seq_len = len(pred)
         if len(label) > seq_len - 2:
-            label = label[:seq_len - 2]
+            label = label[: seq_len - 2]
         label = [0] + label + [0]
         label += [0] * (seq_len - len(label))
         new_label_list.append(label)
@@ -49,14 +48,14 @@ def test_ner_dataset(client):
     dev_ds = load_dataset("msra_ner", split="test")
 
     import os
-    if os.environ.get('https_proxy'):
-        del os.environ['https_proxy']
-    if os.environ.get('http_proxy'):
-        del os.environ['http_proxy']
+
+    if os.environ.get("https_proxy"):
+        del os.environ["https_proxy"]
+    if os.environ.get("http_proxy"):
+        del os.environ["http_proxy"]
 
     print("Start infer...")
-    metric = ChunkEvaluator(
-        label_list=['O', 'B-PER', 'I-PER', 'B-ORG', 'I-ORG', 'B-LOC', 'I-LOC'])
+    metric = ChunkEvaluator(label_list=["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"])
     idx = 0
     batch_size = 32
     max_len = len(dev_ds["tokens"]) - 1
@@ -79,9 +78,9 @@ def test_ner_dataset(client):
         seq_len = [preds.shape[1]] * preds.shape[0]
 
         num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            paddle.to_tensor(seq_len), preds, label_list)
-        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(),
-                      num_correct_chunks.numpy())
+            paddle.to_tensor(seq_len), preds, label_list
+        )
+        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
         idx += batch_size
         print(idx)
 
@@ -91,7 +90,7 @@ def test_ner_dataset(client):
 
 def init_client():
     client = PipelineClient()
-    client.connect(['127.0.0.1:18090'])
+    client.connect(["127.0.0.1:18090"])
     return client
 
 
@@ -106,11 +105,62 @@ def test_demo(client):
 
     text2 = [
         [
-            '从', '首', '都', '利', '隆', '圭', '乘', '车', '向', '湖', '边', '小', '镇',
-            '萨', '利', '马', '进', '发', '时', '，', '不', '到', '１', '０', '０', '公',
-            '里', '的', '道', '路', '上', '坑', '坑', '洼', '洼', '，', '又', '逢', '阵',
-            '雨', '迷', '蒙', '，', '令', '人', '不', '时', '发', '出', '路', '难', '行',
-            '的', '慨', '叹', '。'
+            "从",
+            "首",
+            "都",
+            "利",
+            "隆",
+            "圭",
+            "乘",
+            "车",
+            "向",
+            "湖",
+            "边",
+            "小",
+            "镇",
+            "萨",
+            "利",
+            "马",
+            "进",
+            "发",
+            "时",
+            "，",
+            "不",
+            "到",
+            "１",
+            "０",
+            "０",
+            "公",
+            "里",
+            "的",
+            "道",
+            "路",
+            "上",
+            "坑",
+            "坑",
+            "洼",
+            "洼",
+            "，",
+            "又",
+            "逢",
+            "阵",
+            "雨",
+            "迷",
+            "蒙",
+            "，",
+            "令",
+            "人",
+            "不",
+            "时",
+            "发",
+            "出",
+            "路",
+            "难",
+            "行",
+            "的",
+            "慨",
+            "叹",
+            "。",
         ],
     ]
     ret = client.predict(feed_dict={"tokens": text2})

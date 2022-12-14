@@ -31,12 +31,12 @@ from paddlenlp.metrics import MultiLabelsMetric, AccuracyAndF1
 from utils import convert_example, create_dataloader, LinearDecayWithWarmup
 
 METRIC_CLASSES = {
-    'KUAKE-QIC': Accuracy,
-    'KUAKE-QQR': Accuracy,
-    'KUAKE-QTR': Accuracy,
-    'CHIP-CTC': MultiLabelsMetric,
-    'CHIP-STS': MultiLabelsMetric,
-    'CHIP-CDN-2C': AccuracyAndF1
+    "KUAKE-QIC": Accuracy,
+    "KUAKE-QQR": Accuracy,
+    "KUAKE-QTR": Accuracy,
+    "CHIP-CTC": MultiLabelsMetric,
+    "CHIP-STS": MultiLabelsMetric,
+    "CHIP-CDN-2C": AccuracyAndF1,
 }
 
 # yapf: disable
@@ -93,16 +93,16 @@ def evaluate(model, criterion, metric, data_loader):
         correct = metric.compute(logits, labels)
         metric.update(correct)
     if isinstance(metric, Accuracy):
-        metric_name = 'accuracy'
+        metric_name = "accuracy"
         result = metric.accumulate()
     elif isinstance(metric, MultiLabelsMetric):
-        metric_name = 'macro f1'
-        _, _, result = metric.accumulate('macro')
+        metric_name = "macro f1"
+        _, _, result = metric.accumulate("macro")
     else:
-        metric_name = 'micro f1'
+        metric_name = "micro f1"
         _, _, _, result, _ = metric.accumulate()
 
-    print('eval loss: %.5f, %s: %.5f' % (np.mean(losses), metric_name, result))
+    print("eval loss: %.5f, %s: %.5f" % (np.mean(losses), metric_name, result))
     model.train()
     metric.reset()
 
@@ -115,82 +115,62 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds, dev_ds = load_dataset('cblue',
-                                    args.dataset,
-                                    splits=['train', 'dev'])
+    train_ds, dev_ds = load_dataset("cblue", args.dataset, splits=["train", "dev"])
 
     model = ElectraForSequenceClassification.from_pretrained(
-        'ernie-health-chinese',
-        num_classes=len(train_ds.label_list),
-        activation='tanh')
-    tokenizer = ElectraTokenizer.from_pretrained('ernie-health-chinese')
+        "ernie-health-chinese", num_classes=len(train_ds.label_list), activation="tanh"
+    )
+    tokenizer = ElectraTokenizer.from_pretrained("ernie-health-chinese")
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # segment
-        Pad(axis=0, pad_val=args.max_seq_length - 1, dtype='int64'),  # position
-        Stack(dtype='int64')): [data for data in fn(samples)]
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
-    dev_data_loader = create_dataloader(dev_ds,
-                                        mode='dev',
-                                        batch_size=args.batch_size,
-                                        batchify_fn=batchify_fn,
-                                        trans_fn=trans_func)
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        Pad(axis=0, pad_val=args.max_seq_length - 1, dtype="int64"),  # position
+        Stack(dtype="int64"),
+    ): [data for data in fn(samples)]
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
+    dev_data_loader = create_dataloader(
+        dev_ds, mode="dev", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
-        state_keys = {
-            x: x.replace('discriminator.', '')
-            for x in state_dict.keys() if 'discriminator.' in x
-        }
+        state_keys = {x: x.replace("discriminator.", "") for x in state_dict.keys() if "discriminator." in x}
         if len(state_keys) > 0:
-            state_dict = {
-                state_keys[k]: state_dict[k]
-                for k in state_keys.keys()
-            }
+            state_dict = {state_keys[k]: state_dict[k] for k in state_keys.keys()}
         model.set_dict(state_dict)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(
-        train_data_loader) * args.epochs
+    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.epochs
     args.epochs = (num_training_steps - 1) // len(train_data_loader) + 1
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ['bias', 'norm'])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     if METRIC_CLASSES[args.dataset] is Accuracy:
         metric = METRIC_CLASSES[args.dataset]()
-        metric_name = 'accuracy'
+        metric_name = "accuracy"
     elif METRIC_CLASSES[args.dataset] is MultiLabelsMetric:
-        metric = METRIC_CLASSES[args.dataset](
-            num_labels=len(train_ds.label_list))
-        metric_name = 'macro f1'
+        metric = METRIC_CLASSES[args.dataset](num_labels=len(train_ds.label_list))
+        metric_name = "macro f1"
     else:
         metric = METRIC_CLASSES[args.dataset]()
-        metric_name = 'micro f1'
+        metric_name = "micro f1"
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
@@ -200,8 +180,8 @@ def do_train():
         for step, batch in enumerate(train_data_loader, start=1):
             input_ids, token_type_ids, position_ids, labels = batch
             with paddle.amp.auto_cast(
-                    args.use_amp,
-                    custom_white_list=['layer_norm', 'softmax', 'gelu', 'tanh'],
+                args.use_amp,
+                custom_white_list=["layer_norm", "softmax", "gelu", "tanh"],
             ):
                 logits = model(input_ids, token_type_ids, position_ids)
                 loss = criterion(logits, labels)
@@ -212,7 +192,7 @@ def do_train():
             if isinstance(metric, Accuracy):
                 result = metric.accumulate()
             elif isinstance(metric, MultiLabelsMetric):
-                _, _, result = metric.accumulate('macro')
+                _, _, result = metric.accumulate("macro")
             else:
                 _, _, _, result, _ = metric.accumulate()
 
@@ -230,15 +210,15 @@ def do_train():
                 time_diff = time.time() - tic_train
                 total_train_time += time_diff
                 print(
-                    'global step %d, epoch: %d, batch: %d, loss: %.5f, %s: %.5f, speed: %.2f step/s'
-                    % (global_step, epoch, step, loss, metric_name, result,
-                       args.logging_steps / time_diff))
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, %s: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, metric_name, result, args.logging_steps / time_diff)
+                )
 
             if global_step % args.valid_steps == 0 and rank == 0:
                 evaluate(model, criterion, metric, dev_data_loader)
 
             if global_step % args.save_steps == 0 and rank == 0:
-                save_dir = os.path.join(args.save_dir, 'model_%d' % global_step)
+                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
                 if paddle.distributed.get_world_size() > 1:
@@ -252,7 +232,7 @@ def do_train():
             tic_train = time.time()
 
     if rank == 0 and total_train_time > 0:
-        print('Speed: %.2f steps/s' % (global_step / total_train_time))
+        print("Speed: %.2f steps/s" % (global_step / total_train_time))
 
 
 if __name__ == "__main__":

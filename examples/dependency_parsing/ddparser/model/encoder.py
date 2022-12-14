@@ -20,7 +20,6 @@ from model.dropouts import SharedDropout, IndependentDropout
 
 
 class ErnieEncoder(nn.Layer):
-
     def __init__(self, pad_index, pretrained_model):
         super(ErnieEncoder, self).__init__()
         self.pad_index = pad_index
@@ -38,24 +37,27 @@ class ErnieEncoder(nn.Layer):
 
 
 class LSTMByWPEncoder(nn.Layer):
-
-    def __init__(self,
-                 n_words,
-                 pad_index,
-                 lstm_by_wp_embed_size=200,
-                 n_embed=300,
-                 n_lstm_hidden=300,
-                 n_lstm_layers=3,
-                 lstm_dropout=0.33):
+    def __init__(
+        self,
+        n_words,
+        pad_index,
+        lstm_by_wp_embed_size=200,
+        n_embed=300,
+        n_lstm_hidden=300,
+        n_lstm_layers=3,
+        lstm_dropout=0.33,
+    ):
         super(LSTMByWPEncoder, self).__init__()
         self.pad_index = pad_index
         self.word_embed = nn.Embedding(n_words, lstm_by_wp_embed_size)
 
-        self.lstm = nn.LSTM(input_size=lstm_by_wp_embed_size,
-                            hidden_size=n_lstm_hidden,
-                            num_layers=n_lstm_layers,
-                            dropout=lstm_dropout,
-                            direction="bidirectional")
+        self.lstm = nn.LSTM(
+            input_size=lstm_by_wp_embed_size,
+            hidden_size=n_lstm_hidden,
+            num_layers=n_lstm_layers,
+            dropout=lstm_dropout,
+            direction="bidirectional",
+        )
 
         self.lstm_dropout = SharedDropout(p=lstm_dropout)
         self.mlp_input_size = n_lstm_hidden * 2
@@ -77,21 +79,22 @@ class LSTMByWPEncoder(nn.Layer):
 
 
 class LSTMEncoder(nn.Layer):
-
-    def __init__(self,
-                 feat,
-                 n_feats,
-                 n_words,
-                 pad_index=0,
-                 feat_pad_index=0,
-                 n_char_embed=50,
-                 n_feat_embed=60,
-                 n_lstm_char_embed=100,
-                 n_embed=300,
-                 embed_dropout=0.33,
-                 n_lstm_hidden=300,
-                 n_lstm_layers=3,
-                 lstm_dropout=0.33):
+    def __init__(
+        self,
+        feat,
+        n_feats,
+        n_words,
+        pad_index=0,
+        feat_pad_index=0,
+        n_char_embed=50,
+        n_feat_embed=60,
+        n_lstm_char_embed=100,
+        n_embed=300,
+        embed_dropout=0.33,
+        n_lstm_hidden=300,
+        n_lstm_layers=3,
+        lstm_dropout=0.33,
+    ):
         super(LSTMEncoder, self).__init__()
         self.pad_index = pad_index
 
@@ -104,19 +107,19 @@ class LSTMEncoder(nn.Layer):
             )
             feat_embed_size = n_lstm_char_embed
         else:
-            self.feat_embed = nn.Embedding(num_embeddings=n_feats,
-                                           embedding_dim=n_feat_embed)
+            self.feat_embed = nn.Embedding(num_embeddings=n_feats, embedding_dim=n_feat_embed)
             feat_embed_size = n_feat_embed
 
-        self.word_embed = nn.Embedding(num_embeddings=n_words,
-                                       embedding_dim=n_embed)
+        self.word_embed = nn.Embedding(num_embeddings=n_words, embedding_dim=n_embed)
         self.embed_dropout = IndependentDropout(p=embed_dropout)
 
-        self.lstm = nn.LSTM(input_size=n_embed + feat_embed_size,
-                            hidden_size=n_lstm_hidden,
-                            num_layers=n_lstm_layers,
-                            dropout=lstm_dropout,
-                            direction="bidirectional")
+        self.lstm = nn.LSTM(
+            input_size=n_embed + feat_embed_size,
+            hidden_size=n_lstm_hidden,
+            num_layers=n_lstm_layers,
+            dropout=lstm_dropout,
+            direction="bidirectional",
+        )
         self.lstm_dropout = SharedDropout(p=lstm_dropout)
         self.mlp_input_size = n_lstm_hidden * 2
 
@@ -126,14 +129,13 @@ class LSTMEncoder(nn.Layer):
         word_embed, feat_embed = self.embed_dropout(word_embed, feat_embed)
         embed = paddle.concat([word_embed, feat_embed], axis=-1)
         mask = words != self.pad_index
-        seq_lens = paddle.sum(paddle.cast(mask, 'int32'), axis=-1)
+        seq_lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         x, _ = self.lstm(embed, sequence_length=seq_lens)
         x = self.lstm_dropout(x)
         return words, x
 
 
 class CharLSTMEncoder(nn.Layer):
-
     def __init__(self, n_chars, n_embed, n_out, pad_index=0):
         super(CharLSTMEncoder, self).__init__()
         self.n_chars = n_chars
@@ -144,20 +146,18 @@ class CharLSTMEncoder(nn.Layer):
         # the embedding layer
         self.embed = nn.Embedding(num_embeddings=n_chars, embedding_dim=n_embed)
         # the lstm layer
-        self.lstm = nn.LSTM(input_size=n_embed,
-                            hidden_size=n_out // 2,
-                            direction="bidirectional")
+        self.lstm = nn.LSTM(input_size=n_embed, hidden_size=n_out // 2, direction="bidirectional")
 
     def forward(self, x):
         """Forward network"""
         mask = paddle.any(x != self.pad_index, axis=-1)
 
-        lens = paddle.sum(paddle.cast(mask, 'int32'), axis=-1)
+        lens = paddle.sum(paddle.cast(mask, "int32"), axis=-1)
         select = paddle.nonzero(mask)
         masked_x = paddle.gather_nd(x, select)
         char_mask = masked_x != self.pad_index
         emb = self.embed(masked_x)
-        word_lens = paddle.sum(paddle.cast(char_mask, 'int32'), axis=-1)
+        word_lens = paddle.sum(paddle.cast(char_mask, "int32"), axis=-1)
         _, (h, _) = self.lstm(emb, sequence_length=word_lens)
         h = paddle.concat(paddle.unstack(h), axis=-1)
 

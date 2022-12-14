@@ -42,20 +42,13 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def preprocess_function(examples,
-                        tokenizer,
-                        max_seq_length,
-                        label_nums,
-                        is_test=False):
+def preprocess_function(examples, tokenizer, max_seq_length, label_nums, is_test=False):
     """
     Preprocess dataset
     """
     result = tokenizer(text=examples["text"], max_seq_len=max_seq_length)
     if not is_test:
-        result["labels"] = [
-            float(1) if i in examples["label"] else float(0)
-            for i in range(label_nums)
-        ]
+        result["labels"] = [float(1) if i in examples["label"] else float(0) for i in range(label_nums)]
     return result
 
 
@@ -63,20 +56,20 @@ def read_local_dataset(path, label_list):
     """
     Read dataset file
     """
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            items = line.strip().split('\t')
+            items = line.strip().split("\t")
             if len(items) == 0:
                 continue
             elif len(items) == 1:
                 sentence = items[0]
                 labels = []
-                label = ''
+                label = ""
             else:
-                sentence = ''.join(items[:-1])
+                sentence = "".join(items[:-1])
                 label = items[-1]
-                labels = [label_list[l] for l in label.split(',')]
-            yield {"text": sentence, 'label': labels, 'label_n': label}
+                labels = [label_list[l] for l in label.split(",")]
+            yield {"text": sentence, "label": labels, "label_n": label}
 
 
 @paddle.no_grad()
@@ -85,14 +78,12 @@ def evaluate():
     Evaluate the model performance
     """
     paddle.set_device(args.device)
-    if os.path.exists(os.path.join(
-            args.params_path, "model_state.pdparams")) and os.path.exists(
-                os.path.join(args.params_path,
-                             "model_config.json")) and os.path.exists(
-                                 os.path.join(args.params_path,
-                                              "tokenizer_config.json")):
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.params_path)
+    if (
+        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
+        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
+        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
+    ):
+        model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
@@ -104,40 +95,25 @@ def evaluate():
 
     label_list = {}
     label_map = {}
-    with open(label_path, 'r', encoding='utf-8') as f:
+    with open(label_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
             label_map[i] = l
-    train_ds = load_dataset(read_local_dataset,
-                            path=train_path,
-                            label_list=label_list,
-                            lazy=False)
-    dev_ds = load_dataset(read_local_dataset,
-                          path=dev_path,
-                          label_list=label_list,
-                          lazy=False)
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length,
-                                   label_nums=len(label_list))
+    train_ds = load_dataset(read_local_dataset, path=train_path, label_list=label_list, lazy=False)
+    dev_ds = load_dataset(read_local_dataset, path=dev_path, label_list=label_list, lazy=False)
+    trans_func = functools.partial(
+        preprocess_function, tokenizer=tokenizer, max_seq_length=args.max_seq_length, label_nums=len(label_list)
+    )
     train_ds = train_ds.map(trans_func)
     dev_ds = dev_ds.map(trans_func)
 
     # batchify dataset
     collate_fn = DataCollatorWithPadding(tokenizer)
-    train_batch_sampler = BatchSampler(train_ds,
-                                       batch_size=args.batch_size,
-                                       shuffle=False)
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=collate_fn)
-    dev_batch_sampler = BatchSampler(dev_ds,
-                                     batch_size=args.batch_size,
-                                     shuffle=False)
-    dev_data_loader = DataLoader(dataset=dev_ds,
-                                 batch_sampler=dev_batch_sampler,
-                                 collate_fn=collate_fn)
+    train_batch_sampler = BatchSampler(train_ds, batch_size=args.batch_size, shuffle=False)
+    train_data_loader = DataLoader(dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=collate_fn)
+    dev_batch_sampler = BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
+    dev_data_loader = DataLoader(dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=collate_fn)
 
     model.eval()
 
@@ -151,10 +127,7 @@ def evaluate():
     probs = np.array(probs)
     labels = np.array(labels)
     preds = probs > 0.5
-    report_train = classification_report(labels,
-                                         preds,
-                                         digits=4,
-                                         output_dict=True)
+    report_train = classification_report(labels, preds, digits=4, output_dict=True)
 
     probs = []
     labels = []
@@ -174,45 +147,49 @@ def evaluate():
     logger.info("Dev dataset size: {}".format(len(dev_ds)))
     logger.info("Accuracy in dev dataset: {:.2f}%".format(accuracy * 100))
     logger.info(
-        "Micro avg in dev dataset: precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-        .format(report['micro avg']['precision'] * 100,
-                report['micro avg']['recall'] * 100,
-                report['micro avg']['f1-score'] * 100))
+        "Micro avg in dev dataset: precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}".format(
+            report["micro avg"]["precision"] * 100,
+            report["micro avg"]["recall"] * 100,
+            report["micro avg"]["f1-score"] * 100,
+        )
+    )
     logger.info(
-        "Macro avg in dev dataset: precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-        .format(report['macro avg']['precision'] * 100,
-                report['macro avg']['recall'] * 100,
-                report['macro avg']['f1-score'] * 100))
+        "Macro avg in dev dataset: precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}".format(
+            report["macro avg"]["precision"] * 100,
+            report["macro avg"]["recall"] * 100,
+            report["macro avg"]["f1-score"] * 100,
+        )
+    )
 
     for i in label_map:
         logger.info("Class name: {}".format(label_map[i]))
         logger.info(
-            "Evaluation examples in train dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-            .format(report_train[str(i)]['support'],
-                    100 * report_train[str(i)]['support'] / len(train_ds),
-                    report_train[str(i)]['precision'] * 100,
-                    report_train[str(i)]['recall'] * 100,
-                    report_train[str(i)]['f1-score'] * 100))
+            "Evaluation examples in train dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}".format(
+                report_train[str(i)]["support"],
+                100 * report_train[str(i)]["support"] / len(train_ds),
+                report_train[str(i)]["precision"] * 100,
+                report_train[str(i)]["recall"] * 100,
+                report_train[str(i)]["f1-score"] * 100,
+            )
+        )
         logger.info(
-            "Evaluation examples in dev dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}"
-            .format(report[str(i)]['support'],
-                    100 * report[str(i)]['support'] / len(dev_ds),
-                    report[str(i)]['precision'] * 100,
-                    report[str(i)]['recall'] * 100,
-                    report[str(i)]['f1-score'] * 100))
+            "Evaluation examples in dev dataset: {}({:.1f}%) | precision: {:.2f} | recall: {:.2f} | F1 score {:.2f}".format(
+                report[str(i)]["support"],
+                100 * report[str(i)]["support"] / len(dev_ds),
+                report[str(i)]["precision"] * 100,
+                report[str(i)]["recall"] * 100,
+                report[str(i)]["f1-score"] * 100,
+            )
+        )
         logger.info("----------------------------")
     bad_case_path = os.path.join(args.dataset_dir, args.bad_case_file)
-    with open(bad_case_path, 'w', encoding="utf-8") as f:
+    with open(bad_case_path, "w", encoding="utf-8") as f:
         f.write("Text\tLabel\tPrediction\n")
         for i in range(len(preds)):
             for p, l in zip(preds[i], labels[i]):
                 if (p and l == 0) or (not p and l == 1):
-                    pred_n = [
-                        label_map[i] for i, pp in enumerate(preds[i]) if pp
-                    ]
-                    f.write(dev_ds.data[i]["text"] + "\t" +
-                            dev_ds.data[i]["label_n"] + "\t" +
-                            ",".join(pred_n) + "\n")
+                    pred_n = [label_map[i] for i, pp in enumerate(preds[i]) if pp]
+                    f.write(dev_ds.data[i]["text"] + "\t" + dev_ds.data[i]["label_n"] + "\t" + ",".join(pred_n) + "\n")
                     break
 
     f.close()

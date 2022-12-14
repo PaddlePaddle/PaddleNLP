@@ -21,25 +21,25 @@ import json
 from text2sql.utils import metrics
 
 
-def evaluate(model, dataset, infer_results, name='DuSQL', eval_value=True):
-    if name.lower() == 'dusql':
+def evaluate(model, dataset, infer_results, name="DuSQL", eval_value=True):
+    if name.lower() == "dusql":
         metric = metrics.MetricDuSQLAcc(dataset, eval_value=eval_value)
     else:
-        raise RuntimeError(f'only supports name DuSQL. but got {name}')
+        raise RuntimeError(f"only supports name DuSQL. but got {name}")
 
     for idx, line in enumerate(infer_results):
-        qid, pred_query, db_id, detail_result = line.strip().split('\t')
+        qid, pred_query, db_id, detail_result = line.strip().split("\t")
         dct_result = json.loads(detail_result)
-        qid = dct_result['question_id']
+        qid = dct_result["question_id"]
         metric.update(dataset.get_by_qid(qid)[0], pred_query)
 
     eval_result = metric.finalize()
-    print('evaluating result:', json.dumps(eval_result['total_scores'],
-                                           indent=4))
-    with open('output/debug.json', 'w') as ofs:
+    print("evaluating result:", json.dumps(eval_result["total_scores"], indent=4))
+    with open("output/debug.json", "w") as ofs:
         import random
-        random.shuffle(eval_result['per_item'])
-        json.dump(eval_result['per_item'], ofs, indent=4, ensure_ascii=False)
+
+        random.shuffle(eval_result["per_item"])
+        json.dump(eval_result["per_item"], ofs, indent=4, ensure_ascii=False)
     return eval_result
 
 

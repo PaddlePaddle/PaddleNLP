@@ -45,12 +45,10 @@ def get_paddle_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(
-            f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(
-            f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,
@@ -91,8 +89,7 @@ def test_lr():
                     f"step_{i}_{scheduler_type}_lr",
                     np.array([hf_scheduler.get_last_lr()[-1]]),
                 )
-                pd_reprod_logger.add(f"step_{i}_{scheduler_type}_lr",
-                                     np.array([pd_scheduler.get_lr()]))
+                pd_reprod_logger.add(f"step_{i}_{scheduler_type}_lr", np.array([pd_scheduler.get_lr()]))
 
     diff_helper.compare_info(hf_reprod_logger.data, pd_reprod_logger.data)
     diff_helper.report()

@@ -21,7 +21,7 @@ from paddle.utils import try_import
 from .. import PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
-__all__ = ['CTRLTokenizer']
+__all__ = ["CTRLTokenizer"]
 
 CONTROL_CODES = {
     "Pregnancy": 168629,
@@ -121,41 +121,28 @@ class CTRLTokenizer(PretrainedTokenizer):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "<unk>".
-            
+
     """
+
     resource_files_names = {
         "vocab_file": "vocab.json",
         "merges_file": "merges.txt",
     }
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ctrl":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/vocab.json",
-            "sshleifer-tiny-ctrl":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/vocab.json",
+            "ctrl": "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/vocab.json",
+            "sshleifer-tiny-ctrl": "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/vocab.json",
         },
         "merges_file": {
-            "ctrl":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/merges.txt",
-            "sshleifer-tiny-ctrl":
-            "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/merges.txt",
+            "ctrl": "http://bj.bcebos.com/paddlenlp/models/transformers/ctrl/merges.txt",
+            "sshleifer-tiny-ctrl": "http://bj.bcebos.com/paddlenlp/models/transformers/sshleifer-tiny-ctrl/merges.txt",
         },
     }
-    pretrained_init_configuration = {
-        "ctrl": {},
-        "sshleifer-tiny-ctrl": {
-            "max_len": 256
-        }
-    }
+    pretrained_init_configuration = {"ctrl": {}, "sshleifer-tiny-ctrl": {"max_len": 256}}
 
     CONTROL_CODES = CONTROL_CODES
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 max_len=None,
-                 unk_token="<unk>",
-                 **kwargs):
+    def __init__(self, vocab_file, merges_file, max_len=None, unk_token="<unk>", **kwargs):
         self._vocab_file = vocab_file
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
@@ -190,8 +177,7 @@ class CTRLTokenizer(PretrainedTokenizer):
             return token
 
         while True:
-            bigram = min(
-                pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -207,8 +193,7 @@ class CTRLTokenizer(PretrainedTokenizer):
                     new_word.extend(word[i:j])
                     i = j
 
-                if word[i] == first and i < len(word) - 1 and word[i +
-                                                                   1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -248,7 +233,7 @@ class CTRLTokenizer(PretrainedTokenizer):
         return self._tokenize(text)
 
     def _tokenize(self, text):
-        """ Tokenize a string. """
+        """Tokenize a string."""
         split_tokens = []
         re = try_import("regex")
         words = re.findall(r"\S+\n?", text)
@@ -257,7 +242,7 @@ class CTRLTokenizer(PretrainedTokenizer):
         return split_tokens
 
     def _convert_token_to_id(self, token):
-        """Converts a token (str) to an id using the vocab. """
+        """Converts a token (str) to an id using the vocab."""
         return self.encoder.get(token, self.encoder.get(self.unk_token))
 
     def _convert_id_to_token(self, index):
@@ -318,8 +303,8 @@ class CTRLTokenizer(PretrainedTokenizer):
             logger.warning(
                 "Token indices sequence length is longer than the specified maximum "
                 " sequence length for this CTRL model ({} > {}). Running this"
-                " sequence through the model will result in indexing errors".
-                format(len(ids), self.max_len))
+                " sequence through the model will result in indexing errors".format(len(ids), self.max_len)
+            )
         return ids
 
     def convert_ids_to_tokens(self, ids, skip_special_tokens=False):
@@ -363,7 +348,7 @@ class CTRLTokenizer(PretrainedTokenizer):
 
         Args:
             save_directory (str): Directory to save files into.
-            
+
         """
         for name, file_name in self.resource_files_names.items():
             source_path = getattr(self, "_%s" % name)

@@ -60,47 +60,38 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
     """
 
     # Seperates data into some batches.
-    batches = [
-        data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
-    ]
+    batches = [data[idx : idx + batch_size] for idx in range(0, len(data), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_token_id),  # query_ids
         Pad(axis=0, pad_val=pad_token_id),  # title_ids
         Stack(dtype="int64"),  # query_seq_lens
         Stack(dtype="int64"),  # title_seq_lens
-        Stack(dtype='int64'),
+        Stack(dtype="int64"),
     ): [data for data in fn(samples)]
 
     model.train()
     results = []
     for batch in batches:
-        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(
-            batch)
+        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(batch)
         query_ids = paddle.to_tensor(query_ids)
         title_ids = paddle.to_tensor(title_ids)
         query_seq_lens = paddle.to_tensor(query_seq_lens)
         title_seq_lens = paddle.to_tensor(title_seq_lens)
-        probs, addiational_info = model.forward_interpreter(
-            query_ids, title_ids, query_seq_lens, title_seq_lens)
-        query_emb = addiational_info['embedded'][0]
-        title_emb = addiational_info['embedded'][1]
+        probs, addiational_info = model.forward_interpreter(query_ids, title_ids, query_seq_lens, title_seq_lens)
+        query_emb = addiational_info["embedded"][0]
+        title_emb = addiational_info["embedded"][1]
 
         predicted_class_probs = paddle.max(probs, axis=-1)
         predicted_class_probs = predicted_class_probs.sum()
         paddle.autograd.backward([predicted_class_probs])
-        q_gradients = (
-            (query_emb *
-             query_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
+        q_gradients = ((query_emb * query_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
         q_grad_output = q_gradients / q_gradients.sum(-1, keepdim=True)
-        t_gradients = (
-            (title_emb *
-             title_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
+        t_gradients = ((title_emb * title_emb.grad).sum(-1).detach()).abs()  # gradients: (1, seq_len)
         t_grad_output = t_gradients / t_gradients.sum(-1, keepdim=True)
 
         model.clear_gradients()
-        for query_id, title_id in zip(query_ids.numpy().tolist(),
-                                      title_ids.numpy().tolist()):
+        for query_id, title_id in zip(query_ids.numpy().tolist(), title_ids.numpy().tolist()):
             query = [vocab._idx_to_token[idx] for idx in query_id]
             title = [vocab._idx_to_token[idx] for idx in title_id]
         results.append([q_grad_output, query, t_grad_output, title])
@@ -110,18 +101,14 @@ def interpret(model, data, label_map, batch_size=1, pad_token_id=0, vocab=None):
 
 
 if __name__ == "__main__":
-    paddle.set_device(args.device + ':1')
+    paddle.set_device(args.device + ":1")
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(args.vocab_path,
-                                  unk_token='[UNK]',
-                                  pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token="[UNK]", pad_token="[PAD]")
     tokenizer = CharTokenizer(vocab, args.language)
-    label_map = {0: 'dissimilar', 1: 'similar'}
+    label_map = {0: "dissimilar", 1: "similar"}
 
     # Constructs the newtork.
-    model = SimNet(network=args.network,
-                   vocab_size=len(vocab),
-                   num_classes=len(label_map))
+    model = SimNet(network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
@@ -134,12 +121,14 @@ if __name__ == "__main__":
 
     dev_examples = preprocess_data(dev_ds.data, tokenizer, args.language)
     test_examples = preprocess_data(test_ds.data, tokenizer, args.language)
-    results = interpret(model,
-                        dev_examples,
-                        label_map=label_map,
-                        batch_size=args.batch_size,
-                        pad_token_id=vocab.token_to_idx.get('[PAD]', 0),
-                        vocab=vocab)
+    results = interpret(
+        model,
+        dev_examples,
+        label_map=label_map,
+        batch_size=args.batch_size,
+        pad_token_id=vocab.token_to_idx.get("[PAD]", 0),
+        vocab=vocab,
+    )
 
     # for idx, text in enumerate(data):
     #     print('Data: {} \t Label: {}'.format(text, results[idx]))

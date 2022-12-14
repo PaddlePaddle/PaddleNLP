@@ -21,49 +21,38 @@ import paddle
 
 def gen_id2corpus(corpus_file):
     id2corpus = {}
-    with open(corpus_file, 'r', encoding='utf-8') as f:
+    with open(corpus_file, "r", encoding="utf-8") as f:
         for idx, line in enumerate(f):
             id2corpus[idx] = line.rstrip()
     return id2corpus
 
 
-def create_dataloader(dataset,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None,
-                      trans_fn=None):
+def create_dataloader(dataset, mode="train", batch_size=1, batchify_fn=None, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
-    if mode == 'train':
-        batch_sampler = paddle.io.DistributedBatchSampler(dataset,
-                                                          batch_size=batch_size,
-                                                          shuffle=shuffle)
+    shuffle = True if mode == "train" else False
+    if mode == "train":
+        batch_sampler = paddle.io.DistributedBatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=shuffle)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=shuffle)
 
-    return paddle.io.DataLoader(dataset=dataset,
-                                batch_sampler=batch_sampler,
-                                collate_fn=batchify_fn,
-                                return_list=True)
+    return paddle.io.DataLoader(dataset=dataset, batch_sampler=batch_sampler, collate_fn=batchify_fn, return_list=True)
 
 
 def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
     """
     Builds model inputs from a sequence.
-        
+
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``
 
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
@@ -75,9 +64,9 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
     result = []
 
     for key, text in example.items():
-        if 'label' in key:
+        if "label" in key:
             # do_evaluate
-            result += [example['label']]
+            result += [example["label"]]
         else:
             # do_train
             encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length)
@@ -88,22 +77,19 @@ def convert_example(example, tokenizer, max_seq_length=512, do_evalute=False):
     return result
 
 
-def convert_example_test(example,
-                         tokenizer,
-                         max_seq_length=512,
-                         pad_to_max_seq_len=False):
+def convert_example_test(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
-        
+
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``
 
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
@@ -114,9 +100,7 @@ def convert_example_test(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(text=text,
-                                   max_seq_len=max_seq_length,
-                                   pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length, pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -125,31 +109,31 @@ def convert_example_test(example,
 
 def read_simcse_text(data_path):
     """Reads data."""
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip()
-            yield {'text_a': data, 'text_b': data}
+            yield {"text_a": data, "text_b": data}
 
 
 def read_text_pair(data_path, is_test=False):
     """Reads data."""
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             data = line.rstrip().split("\t")
             if is_test == False:
                 if len(data) != 3:
                     continue
-                yield {'text_a': data[0], 'text_b': data[1], 'label': data[2]}
+                yield {"text_a": data[0], "text_b": data[1], "label": data[2]}
             else:
                 if len(data) != 2:
                     continue
-                yield {'text_a': data[0], 'text_b': data[1]}
+                yield {"text_a": data[0], "text_b": data[1]}
 
 
 def gen_text_file(similar_text_pair_file):
     text2similar_text = {}
     texts = []
-    with open(similar_text_pair_file, 'r', encoding='utf-8') as f:
+    with open(similar_text_pair_file, "r", encoding="utf-8") as f:
         for line in f:
             splited_line = line.rstrip().split("\t")
             if len(splited_line) != 2:
@@ -179,11 +163,10 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         actual_len = np.count_nonzero(cur_input_id)
         dup_word_index = []
         # If sequence length is less than 5, skip it
-        if (actual_len > 5):
+        if actual_len > 5:
             dup_len = random.randint(a=0, b=max(2, int(dup_rate * actual_len)))
             # Skip cls and sep position
-            dup_word_index = random.sample(list(range(1, actual_len - 1)),
-                                           k=dup_len)
+            dup_word_index = random.sample(list(range(1, actual_len - 1)), k=dup_len)
 
         r_input_id = []
         r_token_type_id = []
@@ -207,6 +190,6 @@ def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
         repetitied_input_ids[batch_id] += [0] * pad_len
         repetitied_token_type_ids[batch_id] += [0] * pad_len
 
-    return paddle.to_tensor(repetitied_input_ids,
-                            dtype='int64'), paddle.to_tensor(
-                                repetitied_token_type_ids, dtype='int64')
+    return paddle.to_tensor(repetitied_input_ids, dtype="int64"), paddle.to_tensor(
+        repetitied_token_type_ids, dtype="int64"
+    )

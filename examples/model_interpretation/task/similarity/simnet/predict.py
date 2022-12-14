@@ -50,9 +50,7 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     """
 
     # Seperates data into some batches.
-    batches = [
-        data[idx:idx + batch_size] for idx in range(0, len(data), batch_size)
-    ]
+    batches = [data[idx : idx + batch_size] for idx in range(0, len(data), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=pad_token_id),  # query_ids
@@ -64,8 +62,7 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
     results = []
     model.eval()
     for batch in batches:
-        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(
-            batch)
+        query_ids, title_ids, query_seq_lens, title_seq_lens = batchify_fn(batch)
         query_ids = paddle.to_tensor(query_ids)
         title_ids = paddle.to_tensor(title_ids)
         query_seq_lens = paddle.to_tensor(query_seq_lens)
@@ -82,16 +79,12 @@ def predict(model, data, label_map, batch_size=1, pad_token_id=0):
 if __name__ == "__main__":
     paddle.set_device(args.device)
     # Loads vocab.
-    vocab = Vocab.load_vocabulary(args.vocab_path,
-                                  unk_token='[UNK]',
-                                  pad_token='[PAD]')
+    vocab = Vocab.load_vocabulary(args.vocab_path, unk_token="[UNK]", pad_token="[PAD]")
     tokenizer = JiebaTokenizer(vocab)
-    label_map = {0: 'dissimilar', 1: 'similar'}
+    label_map = {0: "dissimilar", 1: "similar"}
 
     # Constructs the newtork.
-    model = SimNet(network=args.network,
-                   vocab_size=len(vocab),
-                   num_classes=len(label_map))
+    model = SimNet(network=args.network, vocab_size=len(vocab), num_classes=len(label_map))
 
     # Loads model parameters.
     state_dict = paddle.load(args.params_path)
@@ -100,16 +93,18 @@ if __name__ == "__main__":
 
     # Firstly pre-processing prediction data  and then do predict.
     data = [
-        ['世界上什么东西最小', '世界上什么东西最小？'],
-        ['光眼睛大就好看吗', '眼睛好看吗？'],
-        ['小蝌蚪找妈妈怎么样', '小蝌蚪找妈妈是谁画的'],
+        ["世界上什么东西最小", "世界上什么东西最小？"],
+        ["光眼睛大就好看吗", "眼睛好看吗？"],
+        ["小蝌蚪找妈妈怎么样", "小蝌蚪找妈妈是谁画的"],
     ]
     examples = preprocess_prediction_data(data, tokenizer)
-    results = predict(model,
-                      examples,
-                      label_map=label_map,
-                      batch_size=args.batch_size,
-                      pad_token_id=vocab.token_to_idx.get('[PAD]', 0))
+    results = predict(
+        model,
+        examples,
+        label_map=label_map,
+        batch_size=args.batch_size,
+        pad_token_id=vocab.token_to_idx.get("[PAD]", 0),
+    )
 
     for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+        print("Data: {} \t Label: {}".format(text, results[idx]))

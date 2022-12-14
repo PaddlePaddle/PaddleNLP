@@ -31,9 +31,15 @@
 
 ## News 📢
 
+* 🔥 **2022.12.9 发布 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
+  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型**UIE-X**，具有突出的零样本效果及小样本迁移能力。
+  * 🔨 产业应用：新增[**信息抽取全流程应用方案**](./applications/information_extraction)，支持文本、文档各类信息抽取场景，提供从数据标注、微调到部署的产业级全流程解决方案。
+* 🔥 **2022.11.28 发布 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
+  * 💪 框架升级：新增[**Huggingface Hub集成**](https://huggingface.co/PaddlePaddle)，后续将逐步支持Model，Tokenizer，Taskflow直接从[Huggingface Hub](https://huggingface.co/PaddlePaddle)加载；[**小样本 Prompt API**](./docs/advanced_guide/prompt.md)升级，支持PET算法实现。
+  * 💎 NLP工具：[**NLP 流水线系统 Pipelines**](./pipelines)检索能力再加强，新增交互式学习语义检索模型[Ernie-Search](./pipelines/API.md)；发布[**SimpleServing**](./docs/server.md)，支持Taskflow、预训练模型快速部署。
 * 🔥 **2022.11.17 发布 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)**
   * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE AutoPrompt 方案](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
-  * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。💬 新增[**无监督问答 Pipiline**](./pipelines/examples/unsupervised-question-answering/)，支持用少量标注数据低成本搭建检索问答系统，效果领先。
+  * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
   * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
   * 发布 🖼[**PPDiffusers**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，可快速体验、二次开发 **Stable Diffusion**，持续支持更多模型。
@@ -58,6 +64,7 @@
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/200770385-a2c02093-0e1d-4189-b324-8b0251cba316.jpg" width="150" height="150" />
 </div>
+
 ## 特性
 
 #### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>

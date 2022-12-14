@@ -33,16 +33,14 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="The name of the task to perform predict, selected in the list: " +
-        ", ".join(METRIC_CLASSES.keys()),
+        help="The name of the task to perform predict, selected in the list: " + ", ".join(METRIC_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_type",
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
+        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_path",
@@ -67,8 +65,7 @@ def parse_args():
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
+        help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
     args = parser.parse_args()
@@ -76,7 +73,6 @@ def parse_args():
 
 
 class Predictor(object):
-
     def __init__(self, predictor, input_handles, output_handles):
         self.predictor = predictor
         self.input_handles = input_handles
@@ -84,8 +80,7 @@ class Predictor(object):
 
     @classmethod
     def create_predictor(cls, args):
-        config = paddle.inference.Config(args.model_path + ".pdmodel",
-                                         args.model_path + ".pdiparams")
+        config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
         if args.device == "gpu":
             # set GPU configs accordingly
             config.enable_use_gpu(100, 0)
@@ -98,35 +93,22 @@ class Predictor(object):
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handles = [
-            predictor.get_output_handle(name)
-            for name in predictor.get_output_names()
-        ]
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
         return cls(predictor, input_handles, output_handles)
 
     def predict_batch(self, data):
         for input_field, input_handle in zip(data, self.input_handles):
-            input_handle.copy_from_cpu(input_field.numpy(
-            ) if isinstance(input_field, paddle.Tensor) else input_field)
+            input_handle.copy_from_cpu(input_field.numpy() if isinstance(input_field, paddle.Tensor) else input_field)
         self.predictor.run()
-        output = [
-            output_handle.copy_to_cpu() for output_handle in self.output_handles
-        ]
+        output = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
         return output
 
     def predict(self, dataset, collate_fn, batch_size=1):
-        batch_sampler = paddle.io.BatchSampler(dataset,
-                                               batch_size=batch_size,
-                                               shuffle=False)
-        data_loader = paddle.io.DataLoader(dataset=dataset,
-                                           batch_sampler=batch_sampler,
-                                           collate_fn=collate_fn,
-                                           num_workers=0,
-                                           return_list=True)
+        batch_sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, shuffle=False)
+        data_loader = paddle.io.DataLoader(
+            dataset=dataset, batch_sampler=batch_sampler, collate_fn=collate_fn, num_workers=0, return_list=True
+        )
         outputs = []
         for data in data_loader:
             output = self.predict_batch(data)
@@ -144,14 +126,14 @@ def main():
     model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     sentence1_key, sentence2_key = task_to_keys[args.task_name]
 
-    test_ds = load_dataset('glue', args.task_name, split="test")
-    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(
-        args.model_path))
+    test_ds = load_dataset("glue", args.task_name, split="test")
+    tokenizer = tokenizer_class.from_pretrained(os.path.dirname(args.model_path))
 
     def preprocess_function(examples):
         # Tokenize the texts
-        texts = ((examples[sentence1_key], ) if sentence2_key is None else
-                 (examples[sentence1_key], examples[sentence2_key]))
+        texts = (
+            (examples[sentence1_key],) if sentence2_key is None else (examples[sentence1_key], examples[sentence2_key])
+        )
         result = tokenizer(*texts, max_seq_len=args.max_seq_length)
         if "label" in examples:
             # In all cases, rename the column to labels because the model will expect that.
@@ -159,16 +141,13 @@ def main():
         return result
 
     test_ds = test_ds.map(preprocess_function)
-    batchify_fn = lambda samples, fn=Dict({
-        'input_ids':
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        'token_type_ids':
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-            ),  # segment
-    }): fn(samples)
-    predictor.predict(test_ds,
-                      batch_size=args.batch_size,
-                      collate_fn=batchify_fn)
+    batchify_fn = lambda samples, fn=Dict(
+        {
+            "input_ids": Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            "token_type_ids": Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        }
+    ): fn(samples)
+    predictor.predict(test_ds, batch_size=args.batch_size, collate_fn=batchify_fn)
 
 
 if __name__ == "__main__":
