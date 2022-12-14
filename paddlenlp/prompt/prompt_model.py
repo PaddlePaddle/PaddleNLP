@@ -125,17 +125,18 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
     def get_input_spec(self):
         template_keywords = self.template.extract_template_keywords(self.template.prompt)
         input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
-            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
         ]
         if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None], dtype="int64"))  # masked_positions
+            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
         if "soft" in template_keywords:
+            # Add placeholder for argument `masked_positions` if not exists.
             if "mask" not in template_keywords:
                 input_spec.append(None)
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # soft_token_ids
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
             if "encoder" in template_keywords:
-                input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # encoder_ids
+                input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
         return input_spec
