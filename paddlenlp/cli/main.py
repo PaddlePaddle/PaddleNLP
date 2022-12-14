@@ -32,7 +32,6 @@ import inspect
 import shutil
 
 import typer
-from typer import Typer
 
 from paddlenlp.cli.converter import convert_from_local_dir
 from paddlenlp.cli.download import load_community_models
@@ -95,7 +94,7 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     return model_names
 
 
-app = Typer()
+app = typer.Typer()
 
 
 @app.command()
@@ -224,9 +223,11 @@ def server(
     start_backend(app, **backend_kwargs)
 
 
-@app.command(help="install the target version of paddlenlp")
+@app.command(
+    help="install the target version of paddlenlp, eg: paddlenlp install / paddlenlp install paddlepaddle==latest"
+)
 def install(
-    package: str = typer.Option("paddlenlp==latest", "--package-name", help="install the target version of paddlenlp")
+    package: str = typer.Argument(default="paddlenlp==latest", help="install the target version of paddlenlp")
 ):
     """The main function for the staring the SimpleServer"""
     package = package.replace(" ", "").strip()
@@ -244,11 +245,14 @@ def install(
 
     tag = "latest"
     package_name = splits[0]
+
+    # TODO(wj-Mcat): will support `pipelines`, `ppdiffusers` later.
     assert package_name in ["paddlenlp"], "we only support paddlenlp"
 
     if len(splits) == 2:
         tag = splits[1]
 
+    # 2. download & install package from bos server
     install_package_from_bos(package_name=package_name, tag=tag)
 
 

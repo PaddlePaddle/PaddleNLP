@@ -14,55 +14,34 @@
 
 import os.path
 import subprocess
-import sys
 
 from paddlenlp.utils.downloader import get_path_from_url_with_filelock, url_file_exists
 from paddlenlp.utils.env import PACKAGE_HOME
 from paddlenlp.utils.log import logger
 
 PACKAGE_SERVER_HOME = "https://paddlenlp.bj.bcebos.com/wheels"
-PY_VERSIONS = ["py37", "py38", "py39", "py310"]
 
 
-def get_current_py_version() -> str:
-    """
-    get current python version
-    Returns:
-
-    """
-    version_info = sys.version_info
-    assert version_info.major == 3, "must be python3"
-
-    py_version = f"py3{version_info.minor}"
-    if 7 <= version_info.minor <= 10:
-        if py_version in PY_VERSIONS:
-            return py_version
-
-    raise EnvironmentError(f"latest paddlenlp only support python >=3.7,<=3.10, but received {py_version}")
-
-
-def install_package_from_bos(package_name, tag: str = "latest"):
+def install_package_from_bos(package_name: str, tag: str):
     """
     install package from bos server based on package_name and tag
     Args:
-        package_name: the name of package, eg: paddlenlp, ppdiffusers, paddle-pipelines
-        tag: pr number、 version of paddlenlp, or latest
+        package_name (str): the name of package, eg: paddlenlp, ppdiffusers, paddle-pipelines
+        tag (str): pr number、 version of paddlenlp, or latest
     """
-
     # eg: https://paddlenlp.bj.bcebos.com/wheels/paddlenlp-latest-py3-none-any.whl
     file_name = f"{package_name}-{tag}-py3-none-any.whl"
+    logger.info(f"start to downloading package<{file_name}>")
 
     package_url = f"{PACKAGE_SERVER_HOME}/{file_name}"
     if not url_file_exists(package_url):
-        raise ValueError(
-            f"there is not valid package<{package_name}_{get_current_py_version()}_{tag}.whl> "
-            f"from the url<{package_url}>"
-        )
+        raise ValueError(f"there is not valid package<{package_name}_py3_{tag}.whl> " f"from the url<{package_url}>")
 
     file_path = os.path.join(PACKAGE_HOME, file_name)
-    if not os.path.exists(file_path):
-        logger.info(f"start to downloading package<{file_name}> from {package_url}")
-        file_path = get_path_from_url_with_filelock(package_url, PACKAGE_HOME)
 
-    command = f"python -m pip install -i https://mirror.baidu.com/pypi/simple {file_path} --upgrade".split()
+    # force download
+    file_path = get_path_from_url_with_filelock(package_url, PACKAGE_HOME, check_exist=False)
+
+    # force reinstall the local package but ignore the dependencies
+    command = f"python -m pip install --force-reinstall --no-dependencies {file_path}".split()
     subprocess.Popen(command)
