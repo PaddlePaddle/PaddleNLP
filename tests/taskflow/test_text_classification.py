@@ -14,39 +14,49 @@
 
 import os
 import unittest
+from tempfile import TemporaryDirectory
 
 import paddle
 from parameterized import parameterized
-from tempfile import TemporaryDirectory
+
 from paddlenlp.taskflow import Taskflow
 from paddlenlp.taskflow.text_classification import TextClassificationTask
 from paddlenlp.transformers import AutoTokenizer, ErnieForSequenceClassification
 
 
 class TestTextClassificationTask(unittest.TestCase):
-    def setUp(self):
-        self.temp_dir = TemporaryDirectory()
-        self.dygraph_model_path = os.path.join(self.temp_dir.name, "dygraph")
+    @classmethod
+    def setUpClass(cls):
+        cls.temp_dir = TemporaryDirectory()
+        cls.dygraph_model_path = os.path.join(cls.temp_dir.name, "dygraph")
         model = ErnieForSequenceClassification.from_pretrained("__internal_testing__/ernie", num_classes=2)
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/ernie")
-        model.save_pretrained(self.dygraph_model_path)
-        tokenizer.save_pretrained(self.dygraph_model_path)
+        model.save_pretrained(cls.dygraph_model_path)
+        tokenizer.save_pretrained(cls.dygraph_model_path)
 
         # export to static
-        self.static_model_path = os.path.join(self.temp_dir.name, "static")
+        cls.static_model_path = os.path.join(cls.temp_dir.name, "static")
         input_spec = [
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
             paddle.static.InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
         ]
         static_model = paddle.jit.to_static(model, input_spec=input_spec)
-        paddle.jit.save(static_model, self.static_model_path)
-        tokenizer.save_pretrained(self.static_model_path)
+        paddle.jit.save(static_model, cls.static_model_path)
+        tokenizer.save_pretrained(cls.static_model_path)
 
-    def tearDown(self):
-        self.temp_dir.cleanup()
+    @classmethod
+    def tearDownClass(cls):
+        cls.temp_dir.cleanup()
 
-    @parameterized.expand([(1,), (2,)])
-    def test_text_classification_task(self, batch_size):
+    @parameterized.expand(
+        [
+            (1, "multi_class"),
+            (2, "multi_class"),
+            (1, "multi_label"),
+            (2, "multi_label"),
+        ]
+    )
+    def test_classification_task(self, batch_size, model):
         # input_text is a tuple to simulate the args passed from Taskflow to TextClassificationTask
         input_text = (["百度", "深度学习框架", "飞桨", "PaddleNLP"],)
         id2label = {
@@ -54,7 +64,7 @@ class TestTextClassificationTask(unittest.TestCase):
             1: "positive",
         }
         dygraph_taskflow = TextClassificationTask(
-            model="multi_class",
+            model=model,
             task="text_classification",
             task_path=self.dygraph_model_path,
             id2label=id2label,
@@ -63,10 +73,11 @@ class TestTextClassificationTask(unittest.TestCase):
         )
 
         dygraph_results = dygraph_taskflow(input_text)
+
         self.assertEqual(len(dygraph_results), len(input_text[0]))
 
         static_taskflow = TextClassificationTask(
-            model="multi_class",
+            model=model,
             task="text_classification",
             is_static_model=True,
             task_path=self.static_model_path,
@@ -79,18 +90,29 @@ class TestTextClassificationTask(unittest.TestCase):
         self.assertEqual(len(static_results), len(input_text[0]))
 
         for dygraph_result, static_result in zip(dygraph_results, static_results):
-            self.assertEqual(dygraph_result["label"], static_result["label"])
-            self.assertAlmostEqual(dygraph_result["score"], static_result["score"], delta=1e-6)
+            for dygraph_pred, static_pred in zip(dygraph_result["predictions"], static_result["predictions"]):
+                self.assertEqual(dygraph_pred["label"], static_pred["label"])
+                self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
+                # if multi_label, all predictions should be greater than the threshold
+                if model == "multi_label":
+                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.multilabel_threshold)
 
-    @parameterized.expand([(1,), (2,)])
-    def test_taskflow(self, batch_size):
+    @parameterized.expand(
+        [
+            (1, "multi_class"),
+            (2, "multi_class"),
+            (1, "multi_label"),
+            (2, "multi_label"),
+        ]
+    )
+    def test_taskflow(self, batch_size, model):
         input_text = ["百度", "深度学习框架", "飞桨", "PaddleNLP"]
         id2label = {
             0: "negative",
             1: "positive",
         }
         dygraph_taskflow = Taskflow(
-            model="multi_class",
+            model=model,
             task="text_classification",
             task_path=self.dygraph_model_path,
             id2label=id2label,
@@ -101,7 +123,7 @@ class TestTextClassificationTask(unittest.TestCase):
         self.assertEqual(len(dygraph_results), len(input_text))
 
         static_taskflow = Taskflow(
-            model="multi_class",
+            model=model,
             task="text_classification",
             is_static_model=True,
             task_path=self.static_model_path,
@@ -113,5 +135,9 @@ class TestTextClassificationTask(unittest.TestCase):
         self.assertEqual(len(static_results), len(input_text))
 
         for dygraph_result, static_result in zip(dygraph_results, static_results):
-            self.assertEqual(dygraph_result["label"], static_result["label"])
-            self.assertAlmostEqual(dygraph_result["score"], static_result["score"], delta=1e-6)
+            for dygraph_pred, static_pred in zip(dygraph_result["predictions"], static_result["predictions"]):
+                self.assertEqual(dygraph_pred["label"], static_pred["label"])
+                self.assertAlmostEqual(dygraph_pred["score"], static_pred["score"], delta=1e-6)
+                # if multi_label, all predictions should be greater than the threshold
+                if model == "multi_label":
+                    self.assertGreater(dygraph_pred["score"], dygraph_taskflow.task_instance.multilabel_threshold)
