@@ -102,7 +102,13 @@
 
 ### 2.4 效果展示
 
-- UIE-X端到端文档抽取
+- 🧾 通过[Huggingface网页](https://huggingface.co/spaces/PaddlePaddle/UIE-X)体验UIE-X功能：
+
+<div align="center">
+    <img src=https://user-images.githubusercontent.com/40840292/207856955-a01cd5dd-fd5c-48ae-b8fd-c69512a88845.png height=500 width=900 hspace='10'/>
+</div>
+
+- UIE-X端到端文档抽取产业应用示例
 
   - 报关单
 
@@ -125,7 +131,7 @@
   - 表单（需微调）
 
     <div align="center">
-        <img src=https://user-images.githubusercontent.com/40840292/206080645-2f07d560-b949-4248-a51f-1735692cb241.png height=400 width=700 />
+        <img src=https://user-images.githubusercontent.com/40840292/207856330-7aa0d158-47e0-477f-a88f-e23a040504a3.png height=400 width=700 />
     </div>
 
 <a name="3"></a>
