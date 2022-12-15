@@ -12,27 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
 import argparse
+import distutils.util
+import math
+import os
 import random
 import time
-import distutils.util
-from pprint import pprint
 from functools import partial
-from tqdm import tqdm
-import numpy as np
-import math
-from datasets import load_dataset
+from pprint import pprint
 
+import numpy as np
 import paddle
-import paddle.nn as nn
-from paddle.io import BatchSampler, DistributedBatchSampler, DataLoader
-from paddlenlp.transformers import PegasusForConditionalGeneration, PegasusChineseTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+from datasets import load_dataset
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+from tqdm import tqdm
+from utils import compute_metrics, convert_example, main_process_first
+
 from paddlenlp.data import DataCollatorForSeq2Seq
-from utils import convert_example, compute_metrics, main_process_first
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    PegasusChineseTokenizer,
+    PegasusForConditionalGeneration,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -42,11 +44,10 @@ def parse_args():
         "--model_name_or_path",
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
         type=str,
-        required=True,
         help="Path to pre-trained model. ",
     )
-    parser.add_argument("--train_file", type=str, required=False, default=None, help="Train data path.")
-    parser.add_argument("--eval_file", type=str, required=False, default=None, help="Eval data path.")
+    parser.add_argument("--train_file", type=str, required=False, default="data/train.json", help="Train data path.")
+    parser.add_argument("--eval_file", type=str, required=False, default="data/test.json", help="Eval data path.")
     parser.add_argument(
         "--output_dir",
         default="output",
@@ -77,7 +78,7 @@ def parse_args():
     )
     parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
     parser.add_argument(
-        "--num_train_epochs",
+        "--epoch",
         default=3,
         type=int,
         help="Total number of training epochs to perform.",
@@ -86,13 +87,13 @@ def parse_args():
     parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
     parser.add_argument(
         "--train_batch_size",
-        default=20,
+        default=2,
         type=int,
         help="Batch size per GPU/CPU for training.",
     )
     parser.add_argument(
         "--eval_batch_size",
-        default=12,
+        default=2,
         type=int,
         help="Batch size per GPU/CPU for evaluation.",
     )
@@ -111,7 +112,7 @@ def parse_args():
         "--max_steps",
         default=-1,
         type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
+        help="If > 0: set total number of training steps to perform. Override epoch.",
     )
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
@@ -159,8 +160,9 @@ def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length
         )
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
         all_labels.extend(tokenizer.batch_decode(labels, skip_special_tokens=True, clean_up_tokenization_spaces=False))
-    compute_metrics(all_preds, all_labels)
+    rougel = compute_metrics(all_preds, all_labels)
     model.train()
+    return rougel
 
 
 def do_train(args):
@@ -207,8 +209,8 @@ def do_train(args):
         num_training_steps = args.max_steps
         num_train_epochs = math.ceil(num_training_steps / len(train_data_loader))
     else:
-        num_training_steps = len(train_data_loader) * args.num_train_epochs
-        num_train_epochs = args.num_train_epochs
+        num_training_steps = len(train_data_loader) * args.epoch
+        num_train_epochs = args.epoch
 
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
 
@@ -230,6 +232,7 @@ def do_train(args):
     if args.use_amp:
         scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
+    best_rougel = 0
     tic_train = time.time()
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
@@ -262,10 +265,11 @@ def do_train(args):
                 tic_train = time.time()
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
-                evaluate(model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length)
+                rougel = evaluate(model, dev_data_loader, tokenizer, args.min_target_length, args.max_target_length)
                 logger.info("eval done total : %s s" % (time.time() - tic_eval))
-                if paddle.distributed.get_rank() == 0:
-                    output_dir = os.path.join(args.output_dir, "pegeaus_model_%d" % global_step)
+                if paddle.distributed.get_rank() == 0 and best_rougel < rougel:
+                    best_rougel = rougel
+                    output_dir = args.output_dir
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
                     # Need better way to get inner model of DataParallel
@@ -274,14 +278,6 @@ def do_train(args):
                     tokenizer.save_pretrained(output_dir)
             if global_step >= num_training_steps:
                 return
-    if paddle.distributed.get_rank() == 0:
-        output_dir = os.path.join(args.output_dir, "pegeaus_modelfinal_%d" % global_step)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
-        # Need better way to get inner model of DataParallel
-        model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-        model_to_save.save_pretrained(output_dir)
-        tokenizer.save_pretrained(output_dir)
 
 
 if __name__ == "__main__":

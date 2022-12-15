@@ -12,38 +12,44 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
 import argparse
 import random
 import time
 from functools import partial
 from pprint import pprint
+
 import numpy as np
-from datasets import load_dataset
 import paddle
+from datasets import load_dataset
 from paddle.io import BatchSampler, DataLoader
-from paddlenlp.transformers import PegasusForConditionalGeneration, PegasusChineseTokenizer
-from utils import convert_example, compute_metrics
+from utils import compute_metrics, convert_example
+
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.transformers import (
+    PegasusChineseTokenizer,
+    PegasusForConditionalGeneration,
+)
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # Required parameters
     parser.add_argument(
-        "--model_name_or_path",
+        "--init_checkpoint_dir",
         default="IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese",
         type=str,
         required=True,
         help="Path to pre-trained model. ",
     )
-    parser.add_argument("--prefict_file", type=str, required=False, default=None, help="Predict data path.")
+    parser.add_argument(
+        "--prefict_file", type=str, required=False, default="data/valid.json", help="Predict data path."
+    )
     parser.add_argument(
         "--output_path", type=str, default="generate.txt", help="The file path where the infer result will be saved."
     )
     parser.add_argument(
         "--max_source_length",
-        default=1024,
+        default=128,
         type=int,
         help="The maximum total input sequence length after "
         "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",
@@ -56,7 +62,7 @@ def parse_args():
     )
     parser.add_argument(
         "--max_target_length",
-        default=142,
+        default=64,
         type=int,
         help="The maximum total sequence length for target text after "
         "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."
@@ -94,7 +100,7 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 when using faster transformer. Only works when using faster transformer. ",
     )
-    parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for testing or evaluation.")
+    parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for testing or evaluation.")
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
@@ -122,8 +128,8 @@ def set_seed(args):
 def generate(args):
     paddle.set_device(args.device)
     set_seed(args)
-    tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
-    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path)
+    tokenizer = PegasusChineseTokenizer.from_pretrained(args.init_checkpoint_dir)
+    model = PegasusForConditionalGeneration.from_pretrained(args.init_checkpoint_dir)
     dataset = load_dataset("json", data_files=args.prefict_file, split="train")
     remove_columns = ["content", "title"]
     trans_func = partial(
