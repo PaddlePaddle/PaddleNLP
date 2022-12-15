@@ -157,10 +157,28 @@ class AutoTokenizer:
             import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.tokenizer")
             tokenizer_class = getattr(import_class, init_class)
             if use_fast:
-                for fast_tokenizer_class, name in cls._fast_name_mapping.items():
-                    if name == class_name:
-                        import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.fast_tokenizer")
-                        tokenizer_class = getattr(import_class, fast_tokenizer_class)
+                if is_fast_tokenizer_available():
+                    is_support_fast_tokenizer = False
+                    for faster_tokenizer_class, name in cls._faster_name_mapping.items():
+                        if name == class_name:
+                            is_support_fast_tokenizer = True
+                            import_class = importlib.import_module(
+                                f"paddlenlp.transformers.{class_name}.faster_tokenizer"
+                            )
+                            tokenizer_class = getattr(import_class, faster_tokenizer_class)
+                            break
+                    if not is_support_fast_tokenizer:
+                        logger.warning(
+                            f"The tokenizer {tokenizer_class} doesn't have the faster version."
+                            " Please check the map `paddlenlp.transformers.auto.tokenizer.FAST_TOKENIZER_MAPPING_NAMES`"
+                            " to see which fast tokenizers are currently supported."
+                        )
+                else:
+                    logger.warning(
+                        "Can't find the fast_tokenizer package, "
+                        "please ensure install fast_tokenizer correctly. "
+                        "You can install fast_tokenizer by `pip install fast-tokenizer-python`."
+                    )
             return tokenizer_class
         # If no `init_class`, we use pattern recognition to recognize the tokenizer class.
         else:
