@@ -6,10 +6,7 @@ jobs:
   Test:
     name: Test
     runs-on: ubuntu-20.04
-
-    permissions:
-      pull-requests: write
-
+    permissions: write-all
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v1
