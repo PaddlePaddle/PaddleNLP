@@ -1,6 +1,6 @@
 name: Test
 
-on: [push, pull_request]
+on: [pull_request]
 
 jobs:
   Test:
@@ -24,5 +24,6 @@ jobs:
       - name: Pytest Coverage Comment
         uses: MishaKav/pytest-coverage-comment@v1.1.40
         with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
           pytest-xml-coverage-path: coverage.xml
           report-only-changed-files: true
