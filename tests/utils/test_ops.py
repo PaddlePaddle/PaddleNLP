@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
 import unittest
+
+import numpy as np
 import paddle
+
 import paddlenlp.ops as ops
-from common_test import CommonTest
+from tests.common_test import CommonTest
 
 EINSUM_TEST_SAMPLE = {
     "x": np.random.rand(5),
@@ -159,11 +161,6 @@ class TestEinsumEllipsis3(TestEinsum):
 class TestEinsumTestEinsumBilinear(TestEinsum):
     def setUp(self):
         self.sample = {"paradigm": "bn,anm,bm->ba", "data": ["B", "E", "I"]}
-
-
-class TestEinsumTestEinsumOthers(TestEinsum):
-    def setUp(self):
-        self.sample = {"paradigm": "ijkl, lmn->kmn", "data": ["F", "H"]}
 
 
 class TestEinsumTestEinsumOthers(TestEinsum):

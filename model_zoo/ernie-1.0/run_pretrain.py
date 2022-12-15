@@ -14,42 +14,40 @@
 """
 ERNIE-1.0 pretraining scripts.
 """
-import argparse
 import contextlib
-import os
-import sys
-import random
 import json
-import time
-import yaml
+import os
+import random
 import shutil
+import sys
+import time
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-from paddle.io import DataLoader, Dataset
+import yaml
+from args import parse_args
+from data_tools.dataset_utils import build_train_valid_test_datasets
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
 from visualdl import LogWriter
 
+from paddlenlp.data import Stack
 from paddlenlp.transformers import (
-    ErnieModel,
+    ErnieConfig,
+    ErnieForMaskedLM,
     ErnieForPretraining,
     ErniePretrainingCriterion,
     ErnieTokenizer,
-    ErnieForMaskedLM,
+    LinearAnnealingWithWarmupDecay,
 )
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.ops import Topology
 from paddlenlp.utils.log import logger
 
-from args import parse_args
-from data_tools.dataset_utils import build_train_valid_test_datasets
-
 MODEL_CLASSES = {
-    "ernie": (ErnieModel, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
+    "ernie": (ErnieConfig, ErnieForPretraining, ErniePretrainingCriterion, ErnieTokenizer),
 }
 
 
@@ -115,8 +113,8 @@ def create_pretrained_dataset(
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
         out[5] = out[5].reshape([-1, 1])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        _, seq_length = out[0].shape
+        size = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
         if size % 8 != 0:
@@ -198,7 +196,6 @@ def all_gather(v):
 @paddle.no_grad()
 def run_evaluate(data_loader, model, criterion, iter_steps, log_writer, global_step, args, task_name="valid"):
     model.eval()
-    all_loss, all_lm_loss, all_sop_loss = [], [], []
 
     if args.binary_head:
         loss_global = {
@@ -308,7 +305,7 @@ def args_post_process(args, worker_num):
     accumulate_steps = bsz_per_dp // micro_batch_size
     assert (
         accumulate_steps >= 1
-    ), f"Larger global_batch_size: {arg.global_batch_size} is expect, micro_batch_size is {micro_batch_size}, but only {bsz_per_dp} on each card!"
+    ), f"Larger global_batch_size: {args.global_batch_size} is expect, micro_batch_size is {micro_batch_size}, but only {bsz_per_dp} on each card!"
 
     args.eval_iters *= accumulate_steps
     args.test_iters *= accumulate_steps
@@ -332,7 +329,6 @@ def do_train(args):
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
-    local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
 
     if worker_num > 1:
         paddle.distributed.init_parallel_env()
@@ -351,7 +347,6 @@ def do_train(args):
     strategy.hybrid_configs = {"dp_degree": args.dp_degree, "mp_degree": 1, "pp_degree": 1, "sharding_degree": 1}
 
     fleet.init(is_collective=True, strategy=strategy)
-    hcg = fleet.get_hybrid_communicate_group()
 
     # Create the random seed for the worker
     set_seed(args)
@@ -366,7 +361,7 @@ def do_train(args):
         log_writer = LogWriter(os.path.join(args.output_dir, default_logdir()))
 
     # Define the input data in the static mode
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
     if args.binary_head is False:
         model_class = ErnieForMaskedLM
 
@@ -374,7 +369,6 @@ def do_train(args):
 
     # load config in checkpoint
     global_step = 0
-    consumed_samples = 0
     checkpoint_dir = os.path.join(args.output_dir, "model_last")
     if os.path.exists(checkpoint_dir):
         if os.path.isfile(os.path.join(checkpoint_dir, "./config.yml")):
@@ -383,7 +377,6 @@ def do_train(args):
                 assert (
                     step_config["global_batch_size"] == args.global_batch_size
                 ), "Please ensure checkpoint global batch size is the same. Folder: {}".format(checkpoint_dir)
-                consumed_samples = step_config["consumed_samples"]
                 global_step = step_config["global_step"]
 
     if args.model_name_or_path in pretrained_models_list and not args.continue_training:
@@ -392,7 +385,7 @@ def do_train(args):
         model_config["hidden_dropout_prob"] = args.hidden_dropout_prob
         model_config["attention_probs_dropout_prob"] = args.attention_probs_dropout_prob
         model_config["enable_recompute"] = args.use_recompute
-        model = model_class(base_class(**model_config))
+        model = model_class(config_class(**model_config))
     else:
         logger.warning(f"Your model is continue training from {args.model_name_or_path}")
         model = model_class.from_pretrained(
@@ -406,7 +399,7 @@ def do_train(args):
 
     if worker_index == 0:
         # log the model config and args
-        model_config_json = json.dumps(model.get_model_config(), ensure_ascii=False, indent=2)
+        model_config_json = json.dumps(model.config.to_dict(), ensure_ascii=False, indent=2)
         log_writer.add_text("model_config", model_config_json)
         args_dict = {"paddle commit id": str(paddle.version.commit)}
         for arg in vars(args):
@@ -451,7 +444,6 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
     # Must extend chinese char for ErnieTokenizer
     tokenizer.extend_chinese_char()

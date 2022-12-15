@@ -12,14 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import numpy as np
+import os
 from pprint import pprint
-import paddle
+
+import numpy as np
 from paddle import inference
-from paddlenlp.transformers import PegasusChineseTokenizer, PegasusForConditionalGeneration
+
 from paddlenlp.ops.ext_utils import load
+from paddlenlp.transformers import PegasusChineseTokenizer
 
 
 def setup_args():

@@ -63,6 +63,7 @@ from .ctrl.modeling import *
 from .ctrl.tokenizer import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
+from .ernie.configuration import *
 from .ernie.modeling import *
 from .ernie.tokenizer import *
 from .ernie_ctm.modeling import *
@@ -74,6 +75,7 @@ from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
+from .ernie_m.configuration import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
 from .fnet.modeling import *
