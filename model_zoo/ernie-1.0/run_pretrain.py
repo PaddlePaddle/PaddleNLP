@@ -444,7 +444,6 @@ def do_train(args):
     if paddle.distributed.get_world_size() > 1:
         model = fleet.distributed_model(model)
         optimizer = fleet.distributed_optimizer(optimizer)
-    print(args.tokenizer_name_or_path)
     tokenizer = tokenizer_class.from_pretrained(args.tokenizer_name_or_path)
     # Must extend chinese char for ErnieTokenizer
     tokenizer.extend_chinese_char()
