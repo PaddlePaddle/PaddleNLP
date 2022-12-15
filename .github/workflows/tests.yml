@@ -17,7 +17,6 @@ jobs:
           make install
       - name: run the command
         run: make test
-
       - name: Pytest Coverage Comment
         uses: MishaKav/pytest-coverage-comment@v1.1.40
         with:
