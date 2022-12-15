@@ -1,11 +1,6 @@
 name: Test
 
-on:
-  pull_request_target:
-    types:
-      - opened
-      - synchronize
-      - reopened
+on: pull_request
 
 jobs:
   Test:
@@ -13,6 +8,8 @@ jobs:
     runs-on: ubuntu-20.04
     permissions:
       pull-requests: write
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v1
