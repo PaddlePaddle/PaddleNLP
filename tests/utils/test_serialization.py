@@ -18,6 +18,7 @@ from unittest import TestCase
 
 import numpy as np
 from huggingface_hub import hf_hub_download
+from parameterized import parameterized
 
 from paddlenlp.utils import load_torch
 from tests.testing_utils import require_package, slow
@@ -25,12 +26,25 @@ from tests.testing_utils import require_package, slow
 
 class SerializationTest(TestCase):
     @require_package("torch")
-    def test_simple_load(self):
+    @parameterized.expand(
+        [
+            "float32",
+            "float16",
+        ]
+    )
+    def test_simple_load(self, dtype: str):
         import torch
+
+        # torch "normal_kernel_cpu" not implemented for 'Char', 'Int', 'Long', so only support float
+        dtype_mapping = {
+            "float32": torch.float32,
+            "float16": torch.float16,
+        }
+        dtype = dtype_mapping[dtype]
 
         with tempfile.TemporaryDirectory() as tempdir:
             weight_file_path = os.path.join(tempdir, "pytorch_model.bin")
-            torch.save({"a": torch.randn(2, 3), "b": torch.randn(3, 4)}, weight_file_path)
+            torch.save({"a": torch.randn(2, 3, dtype=dtype), "b": torch.randn(3, 4, dtype=dtype)}, weight_file_path)
             numpy_data = load_torch(weight_file_path)
             torch_data = torch.load(weight_file_path)
 

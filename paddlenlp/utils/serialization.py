@@ -85,8 +85,12 @@ class UnpicklerWrapperStage(pickle.Unpickler):
                 return StorageType(name)
             except KeyError:
                 pass
+
+        # pure torch tensor builder
         if mod_name == "torch._utils":
             return _rebuild_tensor_stage
+
+        # pytorch_lightning tensor builder
         if mod_name == "pytorch_lightning":
             return dumpy
         return super().find_class(mod_name, name)
@@ -177,6 +181,9 @@ def load_torch(path: str, **pickle_load_args):
             filename_with_fb = len(f"archive/data/{key}") + 2
 
             # skip the fix position to read tensor data
+            # `MZ_ZIP_LOCAL_DIR_HEADER_SIZE` is from: https://github.com/pytorch/pytorch/blob/master/caffe2/serialize/inline_container.cc#L186
+            # `16` is the fixed characters size from binary file.
+            # `filename_with_fb` is the length of dynamic data key name
             file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE + 16 + filename_with_fb, 1)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
@@ -192,7 +199,7 @@ def load_torch(path: str, **pickle_load_args):
         key = saved_id[2]
         return stage1_key_to_tensor[key]
 
-    # 3. read the structure of storage
+    # 4. read the structure of storage
     unpickler_stage2 = UnpicklerWrapperStage(io.BytesIO(data_iostream), **pickle_load_args)
     unpickler_stage2.persistent_load = persistent_load_stage2
     result_stage2 = unpickler_stage2.load()
