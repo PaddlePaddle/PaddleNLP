@@ -165,6 +165,36 @@ def main():
 
     if compression_args.do_train:
         trainer.train(resume_from_checkpoint=checkpoint)
+    if compression_args:
+
+        @paddle.no_grad()
+        def custom_evaluate(self, model, data_loader):
+            model.eval()
+            slot_right = 0
+
+            intent_right_no_slot = 0
+            sample_num = 0
+            for batch in data_loader:
+                intent_logits, slot_logits, padding_mask = model(
+                    input_ids=batch["input_ids"],
+                )
+                slot_pred = slot_logits.argmax(axis=-1)
+                intent_pred = intent_logits.argmax(axis=-1)
+
+                intent_label = batch["intent_label"]
+                slot_label = batch["slot_label"]
+                if (intent_label == intent_pred) and (intent_label in (0, 2, 3, 4, 6, 7, 8, 10)):
+                    intent_right_no_slot += 1
+                elif ((slot_pred == slot_label) | padding_mask).all() == 1:
+                    slot_right += 1
+                sample_num += 1
+
+            accuracy = (slot_right + intent_right_no_slot) / sample_num * 100
+
+            return accuracy
+
+        trainer.compress(custom_evaluate=custom_evaluate)
+
     if compression_args.do_export:
         model.eval()
         # convert to static graph with specific input description
