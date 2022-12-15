@@ -15,46 +15,70 @@
 
 from typing import Any, Dict, List, Union
 
-from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from .utils import static_mode_guard, dygraph_mode_guard
+from scipy.special import expit as np_sigmoid
+from scipy.special import softmax as np_softmax
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+
 from .task import Task
+from .utils import dygraph_mode_guard, static_mode_guard
 
 usage = r"""
         from paddlenlp import Taskflow
-        id2label = {
-            0: "negative",
-            1: "positive"
-        }
         text_cls = Taskflow(
             "text_classification",
             model="multi_class",
             task_path=<local_saved_model>,
-            id2label=id2label
+            id2label={0: "negative", 1: "positive"}
             )
         text_cls('房间依然很整洁，相当不错')
         '''
         [
-            {'text': '房间依然很整洁，相当不错',
-            'label': 'positive',
-            'score': 0.80}
+            {
+                'text': '房间依然很整洁，相当不错',
+                'predictions: [{
+                    'label': 'positive',
+                    'score': 0.80
+                }]
+            }
         ]
         '''
-
-        text_cls(['房间依然很整洁，相当不错',
-                        '味道不咋地，很一般'])
+        text_cls = Taskflow(
+            "text_classification",
+            model="multi_label",
+            task_path=<local_saved_model>,
+            id2label={ 0: "体育", 1: "经济", 2: "娱乐"}
+            )
+        text_cls(['这是一条体育娱乐新闻的例子',
+                        '这是一条经济新闻'])
         '''
         [
-            {'text': '房间依然很整洁，相当不错',
-            'label': 'positive',
-            'score': 0.90},
-            {'text': '味道不咋地，很一般',
-            'label': 'negative',
-            'score': 0.88},
+            {
+                'text': '这是一条体育娱乐新闻的例子',
+                'predictions: [
+                    {
+                        'label': '体育',
+                        'score': 0.80
+                    },
+                    {
+                        'label': '娱乐',
+                        'score': 0.90
+                    }
+                ]
+            },
+            {
+                'text': '这是一条经济新闻',
+                'predictions: [
+                    {
+                    'label': '经济',
+                    'score': 0.80
+                    }
+                ]
+            }
         ]
          """
 
@@ -73,18 +97,29 @@ class TextClassificationTask(Task):
 
     Args:
         task (string): The name of task.
-        model (string): Mode of the classification, only support `multi_class` for now
+        model (string): Mode of the classification, Supports ["multi_class", "multi_class"]
         task_path (string): The local file path to the model path or a pre-trained model
         id2label (string): The dictionary to map the predictions from class ids to class names
         is_static_model (string): Whether the model is a static model
+        multilabel_threshold (float): The probability threshold used for the multi_label setup. Only effective if model = "multi_label". Defaults to 0.5
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    def __init__(self, task: str, model: str, id2label: Dict[int, str], is_static_model: bool = False, **kwargs):
+    def __init__(
+        self,
+        task: str,
+        model: str,
+        id2label: Dict[int, str],
+        is_static_model: bool = False,
+        multilabel_threshold: float = 0.5,
+        **kwargs
+    ):
         super().__init__(task=task, model=model, is_static_model=is_static_model, **kwargs)
         self.id2label = id2label
         self.is_static_model = is_static_model
         self._construct_tokenizer(self._task_path)
+        self.multilabel_threshold = multilabel_threshold
+
         if self.is_static_model:
             self._get_inference_model()
         else:
@@ -135,8 +170,10 @@ class TextClassificationTask(Task):
         """
         Run the task model from the outputs of the `_tokenize` function.
         """
-        # TODO: support multi_label, hierachical classification
-        model_outputs = []
+        # TODO: support hierachical classification
+        outputs = {}
+        outputs["text"] = inputs["text"]
+        outputs["batch_logits"] = []
         if self.is_static_model:
             with static_mode_guard():
                 for batch in inputs["batches"]:
@@ -144,31 +181,47 @@ class TextClassificationTask(Task):
                         self.input_handles[i].copy_from_cpu(batch[input_name])
                     self.predictor.run()
                     logits = self.output_handle[0].copy_to_cpu().tolist()
-                    pred_indices = np.argmax(logits, axis=-1)
-                    probs = softmax(logits, axis=-1)
-                    for prob, pred_index in zip(probs, pred_indices):
-                        model_outputs.append({"label": pred_index, "score": prob[pred_index]})
+                    outputs["batch_logits"].append(logits)
         else:
             with dygraph_mode_guard():
                 for batch in inputs["batches"]:
                     logits = self._model(**batch)
-                    probs = F.softmax(logits, axis=-1).tolist()
-                    pred_indices = paddle.argmax(logits, axis=-1).tolist()
-                    for prob, pred_index in zip(probs, pred_indices):
-                        model_outputs.append({"label": pred_index, "score": prob[pred_index]})
-        outputs = {}
-        outputs["text"] = inputs["text"]
-        outputs["model_outputs"] = model_outputs
+                    outputs["batch_logits"].append(logits)
         return outputs
 
     def _postprocess(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
-        The model output is tag ids, this function will convert the model output to raw text.
+        This function converts the model logits output to class score and predictions
         """
-        # TODO: support multi_label, hierachical classification
+        # TODO: support hierachical classification
         postprocessed_outputs = []
-        for i, model_output in enumerate(inputs["model_outputs"]):
-            model_output["label"] = self.id2label[model_output["label"]]
-            model_output["text"] = inputs["text"][i]
-            postprocessed_outputs.append(model_output)
+        for logits in inputs["batch_logits"]:
+            if self.model == "multi_class":
+                if isinstance(logits, paddle.Tensor):  # dygraph
+                    scores = F.softmax(logits, axis=-1).numpy()
+                    labels = paddle.argmax(logits, axis=-1).numpy()
+                else:  # static graph
+                    scores = np_softmax(logits, axis=-1)
+                    labels = np.argmax(logits, axis=-1)
+                for score, label in zip(scores, labels):
+                    postprocessed_output = {}
+                    postprocessed_output["predictions"] = [{"label": self.id2label[label], "score": score[label]}]
+                    postprocessed_outputs.append(postprocessed_output)
+            else:  # multi_label
+                if isinstance(logits, paddle.Tensor):  # dygraph
+                    scores = F.sigmoid(logits).numpy()
+                else:  # static graph
+                    scores = np_sigmoid(logits)
+                for score in scores:
+                    postprocessed_output = {}
+                    postprocessed_output["predictions"] = []
+                    for i, class_score in enumerate(score):
+                        if class_score > self.multilabel_threshold:
+                            postprocessed_output["predictions"].append(
+                                {"label": self.id2label[i], "score": class_score}
+                            )
+                    postprocessed_outputs.append(postprocessed_output)
+
+        for i, postprocessed_output in enumerate(postprocessed_outputs):
+            postprocessed_output["text"] = inputs["text"][i]
         return postprocessed_outputs

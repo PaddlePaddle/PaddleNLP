@@ -17,7 +17,7 @@ Taskflow 是 PaddleNLP 预训练模型工具，具备开箱即用的特性，同
 schema = ['出发地', '目的地', '费用', '时间']
 uie = Taskflow("information_extraction", schema=schema)
 app = SimpleServer()
-app.register_taskflow('uie', uie)
+app.register_taskflow('taskflow/uie', uie)
 ```
 这里主要是使用 `SimpleServer` 服务类来注册 Taskflow Server，下面我们具体介绍一下 `register_taskflow` 相关参数
 
@@ -28,7 +28,7 @@ def register_taskflow(
     taskflow_handler=None)
 
 task_name(str)：
-      服务化的名称，最终的服务化的URL: https://host:port/taskflow/{task_name}
+      服务化的名称，最终的服务化的URL: https://host:port/{task_name}
 task(paddlenlp.Taskflow or list(paddlenlp.Taskflow)):
       Taskflow的实例对象，将想要注册的Taskflow任务注册进去，可以是多个Taskflow实例来支持多卡服务化
 taskflow_handler(paddlenlp.server.BaseTaskflowHandler, 可选):
@@ -79,6 +79,28 @@ print(datas)
 ```
 通过上述代码配置即可发送POST请求，同时注意在`data`这个key填入相关请求
 
+同时可以支持定义 `schema` 传入到client请求中，可以快速切换 `schema`
+
+```python
+import requests
+import json
+
+url = "http://0.0.0.0:8189/taskflow/uie"
+headers = {"Content-Type": "application/json"}
+texts = ["城市内交通费7月5日金额114广州至佛山", "5月9日交通费29元从北苑到望京搜后"]
+data = {
+    "data": {
+        "text": texts,
+    },
+    "parameters": {
+        "schema": [] # 自定义schema
+    }
+}
+r = requests.post(url=url, headers=headers, data=json.dumps(data))
+datas = json.loads(r.text)
+print(datas)
+```
+
 ## 预训练模型部署
 PaddleNLP SimpleServing 除了能支持Taskflow的服务化部署，也能支持预训练模型的部署，通过简单的配置即可加载预训练模型来进行服务化，同时在接口层面也能支持服务化的扩展，支持模型前后处理的定制化需求。
 
@@ -108,7 +130,7 @@ def register(task_name,
              precision='fp32',
              device_id=0)
 task_name(str)：
-      服务化的名称，最终的服务化的URL: https://host:port/models/{task_name}
+      服务化的名称，最终的服务化的URL: https://host:port/{task_name}
 model_path(str):
       需要部署的模型路径，这里的路径必须是动转静后的模型路径
 model_handler(paddlenlp.server.BaseModelHandler):
@@ -147,7 +169,7 @@ from paddlenlp import SimpleServer
 from paddlenlp.server import CustomModelHandler, MultiClassificationPostHandler
 
 app = SimpleServer()
-app.register('cls_multi_class',
+app.register('models/cls_multi_class',
              model_path="../../export",
              tokenizer_name='ernie-3.0-medium-zh',
              model_handler=CustomModelHandler,

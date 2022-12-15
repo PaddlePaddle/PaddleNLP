@@ -16,6 +16,7 @@
 from typing import Any, Dict, Optional
 
 import paddle
+from paddle.static import InputSpec
 
 from ..transformers.model_outputs import MaskedLMOutput, SequenceClassifierOutput
 from .prompt_utils import signature
@@ -57,10 +58,10 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         token_type_ids: Optional[paddle.Tensor] = None,
         position_ids: Optional[paddle.Tensor] = None,
         attention_mask: Optional[paddle.Tensor] = None,
-        labels: Optional[paddle.Tensor] = None,
         masked_positions: Optional[paddle.Tensor] = None,
         soft_token_ids: Optional[paddle.Tensor] = None,
         encoder_ids: Optional[paddle.Tensor] = None,
+        labels: Optional[paddle.Tensor] = None,
         return_dict: Optional[bool] = None,
         **kwargs: Dict[str, Any]
     ):
@@ -120,3 +121,22 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         if self.verbalizer is not None:
             params += [p for p in self.verbalizer.parameters()]
         return params
+
+    def get_input_spec(self):
+        template_keywords = self.template.extract_template_keywords(self.template.prompt)
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+        ]
+        if "mask" in template_keywords:
+            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
+        if "soft" in template_keywords:
+            # Add placeholder for argument `masked_positions` if not exists.
+            if "mask" not in template_keywords:
+                input_spec.append(None)
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
+            if "encoder" in template_keywords:
+                input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
+        return input_spec
