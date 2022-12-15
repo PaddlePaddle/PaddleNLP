@@ -19,6 +19,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    ErnieConfig,
     ErnieForMaskedLM,
     ErnieForMultipleChoice,
     ErnieForPretraining,
@@ -33,7 +34,6 @@ from ...testing_utils import slow
 from ..test_modeling_common import (
     ModelTesterMixin,
     ModelTesterPretrainedMixin,
-    floats_tensor,
     ids_tensor,
     random_attention_mask,
 )
@@ -114,20 +114,23 @@ class ErnieModelTester:
         return config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "pad_token_id": self.pad_token_id,
-        }
+        return ErnieConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            pad_token_id=self.pad_token_id,
+            num_class=self.num_classes,
+            num_labels=self.num_labels,
+            num_choices=self.num_choices,
+        )
 
     def create_and_check_model(
         self,
@@ -139,7 +142,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieModel(**config)
+        model = ErnieModel(config)
         model.eval()
         result = model(
             input_ids, attention_mask=input_mask, token_type_ids=token_type_ids, return_dict=self.parent.return_dict
@@ -159,7 +162,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForMaskedLM(ErnieModel(**config))
+        model = ErnieForMaskedLM(config)
         model.eval()
         result = model(
             input_ids,
@@ -186,7 +189,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForMultipleChoice(ErnieModel(**config), num_choices=self.num_choices)
+        model = ErnieForMultipleChoice(config)
         model.eval()
         multiple_choice_inputs_ids = input_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
         multiple_choice_token_type_ids = token_type_ids.unsqueeze(1).expand([-1, self.num_choices, -1])
@@ -215,7 +218,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForQuestionAnswering(ErnieModel(**config))
+        model = ErnieForQuestionAnswering(config)
         model.eval()
         result = model(
             input_ids,
@@ -244,7 +247,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForSequenceClassification(ErnieModel(**config), num_classes=self.num_classes)
+        model = ErnieForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -270,7 +273,7 @@ class ErnieModelTester:
         token_labels,
         choice_labels,
     ):
-        model = ErnieForTokenClassification(ErnieModel(**config), num_classes=self.num_classes)
+        model = ErnieForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -289,7 +292,7 @@ class ErnieModelTester:
     def create_and_check_model_cache(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        model = ErnieModel(**config)
+        model = ErnieModel(config)
         model.eval()
 
         # first forward pass
@@ -412,7 +415,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
 
 class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
     base_model_class = ErniePretrainedModel
-    hf_remote_test_model_path = "PaddlePaddle/ci-test-ernie-model"
+    hf_remote_test_model_path = "PaddleCI/tiny-random-ernie"
     paddlehub_remote_test_model_path = "__internal_testing__/ernie"
 
     @slow
@@ -455,7 +458,6 @@ class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
         with paddle.no_grad():
             output = model(input_ids, attention_mask=attention_mask, use_cache=True, return_dict=True)
 
-        past_key_value = output.past_key_values[0][0]
         expected_shape = [1, 11, 768]
         self.assertEqual(output[0].shape, expected_shape)
 
