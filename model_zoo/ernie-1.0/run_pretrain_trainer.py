@@ -14,37 +14,39 @@
 """
 ERNIE-1.0 pretraining scripts.
 """
-import argparse
+import math
 import os
-import sys
 import random
 import time
-import yaml
-import math
-from typing import Optional
 from dataclasses import dataclass, field
+from typing import Optional
 
 import numpy as np
 import paddle
+from data_tools.dataset_utils import build_train_valid_test_datasets
+
+from paddlenlp.data import Stack
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+    speed_metrics,
+)
 from paddlenlp.transformers import (
-    ErnieModel,
+    ErnieConfig,
+    ErnieForMaskedLM,
     ErnieForPretraining,
     ErniePretrainingCriterion,
     ErnieTokenizer,
-    ErnieForMaskedLM,
+    LinearAnnealingWithWarmupDecay,
 )
-from paddlenlp.transformers import CosineAnnealingWithWarmupDecay, LinearAnnealingWithWarmupDecay
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
-from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.utils.log import logger
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer import speed_metrics, get_last_checkpoint
-
-from data_tools.dataset_utils import build_train_valid_test_datasets
 
 MODEL_CLASSES = {
     "ernie": (
-        ErnieModel,
+        ErnieConfig,
         ErnieForPretraining,
         ErniePretrainingCriterion,
         ErnieTokenizer,
@@ -106,6 +108,14 @@ class DataArguments:
     share_folder: bool = field(
         default=False,
         metadata={"help": "Use share folder for data dir and output dir on multi machine."},
+    )
+    favor_longer_ngram: bool = field(
+        default=False,
+        metadata={"help": "Whether to favor long ngrams"},
+    )
+    max_ngrams: int = field(
+        default=3,
+        metadata={"help": "Max N Grams"},
     )
 
 
@@ -197,8 +207,8 @@ def create_pretrained_dataset(
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
         out[5] = out[5].reshape([-1, 1])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        _, seq_length = out[0].shape
+        size = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
         if size % 8 != 0:
@@ -361,22 +371,22 @@ def main():
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
+    config_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
     if model_args.binary_head is False:
         model_class = ErnieForMaskedLM
 
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
 
-    if model_args.model_name_or_path in pretrained_models_list and not args.continue_training:
-        logger.warning(f"Your model {args.model_name_or_path} is training from scratch !!!")
+    if model_args.model_name_or_path in pretrained_models_list:
+        logger.warning(f"Your model {model_args.model_name_or_path} is training from scratch !!!")
         model_config = model_class.pretrained_init_configuration[model_args.model_name_or_path]
         model_config["hidden_dropout_prob"] = model_args.hidden_dropout_prob
         model_config["attention_probs_dropout_prob"] = model_args.attention_probs_dropout_prob
-        model = model_class(base_class(**model_config))
+        model = model_class(config_class(**model_config))
         # model_config["enable_recompute"] = args.use_recompute
     else:
-        logger.warning(f"Your model is continue training from {args.model_name_or_path}")
+        logger.warning(f"Your model is continue training from {model_args.model_name_or_path}")
         model = model_class.from_pretrained(
             model_args.model_name_or_path,
             hidden_dropout_prob=model_args.hidden_dropout_prob,
