@@ -7,3 +7,4 @@ flake8
 black
 yapf
 parameterized
+pytest-cov
