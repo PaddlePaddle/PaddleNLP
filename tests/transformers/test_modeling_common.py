@@ -584,6 +584,7 @@ class ModelTesterPretrainedMixin:
                     os.path.join(MODEL_HOME, model_name),
                     tempdirname,
                 )
+
                 saved_model_state_file = os.path.join(
                     tempdirname, self.base_model_class.resource_files_names["model_state"]
                 )
