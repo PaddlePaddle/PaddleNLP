@@ -9,7 +9,7 @@ exclude = ['.flake8']
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --ignore tests/transformers/test_t5_modeling.py"
+addopts = "-ra -q --ignore tests/transformers/t5/test_modeling.py"
 testpaths = [
     "tests/transformers",
     "tests/prompt",
