@@ -108,10 +108,15 @@ def parse_args():
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument(
         "--device",
-        choices=["cpu", "gpu", "mlu", "xpu"],
+        choices=["cpu", "gpu", "mlu", "xpu", "npu"],
         default="gpu",
         type=str,
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
+    )
+    parser.add_argument("--num_workers",
+        default=0,
+        type=int,
+        help="Number of dataloader workers"
     )
     parser.add_argument("--dropout", default=0.1, type=float, help="dropout.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="The max value of grad norm.")
@@ -264,10 +269,13 @@ def do_train(args):
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
 
-    batchify_fn = DataCollatorWithPadding(tokenizer)
+    if args.device == "npu":
+        batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+    else:
+        batchify_fn = DataCollatorWithPadding(tokenizer)
 
     train_data_loader = DataLoader(
-        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=args.num_workers, return_list=True
     )
     dev_data_loader = DataLoader(
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True

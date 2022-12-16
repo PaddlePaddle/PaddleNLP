@@ -74,10 +74,15 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
         "--device",
+        choices=["cpu", "gpu", "mlu", "xpu", "npu"],
         default="gpu",
         type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
+    )
+    parser.add_argument("--num_workers",
+        default=0,
+        type=int,
+        help="Number of dataloader workers"
     )
     args = parser.parse_args()
     return args
@@ -117,7 +122,10 @@ def run(args):
     label_list = train_ds.features["ner_tags"].feature.names
     label_num = len(label_list)
 
-    batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer)
+    if args.device == "npu":
+        batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer, padding="max_length", max_length=args.max_seq_length)
+    else:
+        batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer)
 
     # Define the model netword and its loss
     model = AutoModelForTokenClassification.from_pretrained(args.model_name_or_path, num_classes=label_num)
@@ -165,7 +173,7 @@ def run(args):
         train_data_loader = DataLoader(
             dataset=train_ds,
             collate_fn=batchify_fn,
-            num_workers=0,
+            num_workers=args.num_workers,
             batch_sampler=train_batch_sampler,
             return_list=True,
         )

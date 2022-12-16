@@ -103,9 +103,15 @@ def parse_args():
     parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
     parser.add_argument(
         "--device",
-        choices=["cpu", "gpu", "xpu", "mlu"],
+        choices=["cpu", "gpu", "mlu", "xpu", "npu"],
         default="gpu",
-        help="Select which device to train model, defaults to gpu.",
+        type=str,
+        help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
+    )
+    parser.add_argument("--num_workers",
+        default=0,
+        type=int,
+        help="Number of dataloader workers"
     )
     parser.add_argument(
         "--doc_stride",
@@ -373,9 +379,12 @@ def run(args):
             )
         train_batch_sampler = paddle.io.DistributedBatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
 
-        batchify_fn = DataCollatorWithPadding(tokenizer)
+        if args.device == "npu":
+            batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+        else:
+            batchify_fn = DataCollatorWithPadding(tokenizer)
         train_data_loader = DataLoader(
-            dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, return_list=True
+            dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=args.num_workers, return_list=True
         )
 
         with main_process_first(desc="evaluate dataset map pre-processing"):
