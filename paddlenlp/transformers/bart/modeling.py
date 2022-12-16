@@ -22,6 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Embedding, Layer
 
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     ModelOutput,
@@ -142,6 +143,7 @@ class BartEncoder(BartPretrainedModel):
         self,
         input_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         output_attentions=None,
         output_hidden_states=None,
         return_dict=None,
@@ -154,6 +156,8 @@ class BartEncoder(BartPretrainedModel):
             input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
+                See :class:`BartModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             output_attentions (bool, optional):
                 See :class:`BartModel`.
@@ -178,15 +182,25 @@ class BartEncoder(BartPretrainedModel):
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if input_ids is None:
-            raise ValueError("Input_ids cannot be None.")
-        inputs_embeds = self.embed_tokens(input_ids)
-        inputs_embed_pos = self.encoder_embed_positions(paddle.shape(input_ids))
+        if input_ids is None and inputs_embeds is None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            inputs_shape = paddle.shape(input_ids)
+            input_ids = input_ids.reshape((-1, inputs_shape[-1]))
+        elif inputs_embeds is not None:
+            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
+        if inputs_embeds is None:
+            inputs_embeds = self.embed_tokens(input_ids)
+
+        inputs_embed_pos = self.encoder_embed_positions(inputs_shape)
         hidden_states = inputs_embeds + inputs_embed_pos
         hidden_states = self.encoder_layernorm_embedding(hidden_states)
         encoder_input = self.encoder_dropout(hidden_states)
 
-        if attention_mask is None:
+        if attention_mask is None and input_ids is not None:
             attention_mask = (
                 paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
@@ -241,6 +255,7 @@ class BartDecoder(BartPretrainedModel):
         decoder_attention_mask=None,
         encoder_output=None,
         memory_mask=None,
+        decoder_inputs_embeds=None,
         cache=None,
         output_attentions=None,
         output_hidden_states=None,
@@ -257,6 +272,8 @@ class BartDecoder(BartPretrainedModel):
             encoder_output (Tensor, optional):
                 See :class:`BartModel`.
             memory_mask (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             cache (Tensor, optional):
                 See :class:`BartModel`.
@@ -277,16 +294,28 @@ class BartDecoder(BartPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
 
         """
+        # retrieve input_ids and inputs_embeds
+        if decoder_input_ids is not None and decoder_inputs_embeds is not None:
+            raise ValueError("You cannot specify both decoder_input_ids and decoder_inputs_embeds at the same time")
+        elif decoder_input_ids is not None:
+            inputs_shape = paddle.shape(decoder_input_ids)
+            decoder_input_ids = decoder_input_ids.reshape((-1, inputs_shape[-1]))
+        elif decoder_inputs_embeds is not None:
+            inputs_shape = paddle.shape(decoder_inputs_embeds)[:-1]
+        else:
+            raise ValueError("You have to specify either decoder_input_ids or decoder_inputs_embeds")
+
         if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
+            decoder_length = inputs_shape[-1]
             decoder_attention_mask = paddle.tensor.triu(
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+
+        if decoder_inputs_embeds is None:
+            decoder_inputs_embeds = self.embed_tokens(decoder_input_ids)
+
         past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
-        decoder_inputs_embed_pos = self.decoder_embed_positions(
-            paddle.shape(decoder_input_ids), past_key_values_length
-        )
+        decoder_inputs_embed_pos = self.decoder_embed_positions(inputs_shape, past_key_values_length)
         hidden_states = decoder_inputs_embeds + decoder_inputs_embed_pos
         hidden_states = self.decoder_layernorm_embedding(hidden_states)
         decoder_input = self.decoder_dropout(hidden_states)
@@ -345,11 +374,13 @@ class BartModel(BartPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         attention_mask=None,
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
+        inputs_embeds=None,
+        decoder_inputs_embeds=None,
         use_cache=False,
         cache=None,
         output_attentions=None,
@@ -357,109 +388,137 @@ class BartModel(BartPretrainedModel):
         return_dict=None,
     ):
         r"""
-        The BartModel forward method, overrides the `__call__()` special method.
+                The BartModel forward method, overrides the `__call__()` special method.
 
-        Args:
-            input_ids (Tensor):
-                Indices of input sequence tokens in the vocabulary. They are
-                numerical representations of tokens that build the input sequence.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-            attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions,
-                usually the paddings or the subsequent positions.
-                Its data type can be int, float and bool.
-                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
-                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
-                When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
-                It is a tensor with shape broadcasted to `[batch_size, encoder_attention_heads, sequence_length, sequence_length]`.
-                For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
-                [batch_size, encoder_attention_heads, sequence_length, sequence_length].
-                Defaults to `None`, which means nothing needed to be prevented attention to.
-            decoder_input_ids (Tensor, optional):
-                Indices of decoder input sequence tokens in the vocabulary.
-                Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
-                Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
-                by shifting the `input_ids` to the right.
-            decoder_attention_mask (Tensor, optional):
-                Mask used in multi-head attention to avoid performing attention to some unwanted positions in `decoder_input_ids`.
-                Its data type and shape is the same as `attention_mask`. Defaults to `None`.
-            encoder_output (tuple, optional):
-                The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
-                The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, d_model]`.
-                `hidden_states` is hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
-                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, d_model`].
-                `attentions` is attentions of all layers of in the Transformer encoder. The length of `attentions` is `num_hidden_layers`.
-                For all element in the tuple, its data type should be float32 and its shape is [`batch_size, encoder_attention_heads, sequence_length, sequence_length`].
-            use_cache (bool, optional):
-                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
-                 can be used to speed up decoding.
-            cache (list, optional):
-                It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
-                See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
-                It is only used for inference and should be None for training.
-                Default to `None`.
-            output_attentions (bool, optional):
-                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
-                tensors for more detail. Defaults to `False`.
-            output_hidden_states (bool, optional):
-                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
-                more detail. Defaults to `False`.
-            return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
-        Returns:
-            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
-            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
-            to ordered and not None (depending on the input arguments) fields of
-            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
-            Especially, When `return_dict=output_hidden_states=output_attentions=False`,
-            returns tensor `decoder_output`, which is the output at the last layer of the model.
-            Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
+                Args:
+                    input_ids (Tensor, optional):
+                        Indices of input sequence tokens in the vocabulary. They are
+                        numerical representations of tokens that build the input sequence.
+                        Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                    attention_mask (Tensor, optional):
+                        Mask used in multi-head attention to avoid performing attention to some unwanted positions,
+                        usually the paddings or the subsequent positions.
+                        Its data type can be int, float and bool.
+                        When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                        When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                        When the data type is float, the `masked` tokens have `-INF` values and the others have `0` values.
+                        It is a tensor with shape broadcasted to `[batch_size, encoder_attention_heads, sequence_length, sequence_length]`.
+                        For example, its shape can be  [batch_size, sequence_length], [batch_size, sequence_length, sequence_length],
+                        [batch_size, encoder_attention_heads, sequence_length, sequence_length].
+                        Defaults to `None`, which means nothing needed to be prevented attention to.
+                    decoder_input_ids (Tensor, optional):
+                        Indices of decoder input sequence tokens in the vocabulary.
+                        Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                        Defaults to `None`, which means no `decoder_input_ids` is provided, the model will create the tensor
+                        by shifting the `input_ids` to the right.
+                    decoder_attention_mask (Tensor, optional):
+                        Mask used in multi-head attention to avoid performing attention to some unwanted positions in `decoder_input_ids`.
+                        Its data type and shape is the same as `attention_mask`. Defaults to `None`.
+                    encoder_output (tuple, optional):
+                        The output of the encoder, a tuple consists `last_hidden_state`, `hidden_states`(optional), `attentions`(optional).
+                        The data type of `last_hidden_state` is float32 and its shape is `[batch_size, sequence_length, d_model]`.
+                        `hidden_states` is hidden_states of all layers in the Transformer encoder. The length of `hidden_states` is `num_hidden_layers + 1`.
+                        For all element in the tuple, its data type should be float32 and its shape is [`batch_size, sequence_length, d_model`].
+                        `attentions` is attentions of all layers of in the Transformer encoder. The length of `attentions` is `num_hidden_layers`.
+        <<<<<<< HEAD
+                        For all element in the tuple, its data type should be float32 and its shape is [`batch_size, encoder_attention_heads, sequence_length, sequence_length`].
+        =======
+                        For all element in the tuple, its data type should be float32 and its shape is [`batch_size, num_attention_heads, sequence_length, sequence_length`].
+                    inputs_embeds (Tensor, optional):
+                        Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                        of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                        how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                        Default to None.
+                    decoder_inputs_embeds (Tensor, optional):
+                        Optionally, instead of passing `decoder_input_ids` you can choose to directly pass an embedded
+                        representation  of shape `(batch_size, target_sequence_length, hidden_size)`. If `cache` is used,
+                        optionally only the last `decoder_inputs_embeds` have to be input (see `past_key_values`).
+                        This is useful if you want more control over how to convert `decoder_input_ids` indices
+                        into associated vectors than the model's internal embedding lookup matrix. Default to None.
+                        If `decoder_input_ids` and `decoder_inputs_embeds` are both unset, `decoder_inputs_embeds` takes the value
+                        of `inputs_embeds`.
+        >>>>>>> 18584165176b41678c9fb773c7e578d4a3fb094b
+                    use_cache (bool, optional):
+                         Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
+                         can be used to speed up decoding.
+                    cache (list, optional):
+                        It is a list, and each element in the list is a tuple `(incremental_cache, static_cache)`.
+                        See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
+                        It is only used for inference and should be None for training.
+                        Default to `None`.
+                    output_attentions (bool, optional):
+                        Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                        tensors for more detail. Defaults to `False`.
+                    output_hidden_states (bool, optional):
+                        Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                        more detail. Defaults to `False`.
+                    return_dict (bool, optional):
+                        Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                        will be a tuple of tensors. Defaults to `False`.
+                Returns:
+                    An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+                    `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+                    to ordered and not None (depending on the input arguments) fields of
+                    :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+                    Especially, When `return_dict=output_hidden_states=output_attentions=False`,
+                    returns tensor `decoder_output`, which is the output at the last layer of the model.
+                    Its data type should be float32 and has a shape of [batch_size, sequence_length, d_model].
 
-        Example:
-            .. code-block::
+                Example:
+                    .. code-block::
 
-                import paddle
-                from paddlenlp.transformers import BartModel, BartTokenizer
+                        import paddle
+                        from paddlenlp.transformers import BartModel, BartTokenizer
 
-                tokenizer = BartTokenizer.from_pretrained('bart-base')
-                model = BartModel.from_pretrained('bart-base')
+                        tokenizer = BartTokenizer.from_pretrained('bart-base')
+                        model = BartModel.from_pretrained('bart-base')
 
-                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
-                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
-                output = model(**inputs)
+                        inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                        inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                        output = model(**inputs)
         """
         # different to other models, Bart automatically creates decoder_input_ids from
         # inputBartForSequenceClassification_ids if no decoder_input_ids are provided
-        if input_ids is None and encoder_output is None:
+        if input_ids is None and inputs_embeds is None and encoder_output is None:
             raise ValueError("You have to specify either input_ids or encoder_output")
-        if decoder_input_ids is None:
-            assert input_ids is not None, "input_ids should be " "specified when generating decoder_input_ids"
+
+        if decoder_input_ids is None and decoder_inputs_embeds is None:
+            if input_ids is None:
+                raise ValueError(
+                    "If no `decoder_input_ids` or `decoder_inputs_embeds` are "
+                    "passed, `input_ids` cannot be `None`. Please pass either "
+                    "`input_ids` or `decoder_input_ids` or `decoder_inputs_embeds`."
+                )
             decoder_input_ids = shift_tokens_right(input_ids, self.decoder_start_token_id)
-        if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " "specified when generating attention_mask"
+        if attention_mask is None and input_ids is not None:
+            # only generate attention_mask when input_ids is specified
             attention_mask = (
                 paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
             )
+        if inputs_embeds is not None and input_ids is None and attention_mask is None:
+            logger.warning("provided inputs_embeds without attention_mask")
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
             attention_mask.stop_gradient = True
+
+        input_type = type(decoder_input_ids) if decoder_input_ids is not None else type(decoder_inputs_embeds)
         if encoder_output is None:
             encoder_output = self.encoder(
                 input_ids,
                 attention_mask,
+                inputs_embeds=inputs_embeds,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
         # If the user passed a tuple for encoder_outputs, we wrap it in a BaseModelOutput when return_dict=True
         elif return_dict and not isinstance(encoder_output, ModelOutput):
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output,)
             encoder_output = convert_encoder_output(encoder_output)
-        if isinstance(encoder_output, type(decoder_input_ids)):
+        if isinstance(encoder_output, input_type):
             encoder_last_hidden_state = encoder_output
         else:
             encoder_last_hidden_state = encoder_output[0]
@@ -473,15 +532,16 @@ class BartModel(BartPretrainedModel):
             decoder_attention_mask,
             encoder_last_hidden_state,
             attention_mask,
-            cache,
+            cache=cache,
+            decoder_inputs_embeds=decoder_inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
         if not return_dict:
-            if isinstance(decoder_output, type(decoder_input_ids)):
+            if isinstance(decoder_output, input_type):
                 decoder_output = (decoder_output,)
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output,)
             return decoder_output + encoder_output
 
@@ -543,11 +603,13 @@ class BartForSequenceClassification(BartPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         attention_mask=None,
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
+        inputs_embeds=None,
+        decoder_inputs_embeds=None,
         use_cache=False,
         cache=None,
         labels=None,
@@ -559,7 +621,7 @@ class BartForSequenceClassification(BartPretrainedModel):
         The BartForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.
@@ -569,8 +631,12 @@ class BartForSequenceClassification(BartPretrainedModel):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
                 See :class:`BartModel`.
-            use_cache (bool, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            use_cache (bool, optional):
+                See :class:`BartModel`. Forcely set to `False` when `labels` is provided that can save memory during training.
             cache (Tensor, optional):
                 See :class:`BartModel`.
             labels (Tensor, optional):
@@ -608,26 +674,41 @@ class BartForSequenceClassification(BartPretrainedModel):
                 logits = model(**inputs)
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if labels is not None:
+            logger.warning("The `use_cache` argument is changed to `False` since `labels` is provided.")
+            use_cache = False
+
+        if input_ids is None and inputs_embeds is not None:
+            logger.warning(
+                f"{self.__class__.__name__} will not detect eos tokens in `inputs_embeds`. Results may be "
+                "unexpected if using eos tokens in conjunction with `inputs_embeds.`"
+            )
+
         outputs = self.bart(
             input_ids,
             attention_mask,
             decoder_input_ids,
             decoder_attention_mask,
             encoder_output,
-            use_cache,
-            cache,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
         output = outputs[0]
-        eos_mask = paddle.cast(input_ids == self.bart.config["eos_token_id"], dtype="int64")
-        if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
-            raise ValueError("All examples must have the same number of <eos> tokens.")
-
         output_shape = paddle.shape(output)
-        # TODO(gongenlei): support bool tensor index
-        output = output.masked_select(eos_mask.unsqueeze(-1).astype("bool").tile([1, 1, output_shape[-1]]))
+
+        if input_ids is not None:
+            eos_mask = paddle.cast(input_ids == self.bart.config["eos_token_id"], dtype="int64")
+            if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
+                raise ValueError("All examples must have the same number of <eos> tokens.")
+
+            # TODO(gongenlei): support bool tensor index
+            output = output.masked_select(eos_mask.unsqueeze(-1).astype("bool").tile([1, 1, output_shape[-1]]))
+
         sentence_representation = output.reshape([output_shape[0], -1, output_shape[-1]])[:, -1, :]
         logits = self.classifier(sentence_representation)
 
@@ -680,11 +761,13 @@ class BartForQuestionAnswering(BartPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         attention_mask=None,
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
+        inputs_embeds=None,
+        decoder_inputs_embeds=None,
         use_cache=False,
         cache=None,
         start_positions=None,
@@ -697,7 +780,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
         The BartForQuestionAnswering forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.
@@ -707,8 +790,12 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
                 See :class:`BartModel`.
-            use_cache (bool, optional):
+            inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            use_cache (bool, optional):
+                See :class:`BartModel`. Forcely set to `False` when `start_positions` and `end_positions` are provided that can save memory during training.
             cache (Tensor, optional):
                 See :class:`BartModel`.
             start_positions (Tensor, optional):
@@ -762,14 +849,22 @@ class BartForQuestionAnswering(BartPretrainedModel):
                 end_logits  =outputs[1]
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if start_positions is not None and end_positions is not None:
+            logger.warning(
+                "The `use_cache` argument is changed to `False` since `start_positions` and `end_positions` are provided."
+            )
+            use_cache = False
+
         outputs = self.bart(
             input_ids,
             attention_mask,
             decoder_input_ids,
             decoder_attention_mask,
             encoder_output,
-            use_cache,
-            cache,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -786,7 +881,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
             if start_positions.ndim > 1:
                 end_positions = end_positions.squeeze(-1)
             # sometimes the start/end positions are outside our model inputs, we ignore these terms
-            ignored_index = start_logits.shape[1]
+            ignored_index = paddle.shape(start_logits)[1]
             start_positions = start_positions.clip(0, ignored_index)
             end_positions = end_positions.clip(0, ignored_index)
 
@@ -870,11 +965,13 @@ class BartForConditionalGeneration(BartPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         attention_mask=None,
         decoder_input_ids=None,
         decoder_attention_mask=None,
         encoder_output=None,
+        inputs_embeds=None,
+        decoder_inputs_embeds=None,
         use_cache=False,
         cache=None,
         labels=None,
@@ -886,7 +983,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
         The BartForConditionalGeneration forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`BartModel`.
             attention_mask (Tensor, optional):
                 See :class:`BartModel`.
@@ -895,6 +992,10 @@ class BartForConditionalGeneration(BartPretrainedModel):
             decoder_attention_mask (Tensor, optional):
                 See :class:`BartModel`.
             encoder_output (Tensor, optonal):
+                See :class:`BartModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`BartModel`.
+            decoder_inputs_embeds (Tensor, optional):
                 See :class:`BartModel`.
             use_cache (bool, optional):
                 See :class:`BartModel`.
@@ -941,14 +1042,21 @@ class BartForConditionalGeneration(BartPretrainedModel):
 
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        if labels is not None:
+            if use_cache:
+                logger.warning("The `use_cache` argument is changed to `False` since `labels` is provided.")
+            use_cache = False
+
         outputs = self.bart(
             input_ids,
             attention_mask,
             decoder_input_ids,
             decoder_attention_mask,
             encoder_output,
-            use_cache,
-            cache,
+            inputs_embeds=inputs_embeds,
+            decoder_inputs_embeds=decoder_inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

@@ -403,7 +403,7 @@ class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin, unitt
     all_model_classes = (UnifiedTransformerModel, UnifiedTransformerLMHeadModel)
     all_generative_model_classes = {UnifiedTransformerLMHeadModel: (UnifiedTransformerModel, "unified_transformer")}
     test_missing_keys = False
-
+    use_test_inputs_embeds = True
     use_labels = False
     return_dict = False
 

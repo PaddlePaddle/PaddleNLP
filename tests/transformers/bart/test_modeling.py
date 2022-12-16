@@ -402,6 +402,7 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     test_missing_keys = False
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     def setUp(self):
         self.model_tester = BartModelTester(self)
