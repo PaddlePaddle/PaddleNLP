@@ -48,7 +48,12 @@ from paddlenlp.utils.downloader import (
     download_check,
     get_path_from_url_with_filelock,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, LEGACY_CONFIG_NAME, MODEL_HOME
+from paddlenlp.utils.env import (
+    CONFIG_NAME,
+    HF_CACHE_HOME,
+    LEGACY_CONFIG_NAME,
+    MODEL_HOME,
+)
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
@@ -239,6 +244,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 break
         if config is not None:
             self.config: PretrainedConfig = config
+            self.model_config_file = CONFIG_NAME
             return
 
         # extract config from kwargs
@@ -252,6 +258,7 @@ class PretrainedModel(Layer, GenerationMixin):
             raise TypeError("config parameter should be the instance of PretraiendConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
+        self.model_config_file = CONFIG_NAME
         self.warnings_issued = {}
 
     def _post_init(self, original_init, *args, **kwargs):
