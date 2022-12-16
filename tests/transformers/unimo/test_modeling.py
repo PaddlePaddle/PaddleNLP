@@ -12,28 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-import math
-import unittest
-import numpy as np
 import random
+import unittest
+
+import numpy as np
+import paddle
+import paddle.nn as nn
 from parameterized import parameterized_class
 
+from paddlenlp.data import Pad
+from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOModel, UNIMOTokenizer
 from tests.testing_utils import slow
 
 from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
-
-import paddle
-import paddle.nn as nn
-from paddlenlp.transformers import (
-    UNIMOModel,
-    UNIMOLMHeadModel,
-    UNIMOForMaskedLM,
-    UNIMOTokenizer,
-)
-from paddlenlp.data import Pad
-from paddlenlp.data import DataCollatorWithPadding
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 UNIMO_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "unimo-text-1.0",
@@ -406,6 +398,7 @@ class UNIMOModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase)
 
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class, return_labels=False):
