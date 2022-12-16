@@ -13,15 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import tempfile
 
-from tests.testing_utils import slow, PaddleNLPModelTest
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, ids_tensor
-from parameterized import parameterized_class
-
 import paddle
+from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     AutoTokenizer,
@@ -30,7 +26,11 @@ from paddlenlp.transformers import (
     MBartForSequenceClassification,
     MBartModel,
 )
-from paddlenlp.transformers.mbart.modeling import MBartDecoder, MBartEncoder
+from paddlenlp.transformers.mbart.modeling import MBartDecoder
+from tests.testing_utils import PaddleNLPModelTest, slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
 def prepare_mbart_inputs_dict(
@@ -221,11 +221,47 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest
 
             with tempfile.TemporaryDirectory() as tmpdirname:
                 model.save_pretrained(tmpdirname)
-                model2 = model_class.from_pretrained(tmpdirname)
+                model_class.from_pretrained(tmpdirname)
 
     def test_decoder_model_past_with_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_decoder_model_past_large_inputs(*config_and_inputs)
+
+    def test_inputs_embeds_for_mbart(self):
+        # NOTE: rewrite test inputs embeds for mbart model since scaler not equal to 1.0
+        # get config for model and inputs_dict for model forward
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        scaler = config["d_model"] ** 0.5
+        # test all model classes
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            inputs = copy.deepcopy(self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids", encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids) * scaler
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids) * scaler
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids) * scaler
+
+            with paddle.no_grad():
+                embeds_output = model(**inputs)
+
+            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
 
 def assert_tensors_close(a, b, atol=1e-12, prefix=""):
@@ -459,7 +495,7 @@ class MBartStandaloneDecoderModelTester:
 
         # first forward pass
         outputs = model(input_ids, cache=origin_cache, return_dict=self.parent.return_dict)
-        outputs_use_cache_conf = model(input_ids, return_dict=self.parent.return_dict)
+        # outputs_use_cache_conf = model(input_ids, return_dict=self.parent.return_dict)
         outputs_no_past = model(input_ids, cache=None, return_dict=self.parent.return_dict)
 
         # self.parent.assertTrue(len(outputs) == len(outputs_use_cache_conf))  # didn't support using cache by config yet
@@ -508,9 +544,6 @@ class MBartStandaloneDecoderModelTester:
         encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
         origin_cache = model.decoder.gen_cache(encoder_output)
 
-        cache = model.decoder.gen_cache(
-            paddle.randn(shape=[input_ids.shape[0], input_ids.shape[1], config["d_model"]])
-        )
         # first forward pass
 
         past_key_values = model(

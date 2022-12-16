@@ -12,28 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-import math
-import unittest
-import numpy as np
 import random
+import unittest
 
-from tests.testing_utils import slow
-from parameterized import parameterized_class
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
-
+import numpy as np
 import paddle
 import paddle.nn as nn
+from parameterized import parameterized_class
+
+from paddlenlp.data import Pad
 from paddlenlp.transformers import (
-    UnifiedTransformerModel,
     UnifiedTransformerLMHeadModel,
-    UnifiedTransformerForMaskedLM,
+    UnifiedTransformerModel,
     UnifiedTransformerTokenizer,
 )
-from paddlenlp.data import Pad
-from paddlenlp.data import DataCollatorWithPadding
+from tests.testing_utils import slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 UNIFIED_TRANSFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "unified_transformer-12L-cn",
@@ -408,7 +404,7 @@ class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin, unitt
     all_model_classes = (UnifiedTransformerModel, UnifiedTransformerLMHeadModel)
     all_generative_model_classes = {UnifiedTransformerLMHeadModel: (UnifiedTransformerModel, "unified_transformer")}
     test_missing_keys = False
-
+    use_test_inputs_embeds = True
     use_labels = False
     return_dict = False
 
