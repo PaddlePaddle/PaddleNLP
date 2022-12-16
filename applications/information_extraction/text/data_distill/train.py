@@ -1,3 +1,4 @@
+# coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,22 +14,28 @@
 # limitations under the License.
 
 import argparse
-import json
-import time
 import os
-from functools import partial
+import time
 
 import paddle
-import paddle.nn as nn
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, AutoModel
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
-
-from evaluate import evaluate
 from criterion import Criterion
-from utils import reader, set_seed, get_label_maps, create_dataloader, criteria_map, save_model_config
+from evaluate import evaluate
+from utils import (
+    create_dataloader,
+    criteria_map,
+    get_label_maps,
+    reader,
+    save_model_config,
+    set_seed,
+)
+
+from paddlenlp.datasets import load_dataset
+from paddlenlp.layers import (
+    GlobalPointerForEntityExtraction,
+    GPLinkerForRelationExtraction,
+)
+from paddlenlp.transformers import AutoModel, AutoTokenizer, LinearDecayWithWarmup
+from paddlenlp.utils.log import logger
 
 
 def do_train():
@@ -123,7 +130,7 @@ def do_train():
                 logging_loss = tr_loss
                 tic_train = time.time()
 
-            if global_step % args.valid_steps == 0 and rank == 0:
+            if global_step % args.eval_steps == 0 and rank == 0:
                 save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
                 if not os.path.exists(save_dir):
                     os.makedirs(save_dir)
@@ -173,7 +180,7 @@ if __name__ == "__main__":
     parser.add_argument("--encoder", default="ernie-3.0-mini-zh", type=str, help="Select the pretrained encoder model for GP.")
     parser.add_argument("--task_type", choices=['relation_extraction', 'event_extraction', 'entity_extraction', 'opinion_extraction'], default="entity_extraction", type=str, help="Select the training task type.")
     parser.add_argument("--logging_steps", default=10, type=int, help="The interval steps to logging.")
-    parser.add_argument("--valid_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
+    parser.add_argument("--eval_steps", default=200, type=int, help="The interval steps to evaluate model performance.")
     parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of model parameters for initialization.")
 

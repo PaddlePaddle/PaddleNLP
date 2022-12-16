@@ -195,7 +195,6 @@ if __name__ == "__main__":
                 "The src_vocab and trg_vocab must be specified respectively when weight sharing is False. "
             )
 
-    args.unk_token = ARGS.unk_token
     args.bos_token = ARGS.bos_token
     args.eos_token = ARGS.eos_token
     args.pad_token = ARGS.pad_token
