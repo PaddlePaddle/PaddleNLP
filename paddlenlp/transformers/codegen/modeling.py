@@ -81,7 +81,7 @@ class CodeGenAttention(Layer):
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
-        self.embed_dim = config.embed_dim
+        self.embed_dim = config.hidden_size
         self.num_attention_heads = config.num_attention_heads
         self.head_dim = self.embed_dim // self.num_attention_heads
         if self.head_dim * self.num_attention_heads != self.embed_dim:
@@ -215,8 +215,8 @@ class CodeGenMLP(Layer):
     def __init__(self, inner_dim: int, config: CodeGenConfig):
         super().__init__()
 
-        self.fc_in = nn.Linear(config.embed_dim, inner_dim)
-        self.fc_out = nn.Linear(inner_dim, config.embed_dim)
+        self.fc_in = nn.Linear(config.hidden_size, inner_dim)
+        self.fc_out = nn.Linear(inner_dim, config.hidden_size)
 
         self.act = ACT2FN[config.activation_function]
         self.dropout = nn.Dropout(config.resid_pdrop)
@@ -233,7 +233,7 @@ class CodeGenBlock(Layer):
     def __init__(self, config: CodeGenConfig):
         super().__init__()
         inner_dim = config.n_inner if config.n_inner is not None else 4 * config.n_embd
-        self.ln_1 = nn.LayerNorm(config.embed_dim, epsilon=config.layer_norm_epsilon)
+        self.ln_1 = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_epsilon)
         self.attn = CodeGenAttention(config)
         self.mlp = CodeGenMLP(inner_dim, config)
 

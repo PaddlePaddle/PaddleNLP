@@ -76,8 +76,8 @@ class CodeGenConfig(PretrainedConfig):
     ```"""
     model_type = "bert"
     attribute_map: Dict[str, str] = {
+        "hidden_size": "n_embd",
         "num_attention_heads": "n_head",
-        "embed_dim": "n_embd",
         "max_positions": "n_positions",
         "inner_dim": "n_inner",
     }

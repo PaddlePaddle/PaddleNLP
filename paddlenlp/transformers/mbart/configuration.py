@@ -251,6 +251,9 @@ class MBartConfig(PretrainedConfig):
     keys_to_ignore_at_inference = ["past_key_values"]
     attribute_map: Dict[str, str] = {
         "num_classes": "num_labels",
+        "hidden_size": "d_model",
+    }
+    standard_config_map: Dict[str, str] = {
         "num_encoder_layers": "encoder_layers",
         "num_decoder_layers": "decoder_layers",
     }
