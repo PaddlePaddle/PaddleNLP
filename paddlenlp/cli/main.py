@@ -18,6 +18,7 @@ from typing import List, Optional, Tuple, Type
 
 from uvicorn.config import LOGGING_CONFIG
 
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.import_utils import is_package_available
 
 # check whether the package is avaliable and give friendly description.
@@ -119,6 +120,13 @@ def download(
 
     if is_url(model_name):
         logger.error("<MODEL_NAME> can not be url")
+        return
+
+    if model_name == "paddlenlp":
+        logger.info(f"start to download latest paddlenlp code into <{cache_dir}>")
+        get_path_from_url_with_filelock(
+            "https://paddlenlp.bj.bcebos.com/wheels/PaddleNLP.tar.gz", root_dir=cache_dir, check_exist=False
+        )
         return
 
     cache_dir = os.path.join(cache_dir, model_name)
