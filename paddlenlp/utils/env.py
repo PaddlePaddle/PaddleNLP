@@ -50,6 +50,7 @@ PPNLP_HOME = _get_ppnlp_home()
 MODEL_HOME = _get_sub_home("models")
 HF_CACHE_HOME = os.environ.get("HUGGINGFACE_HUB_CACHE", MODEL_HOME)
 DATA_HOME = _get_sub_home("datasets")
+PACKAGE_HOME = _get_sub_home("packages")
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0

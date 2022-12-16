@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import contextlib
-from rouge import Rouge
-import json
 
+import numpy as np
 import paddle
-from paddlenlp.data import Pad
+from rouge import Rouge
+
 from paddlenlp.metrics import BLEU
 from paddlenlp.utils.log import logger
 
@@ -61,6 +60,7 @@ def compute_metrics(preds, targets):
     print("rouge-2:", round(rouge2, 4))
     print("rouge-L:", round(rougel, 4))
     print("BLEU-4:", round(bleu4.score(), 4))
+    return rougel
 
 
 @contextlib.contextmanager

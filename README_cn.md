@@ -31,6 +31,9 @@
 
 ## News 📢
 
+* 🔥 **2022.12.9 发布 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
+  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型**UIE-X**，具有突出的零样本效果及小样本迁移能力。
+  * 🔨 产业应用：新增[**信息抽取全流程应用方案**](./applications/information_extraction)，支持文本、文档各类信息抽取场景，提供从数据标注、微调到部署的产业级全流程解决方案。
 * 🔥 **2022.11.28 发布 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
   * 💪 框架升级：新增[**Huggingface Hub集成**](https://huggingface.co/PaddlePaddle)，后续将逐步支持Model，Tokenizer，Taskflow直接从[Huggingface Hub](https://huggingface.co/PaddlePaddle)加载；[**小样本 Prompt API**](./docs/advanced_guide/prompt.md)升级，支持PET算法实现。
   * 💎 NLP工具：[**NLP 流水线系统 Pipelines**](./pipelines)检索能力再加强，新增交互式学习语义检索模型[Ernie-Search](./pipelines/API.md)；发布[**SimpleServing**](./docs/server.md)，支持Taskflow、预训练模型快速部署。

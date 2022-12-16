@@ -13,30 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import tempfile
-import unittest
-import numpy as np
 import random
+import unittest
+
+import numpy as np
+import paddle
 from parameterized import parameterized_class
 
-from tests.testing_utils import slow
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy, TruncationStrategy
-
-import paddle
-
 from paddlenlp.transformers import (
-    AutoModelForSequenceClassification,
     BartForConditionalGeneration,
     BartForQuestionAnswering,
     BartForSequenceClassification,
     BartModel,
     BartTokenizer,
 )
-from paddlenlp.transformers.bart.modeling import BartDecoder, BartEncoder, shift_tokens_right
+from paddlenlp.transformers.bart.modeling import shift_tokens_right
+from paddlenlp.transformers.tokenizer_utils_base import (
+    PaddingStrategy,
+    TruncationStrategy,
+)
+from tests.testing_utils import slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
 def prepare_bart_inputs_dict(
@@ -408,6 +407,7 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     test_missing_keys = False
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     def setUp(self):
         self.model_tester = BartModelTester(self)
@@ -873,24 +873,22 @@ class BartModelIntegrationTests(unittest.TestCase):
             max_length=1024,
         )
 
-        EXPECTED = [
-            "A French prosecutor says he is not aware of any video footage from on board the plane. Two German "
-            "magazines claim to have found a cell phone video showing the crash. The publications say they watched "
-            "the video, which was found by a source close to the investigation. All 150 on board Germanwings Flight "
-            "9525 were killed.",
-            "Palestinian Authority becomes 123rd member of the International Criminal Court. The move gives the court "
-            "jurisdiction over alleged crimes in Palestinian territories. Israel and the United States opposed the "
-            "Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki said it was a "
-            "move toward greater justice.",
-            "U.S. and its negotiating partners reached a strong framework agreement with Iran. Peter Bergen: The "
-            "debate that has already begun will likely result in more heat than light. He says critics have made "
-            "dubious assumptions and doubtful assertions. Bergen says the goal was to block Iran from building a "
-            "nuclear weapon.",
-            "Liana Barrientos, 39, has been married 10 times, sometimes within two weeks of each other. Prosecutors "
-            "say the marriages were part of an immigration scam. She pleaded not guilty at State Supreme Court in the "
-            "Bronx on Friday. If convicted, she faces up to four years in prison.",
-        ]
+        # EXPECTED = [
+        #     "A French prosecutor says he is not aware of any video footage from on board the plane. Two German "
+        #     "magazines claim to have found a cell phone video showing the crash. The publications say they watched "
+        #     "the video, which was found by a source close to the investigation. All 150 on board Germanwings Flight "
+        #     "9525 were killed.",
+        #     "Palestinian Authority becomes 123rd member of the International Criminal Court. The move gives the court "
+        #     "jurisdiction over alleged crimes in Palestinian territories. Israel and the United States opposed the "
+        #     "Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki said it was a "
+        #     "move toward greater justice.",
+        #     "U.S. and its negotiating partners reached a strong framework agreement with Iran. Peter Bergen: The "
+        #     "debate that has already begun will likely result in more heat than light. He says critics have made "
+        #     "dubious assumptions and doubtful assertions. Bergen says the goal was to block Iran from building a "
+        #     "nuclear weapon.",
+        #     "Liana Barrientos, 39, has been married 10 times, sometimes within two weeks of each other. Prosecutors "
+        #     "say the marriages were part of an immigration scam. She pleaded not guilty at State Supreme Court in the "
+        #     "Bronx on Friday. If convicted, she faces up to four years in prison.",
+        # ]
 
-        generated_summaries = tok.batch_decode(
-            hypotheses_batch.tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
-        )
+        tok.batch_decode(hypotheses_batch.tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True)

@@ -13,11 +13,10 @@
 # limitations under the License.
 
 import numpy as np
-from numpy import array
-import paddle_serving_server.pipeline.operator
-from paddle_serving_server.web_service import WebService, Op
-from paddlenlp.transformers import PegasusChineseTokenizer
+from paddle_serving_server.web_service import Op, WebService
+
 from paddlenlp.ops.ext_utils import load
+from paddlenlp.transformers import PegasusChineseTokenizer
 from paddlenlp.utils.log import logger
 
 

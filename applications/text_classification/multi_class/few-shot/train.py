@@ -12,27 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, field
 import os
 from collections import defaultdict
-
-import numpy as np
+from dataclasses import dataclass, field
 
 import paddle
-from paddle.static import InputSpec
 from paddle.metric import Accuracy
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
+from utils import load_local_dataset
+
 from paddlenlp.prompt import (
     AutoTemplate,
-    SoftVerbalizer,
-    PromptTuningArguments,
-    PromptTrainer,
     PromptModelForSequenceClassification,
+    PromptTrainer,
+    PromptTuningArguments,
+    SoftVerbalizer,
 )
-
-from utils import load_local_dataset
+from paddlenlp.trainer import EarlyStoppingCallback, PdArgumentParser
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -127,22 +124,8 @@ def main():
 
     # Export static model.
     if training_args.do_export:
-        template = prompt_model.template
-        template_keywords = template.extract_template_keywords(template.prompt)
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
-            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None], dtype="float32"),  # attention_mask
-        ]
-        if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None], dtype="int64"))  # masked_positions
-        if "soft" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # soft_token_ids
-        if "encoder" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64"))  # encoder_ids
         export_path = os.path.join(training_args.output_dir, "export")
-        trainer.export_model(export_path, input_spec=input_spec, export_type=model_args.export_type)
+        trainer.export_model(export_path, export_type=model_args.export_type)
 
 
 if __name__ == "__main__":

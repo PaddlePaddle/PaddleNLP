@@ -6,3 +6,12 @@ skip = ['paddlenlp/transformers/__init__.py']
 line-length = 119
 target_version = ['py35', 'py36', 'py37', 'py38', 'py39', 'py310']
 exclude = ['.flake8']
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q --ignore tests/transformers/t5/test_modeling.py"
+testpaths = [
+    "tests/transformers",
+    "tests/prompt",
+    "tests/taskflow",
+]
