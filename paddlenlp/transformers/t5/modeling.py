@@ -575,8 +575,8 @@ class T5PretrainedModel(PretrainedModel):
     def dummy_inputs(self):
         DUMMY_INPUTS = [[7, 6, 0, 0, 1], [1, 2, 3, 0, 0], [0, 0, 0, 4, 5]]
         DUMMY_MASK = [[1, 1, 1, 1, 1], [1, 1, 1, 0, 0], [0, 0, 0, 1, 1]]
-        input_ids = paddle.assign(np.asndarray(DUMMY_INPUTS, dtype="int64"))
-        input_mask = paddle.assign(np.asndarray(DUMMY_MASK, dtype="int64"))
+        input_ids = paddle.assign(np.asarray(DUMMY_INPUTS, dtype="int64"))
+        input_mask = paddle.assign(np.asarray(DUMMY_MASK, dtype="int64"))
         dummy_inputs = {
             "decoder_input_ids": input_ids,
             "input_ids": input_ids,
@@ -697,7 +697,7 @@ class T5PretrainedModel(PretrainedModel):
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids = paddle.where(
             shifted_input_ids == -100,
-            paddle.assign(np.asndarray(pad_token_id, dtype=data_type_converter(shifted_input_ids))),
+            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids))),
             shifted_input_ids,
         )
 
