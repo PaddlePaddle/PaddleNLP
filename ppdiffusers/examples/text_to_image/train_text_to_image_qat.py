@@ -220,6 +220,15 @@ def parse_args():
     parser.add_argument(
         "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
+    parser.add_argument(
+        "--teacher_pretrained_model_name_or_path",
+        type=str,
+        default="CompVis/stable-diffusion-v1-4",
+        help="Path to pretrained model or model identifier from huggingface.co/models.",
+    )
+    parser.add_argument("--distill_coeff", type=float, default=0, help="coeff for distillation loss")
+    parser.add_argument("--use_pact", action="store_true", default=False, help="QAT")
+    parser.add_argument("--save_freq", type=int, default=0, help="frequency to save model")
 
     args = parser.parse_args()
 
@@ -291,10 +300,10 @@ def main():
     quant_config = {
         # It defauts to None, which means that no preprocessing is performed
         # on the active value."
-        "activation_preprocess_type": "PACT",
+        "activation_preprocess_type": "PACT" if args.use_pact else None,
         # It defauts to None, which means that no preprocessing is performed
         # on weights.
-        "weight_preprocess_type": "PACT",
+        "weight_preprocess_type": "PACT" if args.use_pact else None,
         "weight_quantize_type": "channel_wise_abs_max",
         "activation_quantize_type": "moving_average_abs_max",
         "weight_bits": 8,
@@ -337,6 +346,13 @@ def main():
     # Freeze vae and text_encoder
     freeze_params(vae.parameters())
     freeze_params(text_encoder.parameters())
+
+    if args.distill_coeff > 0:
+        teacher_unet = UNet2DConditionModel.from_pretrained(
+            args.teacher_pretrained_model_name_or_path, subfolder="unet"
+        )
+        freeze_params(teacher_unet.parameters())
+        teacher_unet.eval()
 
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
@@ -562,6 +578,11 @@ def main():
                 # Predict the noise residual and compute loss
                 noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
                 loss = F.mse_loss(noise_pred, noise, reduction="mean")
+                if args.distill_coeff > 0:
+                    teacher_noise_pred = teacher_unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                    loss = (1 - args.distill_coeff) * loss + args.distill_coeff * F.mse_loss(
+                        noise_pred, teacher_noise_pred, reduction="mean"
+                    )
 
                 train_loss += loss.item()
                 if args.gradient_accumulation_steps > 1:
@@ -592,6 +613,15 @@ def main():
                         if name == "epoch":
                             continue
                         writer.add_scalar(f"train/{name}", val, step=global_step)
+                    if args.save_freq > 0 and global_step % args.save_freq == 0:
+                        pipeline = StableDiffusionPipeline.from_pretrained(
+                            args.pretrained_model_name_or_path,
+                            text_encoder=text_encoder,
+                            vae=vae,
+                            unet=unwrap_model(unet),
+                            safety_checker=None,
+                        )
+                        pipeline.save_pretrained(os.path.join(args.output_dir, f"step_{global_step}"))
 
             if global_step >= args.max_train_steps:
                 break
@@ -604,13 +634,15 @@ def main():
         # Create the pipeline using using the trained modules and save it.
         pipeline = StableDiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
+            text_encoder=text_encoder,
+            vae=vae,
             unet=unet,
             safety_checker=None,
         )
-        pipeline.save_pretrained(args.output_dir)
+        pipeline.save_pretrained(os.path.join(args.output_dir, "final"))
         quanter.save_quantized_model(
             unet,
-            os.path.join(args.output_dir, "int8"),
+            os.path.join(args.output_dir, "final", "int8"),
             input_spec=[
                 paddle.static.InputSpec(shape=[None, 4, None, None], dtype="float32", name="latent_input"),  # latent
                 paddle.static.InputSpec(shape=[1], dtype="int64", name="timestep"),  # timesteps
