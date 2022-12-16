@@ -12,30 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import os
 import copy
-import math
-import numpy as np
 import inspect
+import math
+import os
+import time
 
 import paddle
-from paddle.utils import try_import
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.metric import Accuracy
-from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+from paddle.utils import try_import
 
-from ..utils.log import logger
 from ..data import Pad
-from ..transformers import AutoModelForSequenceClassification
-from ..transformers import AutoModelForQuestionAnswering
-from ..transformers import AutoModelForTokenClassification
-from ..transformers import export_model
-from ..transformers.ofa_utils import *
-from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 from ..metrics import ChunkEvaluator
-from ..metrics.squad import squad_evaluate, compute_prediction
+from ..metrics.squad import compute_prediction, squad_evaluate
+from ..transformers import export_model
+from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from ..transformers.ofa_utils import (
+    compute_neuron_head_importance,
+    encoder_layer_ofa_forward,
+    encoder_ofa_forward,
+    mha_ofa_forward,
+    prepare_qkv_ofa,
+    reorder_neuron_head,
+)
+from ..utils.log import logger
 from .trainer import Trainer
 
 
@@ -127,7 +129,7 @@ def _dynabert(self, model, output_dir):
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
         args.num_training_steps = args.max_steps
-        args.num_train_epochs = math.ceil(num_training_steps / len(train_dataloader))
+        args.num_train_epochs = math.ceil(args.num_training_steps / len(train_dataloader))
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
         args.num_train_epochs = math.ceil(args.num_train_epochs)
@@ -228,8 +230,8 @@ def _recover_auto_model_forward(self):
 
 
 def _dynabert_init(self, model, eval_dataloader):
-    from paddleslim.nas.ofa.convert_super import Convert, supernet
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
+    from paddleslim.nas.ofa.convert_super import Convert, supernet
 
     # Step1: Initialize a dictionary to save the weights from the origin model.
     origin_weights = model.state_dict()
@@ -393,7 +395,7 @@ def evaluate_token_cls(self, model, data_loader):
 
 
 def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, eval_dataloader, num_train_epochs):
-    from paddleslim.nas.ofa import OFA, DistillConfig, utils
+    from paddleslim.nas.ofa import utils
 
     global_step = 0
     lambda_logit = 1.0
@@ -486,7 +488,7 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
 
 
 def _dynabert_export(self, ofa_model):
-    from paddleslim.nas.ofa import OFA, DistillConfig, utils
+    from paddleslim.nas.ofa import utils
 
     ofa_model._add_teacher = False
     ofa_model, ofa_model.model = _recover_transformer_func(ofa_model), _recover_transformer_func(ofa_model.model)
@@ -526,7 +528,6 @@ def _dynabert_export(self, ofa_model):
 
 
 def _post_training_quantization_grid_search(self, model_dir):
-    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
     args = self.args
     if args.batch_num_list is None:
         args.batch_num_list = [1]
@@ -542,6 +543,11 @@ def _post_training_quantization_grid_search(self, model_dir):
     args.output_filename_prefix = "int8"
 
     def _post_training_quantization(algo, batch_size, batch_nums):
+        try:
+            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+        except ImportError:
+            from paddle.static.quantization import PostTrainingQuantization
+
         def _batch_generator_func():
             param_name_list = []
             for key in self.eval_dataset[0]:
