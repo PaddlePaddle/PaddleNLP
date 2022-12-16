@@ -124,6 +124,17 @@ MAPPING_TASKS = OrderedDict(
 )
 
 
+SPECTIAL_MODELS = OrderedDict(
+    [
+        ("uie-senta-base", "UIE"),
+        ("uie-senta-medium", "UIE"),
+        ("uie-senta-mini", "UIE"),
+        ("uie-senta-micro", "UIE"),
+        ("uie-senta-nano", "UIE"),
+    ]
+)
+
+
 def get_name_mapping(task="Model"):
     """
     Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
@@ -252,6 +263,8 @@ class _BaseAutoModelClass:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
                         try:
+                            if pattern in SPECTIAL_MODELS:
+                                init_class = SPECTIAL_MODELS[pattern]
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
                             logger.error(err)
