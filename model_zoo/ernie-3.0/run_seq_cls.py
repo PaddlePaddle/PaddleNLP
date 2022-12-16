@@ -13,24 +13,27 @@
 # limitations under the License.
 
 import argparse
-import os
-import sys
-import random
-import time
-import math
 import json
+import math
+import os
+import random
+import sys
+import time
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
+from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
-from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 
 METRIC_CLASSES = {
     "afqmc": Accuracy,
@@ -113,11 +116,7 @@ def parse_args():
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
-    parser.add_argument("--num_workers",
-        default=0,
-        type=int,
-        help="Number of dataloader workers"
-    )
+    parser.add_argument("--num_workers", default=0, type=int, help="Number of dataloader workers")
     parser.add_argument("--dropout", default=0.1, type=float, help="dropout.")
     parser.add_argument("--max_grad_norm", default=1.0, type=float, help="The max value of grad norm.")
     args = parser.parse_args()
@@ -275,7 +274,11 @@ def do_train(args):
         batchify_fn = DataCollatorWithPadding(tokenizer)
 
     train_data_loader = DataLoader(
-        dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=args.num_workers, return_list=True
+        dataset=train_ds,
+        batch_sampler=train_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=args.num_workers,
+        return_list=True,
     )
     dev_data_loader = DataLoader(
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True

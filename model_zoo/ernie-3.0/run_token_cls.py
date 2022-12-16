@@ -18,15 +18,17 @@ import random
 import time
 from functools import partial
 
-from datasets import load_dataset
-
 import paddle
+from datasets import load_dataset
 from paddle.io import DataLoader
 
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
-from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.transformers import (
+    AutoModelForTokenClassification,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
 
 parser = argparse.ArgumentParser()
@@ -79,11 +81,7 @@ def parse_args():
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
-    parser.add_argument("--num_workers",
-        default=0,
-        type=int,
-        help="Number of dataloader workers"
-    )
+    parser.add_argument("--num_workers", default=0, type=int, help="Number of dataloader workers")
     args = parser.parse_args()
     return args
 
@@ -123,7 +121,9 @@ def run(args):
     label_num = len(label_list)
 
     if args.device == "npu":
-        batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer, padding="max_length", max_length=args.max_seq_length)
+        batchify_fn = DataCollatorForTokenClassification(
+            tokenizer=tokenizer, padding="max_length", max_length=args.max_seq_length
+        )
     else:
         batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer)
 

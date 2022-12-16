@@ -13,28 +13,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
+import contextlib
+import distutils.util
+import json
+import math
 import os
 import random
 import time
-import json
-import math
-import distutils.util
-import argparse
-import contextlib
-
 from functools import partial
+
 import numpy as np
 import paddle
-
+from datasets import load_dataset
 from paddle.io import DataLoader
 
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics.squad import squad_evaluate, compute_prediction
+from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
+from paddlenlp.transformers import (
+    AutoModelForQuestionAnswering,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils.log import logger
-
-from datasets import load_dataset
 
 
 def parse_args():
@@ -108,11 +109,7 @@ def parse_args():
         type=str,
         help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
-    parser.add_argument("--num_workers",
-        default=0,
-        type=int,
-        help="Number of dataloader workers"
-    )
+    parser.add_argument("--num_workers", default=0, type=int, help="Number of dataloader workers")
     parser.add_argument(
         "--doc_stride",
         type=int,
@@ -384,7 +381,11 @@ def run(args):
         else:
             batchify_fn = DataCollatorWithPadding(tokenizer)
         train_data_loader = DataLoader(
-            dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn, num_workers=args.num_workers, return_list=True
+            dataset=train_ds,
+            batch_sampler=train_batch_sampler,
+            collate_fn=batchify_fn,
+            num_workers=args.num_workers,
+            return_list=True,
         )
 
         with main_process_first(desc="evaluate dataset map pre-processing"):
