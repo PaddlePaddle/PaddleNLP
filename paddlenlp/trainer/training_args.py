@@ -24,7 +24,7 @@ import types
 import warnings
 from dataclasses import asdict, dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import paddle
 from paddle.distributed import fleet
@@ -328,16 +328,15 @@ class TrainingArguments:
             "help": "When doing a multinode distributed training, whether to log once per node or just once on the main node."
         },
     )
-
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
-    logging_strategy: str = field(
+    logging_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
     )
     logging_first_step: bool = field(default=False, metadata={"help": "Log the first global_step"})
     logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
 
-    save_strategy: str = field(
+    save_strategy: IntervalStrategy = field(
         default="steps",
         metadata={"help": "The checkpoint save strategy to use."},
     )
@@ -439,7 +438,6 @@ class TrainingArguments:
         default=False, metadata={"help": "Drop the last incomplete batch if it is not divisible by the batch size."}
     )
     eval_steps: int = field(default=None, metadata={"help": "Run an evaluation every X steps."})
-
     dataloader_num_workers: int = field(
         default=0,
         metadata={
