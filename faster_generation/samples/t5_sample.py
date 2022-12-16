@@ -14,26 +14,15 @@
 
 import argparse
 
-import paddle
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max_length",
-                        default=256,
-                        type=int,
-                        help="Maximum output sequence length.")
-    parser.add_argument("--beam_size",
-                        default=4,
-                        type=int,
-                        help="The beam size to set.")
-    parser.add_argument("--use_faster",
-                        action="store_true",
-                        help="Whether to use faster to predict.")
-    parser.add_argument("--use_fp16_decoding",
-                        action="store_true",
-                        help="Whether to use fp16 to predict.")
+    parser.add_argument("--max_length", default=256, type=int, help="Maximum output sequence length.")
+    parser.add_argument("--beam_size", default=4, type=int, help="The beam size to set.")
+    parser.add_argument("--use_faster", action="store_true", help="Whether to use faster to predict.")
+    parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 to predict.")
     args = parser.parse_args()
     return args
 
@@ -45,22 +34,19 @@ def predict(args):
     model.eval()
     tokenizer = T5Tokenizer.from_pretrained(model_name)
 
-    en_text = (
-        ' This image section from an infrared recording by the Spitzer telescope shows a "family portrait" of countless generations of stars: the oldest stars are seen as blue dots. '
+    en_text = ' This image section from an infrared recording by the Spitzer telescope shows a "family portrait" of countless generations of stars: the oldest stars are seen as blue dots. '
+    input_ids = tokenizer.encode("translate English to French: " + en_text, return_tensors="pd")["input_ids"]
+
+    output, _ = model.generate(
+        input_ids=input_ids,
+        num_beams=args.beam_size,
+        max_length=args.max_length,
+        decode_strategy="beam_search",
+        use_faster=args.use_faster,
+        use_fp16_decoding=args.use_fp16_decoding,
     )
-    input_ids = tokenizer.encode("translate English to French: " + en_text,
-                                 return_tensors="pd")["input_ids"]
 
-    output, _ = model.generate(input_ids=input_ids,
-                               num_beams=args.beam_size,
-                               max_length=args.max_length,
-                               decode_strategy="beam_search",
-                               use_faster=args.use_faster,
-                               use_fp16_decoding=args.use_fp16_decoding)
-
-    translation = tokenizer.decode(output[0],
-                                   skip_special_tokens=True,
-                                   clean_up_tokenization_spaces=False)
+    translation = tokenizer.decode(output[0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
 
     print("The original sentence: ", en_text)
     print("The translation result: ", translation)

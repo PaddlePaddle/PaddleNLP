@@ -14,27 +14,21 @@
 
 import argparse
 import os
-import numpy as np
 from pprint import pprint
 
-import paddle
 import paddle.inference as paddle_infer
 
-from paddlenlp.transformers import T5Tokenizer
 from paddlenlp.ops.ext_utils import load
+from paddlenlp.transformers import T5Tokenizer
 
 
 def setup_args():
     """Setup arguments."""
     parser = argparse.ArgumentParser()
-    parser.add_argument("--inference_model_dir",
-                        default="./infer_model/",
-                        type=str,
-                        help="Path to save inference model of T5. ")
-    parser.add_argument("--batch_size",
-                        default=1,
-                        type=int,
-                        help="Batch size. ")
+    parser.add_argument(
+        "--inference_model_dir", default="./infer_model/", type=str, help="Path to save inference model of T5. "
+    )
+    parser.add_argument("--batch_size", default=1, type=int, help="Batch size. ")
 
     args = parser.parse_args()
 
@@ -48,9 +42,7 @@ def postprocess_response(tokenizer, seq, bos_idx, eos_idx):
         if idx == eos_idx:
             eos_pos = i
             break
-    seq = [
-        idx for idx in seq[:eos_pos + 1] if idx != bos_idx and idx != eos_idx
-    ]
+    seq = [idx for idx in seq[: eos_pos + 1] if idx != bos_idx and idx != eos_idx]
     res = tokenizer.convert_ids_to_string(seq)
     return res
 
@@ -62,15 +54,14 @@ def infer(args):
     inputs = ' This image section from an infrared recording by the Spitzer telescope shows a "family portrait" of countless generations of stars: the oldest stars are seen as blue dots. '
 
     # Input ids
-    input_ids = tokenizer.encode("translate English to French: " + inputs,
-                                 return_tensors="np")["input_ids"]
+    input_ids = tokenizer.encode("translate English to French: " + inputs, return_tensors="np")["input_ids"]
 
     # Load FasterTransformer lib.
     load("FasterTransformer", verbose=True)
 
     config = paddle_infer.Config(
-        os.path.join(args.inference_model_dir, "t5.pdmodel"),
-        os.path.join(args.inference_model_dir, "t5.pdiparams"))
+        os.path.join(args.inference_model_dir, "t5.pdmodel"), os.path.join(args.inference_model_dir, "t5.pdiparams")
+    )
 
     config.enable_use_gpu(100, 0)
     config.disable_glog_info()
@@ -92,9 +83,7 @@ def infer(args):
     output_data = output_data.transpose([1, 2, 0])
 
     # Only use the best sequence.
-    translation = tokenizer.decode(output_data[0][0],
-                                   skip_special_tokens=True,
-                                   clean_up_tokenization_spaces=False)
+    translation = tokenizer.decode(output_data[0][0], skip_special_tokens=True, clean_up_tokenization_spaces=False)
     print("Result:", translation)
 
 
