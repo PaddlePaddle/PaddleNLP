@@ -57,9 +57,8 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             "UpDecoderBlock2D",
             "UpDecoderBlock2D",
             "UpDecoderBlock2D",
-            "UpDecoderBlock2D",
         ),
-        up_block_out_channels: Tuple[int] = (128, 256, 256, 256, 512),
+        up_block_out_channels: Tuple[int] = None,
         block_out_channels: Tuple[int] = (128, 256, 512, 512),
         layers_per_block: int = 2,
         act_fn: str = "silu",
@@ -67,7 +66,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         norm_num_groups: int = 32,
         sample_size: int = 512,
         # new add
-        input_size: Tuple[int] = (256, 256),
+        input_size: Tuple[int] = None,
         # loss arguments
         disc_start=50001,
         kl_weight=1.0e-6,
