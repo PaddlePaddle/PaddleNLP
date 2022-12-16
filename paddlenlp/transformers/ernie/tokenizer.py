@@ -84,12 +84,12 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "uie-base-en": 512,
     "ernie-search-base-dual-encoder-marco-en": 512,
     "ernie-search-large-cross-encoder-marco-en": 512,
-    "ernie-3.0-tiny-base-v2": 2048,
-    "ernie-3.0-tiny-medium-v2": 2048,
-    "ernie-3.0-tiny-mini-v2": 2048,
-    "ernie-3.0-tiny-micro-v2": 2048,
-    "ernie-3.0-tiny-nano-v2": 2048,
-    "ernie-3.0-tiny-pico-v2": 2048,
+    "ernie-3.0-tiny-base-v2-zh": 2048,
+    "ernie-3.0-tiny-medium-v2-zh": 2048,
+    "ernie-3.0-tiny-mini-v2-zh": 2048,
+    "ernie-3.0-tiny-micro-v2-zh": 2048,
+    "ernie-3.0-tiny-nano-v2-zh": 2048,
+    "ernie-3.0-tiny-pico-v2-zh": 2048,
 }
 
 
