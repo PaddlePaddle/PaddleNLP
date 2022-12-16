@@ -125,12 +125,22 @@ def dumpy(*args, **kwarsg):
     return None
 
 
-def seek_by_string(file_handler: BufferedReader, words: str, file_size: int) -> int:
+def seek_by_string(file_handler: BufferedReader, string: str, file_size: int) -> int:
+    """seek the index of file-handler with target words
+
+    Args:
+        file_handler (BufferedReader): file handler
+        string (str): the specific string in the file
+        file_size (int): size of file
+
+    Returns:
+        int: end index of target string
+    """
     word_index = 0
-    word_bytes = words.encode("latin")
+    word_bytes = string.encode("latin")
     empty_byte = "".encode("latin")
 
-    while word_index < len(words) and file_handler.tell() < file_size:
+    while word_index < len(string) and file_handler.tell() < file_size:
         content = file_handler.read(1)
         if content == empty_byte:
             break
@@ -143,8 +153,17 @@ def seek_by_string(file_handler: BufferedReader, words: str, file_size: int) -> 
     return file_handler.tell()
 
 
-def read_prefix_key(file_handler: BufferedReader, end_index):
-    end_index = seek_by_string(file_handler, "data.pkl", end_index)
+def read_prefix_key(file_handler: BufferedReader, file_size: int):
+    """read the prefix key in model weight file, eg: archive/pytorch_model
+
+    Args:
+        file_handler (BufferedReader): file handler
+        fiel_size (_type_): size of file
+
+    Returns:
+        _type_: _description_
+    """
+    end_index = seek_by_string(file_handler, "data.pkl", file_size)
     file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE)
     prefix_key = file_handler.read(end_index - MZ_ZIP_LOCAL_DIR_HEADER_SIZE - len("/data.pkl"))
     return prefix_key
@@ -214,9 +233,9 @@ def load_torch(path: str, **pickle_load_args):
             file_handler.seek(padding_offset, 1)
 
             # save the tensor info in result to re-use memory
-            content = file_handler.read(tensor_meta.nbytes)
-            assert prefix_key not in str(content)
-            stage1_key_to_tensor[key] = np.frombuffer(content, dtype=tensor_meta.dtype).reshape(tensor_meta.size)
+            stage1_key_to_tensor[key] = np.frombuffer(
+                file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype
+            ).reshape(tensor_meta.size)
 
     def persistent_load_stage2(saved_id):
         assert isinstance(saved_id, tuple)
