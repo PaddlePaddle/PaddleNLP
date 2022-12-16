@@ -19,6 +19,8 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -26,7 +28,11 @@ from ..model_outputs import (
     CausalLMOutputWithCrossAttentions,
 )
 from ..nezha.modeling import ACT2FN
-from .configuration import CodeGenConfig
+from .configuration import (
+    CODEGEN_PRETRAINED_INIT_CONFIGURATION,
+    CODEGEN_PRETRAINED_RESOURCE_FILES_MAP,
+    CodeGenConfig,
+)
 
 CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "Salesforce/codegen-350M-nl",
@@ -275,8 +281,9 @@ class CodeGenPreTrainedModel(PretrainedModel):
     models.
     """
 
-    pretrained_init_configuration = {}
-    pretrained_resource_files_map = {"model_state": {}}
+    model_config_file = CONFIG_NAME
+    pretrained_init_configuration = CODEGEN_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = CODEGEN_PRETRAINED_RESOURCE_FILES_MAP
     config_class = CodeGenConfig
     base_model_prefix = "transformer"
 

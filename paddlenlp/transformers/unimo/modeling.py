@@ -17,6 +17,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -44,6 +46,7 @@ class UNIMOPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = UNIMO_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = UNIMO_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "unimo"

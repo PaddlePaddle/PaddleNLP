@@ -17,6 +17,8 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -43,6 +45,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = UNIFIED_TRANSFORMER_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = UNIFIED_TRANSFORMER_PRETRAINED_RESOURCE_FILES_MAP
     config_class = UnifiedTransformerConfig
