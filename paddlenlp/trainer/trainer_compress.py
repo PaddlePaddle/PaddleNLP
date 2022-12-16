@@ -108,7 +108,7 @@ def generate_input_spec(model, dataset):
     for key in dataset[0].keys():
         if key in model_para_keys and key not in ("labels", "start_positions", "end_positions"):
             input_num += 1
-    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int32") for i in range(input_num)]
+    input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64") for i in range(input_num)]
     return input_spec
 
 
@@ -507,7 +507,7 @@ def _dynabert_export(self, ofa_model):
         origin_model_new = ofa_model.export(
             best_config,
             input_shapes=[[1, 1]] * len(input_spec),
-            input_dtypes=["int32"] * len(input_spec),
+            input_dtypes=["int64"] * len(input_spec),
             origin_model=origin_model,
         )
         for name, sublayer in origin_model_new.named_sublayers():
