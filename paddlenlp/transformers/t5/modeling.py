@@ -1385,6 +1385,8 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 logits = output[1]
 
         """
+
+        input_type = type(decoder_input_ids) if decoder_input_ids is not None else type(decoder_inputs_embeds)
         use_cache = use_cache if use_cache is not None else self.config.use_cache
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         # Encode if needed (training, first prediction pass)
@@ -1399,7 +1401,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
                 return_dict=return_dict,
             )
         else:
-            if isinstance(encoder_output, type(decoder_input_ids)):
+            if isinstance(encoder_output, input_type):
                 encoder_output = (encoder_output,)
             if return_dict and not isinstance(encoder_output, BaseModelOutput):
                 encoder_output = convert_encoder_output(encoder_output)

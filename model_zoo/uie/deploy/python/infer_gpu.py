@@ -15,7 +15,6 @@
 import argparse
 from pprint import pprint
 
-import paddle
 from uie_predictor import UIEPredictor
 
 
@@ -39,6 +38,7 @@ def parse_args():
         action="store_true",
         help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
     )
+    parser.add_argument("--multilingual", action="store_true", help="Whether is the multilingual model.")
     parser.add_argument(
         "--max_seq_len",
         default=512,
