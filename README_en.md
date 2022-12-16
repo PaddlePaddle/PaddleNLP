@@ -33,17 +33,17 @@
 * 🔥 **2022.12.9 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
   * 📃 Release **UIE-X**, an universal information extraction model which supports both document and text inputs.
   * 🔨 Industrial application: Release [**Complete Solution of Information Extraction**](./applications/information_extraction), supports most extraction tasks, and we provide a comprehensive and easy-to-use fine-tuning customization workflow。
-* 🔥 **2022.11.28 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
+* **2022.11.28 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
   * 💪 Framework upgrade: Introduced [**Huggingface Hub Integration**](https://huggingface.co/PaddlePaddle) with a plan to gradually support all Models, Tokenizers and Taskflows to directly load from [Huggingface Hub](https://huggingface.co/PaddlePaddle); Added PET implementation to [**Prompt API**](./docs/advanced_guide/prompt.md).
   * 💎 NLP Tool: [**Pipelines**](./pipelines) now supports Cross-Encoder [Ernie-Search](./pipelines/API.md) for Semantic Search; Released [**SimpleServing**](./docs/server.md), a quick out-of-box solution to deploy Taskflows and Pretrained Models.
-* 🔥 **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
+* **2022.11.17 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3) Released!**
   * 💪 Framework upgrade: 🏆 Upgrade [**Prompt API**](./docs/advanced_guide/prompt.md), supporting more flexible prompt definitions and winning the 1st place in [FewCLUE](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA); 🕸 Upgrade [**Trainer API**](./docs/trainer.md), supporting Seq2seqTrainer, IterableDataset as well as bf16 and sharding strategies.
   * 🔨 Industrial application: 🏃 Upgrade for [**Universal Information Extraction**](./model_zoo/uie). Support **quantization aware training** and INT8 precision inference for inference performance boost.
-* 🔥 **2022.10.27 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2) Released!**
+* **2022.10.27 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2) Released!**
   * NLG Upgrade: 📄 Release [**Solution of Text Summarization**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus) based on Pegasus;❓ Release [**Solution of Problem Generation**](./examples/question_generation), providing **general problem generation pre-trained model** based on Baidu's UNIMO Text and large-scale multi domain problem generation dataset. Supporting high-performance inference ability based on FasterGeneration , and covering the whole process of training , inference and deployment.
-* 🔥 **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
+* **2022.10.14 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1) Released!**
   * 🧾 Release multilingual/cross-lingual pre-trained models [**ERNIE-Layout**](./model_zoo/ernie-layout/) which achieves new SOTA results in 11 downstream tasks. **DocPrompt** 🔖 based on ERNIE-Layout is also released which has the ability for multilingual document information extraction and question ansering.
-* 🔥 **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
+* **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
 
   * 💎 NLP Tool: **[Pipelines](./pipelines)** released. Supports for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
 
