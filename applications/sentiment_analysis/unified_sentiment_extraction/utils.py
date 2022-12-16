@@ -12,128 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import math
 import json
 import random
-from tqdm import tqdm
+import re
 
 import numpy as np
 import paddle
-from paddlenlp.utils.log import logger
-
-
-def load_txt(file_path):
-    texts = []
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            texts.append(line.strip())
-    return texts
-
-
-def load_json_file(path):
-    exmaples = []
-    with open(path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            example = json.loads(line)
-            exmaples.append(example)
-    return exmaples
-
-
-def write_json_file(examples, save_path):
-    with open(save_path, "w", encoding="utf-8") as f:
-        for example in examples:
-            line = json.dumps(example, ensure_ascii=False)
-            f.write(line + "\n")
-
-MODEL_MAP = {
-    # vocab.txt/special_tokens_map.json/tokenizer_config.json are common to the default model.
-    "uie-base": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.0/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
-        }
-    },
-    "uie-medium": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.0/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
-        }
-    },
-    "uie-mini": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.0/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
-        }
-    },
-    "uie-micro": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.0/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
-        }
-    },
-    "uie-nano": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.0/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/tokenizer_config.json"
-        }
-    },
-    # Rename to `uie-medium` and the name of `uie-tiny` will be deprecated in future.
-    "uie-tiny": {
-        "resource_file_urls": {
-            "model_state.pdparams":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny_v0.1/model_state.pdparams",
-            "model_config.json":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
-            "vocab_file":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/vocab.txt",
-            "special_tokens_map":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/special_tokens_map.json",
-            "tokenizer_config":
-            "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/tokenizer_config.json"
-        }
-    }
-}
 
 
 def set_seed(seed):
@@ -180,18 +64,12 @@ def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
+    shuffle = True if mode == "train" else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      return_list=True)
+        sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, return_list=True)
     return dataloader
 
 
@@ -204,15 +82,17 @@ def convert_example(example, tokenizer, max_seq_len):
         result_list
     }
     """
-    encoded_inputs = tokenizer(text=[example["prompt"]],
-                               text_pair=[example["content"]],
-                               truncation=True,
-                               max_seq_len=max_seq_len,
-                               pad_to_max_seq_len=True,
-                               return_attention_mask=True,
-                               return_position_ids=True,
-                               return_dict=False,
-                               return_offsets_mapping=True)
+    encoded_inputs = tokenizer(
+        text=[example["prompt"]],
+        text_pair=[example["content"]],
+        truncation=True,
+        max_seq_len=max_seq_len,
+        pad_to_max_seq_len=True,
+        return_attention_mask=True,
+        return_position_ids=True,
+        return_dict=False,
+        return_offsets_mapping=True,
+    )
     encoded_inputs = encoded_inputs[0]
     offset_mapping = [list(x) for x in encoded_inputs["offset_mapping"]]
     bias = 0
@@ -234,9 +114,12 @@ def convert_example(example, tokenizer, max_seq_len):
         end_ids[end] = 1.0
 
     tokenized_output = [
-        encoded_inputs["input_ids"], encoded_inputs["token_type_ids"],
-        encoded_inputs["position_ids"], encoded_inputs["attention_mask"],
-        start_ids, end_ids
+        encoded_inputs["input_ids"],
+        encoded_inputs["token_type_ids"],
+        encoded_inputs["position_ids"],
+        encoded_inputs["attention_mask"],
+        start_ids,
+        end_ids,
     ]
     tokenized_output = [np.array(x, dtype="int64") for x in tokenized_output]
     return tuple(tokenized_output)
@@ -256,31 +139,28 @@ def reader(data_path, max_seq_len=512):
     """
     read json
     """
-    with open(data_path, 'r', encoding='utf-8') as f:
+    with open(data_path, "r", encoding="utf-8") as f:
         for line in f:
             json_line = json.loads(line)
-            content = json_line['content'].strip()
-            prompt = json_line['prompt']
+            content = json_line["content"].strip()
+            prompt = json_line["prompt"]
             # Model Input is aslike: [CLS] Prompt [SEP] Content [SEP]
             # It include three summary tokens.
             if max_seq_len <= len(prompt) + 3:
-                raise ValueError(
-                    "The value of max_seq_len is too small, please set a larger value"
-                )
+                raise ValueError("The value of max_seq_len is too small, please set a larger value")
             max_content_len = max_seq_len - len(prompt) - 3
             if len(content) <= max_content_len:
                 yield json_line
             else:
-                result_list = json_line['result_list']
+                result_list = json_line["result_list"]
                 json_lines = []
                 accumulate = 0
                 while True:
                     cur_result_list = []
 
                     for result in result_list:
-                        if result['start'] + 1 <= max_content_len < result[
-                                'end']:
-                            max_content_len = result['start']
+                        if result["start"] + 1 <= max_content_len < result["end"]:
+                            max_content_len = result["start"]
                             break
 
                     cur_content = content[:max_content_len]
@@ -289,40 +169,30 @@ def reader(data_path, max_seq_len=512):
                     while True:
                         if len(result_list) == 0:
                             break
-                        elif result_list[0]['end'] <= max_content_len:
-                            if result_list[0]['end'] > 0:
+                        elif result_list[0]["end"] <= max_content_len:
+                            if result_list[0]["end"] > 0:
                                 cur_result = result_list.pop(0)
                                 cur_result_list.append(cur_result)
                             else:
-                                cur_result_list = [
-                                    result for result in result_list
-                                ]
+                                cur_result_list = [result for result in result_list]
                                 break
                         else:
                             break
 
-                    json_line = {
-                        'content': cur_content,
-                        'result_list': cur_result_list,
-                        'prompt': prompt
-                    }
+                    json_line = {"content": cur_content, "result_list": cur_result_list, "prompt": prompt}
                     json_lines.append(json_line)
 
                     for result in result_list:
-                        if result['end'] <= 0:
+                        if result["end"] <= 0:
                             break
-                        result['start'] -= max_content_len
-                        result['end'] -= max_content_len
+                        result["start"] -= max_content_len
+                        result["end"] -= max_content_len
                     accumulate += max_content_len
                     max_content_len = max_seq_len - len(prompt) - 3
                     if len(res_content) == 0:
                         break
                     elif len(res_content) < max_content_len:
-                        json_line = {
-                            'content': res_content,
-                            'result_list': result_list,
-                            'prompt': prompt
-                        }
+                        json_line = {"content": res_content, "result_list": result_list, "prompt": prompt}
                         json_lines.append(json_line)
                         break
                     else:
@@ -335,9 +205,9 @@ def reader(data_path, max_seq_len=512):
 def unify_prompt_name(prompt):
     # The classification labels are shuffled during finetuning, so they need
     # to be unified during evaluation.
-    if re.search(r'\[.*?\]$', prompt):
-        prompt_prefix = prompt[:prompt.find("[", 1)]
-        cls_options = re.search(r'\[.*?\]$', prompt).group()[1:-1].split(",")
+    if re.search(r"\[.*?\]$", prompt):
+        prompt_prefix = prompt[: prompt.find("[", 1)]
+        cls_options = re.search(r"\[.*?\]$", prompt).group()[1:-1].split(",")
         cls_options = sorted(list(set(cls_options)))
         cls_options = ",".join(cls_options)
         prompt = prompt_prefix + "[" + cls_options + "]"
@@ -346,11 +216,10 @@ def unify_prompt_name(prompt):
 
 
 def get_relation_type_dict(relation_data):
-
     def compare(a, b):
         a = a[::-1]
         b = b[::-1]
-        res = ''
+        res = ""
         for i in range(min(len(a), len(b))):
             if a[i] == b[i]:
                 res += a[i]
@@ -373,11 +242,9 @@ def get_relation_type_dict(relation_data):
                     match = unify_prompt_name(match)
                     if relation_data[i][0] not in added_list:
                         added_list.append(relation_data[i][0])
-                        relation_type_dict.setdefault(match, []).append(
-                            relation_data[i][1])
+                        relation_type_dict.setdefault(match, []).append(relation_data[i][1])
                     added_list.append(relation_data[j][0])
-                    relation_type_dict.setdefault(match, []).append(
-                        relation_data[j][1])
+                    relation_type_dict.setdefault(match, []).append(relation_data[j][1])
                     added = True
             if not added:
                 added_list.append(relation_data[i][0])
@@ -385,461 +252,3 @@ def get_relation_type_dict(relation_data):
                 suffix = unify_prompt_name(suffix)
                 relation_type_dict[suffix] = relation_data[i][1]
     return relation_type_dict
-
-
-def add_cls_negative_example(texts, subject_set, subject_goldens, prompt_prefix,
-                             options, not_mention_label, negative_ratio):
-    assert len(
-        options
-    ) == 3, "you should make sure that options contain three choices: [正向, 负向, 未提及]."
-    negative_examples = []
-
-    with tqdm(total=len(subject_goldens)) as pbar:
-        for i, subject_golden in enumerate(subject_goldens):
-            nonentity_list = list(set(subject_set) ^ set(subject_golden))
-            nonentity_list.sort()
-
-            num_positive = len(subject_goldens[i])
-
-            if num_positive != 0:
-                actual_ratio = math.ceil(len(nonentity_list) / num_positive)
-            else:
-                # Set num_positive to 1 for text without positive example
-                num_positive, actual_ratio = 1, 0
-
-            if actual_ratio <= negative_ratio or negative_ratio == -1:
-                idxs = [k for k in range(len(nonentity_list))]
-            else:
-                idxs = random.sample(range(0, len(nonentity_list)),
-                                     negative_ratio * num_positive)
-
-            for idx in idxs:
-                random.shuffle(options)
-                prompt = nonentity_list[idx] + "的" + \
-                    prompt_prefix + "[" + ",".join(options) + "]"
-                start = prompt.rfind(not_mention_label) - len(prompt) - 1
-                end = start + len(not_mention_label)
-                result = {"text": not_mention_label, "start": start, "end": end}
-                negative_result = {
-                    "content": texts[i],
-                    "result_list": [result],
-                    "prompt": prompt
-                }
-                negative_examples.append(negative_result)
-            pbar.update(1)
-    return negative_examples
-
-
-def add_entity_negative_example(examples, texts, prompts, label_set,
-                                negative_ratio):
-    negative_examples = []
-    positive_examples = []
-    with tqdm(total=len(prompts)) as pbar:
-        for i, prompt in enumerate(prompts):
-            redundants = list(set(label_set) ^ set(prompt))
-            redundants.sort()
-
-            num_positive = len(examples[i])
-            if num_positive != 0:
-                actual_ratio = math.ceil(len(redundants) / num_positive)
-            else:
-                # Set num_positive to 1 for text without positive example
-                num_positive, actual_ratio = 1, 0
-
-            if actual_ratio <= negative_ratio or negative_ratio == -1:
-                idxs = [k for k in range(len(redundants))]
-            else:
-                idxs = random.sample(range(0, len(redundants)),
-                                     negative_ratio * num_positive)
-
-            for idx in idxs:
-                negative_result = {
-                    "content": texts[i],
-                    "result_list": [],
-                    "prompt": redundants[idx]
-                }
-                negative_examples.append(negative_result)
-            positive_examples.extend(examples[i])
-            pbar.update(1)
-    return positive_examples, negative_examples
-
-
-def add_relation_negative_example(redundants, text, num_positive, ratio):
-    added_example = []
-    rest_example = []
-
-    if num_positive != 0:
-        actual_ratio = math.ceil(len(redundants) / num_positive)
-    else:
-        # Set num_positive to 1 for text without positive example
-        num_positive, actual_ratio = 1, 0
-
-    all_idxs = [k for k in range(len(redundants))]
-    if actual_ratio <= ratio or ratio == -1:
-        idxs = all_idxs
-        rest_idxs = []
-    else:
-        idxs = random.sample(range(0, len(redundants)), ratio * num_positive)
-        rest_idxs = list(set(all_idxs) ^ set(idxs))
-
-    for idx in idxs:
-        negative_result = {
-            "content": text,
-            "result_list": [],
-            "prompt": redundants[idx]
-        }
-        added_example.append(negative_result)
-
-    for rest_idx in rest_idxs:
-        negative_result = {
-            "content": text,
-            "result_list": [],
-            "prompt": redundants[rest_idx]
-        }
-        rest_example.append(negative_result)
-
-    return added_example, rest_example
-
-
-def add_full_negative_example(examples, texts, relation_prompts, predicate_set,
-                              subject_goldens):
-    with tqdm(total=len(relation_prompts)) as pbar:
-        for i, relation_prompt in enumerate(relation_prompts):
-            negative_sample = []
-            for subject in subject_goldens[i]:
-                for predicate in predicate_set:
-                    # The relation prompt is constructed as follows:
-                    # subject + "的" + predicate
-                    prompt = subject + "的" + predicate
-                    if prompt not in relation_prompt:
-                        negative_result = {
-                            "content": texts[i],
-                            "result_list": [],
-                            "prompt": prompt
-                        }
-                        negative_sample.append(negative_result)
-            examples[i].extend(negative_sample)
-            pbar.update(1)
-    return examples
-
-
-def generate_cls_example(text, labels, prompt_prefix, options):
-    random.shuffle(options)
-    cls_options = ",".join(options)
-    prompt = prompt_prefix + "[" + cls_options + "]"
-
-    result_list = []
-    example = {"content": text, "result_list": result_list, "prompt": prompt}
-    for label in labels:
-        start = prompt.rfind(label) - len(prompt) - 1
-        end = start + len(label)
-        result = {"text": label, "start": start, "end": end}
-        example["result_list"].append(result)
-    return example
-
-
-def convert_cls_examples(raw_examples,
-                         prompt_prefix="情感倾向",
-                         options=["正向", "负向"]):
-    """
-    Convert labeled data export from doccano for classification task.
-    """
-    examples = []
-    logger.info(f"Converting doccano data...")
-    with tqdm(total=len(raw_examples)) as pbar:
-        for line in raw_examples:
-            items = json.loads(line)
-            # Compatible with doccano >= 1.6.2
-            if "data" in items.keys():
-                text, labels = items["data"], items["label"]
-            else:
-                text, labels = items["text"], items["label"]
-            example = generate_cls_example(text, labels, prompt_prefix, options)
-            examples.append(example)
-    return examples
-
-
-def convert_ext_examples(raw_examples,
-                         negative_ratio,
-                         prompt_prefix="情感倾向",
-                         options=["正向", "负向", "未提及"],
-                         separator="##",
-                         is_train=True,
-                         not_mention_label="未提及"):
-    """
-    Convert labeled data export from doccano for extraction and aspect-level classification task.
-    """
-
-    def _sep_cls_label(label, separator):
-        label_list = label.split(separator)
-        if len(label_list) == 1:
-            return label_list[0], None
-        return label_list[0], label_list[1:]
-
-    texts = []
-    entity_examples = []
-    relation_examples = []
-    entity_cls_examples = []
-    entity_prompts = []
-    relation_prompts = []
-    entity_label_set = []
-    entity_name_set = []
-    predicate_set = []
-    subject_goldens = []
-    inverse_relation_list = []
-    predicate_list = []
-
-    logger.info(f"Converting doccano data...")
-    with tqdm(total=len(raw_examples)) as pbar:
-        for line in raw_examples:
-            items = json.loads(line)
-            entity_id = 0
-            if "data" in items.keys():
-                relation_mode = False
-                if isinstance(items["label"],
-                              dict) and "entities" in items["label"].keys():
-                    relation_mode = True
-                text = items["data"]
-                entities = []
-                relations = []
-                if not relation_mode:
-                    # Export file in JSONL format which doccano < 1.7.0
-                    # e.g. {"data": "", "label": [ [0, 2, "ORG"], ... ]}
-                    for item in items["label"]:
-                        entity = {
-                            "id": entity_id,
-                            "start_offset": item[0],
-                            "end_offset": item[1],
-                            "label": item[2]
-                        }
-                        entities.append(entity)
-                        entity_id += 1
-                else:
-                    # Export file in JSONL format for relation labeling task which doccano < 1.7.0
-                    # e.g. {"data": "", "label": {"relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}}
-                    entities.extend(
-                        [entity for entity in items["label"]["entities"]])
-                    if "relations" in items["label"].keys():
-                        relations.extend([
-                            relation for relation in items["label"]["relations"]
-                        ])
-            else:
-                # Export file in JSONL format which doccano >= 1.7.0
-                # e.g. {"text": "", "label": [ [0, 2, "ORG"], ... ]}
-                if "label" in items.keys():
-                    text = items["text"]
-                    entities = []
-                    for item in items["label"]:
-                        entity = {
-                            "id": entity_id,
-                            "start_offset": item[0],
-                            "end_offset": item[1],
-                            "label": item[2]
-                        }
-                        entities.append(entity)
-                        entity_id += 1
-                    relations = []
-                else:
-                    # Export file in JSONL (relation) format
-                    # e.g. {"text": "", "relations": [ {"id": 0, "start_offset": 0, "end_offset": 6, "label": "ORG"}, ... ], "entities": [ {"id": 0, "from_id": 0, "to_id": 1, "type": "foundedAt"}, ... ]}
-                    text, relations, entities = items["text"], items[
-                        "relations"], items["entities"]
-            texts.append(text)
-
-            entity_example = []
-            entity_prompt = []
-            entity_example_map = {}
-            entity_map = {}  # id to entity name
-            for entity in entities:
-                entity_name = text[entity["start_offset"]:entity["end_offset"]]
-                entity_map[entity["id"]] = {
-                    "name": entity_name,
-                    "start": entity["start_offset"],
-                    "end": entity["end_offset"]
-                }
-
-                entity_label, entity_cls_label = _sep_cls_label(
-                    entity["label"], separator)
-
-                # Define the prompt prefix for entity-level classification
-                entity_cls_prompt_prefix = entity_name + "的" + prompt_prefix
-                if entity_cls_label is not None:
-                    entity_cls_example = generate_cls_example(
-                        text, entity_cls_label, entity_cls_prompt_prefix,
-                        options)
-
-                    entity_cls_examples.append(entity_cls_example)
-
-                result = {
-                    "text": entity_name,
-                    "start": entity["start_offset"],
-                    "end": entity["end_offset"]
-                }
-                if entity_label not in entity_example_map.keys():
-                    entity_example_map[entity_label] = {
-                        "content": text,
-                        "result_list": [result],
-                        "prompt": entity_label
-                    }
-                else:
-                    entity_example_map[entity_label]["result_list"].append(
-                        result)
-
-                if entity_label not in entity_label_set:
-                    entity_label_set.append(entity_label)
-                if entity_name not in entity_name_set:
-                    entity_name_set.append(entity_name)
-                entity_prompt.append(entity_label)
-
-            for v in entity_example_map.values():
-                entity_example.append(v)
-
-            entity_examples.append(entity_example)
-            entity_prompts.append(entity_prompt)
-
-            subject_golden = []  # Golden entity inputs
-            subject_set = set()
-            relation_example = []
-            relation_prompt = []
-            relation_example_map = {}
-            inverse_relation = []
-            predicates = []
-            for relation in relations:
-                predicate = relation["type"]
-                subject_id = relation["from_id"]
-                object_id = relation["to_id"]
-                # The relation prompt is constructed as follows:
-                # subject + "的" + predicate
-                prompt = entity_map[subject_id]["name"] + "的" + predicate
-                if entity_map[subject_id]["name"] not in subject_golden:
-                    subject_golden.append(entity_map[subject_id]["name"])
-                    subject_set.add(entity_map[subject_id]["name"])
-                result = {
-                    "text": entity_map[object_id]["name"],
-                    "start": entity_map[object_id]["start"],
-                    "end": entity_map[object_id]["end"]
-                }
-
-                inverse_negative = entity_map[object_id][
-                    "name"] + "的" + predicate
-                inverse_relation.append(inverse_negative)
-                predicates.append(predicate)
-
-                if prompt not in relation_example_map.keys():
-                    relation_example_map[prompt] = {
-                        "content": text,
-                        "result_list": [result],
-                        "prompt": prompt
-                    }
-                else:
-                    relation_example_map[prompt]["result_list"].append(result)
-
-                if predicate not in predicate_set:
-                    predicate_set.append(predicate)
-                relation_prompt.append(prompt)
-
-            for v in relation_example_map.values():
-                relation_example.append(v)
-
-            relation_examples.append(relation_example)
-            relation_prompts.append(relation_prompt)
-            subject_goldens.append(subject_golden)
-            inverse_relation_list.append(inverse_relation)
-            predicate_list.append(predicates)
-            pbar.update(1)
-
-    logger.info(f"Adding negative samples for first stage prompt...")
-    negative_examples = add_cls_negative_example(texts, subject_set,
-                                                 subject_goldens, prompt_prefix,
-                                                 options, not_mention_label,
-                                                 negative_ratio)
-    all_cls_examples = entity_cls_examples + negative_examples
-    positive_examples, negative_examples = add_entity_negative_example(
-        entity_examples, texts, entity_prompts, entity_label_set,
-        negative_ratio)
-    if len(positive_examples) == 0:
-        all_entity_examples = []
-    else:
-        all_entity_examples = positive_examples + negative_examples
-
-    all_relation_examples = []
-    if len(predicate_set) != 0:
-        logger.info(f"Adding negative samples for second stage prompt...")
-        if is_train:
-
-            positive_examples = []
-            negative_examples = []
-            per_n_ratio = negative_ratio // 3
-
-            with tqdm(total=len(texts)) as pbar:
-                for i, text in enumerate(texts):
-                    negative_example = []
-                    collects = []
-                    num_positive = len(relation_examples[i])
-
-                    # 1. inverse_relation_list
-                    redundants1 = inverse_relation_list[i]
-
-                    # 2. entity_name_set ^ subject_goldens[i]
-                    redundants2 = []
-                    if len(predicate_list[i]) != 0:
-                        nonentity_list = list(
-                            set(entity_name_set) ^ set(subject_goldens[i]))
-                        nonentity_list.sort()
-
-                        redundants2 = [
-                            nonentity + "的" +
-                            predicate_list[i][random.randrange(
-                                len(predicate_list[i]))]
-                            for nonentity in nonentity_list
-                        ]
-
-                    # 3. entity_label_set ^ entity_prompts[i]
-                    redundants3 = []
-                    if len(subject_goldens[i]) != 0:
-                        non_ent_label_list = list(
-                            set(entity_label_set) ^ set(entity_prompts[i]))
-                        non_ent_label_list.sort()
-
-                        redundants3 = [
-                            subject_goldens[i][random.randrange(
-                                len(subject_goldens[i]))] + "的" + non_ent_label
-                            for non_ent_label in non_ent_label_list
-                        ]
-
-                    redundants_list = [redundants1, redundants2, redundants3]
-
-                    for redundants in redundants_list:
-                        added, rest = add_relation_negative_example(
-                            redundants,
-                            texts[i],
-                            num_positive,
-                            per_n_ratio,
-                        )
-                        negative_example.extend(added)
-                        collects.extend(rest)
-
-                    num_sup = num_positive * negative_ratio - len(
-                        negative_example)
-                    if num_sup > 0 and collects:
-                        if num_sup > len(collects):
-                            idxs = [k for k in range(len(collects))]
-                        else:
-                            idxs = random.sample(range(0, len(collects)),
-                                                 num_sup)
-                        for idx in idxs:
-                            negative_example.append(collects[idx])
-
-                    positive_examples.extend(relation_examples[i])
-                    negative_examples.extend(negative_example)
-                    pbar.update(1)
-            all_relation_examples = positive_examples + negative_examples
-        else:
-            relation_examples = add_full_negative_example(
-                relation_examples, texts, relation_prompts, predicate_set,
-                subject_goldens)
-            all_relation_examples = [
-                r for relation_example in relation_examples
-                for r in relation_example
-            ]
-    return all_entity_examples, all_relation_examples, all_cls_examples
