@@ -43,9 +43,9 @@ args = parser.parse_args()
 def load_dict(dict_path):
     vocab = {}
     i = 0
-    with open(dict_path, 'r', encoding='utf-8') as fin:
+    with open(dict_path, "r", encoding="utf-8") as fin:
         for line in fin:
-            key = line.strip('\n')
+            key = line.strip("\n")
             vocab[key] = i
             i += 1
     return vocab
@@ -55,7 +55,7 @@ def load_vocab(dict_path):
     """Load vocab from file"""
     vocab = {}
     reverse = None
-    with open(dict_path, "r", encoding='utf8') as fin:
+    with open(dict_path, "r", encoding="utf8") as fin:
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
@@ -68,8 +68,7 @@ def load_vocab(dict_path):
             elif len(terms) == 1:
                 key, value = terms[0], i
             else:
-                raise ValueError("Error line: %s in file: %s" %
-                                 (line, dict_path))
+                raise ValueError("Error line: %s in file: %s" % (line, dict_path))
             vocab[key] = value
     return vocab
 
@@ -98,51 +97,48 @@ def parse_decodes(sentences, predictions, lengths, label_vocab):
         tags_out = []
         words = ""
         for s, t in zip(sent, tags):
-            if t.endswith('-B') or t == 'O':
+            if t.endswith("-B") or t == "O":
                 if len(words):
                     sent_out.append(words)
-                tags_out.append(t.split('-')[0])
+                tags_out.append(t.split("-")[0])
                 words = s
             else:
                 words += s
         if len(sent_out) < len(tags_out):
             sent_out.append(words)
-        outputs.append(''.join(
-            [str((s, t)) for s, t in zip(sent_out, tags_out)]))
+        outputs.append("".join([str((s, t)) for s, t in zip(sent_out, tags_out)]))
     return outputs
 
 
 def convert_to_features(example, tokenizer):
     tokens = example[0]
-    tokenized_input = tokenizer(tokens,
-                                return_length=True,
-                                is_split_into_words='token')
+    tokenized_input = tokenizer(tokens, return_length=True, is_split_into_words="token")
     # Token '[CLS]' and '[SEP]' will get label 'O'
-    return tokenized_input['input_ids'], tokenized_input[
-        'token_type_ids'], tokenized_input['seq_len']
+    return tokenized_input["input_ids"], tokenized_input["token_type_ids"], tokenized_input["seq_len"]
 
 
 def read(data_path):
-    with open(data_path, 'r', encoding='utf-8') as fp:
+    with open(data_path, "r", encoding="utf-8") as fp:
         next(fp)  # Skip header
         for line in fp.readlines():
-            words, labels = line.strip('\n').split('\t')
-            words = words.split('\002')
-            labels = labels.split('\002')
+            words, labels = line.strip("\n").split("\t")
+            words = words.split("\002")
+            labels = labels.split("\002")
             yield words, labels
 
 
 class Predictor(object):
-
-    def __init__(self,
-                 model_dir,
-                 device="gpu",
-                 batch_size=200,
-                 use_tensorrt=False,
-                 precision="fp32",
-                 enable_mkldnn=False,
-                 benchmark=False,
-                 save_log_path=""):
+    def __init__(
+        self,
+        model_dir,
+        device="gpu",
+        batch_size=200,
+        use_tensorrt=False,
+        precision="fp32",
+        enable_mkldnn=False,
+        benchmark=False,
+        save_log_path="",
+    ):
         self.batch_size = batch_size
         model_file = os.path.join(model_dir, "inference.pdmodel")
         param_file = os.path.join(model_dir, "inference.pdiparams")
@@ -158,14 +154,14 @@ class Predictor(object):
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "int8": inference.PrecisionType.Int8,
             }
             precision_mode = precision_map[precision]
 
             if use_tensorrt:
-                config.enable_tensorrt_engine(max_batch_size=batch_size,
-                                              min_subgraph_size=30,
-                                              precision_mode=precision_mode)
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                )
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -181,32 +177,27 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
         if args.benchmark:
             import auto_log
+
             pid = os.getpid()
-            self.autolog = auto_log.AutoLogger(model_name="ernie-3.0-medium-zh",
-                                               model_precision=precision,
-                                               batch_size=self.batch_size,
-                                               data_shape="dynamic",
-                                               save_path=save_log_path,
-                                               inference_config=config,
-                                               pids=pid,
-                                               process_name=None,
-                                               gpu_ids=0,
-                                               time_keys=[
-                                                   'preprocess_time',
-                                                   'inference_time',
-                                                   'postprocess_time'
-                                               ],
-                                               warmup=0,
-                                               logger=logger)
+            self.autolog = auto_log.AutoLogger(
+                model_name="ernie-3.0-medium-zh",
+                model_precision=precision,
+                batch_size=self.batch_size,
+                data_shape="dynamic",
+                save_path=save_log_path,
+                inference_config=config,
+                pids=pid,
+                process_name=None,
+                gpu_ids=0,
+                time_keys=["preprocess_time", "inference_time", "postprocess_time"],
+                warmup=0,
+                logger=logger,
+            )
 
     def predict(self, dataset, batchify_fn, tokenizer, label_vocab):
         if args.benchmark:
@@ -219,9 +210,7 @@ class Predictor(object):
         while start_idx < num_of_examples:
             end_idx = start_idx + self.batch_size
             end_idx = end_idx if end_idx < num_of_examples else num_of_examples
-            batch_data = [
-                trans_func(example) for example in dataset[start_idx:end_idx]
-            ]
+            batch_data = [trans_func(example) for example in dataset[start_idx:end_idx]]
 
             if args.benchmark:
                 self.autolog.times.stamp()
@@ -247,23 +236,27 @@ class Predictor(object):
         return results
 
 
-if __name__ == '__main__':
-    tokenizer = AutoTokenizer.from_pretrained('ernie-3.0-medium-zh')
-    test_ds = load_dataset(read,
-                           data_path=os.path.join(args.data_dir, 'test.txt'),
-                           lazy=False)
-    label_vocab = load_dict(os.path.join(args.data_dir, 'tag.dic'))
+if __name__ == "__main__":
+    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
+    test_ds = load_dataset(read, data_path=os.path.join(args.data_dir, "test.txt"), lazy=False)
+    label_vocab = load_dict(os.path.join(args.data_dir, "tag.dic"))
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
-        Stack(dtype='int64'),  # seq_len
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+        Stack(dtype="int64"),  # seq_len
     ): fn(samples)
 
-    predictor = Predictor(args.model_dir, args.device, args.batch_size,
-                          args.use_tensorrt, args.precision, args.enable_mkldnn,
-                          args.benchmark, args.save_log_path)
+    predictor = Predictor(
+        args.model_dir,
+        args.device,
+        args.batch_size,
+        args.use_tensorrt,
+        args.precision,
+        args.enable_mkldnn,
+        args.benchmark,
+        args.save_log_path,
+    )
 
     results = predictor.predict(test_ds, batchify_fn, tokenizer, label_vocab)
     print("\n".join(results))

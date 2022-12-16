@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 
 class Milvus2DocumentStore(SQLDocumentStore):
-    """    
+    """
     you can now run a query using vector similarity and filter for some meta data at the same time!
     (See https://milvus.io/docs/v2.0.x/comparison.md for more details)
 
@@ -138,10 +138,9 @@ class Milvus2DocumentStore(SQLDocumentStore):
             be recreated.
         """
 
-        super().__init__(url=sql_url,
-                         index=index,
-                         duplicate_documents=duplicate_documents,
-                         isolation_level=isolation_level)
+        super().__init__(
+            url=sql_url, index=index, duplicate_documents=duplicate_documents, isolation_level=isolation_level
+        )
 
         # save init parameters to enable export of component config as YAML
         self.set_config(
@@ -161,8 +160,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
 
         if vector_dim is not None:
             warnings.warn(
-                message=
-                "The 'vector_dim' parameter is deprecated, use 'embedding_dim' instead.",
+                message="The 'vector_dim' parameter is deprecated, use 'embedding_dim' instead.",
                 category=DeprecationWarning,
                 stacklevel=2,
             )
@@ -184,7 +182,8 @@ class Milvus2DocumentStore(SQLDocumentStore):
         else:
             raise ValueError(
                 "The Milvus document store can currently only support dot_product, cosine and L2 similarity. "
-                'Please set similarity="dot_product" or "cosine" or "l2"')
+                'Please set similarity="dot_product" or "cosine" or "l2"'
+            )
 
         self.index_type = index_type
         self.index_param = index_param or {"nlist": 16384}
@@ -195,7 +194,8 @@ class Milvus2DocumentStore(SQLDocumentStore):
         self.custom_fields = custom_fields
 
         self.collection = self._create_collection_and_index(
-            self.index, consistency_level, recreate_index=recreate_index)
+            self.index, consistency_level, recreate_index=recreate_index
+        )
 
         self.return_embedding = return_embedding
         self.progress_bar = progress_bar
@@ -218,22 +218,20 @@ class Milvus2DocumentStore(SQLDocumentStore):
         has_collection = utility.has_collection(collection_name=index)
         if not has_collection:
             fields = [
-                FieldSchema(name=self.id_field,
-                            dtype=DataType.INT64,
-                            is_primary=True,
-                            auto_id=True,
-                            description="primary id"),
-                FieldSchema(name=self.embedding_field,
-                            dtype=DataType.FLOAT_VECTOR,
-                            dim=self.embedding_dim,
-                            description="vector"),
+                FieldSchema(
+                    name=self.id_field, dtype=DataType.INT64, is_primary=True, auto_id=True, description="primary id"
+                ),
+                FieldSchema(
+                    name=self.embedding_field,
+                    dtype=DataType.FLOAT_VECTOR,
+                    dim=self.embedding_dim,
+                    description="vector",
+                ),
             ]
 
             for field in custom_fields:
                 if field.name == self.id_field or field.name == self.embedding_field:
-                    logger.warning(
-                        f"Skipping `{field.name}` as it is similar to `id_field` or `embedding_field`"
-                    )
+                    logger.warning(f"Skipping `{field.name}` as it is similar to `id_field` or `embedding_field`")
                 else:
                     fields.append(field)
 
@@ -241,19 +239,13 @@ class Milvus2DocumentStore(SQLDocumentStore):
         else:
             collection_schema = None
 
-        collection = Collection(name=index,
-                                schema=collection_schema,
-                                consistency_level=consistency_level)
+        collection = Collection(name=index, schema=collection_schema, consistency_level=consistency_level)
 
         has_index = collection.has_index()
         if not has_index:
             collection.create_index(
                 field_name=self.embedding_field,
-                index_params={
-                    "index_type": self.index_type,
-                    "metric_type": self.metric_type,
-                    "params": index_param
-                },
+                index_params={"index_type": self.index_type, "metric_type": self.metric_type, "params": index_param},
             )
 
         collection.load()
@@ -289,8 +281,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :return:
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
         index_param = index_param or self.index_param
@@ -301,22 +292,17 @@ class Milvus2DocumentStore(SQLDocumentStore):
         field_map = self._create_document_field_map()
 
         if len(documents) == 0:
-            logger.warning(
-                "Calling DocumentStore.write_documents() with empty list")
+            logger.warning("Calling DocumentStore.write_documents() with empty list")
             return
 
         document_objects = [
-            Document.from_dict(d, field_map=field_map)
-            if isinstance(d, dict) else d for d in documents
+            Document.from_dict(d, field_map=field_map) if isinstance(d, dict) else d for d in documents
         ]
-        document_objects = self._handle_duplicate_documents(
-            document_objects, duplicate_documents)
+        document_objects = self._handle_duplicate_documents(document_objects, duplicate_documents)
         add_vectors = False if document_objects[0].embedding is None else True
 
-        batched_documents = get_batches_from_generator(document_objects,
-                                                       batch_size)
-        with tqdm(total=len(document_objects),
-                  disable=not self.progress_bar) as progress_bar:
+        batched_documents = get_batches_from_generator(document_objects, batch_size)
+        with tqdm(total=len(document_objects), disable=not self.progress_bar) as progress_bar:
             mutation_result: Any = None
 
             for document_batch in batched_documents:
@@ -327,8 +313,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
                         doc_ids.append(doc.id)
                         if isinstance(doc.embedding, np.ndarray):
                             if self.cosine:
-                                embedding = doc.embedding / np.linalg.norm(
-                                    doc.embedding)
+                                embedding = doc.embedding / np.linalg.norm(doc.embedding)
                                 embeddings.append(embedding.tolist())
                             else:
                                 embeddings.append(doc.embedding.tolist())
@@ -342,12 +327,11 @@ class Milvus2DocumentStore(SQLDocumentStore):
                         else:
                             raise AttributeError(
                                 f"Format of supplied document embedding {type(doc.embedding)} is not "
-                                f"supported. Please use list or numpy.ndarray")
+                                f"supported. Please use list or numpy.ndarray"
+                            )
                     if duplicate_documents == "overwrite":
-                        existing_docs = super().get_documents_by_id(ids=doc_ids,
-                                                                    index=index)
-                        self._delete_vector_ids_from_milvus(
-                            documents=existing_docs, index=index)
+                        existing_docs = super().get_documents_by_id(ids=doc_ids, index=index)
+                        self._delete_vector_ids_from_milvus(documents=existing_docs, index=index)
 
                     mutation_result = self.collection.insert([embeddings])
 
@@ -356,26 +340,20 @@ class Milvus2DocumentStore(SQLDocumentStore):
                 for idx, doc in enumerate(document_batch):
                     meta = doc.meta
                     if add_vectors and mutation_result is not None:
-                        meta["vector_id"] = str(
-                            mutation_result.primary_keys[idx])
+                        meta["vector_id"] = str(mutation_result.primary_keys[idx])
                     docs_to_write_in_sql.append(doc)
 
-                super().write_documents(docs_to_write_in_sql,
-                                        index=index,
-                                        duplicate_documents=duplicate_documents)
+                super().write_documents(docs_to_write_in_sql, index=index, duplicate_documents=duplicate_documents)
                 progress_bar.update(batch_size)
         progress_bar.close()
 
     def update_embeddings(
-            self,
-            retriever: "BaseRetriever",
-            index: Optional[str] = None,
-            batch_size: int = 10_000,
-            update_existing_embeddings: bool = True,
-            filters:
-        Optional[Dict[
-            str,
-            Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        self,
+        retriever: "BaseRetriever",
+        index: Optional[str] = None,
+        batch_size: int = 10_000,
+        update_existing_embeddings: bool = True,
+        filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
     ):
         """
         Updates the embeddings in the the document store using the encoding model specified in the retriever.
@@ -396,8 +374,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
 
         document_count = self.get_document_count(index=index)
         if document_count == 0:
-            logger.warning(
-                "Calling DocumentStore.update_embeddings() on an empty index")
+            logger.warning("Calling DocumentStore.update_embeddings() on an empty index")
             return
 
         logger.info(f"Updating embeddings for {document_count} docs...")
@@ -410,32 +387,22 @@ class Milvus2DocumentStore(SQLDocumentStore):
             only_documents_without_embedding=not update_existing_embeddings,
         )
         batched_documents = get_batches_from_generator(result, batch_size)
-        with tqdm(total=document_count,
-                  disable=not self.progress_bar,
-                  position=0,
-                  unit=" docs",
-                  desc="Updating Embedding") as progress_bar:
+        with tqdm(
+            total=document_count, disable=not self.progress_bar, position=0, unit=" docs", desc="Updating Embedding"
+        ) as progress_bar:
             for document_batch in batched_documents:
-                self._delete_vector_ids_from_milvus(documents=document_batch,
-                                                    index=index)
+                self._delete_vector_ids_from_milvus(documents=document_batch, index=index)
 
-                embeddings = retriever.embed_documents(
-                    document_batch)  # type: ignore
+                embeddings = retriever.embed_documents(document_batch)  # type: ignore
                 if self.cosine:
-                    embeddings = [
-                        embedding / np.linalg.norm(embedding)
-                        for embedding in embeddings
-                    ]
-                embeddings_list = [
-                    embedding.tolist() for embedding in embeddings
-                ]
+                    embeddings = [embedding / np.linalg.norm(embedding) for embedding in embeddings]
+                embeddings_list = [embedding.tolist() for embedding in embeddings]
                 assert len(document_batch) == len(embeddings_list)
 
                 mutation_result = self.collection.insert([embeddings_list])
 
                 vector_id_map = {}
-                for vector_id, doc in zip(mutation_result.primary_keys,
-                                          document_batch):
+                for vector_id, doc in zip(mutation_result.primary_keys, document_batch):
                     vector_id_map[doc.id] = str(vector_id)
 
                 self.update_vector_ids(vector_id_map, index=index)
@@ -445,9 +412,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
     def query_by_embedding(
         self,
         query_emb: np.ndarray,
-        filters: Optional[Dict[
-            str,
-            Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
         top_k: int = 10,
         index: Optional[str] = None,
         return_embedding: Optional[bool] = None,
@@ -469,15 +434,12 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :return:
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
         has_collection = utility.has_collection(collection_name=index)
         if not has_collection:
-            raise Exception(
-                "No index exists. Use 'update_embeddings()` to create an index."
-            )
+            raise Exception("No index exists. Use 'update_embeddings()` to create an index.")
         if return_embedding is None:
             return_embedding = self.return_embedding
 
@@ -488,22 +450,17 @@ class Milvus2DocumentStore(SQLDocumentStore):
         search_result: QueryResult = self.collection.search(
             data=[query_emb.tolist()],
             anns_field=self.embedding_field,
-            param={
-                "metric_type": self.metric_type,
-                **self.search_param
-            },
+            param={"metric_type": self.metric_type, **self.search_param},
             limit=top_k,
         )
 
         vector_ids_for_query = []
         scores_for_vector_ids: Dict[str, float] = {}
-        for vector_id, distance in zip(search_result[0].ids,
-                                       search_result[0].distances):
+        for vector_id, distance in zip(search_result[0].ids, search_result[0].distances):
             vector_ids_for_query.append(str(vector_id))
             scores_for_vector_ids[str(vector_id)] = distance
 
-        documents = self.get_documents_by_vector_ids(vector_ids_for_query,
-                                                     index=index)
+        documents = self.get_documents_by_vector_ids(vector_ids_for_query, index=index)
 
         if return_embedding:
             self._populate_embeddings_to_docs(index=index, docs=documents)
@@ -520,9 +477,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
         self,
         index: Optional[str] = None,
         ids: Optional[List[str]] = None,
-        filters: Optional[Dict[
-            str,
-            Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
         headers: Optional[Dict[str, str]] = None,
         batch_size: int = 10_000,
     ):
@@ -534,25 +489,22 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :return: None
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         if ids:
             self._delete_vector_ids_from_milvus(ids=ids, index=index)
         elif filters:
             batch = []
             for existing_docs in super().get_all_documents_generator(
-                    filters=filters, index=index, batch_size=batch_size):
+                filters=filters, index=index, batch_size=batch_size
+            ):
                 batch.append(existing_docs)
                 if len(batch) == batch_size:
-                    self._delete_vector_ids_from_milvus(documents=batch,
-                                                        index=index)
+                    self._delete_vector_ids_from_milvus(documents=batch, index=index)
             if len(batch) != 0:
-                self._delete_vector_ids_from_milvus(documents=batch,
-                                                    index=index)
+                self._delete_vector_ids_from_milvus(documents=batch, index=index)
         else:
-            self.collection = self._create_collection_and_index(
-                self.index, recreate_index=True)
+            self.collection = self._create_collection_and_index(self.index, recreate_index=True)
 
         index = index or self.index
         super().delete_documents(index=index, filters=filters, ids=ids)
@@ -580,9 +532,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
     def get_all_documents_generator(
         self,
         index: Optional[str] = None,
-        filters: Optional[Dict[
-            str,
-            Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
         return_embedding: Optional[bool] = None,
         batch_size: int = 10_000,
         headers: Optional[Dict[str, str]] = None,
@@ -600,13 +550,10 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :param batch_size: When working with large number of documents, batching can help reduce memory footprint.
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
-        documents = super().get_all_documents_generator(index=index,
-                                                        filters=filters,
-                                                        batch_size=batch_size)
+        documents = super().get_all_documents_generator(index=index, filters=filters, batch_size=batch_size)
         if return_embedding is None:
             return_embedding = self.return_embedding
 
@@ -618,9 +565,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
     def get_all_documents(
         self,
         index: Optional[str] = None,
-        filters: Optional[Dict[
-            str,
-            Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
+        filters: Optional[Dict[str, Any]] = None,  # TODO: Adapt type once we allow extended filters in Milvus2DocStore
         return_embedding: Optional[bool] = None,
         batch_size: int = 10_000,
         headers: Optional[Dict[str, str]] = None,
@@ -636,23 +581,18 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :param batch_size: When working with large number of documents, batching can help reduce memory footprint.
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
         result = self.get_all_documents_generator(
-            index=index,
-            filters=filters,
-            return_embedding=return_embedding,
-            batch_size=batch_size)
+            index=index, filters=filters, return_embedding=return_embedding, batch_size=batch_size
+        )
         documents = list(result)
         return documents
 
     def get_document_by_id(
-            self,
-            id: str,
-            index: Optional[str] = None,
-            headers: Optional[Dict[str, str]] = None) -> Optional[Document]:
+        self, id: str, index: Optional[str] = None, headers: Optional[Dict[str, str]] = None
+    ) -> Optional[Document]:
         """
         Fetch a document by specifying its text id string
 
@@ -661,8 +601,7 @@ class Milvus2DocumentStore(SQLDocumentStore):
                       DocumentStore's default index (self.index) will be used.
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         documents = self.get_documents_by_id([id], index)
         document = documents[0] if documents else None
@@ -684,21 +623,16 @@ class Milvus2DocumentStore(SQLDocumentStore):
         :param batch_size: When working with large number of documents, batching can help reduce memory footprint.
         """
         if headers:
-            raise NotImplementedError(
-                "Milvus2DocumentStore does not support headers.")
+            raise NotImplementedError("Milvus2DocumentStore does not support headers.")
 
         index = index or self.index
-        documents = super().get_documents_by_id(ids=ids,
-                                                index=index,
-                                                batch_size=batch_size)
+        documents = super().get_documents_by_id(ids=ids, index=index, batch_size=batch_size)
         if self.return_embedding:
             self._populate_embeddings_to_docs(index=index, docs=documents)
 
         return documents
 
-    def _populate_embeddings_to_docs(self,
-                                     docs: List[Document],
-                                     index: Optional[str] = None):
+    def _populate_embeddings_to_docs(self, docs: List[Document], index: Optional[str] = None):
         index = index or self.index
         docs_with_vector_ids = []
         for doc in docs:
@@ -718,46 +652,36 @@ class Milvus2DocumentStore(SQLDocumentStore):
             vector_id_map[int(vector_id)] = doc
 
         search_result: QueryResult = self.collection.query(
-            expr=f'{self.id_field} in [ {",".join(ids)} ]',
-            output_fields=[self.embedding_field])
+            expr=f'{self.id_field} in [ {",".join(ids)} ]', output_fields=[self.embedding_field]
+        )
 
         for result in search_result:
             doc = vector_id_map[result["id"]]
             doc.embedding = np.array(result["embedding"], "float32")
 
     def _delete_vector_ids_from_milvus(
-            self,
-            documents: Optional[List[Document]] = None,
-            ids: Optional[List[str]] = None,
-            index: Optional[str] = None):
+        self, documents: Optional[List[Document]] = None, ids: Optional[List[str]] = None, index: Optional[str] = None
+    ):
         index = index or self.index
         if ids is None:
             ids = []
             if documents is None:
-                raise ValueError(
-                    "You must either specify documents or ids to delete.")
+                raise ValueError("You must either specify documents or ids to delete.")
             for doc in documents:
                 if "vector_id" in doc.meta:
                     ids.append(str(doc.meta["vector_id"]))
         else:
             docs = super().get_documents_by_id(ids=ids, index=index)
-            ids = [
-                doc.meta["vector_id"] for doc in docs if "vector_id" in doc.meta
-            ]
+            ids = [doc.meta["vector_id"] for doc in docs if "vector_id" in doc.meta]
 
         expr = f"{self.id_field} in [{','.join(ids)}]"
 
         self.collection.delete(expr)
 
-    def get_embedding_count(
-            self,
-            index: Optional[str] = None,
-            filters: Optional[Dict[str, List[str]]] = None) -> int:
+    def get_embedding_count(self, index: Optional[str] = None, filters: Optional[Dict[str, List[str]]] = None) -> int:
         """
         Return the count of embeddings in the document store.
         """
         if filters:
-            raise Exception(
-                "filters are not supported for get_embedding_count in MilvusDocumentStore."
-            )
+            raise Exception("filters are not supported for get_embedding_count in MilvusDocumentStore.")
         return len(self.get_all_documents(index=index))

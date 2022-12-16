@@ -18,10 +18,11 @@ import copy
 import json
 import os
 import tempfile
-import unittest
 import unittest.mock as mock
 
 from requests.exceptions import HTTPError
+
+from paddlenlp.transformers import BertConfig
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 
@@ -46,9 +47,7 @@ config_common_kwargs = {
     "output_attentions": True,
     "use_bfloat16": True,
     "tf_legacy_loss": True,
-    "pruned_heads": {
-        "a": 1
-    },
+    "pruned_heads": {"a": 1},
     "tie_word_embeddings": False,
     "is_decoder": True,
     "cross_attention_hidden_size": 128,
@@ -79,12 +78,8 @@ config_common_kwargs = {
     "remove_invalid_values": True,
     "architectures": ["BertModel"],
     "finetuning_task": "translation",
-    "id2label": {
-        0: "label"
-    },
-    "label2id": {
-        "label": "0"
-    },
+    "id2label": {0: "label"},
+    "label2id": {"label": "0"},
     "tokenizer_class": "BertTokenizerFast",
     "prefix": "prefix",
     "bos_token_id": 6,
@@ -93,20 +88,13 @@ config_common_kwargs = {
     "sep_token_id": 9,
     "decoder_start_token_id": 10,
     "exponential_decay_length_penalty": (5, 1.01),
-    "task_specific_params": {
-        "translation": "some_params"
-    },
+    "task_specific_params": {"translation": "some_params"},
     "problem_type": "regression",
 }
 
 
 class ConfigTester(object):
-
-    def __init__(self,
-                 parent,
-                 config_class=None,
-                 has_text_modality=True,
-                 **kwargs):
+    def __init__(self, parent, config_class=None, has_text_modality=True, **kwargs):
         self.parent = parent
         self.config_class = config_class
         self.has_text_modality = has_text_modality
@@ -114,9 +102,7 @@ class ConfigTester(object):
 
     def create_and_test_config_common_properties(self):
         config = self.config_class(**self.inputs_dict)
-        common_properties = [
-            "hidden_size", "num_attention_heads", "num_hidden_layers"
-        ]
+        common_properties = ["hidden_size", "num_attention_heads", "num_hidden_layers"]
 
         # Add common fields for text models
         if self.has_text_modality:
@@ -124,18 +110,14 @@ class ConfigTester(object):
 
         # Test that config has the common properties as getters
         for prop in common_properties:
-            self.parent.assertTrue(hasattr(config, prop),
-                                   msg=f"`{prop}` does not exist")
+            self.parent.assertTrue(hasattr(config, prop), msg=f"`{prop}` does not exist")
 
         # Test that config has the common properties as setter
         for idx, name in enumerate(common_properties):
             try:
                 setattr(config, name, idx)
                 self.parent.assertEqual(
-                    getattr(config, name),
-                    idx,
-                    msg=
-                    f"`{name} value {idx} expected, but was {getattr(config, name)}"
+                    getattr(config, name), idx, msg=f"`{name} value {idx} expected, but was {getattr(config, name)}"
                 )
             except NotImplementedError:
                 # Some models might not be able to implement setters for common_properties
@@ -147,10 +129,7 @@ class ConfigTester(object):
             try:
                 config = self.config_class(**{name: idx})
                 self.parent.assertEqual(
-                    getattr(config, name),
-                    idx,
-                    msg=
-                    f"`{name} value {idx} expected, but was {getattr(config, name)}"
+                    getattr(config, name), idx, msg=f"`{name} value {idx} expected, but was {getattr(config, name)}"
                 )
             except NotImplementedError:
                 # Some models might not be able to implement setters for common_properties
@@ -206,12 +185,8 @@ class ConfigTester(object):
                 wrong_values.append((key, getattr(config, key), value))
 
         if len(wrong_values) > 0:
-            errors = "\n".join([
-                f"- {v[0]}: got {v[1]} instead of {v[2]}" for v in wrong_values
-            ])
-            raise ValueError(
-                f"The following keys were not properly set in the config:\n{errors}"
-            )
+            errors = "\n".join([f"- {v[0]}: got {v[1]} instead of {v[2]}" for v in wrong_values])
+            raise ValueError(f"The following keys were not properly set in the config:\n{errors}")
 
     def run_common_tests(self):
         self.create_and_test_config_common_properties()
@@ -223,46 +198,22 @@ class ConfigTester(object):
         self.check_config_arguments_init()
 
 
-class ConfigTestUtils(unittest.TestCase):
-
-    def test_config_from_string(self):
-        c = GPT2Config()
-
-        # attempt to modify each of int/float/bool/str config records and verify they were updated
-        n_embd = c.n_embd + 1  # int
-        resid_pdrop = c.resid_pdrop + 1.0  # float
-        scale_attn_weights = not c.scale_attn_weights  # bool
-        summary_type = c.summary_type + "foo"  # str
-        c.update_from_string(
-            f"n_embd={n_embd},resid_pdrop={resid_pdrop},scale_attn_weights={scale_attn_weights},summary_type={summary_type}"
-        )
-        self.assertEqual(n_embd, c.n_embd, "mismatch for key: n_embd")
-        self.assertEqual(resid_pdrop, c.resid_pdrop,
-                         "mismatch for key: resid_pdrop")
-        self.assertEqual(scale_attn_weights, c.scale_attn_weights,
-                         "mismatch for key: scale_attn_weights")
-        self.assertEqual(summary_type, c.summary_type,
-                         "mismatch for key: summary_type")
-
+class ConfigTestUtils:
     def test_config_common_kwargs_is_complete(self):
         base_config = PretrainedConfig()
-        missing_keys = [
-            key for key in base_config.__dict__
-            if key not in config_common_kwargs
-        ]
+        missing_keys = [key for key in base_config.__dict__ if key not in config_common_kwargs]
         # If this part of the test fails, you have arguments to addin config_common_kwargs above.
         self.assertListEqual(
             missing_keys,
-            ["is_encoder_decoder", "_name_or_path", "paddlenlp_version"])
-        keys_with_defaults = [
-            key for key, value in config_common_kwargs.items()
-            if value == getattr(base_config, key)
-        ]
+            ["use_cache", "is_encoder_decoder", "classifier_dropout", "dtype", "_name_or_path", "paddlenlp_version"],
+        )
+        keys_with_defaults = [key for key, value in config_common_kwargs.items() if value == getattr(base_config, key)]
         if len(keys_with_defaults) > 0:
             raise ValueError(
                 "The following keys are set with the default values in"
                 " `test_configuration_common.config_common_kwargs` pick another value for them:"
-                f" {', '.join(keys_with_defaults)}.")
+                f" {', '.join(keys_with_defaults)}."
+            )
 
     def test_cached_files_are_used_when_internet_is_down(self):
         # A mock response for an HTTP head request to emulate server down
@@ -275,9 +226,7 @@ class ConfigTestUtils(unittest.TestCase):
         _ = BertConfig.from_pretrained("hf-internal-testing/tiny-random-bert")
 
         # Under the mock environment we get a 500 error when trying to reach the model.
-        with mock.patch("transformers.utils.hub.requests.head",
-                        return_value=response_mock) as mock_head:
-            _ = BertConfig.from_pretrained(
-                "hf-internal-testing/tiny-random-bert")
+        with mock.patch("transformers.utils.hub.requests.head", return_value=response_mock) as mock_head:
+            _ = BertConfig.from_pretrained("hf-internal-testing/tiny-random-bert")
             # This check we did call the fake head request
             mock_head.assert_called()

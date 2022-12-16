@@ -21,12 +21,11 @@ import numpy as np
 import paddle
 from paddle.metric import Metric
 
-__all__ = ['DetectionF1', 'CorrectionF1']
+__all__ = ["DetectionF1", "CorrectionF1"]
 
 
 class DetectionF1(Metric):
-
-    def __init__(self, pos_label=1, name='DetectionF1', *args, **kwargs):
+    def __init__(self, pos_label=1, name="DetectionF1", *args, **kwargs):
         super(DetectionF1, self).__init__(*args, **kwargs)
         self.pos_label = pos_label
         self._name = name
@@ -36,8 +35,8 @@ class DetectionF1(Metric):
         # [B, T, 2]
         pred_labels = preds.argmax(axis=-1)
         for i, label_length in enumerate(length):
-            pred_label = pred_labels[i][1:1 + label_length]
-            label = labels[i][1:1 + label_length]
+            pred_label = pred_labels[i][1 : 1 + label_length]
+            label = labels[i][1 : 1 + label_length]
             # the sequence has errors
             if (label == self.pos_label).any():
                 if (pred_label == label).all():
@@ -81,22 +80,20 @@ class DetectionF1(Metric):
 
 
 class CorrectionF1(DetectionF1):
-
-    def __init__(self, pos_label=1, name='CorrectionF1', *args, **kwargs):
+    def __init__(self, pos_label=1, name="CorrectionF1", *args, **kwargs):
         super(CorrectionF1, self).__init__(pos_label, name, *args, **kwargs)
 
-    def update(self, det_preds, det_labels, corr_preds, corr_labels, length,
-               *args):
+    def update(self, det_preds, det_labels, corr_preds, corr_labels, length, *args):
         # [B, T, 2]
         det_preds_labels = det_preds.argmax(axis=-1)
         corr_preds_labels = corr_preds.argmax(axis=-1)
 
         for i, label_length in enumerate(length):
             # Ignore [CLS] token, so calculate from position 1.
-            det_preds_label = det_preds_labels[i][1:1 + label_length]
-            det_label = det_labels[i][1:1 + label_length]
-            corr_preds_label = corr_preds_labels[i][1:1 + label_length]
-            corr_label = corr_labels[i][1:1 + label_length]
+            det_preds_label = det_preds_labels[i][1 : 1 + label_length]
+            det_label = det_labels[i][1 : 1 + label_length]
+            corr_preds_label = corr_preds_labels[i][1 : 1 + label_length]
+            corr_label = corr_labels[i][1 : 1 + label_length]
 
             # The sequence has any errors.
             if (det_label == self.pos_label).any():

@@ -22,14 +22,13 @@ _LOGGER = logging.getLogger()
 
 
 class PPMiniLMOp(Op):
-
     def init_op(self):
         pass
 
     def preprocess(self, input_dicts, data_id, log_id):
-        (_, input_dict), = input_dicts.items()
+        ((_, input_dict),) = input_dicts.items()
         feed_dict = {}
-        feed_dict['text'] = list(input_dict.values())
+        feed_dict["text"] = list(input_dict.values())
         return feed_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
@@ -39,7 +38,6 @@ class PPMiniLMOp(Op):
 
 
 class PPMiniLMService(WebService):
-
     def get_pipeline_response(self, read_op):
         ppminilm_op = PPMiniLMOp(name="ppminilm", input_ops=[read_op])
         return ppminilm_op

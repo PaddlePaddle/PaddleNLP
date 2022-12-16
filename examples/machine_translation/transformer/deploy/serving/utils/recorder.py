@@ -3,7 +3,6 @@ import paddle
 
 
 class Recorder(object):
-
     def __init__(self, batch_size, model_name, mem_info=None):
         self.model_name = model_name
         self.precision = "fp32"
@@ -31,6 +30,5 @@ class Recorder(object):
         print("batch_size: {}".format(self.batch_size))
         print("num_of_samples: {}".format(self.samples))
         print("----------------------- Perf info -----------------------")
-        print("average_latency(ms): {}".format(self.infer_time /
-                                               (self.samples)))
+        print("average_latency(ms): {}".format(self.infer_time / (self.samples)))
         print("QPS: {}".format((self.samples) / (self.infer_time / 1000.0)))

@@ -115,12 +115,7 @@ class Downsample2D(nn.Layer):
                  downsampling occurs in the inner-two dimensions.
     """
 
-    def __init__(self,
-                 channels,
-                 use_conv=False,
-                 out_channels=None,
-                 padding=1,
-                 name="conv"):
+    def __init__(self, channels, use_conv=False, out_channels=None, padding=1, name="conv"):
         super().__init__()
         self.channels = channels
         self.out_channels = out_channels or channels
@@ -130,11 +125,7 @@ class Downsample2D(nn.Layer):
         self.name = name
 
         if use_conv:
-            conv = nn.Conv2D(self.channels,
-                             self.out_channels,
-                             3,
-                             stride=stride,
-                             padding=padding)
+            conv = nn.Conv2D(self.channels, self.out_channels, 3, stride=stride, padding=padding)
         else:
             assert self.channels == self.out_channels
             conv = nn.AvgPool2D(kernel_size=stride, stride=stride)
@@ -161,20 +152,11 @@ class Downsample2D(nn.Layer):
 
 
 class FirUpsample2D(nn.Layer):
-
-    def __init__(self,
-                 channels=None,
-                 out_channels=None,
-                 use_conv=False,
-                 fir_kernel=(1, 3, 3, 1)):
+    def __init__(self, channels=None, out_channels=None, use_conv=False, fir_kernel=(1, 3, 3, 1)):
         super().__init__()
         out_channels = out_channels if out_channels else channels
         if use_conv:
-            self.Conv2d_0 = nn.Conv2D(channels,
-                                      out_channels,
-                                      kernel_size=3,
-                                      stride=1,
-                                      padding=1)
+            self.Conv2d_0 = nn.Conv2D(channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.use_conv = use_conv
         self.fir_kernel = fir_kernel
         self.out_channels = out_channels
@@ -240,15 +222,9 @@ class FirUpsample2D(nn.Layer):
             w = w[..., ::-1, ::-1].transpose([0, 2, 1, 3, 4])
             w = paddle.reshape(w, (num_groups * inC, -1, convH, convW))
 
-            x = F.conv2d_transpose(x,
-                                   w,
-                                   stride=stride,
-                                   output_padding=output_padding,
-                                   padding=0)
+            x = F.conv2d_transpose(x, w, stride=stride, output_padding=output_padding, padding=0)
 
-            x = upfirdn2d_native(x,
-                                 paddle.to_tensor(k),
-                                 pad=((p + 1) // 2 + factor - 1, p // 2 + 1))
+            x = upfirdn2d_native(x, paddle.to_tensor(k), pad=((p + 1) // 2 + factor - 1, p // 2 + 1))
         else:
             p = k.shape[0] - factor
             x = upfirdn2d_native(
@@ -271,20 +247,11 @@ class FirUpsample2D(nn.Layer):
 
 
 class FirDownsample2D(nn.Layer):
-
-    def __init__(self,
-                 channels=None,
-                 out_channels=None,
-                 use_conv=False,
-                 fir_kernel=(1, 3, 3, 1)):
+    def __init__(self, channels=None, out_channels=None, use_conv=False, fir_kernel=(1, 3, 3, 1)):
         super().__init__()
         out_channels = out_channels if out_channels else channels
         if use_conv:
-            self.Conv2d_0 = nn.Conv2D(channels,
-                                      out_channels,
-                                      kernel_size=3,
-                                      stride=1,
-                                      padding=1)
+            self.Conv2d_0 = nn.Conv2D(channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.fir_kernel = fir_kernel
         self.use_conv = use_conv
         self.out_channels = out_channels
@@ -323,24 +290,17 @@ class FirDownsample2D(nn.Layer):
             _, _, convH, convW = w.shape
             p = (k.shape[0] - factor) + (convW - 1)
             s = [factor, factor]
-            x = upfirdn2d_native(x,
-                                 paddle.to_tensor(k),
-                                 pad=((p + 1) // 2, p // 2))
+            x = upfirdn2d_native(x, paddle.to_tensor(k), pad=((p + 1) // 2, p // 2))
             x = F.conv2d(x, w, stride=s, padding=0)
         else:
             p = k.shape[0] - factor
-            x = upfirdn2d_native(x,
-                                 paddle.to_tensor(k),
-                                 down=factor,
-                                 pad=((p + 1) // 2, p // 2))
+            x = upfirdn2d_native(x, paddle.to_tensor(k), down=factor, pad=((p + 1) // 2, p // 2))
 
         return x
 
     def forward(self, x):
         if self.use_conv:
-            x = self._downsample_2d(x,
-                                    w=self.Conv2d_0.weight,
-                                    k=self.fir_kernel)
+            x = self._downsample_2d(x, w=self.Conv2d_0.weight, k=self.fir_kernel)
             x = x + self.Conv2d_0.bias.reshape([1, -1, 1, 1])
         else:
             x = self._downsample_2d(x, k=self.fir_kernel, factor=2)
@@ -349,7 +309,6 @@ class FirDownsample2D(nn.Layer):
 
 
 class ResnetBlock2D(nn.Layer):
-
     def __init__(
         self,
         *,
@@ -385,30 +344,18 @@ class ResnetBlock2D(nn.Layer):
         if groups_out is None:
             groups_out = groups
 
-        self.norm1 = nn.GroupNorm(num_groups=groups,
-                                  num_channels=in_channels,
-                                  epsilon=eps)
+        self.norm1 = nn.GroupNorm(num_groups=groups, num_channels=in_channels, epsilon=eps)
 
-        self.conv1 = nn.Conv2D(in_channels,
-                               out_channels,
-                               kernel_size=3,
-                               stride=1,
-                               padding=1)
+        self.conv1 = nn.Conv2D(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if temb_channels is not None:
             self.time_emb_proj = nn.Linear(temb_channels, out_channels)
         else:
             self.time_emb_proj = None
 
-        self.norm2 = nn.GroupNorm(num_groups=groups_out,
-                                  num_channels=out_channels,
-                                  epsilon=eps)
+        self.norm2 = nn.GroupNorm(num_groups=groups_out, num_channels=out_channels, epsilon=eps)
         self.dropout = nn.Dropout(dropout)
-        self.conv2 = nn.Conv2D(out_channels,
-                               out_channels,
-                               kernel_size=3,
-                               stride=1,
-                               padding=1)
+        self.conv2 = nn.Conv2D(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if non_linearity == "swish":
             self.nonlinearity = lambda x: F.silu(x)
@@ -423,9 +370,7 @@ class ResnetBlock2D(nn.Layer):
                 fir_kernel = (1, 3, 3, 1)
                 self.upsample = lambda x: upsample_2d(x, k=fir_kernel)
             elif kernel == "sde_vp":
-                self.upsample = partial(F.interpolate,
-                                        scale_factor=2.0,
-                                        mode="nearest")
+                self.upsample = partial(F.interpolate, scale_factor=2.0, mode="nearest")
             else:
                 self.upsample = Upsample2D(in_channels, use_conv=False)
         elif self.down:
@@ -435,21 +380,13 @@ class ResnetBlock2D(nn.Layer):
             elif kernel == "sde_vp":
                 self.downsample = partial(F.avg_pool2d, kernel_size=2, stride=2)
             else:
-                self.downsample = Downsample2D(in_channels,
-                                               use_conv=False,
-                                               padding=1,
-                                               name="op")
+                self.downsample = Downsample2D(in_channels, use_conv=False, padding=1, name="op")
 
-        self.use_nin_shortcut = (self.in_channels != self.out_channels if
-                                 use_nin_shortcut is None else use_nin_shortcut)
+        self.use_nin_shortcut = self.in_channels != self.out_channels if use_nin_shortcut is None else use_nin_shortcut
 
         self.conv_shortcut = None
         if self.use_nin_shortcut:
-            self.conv_shortcut = nn.Conv2D(in_channels,
-                                           out_channels,
-                                           kernel_size=1,
-                                           stride=1,
-                                           padding=0)
+            self.conv_shortcut = nn.Conv2D(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, x, temb, hey=False):
         h = x
@@ -489,7 +426,6 @@ class ResnetBlock2D(nn.Layer):
 
 
 class Mish(nn.Layer):
-
     def forward(self, x):
         return x * F.tanh(F.softplus(x))
 
@@ -522,10 +458,7 @@ def upsample_2d(x, k=None, factor=2, gain=1):
 
     k = k * (gain * (factor**2))
     p = k.shape[0] - factor
-    return upfirdn2d_native(x,
-                            paddle.to_tensor(k),
-                            up=factor,
-                            pad=((p + 1) // 2 + factor - 1, p // 2))
+    return upfirdn2d_native(x, paddle.to_tensor(k), up=factor, pad=((p + 1) // 2 + factor - 1, p // 2))
 
 
 def downsample_2d(x, k=None, factor=2, gain=1):
@@ -557,10 +490,7 @@ def downsample_2d(x, k=None, factor=2, gain=1):
 
     k = k * gain
     p = k.shape[0] - factor
-    return upfirdn2d_native(x,
-                            paddle.to_tensor(k),
-                            down=factor,
-                            pad=((p + 1) // 2, p // 2))
+    return upfirdn2d_native(x, paddle.to_tensor(k), down=factor, pad=((p + 1) // 2, p // 2))
 
 
 def upfirdn2d_native(input, kernel, up=1, down=1, pad=(0, 0)):
@@ -580,28 +510,26 @@ def upfirdn2d_native(input, kernel, up=1, down=1, pad=(0, 0)):
     out = pad_new(out, [0, 0, 0, up_x - 1, 0, 0, 0, up_y - 1])
     out = out.reshape([-1, in_h * up_y, in_w * up_x, minor])
 
-    out = pad_new(
-        out,
-        [0, 0,
-         max(pad_x0, 0),
-         max(pad_x1, 0),
-         max(pad_y0, 0),
-         max(pad_y1, 0)])
-    out = out[:,
-              max(-pad_y0, 0):out.shape[1] - max(-pad_y1, 0),
-              max(-pad_x0, 0):out.shape[2] - max(-pad_x1, 0), :, ]
+    out = pad_new(out, [0, 0, max(pad_x0, 0), max(pad_x1, 0), max(pad_y0, 0), max(pad_y1, 0)])
+    out = out[
+        :,
+        max(-pad_y0, 0) : out.shape[1] - max(-pad_y1, 0),
+        max(-pad_x0, 0) : out.shape[2] - max(-pad_x1, 0),
+        :,
+    ]
 
     out = out.transpose([0, 3, 1, 2])
-    out = out.reshape(
-        [-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
+    out = out.reshape([-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
     w = paddle.flip(kernel, [0, 1]).reshape([1, 1, kernel_h, kernel_w])
     out = F.conv2d(out, w)
-    out = out.reshape([
-        -1,
-        minor,
-        in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1,
-        in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1,
-    ])
+    out = out.reshape(
+        [
+            -1,
+            minor,
+            in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1,
+            in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1,
+        ]
+    )
     out = out.transpose([0, 2, 3, 1])
     out = out[:, ::down_y, ::down_x, :]
 

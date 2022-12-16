@@ -39,8 +39,7 @@ def get_timestep_embedding(
     assert len(timesteps.shape) == 1, "Timesteps should be a 1d-array"
 
     half_dim = embedding_dim // 2
-    exponent = -math.log(max_period) * paddle.arange(
-        start=0, end=half_dim, dtype="float32")
+    exponent = -math.log(max_period) * paddle.arange(start=0, end=half_dim, dtype="float32")
     exponent = exponent / (half_dim - downscale_freq_shift)
 
     emb = paddle.exp(exponent)
@@ -63,7 +62,6 @@ def get_timestep_embedding(
 
 
 class TimestepEmbedding(nn.Layer):
-
     def __init__(self, channel, time_embed_dim, act_fn="silu"):
         super().__init__()
 
@@ -84,7 +82,6 @@ class TimestepEmbedding(nn.Layer):
 
 
 class Timesteps(nn.Layer):
-
     def __init__(self, num_channels, flip_sin_to_cos, downscale_freq_shift):
         super().__init__()
         self.num_channels = num_channels
@@ -106,10 +103,10 @@ class GaussianFourierProjection(nn.Layer):
 
     def __init__(self, embedding_size=256, scale=1.0):
         super().__init__()
-        self.register_buffer("weight", paddle.randn((embedding_size, )) * scale)
+        self.register_buffer("weight", paddle.randn((embedding_size,)) * scale)
 
         # to delete later
-        self.register_buffer("W", paddle.randn((embedding_size, )) * scale)
+        self.register_buffer("W", paddle.randn((embedding_size,)) * scale)
 
         self.weight = self.W
 

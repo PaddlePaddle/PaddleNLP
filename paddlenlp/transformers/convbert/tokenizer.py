@@ -16,14 +16,10 @@
 from ..electra.tokenizer import ElectraTokenizer
 
 __all__ = [
-    'ConvBertTokenizer',
+    "ConvBertTokenizer",
 ]
 
-PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
-    "convbert-base": 512,
-    "convbert-medium-small": 512,
-    "convbert-small": 512
-}
+PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"convbert-base": 512, "convbert-medium-small": 512, "convbert-small": 512}
 
 
 class ConvBertTokenizer(ElectraTokenizer):
@@ -31,26 +27,18 @@ class ConvBertTokenizer(ElectraTokenizer):
     Construct a ConvBERT tokenizer. `ConvBertTokenizer` is identical to `ElectraTokenizer`.
     For more information regarding those methods, please refer to this superclass.
     """
+
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "convbert-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-base/vocab.txt",
-            "convbert-medium-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-medium-small/vocab.txt",
-            "convbert-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-small/vocab.txt",
+            "convbert-base": "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-base/vocab.txt",
+            "convbert-medium-small": "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-medium-small/vocab.txt",
+            "convbert-small": "https://bj.bcebos.com/paddlenlp/models/transformers/convbert/convbert-small/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "convbert-base": {
-            "do_lower_case": True
-        },
-        "convbert-medium-small": {
-            "do_lower_case": True
-        },
-        "convbert-small": {
-            "do_lower_case": True
-        },
+        "convbert-base": {"do_lower_case": True},
+        "convbert-medium-small": {"do_lower_case": True},
+        "convbert-small": {"do_lower_case": True},
     }
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES

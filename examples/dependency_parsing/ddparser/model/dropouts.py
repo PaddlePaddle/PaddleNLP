@@ -39,7 +39,7 @@ class SharedDropout(nn.Layer):
     def get_mask(x, p):
         """Generate the mask matrix of the dropout by the input."""
         mask = paddle.uniform(shape=x.shape, min=0, max=1) >= p
-        mask = paddle.cast(mask, 'float32')
+        mask = paddle.cast(mask, "float32")
         mask = mask / (1 - p)
         return mask
 
@@ -54,16 +54,10 @@ class IndependentDropout(nn.Layer):
     def forward(self, *items):
         """Forward network"""
         if self.training and self.p > 0:
-            masks = [
-                paddle.uniform(shape=x.shape[:2], min=0, max=1) >= self.p
-                for x in items
-            ]
-            masks = [paddle.cast(x, 'float32') for x in masks]
+            masks = [paddle.uniform(shape=x.shape[:2], min=0, max=1) >= self.p for x in items]
+            masks = [paddle.cast(x, "float32") for x in masks]
             total = paddle.add(*masks)
             scale = len(items) / paddle.maximum(total, paddle.ones_like(total))
             masks = [mask * scale for mask in masks]
-            items = [
-                item * paddle.unsqueeze(mask, axis=-1)
-                for item, mask in zip(items, masks)
-            ]
+            items = [item * paddle.unsqueeze(mask, axis=-1) for item, mask in zip(items, masks)]
         return items

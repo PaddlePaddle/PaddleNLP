@@ -14,20 +14,19 @@
 # limitations under the License.
 import warnings
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-
 from scipy import integrate
 
 from ..configuration_utils import ConfigMixin, register_to_config
-from ..utils import BaseOutput, deprecate
+from ..utils import _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS, BaseOutput
 from .scheduling_utils import SchedulerMixin
 
 
 @dataclass
-# Copied from ppdiffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
+# Copied from diffusers.schedulers.scheduling_ddpm.DDPMSchedulerOutput with DDPM->LMSDiscrete
 class LMSDiscreteSchedulerOutput(BaseOutput):
     """
     Output class for the scheduler's step function output.
@@ -53,8 +52,8 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     Args:
         num_train_timesteps (`int`): number of diffusion steps used to train the model.
@@ -65,8 +64,14 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             `linear` or `scaled_linear`.
         trained_betas (`np.ndarray`, optional):
             option to pass an array of betas directly to the constructor to bypass `beta_start`, `beta_end` etc.
-
+        prediction_type (`str`, default `epsilon`, optional):
+            prediction type of the scheduler function, one of `epsilon` (predicting the noise of the diffusion
+            process), `sample` (directly predicting the noisy sample`) or `v_prediction` (see section 2.4
+            https://imagen.research.google/video/paper.pdf)
     """
+
+    _compatibles = _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS.copy()
+    order = 1
 
     @register_to_config
     def __init__(
@@ -75,31 +80,23 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         beta_start: float = 0.0001,
         beta_end: float = 0.02,
         beta_schedule: str = "linear",
-        trained_betas: Optional[np.ndarray] = None,
+        trained_betas: Optional[Union[np.ndarray, List[float]]] = None,
+        prediction_type: str = "epsilon",
     ):
-
         if trained_betas is not None:
-            self.betas = paddle.to_tensor(trained_betas)
+            self.betas = paddle.to_tensor(trained_betas, dtype="float32")
         elif beta_schedule == "linear":
-            self.betas = paddle.linspace(beta_start,
-                                         beta_end,
-                                         num_train_timesteps,
-                                         dtype="float32")
+            self.betas = paddle.linspace(beta_start, beta_end, num_train_timesteps, dtype="float32")
         elif beta_schedule == "scaled_linear":
             # this schedule is very specific to the latent diffusion model.
-            self.betas = (paddle.linspace(beta_start**0.5,
-                                          beta_end**0.5,
-                                          num_train_timesteps,
-                                          dtype="float32")**2)
+            self.betas = paddle.linspace(beta_start**0.5, beta_end**0.5, num_train_timesteps, dtype="float32") ** 2
         else:
-            raise NotImplementedError(
-                f"{beta_schedule} does is not implemented for {self.__class__}")
+            raise NotImplementedError(f"{beta_schedule} does is not implemented for {self.__class__}")
 
         self.alphas = 1.0 - self.betas
         self.alphas_cumprod = paddle.cumprod(self.alphas, 0)
 
-        sigmas = np.array(
-            ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
+        sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.concatenate([sigmas[::-1], [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
 
@@ -108,17 +105,12 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         # setable values
         self.num_inference_steps = None
-        timesteps = np.linspace(0,
-                                num_train_timesteps - 1,
-                                num_train_timesteps,
-                                dtype=np.float32)[::-1].copy()
-        self.timesteps = paddle.to_tensor(timesteps)
+        timesteps = np.linspace(0, num_train_timesteps - 1, num_train_timesteps, dtype=float)[::-1].copy()
+        self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
         self.derivatives = []
         self.is_scale_input_called = False
 
-    def scale_model_input(
-            self, sample: paddle.Tensor,
-            timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Union[float, paddle.Tensor]) -> paddle.Tensor:
         """
         Scales the denoising model input by `(sigma**2 + 1) ** 0.5` to match the K-LMS algorithm.
 
@@ -131,7 +123,7 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
-        sample = sample / ((sigma**2 + 1)**0.5)
+        sample = sample / ((sigma**2 + 1) ** 0.5)
         self.is_scale_input_called = True
         return sample
 
@@ -150,14 +142,10 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
             for k in range(order):
                 if current_order == k:
                     continue
-                prod *= (tau - self.sigmas[t - k]) / (
-                    self.sigmas[t - current_order] - self.sigmas[t - k])
+                prod *= (tau - self.sigmas[t - k]) / (self.sigmas[t - current_order] - self.sigmas[t - k])
             return prod
 
-        integrated_coeff = integrate.quad(lms_derivative,
-                                          self.sigmas[t],
-                                          self.sigmas[t + 1],
-                                          epsrel=1e-4)[0]
+        integrated_coeff = integrate.quad(lms_derivative, self.sigmas[t], self.sigmas[t + 1], epsrel=1e-4)[0]
 
         return integrated_coeff
 
@@ -171,16 +159,12 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         """
         self.num_inference_steps = num_inference_steps
 
-        timesteps = np.linspace(0,
-                                self.config.num_train_timesteps - 1,
-                                num_inference_steps,
-                                dtype=float)[::-1].copy()
-        sigmas = np.array(
-            ((1 - self.alphas_cumprod) / self.alphas_cumprod)**0.5)
+        timesteps = np.linspace(0, self.config.num_train_timesteps - 1, num_inference_steps, dtype=float)[::-1].copy()
+        sigmas = np.array(((1 - self.alphas_cumprod) / self.alphas_cumprod) ** 0.5)
         sigmas = np.interp(timesteps, np.arange(0, len(sigmas)), sigmas)
         sigmas = np.concatenate([sigmas, [0.0]]).astype(np.float32)
         self.sigmas = paddle.to_tensor(sigmas)
-        self.timesteps = paddle.to_tensor(timesteps)
+        self.timesteps = paddle.to_tensor(timesteps, dtype="float32")
 
         self.derivatives = []
 
@@ -213,24 +197,22 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         if not self.is_scale_input_called:
             warnings.warn(
                 "The `scale_model_input` function should be called before `step` to ensure correct denoising. "
-                "See `StableDiffusionPipeline` for a usage example.")
+                "See `StableDiffusionPipeline` for a usage example."
+            )
 
-        # if (isinstance(timestep, int) or isinstance(timestep, paddle.Tensor)):
-        #     deprecate(
-        #         "timestep as an index",
-        #         "0.8.0",
-        #         "Passing integer indices (e.g. from `enumerate(timesteps)`) as timesteps to"
-        #         " `LMSDiscreteScheduler.step()` will not be supported in future versions. Make sure to pass"
-        #         " one of the `scheduler.timesteps` as a timestep.",
-        #         standard_warn=False,
-        #     )
-        #     step_index = timestep
-        # else:
         step_index = (self.timesteps == timestep).nonzero().item()
         sigma = self.sigmas[step_index]
 
         # 1. compute predicted original sample (x_0) from sigma-scaled predicted noise
-        pred_original_sample = sample - sigma * model_output
+        if self.config.prediction_type == "epsilon":
+            pred_original_sample = sample - sigma * model_output
+        elif self.config.prediction_type == "v_prediction":
+            # * c_out + input * c_skip
+            pred_original_sample = model_output * (-sigma / (sigma**2 + 1) ** 0.5) + (sample / (sigma**2 + 1))
+        else:
+            raise ValueError(
+                f"prediction_type given as {self.config.prediction_type} must be one of `epsilon`, or `v_prediction`"
+            )
 
         # 2. Convert to an ODE derivative
         derivative = (sample - pred_original_sample) / sigma
@@ -240,21 +222,17 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
 
         # 3. Compute linear multistep coefficients
         order = min(step_index + 1, order)
-        lms_coeffs = [
-            self.get_lms_coefficient(order, step_index, curr_order)
-            for curr_order in range(order)
-        ]
+        lms_coeffs = [self.get_lms_coefficient(order, step_index, curr_order) for curr_order in range(order)]
 
         # 4. Compute previous sample based on the derivatives path
-        prev_sample = sample + sum(coeff * derivative
-                                   for coeff, derivative in zip(
-                                       lms_coeffs, reversed(self.derivatives)))
+        prev_sample = sample + sum(
+            coeff * derivative for coeff, derivative in zip(lms_coeffs, reversed(self.derivatives))
+        )
 
         if not return_dict:
-            return (prev_sample, )
+            return (prev_sample,)
 
-        return LMSDiscreteSchedulerOutput(
-            prev_sample=prev_sample, pred_original_sample=pred_original_sample)
+        return LMSDiscreteSchedulerOutput(prev_sample=prev_sample, pred_original_sample=pred_original_sample)
 
     def add_noise(
         self,
@@ -263,25 +241,12 @@ class LMSDiscreteScheduler(SchedulerMixin, ConfigMixin):
         timesteps: paddle.Tensor,
     ) -> paddle.Tensor:
         # Make sure sigmas and timesteps have the same dtype as original_samples
-        self.sigmas = self.sigmas.astype(original_samples.dtype)
-
+        sigmas = self.sigmas.cast(original_samples.dtype)
         schedule_timesteps = self.timesteps
 
-        # if isinstance(timesteps, paddle.Tensor):
-        #     deprecate(
-        #         "timesteps as indices",
-        #         "0.8.0",
-        #         "Passing integer indices  (e.g. from `enumerate(timesteps)`) as timesteps to"
-        #         " `LMSDiscreteScheduler.add_noise()` will not be supported in future versions. Make sure to"
-        #         " pass values from `scheduler.timesteps` as timesteps.",
-        #         standard_warn=False,
-        #     )
-        #     step_indices = timesteps
-        # else:
-        step_indices = [(schedule_timesteps == t).nonzero().item()
-                        for t in timesteps]
+        step_indices = [(schedule_timesteps == t).nonzero().item() for t in timesteps]
 
-        sigma = self.sigmas[step_indices].flatten()
+        sigma = sigmas[step_indices].flatten()
         while len(sigma.shape) < len(original_samples.shape):
             sigma = sigma.unsqueeze(-1)
 

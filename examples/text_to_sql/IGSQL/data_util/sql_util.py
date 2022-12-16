@@ -41,8 +41,7 @@ def strip_whitespace_front(token_list):
     found_valid = False
 
     for token in token_list:
-        if not (token.is_whitespace
-                or token.ttype == token_types.Punctuation) or found_valid:
+        if not (token.is_whitespace or token.ttype == token_types.Punctuation) or found_valid:
             found_valid = True
             new_token_list.append(token)
 
@@ -50,8 +49,8 @@ def strip_whitespace_front(token_list):
 
 
 def strip_whitespace(token_list):
-    """ Strips whitespace from a token list.
-    
+    """Strips whitespace from a token list.
+
     Args:
         token_list(`list`): the token list.
 
@@ -88,12 +87,9 @@ def token_list_to_seq(token_list):
     return seq
 
 
-def find_subtrees(sequence,
-                  current_subtrees,
-                  where_parent=False,
-                  keep_conj_subtrees=False):
+def find_subtrees(sequence, current_subtrees, where_parent=False, keep_conj_subtrees=False):
     """Finds subtrees for a subsequence of SQL.
-    
+
     Args:
       sequence(`list`): Sequence of SQL tokens.
       current_subtrees(`list`): Current list of subtrees.
@@ -133,9 +129,11 @@ def find_subtrees(sequence,
                 current_subtree = []
                 for i, token in enumerate(subtokens):
                     if token.value == "OR" or (
-                            token.value == "AND" and i - 4 >= 0
-                            and i - 4 < len(subtokens)
-                            and subtokens[i - 4].value != "BETWEEN"):
+                        token.value == "AND"
+                        and i - 4 >= 0
+                        and i - 4 < len(subtokens)
+                        and subtokens[i - 4].value != "BETWEEN"
+                    ):
                         and_subtrees.append(current_subtree)
                         current_subtree = []
                     else:
@@ -153,7 +151,7 @@ def find_subtrees(sequence,
         select_toks = []
         for i, token in enumerate(sequence.tokens):
             # Mark whether this current token is a WHERE.
-            is_where = (isinstance(token, sql_types.Where))
+            is_where = isinstance(token, sql_types.Where)
 
             # If you are in a SELECT, start recording what follows until you hit a
             # FROM
@@ -166,18 +164,15 @@ def find_subtrees(sequence,
 
                     seq = []
                     if len(sequence.tokens) > i + 2:
-                        seq = token_list_to_seq(select_toks +
-                                                [sequence.tokens[i + 2]])
+                        seq = token_list_to_seq(select_toks + [sequence.tokens[i + 2]])
 
-                    if seq not in current_subtrees and len(
-                            seq) > 0 and seq[0] in interesting_selects:
+                    if seq not in current_subtrees and len(seq) > 0 and seq[0] in interesting_selects:
                         current_subtrees.append(seq)
 
                     select_toks = []
 
             # Recursively find subtrees in the children of the node.
-            find_subtrees(token, current_subtrees, is_where, where_parent
-                          or keep_conj_subtrees)
+            find_subtrees(token, current_subtrees, is_where, where_parent or keep_conj_subtrees)
 
 
 def get_subtrees(sql, oldsnippets=[]):
@@ -216,7 +211,7 @@ def get_subtrees(sql, oldsnippets=[]):
     for subtree in final_subtrees:
         startpos = -1
         for i in range(len(sql) - len(subtree) + 1):
-            if sql[i:i + len(subtree)] == subtree:
+            if sql[i : i + len(subtree)] == subtree:
                 startpos = i
         if startpos >= 0 and startpos + len(subtree) < len(sql):
             age = 0
@@ -235,10 +230,8 @@ def get_subtrees_simple(sql, oldsnippets=[]):
 
     # get subtrees
     subtrees = []
-    for sub_sql in format_sql.split('\n'):
-        sub_sql = sub_sql.replace('(',
-                                  ' ( ').replace(')',
-                                                 ' ) ').replace(',', ' , ')
+    for sub_sql in format_sql.split("\n"):
+        sub_sql = sub_sql.replace("(", " ( ").replace(")", " ) ").replace(",", " , ")
 
         subtree = sub_sql.strip().split()
         if len(subtree) > 1:
@@ -251,7 +244,7 @@ def get_subtrees_simple(sql, oldsnippets=[]):
     for subtree in final_subtrees:
         startpos = -1
         for i in range(len(sql) - len(subtree) + 1):
-            if sql[i:i + len(subtree)] == subtree:
+            if sql[i : i + len(subtree)] == subtree:
                 startpos = i
 
         if startpos >= 0 and startpos + len(subtree) <= len(sql):
@@ -259,7 +252,7 @@ def get_subtrees_simple(sql, oldsnippets=[]):
             for prevsnippet in oldsnippets:
                 if prevsnippet.sequence == subtree:
                     age = prevsnippet.age + 1
-            new_sql = sql + [';']
+            new_sql = sql + [";"]
             snippet = Snippet(subtree, startpos, new_sql, age=age)
             snippets.append(snippet)
 
@@ -346,7 +339,7 @@ def get_sql_snippets(sequence):
     exit()
 
 
-def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.):
+def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.0):
     query_copy = copy.copy(query)
 
     # Replace the longest snippets first, so sort by length descending.
@@ -367,8 +360,7 @@ def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.):
 
             # Iterate through gold sequence to see if it's a subsequence.
             for start_idx in range(len(query_copy) - snippet_length + 1):
-                if query_copy[start_idx:start_idx +
-                              snippet_length] == snippet_seq:
+                if query_copy[start_idx : start_idx + snippet_length] == snippet_seq:
                     align = random.random() < prob_align
 
                     if align:
@@ -380,12 +372,10 @@ def add_snippets_to_query(snippets, ignored_entities, query, prob_align=1.):
 
                         # Then cut out the indices which were collapsed into
                         # the snippet.
-                        query_copy = query_copy[:start_idx + 1] + \
-                            query_copy[start_idx + snippet_length:]
+                        query_copy = query_copy[: start_idx + 1] + query_copy[start_idx + snippet_length :]
 
                         # Make sure the length is as expected
-                        assert len(query_copy) == prev_length - \
-                            (snippet_length - 1)
+                        assert len(query_copy) == prev_length - (snippet_length - 1)
 
     return query_copy
 
@@ -444,8 +434,7 @@ def fix_parentheses(sequence):
     num_right = sequence.count(")")
 
     if num_right < num_left:
-        fixed_sequence = sequence[:-1] + \
-            [")" for _ in range(num_left - num_right)] + [sequence[-1]]
+        fixed_sequence = sequence[:-1] + [")" for _ in range(num_left - num_right)] + [sequence[-1]]
         return fixed_sequence
 
     return sequence

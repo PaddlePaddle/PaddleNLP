@@ -12,19 +12,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
-from ..utils import is_scipy_available, is_paddle_available
+from ..utils import is_paddle_available, is_scipy_available
 
 if is_paddle_available():
-    from .scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
     from .scheduling_ddim import DDIMScheduler
     from .scheduling_ddpm import DDPMScheduler
     from .scheduling_dpmsolver_multistep import DPMSolverMultistepScheduler
+    from .scheduling_euler_ancestral_discrete import EulerAncestralDiscreteScheduler
+    from .scheduling_euler_discrete import EulerDiscreteScheduler
+    from .scheduling_heun_discrete import HeunDiscreteScheduler
+    from .scheduling_ipndm import IPNDMScheduler
+    from .scheduling_k_dpm_2_ancestral_discrete import KDPM2AncestralDiscreteScheduler
+    from .scheduling_k_dpm_2_discrete import KDPM2DiscreteScheduler
     from .scheduling_karras_ve import KarrasVeScheduler
     from .scheduling_pndm import PNDMScheduler
+    from .scheduling_repaint import RePaintScheduler
     from .scheduling_sde_ve import ScoreSdeVeScheduler
     from .scheduling_sde_vp import ScoreSdeVpScheduler
     from .scheduling_utils import SchedulerMixin
+    from .scheduling_vq_diffusion import VQDiffusionScheduler
 else:
     from ..utils.dummy_paddle_objects import *  # noqa F403
 
