@@ -15,10 +15,12 @@
 from __future__ import annotations
 
 import io
+import os
 import pickle
 from functools import lru_cache
 
 import numpy as np
+from _io import BufferedReader
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
@@ -123,6 +125,31 @@ def dumpy(*args, **kwarsg):
     return None
 
 
+def seek_by_string(file_handler: BufferedReader, words: str, file_size: int) -> int:
+    word_index = 0
+    word_bytes = words.encode("latin")
+    empty_byte = "".encode("latin")
+
+    while word_index < len(words) and file_handler.tell() < file_size:
+        content = file_handler.read(1)
+        if content == empty_byte:
+            break
+
+        if word_bytes[word_index] == content[0]:
+            word_index += 1
+        else:
+            word_index = 0
+
+    return file_handler.tell()
+
+
+def read_prefix_key(file_handler: BufferedReader, end_index):
+    end_index = seek_by_string(file_handler, "data.pkl", end_index)
+    file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE)
+    prefix_key = file_handler.read(end_index - MZ_ZIP_LOCAL_DIR_HEADER_SIZE - len("/data.pkl"))
+    return prefix_key
+
+
 def load_torch(path: str, **pickle_load_args):
     """
     load torch weight file with the following steps:
@@ -142,8 +169,6 @@ def load_torch(path: str, **pickle_load_args):
     # 1. load the structure of pytorch weight file
     def persistent_load_stage1(saved_id):
         assert isinstance(saved_id, tuple)
-        print(saved_id)
-
         data = saved_id[1:]
         storage_type, key, _, numel = data
         dtype = storage_type.dtype
@@ -173,26 +198,25 @@ def load_torch(path: str, **pickle_load_args):
     metadata = sorted(metadata, key=lambda x: x.key)
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
+    content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
+        prefix_key = read_prefix_key(file_handler, content_size).decode("latin")
         file_handler.seek(pre_offset)
+
         for tensor_meta in metadata:
             key = tensor_meta.key
             # eg: archive/data/1FB
-            filename_with_fb = len(f"archive/data/{key}") + 2
-
-            # skip the fix position to read tensor data
-            # `MZ_ZIP_LOCAL_DIR_HEADER_SIZE` is from: https://github.com/pytorch/pytorch/blob/master/caffe2/serialize/inline_container.cc#L186
-            # `16` is the fixed characters size from binary file.
-            # `filename_with_fb` is the length of dynamic data key name
-            file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE + 16 + filename_with_fb, 1)
+            filename = f"{prefix_key}/data/{key}"
+            seek_by_string(file_handler, filename, content_size)
+            file_handler.seek(2, 1)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
-            file_handler.read(padding_offset)
+            file_handler.seek(padding_offset, 1)
 
             # save the tensor info in result to re-use memory
-            stage1_key_to_tensor[key] = np.frombuffer(
-                file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype
-            ).reshape(tensor_meta.size)
+            content = file_handler.read(tensor_meta.nbytes)
+            assert prefix_key not in str(content)
+            stage1_key_to_tensor[key] = np.frombuffer(content, dtype=tensor_meta.dtype).reshape(tensor_meta.size)
 
     def persistent_load_stage2(saved_id):
         assert isinstance(saved_id, tuple)
