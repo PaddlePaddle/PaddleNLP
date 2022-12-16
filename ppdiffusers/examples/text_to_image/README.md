@@ -35,7 +35,7 @@ python -u train_text_to_image_qat.py \
   --output_dir="sd-pokemon-model-int8-onnx"
 ```
 
-在运行 `max_train_steps` 后模型将保存在 `output_dir` 下面，`int8`文件名的是QAT导出的UNet模型
+在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`文件名的是QAT导出的UNet预测模型
 
 ### 1.2 Pokemon训练教程
 

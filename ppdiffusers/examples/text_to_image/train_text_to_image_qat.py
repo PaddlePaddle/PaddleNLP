@@ -642,12 +642,19 @@ def main():
         pipeline.save_pretrained(os.path.join(args.output_dir, "final"))
         quanter.save_quantized_model(
             unet,
-            os.path.join(args.output_dir, "final", "int8"),
+            os.path.join(args.output_dir, "final", "unet_qat", "inference"),
             input_spec=[
-                paddle.static.InputSpec(shape=[None, 4, None, None], dtype="float32", name="latent_input"),  # latent
-                paddle.static.InputSpec(shape=[1], dtype="int64", name="timestep"),  # timesteps
                 paddle.static.InputSpec(
-                    shape=[None, None, 768], dtype="float32", name="encoder_embedding"
+                    shape=[None, 4, None, None],
+                    dtype="float32",
+                ),  # latent
+                paddle.static.InputSpec(
+                    shape=[1],
+                    dtype="int64",
+                ),  # timesteps
+                paddle.static.InputSpec(
+                    shape=[None, None, 768],
+                    dtype="float32",
                 ),  # encoder_embedding
             ],
         )
