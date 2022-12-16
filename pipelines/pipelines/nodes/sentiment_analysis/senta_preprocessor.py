@@ -21,6 +21,7 @@ class SentaProcessor(BaseComponent):
     """
     Read and preprocess texts that you wanna perform sentiment analysis.
     """
+
     outgoing_edges = 1
 
     def __init__(self, max_examples: int = -1):
@@ -34,7 +35,9 @@ class SentaProcessor(BaseComponent):
         if not isinstance(inputs, dict):
             raise TypeError("a expected dict as input, but received {}!".format(type(inputs)))
         if "file_path" not in inputs:
-            raise ValueError("a file path is needed, which you wanna perform sentiment analysis, you can set it by `file_path`.")
+            raise ValueError(
+                "a file path is needed, which you wanna perform sentiment analysis, you can set it by `file_path`."
+            )
         if not os.path.exists(inputs["file_path"]):
             raise ValueError("the file does not exist: {}".format(inputs["file_path"]))
 
@@ -52,7 +55,7 @@ class SentaProcessor(BaseComponent):
         # read texts
         examples = self._read_text_file(meta["file_path"])
         if self.max_examples != -1:
-            examples = examples[:self.max_examples]
+            examples = examples[: self.max_examples]
         # define output for SentaProcessor
         sr_file_name = "sr_" + os.path.basename(meta["file_path"]).split(".")[0] + ".json"
         sr_save_path = os.path.join(os.path.dirname(meta["file_path"]), "images", sr_file_name)
