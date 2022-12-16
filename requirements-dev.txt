@@ -8,3 +8,5 @@ black
 yapf
 parameterized
 pytest-cov
+regex
+pytest-xdist
