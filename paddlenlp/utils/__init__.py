@@ -15,3 +15,4 @@
 from .batch_sampler import *
 from .env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from .import_utils import install_package, uninstall_package
+from .serialization import load_torch
