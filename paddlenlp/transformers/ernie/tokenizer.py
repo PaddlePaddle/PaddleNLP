@@ -16,7 +16,6 @@
 import os
 import pickle
 import shutil
-import warnings
 
 import sentencepiece as spm
 import six
@@ -173,9 +172,9 @@ class ErnieTokenizer(PretrainedTokenizer):
             "ernie-3.0-nano-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
             "ernie-3.0-tiny-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "ernie-3.0-tiny-medium-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
-            "ernie-3.0-tiny-mini-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
-            "ernie-3.0-tiny-micro-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
-            "ernie-3.0-tiny-nano-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
+            "ernie-3.0-tiny-mini-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
+            "ernie-3.0-tiny-micro-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
+            "ernie-3.0-tiny-nano-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
             "rocketqa-zh-base-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "rocketqa-zh-base-para-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh_vocab.txt",
             "rocketqa-zh-medium-query-encoder": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh_vocab.txt",
@@ -199,15 +198,15 @@ class ErnieTokenizer(PretrainedTokenizer):
             "uie-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh_vocab.txt",
             "uie-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh_vocab.txt",
             "uie-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh_vocab.txt",
-            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",        
+            "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-base-dual-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_base/vocab.txt",
             "ernie-search-large-cross-encoder-marco-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_v2_large/vocab.txt",
-            "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2_vocab.txt",
-            "ernie-3.0-tiny-medium-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2_vocab.txt",
-            "ernie-3.0-tiny-mini-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2_vocab.txt",
-            "ernie-3.0-tiny-micro-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2_vocab.txt",
-            "ernie-3.0-tiny-nano-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2_vocab.txt",
-            "ernie-3.0-tiny-pico-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2_vocab.txt",
+            "ernie-3.0-tiny-base-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2_vocab.txt",
+            "ernie-3.0-tiny-medium-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2_vocab.txt",
+            "ernie-3.0-tiny-mini-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2_vocab.txt",
+            "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2_vocab.txt",
+            "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2_vocab.txt",
+            "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2_vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -236,11 +235,11 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-3.0-mini-zh": {"do_lower_case": True},
         "ernie-3.0-micro-zh": {"do_lower_case": True},
         "ernie-3.0-nano-zh": {"do_lower_case": True},
-        "ernie-3.0-tiny-base-v1": {"do_lower_case": True},
-        "ernie-3.0-tiny-medium-v1": {"do_lower_case": True},
-        "ernie-3.0-tiny-mini-v1": {"do_lower_case": True},
-        "ernie-3.0-tiny-micro-v1": {"do_lower_case": True},
-        "ernie-3.0-tiny-nano-v1": {"do_lower_case": True},
+        "ernie-3.0-tiny-base-v1-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-medium-v1-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-mini-v1-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-micro-v1-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-nano-v1-zh": {"do_lower_case": True},
         "rocketqa-zh-base-query-encoder": {"do_lower_case": True},
         "rocketqa-zh-base-para-encoder": {"do_lower_case": True},
         "rocketqa-zh-medium-query-encoder": {"do_lower_case": True},
@@ -264,15 +263,15 @@ class ErnieTokenizer(PretrainedTokenizer):
         "uie-mini": {"do_lower_case": True},
         "uie-micro": {"do_lower_case": True},
         "uie-nano": {"do_lower_case": True},
-        "uie-base-en": {"do_lower_case": True},        
+        "uie-base-en": {"do_lower_case": True},
         "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
         "ernie-search-large-cross-encoder-marco-en": {"do_lower_case": True},
-        "ernie-3.0-tiny-base-v2": {"do_lower_case": True},
-        "ernie-3.0-tiny-medium-v2": {"do_lower_case": True},
-        "ernie-3.0-tiny-mini-v2": {"do_lower_case": True},
-        "ernie-3.0-tiny-micro-v2": {"do_lower_case": True},
-        "ernie-3.0-tiny-nano-v2": {"do_lower_case": True},
-        "ernie-3.0-tiny-pico-v2": {"do_lower_case": True},
+        "ernie-3.0-tiny-base-v2-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-medium-v2-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-mini-v2-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-micro-v2-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-nano-v2-zh": {"do_lower_case": True},
+        "ernie-3.0-tiny-pico-v2-zh": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
