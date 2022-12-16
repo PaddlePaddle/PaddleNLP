@@ -1,4 +1,4 @@
-paddlenlp>=2.4.4
+paddlenlp>=2.4.5
 ftfy
 regex
 Pillow
