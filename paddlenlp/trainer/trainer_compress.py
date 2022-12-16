@@ -21,7 +21,6 @@ import time
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
 from paddle.metric import Accuracy
 from paddle.utils import try_import
 
@@ -544,6 +543,11 @@ def _post_training_quantization_grid_search(self, model_dir):
     args.output_filename_prefix = "int8"
 
     def _post_training_quantization(algo, batch_size, batch_nums):
+        try:
+            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+        except ImportError:
+            from paddle.static.quantization import PostTrainingQuantization
+
         def _batch_generator_func():
             param_name_list = []
             for key in self.eval_dataset[0]:
