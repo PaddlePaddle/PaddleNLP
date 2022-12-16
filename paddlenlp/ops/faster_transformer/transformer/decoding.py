@@ -4070,12 +4070,12 @@ class InferT5Decoding(InferBase):
             if arg not in ["self", "model"]:
                 setattr(self, "_" + arg, value)
 
-        self._num_decoder_layers = model.t5.config["num_decoder_layers"]
-        self._n_head = model.t5.config["num_heads"]
-        self._d_model = model.t5.config["d_model"]
-        self._relative_attention_num_buckets = model.t5.config["relative_attention_num_buckets"]
-        self.tie_word_embeddings = model.t5.config["tie_word_embeddings"]
-        self.act = model.t5.config["feed_forward_proj"]
+        self._num_decoder_layers = model.config.num_decoder_layers
+        self._n_head = model.config.num_heads
+        self._d_model = model.config.d_model
+        self._relative_attention_num_buckets = model.config.relative_attention_num_buckets
+        self.tie_word_embeddings = model.config.tie_word_embeddings
+        self.act = model.config.feed_forward_proj
 
         if "gelu" in self.act:
             self.act = "gelu"
