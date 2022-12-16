@@ -13,12 +13,9 @@
 # limitations under the License.
 
 import argparse
-import logging
-import os
 
-import paddle
-from pipelines.nodes import SentaProcessor, UIESenta, SentaVisualization
 from pipelines import SentaPipeline
+from pipelines.nodes import SentaProcessor, SentaVisualization, UIESenta
 
 
 def format_print(results):
@@ -41,10 +38,10 @@ def senta_pipeline(args):
     # initializing SentaPipeline
     preprocessor = SentaProcessor(max_examples=args.max_examples)
     if not args.aspects:
-        schema = [{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]
+        schema = [{"评价维度": ["观点词", "情感倾向[正向,负向,未提及]"]}]
         senta = UIESenta(schema=schema, model=args.model, batch_size=args.batch_size, aspects=args.aspects)
     else:
-        schema = ['观点词', '情感倾向[正向,负向,未提及]']
+        schema = ["观点词", "情感倾向[正向,负向,未提及]"]
         senta = UIESenta(schema=schema, model=args.model, batch_size=args.batch_size)
     visualization = SentaVisualization(font_name="SimHei")
     senta_pipeline = SentaPipeline(preprocessor=preprocessor, senta=senta, visualization=visualization)
