@@ -172,27 +172,27 @@ TASKS = {
             },
             "skep_ernie_1.0_large_ch": {
                 "task_class": SkepTask,
-                "task_flag": 'sentiment_analysis-skep_ernie_1.0_large_ch',
+                "task_flag": "sentiment_analysis-skep_ernie_1.0_large_ch",
             },
             "uie-senta-base": {
                 "task_class": UIESentaTask,
-                "task_flag": 'sentiment_analysis-uie-senta-base',
+                "task_flag": "sentiment_analysis-uie-senta-base",
             },
             "uie-senta-medium": {
                 "task_class": UIESentaTask,
-                "task_flag": 'sentiment_analysis-uie-senta-medium',
+                "task_flag": "sentiment_analysis-uie-senta-medium",
             },
             "uie-senta-mini": {
                 "task_class": UIESentaTask,
-                "task_flag": 'sentiment_analysis-uie-senta-mini',
+                "task_flag": "sentiment_analysis-uie-senta-mini",
             },
             "uie-senta-micro": {
                 "task_class": UIESentaTask,
-                "task_flag": 'sentiment_analysis-uie-senta-micro',
+                "task_flag": "sentiment_analysis-uie-senta-micro",
             },
             "uie-senta-nano": {
                 "task_class": UIESentaTask,
-                "task_flag": 'sentiment_analysis-uie-senta-nano',
+                "task_flag": "sentiment_analysis-uie-senta-nano",
             },
         },
         "default": {"model": "bilstm"},
