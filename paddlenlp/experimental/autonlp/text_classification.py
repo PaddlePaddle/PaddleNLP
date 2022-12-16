@@ -21,7 +21,6 @@ import numpy as np
 import paddle
 from hyperopt import hp
 from paddle.io import Dataset
-from paddle.static import InputSpec
 from scipy.special import expit as sigmoid
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
@@ -266,8 +265,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 eval_metrics = trainer.evaluate(eval_dataset)
                 # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
                 # We directly export a static model instead of a dynamic model
-                input_spec = self._get_prompt_model_input_spec(prompt_model)
-                trainer.export_model(self.export_path, input_spec=input_spec)
+                trainer.export_model(self.export_path)
                 if os.path.exists(self.training_path):
                     logger.info("Removing training checkpoints to conserve disk space")
                     shutil.rmtree(self.training_path)
@@ -277,26 +275,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
         return trainable
 
-    def _get_prompt_model_input_spec(self, prompt_model):
-        template = prompt_model.template
-        template_keywords = template.extract_template_keywords(template.prompt)
-        print(template_keywords)
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
-            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
-            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
-            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
-        ]
-        if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
-        if "soft" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
-        if "encoder" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
-        print(input_spec)
-        return input_spec
-        
-    
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         if self.problem_type == "multi_class":
             return self._compute_multi_class_metrics(eval_preds=eval_preds)
@@ -351,27 +329,22 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
-        result = tokenizer(text=example[self.text_column], max_length=max_length)
+        result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
         if not is_test:
             example_with_labels = self._preprocess_labels(example)
             result["labels"] = example_with_labels["labels"]
         return result
 
-    def export(self, export_path, trial_id=None):
-        model_result = self._get_model_result(trial_id=trial_id)
-        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-        shutil.copytree(exported_model_path, export_path)
-        logger.info(f"Exported to {export_path}")
-
     def to_taskflow(self, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         if model_config["trainer_type"] == "PromptTrainer":
-            raise NotImplementedError("'Taskflow' inference does not yet support models trained with PromptTrainer.")
+            raise NotImplementedError("'Taskflow' inference does not support models trained with PromptTrainer yet.")
         else:
             exported_model_path = os.path.join(model_result.log_dir, self.export_path)
             return Taskflow(
                 "text_classification",
+                model=self.problem_type,
                 task_path=exported_model_path,
                 id2label=self.id2label,
                 max_length=model_config.get("PreprocessArguments.max_length", 128),

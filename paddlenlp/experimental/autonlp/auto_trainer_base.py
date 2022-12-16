@@ -13,6 +13,8 @@
 # limitations under the License.
 import copy
 import datetime
+import os
+import shutil
 from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -27,6 +29,7 @@ from ray.tune.search.hyperopt import HyperOptSearch
 from paddlenlp.trainer import TrainingArguments
 from paddlenlp.trainer.trainer_utils import EvalPrediction
 from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.utils.log import logger
 
 
 class AutoTrainerBase(metaclass=ABCMeta):
@@ -104,9 +107,11 @@ class AutoTrainerBase(metaclass=ABCMeta):
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
 
-    @abstractmethod
     def export(self, export_path, trial_id=None):
-        pass
+        model_result = self._get_model_result(trial_id=trial_id)
+        exported_model_path = os.path.join(model_result.log_dir, self.export_path)
+        shutil.copytree(exported_model_path, export_path, dirs_exist_ok=True)
+        logger.info(f"Exported to {export_path}")
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
