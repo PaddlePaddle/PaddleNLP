@@ -1182,7 +1182,6 @@ def convert_params(faster_model,
                 params["decoder_ln_bias"].append((module.norm, "bias"))
         elif (isinstance(module, (paddlenlp.transformers.t5.modeling.T5Stack))
               and module.is_decoder):
-            # import pdb; pdb.set_trace()
             num_layer = len(module.block)
             for i, block in enumerate(module.block):
                 if not ft_para_conf.is_load(i, num_layer):
