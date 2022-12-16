@@ -17,8 +17,7 @@ ___当前这部分的代码需要使用develop分支的paddlenlp以及develop分
 # 安装cuda11.2, python 3.7, develop版本的paddle, commit号为b96a21df4e7a42b2445104426e2be407534705e6.
 wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
 pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-# 注意当前该部分的训练需要使用develop分支的paddlenlp和develop分支的ppdiffusers。
-pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
+pip install -r requirements.txt
 ```
 
 ### 1.2 准备数据

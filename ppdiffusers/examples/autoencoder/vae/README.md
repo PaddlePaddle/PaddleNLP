@@ -13,7 +13,7 @@
 wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
 pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
 # 注意，当前该部分的训练需要使用最新版的paddlenlp和ppdiffusers，即 ppdiffusers>=0.9.1，paddlenlp>=2.4.5。
-pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow albumentations
+pip install -r requirements.txt
 ```
 
 ### 1.2 准备数据
