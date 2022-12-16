@@ -47,7 +47,7 @@ def process_file(file_path):
     save_path = os.path.join(os.path.dirname(file_path), "senta_" + os.path.basename(file_path))
     r = requests.post(url, json={"meta": {"file_path": file_path, "save_path": save_path}})
     response = r.json()
-    results = response["meta"]["img_dict"]
+    results = response["img_dict"]
     components = [
         "aspect_wc",
         "aspect_hist",

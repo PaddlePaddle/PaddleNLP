@@ -141,7 +141,7 @@ def senta_file(request: SentaRequest):
     result["meta"] = request.meta
     params = request.params or {}
     res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
-    result["meta"]["img_dict"] = res["img_dict"]
+    result["img_dict"] = res["img_dict"]
     return result
 
 
