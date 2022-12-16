@@ -513,7 +513,8 @@ class ModelTesterMixin:
             shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
 
             loaded_config = config.__class__.from_pretrained(tempdir)
-            self.assertEqual(config.hidden_size, loaded_config.hidden_size)
+            for key in config.__dict__.keys():
+                self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
 
