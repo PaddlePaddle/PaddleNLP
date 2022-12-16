@@ -14,8 +14,6 @@
 """UNIFIED_TRANSFORMER model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = [
@@ -182,7 +180,6 @@ class UnifiedTransformerConfig(PretrainedConfig):
             The id of special token `mask_token`. Defaults to 30000.
     ```"""
     model_type = "unified_transformer"
-    attribute_map: Dict[str, str] = {}
     pretrained_init_configuration = UNIFIED_TRANSFORMER_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

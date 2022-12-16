@@ -127,23 +127,21 @@ class CodeGenModelTester:
         )
 
     def get_config(self):
-        return CodeGenConfig.from_dict(
-            {
-                "vocab_size": self.vocab_size,
-                "n_embd": self.hidden_size,
-                "n_layer": self.num_hidden_layers,
-                "n_head": self.num_attention_heads,
-                "activation_function": self.hidden_act,
-                "resid_pdrop": self.hidden_dropout_prob,
-                "attn_pdrop": self.attention_probs_dropout_prob,
-                "n_positions": self.max_position_embeddings,
-                "n_ctx": self.max_position_embeddings,
-                "initializer_range": self.initializer_range,
-                "bos_token_id": self.bos_token_id,
-                "eos_token_id": self.eos_token_id,
-                "pad_token_id": self.pad_token_id,
-                "rotary_dim": self.rotary_dim,
-            }
+        return CodeGenConfig(
+            vocab_size=self.vocab_size,
+            n_embd=self.hidden_size,
+            n_layer=self.num_hidden_layers,
+            n_head=self.num_attention_heads,
+            activation_function=self.hidden_act,
+            resid_pdrop=self.hidden_dropout_prob,
+            attn_pdrop=self.attention_probs_dropout_prob,
+            n_positions=self.max_position_embeddings,
+            n_ctx=self.max_position_embeddings,
+            initializer_range=self.initializer_range,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            pad_token_id=self.pad_token_id,
+            rotary_dim=self.rotary_dim,
         )
 
     def prepare_config_and_inputs_for_decoder(self):

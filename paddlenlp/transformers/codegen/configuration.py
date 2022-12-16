@@ -14,8 +14,6 @@
 """ CODEGEN model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["CODEGEN_PRETRAINED_INIT_CONFIGURATION", "CodeGenConfig", "CODEGEN_PRETRAINED_RESOURCE_FILES_MAP"]
@@ -74,13 +72,7 @@ class CodeGenConfig(PretrainedConfig):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             Default to `0.02`.
     ```"""
-    model_type = "bert"
-    attribute_map: Dict[str, str] = {
-        "num_attention_heads": "n_head",
-        "embed_dim": "n_embd",
-        "max_positions": "n_positions",
-        "inner_dim": "n_inner",
-    }
+    model_type = "codegen"
     pretrained_init_configuration = CODEGEN_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

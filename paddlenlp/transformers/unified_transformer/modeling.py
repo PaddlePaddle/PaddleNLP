@@ -323,9 +323,9 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
         super(UnifiedTransformerLMHeadModel, self).__init__(config)
         self.unified_transformer = UnifiedTransformerModel(config)
         self.lm_head = UnifiedTransformerLMHead(
-            self.unified_transformer.config["hidden_size"],
-            self.unified_transformer.config["vocab_size"],
-            self.unified_transformer.config["hidden_act"],
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             self.unified_transformer.embeddings.word_embeddings.weight,
         )
         self.apply(self.init_weights)

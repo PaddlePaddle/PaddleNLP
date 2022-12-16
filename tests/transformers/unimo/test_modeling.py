@@ -141,26 +141,24 @@ class UNIMOModelTester:
         return (config, input_ids, input_mask, token_type_ids, position_ids, lm_labels)
 
     def get_config(self):
-        return UNIMOConfig.from_dict(
-            {
-                "vocab_size": self.vocab_size,
-                "hidden_size": self.hidden_size,
-                "num_hidden_layers": self.num_hidden_layers,
-                "num_attention_heads": self.num_attention_heads,
-                "intermediate_size": self.intermediate_size,
-                "hidden_act": self.hidden_act,
-                "hidden_dropout_prob": self.hidden_dropout_prob,
-                "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-                "normalize_before": self.normalize_before,
-                "max_position_embeddings": self.max_position_embeddings,
-                "type_vocab_size": self.type_vocab_size,
-                "initializer_range": self.initializer_range,
-                "unk_token_id": self.unk_token_id,
-                "pad_token_id": self.pad_token_id,
-                "bos_token_id": self.bos_token_id,
-                "eos_token_id": self.eos_token_id,
-                "mask_token_id": self.mask_token_id,
-            }
+        return UNIMOConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            normalize_before=self.normalize_before,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            unk_token_id=self.unk_token_id,
+            pad_token_id=self.pad_token_id,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            mask_token_id=self.mask_token_id,
         )
 
     def prepare_config_and_inputs_for_decoder(self):

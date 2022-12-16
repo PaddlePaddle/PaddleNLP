@@ -75,14 +75,14 @@ class CodeGenAttention(Layer):
         super().__init__()
 
         self.causal_mask = paddle.tril(
-            paddle.ones((config.max_positions, config.max_positions), dtype=paddle.get_default_dtype())
-        ).reshape((1, 1, config.max_positions, config.max_positions))
+            paddle.ones((config.n_positions, config.n_positions), dtype=paddle.get_default_dtype())
+        ).reshape((1, 1, config.n_positions, config.n_positions))
 
         self.attn_dropout = nn.Dropout(config.attn_pdrop)
         self.resid_dropout = nn.Dropout(config.resid_pdrop)
 
-        self.embed_dim = config.embed_dim
-        self.num_attention_heads = config.num_attention_heads
+        self.embed_dim = config.n_embd
+        self.num_attention_heads = config.n_head
         self.head_dim = self.embed_dim // self.num_attention_heads
         if self.head_dim * self.num_attention_heads != self.embed_dim:
             raise ValueError(
@@ -215,8 +215,8 @@ class CodeGenMLP(Layer):
     def __init__(self, inner_dim: int, config: CodeGenConfig):
         super().__init__()
 
-        self.fc_in = nn.Linear(config.embed_dim, inner_dim)
-        self.fc_out = nn.Linear(inner_dim, config.embed_dim)
+        self.fc_in = nn.Linear(config.n_embd, inner_dim)
+        self.fc_out = nn.Linear(inner_dim, config.n_embd)
 
         self.act = ACT2FN[config.activation_function]
         self.dropout = nn.Dropout(config.resid_pdrop)
@@ -233,7 +233,7 @@ class CodeGenBlock(Layer):
     def __init__(self, config: CodeGenConfig):
         super().__init__()
         inner_dim = config.n_inner if config.n_inner is not None else 4 * config.n_embd
-        self.ln_1 = nn.LayerNorm(config.embed_dim, epsilon=config.layer_norm_epsilon)
+        self.ln_1 = nn.LayerNorm(config.n_embd, epsilon=config.layer_norm_epsilon)
         self.attn = CodeGenAttention(config)
         self.mlp = CodeGenMLP(inner_dim, config)
 

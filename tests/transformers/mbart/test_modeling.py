@@ -118,28 +118,26 @@ class MBartModelTester:
         return config, inputs_dict
 
     def get_config(self):
-        return MBartConfig.from_dict(
-            {
-                "vocab_size": self.vocab_size,
-                "d_model": self.hidden_size,
-                "encoder_layers": self.num_hidden_layers,
-                "decoder_layers": self.num_hidden_layers,
-                "encoder_attention_heads": self.num_attention_heads,
-                "decoder_attention_heads": self.num_attention_heads,
-                "encoder_ffn_dim": self.intermediate_size,
-                "decoder_ffn_dim": self.intermediate_size,
-                "dropout": self.hidden_dropout_prob,
-                "attention_dropout": self.attention_probs_dropout_prob,
-                "max_position_embeddings": self.max_position_embeddings,
-                "eos_token_id": self.eos_token_id,
-                "bos_token_id": self.bos_token_id,
-                "pad_token_id": self.pad_token_id,
-                "forced_bos_token_id": self.forced_bos_token_id,
-                "decoder_start_token_id": self.decoder_start_token_id,
-                "activation_function": self.activation_function,
-                "activation_dropout": self.activation_dropout,
-                "init_std": self.init_std,
-            }
+        return MBartConfig(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            encoder_layers=self.num_hidden_layers,
+            decoder_layers=self.num_hidden_layers,
+            encoder_attention_heads=self.num_attention_heads,
+            decoder_attention_heads=self.num_attention_heads,
+            encoder_ffn_dim=self.intermediate_size,
+            decoder_ffn_dim=self.intermediate_size,
+            dropout=self.hidden_dropout_prob,
+            attention_dropout=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.bos_token_id,
+            pad_token_id=self.pad_token_id,
+            forced_bos_token_id=self.forced_bos_token_id,
+            decoder_start_token_id=self.decoder_start_token_id,
+            activation_function=self.activation_function,
+            activation_dropout=self.activation_dropout,
+            init_std=self.init_std,
         )
 
     def prepare_config_and_inputs_for_common(self):
@@ -312,18 +310,16 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
             assert str(self.tgt_text[i]) == str(decoded[i]), f"{i}"
 
     def test_mbart_fast_forward(self):
-        config = MBartConfig.from_dict(
-            {
-                "vocab_size": 99,
-                "d_model": 24,
-                "encoder_layers": 2,
-                "decoder_layers": 2,
-                "encoder_attention_heads": 2,
-                "decoder_attention_heads": 2,
-                "encoder_ffn_dim": 32,
-                "decoder_ffn_dim": 32,
-                "max_position_embeddings": 48,
-            }
+        config = MBartConfig(
+            vocab_size=99,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
         )
         lm_model = MBartForConditionalGeneration(config)
         context = paddle.to_tensor([[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]], dtype="int64")
@@ -424,21 +420,14 @@ class MBartStandaloneDecoderModelTester:
         if self.parent.use_labels:
             lm_labels = ids_tensor([self.batch_size, self.decoder_seq_length], self.vocab_size, dtype="int64")
 
-        config = MBartConfig.from_dict(
-            {
-                "embed_tokens": None,
-                "vocab_size": self.vocab_size,
-                "d_model": self.d_model,
-                "decoder_layers": self.decoder_layers,
-                "decoder_ffn_dim": self.decoder_ffn_dim,
-                # "encoder_attention_heads": self.encoder_attention_heads,
-                "decoder_attention_heads": self.decoder_attention_heads,
-                # "eos_token_id": self.eos_token_id,
-                # "bos_token_id": self.bos_token_id,
-                # "pad_token_id": self.pad_token_id,
-                # "decoder_start_token_id": self.decoder_start_token_id,
-                "max_position_embeddings": self.max_position_embeddings,
-            }
+        config = MBartConfig(
+            embed_tokens=None,
+            vocab_size=self.vocab_size,
+            d_model=self.d_model,
+            decoder_layers=self.decoder_layers,
+            decoder_ffn_dim=self.decoder_ffn_dim,
+            decoder_attention_heads=self.decoder_attention_heads,
+            max_position_embeddings=self.max_position_embeddings,
         )
 
         return (

@@ -14,8 +14,6 @@
 """ UNIMO model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["UNIMO_PRETRAINED_INIT_CONFIGURATION", "UNIMOConfig", "UNIMO_PRETRAINED_RESOURCE_FILES_MAP"]
@@ -264,8 +262,7 @@ class UNIMOConfig(PretrainedConfig):
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to `3`.
     ```"""
-    model_type = "bert"
-    attribute_map: Dict[str, str] = {}
+    model_type = "unimo"
     pretrained_init_configuration = UNIMO_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
