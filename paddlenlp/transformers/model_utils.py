@@ -244,7 +244,7 @@ class PretrainedModel(Layer, GenerationMixin):
         # extract config from kwargs
         if "config" not in kwargs:
             raise ValueError(
-                "PretarinedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
+                "PretrainedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
             )
 
         config = kwargs["config"]
@@ -635,6 +635,7 @@ class PretrainedModel(Layer, GenerationMixin):
             download_check(pretrained_model_name_or_path, "from_pretrained")
         return model, state_to_load
 
+    # NOTE: backward support for old models. Models with PretrainedConfig should be able to use .config
     def get_model_config(self):
         """Get model configuration.
 
@@ -644,6 +645,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # If init_config contains a Layer, use the layer's init_config to save
         def get_config(model):
+            if model.config is not None and isinstance(model.config, PretrainedConfig):
+                return model.config
             model_config = model.init_config
             for key, value in model_config.items():
                 if key == "init_args":
@@ -660,16 +663,19 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def save_model_config(self, save_dir: str):
         """
-        Saves model configuration to a file named "model_config.json" under `save_dir`.
+        Saves model configuration to a file named "config.json" under `save_dir`.
 
         Args:
             save_dir (str): Directory to save model_config file into.
         """
         # Save model config
-        model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.get_model_config()
-        with io.open(model_config_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
+        if isinstance(model_config, PretrainedConfig):
+            model_config.save_pretrained(save_dir)
+        else:
+            model_config_file = os.path.join(save_dir, self.model_config_file)
+            with io.open(model_config_file, "w", encoding="utf-8") as f:
+                f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
     def save_pretrained(self, save_dir: str):
         """
