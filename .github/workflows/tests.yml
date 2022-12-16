@@ -1,6 +1,6 @@
 name: Test
 
-on: pull_request
+on: [push, pull_request]
 
 jobs:
   Test:
@@ -21,9 +21,5 @@ jobs:
           make install
       - name: run the command
         run: make test
-      - name: Pytest Coverage Comment
-        uses: MishaKav/pytest-coverage-comment@v1.1.40
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          pytest-xml-coverage-path: coverage.xml
-          report-only-changed-files: true
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
