@@ -27,6 +27,11 @@ from ..model_outputs import (
     TokenClassifierOutput,
     tuple_output,
 )
+from .configuration import (
+    ERNIE_M_PRETRAINED_INIT_CONFIGURATION,
+    ERNIE_M_PRETRAINED_RESOURCE_FILES_MAP,
+    ErnieMConfig,
+)
 
 __all__ = [
     "ErnieMModel",
@@ -44,13 +49,13 @@ class ErnieMEmbeddings(nn.Layer):
     Include embeddings from word, position.
     """
 
-    def __init__(self, vocab_size, hidden_size=768, hidden_dropout_prob=0.1, max_position_embeddings=514):
+    def __init__(self, config: ErnieMConfig):
         super(ErnieMEmbeddings, self).__init__()
 
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
-        self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(
         self,
@@ -85,9 +90,9 @@ class ErnieMEmbeddings(nn.Layer):
 
 
 class ErnieMPooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: ErnieMConfig):
         super(ErnieMPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -109,64 +114,12 @@ class ErnieMPretrainedModel(PretrainedModel):
 
     """
 
-    pretrained_init_configuration = {
-        "ernie-m-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "vocab_size": 250002,
-            "pad_token_id": 1,
-        },
-        "ernie-m-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "vocab_size": 250002,
-            "pad_token_id": 1,
-        },
-        "uie-m-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "vocab_size": 250002,
-            "pad_token_id": 1,
-        },
-        "uie-m-large": {
-            "attention_probs_dropout_prob": 0.1,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 1024,
-            "initializer_range": 0.02,
-            "max_position_embeddings": 514,
-            "num_attention_heads": 16,
-            "num_hidden_layers": 24,
-            "vocab_size": 250002,
-            "pad_token_id": 1,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ernie-m-base": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_m/ernie_m_base.pdparams",
-            "ernie-m-large": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_m/ernie_m_large.pdparams",
-            "uie-m-base": "https://paddlenlp.bj.bcebos.com/models/transformers/uie_m/uie_m_base.pdparams",
-            "uie-m-large": "https://paddlenlp.bj.bcebos.com/models/transformers/uie_m/uie_m_large.pdparams",
-        }
-    }
+    model_config_file = "config.json"
+    config_class = ErnieMConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
+
+    pretrained_init_configuration = ERNIE_M_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ERNIE_M_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "ernie_m"
 
     def init_weights(self, layer):
@@ -199,80 +152,27 @@ class ErnieMModel(ErnieMPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int):
-            Vocabulary size of `inputs_ids` in `ErnieMModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `ErnieMModel`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layers and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of the `token_type_ids`.
-            Defaults to `2`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer for initializing all weight matrices.
-            Defaults to `0.02`.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`ErnieMPretrainedModel._init_weights()` for how weights are initialized in `ErnieMModel`.
-
-        pad_token_id(int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `1`.
-
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct ErnieMModel.
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=514,
-        initializer_range=0.02,
-        pad_token_id=1,
-    ):
-        super(ErnieMModel, self).__init__()
-        self.pad_token_id = pad_token_id
-        self.initializer_range = initializer_range
-        self.embeddings = ErnieMEmbeddings(vocab_size, hidden_size, hidden_dropout_prob, max_position_embeddings)
+    def __init__(self, config: ErnieMConfig):
+        super(ErnieMModel, self).__init__(config)
+        self.pad_token_id = config.pad_token_id
+        self.initializer_range = config.initializer_range
+        self.embeddings = ErnieMEmbeddings(config)
         encoder_layer = nn.TransformerEncoderLayer(
-            hidden_size,
-            num_attention_heads,
-            dim_feedforward=4 * hidden_size,
-            dropout=hidden_dropout_prob,
-            activation=hidden_act,
-            attn_dropout=attention_probs_dropout_prob,
+            config.hidden_size,
+            config.num_attention_heads,
+            dim_feedforward=4 * config.hidden_size,
+            dropout=config.hidden_dropout_prob,
+            activation=config.hidden_act,
+            attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
             normalize_before=False,
         )
-        self.encoder = nn.TransformerEncoder(encoder_layer, num_hidden_layers)
-        self.pooler = ErnieMPooler(hidden_size)
+        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.pooler = ErnieMPooler(config)
         self.apply(self.init_weights)
 
     def forward(
@@ -433,22 +333,18 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
     designed for sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        ernie (ErnieMModel):
-            An instance of `paddlenlp.transformers.ErnieMModel`.
-        num_classes (int, optional):
-            The number of classes. Default to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ERNIE-M.
-            If None, use the same value as `hidden_dropout_prob`
-            of `paddlenlp.transformers.ErnieMModel` instance. Defaults to `None`.
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct ErnieMForSequenceClassification.
     """
 
-    def __init__(self, ernie_m, num_classes=2, dropout=None):
-        super(ErnieMForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_m.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieMConfig):
+        super(ErnieMForSequenceClassification, self).__init__(config)
+        self.ernie_m = ErnieMModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -472,8 +368,8 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
                 See :class:`ErnieMModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             inputs_embeds (Tensor, optional):
                 If you want to control how to convert `inputs_ids` indices into associated vectors, you can
@@ -522,12 +418,12 @@ class ErnieMForSequenceClassification(ErnieMPretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -551,14 +447,14 @@ class ErnieMForQuestionAnswering(ErnieMPretrainedModel):
     designed for question-answering tasks like SQuAD.
 
     Args:
-        ernie (`ErnieMModel`):
-            An instance of `ErnieMModel`.
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct ErnieMForQuestionAnswering.
     """
 
-    def __init__(self, ernie_m):
-        super(ErnieMForQuestionAnswering, self).__init__()
-        self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], 2)
+    def __init__(self, config: ErnieMConfig):
+        super(ErnieMForQuestionAnswering, self).__init__(config)
+        self.ernie_m = ErnieMModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(
@@ -679,22 +575,18 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        ernie (`ErnieMModel`):
-            An instance of `ErnieMModel`.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of ERNIE-M.
-            If None, use the same value as `hidden_dropout_prob`
-            of `ErnieMModel` instance `ernie_m`. Defaults to `None`.
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct ErnieMForTokenClassification.
     """
 
-    def __init__(self, ernie_m, num_classes=2, dropout=None):
-        super(ErnieMForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.ernie_m = ernie_m  # allow ernie_m to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_m.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieMConfig):
+        super(ErnieMForTokenClassification, self).__init__(config)
+        self.ernie_m = ErnieMModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(
@@ -717,7 +609,7 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
             attention_mask (Tensor, optional):
                 See :class:`ErnieMModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             inputs_embeds (Tensor, optional):
                 If you want to control how to convert `inputs_ids` indices into associated vectors, you can
                 pass an embedded representation directly instead of passing `inputs_ids`.
@@ -733,7 +625,7 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[batch_size, sequence_length, num_labels]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -764,7 +656,7 @@ class ErnieMForTokenClassification(ErnieMPretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
         if not return_dict:
             output = (logits,) + outputs[2:]
             return tuple_output(output, loss)
@@ -783,22 +675,18 @@ class ErnieMForMultipleChoice(ErnieMPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        ernie (:class:`ErnieMModel`):
-            An instance of ErnieMModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of Ernie.
-            If None, use the same value as `hidden_dropout_prob` of `ErnieMModel`
-            instance `ernie-m`. Defaults to None.
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct ErnieMForMultipleChoice.
     """
 
-    def __init__(self, ernie_m, num_choices=2, dropout=None):
-        super(ErnieMForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.ernie_m = ernie_m
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_m.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_m.config["hidden_size"], 1)
+    def __init__(self, config: ErnieMConfig):
+        super(ErnieMForMultipleChoice, self).__init__(config)
+        self.ernie_m = ErnieMModel(config)
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(
@@ -890,16 +778,15 @@ class UIEM(ErnieMPretrainedModel):
     designed for Universal Information Extraction.
 
     Args:
-        ernie (`ErnieMModel`):
-            An instance of `ErnieMModel`.
+        config (:class:`ErnieMConfig`):
+            An instance of ErnieMConfig used to construct UIEM.
     """
 
-    def __init__(self, ernie_m):
-        super(UIEM, self).__init__()
-        self.ernie_m = ernie_m
-        hidden_size = self.ernie_m.config["hidden_size"]
-        self.linear_start = paddle.nn.Linear(hidden_size, 1)
-        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+    def __init__(self, config: ErnieMConfig):
+        super(UIEM, self).__init__(config)
+        self.ernie_m = ErnieMModel(config)
+        self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 

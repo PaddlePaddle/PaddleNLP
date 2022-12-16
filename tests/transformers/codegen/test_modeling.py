@@ -13,24 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-import unittest
-import numpy as np
 import random
+import unittest
 
+import numpy as np
 import paddle
+from parameterized import parameterized_class
+
 from paddlenlp.transformers import (
     CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
     AutoTokenizer,
     CodeGenForCausalLM,
     CodeGenModel,
-    CodeGenTokenizer,
 )
-from ...testing_utils import slow
 
+from ...testing_utils import slow
 from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
-from parameterized import parameterized_class
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    floats_tensor,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class CodeGenModelTester:
@@ -299,7 +303,7 @@ class CodeGenModelTester:
         loss, logits = model(input_ids, return_dict=self.parent.return_dict, labels=input_ids)[:2]
         self.parent.assertEqual(loss.shape, [1])
         self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
-        result.loss.backward()
+        loss.backward()
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
@@ -341,6 +345,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
     use_test_model_name_list = False
     return_dict = False
     use_labels = False
+    use_test_inputs_embeds = True
 
     # attention mask issue
     def _get_input_ids_and_config(self):
@@ -446,7 +451,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
     @slow
     def test_auto_tokenizer(self):
         for model_name in CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST:
-            tokenizer = AutoTokenizer.from_pretrained(model_name)
+            AutoTokenizer.from_pretrained(model_name)
 
 
 class CodeGenModelLanguageGenerationTest(unittest.TestCase):

@@ -18,6 +18,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.nn import Layer
 
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -415,6 +416,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         token_type_ids=None,
         use_cache=False,
         cache=None,
+        inputs_embeds=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
@@ -422,7 +424,7 @@ class CodeGenModel(CodeGenPreTrainedModel):
         r"""
         The CodeGenModel forward method, overrides the `__call__()` special method.
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
@@ -445,6 +447,11 @@ class CodeGenModel(CodeGenPreTrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
             output_attentions (bool, optional):
                 Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
                 tensors for more detail. Defaults to `False`.
@@ -473,12 +480,17 @@ class CodeGenModel(CodeGenPreTrainedModel):
                 output = model(**inputs)
         """
 
-        if input_ids is not None:
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
             input_shape = input_ids.shape
-            input_ids = input_ids.reshape(shape=(-1, input_shape[-1]))
+            input_ids = input_ids.reshape((-1, input_shape[-1]))
             batch_size = input_ids.shape[0]
+        elif inputs_embeds is not None:
+            input_shape = inputs_embeds.shape[:-1]
+            batch_size = inputs_embeds.shape[0]
         else:
-            raise ValueError("You have to specify input_ids")
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         if cache is None:
             past_length = 0
@@ -488,22 +500,27 @@ class CodeGenModel(CodeGenPreTrainedModel):
 
         # Attention mask.
         if attention_mask is None:
-            assert input_ids is not None, "input_ids should be " "specified when generating attention_mask"
-            if batch_size == 1 and past_length != 0:
-                batch_size, seq_len = input_shape
-                attention_mask = paddle.zeros(
-                    [batch_size, 1, 1, seq_len + past_length], dtype=paddle.get_default_dtype()
-                )
+            if input_ids is not None:
+                if batch_size == 1 and past_length != 0:
+                    batch_size, seq_len = input_shape
+                    attention_mask = paddle.zeros(
+                        [batch_size, 1, 1, seq_len + past_length], dtype=paddle.get_default_dtype()
+                    )
+                else:
+                    attention_mask = (
+                        paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+                        * -1e4
+                    )
             else:
-                attention_mask = (
-                    paddle.cast(input_ids == self.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
-                    * -1e4
+                logger.warning(
+                    "Provided inputs_embeds while attention_mask is None, attention weights will not be masked during forwarding."
                 )
         # For 2D attention_mask from tokenizer
         elif attention_mask.ndim == 2:
             attention_mask = paddle.unsqueeze(attention_mask, axis=[1, 2]).astype(paddle.get_default_dtype())
             attention_mask = (1.0 - attention_mask) * -1e4
-        attention_mask.stop_gradient = True
+        if attention_mask is not None:
+            attention_mask.stop_gradient = True
         # TODO: CodeGen Attention Mask is TOO confusion.
         # When it's 2D, it must be int and it's denoted by 1/0.
         # When using model.generate() without providing attention mask
@@ -511,7 +528,8 @@ class CodeGenModel(CodeGenPreTrainedModel):
         # the attention mask's dtype must be float and it's denoted by 0/-inf.
         # Moreover, cannot support 3D attention mask.
 
-        inputs_embeds = self.wte(input_ids)
+        if inputs_embeds is None:
+            inputs_embeds = self.wte(input_ids)
         if token_type_ids is not None:
             token_type_embeds = self.wte(token_type_ids)
             inputs_embeds = inputs_embeds + token_type_embeds
@@ -641,6 +659,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         use_cache=False,
         cache=None,
         labels=None,
+        inputs_embeds=None,
         output_attentions=False,
         output_hidden_states=False,
         return_dict=False,
@@ -648,7 +667,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         r"""
         The CodeGenForCausalLM forward method, overrides the __call__() special method.
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`CodeGenModel`.
             attention_mask (Tensor, optional):
                 See :class:`CodeGenModel`.
@@ -660,12 +679,14 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
                 Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
                 `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
                 are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
+            inputs_embeds (Tensor, optional):
+                See :class:`CodeGenModel`.
             output_attentions (bool, optional):
-                See :class: `CodeGenModel`
+                See :class: `CodeGenModel`.
             output_hidden_states (bool, optional):
-                See :class: `CodeGenModel`
+                See :class: `CodeGenModel`.
             return_dict (bool, optional):
-                See :class: `CodeGenModel`
+                See :class: `CodeGenModel`.
         Returns:
             An instance of :class:`~paddlenlp.transformers.model_outputs.CausalLMOutputWithPastAndCrossAttentions` if
             `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
@@ -691,6 +712,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
             token_type_ids=token_type_ids,
             use_cache=use_cache,
             cache=cache,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,

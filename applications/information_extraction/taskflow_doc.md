@@ -119,7 +119,7 @@
 
 关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
 
-- Delivery Note
+- 表格
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206115688-30de315a-8fd4-4125-a3c3-8cb05c6e39e5.png height=180 width=600 hspace='10'/>
@@ -137,7 +137,7 @@
 
 #### 2.3 跨任务使用
 
-- Delivery Note
+- 实体、关系多任务抽取
 
 对文档进行实体+关系抽取，schema构造如下：
 
@@ -176,10 +176,11 @@ schema = [
 
 - 输入格式
 
-UIE-X支持图片路径、http图片链接、base64的输入形式，支持图片和PDF两种文档格式。
+文档抽取UIE-X支持图片路径、http图片链接、base64的输入形式，支持图片和PDF两种文档格式。文本抽取可以通过`text`指定输入文本。
 
 ```python
 [
+    {'text': '2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！'},
     {'doc': './cases/custom.jpg'},
     {'doc': 'https://user-images.githubusercontent.com/40840292/203457719-84a70241-607e-4bb1-ab4c-3d9beee9e254.jpeg'}
 ]

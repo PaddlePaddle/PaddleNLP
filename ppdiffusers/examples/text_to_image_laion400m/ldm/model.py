@@ -246,3 +246,16 @@ class LatentDiffusionModel(nn.Layer):
             image = self.vae.decode(latents).sample
             image = (image / 2 + 0.5).clip(0, 1).transpose([0, 2, 3, 1]) * 255.0
         return image.cast("float32").numpy().round()
+
+    def set_recompute(self, value=False):
+        def fn(layer):
+            # ldmbert
+            if hasattr(layer, "enable_recompute"):
+                layer.enable_recompute = value
+                print("Set", layer.__class__, "recompute", layer.enable_recompute)
+            # unet
+            if hasattr(layer, "gradient_checkpointing"):
+                layer.gradient_checkpointing = value
+                print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+
+        self.apply(fn)
