@@ -21,8 +21,8 @@ import time
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
 from paddle.metric import Accuracy
-from paddle.static.quantization import PostTrainingQuantization
 from paddle.utils import try_import
 
 from ..data import Pad
