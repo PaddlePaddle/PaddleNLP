@@ -121,6 +121,7 @@ def run(args):
     label_num = len(label_list)
 
     if args.device == "npu":
+        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
         batchify_fn = DataCollatorForTokenClassification(
             tokenizer=tokenizer, padding="max_length", max_length=args.max_seq_length
         )

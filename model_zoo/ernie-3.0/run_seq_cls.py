@@ -269,6 +269,7 @@ def do_train(args):
     dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
 
     if args.device == "npu":
+        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
         batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
     else:
         batchify_fn = DataCollatorWithPadding(tokenizer)
