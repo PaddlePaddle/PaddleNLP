@@ -259,19 +259,19 @@ class ScalingLayer(nn.Layer):
         return (inp - self.shift) / self.scale
 
 
-class vgg16(nn.Layer):
+class VGG16(nn.Layer):
     def __init__(self, pretrained=True, requires_grad=False):
-        super(vgg16, self).__init__()
+        super(VGG16, self).__init__()
         vgg_model = paddle.vision.models.vgg16(pretrained=False)
         if pretrained:
             state_dict = paddle.load(get_weights_path_from_url(*model_urls["vgg16"]))
             vgg_model.set_state_dict(state_dict)
         vgg_pretrained_features = vgg_model.features
-        self.slice1 = paddle.nn.Sequential()
-        self.slice2 = paddle.nn.Sequential()
-        self.slice3 = paddle.nn.Sequential()
-        self.slice4 = paddle.nn.Sequential()
-        self.slice5 = paddle.nn.Sequential()
+        self.slice1 = nn.Sequential()
+        self.slice2 = nn.Sequential()
+        self.slice3 = nn.Sequential()
+        self.slice4 = nn.Sequential()
+        self.slice5 = nn.Sequential()
         self.N_slices = 5
         for x in range(4):
             self.slice1.add_sublayer(str(x), vgg_pretrained_features[x])
@@ -328,7 +328,7 @@ class LPIPS(nn.Layer):
                 % ("LPIPS" if lpips else "baseline", net, "on" if spatial else "off")
             )
 
-        self.pnet_type = net
+        self.pnet_type = net.lower()
         self.pnet_tune = pnet_tune
         self.pnet_rand = pnet_rand
         self.spatial = spatial
@@ -336,7 +336,7 @@ class LPIPS(nn.Layer):
         self.scaling_layer = ScalingLayer()
 
         if self.pnet_type in ["vgg", "vgg16"]:
-            net_type = vgg16
+            net_type = VGG16
             self.chns = [64, 128, 256, 512, 512]
         else:
             raise NotImplementedError

@@ -75,7 +75,7 @@ def parse_args():
         type=str,
         default=None,
         required=False,
-        help="Path to pretrained model or model identifier from huggingface.co/models.",
+        help="Path to pretrained model or model identifier from bos.",
     )
     parser.add_argument(
         "--output_dir",
@@ -108,13 +108,13 @@ def parse_args():
         action="store_true",
         help="Scale base-lr by ngpu * batch_size",
     )
-    parser.add_argument("--freeze_encoder", action="store_true", help="Whether to freeze_encoder.")
+    parser.add_argument("--freeze_encoder", action="store_true", help="Whether to freeze encoder layer.")
     parser.add_argument(
         "--from_scratch",
         action="store_true",
         help="Whether to train new model from scratch. ",
     )
-    parser.add_argument("--vae_config_file", default=None, type=str, help="vae_config_file.")
+    parser.add_argument("--vae_config_file", default=None, type=str, help="Path to the vae_config_file.")
     parser.add_argument(
         "--logging_dir",
         type=str,
@@ -144,12 +144,10 @@ def parse_args():
         default=[],
         type=str,
         nargs="*",
+        help="The prefix keys to be ignored when we resume from a pretrained model, e.g. ignore_keys = ['decoder.'], we will ignore 'decoder.xxx', 'decoder.xxx.xxx'.",
     )
     parser.add_argument(
-        "--input_size",
-        default=[256, 256],
-        type=int,
-        nargs="*",
+        "--input_size", default=None, type=int, nargs="*", help="The height and width of the input at the encoder."
     )
     # dataset
     parser.add_argument(
@@ -168,51 +166,62 @@ def parse_args():
             " resolution"
         ),
     )
-    parser.add_argument("--degradation", type=str, default="pil_nearest", help="degradation")
+    parser.add_argument(
+        "--degradation",
+        type=str,
+        default="pil_nearest",
+        help="Degradation_fn, e.g. cv_bicubic, bsrgan_light, or pil_nearest",
+    )
     parser.add_argument(
         "--file_list",
         type=str,
         default="./data/filelist/train.filelist.list",
-        help="The name of the file_list.",
+        help="Path to the train file_list.",
     )
     parser.add_argument(
         "--num_workers",
         type=int,
         default=8,
-        help="num_workers",
+        help="The number of subprocess to load data.",
     )
     parser.add_argument(
         "--num_records",
         type=int,
         default=62500,
-        help="num_records",
+        help="The num_records of the text_image_pair dataset.",
     )
     parser.add_argument(
         "--buffer_size",
         type=int,
         default=100,
-        help="Buffer size",
+        help="The buffer size of the text_image_pair dataset.",
     )
     parser.add_argument(
         "--shuffle_every_n_samples",
         type=int,
         default=5,
-        help="shuffle_every_n_samples",
+        help="The shuffle_every_n_samples of the text_image_pair dataset.",
     )
 
     # loss fn
-    parser.add_argument("--disc_start", type=int, default=50001)
-    parser.add_argument("--kl_weight", type=float, default=1.0e-6)
-    parser.add_argument("--disc_weight", type=float, default=0.5)
-    parser.add_argument("--logvar_init", type=float, default=0.0)
-    parser.add_argument("--pixelloss_weight", type=float, default=1.0)
-    parser.add_argument("--disc_num_layers", type=int, default=3)
-    parser.add_argument("--disc_in_channels", type=int, default=3)
-    parser.add_argument("--disc_factor", type=float, default=1.0)
-    parser.add_argument("--perceptual_weight", type=float, default=1.0)
-    parser.add_argument("--use_actnorm", action="store_true")
-    parser.add_argument("--disc_conditional", action="store_true")
-    parser.add_argument("--disc_loss", type=str, default="hinge")
+    parser.add_argument("--disc_start", type=int, default=50001, help="The number of steps the discriminator started.")
+    parser.add_argument("--kl_weight", type=float, default=1.0e-6, help="The weight ratio of the kl_loss.")
+    parser.add_argument("--disc_weight", type=float, default=0.5, help="The weight ratio of the disc_loss.")
+    parser.add_argument("--logvar_init", type=float, default=0.0, help="The init value of the output log variances.")
+    parser.add_argument("--pixelloss_weight", type=float, default=1.0, help="The weight ratio of the pixelloss.")
+    parser.add_argument("--disc_num_layers", type=int, default=3, help="The num layers of the discriminator.")
+    parser.add_argument("--disc_in_channels", type=int, default=3, help="The in channels of the discriminator.")
+    parser.add_argument("--disc_factor", type=float, default=1.0, help="The factor of the discriminator loss.")
+    parser.add_argument(
+        "--perceptual_weight", type=float, default=1.0, help="The weight ratio of the perceptual loss."
+    )
+    parser.add_argument(
+        "--use_actnorm", action="store_true", help="Whether to use actnorm in NLayerDiscriminator layer."
+    )
+    parser.add_argument("--disc_conditional", action="store_true", help="Whether to use conditional discriminator.")
+    parser.add_argument(
+        "--disc_loss", type=str, choices=["hinge", "vanilla"], default="hinge", help="The type of discriminator loss."
+    )
     args = parser.parse_args()
 
     args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
