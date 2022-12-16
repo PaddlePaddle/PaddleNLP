@@ -14,8 +14,6 @@
 """ ERNIE-M model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-
 from ..configuration_utils import PretrainedConfig
 
 __all__ = ["ERNIE_M_PRETRAINED_INIT_CONFIGURATION", "ErnieMConfig", "ERNIE_M_PRETRAINED_RESOURCE_FILES_MAP"]
@@ -144,7 +142,6 @@ class ErnieMConfig(PretrainedConfig):
         >>> configuration = model.config
         ```"""
     model_type = "ernie_m"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
     pretrained_init_configuration = ERNIE_M_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -161,6 +158,7 @@ class ErnieMConfig(PretrainedConfig):
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
         pad_token_id: int = 0,
+        num_choices: int = 2,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -175,3 +173,4 @@ class ErnieMConfig(PretrainedConfig):
         self.max_position_embeddings = max_position_embeddings
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
+        self.num_choices = num_choices
