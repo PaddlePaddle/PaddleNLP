@@ -21,6 +21,7 @@ import numpy as np
 import paddle
 from hyperopt import hp
 from paddle.io import Dataset
+from paddle.static import InputSpec
 from scipy.special import expit as sigmoid
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 
@@ -159,6 +160,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "Chinese",
                 "trainer_type": "PromptTrainer",
                 "template.prompt": f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
+                # "template.prompt": f"“{{'text': '{self.text_column}'}}”这句话是关于{{'mask'}}的",
                 "PromptTuningArguments.max_steps": 5,
                 "PromptTuningArguments.model_name_or_path": "ernie-3.0-nano-zh",
             },
@@ -261,17 +263,40 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     compute_metrics=self._compute_metrics,
                 )
                 trainer.train()
-                trainer.save_model(self.export_path)
+                eval_metrics = trainer.evaluate(eval_dataset)
+                # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
+                # We directly export a static model instead of a dynamic model
+                input_spec = self._get_prompt_model_input_spec(prompt_model)
+                trainer.export_model(self.export_path, input_spec=input_spec)
                 if os.path.exists(self.training_path):
                     logger.info("Removing training checkpoints to conserve disk space")
                     shutil.rmtree(self.training_path)
-                eval_metrics = trainer.evaluate(eval_dataset)
                 return eval_metrics
             else:
                 raise ValueError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
 
         return trainable
 
+    def _get_prompt_model_input_spec(self, prompt_model):
+        template = prompt_model.template
+        template_keywords = template.extract_template_keywords(template.prompt)
+        print(template_keywords)
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+        ]
+        if "mask" in template_keywords:
+            input_spec.append(InputSpec(shape=[None], dtype="int64", name="masked_positions"))
+        if "soft" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="soft_token_ids"))
+        if "encoder" in template_keywords:
+            input_spec.append(InputSpec(shape=[None, None], dtype="int64", name="encoder_ids"))
+        print(input_spec)
+        return input_spec
+        
+    
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         if self.problem_type == "multi_class":
             return self._compute_multi_class_metrics(eval_preds=eval_preds)

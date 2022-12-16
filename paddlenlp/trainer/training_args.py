@@ -330,14 +330,14 @@ class TrainingArguments:
     )
 
     logging_dir: Optional[str] = field(default=None, metadata={"help": "VisualDL log dir."})
-    logging_strategy: Union[str, IntervalStrategy] = field(
+    logging_strategy: str = field(
         default="steps",
         metadata={"help": "The logging strategy to use."},
     )
     logging_first_step: bool = field(default=False, metadata={"help": "Log the first global_step"})
     logging_steps: int = field(default=500, metadata={"help": "Log every X updates steps."})
 
-    save_strategy: Union[str, IntervalStrategy] = field(
+    save_strategy: str = field(
         default="steps",
         metadata={"help": "The checkpoint save strategy to use."},
     )
