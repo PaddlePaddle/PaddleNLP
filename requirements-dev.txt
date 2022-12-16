@@ -1,4 +1,4 @@
-paddlepaddle>=2.4.1
+paddlepaddle==2.4.0rc0
 pre-commit
 pytest
 isort
