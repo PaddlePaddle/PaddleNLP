@@ -14,14 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
-import re
 import argparse
-import requests
+import os
 
 import gradio as gr
-
+import requests
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -37,17 +34,34 @@ def process_upload(file):
     else:
         return [gr.update(label="Select a file", value=None), None, gr.update(visible=False, value=None)]
 
-    
+
 def process_file(file_path):
     if not file_path:
-        return [gr.update(visible=False)]+ [None] * 12 + [gr.update(visible=True, value="Warm Note: upload file firstly")]
+        return (
+            [gr.update(visible=False)]
+            + [None] * 12
+            + [gr.update(visible=True, value="Warm Note: upload file firstly")]
+        )
 
     url = f"http://{args.serving_name}:{args.serving_port}/senta_file"
     save_path = os.path.join(os.path.dirname(file_path), "senta_" + os.path.basename(file_path))
-    r = requests.post(url, json={"meta":{"file_path":file_path, "save_path":save_path}})
+    r = requests.post(url, json={"meta": {"file_path": file_path, "save_path": save_path}})
     response = r.json()
     results = response["meta"]["img_dict"]
-    components = ["aspect_wc", "aspect_hist", "opinion_wc", "opinion_hist", "aspect_opinion_wc", "aspect_opinion_hist", "aspect_opinion_wc_pos", "aspect_opinion_hist_pos", "aspect_opinion_wc_neg", "aspect_opinion_hist_neg", "aspect_sentiment_wc", "aspect_sentiment_hist"]
+    components = [
+        "aspect_wc",
+        "aspect_hist",
+        "opinion_wc",
+        "opinion_hist",
+        "aspect_opinion_wc",
+        "aspect_opinion_hist",
+        "aspect_opinion_wc_pos",
+        "aspect_opinion_hist_pos",
+        "aspect_opinion_wc_neg",
+        "aspect_opinion_hist_neg",
+        "aspect_sentiment_wc",
+        "aspect_sentiment_hist",
+    ]
     outputs = [gr.update(visible=True)]
     for component in components:
         if component in results:
@@ -59,7 +73,12 @@ def process_file(file_path):
 
 
 def reset_click():
-    return [gr.update(value=None, label="Select a file"), None, gr.update(visible=False, value=None), gr.update(visible=False)]
+    return [
+        gr.update(value=None, label="Select a file"),
+        None,
+        gr.update(visible=False, value=None),
+        gr.update(visible=False),
+    ]
 
 
 with gr.Blocks() as demo:
@@ -69,10 +88,10 @@ with gr.Blocks() as demo:
     with gr.Row():
         reset_btn = gr.Button("Reset")
         file_btn = gr.Button("Submit")
- 
+
     # define something with exceptional situation
     msg_box = gr.Markdown(visible=False, interactive=False)
-    
+
     # show sentiment analysis with UI for batch processing
     with gr.Column(visible=False) as show:
         gr.Markdown(value="----")
@@ -103,9 +122,28 @@ with gr.Blocks() as demo:
         with gr.Row(equal_height=True):
             aspect_sentiment_wc = gr.Image()
             aspect_sentiment_hist = gr.Image()
-    
+
     upload_file.change(process_upload, inputs=[upload_file], outputs=[upload_file, file_path, msg_box])
-    file_btn.click(process_file, inputs=[file_path], outputs=[show, aspect_wc, aspect_hist, opinion_wc, opinion_hist, aspect_opinion_wc, aspect_opinion_hist, aspect_opinion_wc_pos, aspect_opinion_hist_pos, aspect_opinion_wc_neg, aspect_opinion_hist_neg, aspect_sentiment_wc, aspect_sentiment_hist, msg_box])
+    file_btn.click(
+        process_file,
+        inputs=[file_path],
+        outputs=[
+            show,
+            aspect_wc,
+            aspect_hist,
+            opinion_wc,
+            opinion_hist,
+            aspect_opinion_wc,
+            aspect_opinion_hist,
+            aspect_opinion_wc_pos,
+            aspect_opinion_hist_pos,
+            aspect_opinion_wc_neg,
+            aspect_opinion_hist_neg,
+            aspect_sentiment_wc,
+            aspect_sentiment_hist,
+            msg_box,
+        ],
+    )
     reset_btn.click(reset_click, inputs=None, outputs=[upload_file, file_path, msg_box, show])
 
 
