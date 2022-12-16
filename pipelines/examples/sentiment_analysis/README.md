@@ -1,12 +1,15 @@
-# 端到端开放文档抽取问答系统
+# 端到端情感分析系统
 
 ## 1. 系统介绍
 
-开放文档抽取问答主要指对于网页、数字文档或扫描文档所包含的文本以及丰富的排版格式等信息，通过人工智能技术进行理解、分类、提取以及信息归纳的过程。开放文档抽取问答技术广泛应用于金融、保险、能源、物流、医疗等行业，常见的应用场景包括财务报销单、招聘简历、企业财报、合同文书、动产登记证、法律判决书、物流单据等多模态文档的关键信息抽取、问题回答等。
+情感分析（sentiment analysis）是近年来国内外研究的热点，旨在对带有情感色彩的主观性文本进行分析、处理、归纳和推理，其广泛应用于消费决策、舆情分析、个性化推荐等领域，具有很高的商业价值。按照分析粒度可以大致分为三类：篇章级的情感分析（Document-Level Sentiment Classification）、语句级的情感分析（Sentence-Level Sentiment Classification）和属性级的情感分析（Aspect-Level Sentiment Classification）。
 
-本项目提供了低成本搭建端到端开放文档抽取问答系统的能力。用户只需要处理好自己的业务数据，就可以使用本项目预置的开放文档抽取问答系统模型(文档OCR预处理模型、文档抽取问答模型)快速搭建一个针对自己业务数据的文档抽取问答系统，并提供基于[Gradio](https://gradio.app/) 的 Web 可视化服务。
+本项目更多聚焦于属性级的情感分析，支持文本评论中关于属性、观点词和情感倾向方面的分析。同时为方便用户使用，本项目提供了基于UIE模型提供了从输入数据到情感分析结果可视化的解决方案，用户只需上传自己的业务数据，就可以使用本项目开放的情感分析解决方案，快速搭建一个针对自己业务数据的情感分析系统，并提供基于[Gradio](https://gradio.app/) 的 Web 可视化服务。
 
-![gradio](https://user-images.githubusercontent.com/63761690/197500524-17013358-8d19-43c4-9796-abac1e2d675f.gif)
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/35913314/208049755-8fac879e-c544-443f-b127-5a83899a6d6f.png" />
+</div>
+
 
 ## 2. 快速开始
 
@@ -45,53 +48,49 @@ python setup.py install
 
 【注意】**以下的所有的流程都只需要在`pipelines`根目录下进行，不需要跳转目录**
 
-### 2.2 一键体验问答系统
-您可以通过如下命令快速体验开放文档抽取问答系统的效果。
-
+### 2.2 一键体验情感分析系统
+您可以通过如下命令快速体验开放情感分析系统的效果。
 
 ```bash
-# 我们建议在 GPU 环境下运行本示例，运行速度较快
-# 设置 1 个空闲的 GPU 卡，此处假设 0 卡为空闲 GPU
+# 建议在 GPU 环境下运行本示例，运行速度较快
 export CUDA_VISIBLE_DEVICES=0
-python examples/document-intelligence/docprompt_example.py --device gpu
-# 如果只有 CPU 机器，可以通过 --device 参数指定 cpu 即可, 运行耗时较长
-unset CUDA_VISIBLE_DEVICES
-python examples/document-intelligence/docprompt_example.py --device cpu
+python examples/document-intelligence/docprompt_example.py \
+    --file_path "your file path"
 ```
+
+在运行结束后，可视化结果将存放到与`file_path` 文件所在目录的子目录`images`目录下。
 
 ### 2.3 构建 Web 可视化开放文档抽取问答系统
 
-整个 Web 可视化问答系统主要包含两大组件:  1. 基于 RestAPI 构建模型服务 2. 基于 Gradio 构建 WebUI。接下来我们依次搭建这 2 个服务并串联构成可视化的开放文档抽取问答系统。
+整个 Web 可视化情感分析系统主要包含两大组件:  1. 基于 RestAPI 构建模型服务 2. 基于 Gradio 构建 WebUI。接下来我们依次搭建这 2 个服务并串联构成可视化的情感分析系统。
 
 #### 2.3.1 启动 RestAPI 模型服务
 ```bash
-# 指定智能问答系统的Yaml配置文件
-export PIPELINE_YAML_PATH=rest_api/pipeline/docprompt.yaml
-export QUERY_PIPELINE_NAME=query_documents
+# 指定语义检索系统的Yaml配置文件
+export CUDA_VISIBLE_DEVICES=0
+export PIPELINE_YAML_PATH=rest_api/pipeline/senta.yaml
+export QUERY_PIPELINE_NAME=senta_pipeline
+
 # 使用端口号 8891 启动模型服务
 python rest_api/application.py 8891
 ```
+
 Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh examples/document-intelligence/run_docprompt_server.sh
-```
-启动后可以使用curl命令验证是否成功运行：
-
-```
-curl --request POST --url 'http://0.0.0.0:8891/query_documents' -H "Content-Type: application/json"  --data '{"meta": {"doc": "https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/images/invoice.jpg", "prompt": ["发票号码是多少?", "校验码是多少?"]}}'
+sh examples/sentiment_analysis/run_senta_server.sh
 ```
 
 #### 2.3.2 启动 WebUI
 
 ```bash
-python ui/webapp_docprompt_gradio.py  --serving_port 8891
+python ui/webapp_senta.py --serving_port 8891
 ```
 
 Linux 用户推荐采用 Shell 脚本来启动服务：
 
 ```bash
-sh examples/document-intelligence/run_docprompt_web.sh
+sh examples/sentiment_analysis/run_senta_web.sh
 ```
 
-到这里您就可以打开浏览器访问 http://127.0.0.1:7860 地址体验开放文档抽取问答系统系统服务了。
+接下来，您就可以打开浏览器访问 http://127.0.0.1:7860 地址体验情感分析系统服务了。
