@@ -15,17 +15,20 @@
 import argparse
 import logging
 import os
-
-from paddlenlp import Taskflow
+import time
 
 from utils import load_txt, write_json_file
 
+from paddlenlp import Taskflow
+
 logger = logging.getLogger(__file__)
+
 
 def main(args):
     """
     Predict based on Taskflow.
     """
+    start_time = time.time()
     # read file
     if not os.path.exists(args.file_path):
         raise ValueError("something with wrong for your file_path, it may be not exists.")
@@ -34,13 +37,28 @@ def main(args):
     # define Taskflow for sentiment analysis
     schema = eval(args.schema)
     if args.load_from_dir:
-        senta = Taskflow("sentiment_analysis", model=args.model, schema=schema, aspects=args.aspects, batch_size=args.batch_size, max_seq_len=args.max_seq_len, task_path=args.load_from_dir)
+        senta = Taskflow(
+            "sentiment_analysis",
+            model=args.model,
+            schema=schema,
+            aspects=args.aspects,
+            batch_size=args.batch_size,
+            max_seq_len=args.max_seq_len,
+            task_path=args.load_from_dir,
+        )
     else:
-        senta = Taskflow("sentiment_analysis", model=args.model, schema=schema, aspects=args.aspects, batch_size=args.batch_size, max_seq_len=args.max_seq_len)
-    
+        senta = Taskflow(
+            "sentiment_analysis",
+            model=args.model,
+            schema=schema,
+            aspects=args.aspects,
+            batch_size=args.batch_size,
+            max_seq_len=args.max_seq_len,
+        )
+
     # predict with Taskflow
     results = senta(examples)
-    
+
     # save results
     save_path = args.save_path
     if not save_path:
@@ -48,7 +66,8 @@ def main(args):
         save_path = os.path.join(save_dir, "sentiment_results.json")
     write_json_file(results, save_path)
     logger.info("The results of sentiment analysis has been saved to: {}".format(save_path))
-    
+    logger.info("This run take {} seconds.".format(time.time() - start_time))
+
 
 if __name__ == "__main__":
     # yapf: disable
