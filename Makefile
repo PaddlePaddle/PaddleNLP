@@ -35,10 +35,9 @@ lint:
 test: unit-test
 
 unit-test:
-	# only enable bert-test: there are many failed tests
-	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert \
-		tests/prompt \
-		tests/transformers/test_configuration_utils.py
+	PYTHONPATH=$(shell pwd) pytest \
+		-n auto --cov paddlenlp \
+		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 

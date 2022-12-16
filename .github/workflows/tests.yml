@@ -6,6 +6,10 @@ jobs:
   Test:
     name: Test
     runs-on: ubuntu-20.04
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
     steps:
       - uses: actions/checkout@v3
       - uses: actions/setup-python@v1
@@ -17,3 +21,5 @@ jobs:
           make install
       - name: run the command
         run: make test
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
