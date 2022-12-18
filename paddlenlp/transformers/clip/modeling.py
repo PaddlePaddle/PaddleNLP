@@ -567,7 +567,7 @@ class VisionTransformer(nn.Layer):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-
+        
         if isinstance(encoder_outputs, type(embedding_output)):
             last_hidden_state = encoder_outputs
         else:
@@ -580,14 +580,29 @@ class VisionTransformer(nn.Layer):
 
         if not return_dict:
             return (last_hidden_state, pooled_output) + encoder_outputs[1:]
-
+        # vit_layernorm_shared
         return BaseModelOutputWithPoolingAndCrossAttentions(
             last_hidden_state=last_hidden_state,
             pooler_output=pooled_output,
-            hidden_states=encoder_outputs.hidden_states,
+            hidden_states=hidden_states,
             attentions=encoder_outputs.attentions,
         )
 
+    def forward_pre(self, x):
+        x = self.conv1(x)  # shape = [*, width, grid, grid]
+        x = x.reshape([x.shape[0], x.shape[1], -1])  # shape = [*, width, grid ** 2]
+        x = x.transpose((0, 2, 1))  # shape = [*, grid ** 2, width]
+        # t = self.class_embedding.weight + paddle.zeros([x.shape[0], 1, x.shape[-1]], dtype=x.dtype)
+        t  = self.class_embedding.unsqueeze([0, 1]).expand([x.shape[0], -1, -1])+ paddle.zeros([x.shape[0], 1, x.shape[-1]], dtype=x.dtype)
+        x = paddle.concat([t, x], axis=1)  # shape = [*, grid ** 2 + 1, width]
+        x = x + self.positional_embedding.weight
+        x = self.ln_pre(x)
+        return x
+
+    def forward_post(self, x):
+
+        x = self.ln_post(x)
+        return x
 
 class TextTransformer(nn.Layer):
     def __init__(
@@ -803,9 +818,9 @@ class CLIPModel(CLIPPretrainedModel):
                 mlp_ratio=vision_mlp_ratio,
                 normalize_before=True,
             )
-            self.vision_projection = paddle.create_parameter(
-                (vision_embed_dim, projection_dim), paddle.get_default_dtype()
-            )
+            # self.vision_projection = paddle.create_parameter(
+            #     (vision_embed_dim, projection_dim), paddle.get_default_dtype()
+            # )
 
         self.text_model = TextTransformer(
             context_length=max_text_length,
@@ -857,6 +872,10 @@ class CLIPModel(CLIPPretrainedModel):
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
             )
+            
+            # hidden_states = vision_outputs[2]
+            # xs = paddle.stack(hidden_states[1:], axis=0)
+            # hidden_embedds = self.vision_model.ln_post(xs)
             pooled_output = vision_outputs[1]
             image_features = paddle.matmul(pooled_output, self.vision_projection)
             return image_features
