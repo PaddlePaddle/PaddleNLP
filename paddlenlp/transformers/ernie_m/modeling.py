@@ -790,12 +790,14 @@ class UIEM(ErnieMPretrainedModel):
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
         Args:
             input_ids (Tensor):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
+                See :class:`ErnieMModel`.
+            attention_mask (Tensor, optional):
                 See :class:`ErnieMModel`.
 
         Example:
@@ -811,11 +813,16 @@ class UIEM(ErnieMPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 start_prob, end_prob = model(**inputs)
         """
-        sequence_output, _ = self.ernie_m(input_ids=input_ids, position_ids=position_ids)
+        sequence_output, _ = self.ernie_m(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)
         end_logits = self.linear_end(sequence_output)
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
+        # TODO: add return dict support
         return start_prob, end_prob

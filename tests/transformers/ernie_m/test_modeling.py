@@ -20,6 +20,7 @@ from paddle import Tensor
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    UIEM,
     ErnieMConfig,
     ErnieMForMultipleChoice,
     ErnieMForQuestionAnswering,
@@ -226,6 +227,26 @@ class ErnieMModelTester:
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
+    def create_and_check_for_uie(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = UIEM(config)
+        model.eval()
+        start_prob, end_prob = model(
+            input_ids,
+            attention_mask=input_mask,
+        )
+
+        self.parent.assertEqual(start_prob.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_prob.shape, [self.batch_size, self.seq_length])
+
     def create_and_check_for_token_classification(
         self,
         config: ErnieMConfig,
@@ -356,6 +377,7 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
         ErnieMForTokenClassification,
         ErnieMForQuestionAnswering,
         ErnieMForMultipleChoice,
+        UIEM,
     )
 
     def setUp(self):
@@ -379,6 +401,10 @@ class ErnieMModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_question_answering(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
+
+    def test_for_uie(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_uie(*config_and_inputs)
 
     def test_for_multi_choice(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
