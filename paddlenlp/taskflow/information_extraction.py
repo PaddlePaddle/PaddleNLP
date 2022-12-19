@@ -376,7 +376,7 @@ class UIETask(Task):
         },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
