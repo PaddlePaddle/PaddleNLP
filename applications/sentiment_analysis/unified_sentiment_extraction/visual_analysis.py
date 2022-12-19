@@ -482,33 +482,12 @@ class SentimentResult:
 
 
 if __name__ == "__main__":
-    # ypdf: disable
+    # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--file_path",
-        default="./outputs/test_hotel.json",
-        type=str,
-        help="The result path of sentiment analysis.",
-    )
-    parser.add_argument(
-        "--save_dir",
-        default="./images",
-        type=str,
-        help="The saving path of images.",
-    )
-    parser.add_argument(
-        "--font_path",
-        default=None,
-        type=str,
-        help="The font Path for showing Chinese in wordcloud.",
-    )
-    parser.add_argument(
-        "--sentiment_name",
-        default="情感倾向[正向,负向,未提及]",
-        type=str,
-        help="The prompt for sentiment polarity prediction in the result of sentiment analysis.",
-    )
-
+    parser.add_argument("--file_path", default="./outputs/test_hotel.json", type=str, help="The result path of sentiment analysis.")
+    parser.add_argument("--save_dir", default="./images", type=str, help="The saving path of images.")
+    parser.add_argument("--font_path", default=None, type=str, help="The font Path for showing Chinese in wordcloud.")
+    parser.add_argument("--sentiment_name", default="情感倾向[正向,负向,未提及]", type=str, help="The prompt for sentiment polarity prediction in the result of sentiment analysis.")
     args = parser.parse_args()
     # ypdf: enable
 
