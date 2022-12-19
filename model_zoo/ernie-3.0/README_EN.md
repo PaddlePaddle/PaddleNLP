@@ -1525,8 +1525,8 @@ The testing environment is as above. The number of threads is set to 12 when tes
 | -------------------------- | ------------ | ------------ | ------------- | ------------- | ------------- | ------------- |
 | ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45        | 90.91(1.0x)   | 93.04         | 33.74(1.0x)   | 66.95         |
 | ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88) | 141.00(1.6x)  | 92.64(-0.40)  | 56.51(1.7x)   | 66.23(-0.72)  |
-| ERNIE 3.0-Medium+裁剪+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23)  | 48.47(1.4x)   | 65.55(-1.40)  |
-| ERNIE 3.0-Medium+裁剪+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
+| ERNIE 3.0-Medium+clipping+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23)  | 48.47(1.4x)   | 65.55(-1.40)  |
+| ERNIE 3.0-Medium+clipping+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
 
 
 After the same compression, the speedup ratio of three types of tasks (classification, sequence labeling, and reading comprehension) reaches about 2.3.
