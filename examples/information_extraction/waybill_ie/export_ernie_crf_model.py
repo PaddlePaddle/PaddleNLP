@@ -42,7 +42,6 @@ if __name__ == "__main__":
     label_vocab = load_dict(os.path.join(args.data_dir, "tag.dic"))
 
     # Define the model netword and its loss
-
     ernie = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_labels=len(label_vocab))
     model = ErnieCrfForTokenClassification(ernie)
     if args.params_path and os.path.isfile(args.params_path):
