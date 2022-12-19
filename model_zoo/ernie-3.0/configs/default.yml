@@ -8,7 +8,7 @@ DefaultArgs:
 # Datasets which used for sequence classfication
 SequenceClassification:
     afqmc: 
-        num_train_epochs: 6
+        num_train_epochs: 1
         learning_rate: 0.00003
         max_seq_length: 128
         per_device_train_batch_size: 64 
@@ -55,7 +55,7 @@ TokenClassification:
     msra_ner:
             learning_rate: 0.00005
             max_seq_length: 128
-            num_train_epochs: 3
+            num_train_epochs: 1
             per_device_train_batch_size: 16
             per_device_eval_batch_size: 16
 
@@ -64,7 +64,7 @@ QuestionAnswering:
     cmrc2018:
             learning_rate: 0.00005
             max_seq_length: 512 
-            num_train_epochs: 8
+            num_train_epochs: 1
             per_device_train_batch_size: 24 
             per_device_eval_batch_size: 12
 
