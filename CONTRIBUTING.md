@@ -31,33 +31,33 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
 
 #### 4. Set up the development environment
 
-   Before you start coding, you need to setup the development environment. We highly recommend doing all your development in a virtual environment such as 
+   Before you start coding, you need to setup the development environment. We highly recommend doing all your development in a virtual environment such as
    [venv](https://docs.python.org/3/library/venv.html) or [conda](https://docs.conda.io/en/latest/). After you setup and activated your virtual environment,
    run the following command:
 
    ```bash
    make install
    ```
-   
+
    This will setup all the dependencies of `PaddleNLP` as well as the [`pre-commit`](http://pre-commit.com/) tool.
-   
+
    If you are working on the `examples` or `applications` module and require importing from `PaddleNLP`, make sure you install `PaddleNLP` in editable mode.
    If `PaddleNLP` is already installed in the virtual environment, remove it with `pip uninstall paddlenlp` before reinstalling it in editable mode with
    `pip install -e .`
- 
+
 #### 5. Develop
 
    As you develop your new exciting feature, keep in mind that it should be covered by unit tests. All of our unit tests can be found under the `tests` directory.
    You can either modify existing unit test to cover the new feature, or create a new test from scratch.
    As you finish up the your code, you should make sure the test suite passes. You can run the tests impacted by your changes like this:
-   
+
    ```bash
    pytest tests/<test_to_run>.py
    ```
-   
+
 #### 6. Commit
 
-   We utilizes [`pre-commit`](http://pre-commit.com/) (with [black](https://black.readthedocs.io/en/stable/), [isort](https://pycqa.github.io/isort/) and 
+   We utilizes [`pre-commit`](http://pre-commit.com/) (with [black](https://black.readthedocs.io/en/stable/), [isort](https://pycqa.github.io/isort/) and
    [flake8](https://flake8.pycqa.org/en/latest/) under the hood) to check the style of code and documentation in every commit. When you run run `git commit`, you will see
    something like the following:
 
@@ -77,8 +77,8 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
     Tabs remover.........................................(no files to check)Skipped
     copyright_checker........................................................Passed
    ```
-   
-   But most of the time things don't go so smoothly. When your code or documentation doesn't meet the standard, the `pre-commit` check will fail. 
+
+   But most of the time things don't go so smoothly. When your code or documentation doesn't meet the standard, the `pre-commit` check will fail.
    ```
     ➜  (my-virtual-env) git commit -m "commiting my cool feature"
     black....................................................................Passed
@@ -100,12 +100,12 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
     Tabs remover.........................................(no files to check)Skipped
     copyright_checker........................................................Passed
    ```
-   
+
    But **don't panic**!
    Our tooling will fix most of the style errors automatically. Some errors will need to be addressed manually. Fortunately, the error messages are straight forward and
-   the errors are usually simple to fix. After addressing the errors, you can run `git add <files>` and `git commit` again, which will trigger `pre-commit` again. 
+   the errors are usually simple to fix. After addressing the errors, you can run `git add <files>` and `git commit` again, which will trigger `pre-commit` again.
    Once the `pre-commit` checks pass, you are ready to push the code.
-   
+
    [Google][http://google.com/] or [StackOverflow](https://stackoverflow.com/) are great tools to help you understand the code style errors.
    Don't worry if you still can't figure it out. You can commit with `git commit -m "style error" --no-verify` and we are happy to help you once you create a Pull Request.
 
