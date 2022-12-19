@@ -45,14 +45,14 @@
 * [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)
   * 新增[中文文本摘要方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增[问题生成方案](./examples/question_generation)。
   * 发布[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱。
-  
+
 * [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)
   * 新增多语言跨模态布局增强文档智能大模型 [ERNIE-Layout](./model_zoo/ernie-layout/)以及文档抽取问答模型DocPrompt，精准理解文档图片布局与语义信息。
 
 * **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
-  * 💎 NLP工具：**[NLP 流水线系统 Pipelines](./pipelines)** 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 🔨 🍭产业应用：新增 **[文本分类全流程应用方案](./applications/text_classification)** ，覆盖多分类、多标签、层次分类各类场景，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优。
-  * 💪 框架升级：[**模型自动压缩 API**](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[**小样本 Prompt**](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
+  * 💎 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
+  * 🔨 🍭产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持 小样本学习 和 TrustAI 可信计算模型训练与调优。
+  * 💪 框架升级：[模型自动压缩 API](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[小样本 Prompt](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
 
 ## 社区交流
