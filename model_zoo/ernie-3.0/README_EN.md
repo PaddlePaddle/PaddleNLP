@@ -2,27 +2,27 @@
 # ERNIE 3.0 Lightweight Model
 
  **Directory**
-   * [ERNIE Tiny 3.0 Introduction](#ERNIE Tiny 3.0 Introduction)
-       * [Online Distillation Technology](#Online Distillation Technology)
-   * [Model Effects](#Model Effect)
-   * [Fine-tuning](#Fine-tuning)
-   * [Model Compression](#Model Compression)
-       * [Environment Dependencies](#Environment Dependencies)
-       * [Model Compression API](#Model Compression API )
-       * [Compression Effect](#Compression Effect)
-           * [Accuracy Test](#Accuracy Test)
-           * [Performance Test](#Performance Test)
-               * [CPU Performance](#CPU Performance)
-               * [GPU Performance](#CPU Performance)
-   * [Speed Up with FasterTokenizer](#Speed Up with FasterTokenizer)
-   * [Deployment](#Deployment)
-       * [Python Deployment](#Python Deployment)
-       * [Service Deployment](#Service Deployment)
-       * [Paddle2ONNX Deployment](#Paddle2ONNX Deployment)
-   * [Notebook Guide](#Notebook Guide)
-   * [References](#References)
+   * [ERNIE Tiny 3.0 Introduction](#模型介绍)
+       * [Online Distillation Technology](#在线蒸馏技术)
+   * [Model Effects](#模型效果)
+   * [Fine-tuning](#微调)
+   * [Model Compression](#模型压缩)
+       * [Environment Dependencies](#环境依赖)
+       * [Model Compression API](#模型压缩API使用)
+       * [Compression Effect](#压缩效果)
+           * [Accuracy Test](#精度测试)
+           * [Performance Test](#性能测试)
+               * [CPU Performance](#CPU性能)
+               * [GPU Performance](#CPU性能)
+   * [Speed Up with FasterTokenizer](#使用FasterTokenizer加速)
+   * [Deployment](#部署)
+       * [Python Deployment](#Python部署)
+       * [Service Deployment](#服务化部署)
+       * [Paddle2ONNX Deployment](#Paddle2ONNX部署)
+   * [Notebook Guide](#Notebook教程)
+   * [References](#参考文献)
 
-<a name="ERNIE Tiny 3.0 Introduction"></a>
+<a name="模型介绍"></a>
 
 ## ERNIE Tiny 3.0 Introduction
 
@@ -30,7 +30,7 @@ ERNIE Tiny Models are lightweight models obtained from Wenxin large model ERNIE 
 
 For a detailed explanation of related technologies, please refer to the article [解析全球最大中文单体模型鹏城-百度·文心技术细节](https://www.jiqizhixin.com/articles/2021-12-08-9)
 
-<a name="Online Distillation Technology"></a>
+<a name="在线蒸馏技术"></a>
 
 ### Online Distillation Technology
 
@@ -46,7 +46,7 @@ For more technical details, please refer to the paper:
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168516904-3fff73e0-010d-4bef-adc1-4d7c97a9c6ff.png" title="ERNIE 3.0 Online Distillation">
 </p>
 
-<a name="Model Effects"></a>
+<a name="模型效果"></a>
 
 ## Model Effects
 
@@ -61,7 +61,7 @@ ERNIE Tiny 3.0 open sources five models: **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Me
 
 Below is the precision-latency graph of the small Chinese models in PaddleNLP. The abscissa represents the latency (unit: ms) tested on CLUE IFLYTEK dataset (maximum sequence length is set to 128), and the ordinate is the average accuracy on 10 CLUE tasks (including text classification, text matching, natural language inference, Pronoun disambiguation, machine reading comprehension and other tasks), among which the metric of CMRC2018 is Exact Match (EM), and the metric of other tasks is Accuracy. The closer the model to the top left in the figure, the higher the level of accuracy and performance.The top left model in the figure has the highest level of accuracy and performance.
 
-The number of parameters of the model are marked under the model name in the figure. For the test environment, see [performance test](#performance test) in details.
+The number of parameters of the model are marked under the model name in the figure. For the test environment, see [performance test](#性能测试) in details.
 
 precision-latency graph under CPU (number of threads: 1 and 8), batch_size = 32：
 
@@ -1312,7 +1312,7 @@ The following is the directory structure and description of this project:：
 
 ```
 
-<a name="Fine-tuning"></a>
+<a name="微调"></a>
 
 ## Fine-tuning
 
@@ -1369,13 +1369,13 @@ python run_qa.py \
     --max_seq_length 512
 ```
 
-<a name="Model Compression"></a>
+<a name="模型压缩"></a>
 
 ## Model Compression
 
 Although ERNIE 3.0 has provided effective 6-layer and 4-layer lightweight models that can be used directly after fine-tuning, models need to be compressed if models require further deployment and release. You can use the model compression plans and API to compress the fine-tuned models.
 
-<a name="Environment Dependencies"></a>
+<a name="环境依赖"></a>
 
 ### Environment Dependencies
 
@@ -1385,7 +1385,7 @@ Paddleslim package needs to be installed to use cropping
 pip install paddleslim
 ```
 
-<a name="Model Compression API"></a>
+<a name="模型压缩API使用"></a>
 
 ### Model Compression API
 
@@ -1474,11 +1474,11 @@ python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/h
 The --model_path parameter requires the path and prefix of the static graph model.
 
 
-<a name="Compression Effect"></a>
+<a name="压缩效果"></a>
 
 ### Compression Effect
 
-<a name="Accuracy Test"></a>
+<a name="精度测试"></a>
 
 #### Accuracy Test
 
@@ -1496,7 +1496,7 @@ In this case, we use compression API to compress ERNIE 3.0-Medium models fine-tu
 **Evaluation indicators：** the indicator of CLUE classification tasks (AFQMC semantic similarity, TNEWS text classification, IFLYTEK long text classification, CMNLI natural language inference, OCNLI natural language inference, CLUEWSC2020 pronoun disambiguation, CSL paper keyword identification) is Accuracy; The indicator of the reading comprehension task CLUE CMRC2018 is EM (Exact Match)/F1-Score, and EM is used to calculate the average; The indicator of the sequence labeling task MSRA_NER is Precision/Recall/F1-Score, and F1-Score is used to calculate the average.
 According to the table, the accuracy of `ERNIE 3.0-Medium` models decreases by 0.46 on average with a decrease of 0.17 after pruning and 0.77 after quantization.
 
-<a name="Performance Testing"></a>
+<a name="性能测试"></a>
 
 #### Performance Test
 
@@ -1516,7 +1516,7 @@ The configuration is as follows：
 
 7. The unit of accuracy data: Accuracy for text classification, F1-Score for sequence labeling, and EM (Exact Match) for reading comprehension.
 
-<a name="CPU performance"></a>
+<a name="CPU性能"></a>
 
 ##### CPU performance
 
@@ -1533,7 +1533,7 @@ The testing environment is as above. The number of threads is set to 12 when tes
 After the same compression, the speedup ratio of three types of tasks (text classification, token classification, and question answering) reaches about 2.3.
 
 
-<a name="GPU performance"></a>
+<a name="GPU性能"></a>
 
 #####  GPU performance
 
@@ -1549,7 +1549,7 @@ After the same compression, the speedup ratio of three types of tasks (text clas
 
 After pruning and quantization, the speedup ratio of the three types of tasks (text classification, token classification, and question answering) reaches about 3, and the average accuracy loss of all tasks can be controlled within 0.5 (0.46).
 
-<a name="Speed Up with FasterTokenizer"></a>
+<a name="使用FasterTokenizer加速"></a>
 
 ### Speed Up with FasterTokenizer
 
@@ -1588,7 +1588,7 @@ from paddlenlp.transformers import AutoTokenizer
 AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
 
-<a name="Deployment"></a>
+<a name="部署"></a>
 
 ## Deployment
 We provide various deployment scenarios for ERNIE 3.0, which can meet the deployment requirements in different tasks, please choose according to the actual situation:
@@ -1597,20 +1597,20 @@ We provide various deployment scenarios for ERNIE 3.0, which can meet the deploy
         <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
 </p>
 
-<a name="Python Deployment"></a>
+<a name="Python部署"></a>
 
 ### Python Deployment
 
 For Python deployment, please refer to: [Python Deployment Guide](./deploy/python/README.md)
 
-<a name="Service Deployment"></a>
+<a name="服务化部署"></a>
 
 ### Service Deployment
 
 - [Triton Inference Server Service-oriented Deployment Guide](./deploy/triton/README.md)
 - [Paddle Serving Service-oriented Deployment Guide](./deploy/serving/README.md)
 
-<a name="Paddle2ONNX Deployment"></a>
+<a name="Paddle2ONNX部署"></a>
 
 ### Paddle2ONNX Deployment
 
@@ -1622,7 +1622,7 @@ For ONNX Export and ONNXRuntime deployment,please refer to [ONNX Export and ONNX
 Coming soon!
 
 
-<a name="References"></a>
+<a name="参考文献"></a>
 
 
 ## Notebook Guide
