@@ -1376,7 +1376,7 @@ python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc 
 python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml
 
 # 阅读理解任务
-python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml
+python run_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml
 ```
 
 
@@ -1561,13 +1561,14 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 ### Python 部署
 
-Python部署请参考：[Python 部署指南](./deploy/python/README.md)
+Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
 
 <a name="服务化部署"></a>
 
 ### 服务化部署
 
 - [Triton Inference Server 服务化部署指南](./deploy/triton/README.md)
+- [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/)
 
 
 <a name="参考文献"></a>
