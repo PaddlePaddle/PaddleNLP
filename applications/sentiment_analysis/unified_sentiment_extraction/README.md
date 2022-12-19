@@ -849,6 +849,7 @@ paddlenlp.Taskflow装载定制模型，通过task_path指定模型权重文件�
 
 ## **6. 模型部署**
 
+### **6.1 基于SimpleServer进行服务化部署**
 本项目支持基于PaddleNLP SimpleServing进行服务化部署，可以在`deploy`目录下执行以下命令启动服务和请求。
 
 **启动服务**
@@ -872,3 +873,7 @@ senta2 = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base", d
 
 app.register_taskflow('senta', [senta1, senta2])
 ```
+
+### **6.2 基于Pipeline进行部署**
+
+本项目支持基于Pipeline的方式进行部署，用户只需要上传测试文件，即可获取对应的情感分析可视化结果，更多信息请参考[情感分析Pipeline](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/sentiment_analysis)。
