@@ -1493,7 +1493,7 @@ In this case, we use compression API to compress ERNIE 3.0-Medium models fine-tu
 | ERNIE 3.0-Medium+pruning+quantization+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+quantization+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
-**Evaluation indicators：** the indicator of CLUE classification tasks (AFQMC semantic similarity, TNEWS text classification, IFLYTEK long text classification, CMNLI natural language inference, OCNLI natural language inference, CLUEWSC2020 pronoun disambiguation, CSL paper keyword identification) is Accuracy; The indicator of the reading comprehension task CLUE CMRC2018 is EM (Exact Match)/F1-Score, and EM is used to calculate the average; The indicator of the sequence labeling task MSRA_NER is Precision/Recall/F1-Score, and F1-Score is used to calculate the average.
+**Evaluation Indicators：** the indicator of CLUE classification tasks (AFQMC semantic similarity, TNEWS text classification, IFLYTEK long text classification, CMNLI natural language inference, OCNLI natural language inference, CLUEWSC2020 pronoun disambiguation, CSL paper keyword identification) is Accuracy; The indicator of the reading comprehension task CLUE CMRC2018 is EM (Exact Match)/F1-Score, and EM is used to calculate the average; The indicator of the sequence labeling task MSRA_NER is Precision/Recall/F1-Score, and F1-Score is used to calculate the average.
 According to the table, the accuracy of `ERNIE 3.0-Medium` models decreases by 0.46 on average with a decrease of 0.17 after pruning and 0.77 after quantization.
 
 <a name="性能测试"></a>
@@ -1518,7 +1518,7 @@ The configuration is as follows：
 
 <a name="CPU性能"></a>
 
-##### CPU performance
+##### CPU Performance
 
 The testing environment is as above. The number of threads is set to 12 when testing CPU performance.
 
@@ -1535,7 +1535,7 @@ After the same compression, the speedup ratio of three types of tasks (text clas
 
 <a name="GPU性能"></a>
 
-#####  GPU performance
+#####  GPU Performance
 
 |                            | TNEWS Performance    | TNEWS Accuracy   | MSRA_NER Performance | MSRA_NER Accuracy | CMRC2018 Performance | CMRC2018 Accuracy |
 | -------------------------- | ------------- | ------------ | ------------- | ------------- | ------------- | ------------- |
@@ -1617,7 +1617,7 @@ For Python deployment, please refer to: [Python Deployment Guide](./deploy/pytho
 For ONNX Export and ONNXRuntime deployment,please refer to [ONNX Export and ONNXRuntime Deployment Guide](./deploy/paddle2onnx/README.md)
 
 
-### Paddle Lite Mobile deployment
+### Paddle Lite Mobile Deployment
 
 Coming soon!
 
