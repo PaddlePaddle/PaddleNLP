@@ -62,7 +62,7 @@ class NERPostHandler(BasePostHandler):
 app = SimpleServer()
 app.register(
     "ernie_ner",
-    model_path="../../best_models/msra_ner/msra_ner/export/",
+    model_path="../../best_models/msra_ner/export/",
     tokenizer_name="ernie-3.0-medium-zh",
     model_handler=TokenClsModelHandler,
     post_handler=NERPostHandler,

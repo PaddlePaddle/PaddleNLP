@@ -237,35 +237,6 @@ class QuestionAnsweringTrainer(Trainer):
         return PredictionOutput(predictions=predictions.predictions, label_ids=predictions.label_ids, metrics=metrics)
 
 
-# class Dict(object):
-#
-#    def __init__(self, fn):
-#        assert isinstance(fn, (dict)), 'Input pattern not understood. The input of Dict must be a dict with key of input column name and value of collate_fn ' \
-#                                   'Received fn=%s' % (str(fn))
-#
-#        self._fn = fn
-#
-#        for col_name, ele_fn in self._fn.items():
-#            assert callable(
-#                ele_fn
-#            ), 'Batchify functions must be callable! type(fn[%d]) = %s' % (
-#                col_name, str(type(ele_fn)))
-#
-#    def __call__(self, data):
-#
-#        ret = {}
-#        if len(data) <= 0:
-#            return ret
-#
-#        for col_name, ele_fn in self._fn.items():
-#            # skip unused col_name, such as labels in test mode.
-#            if col_name not in data[0].keys():
-#                continue
-#            result = ele_fn([ele[col_name] for ele in data])
-#            ret[col_name] = result
-#
-#        return ret
-
 # Data pre-process function for clue benchmark datatset
 def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512, **kwargs):
     """convert a glue example into necessary features"""
