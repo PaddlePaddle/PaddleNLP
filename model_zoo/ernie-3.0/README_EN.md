@@ -1487,9 +1487,9 @@ In this case, we use compression API to compress ERNIE 3.0-Medium models fine-tu
 | ------------------------------- | ----- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------- |
 | ERNIE 3.0-Medium                | 74.87 | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.95/87.15 | 92.65/93.43/93.04 |
 | ERNIE 3.0-Medium+FP16           | 74.87 | 75.32 | 57.45 | 60.22   | 81.16 | 77.22 | 80.59       | 81.90 | 66.95/87.16 | 92.65/93.45/93.05 |
-| ERNIE 3.0-Medium+clipping+FP32      | 74.70 | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.92/86.43 | 93.10/93.43/93.27 |
-| ERNIE 3.0-Medium+clipping+FP16      | 74.71 | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 81.73 | 65.89/86.44 | 93.10/93.43/93.27 |
-| ERNIE 3.0-Medium+clipping+quantization+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
+| ERNIE 3.0-Medium+cropping+FP32      | 74.70 | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.92/86.43 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+cropping+FP16      | 74.71 | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 81.73 | 65.89/86.44 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+cropping+quantization+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+quantization+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
 **Evaluation indicators：** the indicator of CLUE classification tasks (AFQMC semantic similarity, TNEWS text classification, IFLYTEK long text classification, CMNLI natural language inference, OCNLI natural language inference, CLUEWSC2020 pronoun disambiguation, CSL paper keyword identification) is Accuracy; The indicator of the reading comprehension task CLUE CMRC2018 is EM (Exact Match)/F1-Score, and EM is used to calculate the average; The indicator of the sequence labeling task MSRA_NER is Precision/Recall/F1-Score, and F1-Score is used to calculate the average.
@@ -1525,8 +1525,8 @@ The testing environment is as above. The number of threads is set to 12 when tes
 | -------------------------- | ------------ | ------------ | ------------- | ------------- | ------------- | ------------- |
 | ERNIE 3.0-Medium+FP32      | 311.95(1.0X) | 57.45        | 90.91(1.0x)   | 93.04         | 33.74(1.0x)   | 66.95         |
 | ERNIE 3.0-Medium+INT8      | 600.35(1.9x) | 56.57(-0.88) | 141.00(1.6x)  | 92.64(-0.40)  | 56.51(1.7x)   | 66.23(-0.72)  |
-| ERNIE 3.0-Medium+clipping+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23)  | 48.47(1.4x)   | 65.55(-1.40)  |
-| ERNIE 3.0-Medium+clipping+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
+| ERNIE 3.0-Medium+cropping+FP32 | 408.65(1.3x) | 57.31(-0.14) | 122.13(1.3x)  | 93.27(+0.23)  | 48.47(1.4x)   | 65.55(-1.40)  |
+| ERNIE 3.0-Medium+cropping+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
 
 
 After the same compression, the speedup ratio of three types of tasks (classification, sequence labeling, and reading comprehension) reaches about 2.3.
@@ -1541,9 +1541,9 @@ After the same compression, the speedup ratio of three types of tasks (classific
 | ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04         | 146.84(1.0x)  | 66.95         |
 | ERNIE 3.0-Medium+FP16      | 2672.41(2.4x) | 57.45(0.00)  | 840.11(2.3x)  | 93.05(0.01)   | 303.43(2.1x)  | 66.95(0.00)   |
 | ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63   |
-| ERNIE 3.0-Medium+clipping+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
-| ERNIE 3.0-Medium+clipping+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23)  | 445.71(3.0x)  | 65.89(-1.06)  |
-| ERNIE 3.0-Medium+clipping+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
+| ERNIE 3.0-Medium+cropping+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
+| ERNIE 3.0-Medium+cropping+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23)  | 445.71(3.0x)  | 65.89(-1.06)  |
+| ERNIE 3.0-Medium+cropping+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
 
 After clipping and quantization, the speedup ratio of the three types of tasks (classification, sequence labeling, and reading comprehension) reaches about 3, and the average accuracy loss of all tasks can be controlled within 0.5 (0.46).
