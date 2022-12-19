@@ -124,7 +124,6 @@ def generate_input_spec(model, dataset):
         if key in model_para_keys and key not in ("labels", "start_positions", "end_positions"):
             input_num += 1
     input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64") for i in range(input_num)]
-    # print("input_num", input_num)
     return input_spec
 
 
@@ -760,8 +759,10 @@ def _quant_embeddings(self, input_prefix):
 
     quant_emb_program = quant.quant_embedding(main_program, place, config)
 
+    input_dir = os.path.dirname(input_prefix)
+
     paddle.fluid.io.save_inference_model(
-        self.args.output_dir,
+        input_dir,
         feed_target_names,
         fetch_targets,
         exe,
