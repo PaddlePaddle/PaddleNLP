@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-from tqdm import tqdm
-from collections import defaultdict
-
 
 def load_dict(dict_path):
     with open(dict_path, "r", encoding="utf-8") as f:
@@ -26,35 +22,28 @@ def load_dict(dict_path):
         return word2id, id2word
 
 
-def read(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            text, label = line.split("\t")
-            text = text[:-1] if text[-1] == "\n" else text
-            label = label[:-1] if label[-1] == "\n" else label
-            label = label.split(" ")
-            text = list(text)
-            assert len(text) == len(label), f"{text},  {label}"
-            example = {"text": text, "label": label}
-
-            yield example
-
-
 def convert_example_to_feature(example, tokenizer, label2id, max_seq_len=512, is_test=False):
-    encoded_inputs = tokenizer(
-        list(example["text"]), is_split_into_words=True, max_seq_len=max_seq_len, return_length=True
-    )
-
+    example = example["text"].rstrip().split("\t")
+    text = list(example[0])
     if not is_test:
-        label = (
-            [label2id["O"]]
-            + [label2id[label_term] for label_term in example["label"]][: (max_seq_len - 2)]
-            + [label2id["O"]]
+        label = example[1].split(" ")
+        assert len(text) == len(label)
+        new_text = []
+        new_label = []
+        for text_ch, label_ch in zip(text, label):
+            if text_ch.strip():
+                new_text.append(text_ch)
+                new_label.append(label_ch)
+        new_label = (
+            [label2id["O"]] + [label2id[label_term] for label_term in new_label][: (max_seq_len - 2)] + [label2id["O"]]
         )
-
+        encoded_inputs = tokenizer(new_text, is_split_into_words="token", max_seq_len=max_seq_len, return_length=True)
+        encoded_inputs["labels"] = new_label
         assert len(encoded_inputs["input_ids"]) == len(
-            label
-        ), f"input_ids: {len(encoded_inputs['input_ids'])}, label: {len(label)}"
-        return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"], label
+            new_label
+        ), f"input_ids: {len(encoded_inputs['input_ids'])}, label: {len(new_label)}"
+    else:
+        new_text = [text_ch for text_ch in text if text_ch.strip()]
+        encoded_inputs = tokenizer(new_text, is_split_into_words="token", max_seq_len=max_seq_len, return_length=True)
 
-    return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"]
+    return encoded_inputs

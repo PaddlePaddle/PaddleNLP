@@ -14,18 +14,18 @@
 
 import argparse
 import os
-import sys
-from functools import partial
-import numpy as np
 import time
-import paddle
-from paddle import inference
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import PPMiniLMTokenizer
-from paddlenlp.metrics import AccuracyAndF1
+from functools import partial
 
-from data import read, load_dict, convert_example_to_feature
+import numpy as np
+import paddle
+from data import convert_example_to_feature, load_dict
+from datasets import load_dataset
+from paddle import inference
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.metrics import AccuracyAndF1
+from paddlenlp.transformers import PPMiniLMTokenizer
 
 
 class Predictor(object):
@@ -108,8 +108,8 @@ class Predictor(object):
         for i, data in enumerate(data_loader):
             if i < args.perf_warmup_steps:  # skip warmup steps.
                 continue
-            output = self.predict_batch([data[0], data[1]])
-            logits = paddle.to_tensor(output)
+            output = self.predict_batch([data["input_ids"], data["token_type_ids"]])
+            paddle.to_tensor(output)
 
         used_time = time.time() - start_time
         return used_time
@@ -139,24 +139,18 @@ if __name__ == "__main__":
     paddle.seed(42)
 
     label2id, id2label = load_dict(args.label_path)
-    test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
+    datasets = load_dataset("text", data_files={"test": args.test_path})
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len, is_test=False
     )
-    test_ds = test_ds.map(trans_func, lazy=True)
+    test_ds = datasets["test"].map(trans_func, batched=False, remove_columns=["text"])
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
-        Stack(dtype="int64"),  # seq_len
-        Stack(dtype="int64"),  # label
-    ): fn(samples)
-
+    data_collator = DataCollatorWithPadding(tokenizer, padding=True)
     batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
     data_loader = paddle.io.DataLoader(
-        dataset=test_ds, batch_sampler=batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+        dataset=test_ds, batch_sampler=batch_sampler, collate_fn=data_collator, num_workers=0, return_list=True
     )
 
     predictor = Predictor(args)

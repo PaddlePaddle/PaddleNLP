@@ -12,25 +12,34 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
-sys.path.append("../")
-
-import os
 import argparse
+import os
+import random
 import warnings
 from functools import partial
+
+import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.metrics.glue import AccuracyAndF1
-from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.transformers import PPMiniLMForSequenceClassification, PPMiniLMTokenizer, LinearDecayWithWarmup
+from data import convert_example_to_feature, load_dict
+from datasets import load_dataset
 from evaluate import evaluate
-from utils import set_seed
-from data import read, load_dict, convert_example_to_feature
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.metrics.glue import AccuracyAndF1
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    PPMiniLMForSequenceClassification,
+    PPMiniLMTokenizer,
+)
 
 warnings.filterwarnings("ignore")
+
+
+def set_seed(seed):
+    paddle.seed(seed)
+    random.seed(seed)
+    np.random.seed(seed)
 
 
 def train():
@@ -43,27 +52,21 @@ def train():
 
     # load and process data
     label2id, id2label = load_dict(args.label_path)
-    train_ds = load_dataset(read, data_path=args.train_path, lazy=False)
-    dev_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
+    datasets = load_dataset("text", data_files={"train": args.train_path, "dev": args.dev_path})
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len
     )
-    train_ds = train_ds.map(trans_func, lazy=False)
-    dev_ds = dev_ds.map(trans_func, lazy=False)
+    train_ds = datasets["train"].map(trans_func, batched=False, remove_columns=["text"])
+    dev_ds = datasets["dev"].map(trans_func, batched=False, remove_columns=["text"])
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
-        Stack(dtype="int64"),
-        Stack(dtype="int64"),
-    ): fn(samples)
+    data_collator = DataCollatorWithPadding(tokenizer, padding=True)
 
     train_batch_sampler = paddle.io.BatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
     dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
-    train_loader = paddle.io.DataLoader(train_ds, batch_sampler=train_batch_sampler, collate_fn=batchify_fn)
-    dev_loader = paddle.io.DataLoader(dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn)
+    train_loader = paddle.io.DataLoader(train_ds, batch_sampler=train_batch_sampler, collate_fn=data_collator)
+    dev_loader = paddle.io.DataLoader(dev_ds, batch_sampler=dev_batch_sampler, collate_fn=data_collator)
 
     # configure model training
     model = PPMiniLMForSequenceClassification.from_pretrained(args.base_model_name, num_classes=len(label2id))
@@ -89,8 +92,11 @@ def train():
     model.train()
     for epoch in range(1, args.num_epochs + 1):
         for batch_data in train_loader():
-            input_ids, token_type_ids, _, labels = batch_data
-            # logits: batch_size, seql_len, num_tags
+            input_ids, token_type_ids, labels = (
+                batch_data["input_ids"],
+                batch_data["token_type_ids"],
+                batch_data["labels"],
+            )
             logits = model(input_ids, token_type_ids=token_type_ids)
             loss = F.cross_entropy(logits, labels)
 

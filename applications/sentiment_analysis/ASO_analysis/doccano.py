@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import json
 import argparse
+import json
+import os
+
 import numpy as np
-from utils import decoding, concate_aspect_and_opinion, save_examples, save_dict
+from utils import concate_aspect_and_opinion, decoding, save_dict, save_examples
 
 
 def doccano2SA(doccano_file, save_ext_dir, save_cls_dir, splits=[0.8, 0.9], is_shuffle=True):

@@ -13,10 +13,15 @@
 # limitations under the License.
 
 import argparse
+
 import paddle
-from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
 from utils import decoding, load_dict
-from seqeval.metrics.sequence_labeling import get_entities
+
+from paddlenlp.transformers import (
+    SkepForSequenceClassification,
+    SkepForTokenClassification,
+    SkepTokenizer,
+)
 
 
 def is_aspect_first(text, aspect, opinion_word):

@@ -12,25 +12,138 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
-sys.path.append("../")
-
-import os
-import json
-import copy
 import argparse
-import numpy as np
-from functools import partial
+import copy
+import json
+import os
 from collections import defaultdict
+from functools import partial
+
 import paddle
+from datasets import Dataset, load_dataset
 from paddle import inference
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.data import Stack, Tuple, Pad
+from seqeval.metrics.sequence_labeling import get_entities
+
+from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithPadding
 from paddlenlp.transformers import SkepTokenizer
-from utils import decoding, read_test_file, load_dict
-from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
-from classification.data import convert_example_to_feature as convert_example_to_feature_cls
+
+
+def load_dict(dict_path):
+    with open(dict_path, "r", encoding="utf-8") as f:
+        words = [word.strip() for word in f.readlines()]
+        word2id = dict(zip(words, range(len(words))))
+        id2word = dict((v, k) for k, v in word2id.items())
+
+        return word2id, id2word
+
+
+def read_test_file(data_path):
+    with open(data_path, "r", encoding="utf-8") as f:
+        for line in f.readlines():
+            line = line.strip().replace(" ", "")
+            yield {"text": line}
+
+
+def decoding(text, tag_seq):
+    assert len(text) == len(tag_seq), f"text len: {len(text)}, tag_seq len: {len(tag_seq)}"
+
+    puncs = list(",.?;!，。？；！")
+    splits = [idx for idx in range(len(text)) if text[idx] in puncs]
+
+    prev = 0
+    sub_texts, sub_tag_seqs = [], []
+    for i, split in enumerate(splits):
+        sub_tag_seqs.append(tag_seq[prev:split])
+        sub_texts.append(text[prev:split])
+        prev = split
+    sub_tag_seqs.append(tag_seq[prev:])
+    sub_texts.append((text[prev:]))
+
+    ents_list = []
+    for sub_text, sub_tag_seq in zip(sub_texts, sub_tag_seqs):
+        ents = get_entities(sub_tag_seq, suffix=False)
+        ents_list.append((sub_text, ents))
+
+    aps = []
+    no_a_words = []
+    for sub_tag_seq, ent_list in ents_list:
+        sub_aps = []
+        sub_no_a_words = []
+        for ent in ent_list:
+            ent_name, start, end = ent
+            if ent_name == "Aspect":
+                aspect = sub_tag_seq[start : end + 1]
+                sub_aps.append([aspect])
+                if len(sub_no_a_words) > 0:
+                    sub_aps[-1].extend(sub_no_a_words)
+                    sub_no_a_words.clear()
+            else:
+                ent_name == "Opinion"
+                opinion = sub_tag_seq[start : end + 1]
+                if len(sub_aps) > 0:
+                    sub_aps[-1].append(opinion)
+                else:
+                    sub_no_a_words.append(opinion)
+
+        if sub_aps:
+            aps.extend(sub_aps)
+            if len(no_a_words) > 0:
+                aps[-1].extend(no_a_words)
+                no_a_words.clear()
+        elif sub_no_a_words:
+            if len(aps) > 0:
+                aps[-1].extend(sub_no_a_words)
+            else:
+                no_a_words.extend(sub_no_a_words)
+
+    if no_a_words:
+        no_a_words.insert(0, "None")
+        aps.append(no_a_words)
+
+    return aps
+
+
+def convert_example_to_feature_ext(example, tokenizer, label2id, max_seq_len=512, is_test=False):
+    example = example["text"].rstrip().split("\t")
+    text = list(example[0])
+    if not is_test:
+        label = example[1].split(" ")
+        assert len(text) == len(label)
+        new_text = []
+        new_label = []
+        for text_ch, label_ch in zip(text, label):
+            if text_ch.strip():
+                new_text.append(text_ch)
+                new_label.append(label_ch)
+        new_label = (
+            [label2id["O"]] + [label2id[label_term] for label_term in new_label][: (max_seq_len - 2)] + [label2id["O"]]
+        )
+        encoded_inputs = tokenizer(new_text, is_split_into_words="token", max_seq_len=max_seq_len, return_length=True)
+        encoded_inputs["labels"] = new_label
+        assert len(encoded_inputs["input_ids"]) == len(
+            new_label
+        ), f"input_ids: {len(encoded_inputs['input_ids'])}, label: {len(new_label)}"
+    else:
+        new_text = [text_ch for text_ch in text if text_ch.strip()]
+        encoded_inputs = tokenizer(new_text, is_split_into_words="token", max_seq_len=max_seq_len, return_length=True)
+
+    return encoded_inputs
+
+
+def convert_example_to_feature_cls(example, tokenizer, label2id, max_seq_len=512, is_test=False):
+    example = example["text"].rstrip().split("\t")
+    if not is_test:
+        label = int(example[0])
+        aspect_text = example[1]
+        text = example[2]
+        encoded_inputs = tokenizer(aspect_text, text_pair=text, max_seq_len=max_seq_len, return_length=True)
+        encoded_inputs["label"] = label
+    else:
+        aspect_text = example[0]
+        text = example[1]
+        encoded_inputs = tokenizer(aspect_text, text_pair=text, max_seq_len=max_seq_len, return_length=True)
+
+    return encoded_inputs
 
 
 class Predictor(object):
@@ -88,7 +201,7 @@ class Predictor(object):
         return predictor, input_handles, output_handle
 
     def predict_ext(self, args):
-        ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
+        datasets = load_dataset("text", data_files={"test": args.test_path})
         trans_func = partial(
             convert_example_to_feature_ext,
             tokenizer=self.tokenizer,
@@ -96,20 +209,20 @@ class Predictor(object):
             max_seq_len=args.ext_max_seq_len,
             is_test=True,
         )
-        test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
-        batch_list = [test_ds[idx : idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
-
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
-            Stack(dtype="int64"),
-        ): fn(samples)
+        test_ds = copy.copy(datasets["test"]).map(trans_func, batched=False, remove_columns=["text"])
+        data_collator = DataCollatorForTokenClassification(self.tokenizer, label_pad_token_id=self.ext_label2id["O"])
+        test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+        test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=data_collator)
 
         results = []
-        for bid, batch_data in enumerate(batch_list):
-            input_ids, token_type_ids, seq_lens = batchify_fn(batch_data)
-            self.ext_input_handles[0].copy_from_cpu(input_ids)
-            self.ext_input_handles[1].copy_from_cpu(token_type_ids)
+        for bid, batch_data in enumerate(test_loader):
+            input_ids, token_type_ids, seq_lens = (
+                batch_data["input_ids"],
+                batch_data["token_type_ids"],
+                batch_data["seq_len"],
+            )
+            self.ext_input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.ext_input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.ext_predictor.run()
             logits = self.ext_output_hanle.copy_to_cpu()
 
@@ -117,7 +230,7 @@ class Predictor(object):
             for eid, (seq_len, prediction) in enumerate(zip(seq_lens, predictions)):
                 idx = bid * args.batch_size + eid
                 tag_seq = [self.ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
-                text = ori_test_ds[idx]["text"]
+                text = datasets["test"][idx]["text"]
                 aps = decoding(text[: args.ext_max_seq_len - 2], tag_seq)
                 for aid, ap in enumerate(aps):
                     aspect, opinions = ap[0], list(set(ap[1:]))
@@ -131,10 +244,17 @@ class Predictor(object):
                             "aspect_text": aspect_text,
                         }
                     )
+
         return results
 
     def predict_cls(self, args, ext_results):
-        test_ds = MapDataset(ext_results)
+        text_list = []
+        for result in ext_results:
+            example = result["aspect_text"] + "\t" + result["text"]
+            text_list.append(example)
+        ext_results = {"text": text_list}
+
+        dataset = Dataset.from_dict(ext_results)
         trans_func = partial(
             convert_example_to_feature_cls,
             tokenizer=self.tokenizer,
@@ -142,20 +262,17 @@ class Predictor(object):
             max_seq_len=args.cls_max_seq_len,
             is_test=True,
         )
-        test_ds = test_ds.map(trans_func, lazy=False)
-        batch_list = [test_ds[idx : idx + args.batch_size] for idx in range(0, len(test_ds), args.batch_size)]
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),
-            Stack(dtype="int64"),
-        ): fn(samples)
+        test_ds = dataset.map(trans_func, batched=False, remove_columns=["text"])
+        data_collator = DataCollatorWithPadding(self.tokenizer, padding=True)
+        test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
+        test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=data_collator)
 
         results = []
-        for batch_data in batch_list:
-            input_ids, token_type_ids, _ = batchify_fn(batch_data)
-            self.cls_input_handles[0].copy_from_cpu(input_ids)
-            self.cls_input_handles[1].copy_from_cpu(token_type_ids)
+        for batch_data in test_loader:
+            input_ids, token_type_ids = batch_data["input_ids"], batch_data["token_type_ids"]
+            self.cls_input_handles[0].copy_from_cpu(input_ids.numpy())
+            self.cls_input_handles[1].copy_from_cpu(token_type_ids.numpy())
             self.cls_predictor.run()
             logits = self.cls_output_hanle.copy_to_cpu()
 
@@ -226,7 +343,7 @@ if __name__ == "__main__":
     parser.add_argument("--ext_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for extraction model.")
     parser.add_argument("--cls_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for classification model.")
     parser.add_argument("--use_tensorrt", action='store_true', help="Whether to use inference engin TensorRT.")
-    parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"],help='The tensorrt precision.')
+    parser.add_argument("--precision", default="fp32", type=str, choices=["fp32", "fp16", "int8"], help='The tensorrt precision.')
     parser.add_argument("--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference.")
     parser.add_argument('--cpu_threads', default=10, type=int, help='Number of threads to predict when using cpu.')
     parser.add_argument('--enable_mkldnn', default=False, type=eval, choices=[True, False], help='Enable to use mkldnn to speed up when using cpu.')

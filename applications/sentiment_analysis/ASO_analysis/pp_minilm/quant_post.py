@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-import os
-import time
 import argparse
-import numpy as np
 from functools import partial
 
 import paddle
 import paddleslim
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.datasets import load_dataset
+from data import convert_example_to_feature, load_dict
+from datasets import load_dataset
+
+from paddlenlp.data import Pad
 from paddlenlp.transformers import PPMiniLMTokenizer
-from data import convert_example_to_feature, read, load_dict
 
 
 def quant_post(args):
@@ -32,19 +29,19 @@ def quant_post(args):
     exe = paddle.static.Executor(place)
 
     label2id, id2label = load_dict(args.label_path)
-    train_ds = load_dataset(read, data_path=args.dev_path, lazy=False)
+    datasets = load_dataset("text", data_files={"dev": args.dev_path})
 
     tokenizer = PPMiniLMTokenizer.from_pretrained(args.base_model_name)
     trans_func = partial(
         convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len
     )
-    train_ds = train_ds.map(trans_func, lazy=True)
+    dev_ds = datasets["dev"].map(trans_func, batched=False, remove_columns=["text"])
 
     def batch_generator_func():
         batch_data = [[], []]
-        for data in train_ds:
-            batch_data[0].append(data[0])
-            batch_data[1].append(data[1])
+        for data in dev_ds:
+            batch_data[0].append(data["input_ids"])
+            batch_data[1].append(data["token_type_ids"])
             if len(batch_data[0]) == args.batch_size:
                 input_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[0])
                 segment_ids = Pad(axis=0, pad_val=0, dtype="int64")(batch_data[1])

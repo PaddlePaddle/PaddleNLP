@@ -13,22 +13,29 @@
 # limitations under the License.
 
 import argparse
-from tqdm import tqdm
 from functools import partial
+
 import paddle
-from paddlenlp.data import Pad, Stack, Tuple
+from data import convert_example_to_feature, load_dict
+from datasets import load_dataset
+from tqdm import tqdm
+
+from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.metrics import ChunkEvaluator
-from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import SkepForTokenClassification, SkepTokenizer
-from data import read, load_dict, convert_example_to_feature
 
 
 def evaluate(model, data_loader, metric):
 
     model.eval()
     metric.reset()
-    for idx, batch_data in tqdm(enumerate(data_loader)):
-        input_ids, token_type_ids, seq_lens, labels = batch_data
+    for batch_data in tqdm(data_loader):
+        input_ids, token_type_ids, seq_lens, labels = (
+            batch_data["input_ids"],
+            batch_data["token_type_ids"],
+            batch_data["seq_len"],
+            batch_data["labels"],
+        )
         logits = model(input_ids, token_type_ids=token_type_ids)
 
         # count metric
@@ -55,21 +62,15 @@ if __name__ == "__main__":
     # load dev data
     model_name = "skep_ernie_1.0_large_ch"
     label2id, id2label = load_dict(args.label_path)
-    test_ds = load_dataset(read, data_path=args.test_path, lazy=False)
+    datasets = load_dataset("text", data_files={"test": args.test_path})
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     trans_func = partial(convert_example_to_feature, tokenizer=tokenizer, label2id=label2id, max_seq_len=args.max_seq_len)
-    test_ds = test_ds.map(trans_func, lazy=False)
+    test_ds = datasets["test"].map(trans_func, batched=False, remove_columns=["text"])
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
-        Stack(dtype="int64"),
-        Pad(axis=0, pad_val=-1, dtype="int64")
-    ): fn(samples)
-
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=label2id["O"])
     test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=data_collator)
 
     # load model
     loaded_state_dict = paddle.load(args.model_path)
@@ -79,5 +80,5 @@ if __name__ == "__main__":
     metric = ChunkEvaluator(label2id.keys())
 
     # evalute on dev data
-    precision, recall, f1  = evaluate(model, test_loader,  metric)
+    precision, recall, f1 = evaluate(model, test_loader, metric)
     print(f'evalution result: precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')

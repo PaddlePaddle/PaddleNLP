@@ -12,19 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import argparse
 import copy
 import json
-import argparse
-from functools import partial
 from collections import defaultdict
+from functools import partial
+
 import paddle
-from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset, MapDataset
-from paddlenlp.transformers import SkepTokenizer, SkepForTokenClassification, SkepForSequenceClassification
-from utils import decoding, load_dict, read_test_file
+from classification.data import (
+    convert_example_to_feature as convert_example_to_feature_cls,
+)
+from datasets import Dataset, load_dataset
 from extraction.data import convert_example_to_feature as convert_example_to_feature_ext
-from classification.data import convert_example_to_feature as convert_example_to_feature_cls
+from utils import decoding, load_dict
+
+from paddlenlp.data import DataCollatorForTokenClassification, DataCollatorWithPadding
+from paddlenlp.transformers import (
+    SkepForSequenceClassification,
+    SkepForTokenClassification,
+    SkepTokenizer,
+)
 
 
 def concate_aspect_and_opinion(text, aspect, opinions):
@@ -40,12 +47,12 @@ def concate_aspect_and_opinion(text, aspect, opinions):
 
 
 def predict_ext(args):
-    # load dict
+    # load dict and dataset
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
+    datasets = load_dataset("text", data_files={"test": args.test_path})
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    ori_test_ds = load_dataset(read_test_file, data_path=args.test_path, lazy=False)
     trans_func = partial(
         convert_example_to_feature_ext,
         tokenizer=tokenizer,
@@ -53,16 +60,10 @@ def predict_ext(args):
         max_seq_len=args.ext_max_seq_len,
         is_test=True,
     )
-    test_ds = copy.copy(ori_test_ds).map(trans_func, lazy=False)
-
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),
-        Stack(dtype="int64"),
-    ): fn(samples)
-
+    test_ds = copy.copy(datasets["test"]).map(trans_func, batched=False, remove_columns=["text"])
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=ext_label2id["O"])
     test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=data_collator)
     print("test data loaded.")
 
     # load ext model
@@ -74,14 +75,18 @@ def predict_ext(args):
     ext_model.eval()
     results = []
     for bid, batch_data in enumerate(test_loader):
-        input_ids, token_type_ids, seq_lens = batch_data
+        input_ids, token_type_ids, seq_lens = (
+            batch_data["input_ids"],
+            batch_data["token_type_ids"],
+            batch_data["seq_len"],
+        )
         logits = ext_model(input_ids, token_type_ids=token_type_ids)
 
         predictions = logits.argmax(axis=2).numpy()
         for eid, (seq_len, prediction) in enumerate(zip(seq_lens, predictions)):
             idx = bid * args.batch_size + eid
             tag_seq = [ext_id2label[idx] for idx in prediction[:seq_len][1:-1]]
-            text = ori_test_ds[idx]["text"]
+            text = datasets["test"][idx]["text"]
             aps = decoding(text[: args.ext_max_seq_len - 2], tag_seq)
             for aid, ap in enumerate(aps):
                 aspect, opinions = ap[0], list(set(ap[1:]))
@@ -103,9 +108,14 @@ def predict_cls(args, ext_results):
     # load dict
     model_name = "skep_ernie_1.0_large_ch"
     cls_label2id, cls_id2label = load_dict(args.cls_label_path)
+    text_list = []
+    for result in ext_results:
+        example = result["aspect_text"] + "\t" + result["text"]
+        text_list.append(example)
+    ext_results = {"text": text_list}
+    dataset = Dataset.from_dict(ext_results)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
-    test_ds = MapDataset(ext_results)
     trans_func = partial(
         convert_example_to_feature_cls,
         tokenizer=tokenizer,
@@ -113,17 +123,11 @@ def predict_cls(args, ext_results):
         max_seq_len=args.cls_max_seq_len,
         is_test=True,
     )
-    test_ds = test_ds.map(trans_func, lazy=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),
-        Stack(dtype="int64"),
-    ): fn(samples)
-
-    # set shuffle is False
+    test_ds = dataset.map(trans_func, batched=False, remove_columns=["text"])
+    data_collator = DataCollatorWithPadding(tokenizer, padding=True)
     test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
-    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn)
+    test_loader = paddle.io.DataLoader(test_ds, batch_sampler=test_batch_sampler, collate_fn=data_collator)
     print("test data loaded.")
 
     # load cls model
@@ -136,7 +140,7 @@ def predict_cls(args, ext_results):
 
     results = []
     for bid, batch_data in enumerate(test_loader):
-        input_ids, token_type_ids, seq_lens = batch_data
+        input_ids, token_type_ids = batch_data["input_ids"], batch_data["token_type_ids"]
         logits = cls_model(input_ids, token_type_ids=token_type_ids)
 
         predictions = logits.argmax(axis=1).numpy().tolist()

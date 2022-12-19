@@ -12,9 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-from tqdm import tqdm
-
 
 def load_dict(dict_path):
     with open(dict_path, "r", encoding="utf-8") as f:
@@ -25,23 +22,17 @@ def load_dict(dict_path):
         return word2id, id2word
 
 
-def read(data_path):
-    with open(data_path, "r", encoding="utf-8") as f:
-        for line in f.readlines():
-            items = line.strip().split("\t")
-            assert len(items) == 3
-            example = {"label": int(items[0]), "aspect_text": items[1], "text": items[2]}
-
-            yield example
-
-
 def convert_example_to_feature(example, tokenizer, label2id, max_seq_len=512, is_test=False):
-    encoded_inputs = tokenizer(
-        example["aspect_text"], text_pair=example["text"], max_seq_len=max_seq_len, return_length=True
-    )
-
+    example = example["text"].rstrip().split("\t")
     if not is_test:
-        label = example["label"]
-        return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"], label
+        label = int(example[0])
+        aspect_text = example[1]
+        text = example[2]
+        encoded_inputs = tokenizer(aspect_text, text_pair=text, max_seq_len=max_seq_len, return_length=True)
+        encoded_inputs["label"] = label
+    else:
+        aspect_text = example[0]
+        text = example[1]
+        encoded_inputs = tokenizer(aspect_text, text_pair=text, max_seq_len=max_seq_len, return_length=True)
 
-    return encoded_inputs["input_ids"], encoded_inputs["token_type_ids"], encoded_inputs["seq_len"]
+    return encoded_inputs

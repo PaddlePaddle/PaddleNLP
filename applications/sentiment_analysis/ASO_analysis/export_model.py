@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+
 import paddle
+
 from paddlenlp.transformers import (
-    SkepForTokenClassification,
-    SkepForSequenceClassification,
     PPMiniLMForSequenceClassification,
+    SkepForSequenceClassification,
+    SkepForTokenClassification,
 )
 
 if __name__ == "__main__":
