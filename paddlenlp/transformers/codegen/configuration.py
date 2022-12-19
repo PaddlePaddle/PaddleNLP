@@ -94,16 +94,13 @@ class CodeGenConfig(PretrainedConfig):
         layer_norm_epsilon: float = 1e-05,
         initializer_range: float = 0.02,
         scale_attn_weights: bool = True,
-        tie_word_embeddings: bool = False,
         n_inner: int = None,
-        use_cache: bool = True,
         **kwargs,
     ):
         super().__init__(
             bos_token_id=bos_token_id,
             eos_token_id=eos_token_id,
             pad_token_id=pad_token_id,
-            tie_word_embeddings=tie_word_embeddings,
             **kwargs,
         )
         self.vocab_size = vocab_size
@@ -121,4 +118,3 @@ class CodeGenConfig(PretrainedConfig):
         self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
         self.scale_attn_weights = scale_attn_weights
-        self.use_cache = use_cache

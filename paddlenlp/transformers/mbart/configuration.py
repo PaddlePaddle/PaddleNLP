@@ -201,43 +201,6 @@ class MBartConfig(PretrainedConfig):
         init_std (float, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
             Default to `0.02`.
-
-        vocab_size (`int`, optional):
-            Vocabulary size of the BART model. Defines the number of different tokens that can be represented by the
-            `inputs_ids` passed when calling [`BartModel`] or [`TFBartModel`]. Defaults to 50265.
-        d_model (`int`, optional):
-            Dimensionality of the layers and the pooler layer. Defaults to 1024
-        encoder_layers (`int`, optional):
-            Number of encoder layers. Defaults to 12.
-        decoder_layers (`int`, optional):
-            Number of decoder layers. Defaults to 12.
-        encoder_attention_heads (`int`, optional):
-            Number of attention heads for each attention layer in the Transformer encoder. Defaults to 16.
-        decoder_attention_heads (`int`, optional):
-            Number of attention heads for each attention layer in the Transformer decoder. Defaults to 16.
-        decoder_ffn_dim (`int`, optional):
-            Dimensionality of the "intermediate" (often named feed-forward) layer in decoder. Defaults to 4096.
-        encoder_ffn_dim (`int`, optional):
-            Dimensionality of the "intermediate" (often named feed-forward) layer in decoder. Defaults to 4096.
-        activation_function (`str` or `function`, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions are supported.
-            Defaults to `"gelu"`.
-        dropout (`float`, optional):
-            The dropout probability for all fully connected layers in the embeddings, encoder, and pooler. Defaults to 0.1.
-        attention_dropout (`float`, optional):
-            The dropout ratio for the attention probabilities. Defaults to 0.1.
-        activation_dropout (`float`, optional):
-            The dropout ratio for activations inside the fully connected layer. Defaults to 0.1.
-        classifier_dropout (`float`, optional):
-            The dropout ratio for classifier. Defaults to 0.1.
-        max_position_embeddings (`int`, optional):
-            The maximum sequence length that this model might ever be used with. Typically set this to something large
-            just in case (e.g., 512 or 1024 or 2048). Defaults to 1024.
-        init_std (`float`, optional):
-            The standard deviation of the truncated_normal_initializer for initializing all weight matrices. Defaults to 0.02.
-        use_cache (`bool`, optional):
-            Whether or not the model should return the last key/values attentions (not used by all models). Defaults to `True`.
         num_labels (`int`, optional):
             The number of labels to use in [`BartForSequenceClassification`]. Defaults to 3.
         forced_eos_token_id (`int`, optional):
@@ -261,8 +224,6 @@ class MBartConfig(PretrainedConfig):
         bos_token_id: int = 0,
         pad_token_id: int = 1,
         eos_token_id: int = 2,
-        decoder_start_token_id: int = 2,
-        forced_bos_token_id: int = 250004,
         forced_eos_token_id: int = 2,
         d_model: int = 768,
         encoder_layers: int = 12,
@@ -271,12 +232,10 @@ class MBartConfig(PretrainedConfig):
         decoder_attention_heads: int = 16,
         encoder_ffn_dim: int = 4096,
         decoder_ffn_dim: int = 4096,
-        use_cache: bool = True,
         dropout: float = 0.1,
         activation_function: str = "gelu",
         attention_dropout: float = 0.0,
         activation_dropout: float = 0.0,
-        classifier_dropout: float = 0.0,
         max_position_embeddings: int = 1024,
         init_std: float = 0.02,
         is_encoder_decoder: bool = True,
@@ -306,9 +265,6 @@ class MBartConfig(PretrainedConfig):
         self.activation_dropout = activation_dropout
         self.activation_function = activation_function
         self.init_std = init_std
-        self.classifier_dropout = classifier_dropout
-        self.use_cache = use_cache
-        self.num_hidden_layers = encoder_layers
 
         if not scale_embedding:
             logger.warning(

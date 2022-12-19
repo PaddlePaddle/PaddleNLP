@@ -112,15 +112,11 @@ class BartConfig(PretrainedConfig):
             The dropout ratio for the attention probabilities. Default to 0.1.
         activation_dropout (`float`, optional):
             The dropout ratio for activations inside the fully connected layer. Default to 0.1.
-        classifier_dropout (`float`, optional):
-            The dropout ratio for classifier. Default to 0.1.
         max_position_embeddings (`int`, optional):
             The maximum sequence length that this model might ever be used with. Typically set this to something large
             just in case (e.g., 512 or 1024 or 2048). Default to 1024.
         init_std (`float`, optional):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices. Default to 0.02.
-        use_cache (`bool`, optional):
-            Whether or not the model should return the last key/values attentions (not used by all models). Default to `True`.
         num_labels (`int`, optional):
             The number of labels to use in [`BartForSequenceClassification`]. Default to 3.
         forced_eos_token_id (`int`, optional):
@@ -154,8 +150,6 @@ class BartConfig(PretrainedConfig):
         attention_dropout: float = 0.1,
         activation_dropout: float = 0.1,
         init_std: float = 0.02,
-        classifier_dropout: float = 0.1,
-        use_cache: bool = True,
         num_labels: int = 3,
         pad_token_id: int = 1,
         bos_token_id: int = 0,
@@ -190,8 +184,6 @@ class BartConfig(PretrainedConfig):
         self.activation_dropout = activation_dropout
         self.activation_function = activation_function
         self.init_std = init_std
-        self.classifier_dropout = classifier_dropout
-        self.use_cache = use_cache
         self.num_hidden_layers = encoder_layers
         if scale_embedding:
             logger.warning(
