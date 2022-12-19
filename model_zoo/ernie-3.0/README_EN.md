@@ -2,7 +2,7 @@
 # ERNIE 3.0 Lightweight Model
 
  **Directory**
-   * [ERNIE Tiny 3.0 Introduction](#An Introduction to the Model)
+   * [ERNIE Tiny 3.0 Introduction](#ERNIE Tiny 3.0 Introduction)
        * [Online Distillation Technology](#Online Distillation Technology)
    * [Model Effects](#Model Effect)
    * [Fine-tuning](#Fine-tuning)
@@ -17,7 +17,7 @@
    * [Speed Up with FasterTokenizer](#Speed Up with FasterTokenizer)
    * [Deployment](#Deployment)
        * [Python Deployment](#Python Deployment)
-       * [Service Deployment](#Service-oriented Deployment)
+       * [Service Deployment](#Service Deployment)
        * [Paddle2ONNX Deployment](#Paddle2ONNX Deployment)
    * [Notebook Guide](#Notebook Guide)
    * [References](#References)
