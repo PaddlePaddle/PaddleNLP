@@ -614,7 +614,10 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         super().__init__(config)
         self.mbart = MBartModel(config)
         self.classifier = MBartClassificationHead(
-            config.d_model, config.d_model, config.num_labels, config.classifier_dropout
+            config.d_model,
+            config.d_model,
+            config.num_labels,
+            config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
         self.apply(self.init_weights)
 

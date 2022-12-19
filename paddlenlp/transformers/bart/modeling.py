@@ -595,12 +595,15 @@ class BartForSequenceClassification(BartPretrainedModel):
             An instance of BartConfig used to construct BartForSequenceClassification.
     """
 
-    def __init__(self, config: BartConfig, **kwargs):
-        super().__init__(config, **kwargs)
+    def __init__(self, config: BartConfig):
+        super().__init__(config)
         self.bart = BartModel(config)
         self.num_labels = config.num_labels
         self.classifier = BartClassificationHead(
-            config.d_model, config.d_model, config.num_labels, config.classifier_dropout
+            config.d_model,
+            config.d_model,
+            config.num_labels,
+            config.classifier_dropout if config.classifier_dropout is not None else config.dropout,
         )
         self.apply(self.init_weights)
 
