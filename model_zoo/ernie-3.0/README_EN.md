@@ -1,3 +1,4 @@
+[简体中文](README_CN.md)| English
 # ERNIE 3.0 Lightweight Model
 
  **Directory**
