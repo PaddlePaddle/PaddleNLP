@@ -12,28 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
+from functools import partial
 
 import paddle
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import AutoTokenizer, AutoModelForTokenClassification
+from data import load_dataset, load_dict, parse_decodes
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 
-from data import load_dict, load_dataset, parse_decodes
-
+# fmt: off
 parser = argparse.ArgumentParser()
-
-# yapf: disable
-parser.add_argument("--save_dir", default='./ernie_ckpt', type=str, help="The output directory where the model checkpoints will be written.")
+parser.add_argument("--save_dir", default="./ernie_ckpt", type=str, help="The output directory where the model checkpoints will be written.")
 parser.add_argument("--epochs", default=10, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for training.")
-parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"] ,help="The device to select to train the model, is must be cpu/gpu.")
-parser.add_argument("--data_dir", default='./waybill_ie/data', type=str, help="The folder where the dataset is located.")
-
+parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu"], help="The device to select to train the model, is must be cpu/gpu.")
+parser.add_argument("--data_dir", default="./waybill_ie/data", type=str, help="The folder where the dataset is located.")
 args = parser.parse_args()
-# yapf: enable
+# fmt: on
 
 
 def convert_to_features(example, tokenizer, label_vocab):
@@ -118,12 +116,15 @@ if __name__ == "__main__":
     test_ds.map(trans_func)
 
     ignore_label = -1
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
-        Stack(dtype="int64"),  # seq_len
-        Pad(axis=0, pad_val=ignore_label, dtype="int64"),  # labels
-    ): fn(samples)
+
+    def batchify_fn(samples):
+        fn = Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int32"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int32"),  # token_type_ids
+            Stack(dtype="int64"),  # seq_len
+            Pad(axis=0, pad_val=label_vocab.get("O", 0), dtype="int64"),  # labels
+        )
+        return fn(samples)
 
     train_loader = create_dataloader(
         dataset=train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn
@@ -134,7 +135,7 @@ if __name__ == "__main__":
     test_loader = create_dataloader(dataset=test_ds, mode="test", batch_size=args.batch_size, batchify_fn=batchify_fn)
 
     # Define the model netword and its loss
-    model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_classes=len(label_vocab))
+    model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh", num_labels=len(label_vocab))
     if trainer_num > 1:
         model = paddle.DataParallel(model)
     metric = ChunkEvaluator(label_list=label_vocab.keys(), suffix=True)

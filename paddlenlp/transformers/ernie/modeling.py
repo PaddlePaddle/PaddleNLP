@@ -634,7 +634,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         super(ErnieForTokenClassification, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.num_labels = config.num_labels
-        print(self.num_labels)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
@@ -1222,16 +1221,15 @@ class UIE(ErniePretrainedModel):
     output to compute `start_prob` and `end_prob`,
     designed for Universal Information Extraction.
     Args:
-        ernie (`ErnieModel`):
-            An instance of `ErnieModel`.
+        config (:class:`ErnieConfig`):
+            An instance of ErnieConfig used to construct ErnieForMultipleChoice
     """
 
-    def __init__(self, ernie):
-        super(UIE, self).__init__()
-        self.ernie = ernie
-        hidden_size = self.ernie.config["hidden_size"]
-        self.linear_start = paddle.nn.Linear(hidden_size, 1)
-        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+    def __init__(self, config: ErnieConfig):
+        super(UIE, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
