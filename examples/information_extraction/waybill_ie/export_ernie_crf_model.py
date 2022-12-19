@@ -16,11 +16,10 @@ import argparse
 import os
 
 import paddle
+from model import ErnieCrfForTokenClassification
 
 from data import load_dict
 from paddlenlp.transformers import AutoModelForTokenClassification
-
-from .model import ErnieCrfForTokenClassification
 
 # fmt: off
 parser = argparse.ArgumentParser()

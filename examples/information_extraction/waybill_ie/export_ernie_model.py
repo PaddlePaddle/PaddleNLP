@@ -17,9 +17,8 @@ import os
 
 import paddle
 
+from data import load_dict
 from paddlenlp.transformers import AutoModelForTokenClassification
-
-from .data import load_dict
 
 # fmt: off
 parser = argparse.ArgumentParser()
