@@ -46,6 +46,7 @@ __all__ = [
     "ErniePretrainingCriterion",
     "ErnieForMaskedLM",
     "ErnieForMultipleChoice",
+    "UIE",
 ]
 
 
@@ -423,8 +424,8 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size,)`, optional):
                 Labels for computing the sequence classification/regression loss.
-                Indices should be in `[0, ..., num_classes - 1]`. If `num_classes == 1`
-                a regression loss is computed (Mean-Square loss), If `num_classes > 1`
+                Indices should be in `[0, ..., num_labels - 1]`. If `num_labels == 1`
+                a regression loss is computed (Mean-Square loss), If `num_labels > 1`
                 a classification loss is computed (Cross-Entropy).
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
@@ -473,12 +474,12 @@ class ErnieForSequenceClassification(ErniePretrainedModel):
 
         loss = None
         if labels is not None:
-            if self.num_classes == 1:
+            if self.num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
             elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
                 loss_fct = paddle.nn.CrossEntropyLoss()
-                loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+                loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
             else:
                 loss_fct = paddle.nn.BCEWithLogitsLoss()
                 loss = loss_fct(logits, labels)
@@ -664,7 +665,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
             inputs_embeds(Tensor, optional):
                 See :class:`ErnieModel`.
             labels (Tensor of shape `(batch_size, sequence_length)`, optional):
-                Labels for computing the token classification loss. Indices should be in `[0, ..., num_classes - 1]`.
+                Labels for computing the token classification loss. Indices should be in `[0, ..., num_labels - 1]`.
             output_hidden_states (bool, optional):
                 Whether to return the hidden states of all layers.
                 Defaults to `False`.
@@ -712,7 +713,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         loss = None
         if labels is not None:
             loss_fct = paddle.nn.CrossEntropyLoss()
-            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
         if not return_dict:
             output = (logits,) + outputs[2:]
             return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
@@ -823,7 +824,7 @@ class ErnieForPretraining(ErniePretrainedModel):
     """
 
     def __init__(self, config: ErnieConfig):
-        super(ErnieForPretraining, self).__init__()
+        super(ErnieForPretraining, self).__init__(config)
         self.ernie = ErnieModel(config)
         weight_attr = paddle.ParamAttr(
             initializer=nn.initializer.TruncatedNormal(mean=0.0, std=self.ernie.initializer_range)
@@ -1212,3 +1213,58 @@ class ErnieForMultipleChoice(ErniePretrainedModel):
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
         )
+
+
+class UIE(ErniePretrainedModel):
+    """
+    Ernie Model with two linear layer on top of the hidden-states
+    output to compute `start_prob` and `end_prob`,
+    designed for Universal Information Extraction.
+    Args:
+        ernie (`ErnieModel`):
+            An instance of `ErnieModel`.
+    """
+
+    def __init__(self, ernie):
+        super(UIE, self).__init__()
+        self.ernie = ernie
+        hidden_size = self.ernie.config["hidden_size"]
+        self.linear_start = paddle.nn.Linear(hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
+        self.apply(self.init_weights)
+
+    def forward(self, input_ids, token_type_ids, position_ids=None, attention_mask=None):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel`.
+            token_type_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            position_ids (Tensor, optional):
+                See :class:`ErnieModel`.
+            attention_mask (Tensor, optional):
+                See :class:`ErnieModel`.
+        Example:
+            .. code-block::
+                import paddle
+                from paddlenlp.transformers import UIE, ErnieTokenizer
+                tokenizer = ErnieTokenizer.from_pretrained('uie-base')
+                model = UIE.from_pretrained('uie-base')
+                inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!")
+                inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
+                start_prob, end_prob = model(**inputs)
+        """
+        sequence_output, _ = self.ernie(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
+        start_logits = self.linear_start(sequence_output)
+        start_logits = paddle.squeeze(start_logits, -1)
+        start_prob = self.sigmoid(start_logits)
+        end_logits = self.linear_end(sequence_output)
+        end_logits = paddle.squeeze(end_logits, -1)
+        end_prob = self.sigmoid(end_logits)
+        return start_prob, end_prob
