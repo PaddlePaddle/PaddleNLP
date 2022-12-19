@@ -23,7 +23,6 @@ parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum to
 parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for predicting.")
 args = parser.parse_args()
 # yapf: disable
-
 url = "http://0.0.0.0:8189/models/ernie_ner"
 headers = {"Content-Type": "application/json"}
 
@@ -31,12 +30,12 @@ if __name__ == "__main__":
     texts = ["研究证实，细胞减少与肺内病变程度及肺内炎性病变吸收程度密切相关。", ]
     data = {
         'data': {
-             'text': [['江', '泽', '民', '主', '席', '在', '宴', '会', '上', '发', '表', '了', '讲', '话', '。'],
-                      ['可', '以', '相', '信', '，', '中', '国', '与', '加', '州', '的', '友', '好', '互', '利', '合', '作', '，', '将', '会', '获', '得', '新', '的', '更', '大', '的', '发', '展', '。']]},
+            'text': [['江', '泽', '民', '主', '席', '在', '宴', '会', '上', '发', '表', '了', '讲', '话', '。'],  # noqa: E126
+                     ['可', '以', '相', '信', '，', '中', '国', '与', '加', '州', '的', '友', '好', '互', '利', '合', '作', '，', '将', '会', '获', '得', '新', '的', '更', '大', '的', '发', '展', '。']]},  # noqa: E126
         'parameters': {
-             'max_seq_len': args.max_seq_len,
-             'batch_size': args.batch_size,
-             'is_split_into_words': True
+            'max_seq_len': args.max_seq_len,
+            'batch_size': args.batch_size,
+            'is_split_into_words': True
         }
     }
     r = requests.post(url=url, headers=headers, data=json.dumps(data))

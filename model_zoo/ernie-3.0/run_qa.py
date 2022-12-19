@@ -124,6 +124,8 @@ def main():
             )
     if training_args.do_predict:
         predict_examples = raw_datasets["test"]
+        contexts = predict_examples["context"]
+        questions = predict_examples["question"]
         with training_args.main_process_first(desc="test dataset map pre-processing"):
             predict_dataset = predict_examples.map(
                 partial(prepare_validation_features, tokenizer=tokenizer, args=data_args),
@@ -193,7 +195,8 @@ def main():
     if training_args.do_predict:
         test_ret = trainer.predict(predict_dataset, predict_examples)
         trainer.log_metrics("predict", test_ret.metrics)
-        out_dict = {"query": test_ret.predictions, "answer": test_ret.label_ids}
+
+        out_dict = {"answer": test_ret.predictions, "context": contexts, "question": questions}
         out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
         json.dump(out_dict, out_file)
 

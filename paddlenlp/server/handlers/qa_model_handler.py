@@ -13,10 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-
-from paddlenlp.data import DataCollatorWithPadding
-
+from ...data import Pad, Tuple
 from .base_handler import BaseModelHandler
 
 
@@ -55,16 +52,17 @@ class QAModelHandler(BaseModelHandler):
         if isinstance(question, str):
             question = [question]
 
+        tokenizer_results = tokenizer(question, context, stride=doc_stride, max_length=max_seq_len)
         examples = []
-        examples = tokenizer(question, context, stride=doc_stride, max_length=max_seq_len)
-
-        examples = []
-        for input_ids, token_type_ids in zip(examples["input_ids"], examples["token_type_ids"]):
+        for input_ids, token_type_ids in zip(tokenizer_results["input_ids"], tokenizer_results["token_type_ids"]):
             examples.append((input_ids, token_type_ids))
         # Seperates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
-        batchify_fn = DataCollatorWithPadding(tokenizer)
+        batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
+        ): fn(samples)
 
         results = [[] for i in range(0, predictor._output_num)]
         for batch in batches:
@@ -76,16 +74,13 @@ class QAModelHandler(BaseModelHandler):
                 predictor._predictor.run()
                 output = [output_handle.copy_to_cpu() for output_handle in predictor._output_handles]
                 for i, out in enumerate(output):
-                    results[i].append(out)
+                    results[i].extend(out.tolist())
             else:
                 output = predictor._predictor.run(None, {"input_ids": input_ids, "token_type_ids": token_type_ids})
                 for i, out in enumerate(output):
-                    results[i].append(out)
+                    results[i].extend(out.tolist())
 
-        results_concat = []
-        for i in range(0, len(results)):
-            results_concat.append(np.concatenate(results[i], axis=0))
-        out_dict = {"logits": results_concat[0].tolist(), "data": data}
-        for i in range(1, len(results_concat)):
-            out_dict[f"logits_{i}"] = results_concat[i].tolist()
+        out_dict = {"logits": results[0], "data": data}
+        for i in range(1, len(results)):
+            out_dict[f"logits_{i}"] = results[1]
         return out_dict
