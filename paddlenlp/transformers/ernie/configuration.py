@@ -322,7 +322,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-base-v1": {
+    "ernie-3.0-tiny-base-v1-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -336,7 +336,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-medium-v1": {
+    "ernie-3.0-tiny-medium-v1-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -351,7 +351,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-mini-v1": {
+    "ernie-3.0-tiny-mini-v1-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -366,7 +366,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-micro-v1": {
+    "ernie-3.0-tiny-micro-v1-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -381,7 +381,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-nano-v1": {
+    "ernie-3.0-tiny-nano-v1-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -771,7 +771,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "vocab_size": 30522,
         "pad_token_id": 0,
     },
-    "ernie-3.0-tiny-base-v2": {
+    "ernie-3.0-tiny-base-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -785,7 +785,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-medium-v2": {
+    "ernie-3.0-tiny-medium-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -800,7 +800,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-mini-v2": {
+    "ernie-3.0-tiny-mini-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -815,7 +815,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-micro-v2": {
+    "ernie-3.0-tiny-micro-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -830,7 +830,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-nano-v2": {
+    "ernie-3.0-tiny-nano-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -845,7 +845,7 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
-    "ernie-3.0-tiny-pico-v2": {
+    "ernie-3.0-tiny-pico-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
         "hidden_dropout_prob": 0.1,
@@ -887,11 +887,11 @@ ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
         "ernie-3.0-mini-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
         "ernie-3.0-micro-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
         "ernie-3.0-nano-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
-        "ernie-3.0-tiny-base-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams",
-        "ernie-3.0-tiny-medium-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams",
-        "ernie-3.0-tiny-mini-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
-        "ernie-3.0-tiny-micro-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
-        "ernie-3.0-tiny-nano-v1": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
+        "ernie-3.0-tiny-base-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams",
+        "ernie-3.0-tiny-medium-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams",
+        "ernie-3.0-tiny-mini-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_mini_zh.pdparams",
+        "ernie-3.0-tiny-micro-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_micro_zh.pdparams",
+        "ernie-3.0-tiny-nano-v1-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams",
         "rocketqa-zh-base-query-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-query-encoder.pdparams",
         "rocketqa-zh-base-para-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-base-para-encoder.pdparams",
         "rocketqa-zh-medium-query-encoder": "https://paddlenlp.bj.bcebos.com/models/transformers/rocketqa/rocketqa-zh-medium-query-encoder.pdparams",
@@ -918,12 +918,12 @@ ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
         "uie-base-en": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_base_en.pdparams",
         "ernie-search-base-dual-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_base_dual_encoder_marco_en.pdparams",
         "ernie-search-large-cross-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_large_cross_encoder_marco_en.pdparams",
-        "ernie-3.0-tiny-base-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams",
-        "ernie-3.0-tiny-medium-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams",
-        "ernie-3.0-tiny-mini-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2.pdparams",
-        "ernie-3.0-tiny-micro-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
-        "ernie-3.0-tiny-nano-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
-        "ernie-3.0-tiny-pico-v2": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
+        "ernie-3.0-tiny-base-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams",
+        "ernie-3.0-tiny-medium-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams",
+        "ernie-3.0-tiny-mini-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2.pdparams",
+        "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
+        "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
+        "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
     }
 }
 
