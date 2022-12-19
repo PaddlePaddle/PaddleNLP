@@ -93,7 +93,6 @@ class CodeGenConfig(PretrainedConfig):
         activation_function: str = "gelu_new",
         layer_norm_epsilon: float = 1e-05,
         initializer_range: float = 0.02,
-        scale_attn_weights: bool = True,
         n_inner: int = None,
         **kwargs,
     ):
@@ -117,4 +116,3 @@ class CodeGenConfig(PretrainedConfig):
         self.attn_pdrop = attn_pdrop
         self.layer_norm_epsilon = layer_norm_epsilon
         self.initializer_range = initializer_range
-        self.scale_attn_weights = scale_attn_weights
