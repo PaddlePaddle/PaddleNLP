@@ -2,13 +2,13 @@
 # ERNIE 3.0 Lightweight Model
 
  **Directory**
-   * [An Introduction to the Model](#An Introduction to the Model)
+   * [ERNIE Tiny 3.0 Introduction](#An Introduction to the Model)
        * [Online Distillation Technology](#Online Distillation Technology)
-   * [Model Effect](#Model Effect)
+   * [Model Effects](#Model Effect)
    * [Fine-tuning](#Fine-tuning)
    * [Model Compression](#Model Compression)
        * [Environment Dependencies](#Environment Dependencies)
-       * [Model Compression API ](#Model Compression API )
+       * [Model Compression API](#Model Compression API )
        * [Compression Effect](#Compression Effect)
            * [Accuracy Test](#Accuracy Test)
            * [Performance Test](#Performance Test)
@@ -17,27 +17,28 @@
    * [Speed Up with FasterTokenizer](#Speed Up with FasterTokenizer)
    * [Deployment](#Deployment)
        * [Python Deployment](#Python Deployment)
-       * [Service-oriented Deployment](#Service-oriented Deployment)
+       * [Service Deployment](#Service-oriented Deployment)
        * [Paddle2ONNX Deployment](#Paddle2ONNX Deployment)
    * [Notebook Guide](#Notebook Guide)
    * [References](#References)
 
-<a name="An Introduction to the model"></a>
+<a name="ERNIE Tiny 3.0 Introduction"></a>
 
-## An Introduction to the model
+## ERNIE Tiny 3.0 Introduction
 
-The open source model is a lightweight model obtained through **online distillation technology** based on Wenxin Big Models (ERNIE 3.0). Compared with ERNIE 2.0, its Chinese effect is stronger while the model structure remains unchanged.
+ERNIE Tiny Models are lightweight models obtained from Wenxin large model ERNIE 3.0 using distillation technology. The model structure is consistent with ERNIE 2.0, and has a stronger Chinese effect than ERNIE 2.0.
 
-Related technical details can be found in the article ["Analysis of the world's largest Chinese monolithic model Pengcheng - Baidu - Wenxin technical details"](https://www.jiqizhixin.com/articles/2021-12-08-9)
+For a detailed explanation of related technologies, please refer to the article [解析全球最大中文单体模型鹏城-百度·文心技术细节](https://www.jiqizhixin.com/articles/2021-12-08-9)
 
 <a name="Online Distillation Technology"></a>
 
 ### Online Distillation Technology
 
-In model learning, the online distillation technology periodically passes knowledge signals to several student models for simultaneous training, aiming to produce student models of multiple sizes at once in the distillation phase. Compared with traditional distillation ones, this technique greatly reduces computing power consumption caused by the extra distillation computation of big models and the repetitive knowledge transfer of multiple student models.
+In the process of model learning, online distillation technology periodically transmits knowledge signals to several student models for simultaneous training, thereby producing student models of multiple sizes at one time in the distillation stage. Compared with the traditional distillation technology, this technology greatly saves the computing power consumption caused by the extra distillation calculation of the large model and the repeated knowledge transfer of multiple students.
 
-Taking advantage of the scale strength of Wenxin Big Models, this novel method ensures the effect and multiple sizes of student models after distillation, as well as allows their application for different performance requirements. In addition, due to the huge gap between the size of Wenxin Big Models and student models, model distillation can be extremely difficult and even prone to failure. For this reason, the introduced helper model is used as a bridge for knowledge transfer. It can solve the problem of the large expression distance between student models and large models, thus promoting the efficiency of distillation.
-More technical details can be found in the following articles:
+This novel distillation method takes advantage of the scale advantage of the Wenxin large model, and ensures the effect and size richness of the student model after the distillation is completed, which is convenient for application scenarios with different performance requirements. In addition, due to the huge gap between the model size of the Wenxin model and the student model, the model distillation is extremely difficult or even easy to fail. To this end, by introducing the technology of the teaching assistant model for distillation, the teaching assistant is used as a bridge for knowledge transfer to shorten the problem that the expression space between the student model and the large model is too large, thereby promoting the improvement of distillation efficiency.
+
+For more technical details, please refer to the paper:
 - [ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression](https://arxiv.org/abs/2106.02241)
 - [ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation](https://arxiv.org/abs/2112.12731)
 
@@ -45,11 +46,11 @@ More technical details can be found in the following articles:
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168516904-3fff73e0-010d-4bef-adc1-4d7c97a9c6ff.png" title="ERNIE 3.0 Online Distillation">
 </p>
 
-<a name="Model Effect"></a>
+<a name="Model Effects"></a>
 
-## Model Effect
+## Model Effects
 
-The five open source models **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** in this project:
+ERNIE Tiny 3.0 open sources five models: **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 **ERNIE 3.0 _Mini_** 、 **ERNIE 3.0 _Micro_** 、 **ERNIE 3.0 _Nano_** 
 
 - [**ERNIE 3.0-_Base_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_base_zh.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-_Medium_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_medium_zh.pdparams) (_6-layer, 768-hidden, 12-heads_)
@@ -58,11 +59,11 @@ The five open source models **ERNIE 3.0 _Base_** 、**ERNIE 3.0 _Medium_** 、 *
 - [**ERNIE 3.0-_Nano_**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_nano_zh.pdparams) (_4-layer, 312-hidden, 12-heads_)
 
 
-Below is the **effect-latency graph** of PaddleNLP lightweight Chinese models. The horizontal axis represents the latency (in ms) tested on the IFLYTEK dataset (maximum sequence length is 128), and the vertical axis represents the average accuracy on the 10 tasks of CLUE (including text classification, text matching, natural language inference, pronoun disambiguation, and reading comprehension). Among them, the evaluation metric for the CMRC2018 reading comprehension is Exact Match (EM), while others use Accuracy for evaluation. The higher the model is to **the upper left**, the higher its level of accuracy and performance.
+Below is the precision-latency graph of the small Chinese models in PaddleNLP. The abscissa represents the latency (unit: ms) tested on CLUE IFLYTEK dataset (maximum sequence length is set to 128), and the ordinate is the average accuracy on 10 CLUE tasks (including text classification, text matching, natural language inference, Pronoun disambiguation, machine reading comprehension and other tasks), among which the metric of CMRC2018 is Exact Match (EM), and the metric of other tasks is Accuracy. The closer the model to the top left in the figure, the higher the level of accuracy and performance.The top left model in the figure has the highest level of accuracy and performance.
 
-In the figure, the parameters are marked below the model name, and the test environment is shown in the [performance test](#performance test)。
+The number of parameters of the model are marked under the model name in the figure. For the test environment, see [performance test](#performance test) in details.
 
-batch_size=32,the effect-latency graph under CPU (num_threads=1 and num_threads=8)：
+precision-latency graph under CPU (number of threads: 1 and 8), batch_size = 32：
 
 <table>
     <tr>
@@ -71,7 +72,7 @@ batch_size=32,the effect-latency graph under CPU (num_threads=1 and num_threads=
     </tr>
 </table>
 
-batch_size=1, the effect-latency graph under CPU (num_threads=1 and num_threads=8)：
+precision-latency graph under CPU (number of threads: 1 and 8), batch_size = 1:
 
 <table>
     <tr>
@@ -80,7 +81,7 @@ batch_size=1, the effect-latency graph under CPU (num_threads=1 and num_threads=
     </tr>
 </table>
 
-batch_size=32/1, FP16 prediction accuracy, the effect-latency graph under GPU (num_threads=1 and num_threads=8)：
+precision-latency graph under GPU, batch_size = 32, 1:
 
 <table>
     <tr>
@@ -89,9 +90,9 @@ batch_size=32/1, FP16 prediction accuracy, the effect-latency graph under GPU (n
     </tr>
 </table>
 
-As can be seen from the figures, the performance of ERNIE 3.0 lightweight models in accuracy and performance has been ahead of UER-py, Huawei-Noah, and Chinese models of HFL. When the batch_size equals 1 with FP16 prediction accuracy, wide and shallow models on GPU perform better in terms of inference.
+As can be seen from the figure, the comprehensive performance of the ERNIE Tiny 3.0 models has been comprehensively ahead of UER-py, Huawei-Noah and HFL in terms of accuracy and performance. And when batch_size=1 and the precision mode is FP16, the inference performance of the wide and shallow model on the GPU is more advantageous.
 
-The metrics on the CLUE **validation set** are shown in the following table：
+The precision data on the CLUE **validation set** are shown in the following table:
 
 <table style="width:100%;" cellpadding="2" cellspacing="0" border="1" bordercolor="#000000">
     <tbody>
@@ -1315,9 +1316,9 @@ The following is the directory structure and description of this project:：
 
 ## Fine-tuning
 
-The pre-trained models released by ERNIE 3.0 cannot be directly used on downstream tasks. They need fine-tuning using data from specific tasks.
+The pre-trained models released by ERNIE 3.0 cannot be directly used for prediction, and the pre-trained models need to be fine-tuned using task-specific data.
 
-ERNIE 3.0 models can be got with one line of code using PaddleNLP. Then you can fine-tune it using your own downstream data to obtain better models in specific tasks.
+Using PaddleNLP, you only need one line code to get the ERNIE Tiny 3.0 models, and then you can fine-tune it under your own task data to obtain task-specific models.
 
 ```python
 
@@ -1325,28 +1326,28 @@ from paddlenlp.transformers import *
 
 tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-medium-zh")
 
-# For classification tasks
+# For Text Classification Task
 seq_cls_model = AutoModelForSequenceClassification.from_pretrained("ernie-3.0-medium-zh")
 
-# For sequence labeling
+# For Token Classification Task
 token_cls_model = AutoModelForTokenClassification.from_pretrained("ernie-3.0-medium-zh")
 
-# For reading comprehension
+# For Question Answering Task
 qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-medium-zh")
 
 ```
 
-The project provides fine-tuned sample scripts targeted at classification (including text classification, text matching, natural language inference, pronoun disambiguation, and other tasks), sequence labeling, and reading comprehension.You can refer to the three scripts `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py`，Start up as follows：
+The project provides fine-tuned sample scripts targeted at classification (including text classification, text matching, natural language inference, pronoun disambiguation, etc.), token classification, and question answering.You can refer to the three scripts `run_seq_cls.py` 、`run_token_cls.py`、`run_qa.py`，Start up as follows：
 
 ```shell
-# classification tasks
+# Text Classification Task
 # The script supports seven classification tasks in CLUE. Their hyperparameters are not all the same, so the configuration of hyperparameters in classification tasks is configured by config.yml
 python run_seq_cls.py  \
     --task_name tnews \
     --model_name_or_path ernie-3.0-medium-zh \
     --do_train
 
-# sequence labeling
+# Token Classification Task
 python run_token_cls.py \
     --task_name msra_ner  \
     --model_name_or_path ernie-3.0-medium-zh \
@@ -1358,7 +1359,7 @@ python run_token_cls.py \
     --max_seq_length 128 \
     --remove_unused_columns False
 
-# reading comprehension
+# Question Answering Task
 python run_qa.py \
     --model_name_or_path ernie-3.0-medium-zh \
     --do_train \
@@ -1372,7 +1373,7 @@ python run_qa.py \
 
 ## Model Compression
 
-Although ERNIE 3.0 has provided effective 6-layer and 4-layer lightweight models that can be used directly after fine-tuning, models need to be compressed if models require further deployment and release. You can refer to the model compression schemes and API provided here to process fine-tuned models.
+Although ERNIE 3.0 has provided effective 6-layer and 4-layer lightweight models that can be used directly after fine-tuning, models need to be compressed if models require further deployment and release. You can use the model compression plans and API to compress the fine-tuned models.
 
 <a name="Environment Dependencies"></a>
 
@@ -1388,7 +1389,7 @@ pip install paddleslim
 
 ### Model Compression API
 
-This project uses the compression API to crop and quantify models fine-tuned on the task data. After uploading the model and the associated compression hyperparameters (optional, with default options provided), you can start cropping and quantization with the `compress()`line. Compressed models can be saved automatically for deployment.
+This project uses the compression API to prune and quantify models fine-tuned on the task data. After uploading the model and the associated compression hyperparameters (optional, with default options provided), you can start cropping and quantization with the `compress()`line. Compressed models can be saved automatically for deployment.
 
 The core invocation is as follows. You can refer to the full sample script below this directory if you need to run through the complete example:
 
@@ -1426,14 +1427,14 @@ Some hyperparameters of model compression can be controlled by passing command-l
 This project provides examples of using compression API in classification (text classification, text matching, natural language inference, pronoun disambiguation, etc.), sequence labeling, and reading comprehension. Refer to `compress_seq_cls.py` 、`compress_token_cls.py`、`compress_qa.py`，then start up as follows：
 
 ```shell
-# classification tasks
+# Classification Tasks 
 # This script supports seven classification tasks in CLUE. Their hyperparameters are not all the same, so the configuration of hyperparameters in classification tasks is configured by config.yml
 python compress_seq_cls.py \
     --dataset "clue tnews"  \
     --model_name_or_path best_models/TNEWS  \
     --output_dir ./
 
-# sequence labeling
+# Token Classification
 python compress_token_cls.py \
     --dataset "msra_ner"  \
     --model_name_or_path best_models/MSRA_NER \
@@ -1445,7 +1446,7 @@ python compress_token_cls.py \
     --remove_unused_columns False \
     --num_train_epochs 3
 
-# reading comprehension
+# Question Answering 
 python compress_qa.py \
     --dataset "clue cmrc2018" \
     --model_name_or_path best_models/CMRC2018  \
@@ -1464,7 +1465,7 @@ One line of code to verify the accuracy of compressed models:
 ```shell
 # primitive model
 python infer.py --task_name tnews --model_path best_models/TNEWS/compress/inference/infer --use_trt
-# after clipping
+# after pruning
 python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/float --use_trt
 # after quantization
 python infer.py --task_name tnews --model_path best_models/TNEWS/compress/0.75/hist16/int8 --use_trt --precision int8
@@ -1487,17 +1488,17 @@ In this case, we use compression API to compress ERNIE 3.0-Medium models fine-tu
 | ------------------------------- | ----- | ----- | ----- | ------- | ----- | ----- | ----------- | ----- | ----------- | ----------------- |
 | ERNIE 3.0-Medium                | 74.87 | 75.35 | 57.45 | 60.18   | 81.16 | 77.19 | 80.59       | 81.93 | 66.95/87.15 | 92.65/93.43/93.04 |
 | ERNIE 3.0-Medium+FP16           | 74.87 | 75.32 | 57.45 | 60.22   | 81.16 | 77.22 | 80.59       | 81.90 | 66.95/87.16 | 92.65/93.45/93.05 |
-| ERNIE 3.0-Medium+cropping+FP32      | 74.70 | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.92/86.43 | 93.10/93.43/93.27 |
-| ERNIE 3.0-Medium+cropping+FP16      | 74.71 | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 81.73 | 65.89/86.44 | 93.10/93.43/93.27 |
-| ERNIE 3.0-Medium+cropping+quantization+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
+| ERNIE 3.0-Medium+pruning+FP32      | 74.70 | 75.14 | 57.31 | 60.29   | 81.25 | 77.46 | 79.93       | 81.70 | 65.92/86.43 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+pruning+FP16      | 74.71 | 75.21 | 57.27 | 60.29   | 81.24 | 77.56 | 79.93       | 81.73 | 65.89/86.44 | 93.10/93.43/93.27 |
+| ERNIE 3.0-Medium+pruning+quantization+INT8 | 74.44 | 75.02 | 57.26 | 60.37   | 81.03 | 77.25 | 77.96       | 81.67 | 66.17/86.55 | 93.17/93.23/93.20 |
 | ERNIE 3.0-Medium+quantization+INT8      | 74.10 | 74.67 | 56.99 | 59.91   | 81.03 | 75.05 | 78.62       | 81.60 | 66.32/86.82 | 93.10/92.90/92.70 |
 
 **Evaluation indicators：** the indicator of CLUE classification tasks (AFQMC semantic similarity, TNEWS text classification, IFLYTEK long text classification, CMNLI natural language inference, OCNLI natural language inference, CLUEWSC2020 pronoun disambiguation, CSL paper keyword identification) is Accuracy; The indicator of the reading comprehension task CLUE CMRC2018 is EM (Exact Match)/F1-Score, and EM is used to calculate the average; The indicator of the sequence labeling task MSRA_NER is Precision/Recall/F1-Score, and F1-Score is used to calculate the average.
-According to the table, the accuracy of `ERNIE 3.0-Medium` models decreases by 0.46 on average with a decrease of 0.17 after clipping and 0.77 after quantization.
+According to the table, the accuracy of `ERNIE 3.0-Medium` models decreases by 0.46 on average with a decrease of 0.17 after pruning and 0.77 after quantization.
 
 <a name="Performance Testing"></a>
 
-#### Performance Testing
+#### Performance Test
 
 The configuration is as follows：
 
@@ -1529,7 +1530,7 @@ The testing environment is as above. The number of threads is set to 12 when tes
 | ERNIE 3.0-Medium+cropping+INT8 | 704.42(2.3x) | 56.69(-0.76) | 215.58(2.4x)  | 92.39(-0.65)  | 75.23(2.2x)   | 63.47(-3.48)  |
 
 
-After the same compression, the speedup ratio of three types of tasks (classification, sequence labeling, and reading comprehension) reaches about 2.3.
+After the same compression, the speedup ratio of three types of tasks (text classification, token classification, and question answering) reaches about 2.3.
 
 
 <a name="GPU performance"></a>
@@ -1541,12 +1542,12 @@ After the same compression, the speedup ratio of three types of tasks (classific
 | ERNIE 3.0-Medium+FP32      | 1123.85(1.0x) | 57.45        | 366.75(1.0x)  | 93.04         | 146.84(1.0x)  | 66.95         |
 | ERNIE 3.0-Medium+FP16      | 2672.41(2.4x) | 57.45(0.00)  | 840.11(2.3x)  | 93.05(0.01)   | 303.43(2.1x)  | 66.95(0.00)   |
 | ERNIE 3.0-Medium+INT8      | 3226.26(2.9x) | 56.99(-0.46) | 889.33(2.4x)  | 92.70(-0.34)  | 348.84(2.4x)  | 66.32(-0.63   |
-| ERNIE 3.0-Medium+cropping+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
-| ERNIE 3.0-Medium+cropping+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23)  | 445.71(3.0x)  | 65.89(-1.06)  |
-| ERNIE 3.0-Medium+cropping+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
+| ERNIE 3.0-Medium+pruning+FP32 | 1424.01(1.3x) | 57.31(-0.14) | 454.27(1.2x)  | 93.27(+0.23)  | 183.77(1.3x)  | 65.92(-1.03)  |
+| ERNIE 3.0-Medium+pruning+FP16 | 3577.62(3.2x) | 57.27(-0.18) | 1138.77(3.1x) | 93.27(+0.23)  | 445.71(3.0x)  | 65.89(-1.06)  |
+| ERNIE 3.0-Medium+pruning+INT8 | 3635.48(3.2x) | 57.26(-0.19) | 1105.26(3.0x) | 93.20(+0.16)  | 444.27(3.0x)  | 66.17(-0.78)  |
 
 
-After clipping and quantization, the speedup ratio of the three types of tasks (classification, sequence labeling, and reading comprehension) reaches about 3, and the average accuracy loss of all tasks can be controlled within 0.5 (0.46).
+After pruning and quantization, the speedup ratio of the three types of tasks (text classification, token classification, and question answering) reaches about 3, and the average accuracy loss of all tasks can be controlled within 0.5 (0.46).
 
 <a name="Speed Up with FasterTokenizer"></a>
 
@@ -1554,7 +1555,7 @@ After clipping and quantization, the speedup ratio of the three types of tasks (
 
 PaddlePaddle’s FasterTokenizer is a text processing operator library with high speed. It integrates with Google's LinMaxMatch algorithm that was released in late 2021. This algorithm introduces Aho-Corasick to optimize the time complexity of WordPiece from O(N2) to O(N), and it has been widely used in Google Search. FasterTokenizer takes the lead in speed. The larger the batch_size, the faster it is. For example, with a batch_size of 64, FasterTokenizer Tokenizes words 28 times faster than HuggingFace.
 
-After clipping and quantization of the ERNIE 3.0 lightweight model, when the number of word segmentation threads is set to 4, FasterTokenizer can improve its performance by 2.39 times in IFLYTEK (long text classification dataset with a maximum sequence length of 128) in the NVIDIA Tesla T4 environment. Compared with BERT-Base, the model’s performance is improved by 7.09 times. In the condition of Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz and 8 threads, the performance is improved by 1.27 times, 5.13 times higher than BERT-Base. The speedup effect is demonstrated in the following chart:
+After pruning and quantization of the ERNIE 3.0 lightweight model, when the number of word segmentation threads is set to 4, FasterTokenizer can improve its performance by 2.39 times in IFLYTEK (long text classification dataset with a maximum sequence length of 128) in the NVIDIA Tesla T4 environment. Compared with BERT-Base, the model’s performance is improved by 7.09 times. In the condition of Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz and 8 threads, the performance is improved by 1.27 times, 5.13 times higher than BERT-Base. The speedup effect is demonstrated in the following chart:
 
 <table>
     <tr>
@@ -1590,7 +1591,8 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 <a name="Deployment"></a>
 
 ## Deployment
-We provide a variety of deployment options for ERNIE 3.0 to meet various deployment requirements. Please select according to actual situations.
+We provide various deployment scenarios for ERNIE 3.0, which can meet the deployment requirements in different tasks, please choose according to the actual situation:
+
 <p align="center">
         <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
 </p>
@@ -1599,11 +1601,11 @@ We provide a variety of deployment options for ERNIE 3.0 to meet various deploym
 
 ### Python Deployment
 
-For Python deplyment, please refer to: [Python Deployment Guide](./deploy/python/README.md)
+For Python deployment, please refer to: [Python Deployment Guide](./deploy/python/README.md)
 
-<a name="Service-oriented Deployment"></a>
+<a name="Service Deployment"></a>
 
-### Service-oriented Deployment
+### Service Deployment
 
 - [Triton Inference Server Service-oriented Deployment Guide](./deploy/triton/README.md)
 - [Paddle Serving Service-oriented Deployment Guide](./deploy/serving/README.md)
