@@ -20,7 +20,7 @@ import requests
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--max_seq_len", default=512, type=int, help="The maximum total input sequence length after tokenization.")
-parser.add_argument("--batch_size", default=1, type=int, help="Batch size per GPU/CPU for predicting.")
+parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for predicting.")
 parser.add_argument("--doc_stride", default=128, type=int, help="Batch size per GPU/CPU for predicting.")
 args = parser.parse_args()
 # yapf: disable

@@ -27,14 +27,17 @@ class QAPostHandler(BasePostHandler):
         end_logits = data["logits_1"]
         contexts = data["data"]["context"]
         questions = data["data"]["question"]
+        offset_mappings = data["data"]["offset_mapping"]
         answers = []
         count = 0
-        for start_logit, end_logit in zip(start_logits, end_logits):
+        for start_logit, end_logit, offset_mapping in zip(start_logits, end_logits, offset_mappings):
             start_position = np.argmax(np.array(start_logit))
             end_position = np.argmax(np.array(end_logit))
+            start_id = offset_mapping[start_position][0]
+            end_id = offset_mapping[end_position][1]
             answer = []
             if end_position > start_position:
-                answer = contexts[count][start_position:end_position]
+                answer = contexts[count][start_id:end_id]
             answers.append(answer)
             count += 1
 

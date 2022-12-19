@@ -42,7 +42,6 @@ class NERPostHandler(BasePostHandler):
                 if label_name == "O" or label_name.startswith("B-"):
                     if len(words):
                         items.append({"pos": [start, i], "entity": words, "label": tag})
-
                     if label_name.startswith("B-"):
                         tag = label_name.split("-")[1]
                     else:
@@ -61,7 +60,7 @@ class NERPostHandler(BasePostHandler):
 
 app = SimpleServer()
 app.register(
-    "ernie_ner",
+    "models/ernie_ner",
     model_path="../../best_models/msra_ner/export/",
     tokenizer_name="ernie-3.0-medium-zh",
     model_handler=TokenClsModelHandler,

@@ -202,7 +202,7 @@ def main():
 
         out_dict = {"value": value, "tokens_label": tokens_label}
         out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
-        json.dump(out_dict, out_file)
+        json.dump(out_dict, out_file, ensure_ascii=True)
 
     # Export inference model
     if training_args.do_export:

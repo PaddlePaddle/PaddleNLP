@@ -95,7 +95,7 @@ def main():
     elif training_args.do_eval:
         column_names = raw_datasets["validation"].column_names
     else:
-        column_names = raw_datasets["test"].column_names
+        column_names = raw_datasets["validation"].column_names
 
     if training_args.do_train:
         train_dataset = raw_datasets["train"]
@@ -123,7 +123,7 @@ def main():
                 desc="Running tokenizer on validation dataset",
             )
     if training_args.do_predict:
-        predict_examples = raw_datasets["test"]
+        predict_examples = raw_datasets["validation"]
         contexts = predict_examples["context"]
         questions = predict_examples["question"]
         with training_args.main_process_first(desc="test dataset map pre-processing"):
@@ -197,8 +197,8 @@ def main():
         trainer.log_metrics("predict", test_ret.metrics)
 
         out_dict = {"answer": test_ret.predictions, "context": contexts, "question": questions}
-        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
-        json.dump(out_dict, out_file)
+        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w", encoding="utf8")
+        json.dump(out_dict, out_file, ensure_ascii=True)
 
     # Export inference model
     if training_args.do_export:
