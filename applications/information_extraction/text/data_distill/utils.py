@@ -435,6 +435,9 @@ def doccano2distill(json_lines, task_type, label_maps=None):
                 ent_text = text[entity["start_offset"] : entity["end_offset"]]
                 if entity["label"] not in label_maps["entity2id"].keys():
                     if task_type == "entity_extraction":
+                        logger.warning(
+                            "Found undefined label type. The setting of schema should contain all the label types in annotation file export from annotation platform."
+                        )
                         continue
                     else:
                         ent_type = "object"
