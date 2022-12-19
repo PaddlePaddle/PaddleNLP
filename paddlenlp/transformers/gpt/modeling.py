@@ -842,10 +842,8 @@ class GPTModel(GPTPretrainedModel):
         elif input_ids is not None:
             input_shape = paddle.shape(input_ids)
             input_ids = input_ids.reshape((-1, input_shape[-1]))
-            batch_size = input_shape[0]
         elif inputs_embeds is not None:
             input_shape = paddle.shape(inputs_embeds)[:-1]
-            batch_size = input_shape[0]
         else:
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
