@@ -16,8 +16,8 @@ import argparse
 import os
 
 import paddle
-
 from data import load_dict
+
 from paddlenlp.transformers import AutoModelForTokenClassification
 
 # fmt: off

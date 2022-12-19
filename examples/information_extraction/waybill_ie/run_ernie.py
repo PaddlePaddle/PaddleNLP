@@ -17,8 +17,8 @@ import os
 from functools import partial
 
 import paddle
-
 from data import load_dataset, load_dict, parse_decodes
+
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.metrics import ChunkEvaluator
 from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
