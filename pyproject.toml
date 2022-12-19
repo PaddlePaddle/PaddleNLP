@@ -1,5 +1,6 @@
 [tool.isort]
 profile = 'black'
+known_third_party = ["paddle"]
 skip = ['paddlenlp/transformers/__init__.py']
 
 [tool.black]
