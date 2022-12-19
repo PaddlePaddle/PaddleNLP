@@ -21,13 +21,7 @@ from paddlenlp.trainer import Trainer
 
 
 class LayoutTrainer(Trainer):
-
-    def __init__(self,
-                 *args,
-                 eval_examples=None,
-                 post_process_function=None,
-                 convert_fn=None,
-                 **kwargs):
+    def __init__(self, *args, eval_examples=None, post_process_function=None, convert_fn=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.eval_examples = eval_examples
         self.post_process_function = post_process_function
@@ -79,13 +73,12 @@ class LayoutTrainer(Trainer):
 
         if self.post_process_function is not None and self.compute_metrics is not None:
             pred_rst, gt_rst, eval_preds = self.post_process_function(
-                eval_examples, eval_dataset, output.predictions,
-                output.label_ids)
+                eval_examples, eval_dataset, output.predictions, output.label_ids
+            )
             self.save_predictions("eval", pred_rst, gt_rst)
             metrics = self.compute_metrics(eval_preds)
             if self.convert_fn is not None:
-                processed_metrics = self.convert_fn(pred_rst,
-                                                    self.args.output_dir)
+                processed_metrics = self.convert_fn(pred_rst, self.args.output_dir)
                 if processed_metrics is not None:
                     metrics.update(processed_metrics)
 
@@ -98,15 +91,10 @@ class LayoutTrainer(Trainer):
         else:
             metrics = {}
 
-        self.control = self.callback_handler.on_evaluate(
-            self.args, self.state, self.control, metrics)
+        self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, metrics)
         return metrics
 
-    def predict(self,
-                predict_dataset,
-                predict_examples,
-                ignore_keys=None,
-                metric_key_prefix: str = "test"):
+    def predict(self, predict_dataset, predict_examples, ignore_keys=None, metric_key_prefix: str = "test"):
 
         predict_dataloader = self.get_test_dataloader(predict_dataset)
 
@@ -125,14 +113,13 @@ class LayoutTrainer(Trainer):
 
         if self.post_process_function is not None and self.compute_metrics is not None:
             pred_rst, gt_rst, eval_preds = self.post_process_function(
-                predict_examples, predict_dataset, output.predictions,
-                output.label_ids)
+                predict_examples, predict_dataset, output.predictions, output.label_ids
+            )
             self.save_predictions("test", pred_rst, gt_rst)
             metrics = self.compute_metrics(eval_preds)
 
             if self.convert_fn is not None:
-                processed_metrics = self.convert_fn(pred_rst,
-                                                    self.args.output_dir)
+                processed_metrics = self.convert_fn(pred_rst, self.args.output_dir)
                 if processed_metrics is not None:
                     metrics.update(processed_metrics)
 

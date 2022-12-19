@@ -12,35 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import re
-import copy
-import uuid
-import math
-import json
-import gzip
-import tqdm
-import random
-import pickle
-import re
 import base64
-from functools import cmp_to_key
+import random
+import re
+import uuid
 from collections.abc import Sequence
-from PIL import Image
+from functools import cmp_to_key
 from io import BytesIO
+
 import numpy as np
-from .log import logger
+from PIL import Image
 
 
 class BaseOperator(object):
-
     def __init__(self, name=None):
         if name is None:
             name = self.__class__.__name__
-        self._id = name + '_' + str(uuid.uuid4())[-6:]
+        self._id = name + "_" + str(uuid.uuid4())[-6:]
 
     def __call__(self, sample, context=None):
-        """ Process a sample.
+        """Process a sample.
         Args:
             sample (dict): a dict of sample, eg: {'image':xx, 'label': xxx}
             context (dict): info about this sample processing
@@ -54,39 +45,35 @@ class BaseOperator(object):
 
 
 class DecodeImage(BaseOperator):
-
     def __init__(self):
-        """ Transform the image data to numpy format."""
+        """Transform the image data to numpy format."""
         super(DecodeImage, self).__init__()
 
     def __call__(self, sample, context=None):
-        """ load image if 'im_file' field is not empty but 'image' is"""
-        if 'image' not in sample:
-            sample["image"] = base64.b64decode(
-                sample["im_base64"].encode('utf-8'))
+        """load image if 'im_file' field is not empty but 'image' is"""
+        if "image" not in sample:
+            sample["image"] = base64.b64decode(sample["im_base64"].encode("utf-8"))
 
-        im = sample['image']
-        data = np.frombuffer(bytearray(im), dtype='uint8')
-        im = np.array(Image.open(BytesIO(data)).convert('RGB'))  # RGB format
-        sample['image'] = im
+        im = sample["image"]
+        data = np.frombuffer(bytearray(im), dtype="uint8")
+        im = np.array(Image.open(BytesIO(data)).convert("RGB"))  # RGB format
+        sample["image"] = im
 
-        if 'h' not in sample:
-            sample['h'] = im.shape[0]
-        elif sample['h'] != im.shape[0]:
-            sample['h'] = im.shape[0]
-        if 'w' not in sample:
-            sample['w'] = im.shape[1]
-        elif sample['w'] != im.shape[1]:
-            sample['w'] = im.shape[1]
+        if "h" not in sample:
+            sample["h"] = im.shape[0]
+        elif sample["h"] != im.shape[0]:
+            sample["h"] = im.shape[0]
+        if "w" not in sample:
+            sample["w"] = im.shape[1]
+        elif sample["w"] != im.shape[1]:
+            sample["w"] = im.shape[1]
 
         # make default im_info with [h, w, 1]
-        sample['im_info'] = np.array([im.shape[0], im.shape[1], 1.],
-                                     dtype=np.float32)
+        sample["im_info"] = np.array([im.shape[0], im.shape[1], 1.0], dtype=np.float32)
         return sample
 
 
 class ResizeImage(BaseOperator):
-
     def __init__(self, target_size=0, interp=1):
         """
         Rescale image to the specified target size, and capped at max_size
@@ -102,14 +89,13 @@ class ResizeImage(BaseOperator):
         self.interp = int(interp)
         if not (isinstance(target_size, int) or isinstance(target_size, list)):
             raise TypeError(
-                "Type of target_size is invalid. Must be Integer or List, now is {}"
-                .format(type(target_size)))
+                "Type of target_size is invalid. Must be Integer or List, now is {}".format(type(target_size))
+            )
         self.target_size = target_size
 
     def __call__(self, sample, context=None, save_real_img=False):
-        """ Resize the image numpy.
-        """
-        im = sample['image']
+        """Resize the image numpy."""
+        im = sample["image"]
         if not isinstance(im, np.ndarray):
             raise TypeError("{}: image type is not numpy.".format(self))
         im_shape = im.shape
@@ -120,20 +106,18 @@ class ResizeImage(BaseOperator):
         else:
             selected_size = self.target_size
         if float(im_size_min) == 0:
-            raise ZeroDivisionError('{}: min size of image is 0'.format(self))
+            raise ZeroDivisionError("{}: min size of image is 0".format(self))
 
         resize_w = selected_size
         resize_h = selected_size
 
-        im = im.astype('uint8')
-        im = Image.fromarray(im)
+        im = Image.fromarray(im.astype("uint8"))
         im = im.resize((int(resize_w), int(resize_h)), self.interp)
-        sample['image'] = np.array(im)
+        sample["image"] = np.array(im)
         return sample
 
 
 class Permute(BaseOperator):
-
     def __init__(self, to_bgr=True):
         """
         Change the channel.
@@ -150,10 +134,10 @@ class Permute(BaseOperator):
             batch_input = False
             samples = [samples]
         for sample in samples:
-            assert 'image' in sample, "image data not found"
+            assert "image" in sample, "image data not found"
             for k in sample.keys():
                 # hard code
-                if k.startswith('image'):
+                if k.startswith("image"):
                     im = sample[k]
                     im = np.swapaxes(im, 1, 2)
                     im = np.swapaxes(im, 1, 0)
@@ -166,11 +150,7 @@ class Permute(BaseOperator):
 
 
 class NormalizeImage(BaseOperator):
-
-    def __init__(self,
-                 mean=[0.485, 0.456, 0.406],
-                 std=[1, 1, 1],
-                 is_channel_first=True):
+    def __init__(self, mean=[0.485, 0.456, 0.406], std=[1, 1, 1], is_channel_first=True, is_scale=False):
         """
         Args:
             mean (list): the pixel mean
@@ -181,9 +161,11 @@ class NormalizeImage(BaseOperator):
         self.mean = mean
         self.std = std
         self.is_channel_first = is_channel_first
+        self.is_scale = is_scale
         from functools import reduce
+
         if reduce(lambda x, y: x * y, self.std) == 0:
-            raise ValueError('{}: std is invalid!'.format(self))
+            raise ValueError("{}: std is invalid!".format(self))
 
     def __call__(self, sample, context=None):
         """Normalize the image.
@@ -198,7 +180,7 @@ class NormalizeImage(BaseOperator):
             samples = [samples]
         for sample in samples:
             for k in sample.keys():
-                if k.startswith('image'):
+                if k.startswith("image"):
                     im = sample[k]
                     im = im.astype(np.float32, copy=False)
                     if self.is_channel_first:
@@ -207,6 +189,8 @@ class NormalizeImage(BaseOperator):
                     else:
                         mean = np.array(self.mean)[np.newaxis, np.newaxis, :]
                         std = np.array(self.std)[np.newaxis, np.newaxis, :]
+                    if self.is_scale:
+                        im = im / 255.0
                     im -= mean
                     im /= std
                     sample[k] = im
@@ -237,30 +221,26 @@ class PadBatch(BaseOperator):
         coarsest_stride = self.pad_to_stride
         if coarsest_stride == 0:
             return samples
-        max_shape = np.array([data['image'].shape
-                              for data in samples]).max(axis=0)
+        max_shape = np.array([data["image"].shape for data in samples]).max(axis=0)
 
         if coarsest_stride > 0:
-            max_shape[1] = int(
-                np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
-            max_shape[2] = int(
-                np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
+            max_shape[1] = int(np.ceil(max_shape[1] / coarsest_stride) * coarsest_stride)
+            max_shape[2] = int(np.ceil(max_shape[2] / coarsest_stride) * coarsest_stride)
 
         for data in samples:
-            im = data['image']
+            im = data["image"]
             im_c, im_h, im_w = im.shape[:]
-            padding_im = np.zeros((im_c, max_shape[1], max_shape[2]),
-                                  dtype=np.float32)
+            padding_im = np.zeros((im_c, max_shape[1], max_shape[2]), dtype=np.float32)
             padding_im[:, :im_h, :im_w] = im
-            data['image'] = padding_im
+            data["image"] = padding_im
             if self.use_padded_im_info:
-                data['im_info'][:2] = max_shape[1:3]
+                data["im_info"][:2] = max_shape[1:3]
         return samples
 
 
 def check(s):
     """Check whether is English"""
-    my_re = re.compile(r'[A-Za-z0-9]', re.S)
+    my_re = re.compile(r"[A-Za-z0-9]", re.S)
     res = re.findall(my_re, s)
     if len(res):
         return True
@@ -268,10 +248,33 @@ def check(s):
 
 
 def img2base64(img_path):
-    """ get base64 """
+    """get base64"""
     with open(img_path, "rb") as f:
-        base64_str = base64.b64encode(f.read()).decode('utf-8')
+        base64_str = base64.b64encode(f.read()).decode("utf-8")
     return base64_str
+
+
+def np2base64(image_np):
+    img = Image.fromarray(image_np)
+    base64_str = pil2base64(img)
+    return base64_str
+
+
+def pil2base64(image, image_type=None, size=False):
+    if not image_type:
+        image_type = "JPEG"
+    img_buffer = BytesIO()
+    image.save(img_buffer, format=image_type)
+
+    byte_data = img_buffer.getvalue()
+    base64_str = base64.b64encode(byte_data)
+
+    base64_string = base64_str.decode("utf-8")
+
+    if size:
+        return base64_string, image.size
+    else:
+        return base64_string
 
 
 class Bbox(object):
@@ -308,8 +311,7 @@ class Bbox(object):
         """
         Reload the `repr` operator.
         """
-        return "(x={}, y={}, w={}, h={})".format(self.left, self.top,
-                                                 self.width, self.height)
+        return "(x={}, y={}, w={}, h={})".format(self.left, self.top, self.width, self.height)
 
     def __eq__(self, other):
         """
@@ -319,31 +321,30 @@ class Bbox(object):
 
         << True if two box is equal else False.
         """
-        return self.left == other.left and self.top == other.top \
-               and self.width == other.width and self.height == other.height
+        return (
+            self.left == other.left
+            and self.top == other.top
+            and self.width == other.width
+            and self.height == other.height
+        )
 
     def tuple(self, precision=3):
         """
         Return the tuple format box.
         """
-        return tuple(
-            round(one, precision)
-            for one in (self.left, self.top, self.width, self.height))
+        return tuple(round(one, precision) for one in (self.left, self.top, self.width, self.height))
 
     def list_int(self):
         """
         Return the list(int) format box.
         """
-        return list(
-            int(one) for one in (self.left, self.top, self.width, self.height))
+        return list(int(one) for one in (self.left, self.top, self.width, self.height))
 
     def points_tuple(self, precision=3):
         """
         Return the coordinate of box
         """
-        return tuple(
-            round(one, precision)
-            for one in (self.left, self.top, self.right, self.bottom))
+        return tuple(round(one, precision) for one in (self.left, self.top, self.right, self.bottom))
 
     @property
     def left(self):
@@ -373,8 +374,7 @@ class Bbox(object):
 
         ^^ AssertionError: when right is less than left.
         """
-        assert right >= self._c_left, "right {} < left {} is forbidden.".format(
-            right, self._c_left)
+        assert right >= self._c_left, "right {} < left {} is forbidden.".format(right, self._c_left)
         self._c_width = right - self._c_left
 
     @property
@@ -405,8 +405,7 @@ class Bbox(object):
 
         ^^ AssertionError: when bottom is less than top.
         """
-        assert bottom >= self._c_top, "top {} > bottom {} is forbidden.".format(
-            self._c_top, bottom)
+        assert bottom >= self._c_top, "top {} > bottom {} is forbidden.".format(self._c_top, bottom)
         self._c_height = bottom - self._c_top
 
     @property
@@ -495,8 +494,7 @@ class Bbox(object):
 
         << True if `self` contains `box` else False
         """
-        return self.left <= box.left and self.top <= box.top \
-               and self.right >= box.right and self.bottom >= box.bottom
+        return self.left <= box.left and self.top <= box.top and self.right >= box.right and self.bottom >= box.bottom
 
     def overlap_vertically(self, box):
         """
@@ -582,8 +580,7 @@ class Bbox(object):
         """
         Translate box in the direction of vector
         """
-        return Bbox(self.left + vector[0], self.top + vector[1], self.width,
-                    self.height)
+        return Bbox(self.left + vector[0], self.top + vector[1], self.width, self.height)
 
     @staticmethod
     def union(*boxes):
@@ -594,10 +591,8 @@ class Bbox(object):
 
         << The union `Bbox` of `boxes`.
         """
-        left, top = min([box.left
-                         for box in boxes]), min([box.top for box in boxes])
-        right, bottom = max([box.right for box in boxes
-                             ]), max([box.bottom for box in boxes])
+        left, top = min([box.left for box in boxes]), min([box.top for box in boxes])
+        right, bottom = max([box.right for box in boxes]), max([box.bottom for box in boxes])
 
         return Bbox.from_points((left, top), (right, bottom))
 
@@ -628,10 +623,8 @@ class Bbox(object):
 
         << The intersection `Bbox` of `boxes`.
         """
-        left, top = max(box.left for box in boxes), max(box.top
-                                                        for box in boxes)
-        right, bottom = min(box.right for box in boxes), min(box.bottom
-                                                             for box in boxes)
+        left, top = max(box.left for box in boxes), max(box.top for box in boxes)
+        right, bottom = min(box.right for box in boxes), min(box.bottom for box in boxes)
 
         if left > right or top > bottom:
             return Bbox()
@@ -646,8 +639,7 @@ class Bbox(object):
         >> boxa: The box to calculate with.
         >> boxb: The box to calculate with.
         """
-        return Bbox.intersection(boxa, boxb).area() / Bbox.union(boxa,
-                                                                 boxb).area()
+        return Bbox.intersection(boxa, boxb).area() / Bbox.union(boxa, boxb).area()
 
     @staticmethod
     def from_points(p0, p1):
@@ -661,10 +653,8 @@ class Bbox(object):
 
         ^^ AssertionError: if width or height is less than 0.
         """
-        assert p1[0] >= p0[0], "width {} must larger than 0.".format(p1[0] -
-                                                                     p0[0])
-        assert p1[1] >= p0[1], "height {} must larger than 0.".format(p1[1] -
-                                                                      p0[1])
+        assert p1[0] >= p0[0], "width {} must larger than 0.".format(p1[0] - p0[0])
+        assert p1[1] >= p0[1], "height {} must larger than 0.".format(p1[1] - p0[1])
 
         return Bbox(p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1])
 
@@ -692,29 +682,21 @@ def two_dimension_sort_layout(layout1, layout2, vratio=0.54):
 
 
 def ppocr2example(ocr_res, img_path):
-    """Transfer paddleocr result to example
-    """
+    """Transfer paddleocr result to example"""
     segments = []
     for rst in ocr_res:
         left = min(rst[0][0][0], rst[0][3][0])
         top = min(rst[0][0][-1], rst[0][1][-1])
-        width = max(rst[0][1][0], rst[0][2][0]) - min(rst[0][0][0],
-                                                      rst[0][3][0])
-        height = max(rst[0][2][-1], rst[0][3][-1]) - min(
-            rst[0][0][-1], rst[0][1][-1])
-        segments.append({
-            "bbox": Bbox(*[left, top, width, height]),
-            "text": rst[-1][0]
-        })
+        width = max(rst[0][1][0], rst[0][2][0]) - min(rst[0][0][0], rst[0][3][0])
+        height = max(rst[0][2][-1], rst[0][3][-1]) - min(rst[0][0][-1], rst[0][1][-1])
+        segments.append({"bbox": Bbox(*[left, top, width, height]), "text": rst[-1][0]})
     segments.sort(key=cmp_to_key(two_dimension_sort_layout))
     img_base64 = img2base64(img_path)
     doc_tokens = []
     doc_boxes = []
 
-    im_w_box = max([seg["bbox"].left + seg["bbox"].width
-                    for seg in segments]) + 20
-    im_h_box = max([seg["bbox"].top + seg["bbox"].height
-                    for seg in segments]) + 20
+    im_w_box = max([seg["bbox"].left + seg["bbox"].width for seg in segments]) + 20
+    im_h_box = max([seg["bbox"].top + seg["bbox"].height for seg in segments]) + 20
     img = Image.open(img_path)
     im_w, im_h = img.size
     im_w, im_h = max(im_w, im_w_box), max(im_h, im_h_box)
@@ -742,22 +724,11 @@ def ppocr2example(ocr_res, img_path):
             char_num += 1
         char_width = int(w / char_num)
         for char_idx in range(char_num):
-            doc_boxes.append([
-                Bbox(*[
-                    bbox.left +
-                    (char_width * char_idx), bbox.top, char_width, bbox.height
-                ])
-            ])
+            doc_boxes.append([Bbox(*[bbox.left + (char_width * char_idx), bbox.top, char_width, bbox.height])])
     new_doc_boxes = []
     for doc_box in doc_boxes:
         bbox = doc_box[0]
         new_doc_boxes.append([bbox.left, bbox.top, bbox.right, bbox.bottom])
     doc_boxes = new_doc_boxes
-    example = {
-        "text": doc_tokens,
-        "bbox": doc_boxes,
-        "width": im_w,
-        "height": im_h,
-        "image": img_base64
-    }
+    example = {"text": doc_tokens, "bbox": doc_boxes, "width": im_w, "height": im_h, "image": img_base64}
     return example

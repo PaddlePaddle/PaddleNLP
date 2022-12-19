@@ -32,15 +32,13 @@ huggingface_to_paddle = {
 }
 
 skip_weights = ["embeddings.position_ids"]
-dont_transpose = [
-    "attention.self.key_conv_attn_layer", "_embeddings.weight", "LayerNorm."
-]
+dont_transpose = ["attention.self.key_conv_attn_layer", "_embeddings.weight", "LayerNorm."]
 
 
-def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
-                                         paddle_dump_path):
+def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path, paddle_dump_path):
     import torch
     import paddle
+
     pytorch_state_dict = torch.load(pytorch_checkpoint_path, map_location="cpu")
     paddle_state_dict = OrderedDict()
     for k, v in pytorch_state_dict.items():
@@ -65,16 +63,19 @@ def convert_pytorch_checkpoint_to_paddle(pytorch_checkpoint_path,
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--pytorch_checkpoint_path",
-                        default="./conv-bert-base/pytorch_model.bin",
-                        type=str,
-                        required=False,
-                        help="Path to the Pytorch checkpoint path.")
-    parser.add_argument("--paddle_dump_path",
-                        default="./convbert-base/model_state.pdparams",
-                        type=str,
-                        required=False,
-                        help="Path to the output Paddle model.")
+    parser.add_argument(
+        "--pytorch_checkpoint_path",
+        default="./conv-bert-base/pytorch_model.bin",
+        type=str,
+        required=False,
+        help="Path to the Pytorch checkpoint path.",
+    )
+    parser.add_argument(
+        "--paddle_dump_path",
+        default="./convbert-base/model_state.pdparams",
+        type=str,
+        required=False,
+        help="Path to the output Paddle model.",
+    )
     args = parser.parse_args()
-    convert_pytorch_checkpoint_to_paddle(args.pytorch_checkpoint_path,
-                                         args.paddle_dump_path)
+    convert_pytorch_checkpoint_to_paddle(args.pytorch_checkpoint_path, args.paddle_dump_path)

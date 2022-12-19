@@ -12,28 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, field
 import os
-import sys
+from collections import defaultdict
+from dataclasses import dataclass, field
 
 import paddle
 import paddle.nn.functional as F
-from paddle.static import InputSpec
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
-from paddlenlp.prompt import (
-    AutoTemplate,
-    SoftVerbalizer,
-    PromptTuningArguments,
-    PromptTrainer,
-    PromptModelForSequenceClassification,
-)
-
+from metric import MetricReport
 from utils import load_local_dataset
 
-sys.path.append("../")
-from metric import MetricReport
+from paddlenlp.prompt import (
+    AutoTemplate,
+    PromptModelForSequenceClassification,
+    PromptTrainer,
+    PromptTuningArguments,
+    SoftVerbalizer,
+)
+from paddlenlp.trainer import EarlyStoppingCallback, PdArgumentParser
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -41,8 +38,6 @@ from metric import MetricReport
 class DataArguments:
     data_dir: str = field(default="./data", metadata={"help": "The dataset dictionary includes train.txt, dev.txt and label.txt files."})
     prompt: str = field(default=None, metadata={"help": "The input prompt for tuning."})
-    soft_encoder: str = field(default="lstm", metadata={"help": "The encoder type of soft template, `lstm`, `mlp` or None."})
-    encoder_hidden_size: int = field(default=200, metadata={"help": "The dimension of soft embeddings."})
 
 
 @dataclass
@@ -54,8 +49,7 @@ class ModelArguments:
 
 def main():
     # Parse the arguments.
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, PromptTuningArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, PromptTuningArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -67,34 +61,30 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
-    template = AutoTemplate.create_from(
-        data_args.prompt,
-        tokenizer,
-        training_args.max_seq_length,
-        model=model,
-        prompt_encoder=data_args.soft_encoder,
-        encoder_hidden_size=data_args.encoder_hidden_size)
-    logger.info("Using template: {}".format(template.template))
+    template = AutoTemplate.create_from(data_args.prompt, tokenizer, training_args.max_seq_length, model=model)
+    logger.info("Using template: {}".format(template.prompt))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
-    verbalizer = SoftVerbalizer.from_file(tokenizer, model, label_file)
+    with open(label_file, "r", encoding="utf-8") as fp:
+        label_words = defaultdict(list)
+        for line in fp:
+            data = line.strip().split("==")
+            word = data[1] if len(data) > 1 else data[0].split("##")[-1]
+            label_words[data[0]].append(word)
+    verbalizer = SoftVerbalizer(label_words, tokenizer, model)
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
-        data_path=data_args.data_dir,
-        splits=["train", "dev", "test"],
-        label_list=verbalizer.labels_to_ids)
+        data_path=data_args.data_dir, splits=["train", "dev", "test"], label_list=verbalizer.labels_to_ids
+    )
 
     # Define the criterion.
     criterion = paddle.nn.BCEWithLogitsLoss()
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForSequenceClassification(
-        model,
-        template,
-        verbalizer,
-        freeze_plm=training_args.freeze_plm,
-        freeze_dropout=training_args.freeze_dropout)
+        model, template, verbalizer, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
+    )
 
     # Define the metric function.
     def compute_metrics(eval_preds):
@@ -102,26 +92,22 @@ def main():
         preds = F.sigmoid(paddle.to_tensor(eval_preds.predictions))
         metric.update(preds, paddle.to_tensor(eval_preds.label_ids))
         micro_f1_score, macro_f1_score = metric.accumulate()
-        return {
-            "micro_f1_score": micro_f1_score,
-            "macro_f1_score": macro_f1_score
-        }
+        return {"micro_f1_score": micro_f1_score, "macro_f1_score": macro_f1_score}
 
     # Deine the early-stopping callback.
-    callbacks = [
-        EarlyStoppingCallback(early_stopping_patience=4,
-                              early_stopping_threshold=0.)
-    ]
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.
-    trainer = PromptTrainer(model=prompt_model,
-                            tokenizer=tokenizer,
-                            args=training_args,
-                            criterion=criterion,
-                            train_dataset=train_ds,
-                            eval_dataset=dev_ds,
-                            callbacks=callbacks,
-                            compute_metrics=compute_metrics)
+    trainer = PromptTrainer(
+        model=prompt_model,
+        tokenizer=tokenizer,
+        args=training_args,
+        criterion=criterion,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        callbacks=callbacks,
+        compute_metrics=compute_metrics,
+    )
 
     # Training.
     if training_args.do_train:
@@ -139,16 +125,9 @@ def main():
 
     # Export static model.
     if training_args.do_export:
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # mask_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # soft_token_ids
-        ]
-        export_path = os.path.join(training_args.output_dir, 'export')
-        trainer.export_model(export_path,
-                             input_spec=input_spec,
-                             export_type=model_args.export_type)
+        export_path = os.path.join(training_args.output_dir, "export")
+        trainer.export_model(export_path, export_type=model_args.export_type)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

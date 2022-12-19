@@ -32,8 +32,7 @@ class Timer(object):
         self._last = self._start
 
     def reset(self, only_last=False, msg=None):
-        """reset all setting
-        """
+        """reset all setting"""
         if msg is not None:
             self._msg = msg
         curr_time = time.time()
@@ -42,27 +41,24 @@ class Timer(object):
             self._start = curr_time
 
     def check(self):
-        """check cost time from start
-        """
+        """check cost time from start"""
         end = time.time()
         cost = end - self._start
         return cost
 
     def interval(self):
-        """check cost time from lst
-        """
+        """check cost time from lst"""
         end = time.time()
         cost = end - self._last
         self._last = end
         return cost
 
     def ending(self):
-        """ending checking and log
-        """
-        cost = '%.2f' % time.time() - self._start
+        """ending checking and log"""
+        cost = "%.2f" % time.time() - self._start
         if self._msg == "":
             log_msg = "cost time: %s" % (cost)
-        elif '{}' in self._msg:
+        elif "{}" in self._msg:
             log_msg = self._msg.format(cost)
         else:
             log_msg = self._msg + cost
@@ -71,8 +67,7 @@ class Timer(object):
 
 
 def list_increment(lst: list, base: int):
-    """increment each element in list
-    """
+    """increment each element in list"""
     for i in range(len(lst)):
         lst[i] += base
     return lst
@@ -86,41 +81,30 @@ def count_file_lines(filename):
     return cnt
 
 
-def print_tensors(tag='*', **kwrags):
-    """print tensors for debuging
-    """
+def print_tensors(tag="*", **kwrags):
+    """print tensors for debuging"""
     print(tag * 50)
     for key, value in kwrags.items():
-        print(key, ':', value)
+        print(key, ":", value)
 
 
 if __name__ == "__main__":
     """run some simple test cases"""
     import json
     from boomup import data_struct
-    question = '三峡碧江需要大于2的招聘数量'
+
+    question = "三峡碧江需要大于2的招聘数量"
     table_json = {
-        "rows": [[
-            4.0, "污水运行工", "三峡碧江公司", "渝北", 2.0, "大专及以上", "给排水/环境工程/机电及相关专业",
-            "sxswrlzyb@163.com"
+        "rows": [
+            [4.0, "污水运行工", "三峡碧江公司", "渝北", 2.0, "大专及以上", "给排水/环境工程/机电及相关专业", "sxswrlzyb@163.com"],
+            [5.0, "污水运行工", "三峡垫江公司", "垫江", 1.0, "大专及以上", "给排水/环境工程/机电及相关专业", "sxswrlzyb@163.com"],
         ],
-                 [
-                     5.0, "污水运行工", "三峡垫江公司", "垫江", 1.0, "大专及以上",
-                     "给排水/环境工程/机电及相关专业", "sxswrlzyb@163.com"
-                 ]],
-        "name":
-        "Table_a7b5108c3b0611e98ad7f40f24344a08",
-        "title":
-        "",
-        "header":
-        ["岗位序号", "招聘岗位", "用人单位", "工作地点", "招聘数量", "学历要求", "专业及资格要求", "简历投递邮箱"],
-        "common":
-        "",
-        "id":
-        "a7b510",
-        "types":
-        ["real", "text", "text", "text", "real", "text", "text", "text"]
+        "name": "Table_a7b5108c3b0611e98ad7f40f24344a08",
+        "title": "",
+        "header": ["岗位序号", "招聘岗位", "用人单位", "工作地点", "招聘数量", "学历要求", "专业及资格要求", "简历投递邮箱"],
+        "common": "",
+        "id": "a7b510",
+        "types": ["real", "text", "text", "text", "real", "text", "text", "text"],
     }
-    table_json['header'] = data_struct.Header(table_json['header'],
-                                              table_json['types'])
+    table_json["header"] = data_struct.Header(table_json["header"], table_json["types"])
     table = data_struct.Table(**table_json)

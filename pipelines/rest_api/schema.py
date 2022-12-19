@@ -106,3 +106,19 @@ class QueryImageResponse(BaseModel):
     answers: List[str] = []
     documents: List[DocumentSerialized] = []
     debug: Optional[Dict] = Field(None, alias="_debug")
+
+
+class QueryQAPairRequest(BaseModel):
+    meta: List[str]
+    params: Optional[dict] = None
+    debug: Optional[bool] = False
+
+    class Config:
+        # Forbid any extra fields in the request to avoid silent failures
+        extra = Extra.forbid
+
+
+class QueryQAPairResponse(BaseModel):
+    meta: List[str]
+    filtered_cqa_triples: List[dict] = []
+    debug: Optional[Dict] = Field(None, alias="_debug")

@@ -14,23 +14,24 @@
 
 import os
 import six
+import json
 import psutil
 import argparse
 
 import numpy as np
 
 from paddlenlp.utils.log import logger
-from paddlenlp.prompt import AutoTemplate, Verbalizer, InputExample
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
+from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
 import paddle2onnx
 import onnxruntime as ort
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_path_prefix", type=str, required=True, help="The path prefix of inference model to be used.")
-parser.add_argument("--model_name_or_path", default="ernie-3.0-base-zh", type=str, help="The directory or name of model.")
+parser.add_argument("--model_name", default="ernie-3.0-base-zh", type=str, help="The name of pretrained model.")
 parser.add_argument("--data_dir", default=None, type=str, help="The path to the prediction data, including label.txt and data.txt.")
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
+parser.add_argument("--max_length", default=128, type=int, help="The maximum total input sequence length after tokenization.")
 parser.add_argument("--use_fp16", action='store_true', help="Whether to use fp16 inference, only takes effect when deploying on gpu.")
 parser.add_argument("--batch_size", default=200, type=int, help="Batch size per GPU/CPU for predicting.")
 parser.add_argument("--num_threads", default=psutil.cpu_count(logical=False), type=int, help="num_threads for cpu.")
@@ -41,23 +42,15 @@ args = parser.parse_args()
 
 
 class InferBackend(object):
-
-    def __init__(self,
-                 model_path_prefix,
-                 device="cpu",
-                 device_id=0,
-                 use_fp16=False,
-                 num_threads=10):
+    def __init__(self, model_path_prefix, device="cpu", device_id=0, use_fp16=False, num_threads=10):
 
         if not isinstance(device, six.string_types):
             logger.error(
-                ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                ">>> [InferBackend] The type of device must be string, but the type you set is: ", type(device)
+            )
             exit(0)
-        if device not in ['cpu', 'gpu']:
-            logger.error(
-                ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
-                type(device))
+        if device not in ["cpu", "gpu"]:
+            logger.error(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(device))
             exit(0)
 
         logger.info(">>> [InferBackend] Creating Engine ...")
@@ -66,7 +59,8 @@ class InferBackend(object):
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
-            enable_onnx_checker=True)
+            enable_onnx_checker=True,
+        )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
         with open(float_onnx_file, "wb") as f:
@@ -74,44 +68,34 @@ class InferBackend(object):
 
         if device == "gpu":
             logger.info(">>> [InferBackend] Use GPU to inference ...")
-            providers = ['CUDAExecutionProvider']
+            providers = ["CUDAExecutionProvider"]
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
                 from onnxconverter_common import float16
                 import onnx
-                fp16_model_file = os.path.join(infer_model_dir,
-                                               "fp16_model.onnx")
+
+                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
         else:
             logger.info(">>> [InferBackend] Use CPU to inference ...")
-            providers = ['CPUExecutionProvider']
+            providers = ["CPUExecutionProvider"]
             if use_fp16:
                 logger.warning(
-                    ">>> [InferBackend] Ignore use_fp16 as it only " +
-                    "takes effect when deploying on gpu...")
+                    ">>> [InferBackend] Ignore use_fp16 as it only " + "takes effect when deploying on gpu..."
+                )
 
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = num_threads
-        self.predictor = ort.InferenceSession(onnx_model,
-                                              sess_options=sess_options,
-                                              providers=providers,
-                                              provider_options=[{
-                                                  'device_id':
-                                                  device_id
-                                              }])
-        self.input_handles = [
-            self.predictor.get_inputs()[0].name,
-            self.predictor.get_inputs()[1].name,
-            self.predictor.get_inputs()[2].name
-        ]
+        self.predictor = ort.InferenceSession(
+            onnx_model, sess_options=sess_options, providers=providers, provider_options=[{"device_id": device_id}]
+        )
 
         if device == "gpu":
             try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+                assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
                     f"The environment for GPU inference is not set properly. "
@@ -122,27 +106,48 @@ class InferBackend(object):
         logger.info(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
-        input_dict = {
-            k: v
-            for k, v in input_dict.items() if k in self.input_handles
-        }
         result = self.predictor.run(None, input_dict)
         return result
 
 
 class MultiClassPredictor(object):
+    def __init__(self, args):
+        self.args = args
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        self.model = AutoModelForMaskedLM.from_pretrained(args.model_name)
+        self.template, self.labels, self.input_handles = self.post_init()
+        self.collate_fn = PromptDataCollatorWithPadding(
+            self.tokenizer, padding=True, return_tensors="np", return_attention_mask=True
+        )
 
-    def __init__(self, args, label_list):
-        self._label_list = label_list
-        self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-        self._max_seq_length = args.max_seq_length
-        self._batch_size = args.batch_size
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              args.device, args.device_id,
-                                              args.use_fp16, args.num_threads)
-        self._template = AutoTemplate.load_from(
-            os.path.dirname(args.model_path_prefix), self._tokenizer,
-            args.max_seq_length)
+        self.inference_backend = InferBackend(
+            self.args.model_path_prefix,
+            self.args.device,
+            self.args.device_id,
+            self.args.use_fp16,
+            self.args.num_threads,
+        )
+
+    def post_init(self):
+        export_path = os.path.dirname(self.args.model_path_prefix)
+        template_path = os.path.join(export_path, "template_config.json")
+        with open(template_path, "r") as fp:
+            prompt = json.load(fp)
+            template = AutoTemplate.create_from(prompt, self.tokenizer, self.args.max_length, self.model)
+        keywords = template.extract_template_keywords(template.prompt)
+        inputs = ["input_ids", "token_type_ids", "position_ids", "attention_mask"]
+        if "mask" in keywords:
+            inputs.append("masked_positions")
+        if "soft" in keywords:
+            inputs.append("soft_token_ids")
+        if "encoder" in keywords:
+            inputs.append("encoder_ids")
+        verbalizer_path = os.path.join(export_path, "verbalizer_config.json")
+        with open(verbalizer_path, "r") as fp:
+            label_words = json.load(fp)
+            labels = sorted(list(label_words.keys()))
+
+        return template, labels, inputs
 
     def predict(self, input_data: list):
         encoded_inputs = self.preprocess(input_data)
@@ -155,14 +160,25 @@ class MultiClassPredictor(object):
         infer_data = self.inference_backend.infer(input_dict)
         return infer_data
 
-    def infer_batch(self, encoded_inputs):
-        num_sample = len(encoded_inputs["input_ids"])
+    def infer_batch(self, inputs):
+        num_sample = len(inputs)
         infer_data = None
         num_infer_data = None
-        for idx in range(0, num_sample, self._batch_size):
-            l, r = idx, idx + self._batch_size
-            keys = encoded_inputs.keys()
-            input_dict = {k: encoded_inputs[k][l:r] for k in keys}
+        for index in range(0, num_sample, self.args.batch_size):
+            left, right = index, index + self.args.batch_size
+            batch_dict = self.collate_fn(inputs[left:right])
+            input_dict = {}
+            for key in self.input_handles:
+                value = batch_dict[key]
+                if key == "attention_mask":
+                    if value.ndim == 2:
+                        value = (1 - value[:, np.newaxis, np.newaxis, :]) * -1e4
+                    elif value.ndim != 4:
+                        raise ValueError("Expect attention mask with ndim=2 or 4, but get ndim={}".format(value.ndim))
+                    value = value.astype("float32")
+                else:
+                    value = value.astype("int64")
+                input_dict[key] = value
             results = self._infer(input_dict)
             if infer_data is None:
                 infer_data = [[x] for x in results]
@@ -175,21 +191,13 @@ class MultiClassPredictor(object):
         return infer_data
 
     def preprocess(self, input_data: list):
-        text = [InputExample(text_a=x) for x in input_data]
-        inputs = [self._template.wrap_one_example(x) for x in text]
-        inputs = {
-            "input_ids":
-            np.array([x["input_ids"] for x in inputs], dtype="int64"),
-            "mask_ids":
-            np.array([x["mask_ids"] for x in inputs], dtype="int64"),
-            "soft_token_ids":
-            np.array([x["soft_token_ids"] for x in inputs], dtype="int64")
-        }
+        text = [{"text_a": x} for x in input_data]
+        inputs = [self.template(x) for x in text]
         return inputs
 
     def postprocess(self, infer_data):
         preds = np.argmax(infer_data[0], axis=-1)
-        labels = [self._label_list[x] for x in preds]
+        labels = [self.labels[x] for x in preds]
         return {"label": labels}
 
     def printer(self, result, input_data):
@@ -204,12 +212,10 @@ if __name__ == "__main__":
     for arg_name, arg_value in vars(args).items():
         logger.info("{:20}: {}".format(arg_name, arg_value))
 
-    export_path = os.path.dirname(args.model_path_prefix)
-    labels, _ = Verbalizer.load_from(export_path)
+    predictor = MultiClassPredictor(args)
 
     text_dir = os.path.join(args.data_dir, "data.txt")
     with open(text_dir, "r", encoding="utf-8") as f:
         text_list = [x.strip() for x in f.readlines()]
 
-    predictor = MultiClassPredictor(args, labels)
     predictor.predict(text_list)

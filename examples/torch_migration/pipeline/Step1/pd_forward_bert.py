@@ -19,7 +19,7 @@ import paddle
 from reprod_log import ReprodLogger
 
 CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
-CONFIG_PATH = CURRENT_DIR.rsplit('/', 1)[0]
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
 sys.path.append(CONFIG_PATH)
 
 from models.pd_bert import BertConfig, BertForSequenceClassification
@@ -30,14 +30,13 @@ if __name__ == "__main__":
     # def logger
     reprod_logger = ReprodLogger()
 
-    paddle_dump_path = '../weights/paddle_weight.pdparams'
+    paddle_dump_path = "../weights/paddle_weight.pdparams"
     config = BertConfig()
     model = BertForSequenceClassification(config)
     checkpoint = paddle.load(paddle_dump_path)
     model.bert.load_dict(checkpoint)
 
-    classifier_weights = paddle.load(
-        "../classifier_weights/paddle_classifier_weights.bin")
+    classifier_weights = paddle.load("../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
     model.eval()
     # read or gen fake data

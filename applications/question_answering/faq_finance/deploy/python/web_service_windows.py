@@ -25,15 +25,10 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    pad_to_max_seq_len=False):
+def convert_example(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=False):
     result = []
     for text in example:
-        encoded_inputs = tokenizer(text=text,
-                                   max_seq_len=max_seq_length,
-                                   pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length, pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
@@ -41,13 +36,14 @@ def convert_example(example,
 
 
 class ErnieService(WebService):
-
     def init_service(self):
         from paddlenlp.transformers import AutoTokenizer
+
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
     def preprocess(self, feed=[], fetch=[]):
         from paddlenlp.data import Stack, Tuple, Pad
+
         print("input dict", feed)
         batch_size = len(feed)
         is_batch = True
@@ -56,15 +52,13 @@ class ErnieService(WebService):
             input_ids, segment_ids = convert_example([feed[i]], self.tokenizer)
             examples.append((input_ids, segment_ids))
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
-                ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_type_id, dtype="int64"),  # segment
         ): fn(samples)
         input_ids, segment_ids = batchify_fn(examples)
         feed_dict = {}
-        feed_dict['input_ids'] = input_ids
-        feed_dict['token_type_ids'] = segment_ids
+        feed_dict["input_ids"] = input_ids
+        feed_dict["token_type_ids"] = segment_ids
         return feed_dict, fetch, is_batch
 
     def postprocess(self, feed=[], fetch=[], fetch_map=None):

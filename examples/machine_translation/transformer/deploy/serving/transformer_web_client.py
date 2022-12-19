@@ -13,24 +13,18 @@ from paddle_serving_client.utils import MultiThreadRunner
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="../configs/transformer.big.yaml",
-                        type=str,
-                        help="Path of the config file. ")
+    parser.add_argument(
+        "--config", default="../configs/transformer.big.yaml", type=str, help="Path of the config file. "
+    )
     parser.add_argument("--batch_size", type=int, help="Batch size. ")
-    parser.add_argument("--threads",
-                        default=1,
-                        type=int,
-                        help="Number of threads. ")
-    parser.add_argument("--profile",
-                        action="store_true",
-                        help="Whether to profile. ")
+    parser.add_argument("--threads", default=1, type=int, help="Number of threads. ")
+    parser.add_argument("--profile", action="store_true", help="Whether to profile. ")
     args = parser.parse_args()
     return args
 
 
 def do_client(idx, args):
-    dataset = load_dataset('wmt14ende', splits=('test'))
+    dataset = load_dataset("wmt14ende", splits=("test"))
 
     headers = {"Content-type": "application/json"}
     url = "http://127.0.0.1:9292/transformer/prediction"
@@ -74,7 +68,7 @@ def multithread_http(args):
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
         pprint(args)
     if ARGS.batch_size is not None:
@@ -85,6 +79,7 @@ if __name__ == "__main__":
 
     if args.profile:
         from utils.recorder import Recorder
+
         multithread_http(args)
     else:
         do_client(0, args)

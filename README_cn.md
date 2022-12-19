@@ -31,8 +31,15 @@
 
 ## News 📢
 
-* 🔥 **2022.11.12 PaddleNLP新增AutoPrompt自动化提示功能，登顶FewCLUE小样本学习榜单!**
-  * 🥇 PaddleNLP 团队开源了 **AutoPrompt** 方案，基于开源的文心 ERNIE 预训练语言模型 ，结合了领域预训练和自动化提示学习技术，以291M 参数量的模型在小样本权威学习榜单 FewCLUE 排名第一，[详见](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)。
+* 🔥 **2022.12.9 发布 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
+  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型**UIE-X**，具有突出的零样本效果及小样本迁移能力。
+  * 🔨 产业应用：新增[**信息抽取全流程应用方案**](./applications/information_extraction)，支持文本、文档各类信息抽取场景，提供从数据标注、微调到部署的产业级全流程解决方案。
+* 🔥 **2022.11.28 发布 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
+  * 💪 框架升级：新增[**Huggingface Hub集成**](https://huggingface.co/PaddlePaddle)，后续将逐步支持Model，Tokenizer，Taskflow直接从[Huggingface Hub](https://huggingface.co/PaddlePaddle)加载；[**小样本 Prompt API**](./docs/advanced_guide/prompt.md)升级，支持PET算法实现。
+  * 💎 NLP工具：[**NLP 流水线系统 Pipelines**](./pipelines)检索能力再加强，新增交互式学习语义检索模型[Ernie-Search](./pipelines/API.md)；发布[**SimpleServing**](./docs/server.md)，支持Taskflow、预训练模型快速部署。
+* 🔥 **2022.11.17 发布 [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)**
+  * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE AutoPrompt 方案](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
+  * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
   * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
   * 发布 🖼[**PPDiffusers**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，可快速体验、二次开发 **Stable Diffusion**，持续支持更多模型。
@@ -42,7 +49,7 @@
 
 * 🔥 **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
   * 💎 NLP工具：**[NLP 流水线系统 Pipelines](./pipelines)** 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 💢 产业应用：新增 **[文本分类全流程应用方案](./applications/text_classification)** ，覆盖多分类、多标签、层次分类各类场景，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优；[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，发布 **UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，打破 UIE 推理瓶颈，推理速度提升 100 倍以上；
+  * 🔨 产业应用：新增 **[文本分类全流程应用方案](./applications/text_classification)** ，覆盖多分类、多标签、层次分类各类场景，支持 **小样本学习** 和 **TrustAI** 可信计算模型训练与调优；[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，发布 **UIE-M**，支持中英文混合抽取，新增**UIE 数据蒸馏**方案，打破 UIE 推理瓶颈，推理速度提升 100 倍以上；
   * 🍭 AIGC 内容生成：新增代码生成 SOTA 模型[**CodeGen**](./examples/code_generation/codegen)，支持多种编程语言代码生成；集成[**文图生成潮流模型**](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#%E6%96%87%E5%9B%BE%E7%94%9F%E6%88%90) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；新增[**中文文本摘要应用**](./applications/text_summarization)，基于大规模语料的中文摘要模型首次发布，可支持 Taskflow 一键调用和定制训练；
   * 💪 框架升级：[**模型自动压缩 API**](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[**小样本 Prompt**](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
@@ -57,6 +64,7 @@
   <div align="center">
   <img src="https://user-images.githubusercontent.com/11793384/200770385-a2c02093-0e1d-4189-b324-8b0251cba316.jpg" width="150" height="150" />
 </div>
+
 ## 特性
 
 #### <a href=#开箱即用的nlp工具集> 📦 开箱即用的NLP工具集 </a>
@@ -244,10 +252,10 @@ PaddleNLP针对信息抽取、语义检索、智能问答、情感分析等高�
 </div>
 
 ```python
-AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_faster=True)
+AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 ```
 
-为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_faster=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
+为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_fast=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
 
 #### ⚡️ FasterGeneration：高性能生成加速库
 
@@ -278,7 +286,7 @@ outputs, _ = model.generate(
 
 ### 环境依赖
 
-- python >= 3.6
+- python >= 3.7
 - paddlepaddle >= 2.2
 
 ### pip安装

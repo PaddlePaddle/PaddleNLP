@@ -31,8 +31,7 @@ from paddlenlp.utils.image_utils import ppocr2example
 
 
 class InferBackend(object):
-
-    def __init__(self, model_path_prefix, device='cpu'):
+    def __init__(self, model_path_prefix, device="cpu"):
         logger.info(">>> [InferBackend] Creating Engine ...")
         config = paddle.inference.Config(
             model_path_prefix + ".pdmodel",
@@ -49,79 +48,64 @@ class InferBackend(object):
         config.enable_memory_optim()
         self.predictor = paddle.inference.create_predictor(config)
         self.input_names = [name for name in self.predictor.get_input_names()]
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handles = [
-            self.predictor.get_output_handle(name)
-            for name in self.predictor.get_output_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handles = [self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()]
         logger.info(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
         for idx, input_name in enumerate(self.input_names):
             self.input_handles[idx].copy_from_cpu(input_dict[input_name])
         self.predictor.run()
-        outputs = [
-            output_handle.copy_to_cpu() for output_handle in self.output_handles
-        ]
+        outputs = [output_handle.copy_to_cpu() for output_handle in self.output_handles]
         return outputs
 
 
 class Predictor(object):
-
     def __init__(self, args):
         use_gpu = True if args.device == "gpu" else False
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            "ernie-layoutx-base-uncased")
+        self.tokenizer = AutoTokenizer.from_pretrained("ernie-layoutx-base-uncased")
         self.batch_size = args.batch_size
         self.max_seq_length = args.max_seq_length
         self.task_type = args.task_type
         self.lang = args.lang
-        self.ocr = PaddleOCR(use_angle_cls=True,
-                             lang=self.lang,
-                             show_log=False,
-                             use_gpu=use_gpu)
+        self.ocr = PaddleOCR(use_angle_cls=True, lang=self.lang, show_log=False, use_gpu=use_gpu)
 
         self.examples_cache = collections.defaultdict(list)
         self.features_cache = collections.defaultdict(list)
-        self._PrelimPrediction = collections.namedtuple("PrelimPrediction", [
-            "feature_index", "start_index", "end_index", "start_logit",
-            "end_logit"
-        ])
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              device=args.device)
+        self._PrelimPrediction = collections.namedtuple(
+            "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
+        )
+        self.inference_backend = InferBackend(args.model_path_prefix, device=args.device)
         if self.task_type == "ner":
             self.label_dict = {
-                'O': 0,
-                'B-ANSWER': 1,
-                'I-ANSWER': 2,
-                'B-HEADER': 3,
-                'I-HEADER': 4,
-                'B-QUESTION': 5,
-                'I-QUESTION': 6
+                "O": 0,
+                "B-ANSWER": 1,
+                "I-ANSWER": 2,
+                "B-HEADER": 3,
+                "I-HEADER": 4,
+                "B-QUESTION": 5,
+                "I-QUESTION": 6,
             }
             self.preprocess = self.preprocess_ner
             self.postprocess = self.postprocess_ner
         elif self.task_type == "cls":
             self.label_dict = {
-                'advertisement': 0,
-                'budget': 1,
-                'email': 2,
-                'file folder': 3,
-                'form': 4,
-                'handwritten': 5,
-                'invoice': 6,
-                'letter': 7,
-                'memo': 8,
-                'news article': 9,
-                'presentation': 10,
-                'questionnaire': 11,
-                'resume': 12,
-                'scientific publication': 13,
-                'scientific report': 14,
-                'specification': 15
+                "advertisement": 0,
+                "budget": 1,
+                "email": 2,
+                "file folder": 3,
+                "form": 4,
+                "handwritten": 5,
+                "invoice": 6,
+                "letter": 7,
+                "memo": 8,
+                "news article": 9,
+                "presentation": 10,
+                "questionnaire": 11,
+                "resume": 12,
+                "scientific publication": 13,
+                "scientific report": 14,
+                "specification": 15,
             }
             self.preprocess = self.preprocess_cls
             self.postprocess = self.postprocess_cls
@@ -145,8 +129,7 @@ class Predictor(object):
                 continue
             num_left_context = position - doc_span["start"]
             num_right_context = end - position
-            score = min(num_left_context,
-                        num_right_context) + 0.01 * doc_span["length"]
+            score = min(num_left_context, num_right_context) + 0.01 * doc_span["length"]
             if best_score is None or score > best_score:
                 best_score = score
                 best_span_index = span_index
@@ -154,9 +137,7 @@ class Predictor(object):
 
     def _get_best_indexes(self, logits, n_best_size):
         """Get the n-best logits from a list."""
-        index_and_score = sorted(enumerate(logits),
-                                 key=lambda x: x[1],
-                                 reverse=True)
+        index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
 
         best_indexes = []
         for i in range(len(index_and_score)):
@@ -186,8 +167,7 @@ class Predictor(object):
             ns_text = "".join(ns_chars)
             return (ns_text, ns_to_s_map)
 
-        tok_text = tokenizer.convert_tokens_to_string(
-            tokenizer.tokenize(orig_text))
+        tok_text = tokenizer.convert_tokens_to_string(tokenizer.tokenize(orig_text))
 
         start_position = tok_text.find(pred_text)
         if start_position == -1:
@@ -224,14 +204,10 @@ class Predictor(object):
         if orig_end_position is None:
             return orig_text
 
-        output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+        output_text = orig_text[orig_start_position : (orig_end_position + 1)]
         return output_text
 
-    def preprocess_ner(self,
-                       examples,
-                       doc_stride=128,
-                       target_size=1000,
-                       max_size=1000):
+    def preprocess_ner(self, examples, doc_stride=128, target_size=1000, max_size=1000):
         ignore_label_id = -100
         tokenized_examples = collections.defaultdict(list)
         for example_idx, example_text in enumerate(examples["text"]):
@@ -299,16 +275,13 @@ class Predictor(object):
 
                 for i in range(doc_span["length"]):
                     split_token_index = doc_span["start"] + i
-                    token_to_orig_map[str(
-                        len(tokens))] = tok_to_orig_index[split_token_index]
+                    token_to_orig_map[str(len(tokens))] = tok_to_orig_index[split_token_index]
 
-                    is_max_context = self._check_is_max_context(
-                        doc_spans, doc_span_index, split_token_index)
+                    is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                     token_is_max_context[str(len(tokens))] = is_max_context
                     tokens.append(all_doc_tokens[split_token_index])
                     token_boxes.append(all_doc_token_boxes[split_token_index])
-                    token_label_ids.append(self.label_dict[
-                        all_doc_token_labels[split_token_index]])
+                    token_label_ids.append(self.label_dict[all_doc_token_labels[split_token_index]])
                     sentence_ids.append(0)
 
                 token_is_max_context[str(len(tokens))] = False
@@ -340,43 +313,31 @@ class Predictor(object):
                 tokenized_examples["position_ids"].append(position_ids)
                 tokenized_examples["image"].append(image)
                 tokenized_examples["labels"].append(token_label_ids)
-                tokenized_examples["token_is_max_context"].append(
-                    token_is_max_context)
-                tokenized_examples["token_to_orig_map"].append(
-                    token_to_orig_map)
-        for input_id in tokenized_examples['input_ids']:
-            input_id = input_id + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(input_id))
+                tokenized_examples["token_is_max_context"].append(token_is_max_context)
+                tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
+        for input_id in tokenized_examples["input_ids"]:
+            input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(input_id)
+            )
 
-        for att_mask in tokenized_examples['attention_mask']:
-            att_mask = att_mask + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(att_mask))
+        for att_mask in tokenized_examples["attention_mask"]:
+            att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(att_mask)
+            )
 
-        for bbox in tokenized_examples['bbox']:
-            bbox = bbox + [[0, 0, 0, 0]
-                           for _ in range(self.max_seq_length - len(bbox))]
+        for bbox in tokenized_examples["bbox"]:
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
 
-        for label in tokenized_examples['labels']:
-            label = label + [1 * ignore_label_id
-                             ] * (self.max_seq_length - len(label))
+        for label in tokenized_examples["labels"]:
+            label = label + [1 * ignore_label_id] * (self.max_seq_length - len(label))
 
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.examples_cache["text"] = [item for item in examples["text"]]
         self.features_cache["id"] = [item for item in tokenized_examples["id"]]
-        self.features_cache["labels"] = [
-            item for item in tokenized_examples["labels"]
-        ]
-        self.features_cache["tokens"] = [
-            item for item in tokenized_examples["tokens"]
-        ]
-        self.features_cache["token_is_max_context"] = [
-            item for item in tokenized_examples["token_is_max_context"]
-        ]
-        self.features_cache["token_to_orig_map"] = [
-            item for item in tokenized_examples["token_to_orig_map"]
-        ]
+        self.features_cache["labels"] = [item for item in tokenized_examples["labels"]]
+        self.features_cache["tokens"] = [item for item in tokenized_examples["tokens"]]
+        self.features_cache["token_is_max_context"] = [item for item in tokenized_examples["token_is_max_context"]]
+        self.features_cache["token_to_orig_map"] = [item for item in tokenized_examples["token_to_orig_map"]]
         return tokenized_examples
 
     def postprocess_ner(self, preds):
@@ -399,65 +360,46 @@ class Predictor(object):
             gather_map = []
             for idx in features_ids:
                 pred, label = preds[idx], self.features_cache["labels"][idx]
-                prediction, prediction_score = self.get_predictions(
-                    pred, list(self.label_dict.keys()))
+                prediction, prediction_score = self.get_predictions(pred, list(self.label_dict.keys()))
 
-                token_is_max_context = self.features_cache[
-                    "token_is_max_context"][idx]
-                token_to_orig_map = self.features_cache["token_to_orig_map"][
-                    idx]
+                token_is_max_context = self.features_cache["token_is_max_context"][idx]
+                token_to_orig_map = self.features_cache["token_to_orig_map"][idx]
                 for token_idx in range(len(token_is_max_context)):
                     token_idx += 1
                     if token_is_max_context[str(token_idx)]:
-                        gather_tokens.append(
-                            self.features_cache["tokens"][idx][token_idx])
+                        gather_tokens.append(self.features_cache["tokens"][idx][token_idx])
                         gather_pred.append(prediction[token_idx])
                         gather_score.append(prediction_score[token_idx])
                         gather_label.append(label[token_idx])
                         gather_map.append(token_to_orig_map[str(token_idx)])
 
-            recover_pred = [
-                p for (p, l) in zip(gather_pred, gather_label) if l != -100
-            ]
+            recover_pred = [p for (p, l) in zip(gather_pred, gather_label) if l != -100]
 
             pred_entities = get_entities(recover_pred)
             recover_preds.append(recover_pred)
 
             for item in pred_entities:
-                entity = self.tokenizer.convert_tokens_to_string(
-                    gather_tokens[item[1]:(item[2] + 1)]).strip()
+                entity = self.tokenizer.convert_tokens_to_string(gather_tokens[item[1] : (item[2] + 1)]).strip()
                 orig_doc_start = gather_map[item[1]]
                 orig_doc_end = gather_map[item[2]]
-                orig_tokens = self.examples_cache["text"][eid][orig_doc_start:(
-                    orig_doc_end + 1)]
+                orig_tokens = self.examples_cache["text"][eid][orig_doc_start : (orig_doc_end + 1)]
                 orig_text = separator.join(orig_tokens)
-                final_text = self.get_final_text(entity, orig_text, False,
-                                                 self.tokenizer)
+                final_text = self.get_final_text(entity, orig_text, False, self.tokenizer)
                 final_text = final_text.replace("   ", " ")
 
                 res = {
-                    "text":
-                    final_text,
-                    "label":
-                    item[0],
-                    "start":
-                    item[1],
-                    "end":
-                    item[2],
-                    "probability":
-                    sum(gather_score[item[1]:item[2] + 1]) /
-                    (item[2] - item[1] + 1),
+                    "text": final_text,
+                    "label": item[0],
+                    "start": item[1],
+                    "end": item[2],
+                    "probability": sum(gather_score[item[1] : item[2] + 1]) / (item[2] - item[1] + 1),
                 }
                 prediction_tags.append(res)
 
             predictions.append(prediction_tags)
         return predictions
 
-    def preprocess_cls(self,
-                       examples,
-                       doc_stride=128,
-                       target_size=1000,
-                       max_size=1000):
+    def preprocess_cls(self, examples, doc_stride=128, target_size=1000, max_size=1000):
         tokenized_examples = collections.defaultdict(list)
         for example_idx, example_text in enumerate(examples["text"]):
             tok_to_orig_index = []
@@ -541,19 +483,18 @@ class Predictor(object):
                 tokenized_examples["bbox"].append(token_boxes)
                 tokenized_examples["position_ids"].append(position_ids)
                 tokenized_examples["image"].append(image)
-        for input_id in tokenized_examples['input_ids']:
-            input_id = input_id + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(input_id))
+        for input_id in tokenized_examples["input_ids"]:
+            input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(input_id)
+            )
 
-        for att_mask in tokenized_examples['attention_mask']:
-            att_mask = att_mask + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(att_mask))
+        for att_mask in tokenized_examples["attention_mask"]:
+            att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(att_mask)
+            )
 
-        for bbox in tokenized_examples['bbox']:
-            bbox = bbox + [[0, 0, 0, 0]
-                           for _ in range(self.max_seq_length - len(bbox))]
+        for bbox in tokenized_examples["bbox"]:
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
 
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.features_cache["id"] = [item for item in tokenized_examples["id"]]
@@ -580,12 +521,7 @@ class Predictor(object):
             predictions.append(list(self.label_dict.keys())[max_rcd[1]])
         return predictions
 
-    def preprocess_mrc(self,
-                       examples,
-                       doc_stride=128,
-                       max_query_length=64,
-                       target_size=1000,
-                       max_size=1000):
+    def preprocess_mrc(self, examples, doc_stride=128, max_query_length=64, target_size=1000, max_size=1000):
         qid = -1
         tokenized_examples = collections.defaultdict(list)
         for example_idx, example_text in enumerate(examples["text"]):
@@ -625,10 +561,8 @@ class Predictor(object):
             for question in self.questions[example_idx]:
                 qid += 1
                 query_tokens = self.tokenizer.tokenize(
-                    question,
-                    add_special_tokens=False,
-                    truncation=False,
-                    max_length=max_query_length)
+                    question, add_special_tokens=False, truncation=False, max_length=max_query_length
+                )
 
                 start_offset = 0
                 doc_spans = []
@@ -660,15 +594,12 @@ class Predictor(object):
 
                     for i in range(doc_span["length"]):
                         split_token_index = doc_span["start"] + i
-                        token_to_orig_map[str(
-                            len(tokens))] = tok_to_orig_index[split_token_index]
+                        token_to_orig_map[str(len(tokens))] = tok_to_orig_index[split_token_index]
 
-                        is_max_context = self._check_is_max_context(
-                            doc_spans, doc_span_index, split_token_index)
+                        is_max_context = self._check_is_max_context(doc_spans, doc_span_index, split_token_index)
                         token_is_max_context[str(len(tokens))] = is_max_context
                         tokens.append(all_doc_tokens[split_token_index])
-                        token_boxes.append(
-                            all_doc_token_boxes[split_token_index])
+                        token_boxes.append(all_doc_token_boxes[split_token_index])
                         sentence_ids.append(seg_a)
 
                     token_is_max_context[str(len(tokens))] = False
@@ -678,8 +609,7 @@ class Predictor(object):
                     sentence_ids.append(seg_a)
                     input_mask = [1] * len(tokens)
 
-                    while len(tokens
-                              ) < self.max_seq_length - len(query_tokens) - 1:
+                    while len(tokens) < self.max_seq_length - len(query_tokens) - 1:
                         token_is_max_context[str(len(tokens))] = False
                         token_to_orig_map[str(len(tokens))] = -1
                         tokens.append(self.tokenizer.pad_token)
@@ -703,9 +633,9 @@ class Predictor(object):
                     sentence_ids.append(seg_b)
 
                     input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
-                    position_ids = list(
-                        range(len(tokens) - len(query_tokens) - 1)) + list(
-                            range(len(query_tokens) + 1))
+                    position_ids = list(range(len(tokens) - len(query_tokens) - 1)) + list(
+                        range(len(query_tokens) + 1)
+                    )
 
                     answer_rcd = []
                     start_position = -1
@@ -727,41 +657,28 @@ class Predictor(object):
                     tokenized_examples["bbox"].append(token_boxes)
                     tokenized_examples["position_ids"].append(position_ids)
                     tokenized_examples["image"].append(image)
-                    tokenized_examples["token_is_max_context"].append(
-                        token_is_max_context)
-                    tokenized_examples["token_to_orig_map"].append(
-                        token_to_orig_map)
-        for input_id in tokenized_examples['input_ids']:
-            input_id = input_id + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(input_id))
+                    tokenized_examples["token_is_max_context"].append(token_is_max_context)
+                    tokenized_examples["token_to_orig_map"].append(token_to_orig_map)
+        for input_id in tokenized_examples["input_ids"]:
+            input_id = input_id + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(input_id)
+            )
 
-        for att_mask in tokenized_examples['attention_mask']:
-            att_mask = att_mask + [
-                1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]
-            ] * (self.max_seq_length - len(att_mask))
+        for att_mask in tokenized_examples["attention_mask"]:
+            att_mask = att_mask + [1 * self.tokenizer.tokens_to_ids[self.tokenizer.pad_token]] * (
+                self.max_seq_length - len(att_mask)
+            )
 
-        for bbox in tokenized_examples['bbox']:
-            bbox = bbox + [[0, 0, 0, 0]
-                           for _ in range(self.max_seq_length - len(bbox))]
+        for bbox in tokenized_examples["bbox"]:
+            bbox = bbox + [[0, 0, 0, 0] for _ in range(self.max_seq_length - len(bbox))]
         self.examples_cache["name"] = list(range(len(examples["text"])))
         self.examples_cache["text"] = [item for item in examples["text"]]
         self.features_cache["id"] = [item for item in tokenized_examples["id"]]
-        self.features_cache["question_id"] = [
-            item for item in tokenized_examples["question_id"]
-        ]
-        self.features_cache["tokens"] = [
-            item for item in tokenized_examples["tokens"]
-        ]
-        self.features_cache["questions"] = [
-            item for item in tokenized_examples["questions"]
-        ]
-        self.features_cache["token_is_max_context"] = [
-            item for item in tokenized_examples["token_is_max_context"]
-        ]
-        self.features_cache["token_to_orig_map"] = [
-            item for item in tokenized_examples["token_to_orig_map"]
-        ]
+        self.features_cache["question_id"] = [item for item in tokenized_examples["question_id"]]
+        self.features_cache["tokens"] = [item for item in tokenized_examples["tokens"]]
+        self.features_cache["questions"] = [item for item in tokenized_examples["questions"]]
+        self.features_cache["token_is_max_context"] = [item for item in tokenized_examples["token_is_max_context"]]
+        self.features_cache["token_to_orig_map"] = [item for item in tokenized_examples["token_to_orig_map"]]
         return tokenized_examples
 
     def postprocess_mrc(self, preds, max_answer_length=64, n_best_size=5):
@@ -770,8 +687,7 @@ class Predictor(object):
         for idx, feature_id in enumerate(self.features_cache["id"]):
             feature_id_to_features[feature_id].append(idx)
 
-        predictions = collections.defaultdict(
-            lambda: collections.defaultdict(list))
+        predictions = collections.defaultdict(lambda: collections.defaultdict(list))
         for ei, example_id in enumerate(self.examples_cache["name"]):
             feature_map = example_id
             features_ids = feature_id_to_features[feature_map]
@@ -780,16 +696,13 @@ class Predictor(object):
                 start_logits = preds[0][idx]
                 end_logits = preds[1][idx]
 
-                start_indexes = self._get_best_indexes(start_logits,
-                                                       n_best_size)
+                start_indexes = self._get_best_indexes(start_logits, n_best_size)
                 end_indexes = self._get_best_indexes(end_logits, n_best_size)
-                token_is_max_context = self.features_cache[
-                    "token_is_max_context"][idx]
+                token_is_max_context = self.features_cache["token_is_max_context"][idx]
 
                 for start_index in start_indexes:
                     for end_index in end_indexes:
-                        if not token_is_max_context.get(str(start_index),
-                                                        False):
+                        if not token_is_max_context.get(str(start_index), False):
                             continue
                         if end_index < start_index:
                             continue
@@ -802,52 +715,39 @@ class Predictor(object):
                                 start_index=start_index,
                                 end_index=end_index,
                                 start_logit=start_logits[start_index],
-                                end_logit=end_logits[end_index]))
+                                end_logit=end_logits[end_index],
+                            )
+                        )
 
-            prelim_predictions = sorted(prelim_predictions,
-                                        key=lambda x:
-                                        (x.start_logit + x.end_logit),
-                                        reverse=True)
+            prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
             for rcd in prelim_predictions:
 
-                question_id = self.features_cache["question_id"][
-                    rcd.feature_index]
+                question_id = self.features_cache["question_id"][rcd.feature_index]
                 question = self.features_cache["questions"][rcd.feature_index]
                 if question_id in predictions[example_id]:
                     continue
 
                 if rcd.start_index > 0:
-                    tok_tokens = self.features_cache["tokens"][
-                        rcd.feature_index][rcd.start_index:(rcd.end_index + 1)]
-                    orig_doc_start = self.features_cache["token_to_orig_map"][
-                        rcd.feature_index][str(rcd.start_index)]
-                    orig_doc_end = self.features_cache["token_to_orig_map"][
-                        rcd.feature_index][str(rcd.end_index)]
-                    orig_tokens = self.examples_cache["text"][ei][
-                        orig_doc_start:(orig_doc_end + 1)]
+                    tok_tokens = self.features_cache["tokens"][rcd.feature_index][
+                        rcd.start_index : (rcd.end_index + 1)
+                    ]
+                    orig_doc_start = self.features_cache["token_to_orig_map"][rcd.feature_index][str(rcd.start_index)]
+                    orig_doc_end = self.features_cache["token_to_orig_map"][rcd.feature_index][str(rcd.end_index)]
+                    orig_tokens = self.examples_cache["text"][ei][orig_doc_start : (orig_doc_end + 1)]
                     orig_text = separator.join(orig_tokens)
 
-                    tok_text = self.tokenizer.convert_tokens_to_string(
-                        tok_tokens).strip()
-                    final_text = self.get_final_text(tok_text, orig_text, False,
-                                                     self.tokenizer)
+                    tok_text = self.tokenizer.convert_tokens_to_string(tok_tokens).strip()
+                    final_text = self.get_final_text(tok_text, orig_text, False, self.tokenizer)
                 else:
                     continue
                 if question_id in predictions[example_id]:
-                    predictions[example_id][question_id]["answer"].append(
-                        final_text)
+                    predictions[example_id][question_id]["answer"].append(final_text)
                 else:
-                    predictions[example_id][question_id] = {
-                        "question": question,
-                        "answer": [final_text]
-                    }
+                    predictions[example_id][question_id] = {"question": question, "answer": [final_text]}
         formatted_predictions = []
         for v in predictions.values():
-            formatted_predictions.append([{
-                "question": qa["question"],
-                "answer": qa["answer"]
-            } for qa in v.values()])
+            formatted_predictions.append([{"question": qa["question"], "answer": qa["answer"]} for qa in v.values()])
         return formatted_predictions
 
     def infer(self, data):
@@ -869,12 +769,11 @@ class Predictor(object):
 
         preprocess_result = self.preprocess(inputs)
         preds = [[], []] if self.task_type == "mrc" else []
-        for idx in range(0, len(preprocess_result['id']), self.batch_size):
+        for idx in range(0, len(preprocess_result["id"]), self.batch_size):
             l, r = idx, idx + self.batch_size
             input_dict = {}
             for input_name in self.inference_backend.input_names:
-                input_dict[input_name] = np.array(
-                    preprocess_result[input_name][l:r], dtype='int64')
+                input_dict[input_name] = np.array(preprocess_result[input_name][l:r], dtype="int64")
             output = self.infer(input_dict)
             if self.task_type != "mrc":
                 preds.extend(output[0].tolist())
@@ -890,7 +789,7 @@ class Predictor(object):
 
 
 def _decode_image(im_base64):
-    """ Decode image """
+    """Decode image"""
     if im_base64 is not None:
         image = base64.b64decode(im_base64.encode("utf-8"))
         im = np.frombuffer(image, dtype="uint8")
@@ -934,17 +833,20 @@ def _scale_same_as_image(boxes, width, height, target_size):
     scale_x = target_size / width
     scale_y = target_size / height
 
-    new_boxes = [[
-        int(max(0, min(box[0] * scale_x, target_size - 1))),
-        int(max(0, min(box[1] * scale_y, target_size - 1))),
-        int(max(0, min(box[2] * scale_x, target_size - 1))),
-        int(max(0, min(box[3] * scale_y, target_size - 1))),
-    ] for box in boxes]
+    new_boxes = [
+        [
+            int(max(0, min(box[0] * scale_x, target_size - 1))),
+            int(max(0, min(box[1] * scale_y, target_size - 1))),
+            int(max(0, min(box[2] * scale_x, target_size - 1))),
+            int(max(0, min(box[3] * scale_y, target_size - 1))),
+        ]
+        for box in boxes
+    ]
     return new_boxes, (scale_x, scale_y)
 
 
 def _permute(im, channel_first=True, to_bgr=False):
-    """ Permute """
+    """Permute"""
     if channel_first:
         im = np.swapaxes(im, 1, 2)
         im = np.swapaxes(im, 1, 0)
@@ -962,8 +864,5 @@ def _str2im(
     # step1: decode image
     origin_im = _decode_image(im_base64)
     # step2: resize image
-    im = _resize_image(origin_im,
-                       target_size=target_size,
-                       interp=1,
-                       resize_box=False)
+    im = _resize_image(origin_im, target_size=target_size, interp=1, resize_box=False)
     return im, origin_im

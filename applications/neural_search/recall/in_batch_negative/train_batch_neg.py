@@ -17,14 +17,17 @@ import random
 import time
 import numpy as np
 import paddle
+import paddle.nn.functional as F
 from functools import partial
+
 from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
+
 from base_model import SemanticIndexBase
-from batch_negative.model import SemanticIndexBatchNeg
+from batch_negative.model import SemanticIndexBatchNeg, SemanticIndexCacheNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file
 from ann_util import build_index
 
@@ -89,6 +92,15 @@ parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt'
                     help="evaluate_result")
 parser.add_argument('--evaluate', action='store_true',
                     help='whether evaluate while training')
+parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
+parser.add_argument("--amp_loss_scale", default=32768, type=float,help="The value of scale_loss for fp16. This is only used for AMP training.")
+parser.add_argument("--use_recompute",
+                        action='store_true',
+                        help="Using the recompute to scale up the batch size and save the memory.")
+parser.add_argument("--use_gradient_cache",
+                        action='store_true',
+                        help="Using the gradient cache to scale up the batch size and save the memory.")
+parser.add_argument("--chunk_numbers",type=int,default=50,help="The number of the chunks for model")
 args = parser.parse_args()
 # yapf: enable
 
@@ -106,30 +118,30 @@ def recall(rs, N=10):
 
 
 @paddle.no_grad()
-def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
-             text_list, id2corpus):
+def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file, text_list, id2corpus):
     # Load pretrained semantic model
     inner_model = model._layers
     final_index = build_index(args, corpus_data_loader, inner_model)
     query_embedding = inner_model.get_semantic_embedding(query_data_loader)
-    with open(recall_result_file, 'w', encoding='utf-8') as f:
+    with open(recall_result_file, "w", encoding="utf-8") as f:
         for batch_index, batch_query_embedding in enumerate(query_embedding):
-            recalled_idx, cosine_sims = final_index.knn_query(
-                batch_query_embedding.numpy(), args.recall_num)
+            recalled_idx, cosine_sims = final_index.knn_query(batch_query_embedding.numpy(), args.recall_num)
             batch_size = len(cosine_sims)
             for row_index in range(batch_size):
                 text_index = args.batch_size * batch_index + row_index
                 for idx, doc_idx in enumerate(recalled_idx[row_index]):
-                    f.write("{}\t{}\t{}\n".format(
-                        text_list[text_index]["text"], id2corpus[doc_idx],
-                        1.0 - cosine_sims[row_index][idx]))
+                    f.write(
+                        "{}\t{}\t{}\n".format(
+                            text_list[text_index]["text"], id2corpus[doc_idx], 1.0 - cosine_sims[row_index][idx]
+                        )
+                    )
     text2similar = {}
-    with open(args.similar_text_pair_file, 'r', encoding='utf-8') as f:
+    with open(args.similar_text_pair_file, "r", encoding="utf-8") as f:
         for line in f:
             text, similar_text = line.rstrip().split("\t")
             text2similar[text] = similar_text
     rs = []
-    with open(recall_result_file, 'r', encoding='utf-8') as f:
+    with open(recall_result_file, "r", encoding="utf-8") as f:
         relevance_labels = []
         for index, line in enumerate(f):
             if index % args.recall_num == 0 and index != 0:
@@ -148,17 +160,201 @@ def evaluate(model, corpus_data_loader, query_data_loader, recall_result_file,
     for topN in recall_num:
         R = round(100 * recall(rs, N=topN), 3)
         recall_N.append(str(R))
-    evaluate_result_file = os.path.join(args.recall_result_dir,
-                                        args.evaluate_result)
-    result = open(evaluate_result_file, 'a')
+    evaluate_result_file = os.path.join(args.recall_result_dir, args.evaluate_result)
+    result = open(evaluate_result_file, "a")
     res = []
-    timestamp = time.strftime('%Y%m%d-%H%M%S', time.localtime())
+    timestamp = time.strftime("%Y%m%d-%H%M%S", time.localtime())
     res.append(timestamp)
     for key, val in zip(recall_num, recall_N):
-        print('recall@{}={}'.format(key, val))
+        print("recall@{}={}".format(key, val))
         res.append(str(val))
-    result.write('\t'.join(res) + '\n')
+    result.write("\t".join(res) + "\n")
     return float(recall_N[1])
+
+
+def train(
+    train_data_loader,
+    model,
+    optimizer,
+    lr_scheduler,
+    rank,
+    corpus_data_loader,
+    query_data_loader,
+    recall_result_file,
+    text_list,
+    id2corpus,
+    tokenizer,
+):
+    global_step = 0
+    best_recall = 0.0
+    tic_train = time.time()
+    for epoch in range(1, args.epochs + 1):
+        for step, batch in enumerate(train_data_loader, start=1):
+            query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
+
+            loss = model(
+                query_input_ids=query_input_ids,
+                title_input_ids=title_input_ids,
+                query_token_type_ids=query_token_type_ids,
+                title_token_type_ids=title_token_type_ids,
+            )
+
+            global_step += 1
+            if global_step % args.log_steps == 0 and rank == 0:
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, args.log_steps / (time.time() - tic_train))
+                )
+                tic_train = time.time()
+            loss.backward()
+            optimizer.step()
+            lr_scheduler.step()
+            optimizer.clear_grad()
+            if not args.evaluate:
+                if global_step % args.save_steps == 0 and rank == 0:
+                    save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+                    if not os.path.exists(save_dir):
+                        os.makedirs(save_dir)
+                    save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                    paddle.save(model.state_dict(), save_param_path)
+                    tokenizer.save_pretrained(save_dir)
+        if args.evaluate and rank == 0:
+            print("evaluating")
+            recall_5 = evaluate(model, corpus_data_loader, query_data_loader, recall_result_file, text_list, id2corpus)
+            if recall_5 > best_recall:
+                best_recall = recall_5
+
+                save_dir = os.path.join(args.save_dir, "model_best")
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
+                save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                paddle.save(model.state_dict(), save_param_path)
+                tokenizer.save_pretrained(save_dir)
+                with open(os.path.join(save_dir, "train_result.txt"), "a", encoding="utf-8") as fp:
+                    fp.write("epoch=%d, global_step: %d, recall: %s\n" % (epoch, global_step, recall_5))
+
+
+def gradient_cache_train(train_data_loader, model, optimizer, lr_scheduler, rank, tokenizer):
+
+    if args.use_amp:
+        scaler = paddle.amp.GradScaler(init_loss_scaling=args.amp_loss_scale)
+
+    if args.batch_size % args.chunk_numbers == 0:
+        chunk_numbers = args.chunk_numbers
+    else:
+        raise Exception(
+            f" Batch_size {args.batch_size} must divides chunk_numbers {args.chunk_numbers} without producing a remainder "
+        )
+
+    def split(inputs, chunk_numbers, axis=0):
+        if inputs.shape[0] % chunk_numbers == 0:
+            return paddle.split(inputs, chunk_numbers, axis=0)
+        else:
+            return paddle.split(inputs, inputs.shape[0], axis=0)
+
+    global_step = 0
+    tic_train = time.time()
+    for epoch in range(1, args.epochs + 1):
+        for step, batch in enumerate(train_data_loader, start=1):
+            # Separate large batches into several sub batches
+            chunked_x = [split(t, chunk_numbers, axis=0) for t in batch]
+            sub_batchs = [list(s) for s in zip(*chunked_x)]
+
+            all_grads = []
+            all_CUDA_rnd_state = []
+            all_query = []
+            all_title = []
+
+            for sub_batch in sub_batchs:
+                all_reps = []
+                all_labels = []
+                (
+                    sub_query_input_ids,
+                    sub_query_token_type_ids,
+                    sub_title_input_ids,
+                    sub_title_token_type_ids,
+                ) = sub_batch
+                with paddle.amp.auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax", "gelu"]):
+
+                    with paddle.no_grad():
+                        sub_CUDA_rnd_state = paddle.framework.random.get_cuda_rng_state()
+                        all_CUDA_rnd_state.append(sub_CUDA_rnd_state)
+                        sub_cosine_sim, sub_label, query_embedding, title_embedding = model(
+                            query_input_ids=sub_query_input_ids,
+                            title_input_ids=sub_title_input_ids,
+                            query_token_type_ids=sub_query_token_type_ids,
+                            title_token_type_ids=sub_title_token_type_ids,
+                        )
+                        all_reps.append(sub_cosine_sim)
+                        all_labels.append(sub_label)
+                        all_title.append(title_embedding)
+                        all_query.append(query_embedding)
+
+                model_reps = paddle.concat(all_reps, axis=0)
+                model_title = paddle.concat(all_title)
+                model_query = paddle.concat(all_query)
+
+                model_title = model_title.detach()
+                model_query = model_query.detach()
+
+                model_query.stop_gradient = False
+                model_title.stop_gradient = False
+                model_reps.stop_gradient = False
+
+                model_label = paddle.concat(all_labels, axis=0)
+                loss = F.cross_entropy(input=model_reps, label=model_label)
+                loss.backward()
+                # Store gradients
+                all_grads.append(model_reps.grad)
+
+            for sub_batch, CUDA_state, grad in zip(sub_batchs, all_CUDA_rnd_state, all_grads):
+
+                (
+                    sub_query_input_ids,
+                    sub_query_token_type_ids,
+                    sub_title_input_ids,
+                    sub_title_token_type_ids,
+                ) = sub_batch
+                paddle.framework.random.set_cuda_rng_state(CUDA_state)
+                # Recompute the forward propogation
+                sub_cosine_sim, sub_label, query_embedding, title_embedding = model(
+                    query_input_ids=sub_query_input_ids,
+                    title_input_ids=sub_title_input_ids,
+                    query_token_type_ids=sub_query_token_type_ids,
+                    title_token_type_ids=sub_title_token_type_ids,
+                )
+                # Chain rule
+                surrogate = paddle.dot(sub_cosine_sim, grad)
+                # Backward propogation
+                if args.use_amp:
+                    scaled = scaler.scale(surrogate)
+                    scaled.backward()
+                else:
+                    surrogate.backward()
+            # Update model parameters
+            if args.use_amp:
+                scaler.minimize(optimizer, scaled)
+            else:
+                optimizer.step()
+
+            global_step += 1
+            if global_step % args.log_steps == 0 and rank == 0:
+                print(
+                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
+                    % (global_step, epoch, step, loss, args.log_steps / (time.time() - tic_train))
+                )
+                tic_train = time.time()
+
+            lr_scheduler.step()
+            optimizer.clear_grad()
+
+            if global_step % args.save_steps == 0 and rank == 0:
+                save_dir = os.path.join(args.save_dir, "model_%d" % global_step)
+                if not os.path.exists(save_dir):
+                    os.makedirs(save_dir)
+                save_param_path = os.path.join(save_dir, "model_state.pdparams")
+                paddle.save(model.state_dict(), save_param_path)
+                tokenizer.save_pretrained(save_dir)
 
 
 def do_train():
@@ -169,39 +365,32 @@ def do_train():
 
     set_seed(args.seed)
 
-    train_ds = load_dataset(read_text_pair,
-                            data_path=args.train_set_file,
-                            lazy=False)
+    train_ds = load_dataset(read_text_pair, data_path=args.train_set_file, lazy=False)
 
-    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path)
+    pretrained_model = AutoModel.from_pretrained(args.model_name_or_path, enable_recompute=args.use_recompute)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
 
-    trans_func = partial(convert_example,
-                         tokenizer=tokenizer,
-                         max_seq_length=args.max_seq_length)
+    trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # query_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # query_segment
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
     ): [data for data in fn(samples)]
 
-    train_data_loader = create_dataloader(train_ds,
-                                          mode='train',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn,
-                                          trans_fn=trans_func)
-
-    model = SemanticIndexBatchNeg(pretrained_model,
-                                  margin=args.margin,
-                                  scale=args.scale,
-                                  output_emb_size=args.output_emb_size)
+    train_data_loader = create_dataloader(
+        train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func
+    )
+    if args.use_gradient_cache:
+        model = SemanticIndexCacheNeg(
+            pretrained_model, margin=args.margin, scale=args.scale, output_emb_size=args.output_emb_size
+        )
+    else:
+        model = SemanticIndexBatchNeg(
+            pretrained_model, margin=args.margin, scale=args.scale, output_emb_size=args.output_emb_size
+        )
 
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
@@ -211,10 +400,8 @@ def do_train():
     model = paddle.DataParallel(model)
 
     batchify_fn_dev = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'
-            ),  # text_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # text_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # text_input
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # text_segment
     ): [data for data in fn(samples)]
 
     id2corpus = gen_id2corpus(args.corpus_file)
@@ -223,96 +410,53 @@ def do_train():
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
-    corpus_data_loader = create_dataloader(corpus_ds,
-                                           mode='predict',
-                                           batch_size=args.batch_size,
-                                           batchify_fn=batchify_fn_dev,
-                                           trans_fn=trans_func)
+    corpus_data_loader = create_dataloader(
+        corpus_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn_dev, trans_fn=trans_func
+    )
 
     text_list, text2similar_text = gen_text_file(args.similar_text_pair_file)
 
     query_ds = MapDataset(text_list)
 
-    query_data_loader = create_dataloader(query_ds,
-                                          mode='predict',
-                                          batch_size=args.batch_size,
-                                          batchify_fn=batchify_fn_dev,
-                                          trans_fn=trans_func)
+    query_data_loader = create_dataloader(
+        query_ds, mode="predict", batch_size=args.batch_size, batchify_fn=batchify_fn_dev, trans_fn=trans_func
+    )
 
     if not os.path.exists(args.recall_result_dir):
         os.mkdir(args.recall_result_dir)
 
-    recall_result_file = os.path.join(args.recall_result_dir,
-                                      args.recall_result_file)
+    recall_result_file = os.path.join(args.recall_result_dir, args.recall_result_file)
 
     num_training_steps = len(train_data_loader) * args.epochs
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
         parameters=model.parameters(),
         weight_decay=args.weight_decay,
-        apply_decay_param_fun=lambda x: x in decay_params)
+        apply_decay_param_fun=lambda x: x in decay_params,
+    )
 
-    global_step = 0
-    best_recall = 0.0
-    tic_train = time.time()
-    for epoch in range(1, args.epochs + 1):
-        for step, batch in enumerate(train_data_loader, start=1):
-            query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids = batch
-
-            loss = model(query_input_ids=query_input_ids,
-                         title_input_ids=title_input_ids,
-                         query_token_type_ids=query_token_type_ids,
-                         title_token_type_ids=title_token_type_ids)
-
-            global_step += 1
-            if global_step % args.log_steps == 0 and rank == 0:
-                print(
-                    "global step %d, epoch: %d, batch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, step, loss, 10 /
-                       (time.time() - tic_train)))
-                tic_train = time.time()
-            loss.backward()
-            optimizer.step()
-            lr_scheduler.step()
-            optimizer.clear_grad()
-            if not args.evaluate:
-                if global_step % args.save_steps == 0 and rank == 0:
-                    save_dir = os.path.join(args.save_dir,
-                                            "model_%d" % global_step)
-                    if not os.path.exists(save_dir):
-                        os.makedirs(save_dir)
-                    save_param_path = os.path.join(save_dir,
-                                                   'model_state.pdparams')
-                    paddle.save(model.state_dict(), save_param_path)
-                    tokenizer.save_pretrained(save_dir)
-        if args.evaluate and rank == 0:
-            print("evaluating")
-            recall_5 = evaluate(model, corpus_data_loader, query_data_loader,
-                                recall_result_file, text_list, id2corpus)
-            if recall_5 > best_recall:
-                best_recall = recall_5
-
-                save_dir = os.path.join(args.save_dir, "model_best")
-                if not os.path.exists(save_dir):
-                    os.makedirs(save_dir)
-                save_param_path = os.path.join(save_dir, 'model_state.pdparams')
-                paddle.save(model.state_dict(), save_param_path)
-                tokenizer.save_pretrained(save_dir)
-                with open(os.path.join(save_dir, "train_result.txt"),
-                          'a',
-                          encoding='utf-8') as fp:
-                    fp.write('epoch=%d, global_step: %d, recall: %s\n' %
-                             (epoch, global_step, recall_5))
+    if args.use_gradient_cache:
+        gradient_cache_train(train_data_loader, model, optimizer, lr_scheduler, rank, tokenizer)
+    else:
+        train(
+            train_data_loader,
+            model,
+            optimizer,
+            lr_scheduler,
+            rank,
+            corpus_data_loader,
+            query_data_loader,
+            recall_result_file,
+            text_list,
+            id2corpus,
+            tokenizer,
+        )
 
 
 if __name__ == "__main__":

@@ -33,7 +33,7 @@ task2filename = {
     "mnli": ["MNLI-m.tsv", "MNLI-mm.tsv"],
     "rte": "RTE.tsv",
     "qnli": "QNLI.tsv",
-    "wnli": "WNLI.tsv"
+    "wnli": "WNLI.tsv",
 }
 
 
@@ -48,10 +48,7 @@ def get_args():
     parser.add_argument(
         "--task_name",
         type=str,
-        choices=[
-            "cola", "sst-2", "mrpc", "sts-b", "qqp", "mnli", "rte", "qnli",
-            "wnli"
-        ],
+        choices=["cola", "sst-2", "mrpc", "sts-b", "qqp", "mnli", "rte", "qnli", "wnli"],
         default="cola",
         required=True,
         help="task_name.",
@@ -61,8 +58,7 @@ def get_args():
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
+        help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
@@ -104,16 +100,12 @@ def writetsv(outputs, file):
 
 def predict2file(args):
     if args.task_name == "mnli":
-        test_ds_matched, test_ds_mismatched = load_dataset(
-            "glue", "mnli", splits=["test_matched", "test_mismatched"])
-        id2label = dict(
-            zip(range(len(test_ds_matched.label_list)),
-                test_ds_matched.label_list))
+        test_ds_matched, test_ds_mismatched = load_dataset("glue", "mnli", splits=["test_matched", "test_mismatched"])
+        id2label = dict(zip(range(len(test_ds_matched.label_list)), test_ds_matched.label_list))
     else:
         test_ds = load_dataset("glue", args.task_name, splits="test")
         if test_ds.label_list is not None:
-            id2label = dict(
-                zip(range(len(test_ds.label_list)), test_ds.label_list))
+            id2label = dict(zip(range(len(test_ds.label_list)), test_ds.label_list))
         else:
             id2label = None
 
@@ -136,8 +128,7 @@ def predict2file(args):
     if args.task_name == "mnli":
         test_ds_matched = test_ds_matched.map(trans_func, lazy=True)
         test_ds_mismatched = test_ds_mismatched.map(trans_func, lazy=True)
-        test_batch_sampler_matched = paddle.io.BatchSampler(
-            test_ds_matched, batch_size=args.batch_size, shuffle=False)
+        test_batch_sampler_matched = paddle.io.BatchSampler(test_ds_matched, batch_size=args.batch_size, shuffle=False)
         test_data_loader_matched = DataLoader(
             dataset=test_ds_matched,
             batch_sampler=test_batch_sampler_matched,
@@ -146,7 +137,8 @@ def predict2file(args):
             return_list=True,
         )
         test_batch_sampler_mismatched = paddle.io.BatchSampler(
-            test_ds_mismatched, batch_size=args.batch_size, shuffle=False)
+            test_ds_mismatched, batch_size=args.batch_size, shuffle=False
+        )
         test_data_loader_mismatched = DataLoader(
             dataset=test_ds_mismatched,
             batch_sampler=test_batch_sampler_mismatched,
@@ -157,15 +149,12 @@ def predict2file(args):
         file_m = os.path.join("template", task2filename[args.task_name][0])
         file_mm = os.path.join("template", task2filename[args.task_name][1])
         matched_outputs = predict(test_data_loader_matched, model, id2label)
-        mismatched_outputs = predict(test_data_loader_mismatched, model,
-                                     id2label)
+        mismatched_outputs = predict(test_data_loader_mismatched, model, id2label)
         writetsv(matched_outputs, file_m)
         writetsv(mismatched_outputs, file_mm)
     else:
         test_ds = test_ds.map(trans_func, lazy=True)
-        test_batch_sampler = paddle.io.BatchSampler(test_ds,
-                                                    batch_size=args.batch_size,
-                                                    shuffle=False)
+        test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
         test_data_loader = DataLoader(
             dataset=test_ds,
             batch_sampler=test_batch_sampler,

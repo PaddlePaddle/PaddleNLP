@@ -97,35 +97,26 @@ class COTE(datasets.GeneratorBasedBuilder):
         features = {
             "id": datasets.Value("int32"),
             "text_a": datasets.Value("string"),
-            "label": datasets.Value("string")
+            "label": datasets.Value("string"),
         }
 
         return datasets.DatasetInfo(
             description=_DESCRIPTION,
             features=datasets.Features(features),
             homepage="https://www.luge.ai/#/luge/dataDetail?id=19",
-            citation=_CITATION)
+            citation=_CITATION,
+        )
 
     def _split_generators(self, dl_manager):
         downloaded_dir = dl_manager.download_and_extract(self.config.data_url)
         data_dir = os.path.join(downloaded_dir, self.config.data_dir)
 
-        train_split = datasets.SplitGenerator(name=datasets.Split.TRAIN,
-                                              gen_kwargs={
-                                                  "filepath":
-                                                  os.path.join(
-                                                      data_dir, "train.tsv"),
-                                                  "split":
-                                                  "train"
-                                              })
-        test_split = datasets.SplitGenerator(name=datasets.Split.TEST,
-                                             gen_kwargs={
-                                                 "filepath":
-                                                 os.path.join(
-                                                     data_dir, "test.tsv"),
-                                                 "split":
-                                                 "test"
-                                             })
+        train_split = datasets.SplitGenerator(
+            name=datasets.Split.TRAIN, gen_kwargs={"filepath": os.path.join(data_dir, "train.tsv"), "split": "train"}
+        )
+        test_split = datasets.SplitGenerator(
+            name=datasets.Split.TEST, gen_kwargs={"filepath": os.path.join(data_dir, "test.tsv"), "split": "test"}
+        )
 
         return [train_split, test_split]
 

@@ -25,38 +25,31 @@ from functools import partial
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input_path',
-                        type=str,
-                        required=True,
-                        help='Path to you raw files. Folder or file path.')
-    parser.add_argument('--workers',
-                        type=int,
-                        default=1,
-                        help='Number of worker processes to launch')
-    parser.add_argument('--output_path',
-                        type=str,
-                        default="./tmp",
-                        help='Path to save the output json files.')
-    parser.add_argument('--data_format',
-                        type=str,
-                        default="jsonl",
-                        choices=["jsonl", "wudao"],
-                        help='Path to you raw files. Folder or file path.')
-    parser.add_argument('--cn_seg_func',
-                        type=str,
-                        default='jieba',
-                        choices=['lac', 'seg', 'jieba'],
-                        help='Words segment function for chinese words.')
-    parser.add_argument('--log_interval',
-                        type=int,
-                        default=1,
-                        help='Interval between progress updates.')
+    parser.add_argument("--input_path", type=str, required=True, help="Path to you raw files. Folder or file path.")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes to launch")
+    parser.add_argument("--output_path", type=str, default="./tmp", help="Path to save the output json files.")
+    parser.add_argument(
+        "--data_format",
+        type=str,
+        default="jsonl",
+        choices=["jsonl", "wudao"],
+        help="Path to you raw files. Folder or file path.",
+    )
+    parser.add_argument(
+        "--cn_seg_func",
+        type=str,
+        default="jieba",
+        choices=["lac", "seg", "jieba"],
+        help="Words segment function for chinese words.",
+    )
+    parser.add_argument("--log_interval", type=int, default=1, help="Interval between progress updates.")
     args = parser.parse_args()
     return args
 
 
 def lexical_analysis_fn():
     from LAC import LAC
+
     lac = LAC(mode="lac")
 
     def process(line):
@@ -68,7 +61,8 @@ def lexical_analysis_fn():
 
 def chinese_segmentation_fn():
     from LAC import LAC
-    lac_cws = LAC(mode='seg')
+
+    lac_cws = LAC(mode="seg")
 
     def process(line):
         words = lac_cws.run(line)
@@ -88,9 +82,9 @@ def jieba_segmentation_fn():
 
 
 CHINESE_SEG_FUNC = {
-    'lac': lexical_analysis_fn(),
-    'seg': chinese_segmentation_fn(),
-    'jieba': jieba_segmentation_fn(),
+    "lac": lexical_analysis_fn(),
+    "seg": chinese_segmentation_fn(),
+    "jieba": jieba_segmentation_fn(),
 }
 
 
@@ -117,12 +111,12 @@ def read_jsonl(path):
 
 
 READFILE_FUNC = {
-    'jsonl': read_jsonl,
-    'wudao': read_wudao,
+    "jsonl": read_jsonl,
+    "wudao": read_wudao,
 }
 
-special_chars = ['\n', '。', '?', '？', ' ', ';', '；', '！', '!']
-split_chars = ['。', '?', '？', ';', '；', '!', '！']
+special_chars = ["\n", "。", "?", "？", " ", ";", "；", "！", "!"]
+split_chars = ["。", "?", "？", ";", "；", "!", "！"]
 
 
 def text_to_text(path, output_path, read_func, seg_func):
@@ -137,6 +131,7 @@ def text_to_text(path, output_path, read_func, seg_func):
     read_func = READFILE_FUNC[read_func]
 
     import time
+
     s = time.time()
     data_len = 0
     count = 0
@@ -150,7 +145,7 @@ def text_to_text(path, output_path, read_func, seg_func):
             # because of those token will be treat as sentence spliter.
             # 此处为断句逻辑
             for char in special_chars:
-                text = re.sub('[' + char + ']+[ ]*', char, text)
+                text = re.sub("[" + char + "]+[ ]*", char, text)
             for char in split_chars:
                 text = text.replace(char, char + "\n")
 
@@ -188,10 +183,9 @@ def main():
     if not os.path.exists(args.output_path):
         os.makedirs(args.output_path)
 
-    trans_func = partial(text_to_text,
-                         output_path=args.output_path,
-                         seg_func=args.cn_seg_func,
-                         read_func=args.data_format)
+    trans_func = partial(
+        text_to_text, output_path=args.output_path, seg_func=args.cn_seg_func, read_func=args.data_format
+    )
 
     encoded_files = pool.imap(trans_func, file_paths, 1)
 
@@ -205,9 +199,7 @@ def main():
             current = time.time()
             elapsed = current - proc_start
             mbs = total_bytes_processed / elapsed / 1024 / 1024
-            print(f"Processed {i} files",
-                  f"({i/elapsed} files/s, {mbs} MB/s).",
-                  file=sys.stderr)
+            print(f"Processed {i} files", f"({i/elapsed} files/s, {mbs} MB/s).", file=sys.stderr)
     pool.close()
 
 

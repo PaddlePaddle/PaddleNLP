@@ -21,14 +21,14 @@ from paddlenlp.transformers import ElectraForSequenceClassification
 from model import ElectraForBinaryTokenClassification, ElectraForSPO
 
 NUM_CLASSES = {
-    'CHIP-CDN-2C': 2,
-    'CHIP-STS': 2,
-    'CHIP-CTC': 44,
-    'KUAKE-QQR': 3,
-    'KUAKE-QTR': 4,
-    'KUAKE-QIC': 11,
-    'CMeEE': [33, 5],
-    'CMeIE': 44
+    "CHIP-CDN-2C": 2,
+    "CHIP-STS": 2,
+    "CHIP-CTC": 44,
+    "KUAKE-QQR": 3,
+    "KUAKE-QTR": 4,
+    "KUAKE-QIC": 11,
+    "CMeEE": [33, 5],
+    "CMeIE": 44,
 }
 
 # yapf: disable
@@ -44,29 +44,27 @@ if __name__ == "__main__":
     if args.train_dataset not in NUM_CLASSES:
         raise ValueError(f"Please modify the code to fit {args.dataset}")
 
-    if args.train_dataset == 'CMeEE':
+    if args.train_dataset == "CMeEE":
         model = ElectraForBinaryTokenClassification.from_pretrained(
-            args.params_path, num_classes=NUM_CLASSES[args.train_dataset])
-    elif args.train_dataset == 'CMeIE':
-        model = ElectraForSPO.from_pretrained(
-            args.params_path, num_classes=NUM_CLASSES[args.train_dataset])
+            args.params_path, num_classes=NUM_CLASSES[args.train_dataset]
+        )
+    elif args.train_dataset == "CMeIE":
+        model = ElectraForSPO.from_pretrained(args.params_path, num_classes=NUM_CLASSES[args.train_dataset])
     else:
         model = ElectraForSequenceClassification.from_pretrained(
-            args.params_path,
-            num_classes=NUM_CLASSES[args.train_dataset],
-            activation='tanh')
+            args.params_path, num_classes=NUM_CLASSES[args.train_dataset], activation="tanh"
+        )
 
     model.eval()
 
     # Convert to static graph with specific input description:
-    # input_ids, token_type_ids and position_ids.
+    # input_ids, token_type_ids
     input_spec = [
-        paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-        paddle.static.InputSpec(shape=[None, None], dtype='int64'),
-        paddle.static.InputSpec(shape=[None, None], dtype='int64')
+        paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        paddle.static.InputSpec(shape=[None, None], dtype="int64"),
     ]
     model = paddle.jit.to_static(model, input_spec=input_spec)
 
     # Save in static graph model.
-    save_path = os.path.join(args.output_path, 'inference')
+    save_path = os.path.join(args.output_path, "inference")
     paddle.jit.save(model, save_path)

@@ -65,7 +65,7 @@ class SegJiebaTask(Task):
         task(string): The name of task.
         model(string): The model name in the task.
         user_dict(string): The user-defined dictionary, default to None.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, user_dict=None, **kwargs):
@@ -101,7 +101,6 @@ class SegJiebaTask(Task):
         return results
 
     def _run_model(self, inputs):
-
         def cut(string):
             return jieba.lcut(string)
 
@@ -111,11 +110,11 @@ class SegJiebaTask(Task):
 
 class SegLACTask(LacTask):
     """
-    Segement the sentences to the words using LAC mode. 
+    Segement the sentences to the words using LAC mode.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -126,16 +125,13 @@ class SegLACTask(LacTask):
         The model output is the tag ids, this function will convert the model output to raw text.
         """
         batch_out = []
-        lengths = inputs['lens']
-        preds = inputs['result']
-        sents = inputs['text']
+        lengths = inputs["lens"]
+        preds = inputs["result"]
+        sents = inputs["text"]
         final_results = []
         for sent_index in range(len(lengths)):
             single_result = {}
-            tags = [
-                self._id2tag_dict[str(index)]
-                for index in preds[sent_index][:lengths[sent_index]]
-            ]
+            tags = [self._id2tag_dict[str(index)] for index in preds[sent_index][: lengths[sent_index]]]
             sent = sents[sent_index]
             if self._custom:
                 self._custom.parse_customization(sent, tags)
@@ -145,11 +141,11 @@ class SegLACTask(LacTask):
             for ind, tag in enumerate(tags):
                 if parital_word == "":
                     parital_word = sent[ind]
-                    tags_out.append(tag.split('-')[0])
+                    tags_out.append(tag.split("-")[0])
                     continue
                 if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
                     sent_out.append(parital_word)
-                    tags_out.append(tag.split('-')[0])
+                    tags_out.append(tag.split("-")[0])
                     parital_word = sent[ind]
                     continue
                 parital_word += sent[ind]
@@ -158,18 +154,17 @@ class SegLACTask(LacTask):
                 sent_out.append(parital_word)
             final_results.append(sent_out)
         final_results = self._auto_joiner(final_results, self.input_mapping)
-        final_results = final_results if len(
-            final_results) > 1 else final_results[0]
+        final_results = final_results if len(final_results) > 1 else final_results[0]
         return final_results
 
 
 class SegWordTagTask(NERWordTagTask):
     """
-    Segement the sentences to the words using WordTag model. 
+    Segement the sentences to the words using WordTag model.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
 
     """
 
@@ -180,10 +175,9 @@ class SegWordTagTask(NERWordTagTask):
         simple_results = []
         for result in results:
             simple_result = []
-            if 'items' in result:
-                for item in result['items']:
-                    simple_result.append(item['item'])
+            if "items" in result:
+                for item in result["items"]:
+                    simple_result.append(item["item"])
             simple_results.append(simple_result)
-        simple_results = simple_results[0] if len(
-            simple_results) == 1 else simple_results
+        simple_results = simple_results[0] if len(simple_results) == 1 else simple_results
         return simple_results

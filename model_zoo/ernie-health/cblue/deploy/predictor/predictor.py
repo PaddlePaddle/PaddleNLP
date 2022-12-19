@@ -27,23 +27,15 @@ from paddlenlp.transformers import normalize_chars, tokenize_special_chars
 
 
 class InferBackend(object):
-
-    def __init__(self,
-                 model_path_prefix,
-                 device="cpu",
-                 device_id=0,
-                 use_fp16=False,
-                 num_threads=10):
+    def __init__(self, model_path_prefix, device="cpu", device_id=0, use_fp16=False, num_threads=10):
 
         if not isinstance(device, six.string_types):
             logger.error(
-                ">>> [InferBackend] The type of device must be string, but the type you set is: ",
-                type(device))
+                ">>> [InferBackend] The type of device must be string, but the type you set is: ", type(device)
+            )
             exit(0)
-        if device not in ['cpu', 'gpu']:
-            logger.error(
-                ">>> [InferBackend] The device must be cpu or gpu, but your device is set to:",
-                type(device))
+        if device not in ["cpu", "gpu"]:
+            logger.error(">>> [InferBackend] The device must be cpu or gpu, but your device is set to:", type(device))
             exit(0)
 
         logger.info(">>> [InferBackend] Creating Engine ...")
@@ -52,7 +44,8 @@ class InferBackend(object):
             model_file=model_path_prefix + ".pdmodel",
             params_file=model_path_prefix + ".pdiparams",
             opset_version=13,
-            enable_onnx_checker=True)
+            enable_onnx_checker=True,
+        )
         infer_model_dir = model_path_prefix.rsplit("/", 1)[0]
         float_onnx_file = os.path.join(infer_model_dir, "model.onnx")
         with open(float_onnx_file, "wb") as f:
@@ -60,45 +53,39 @@ class InferBackend(object):
 
         if device == "gpu":
             logger.info(">>> [InferBackend] Use GPU to inference ...")
-            providers = ['CUDAExecutionProvider']
+            providers = ["CUDAExecutionProvider"]
             if use_fp16:
                 logger.info(">>> [InferBackend] Use FP16 to inference ...")
                 from onnxconverter_common import float16
                 import onnx
-                fp16_model_file = os.path.join(infer_model_dir,
-                                               "fp16_model.onnx")
+
+                fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
-                trans_model = float16.convert_float_to_float16(
-                    onnx_model, keep_io_types=True)
+                trans_model = float16.convert_float_to_float16(onnx_model, keep_io_types=True)
                 onnx.save_model(trans_model, fp16_model_file)
                 onnx_model = fp16_model_file
         else:
             logger.info(">>> [InferBackend] Use CPU to inference ...")
-            providers = ['CPUExecutionProvider']
+            providers = ["CPUExecutionProvider"]
             if use_fp16:
                 logger.warning(
-                    ">>> [InferBackend] Ignore use_fp16 as it only " +
-                    "takes effect when deploying on gpu...")
+                    ">>> [InferBackend] Ignore use_fp16 as it only " + "takes effect when deploying on gpu..."
+                )
 
         sess_options = ort.SessionOptions()
         sess_options.intra_op_num_threads = num_threads
-        self.predictor = ort.InferenceSession(onnx_model,
-                                              sess_options=sess_options,
-                                              providers=providers,
-                                              provider_options=[{
-                                                  'device_id':
-                                                  device_id
-                                              }])
+        self.predictor = ort.InferenceSession(
+            onnx_model, sess_options=sess_options, providers=providers, provider_options=[{"device_id": device_id}]
+        )
 
         self.input_handles = [
             self.predictor.get_inputs()[0].name,
             self.predictor.get_inputs()[1].name,
-            self.predictor.get_inputs()[2].name
         ]
 
         if device == "gpu":
             try:
-                assert 'CUDAExecutionProvider' in self.predictor.get_providers()
+                assert "CUDAExecutionProvider" in self.predictor.get_providers()
             except AssertionError:
                 raise AssertionError(
                     f"The environment for GPU inference is not set properly. "
@@ -109,25 +96,20 @@ class InferBackend(object):
         logger.info(">>> [InferBackend] Engine Created ...")
 
     def infer(self, input_dict: dict):
-        input_dict = {
-            k: v
-            for k, v in input_dict.items() if k in self.input_handles
-        }
+        input_dict = {k: v for k, v in input_dict.items() if k in self.input_handles}
         result = self.predictor.run(None, input_dict)
         return result
 
 
 class EHealthPredictor(object):
-
     def __init__(self, args, label_list):
         self.label_list = label_list
-        self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path,
-                                                        use_faster=True)
+        self._tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path, use_fast=True)
         self._max_seq_length = args.max_seq_length
         self._batch_size = args.batch_size
-        self.inference_backend = InferBackend(args.model_path_prefix,
-                                              args.device, args.device_id,
-                                              args.use_fp16, args.num_threads)
+        self.inference_backend = InferBackend(
+            args.model_path_prefix, args.device, args.device_id, args.use_fp16, args.num_threads
+        )
 
     def predict(self, input_data: list):
         encoded_inputs = self.preprocess(input_data)
@@ -164,8 +146,7 @@ class EHealthPredictor(object):
         start_time = time.time()
         infer_result = self.infer_batch(preprocess_result)
         total_time = time.time() - start_time
-        logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" %
-                    (nums, total_time, 1000 * total_time / nums))
+        logger.info("sample nums: %d, time: %.2f, latency: %.2f ms" % (nums, total_time, 1000 * total_time / nums))
 
     def get_text_and_label(self, dataset):
         raise NotImplementedError
@@ -181,7 +162,6 @@ class EHealthPredictor(object):
 
 
 class CLSPredictor(EHealthPredictor):
-
     def preprocess(self, input_data: list):
         norm_text = lambda x: tokenize_special_chars(normalize_chars(x))
         # To deal with a pair of input text.
@@ -192,17 +172,13 @@ class CLSPredictor(EHealthPredictor):
             text = [norm_text(x) for x in input_data]
             text_pair = None
 
-        data = self._tokenizer(text=text,
-                               text_pair=text_pair,
-                               max_length=self._max_seq_length,
-                               padding=True,
-                               truncation=True,
-                               return_position_ids=True)
+        data = self._tokenizer(
+            text=text, text_pair=text_pair, max_length=self._max_seq_length, padding=True, truncation=True
+        )
 
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data['position_ids'], dtype="int64")
         }
         return encoded_inputs
 
@@ -219,13 +195,13 @@ class CLSPredictor(EHealthPredictor):
         label, confidence = result["label"], result["confidence"]
         for i in range(len(label)):
             logger.info("input data: {}".format(input_data[i]))
-            logger.info("labels: {}, confidence: {}".format(
-                self.label_list[label[i]], confidence[i]))
+            logger.info("labels: {}, confidence: {}".format(self.label_list[label[i]], confidence[i]))
             logger.info("-----------------------------")
 
 
 class NERPredictor(EHealthPredictor):
-    """ The predictor for CMeEE dataset. """
+    """The predictor for CMeEE dataset."""
+
     en_to_cn = {
         "bod": "身体",
         "mic": "微生物类",
@@ -235,27 +211,26 @@ class NERPredictor(EHealthPredictor):
         "equ": "医疗设备",
         "dru": "药物",
         "dep": "科室",
-        "ite": "医学检验项目"
+        "ite": "医学检验项目",
     }
 
     def _extract_chunk(self, tokens):
         chunks = set()
         start_idx, cur_idx = 0, 0
         while cur_idx < len(tokens):
-            if tokens[cur_idx][0] == 'B':
+            if tokens[cur_idx][0] == "B":
                 start_idx = cur_idx
                 cur_idx += 1
-                while cur_idx < len(tokens) and tokens[cur_idx][0] == 'I':
+                while cur_idx < len(tokens) and tokens[cur_idx][0] == "I":
                     if tokens[cur_idx][2:] == tokens[start_idx][2:]:
                         cur_idx += 1
                     else:
                         break
-                if cur_idx < len(tokens) and tokens[cur_idx][0] == 'E':
+                if cur_idx < len(tokens) and tokens[cur_idx][0] == "E":
                     if tokens[cur_idx][2:] == tokens[start_idx][2:]:
-                        chunks.add(
-                            (tokens[cur_idx][2:], start_idx - 1, cur_idx))
+                        chunks.add((tokens[cur_idx][2:], start_idx - 1, cur_idx))
                         cur_idx += 1
-            elif tokens[cur_idx][0] == 'S':
+            elif tokens[cur_idx][0] == "S":
                 chunks.add((tokens[cur_idx][2:], cur_idx - 1, cur_idx))
                 cur_idx += 1
             else:
@@ -264,19 +239,13 @@ class NERPredictor(EHealthPredictor):
 
     def preprocess(self, infer_data):
         infer_data = [[x.lower() for x in text] for text in infer_data]
-        data = self._tokenizer(infer_data,
-                               max_length=self._max_seq_length,
-                               padding=True,
-                               is_split_into_words=True,
-                               truncation=True,
-                               return_position_ids=True,
-                               return_attention_mask=True)
+        data = self._tokenizer(
+            infer_data, max_length=self._max_seq_length, padding=True, is_split_into_words=True, truncation=True
+        )
 
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data["position_ids"], dtype="int64"),
-            "attention_mask": np.array(data["attention_mask"], dtype="float32")
         }
         return encoded_inputs
 
@@ -287,15 +256,10 @@ class NERPredictor(EHealthPredictor):
         for oth_ids, sym_ids in zip(tokens_oth, tokens_sym):
             token_oth = [self.label_list[0][x] for x in oth_ids]
             token_sym = [self.label_list[1][x] for x in sym_ids]
-            chunks = self._extract_chunk(token_oth) \
-                     + self._extract_chunk(token_sym)
+            chunks = self._extract_chunk(token_oth) + self._extract_chunk(token_sym)
             sub_entity = []
             for etype, sid, eid in chunks:
-                sub_entity.append({
-                    "type": self.en_to_cn[etype],
-                    "start_id": sid,
-                    "end_id": eid
-                })
+                sub_entity.append({"type": self.en_to_cn[etype], "start_id": sid, "end_id": eid})
             entity.append(sub_entity)
         return {"entity": entity}
 
@@ -305,14 +269,19 @@ class NERPredictor(EHealthPredictor):
             logger.info("input data: {}".format(input_data[i]))
             logger.info("detected entities:")
             for item in preds:
-                logger.info("* entity: {}, type: {}, position: ({}, {})".format(
-                    input_data[i][item["start_id"]:item["end_id"]],
-                    item["type"], item["start_id"], item["end_id"]))
+                logger.info(
+                    "* entity: {}, type: {}, position: ({}, {})".format(
+                        input_data[i][item["start_id"] : item["end_id"]],
+                        item["type"],
+                        item["start_id"],
+                        item["end_id"],
+                    )
+                )
             logger.info("-----------------------------")
 
 
 class SPOPredictor(EHealthPredictor):
-    """ The predictor for the CMeIE dataset. """
+    """The predictor for the CMeIE dataset."""
 
     def predict(self, input_data: list):
         encoded_inputs = self.preprocess(input_data)
@@ -324,19 +293,18 @@ class SPOPredictor(EHealthPredictor):
 
     def preprocess(self, infer_data):
         infer_data = [[x.lower() for x in text] for text in infer_data]
-        data = self._tokenizer(infer_data,
-                               max_length=self._max_seq_length,
-                               padding=True,
-                               is_split_into_words=True,
-                               truncation=True,
-                               return_position_ids=True,
-                               return_attention_mask=True)
-
+        data = self._tokenizer(
+            infer_data,
+            max_length=self._max_seq_length,
+            padding=True,
+            is_split_into_words=True,
+            truncation=True,
+            return_attention_mask=True,
+        )
         encoded_inputs = {
             "input_ids": np.array(data["input_ids"], dtype="int64"),
             "token_type_ids": np.array(data["token_type_ids"], dtype="int64"),
-            "position_ids": np.array(data["position_ids"], dtype="int64"),
-            "attention_mask": np.array(data["attention_mask"], dtype="float32")
+            "attention_mask": np.array(data["attention_mask"], dtype="float32"),
         }
         return encoded_inputs
 
@@ -384,10 +352,11 @@ class SPOPredictor(EHealthPredictor):
             logger.info("input data: {}".format(input_data[i]))
             logger.info("detected entities and relations:")
             for sid, eid in ent:
-                logger.info("* entity: {}, position: ({}, {})".format(
-                    input_data[i][sid:eid + 1], sid, eid))
+                logger.info("* entity: {}, position: ({}, {})".format(input_data[i][sid : eid + 1], sid, eid))
             for s, p, o in rel:
-                logger.info("+ spo: ({}, {}, {})".format(
-                    input_data[i][s[0]:s[1] + 1], self.label_list[p],
-                    input_data[i][o[0]:o[1] + 1]))
+                logger.info(
+                    "+ spo: ({}, {}, {})".format(
+                        input_data[i][s[0] : s[1] + 1], self.label_list[p], input_data[i][o[0] : o[1] + 1]
+                    )
+                )
             logger.info("-----------------------------")
