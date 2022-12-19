@@ -1,3 +1,4 @@
+简体中文 | [English](README_EN.md)
 # ERNIE 3.0 轻量级模型
 
  **目录**
