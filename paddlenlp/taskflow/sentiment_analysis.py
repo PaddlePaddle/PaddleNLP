@@ -169,16 +169,18 @@ class SentaTask(Task):
             lens = len(ids)
             examples.append((ids, lens))
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get("[PAD]", 0)),  # input_ids
-            Stack(dtype="int64"),  # seq_len
-        ): fn(samples)
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
         outputs = {}
         outputs["data_loader"] = batches
         outputs["text"] = filter_inputs
-        self.batchify_fn = batchify_fn
         return outputs
+
+    def _batchify_fn(self, samples):
+        fn = Tuple(
+            Pad(axis=0, pad_val=self._tokenizer.vocab.token_to_idx.get("[PAD]", 0)),  # input_ids
+            Stack(dtype="int64"),  # seq_len
+        )
+        return fn(samples)
 
     def _run_model(self, inputs):
         """
@@ -188,7 +190,7 @@ class SentaTask(Task):
         scores = []
         with static_mode_guard():
             for batch in inputs["data_loader"]:
-                ids, lens = self.batchify_fn(batch)
+                ids, lens = self._batchify_fn(batch)
                 self.input_handles[0].copy_from_cpu(ids)
                 self.input_handles[1].copy_from_cpu(lens)
                 self.predictor.run()
@@ -300,16 +302,18 @@ class SkepTask(Task):
             segment_ids = encoded_inputs["token_type_ids"]
             examples.append((ids, segment_ids))
 
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # token type ids
-        ): [data for data in fn(samples)]
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
         outputs = {}
         outputs["text"] = filter_inputs
         outputs["data_loader"] = batches
-        self._batchify_fn = batchify_fn
         return outputs
+
+    def _batchify_fn(self, samples):
+        fn = Tuple(
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_id),  # input ids
+            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id),  # token type ids
+        )
+        return fn(samples)
 
     def _run_model(self, inputs):
         """
