@@ -14,10 +14,12 @@
 
 __version__ = "1.0.0"
 
-from typing import Tuple, Union, Tuple, List, Dict
-import sys
 import os
 import platform
+import sys
+from typing import Dict, List, Tuple, Union
+
+from . import core_tokenizers as C
 
 current_path = os.path.abspath(os.path.dirname(__file__))
 
@@ -52,8 +54,6 @@ except ImportError as e:
         )
 except Exception as e:
     raise e
-
-from . import core_tokenizers as C
 
 TextInputSequence = str
 PreTokenizedInputSequence = Union[List[str], Tuple[str]]
@@ -499,7 +499,7 @@ class Tokenizer:
         return self._tokenizer.decode(ids, skip_special_tokens)
 
     def decode_batch(self, sequences: List[List[int]], skip_special_tokens: bool = True):
-        return self._tokenizer.decode_batch(sequence, skip_special_tokens)
+        return self._tokenizer.decode_batch(sequences, skip_special_tokens)
 
     def id_to_token(self, id: int):
         return self._tokenizer.id_to_token(id)
@@ -519,13 +519,13 @@ class Tokenizer:
     @staticmethod
     def from_str(json: str):
         tr = Tokenizer(None)
-        tr._tokenizer = C.tokenizer.from_str(json)
+        tr._tokenizer = C.Tokenizer.from_str(json)
         return tr
 
     @staticmethod
     def from_file(json: str):
         tr = Tokenizer(None)
-        tr._tokenizer = C.tokenizer.from_file(json)
+        tr._tokenizer = C.Tokenizer.from_file(json)
         return tr
 
 
@@ -544,9 +544,9 @@ def get_thread_num():
     return C.get_thread_num()
 
 
-from . import models
-from . import normalizers
-from . import pretokenizers
-from . import postprocessors
-from . import decoders
-from .tokenizers_impl import ErnieFastTokenizer, SentencePieceBPEFastTokenizer, ClipFastTokenizer
+from . import decoders, models, normalizers, postprocessors, pretokenizers
+from .tokenizers_impl import (
+    ClipFastTokenizer,
+    ErnieFastTokenizer,
+    SentencePieceBPEFastTokenizer,
+)
