@@ -179,7 +179,7 @@ class UNIMOModelTester:
         )[:2]
 
         self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(cache), config["num_hidden_layers"])
+        self.parent.assertEqual(len(cache), config.num_hidden_layers)
 
     def create_and_check_unimo_model_past(self, config, input_ids, input_mask, token_type_ids, position_ids, *args):
         model = UNIMOModel(config)
@@ -215,7 +215,7 @@ class UNIMOModelTester:
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
         next_token_types = ids_tensor([self.batch_size, 1], self.type_vocab_size, dtype="int64")
         next_position = position_ids[:, -1:] + 1
 
@@ -274,7 +274,7 @@ class UNIMOModelTester:
         )[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_token_types = ids_tensor([self.batch_size, 3], self.type_vocab_size, dtype="int64")
         next_position = position_ids[:, -3:] + 3
 

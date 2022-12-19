@@ -42,11 +42,9 @@ def prepare_mbart_inputs_dict(
     decoder_attention_mask=None,
 ):
     if attention_mask is None:
-        attention_mask = (input_ids == config["pad_token_id"]).astype("float32").unsqueeze([1, 2]) * -1e4
+        attention_mask = (input_ids == config.pad_token_id).astype("float32").unsqueeze([1, 2]) * -1e4
     if decoder_attention_mask is None:
-        decoder_attention_mask = (decoder_input_ids == config["pad_token_id"]).astype("float32").unsqueeze(
-            [1, 2]
-        ) * -1e4
+        decoder_attention_mask = (decoder_input_ids == config.pad_token_id).astype("float32").unsqueeze([1, 2]) * -1e4
     return {
         "input_ids": input_ids,
         "decoder_input_ids": decoder_input_ids,
@@ -151,9 +149,7 @@ class MBartModelTester:
         input_ids = inputs_dict["input_ids"]
         attention_mask = inputs_dict["attention_mask"]
 
-        cache = model.decoder.gen_cache(
-            paddle.randn(shape=[input_ids.shape[0], input_ids.shape[1], config["d_model"]])
-        )
+        cache = model.decoder.gen_cache(paddle.randn(shape=[input_ids.shape[0], input_ids.shape[1], config.d_model]))
 
         # first forward pass
         outputs = model(
@@ -163,7 +159,7 @@ class MBartModelTester:
         output, past_key_values = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_attn_mask = (1 - ids_tensor((self.batch_size, 3), 2, dtype="int64").unsqueeze([1, 2])).astype(
             "float32"
         ) * -1e4
@@ -232,7 +228,7 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest
         # NOTE: rewrite test inputs embeds for mbart model since scaler not equal to 1.0
         # get config for model and inputs_dict for model forward
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
-        scaler = config["d_model"] ** 0.5
+        scaler = config.d_model**0.5
         # test all model classes
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
@@ -364,7 +360,7 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
         loss, logits = lm_model(
             input_ids=context, decoder_input_ids=summary, labels=summary, return_dict=self.return_dict
         )[:2]
-        expected_shape = [*summary.shape, config["vocab_size"]]
+        expected_shape = [*summary.shape, config.vocab_size]
         self.assertIsInstance(loss.item(), float)
         self.assertEqual(logits.shape, expected_shape)
 
@@ -502,7 +498,7 @@ class MBartStandaloneDecoderModelTester:
         past_key_values = outputs[1]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -548,11 +544,11 @@ class MBartStandaloneDecoderModelTester:
         )[1]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # change a random masked slice from input_ids
         random_seq_idx_to_change = ids_tensor((1,), half_seq_length, dtype="int64").item() + 1
-        random_other_next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64").squeeze(-1)
+        random_other_next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64").squeeze(-1)
         input_ids[:, -random_seq_idx_to_change] = random_other_next_tokens
 
         # append to next input_ids and attn_mask

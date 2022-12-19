@@ -63,7 +63,7 @@ class UNIMOPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range")
-                        else self.unimo.config["initializer_range"],
+                        else self.unimo.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -432,7 +432,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         lm_loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
-            lm_loss = loss_fct(logits.reshape((-1, self.unimo.config["vocab_size"])), labels.reshape((-1,)))
+            lm_loss = loss_fct(logits.reshape((-1, self.unimo.config.vocab_size)), labels.reshape((-1,)))
 
         if not return_dict:
             if isinstance(outputs, input_type):

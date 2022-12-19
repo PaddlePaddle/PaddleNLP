@@ -219,9 +219,9 @@ class CodeGenAttention(Layer):
 
 
 class CodeGenMLP(Layer):
-    def __init__(self, inner_dim: int, config: CodeGenConfig):
+    def __init__(self, config: CodeGenConfig):
         super().__init__()
-
+        inner_dim = config.n_inner if config.n_inner is not None else 4 * config.n_embd
         self.fc_in = nn.Linear(config.n_embd, inner_dim)
         self.fc_out = nn.Linear(inner_dim, config.n_embd)
 
@@ -239,10 +239,9 @@ class CodeGenMLP(Layer):
 class CodeGenBlock(Layer):
     def __init__(self, config: CodeGenConfig):
         super().__init__()
-        inner_dim = config.n_inner if config.n_inner is not None else 4 * config.n_embd
         self.ln_1 = nn.LayerNorm(config.n_embd, epsilon=config.layer_norm_epsilon)
         self.attn = CodeGenAttention(config)
-        self.mlp = CodeGenMLP(inner_dim, config)
+        self.mlp = CodeGenMLP(config)
 
     def forward(
         self,
@@ -296,7 +295,7 @@ class CodeGenPreTrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range")
-                        else self.transformer.config["initializer_range"],
+                        else self.transformer.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -559,7 +558,7 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         if decode_strategy == "beam_search":
             raise AttributeError("'beam_search' is not supported yet in the faster version of GPTJ")
         # Currently, FasterTransformer only support restricted size_per_head.
-        size_per_head = self.transformer.config["n_embd"] // self.transformer.config["n_head"]
+        size_per_head = self.transformer.config.n_embd // self.transformer.config.n_head
         if size_per_head not in [32, 64, 80, 96, 128, 160, 192, 224, 256]:
             raise AttributeError(
                 "'size_per_head = %d' is not supported yet in the faster version of GPTJ" % size_per_head

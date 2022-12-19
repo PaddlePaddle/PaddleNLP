@@ -65,7 +65,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
                         mean=0.0,
                         std=self.initializer_range
                         if hasattr(self, "initializer_range")
-                        else self.unified_transformer.config["initializer_range"],
+                        else self.unified_transformer.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )

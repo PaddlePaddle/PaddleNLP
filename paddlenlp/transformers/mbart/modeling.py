@@ -90,7 +90,7 @@ class MBartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.mbart.config["init_std"],
+                        std=self.init_std if hasattr(self, "init_std") else self.mbart.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -717,7 +717,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         output = outputs[0]
         output_shape = paddle.shape(output)
         if input_ids is not None:
-            eos_mask = paddle.cast(input_ids == self.mbart.config["eos_token_id"], dtype="int64")
+            eos_mask = paddle.cast(input_ids == self.mbart.config.eos_token_id, dtype="int64")
             if len(paddle.unique(paddle.sum(eos_mask, axis=1))) > 1:
                 raise ValueError("All examples must have the same number of <eos> tokens.")
 
@@ -1073,7 +1073,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         masked_lm_loss = None
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
-            masked_lm_loss = loss_fct(lm_logits.reshape((-1, self.mbart.config["vocab_size"])), labels.reshape((-1,)))
+            masked_lm_loss = loss_fct(lm_logits.reshape((-1, self.mbart.config.vocab_size)), labels.reshape((-1,)))
 
         if not return_dict:
             if len(outputs) == 2:
