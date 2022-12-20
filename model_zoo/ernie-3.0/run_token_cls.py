@@ -19,12 +19,11 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn as nn
-from datasets import load_metric
+from datasets import load_dataset, load_metric
 from utils import DataArguments, ModelArguments, load_config, token_convert_example
 
 import paddlenlp
 from paddlenlp.data import DataCollatorForTokenClassification
-from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -73,12 +72,12 @@ def main():
             )
 
     raw_datasets = load_dataset(data_args.dataset)
-    label_list = getattr(raw_datasets["train"], "label_list", None)
+    label_list = raw_datasets["train"].features["ner_tags"].feature.names
     data_args.label_list = label_list
     data_args.ignore_label = -100
     data_args.no_entity_id = len(data_args.label_list) - 1
 
-    num_classes = len(raw_datasets["train"].label_list)
+    num_classes = len(label_list)
 
     # Define tokenizer, model, loss function.
     tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -102,7 +101,7 @@ def main():
         max_seq_length=data_args.max_seq_length,
     )
     # Define data collector
-    data_collator = DataCollatorForTokenClassification(tokenizer)
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=data_args.ignore_label)
 
     # Dataset pre-process
     if training_args.do_train:
