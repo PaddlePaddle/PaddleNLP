@@ -74,9 +74,9 @@
 我们在通用、金融、医疗三大场景自建多模测试集上进行了实验：
 
 <table>
-<tr><th row_span='2'><th colspan='2'>通用<th colspan='2'>金融<th colspan='2'>医疗
-<tr><td><th>0-shot<th>5-shot<th>0-shot<th>5-shot<th>0-shot<th>5-shot
-<tr><td>🧾 🎓<b>uie-x-base (12L768H)</b><td>65.03<td>/<td>73.51<td>/<td>84.24<td>-
+<tr><th row_span='2'><th>通用<th>金融<th colspan='2'>医疗
+<tr><td><th>0-shot<th>0-shot<th>0-shot<th>5-shot
+<tr><td>🧾 🎓<b>uie-x-base (12L768H)</b><td>65.03<td>73.51<td>84.24<td>-
 </table>
 
 <a name="23"></a>
