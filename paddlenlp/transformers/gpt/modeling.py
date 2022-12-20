@@ -422,15 +422,20 @@ class GPTEmbeddings(nn.Layer):
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(inputs_embeddings)[:-1]
+
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
 
-        input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embedings + position_embeddings
+        embeddings = input_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -751,9 +756,10 @@ class GPTModel(GPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         use_cache=False,
         cache=None,
         output_attentions=False,
@@ -764,10 +770,11 @@ class GPTModel(GPTPretrainedModel):
         The GPTModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to None.
             position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 max_position_embeddings - 1]``.
@@ -782,6 +789,11 @@ class GPTModel(GPTPretrainedModel):
                 Its data type should be int64.
                 The `masked` tokens have `0` values, and the `unmasked` tokens have `1` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
@@ -825,15 +837,27 @@ class GPTModel(GPTPretrainedModel):
         """
 
         self.checkpoints = []
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_ids = input_ids.reshape((-1, input_shape[-1]))
+        elif inputs_embeds is not None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
         if position_ids is None:
             past_length = 0
             if cache is not None:
                 past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
+            position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.expand_as(position_ids, input_ids)
-        embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
+            position_ids = paddle.expand(position_ids, input_shape)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
+        )
 
         # TODO, use registered buffer
         length = paddle.shape(input_ids)[-1]
@@ -899,7 +923,7 @@ class GPTForPretraining(GPTPretrainedModel):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
@@ -1011,7 +1035,7 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
@@ -1105,9 +1129,10 @@ class GPTLMHeadModel(GPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         use_cache=False,
         cache=None,
         labels=None,
@@ -1118,11 +1143,13 @@ class GPTLMHeadModel(GPTPretrainedModel):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (Tensor, optional):
+                See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`GPTModel`.
             use_cache (bool, optional):
                 See :class:`GPTModel`.
@@ -1154,6 +1181,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             cache=cache,
             output_attentions=output_attentions,
@@ -1286,9 +1314,10 @@ class GPTForTokenClassification(GPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         labels=None,
         output_attentions=False,
         output_hidden_states=False,
@@ -1298,11 +1327,13 @@ class GPTForTokenClassification(GPTPretrainedModel):
         The GPTForTokenClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids(Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
+                See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`GPTModel`.
             labels (Tensor, optional):
                 Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
@@ -1343,6 +1374,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
@@ -1397,9 +1429,10 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
     def forward(
         self,
-        input_ids,
+        input_ids=None,
         position_ids=None,
         attention_mask=None,
+        inputs_embeds=None,
         labels=None,
         use_cache=False,
         output_attentions=False,
@@ -1410,11 +1443,13 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         The GPTForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids(Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
+                See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
                 See :class:`GPTModel`.
             labels (Tensor, optional):
                 Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
@@ -1459,6 +1494,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
