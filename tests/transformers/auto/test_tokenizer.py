@@ -29,3 +29,8 @@ class AutoTokenizerTest(unittest.TestCase):
             self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertFastTokenizer)
         else:
             self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertTokenizer)
+
+    def test_fast_tokenizer_non_exist(self):
+        tokenizer1 = AutoTokenizer.from_pretrained("t5-small", use_fast=True)
+        # T5 FastTokenizer doesn't exist yet, so from_pretrained will return the normal tokenizer.
+        self.assertIsInstance(tokenizer1, paddlenlp.transformers.T5Tokenizer)
