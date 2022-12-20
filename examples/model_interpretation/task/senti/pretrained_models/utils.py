@@ -17,16 +17,12 @@
 import numpy as np
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    is_test=False,
-                    language='ch'):
+def convert_example(example, tokenizer, max_seq_length=512, is_test=False, language="ch"):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
+    by concatenating and adding special tokens. And creates a mask from the two sequences passed
     to be used in a sequence-pair classification task.
-        
+
     A BERT sequence has the following format:
 
     - single sequence: ``[CLS] X [SEP]``
@@ -36,9 +32,9 @@ def convert_example(example,
 
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
@@ -47,7 +43,7 @@ def convert_example(example,
         token_type_ids(obj: `list[int]`): List of sequence pair mask.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    if language == 'ch':
+    if language == "ch":
         text = "text"
         label = "label"
     else:

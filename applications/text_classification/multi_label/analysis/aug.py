@@ -32,56 +32,42 @@ args = parser.parse_args()
 
 def aug():
     """Do data augmentation"""
-    if args.aug_strategy in ["mix", "substitute", "insert"
-                             ] and args.aug_strategy == "mlm":
+    if args.aug_strategy in ["mix", "substitute", "insert"] and args.aug_strategy == "mlm":
         paddle.set_device(args.device)
 
     if args.aug_strategy in ["substitute", "insert", "delete", "swap"]:
         if args.aug_strategy == "substitute":
-            aug = WordSubstitute(args.aug_type,
-                                 create_n=args.create_n,
-                                 aug_percent=args.aug_percent)
+            aug = WordSubstitute(args.aug_type, create_n=args.create_n, aug_percent=args.aug_percent)
         elif args.aug_strategy == "insert":
-            aug = WordInsert(args.aug_type,
-                             create_n=args.create_n,
-                             aug_percent=args.aug_percent)
+            aug = WordInsert(args.aug_type, create_n=args.create_n, aug_percent=args.aug_percent)
         elif args.aug_strategy == "delete":
-            aug = WordDelete(create_n=args.create_n,
-                             aug_percent=args.aug_percent)
+            aug = WordDelete(create_n=args.create_n, aug_percent=args.aug_percent)
         elif args.aug_strategy == "swap":
             aug = WordSwap(create_n=args.create_n, aug_percent=args.aug_percent)
-        with open(args.train_path, 'r',
-                  encoding='utf-8') as f1, open(args.aug_path,
-                                                'w',
-                                                encoding='utf-8') as f2:
+        with open(args.train_path, "r", encoding="utf-8") as f1, open(args.aug_path, "w", encoding="utf-8") as f2:
             for line in f1:
-                s, l = line.strip().split('\t')
+                s, l = line.strip().split("\t")
                 augs = aug.augment(s)
                 for a in augs:
-                    f2.write(a + '\t' + l + '\n')
+                    f2.write(a + "\t" + l + "\n")
         f1.close(), f2.close()
     elif args.aug_strategy in ["mix"]:
         aug = [
-            WordSubstitute(args.aug_type,
-                           create_n=1,
-                           aug_percent=args.aug_percent),
+            WordSubstitute(args.aug_type, create_n=1, aug_percent=args.aug_percent),
             WordInsert(args.aug_type, create_n=1, aug_percent=args.aug_percent),
             WordDelete(create_n=1, aug_percent=args.aug_percent),
-            WordSwap(create_n=1, aug_percent=args.aug_percent)
+            WordSwap(create_n=1, aug_percent=args.aug_percent),
         ]
         count = 0
-        with open(args.train_path, 'r',
-                  encoding='utf-8') as f1, open(args.aug_path,
-                                                'w',
-                                                encoding='utf-8') as f2:
+        with open(args.train_path, "r", encoding="utf-8") as f1, open(args.aug_path, "w", encoding="utf-8") as f2:
             for line in f1:
-                s, l = line.strip().split('\t')
+                s, l = line.strip().split("\t")
                 for i in range(args.create_n):
                     i = count % len(aug)
                     augs = aug[i].augment(s)
                     count += 1
                     for a in augs:
-                        f2.write(a + '\t' + l + '\n')
+                        f2.write(a + "\t" + l + "\n")
         f1.close(), f2.close()
 
 

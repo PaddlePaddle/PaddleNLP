@@ -17,7 +17,7 @@
 from ..bert.tokenizer import BertTokenizer
 from .. import AddedToken
 
-__all__ = ['MPNetTokenizer']
+__all__ = ["MPNetTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"mpnet-base": 514}
 
@@ -27,81 +27,75 @@ class MPNetTokenizer(BertTokenizer):
     Construct a MPNet tokenizer which is almost identical to `BertTokenizer`.
     For more information regarding those methods, please refer to this superclass.
     """
+
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "mpnet-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/vocab.txt",
+            "mpnet-base": "https://bj.bcebos.com/paddlenlp/models/transformers/mpnet/mpnet-base/vocab.txt",
         }
     }
     pretrained_init_configuration = {"mpnet-base": {"do_lower_case": True}}
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 bos_token="<s>",
-                 eos_token="</s>",
-                 unk_token="[UNK]",
-                 sep_token="</s>",
-                 pad_token="<pad>",
-                 cls_token="<s>",
-                 mask_token="<mask>",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        bos_token="<s>",
+        eos_token="</s>",
+        unk_token="[UNK]",
+        sep_token="</s>",
+        pad_token="<pad>",
+        cls_token="<s>",
+        mask_token="<mask>",
+        **kwargs
+    ):
 
-        super().__init__(vocab_file=vocab_file,
-                         do_lower_case=do_lower_case,
-                         unk_token=unk_token,
-                         sep_token=sep_token,
-                         pad_token=pad_token,
-                         cls_token=cls_token,
-                         mask_token=mask_token)
+        super().__init__(
+            vocab_file=vocab_file,
+            do_lower_case=do_lower_case,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+        )
 
-        bos_token = AddedToken(bos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   bos_token, str) else bos_token
-        eos_token = AddedToken(eos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   eos_token, str) else eos_token
-        sep_token = AddedToken(sep_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   sep_token, str) else sep_token
-        cls_token = AddedToken(cls_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   cls_token, str) else cls_token
-        unk_token = AddedToken(unk_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
+        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
-        self._build_special_tokens_map_extended(bos_token=bos_token,
-                                                eos_token=eos_token,
-                                                sep_token=sep_token,
-                                                cls_token=cls_token,
-                                                unk_token=unk_token,
-                                                pad_token=pad_token,
-                                                mask_token=mask_token)
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token,
+            eos_token=eos_token,
+            sep_token=sep_token,
+            cls_token=cls_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            mask_token=mask_token,
+        )
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_seq_len=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 pad_to_max_seq_len=False,
-                 truncation_strategy="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=False,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False):
+    def __call__(
+        self,
+        text,
+        text_pair=None,
+        max_seq_len=None,
+        stride=0,
+        is_split_into_words=False,
+        pad_to_max_seq_len=False,
+        truncation_strategy="longest_first",
+        return_position_ids=False,
+        return_token_type_ids=False,
+        return_attention_mask=False,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+    ):
         return super().__call__(
             text,
             text_pair=text_pair,
@@ -115,13 +109,14 @@ class MPNetTokenizer(BertTokenizer):
             return_attention_mask=return_attention_mask,
             return_length=return_length,
             return_overflowing_tokens=return_overflowing_tokens,
-            return_special_tokens_mask=return_special_tokens_mask)
+            return_special_tokens_mask=return_special_tokens_mask,
+        )
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
         Build model inputs from a sequence or a pair of sequence for sequence classification tasks by concatenating and
-        adding special tokens. 
-        
+        adding special tokens.
+
         A MPNet sequence has the following format:
 
         - single sequence:      ``<s> X </s>``
@@ -142,10 +137,7 @@ class MPNetTokenizer(BertTokenizer):
         sep = [self.sep_token_id]
         return cls + token_ids_0 + sep + sep + token_ids_1 + sep
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -155,7 +147,7 @@ class MPNetTokenizer(BertTokenizer):
                 A list of `inputs_ids` for the first sequence.
             token_ids_1 (List[int], optinal):
                 Optional second list of IDs for sequence pairs. Defaults to None.
-            already_has_special_tokens (bool, optional): Whether or not the token list is already 
+            already_has_special_tokens (bool, optional): Whether or not the token list is already
                 formatted with special tokens for the model. Defaults to None.
 
         Returns:
@@ -164,18 +156,14 @@ class MPNetTokenizer(BertTokenizer):
 
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0,
-                token_ids_1=token_ids_1,
-                already_has_special_tokens=True)
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
 
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Creates a mask from the two sequences passed to be used in a sequence-pair classification task. MPNet does not
         make use of token type ids, therefore a list of zeros is returned.

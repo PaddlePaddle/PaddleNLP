@@ -37,7 +37,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
 | [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果|
-| [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
+| [情感分析](#情感分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
@@ -941,7 +941,6 @@ from paddlenlp import Taskflow
 <tr><td>uie-mini (6L384H)<td>37.04<td>64.65<td>60.50<td>78.36<td>72.09<td>76.38
 <tr><td>uie-micro (4L384H)<td>37.53<td>62.11<td>57.04<td>75.92<td>66.00<td>70.22
 <tr><td>uie-nano (4L312H)<td>38.94<td>66.83<td>48.29<td>76.74<td>62.86<td>72.35
-</table>
 <tr><td>uie-m-large (24L1024H)<td><b>49.35</b><td><b>74.55</b><td>70.50<td><b>92.66</b><td><b>78.49</b><td><b>83.02</b>
 <tr><td>uie-m-base (12L768H)<td>38.46<td>74.31<td>63.37<td>87.32<td>76.27<td>80.13
 </table>
@@ -1215,7 +1214,8 @@ from paddlenlp import Taskflow
 
 ```python
 >>> from paddlenlp import Taskflow
->>> text_similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
+>>> similarity = Taskflow("text_similarity")
+>>> similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
 [{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
 ```
 
@@ -1240,8 +1240,8 @@ from paddlenlp import Taskflow
 * `task_path`：自定义任务路径，默认为None。
 </div></details>
 
-### 情感倾向分析
-<details><summary>&emsp;基于情感知识增强预训练模型SKEP达到业界SOTA </summary><div>
+### 情感分析
+<details><summary>&emsp;集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务 </summary><div>
 
 #### 支持不同模型，速度快和精度高两种模式
 
@@ -1256,18 +1256,41 @@ from paddlenlp import Taskflow
 >>> senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
 >>> senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
 [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive', 'score': 0.984320878982544}]
+
+# 使用UIE模型进行情感分析，具有较强的样本迁移能力
+# 1. 语句级情感分析
+>>> schema = ['情感倾向[正向，负向]']
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta('蛋糕味道不错，店家服务也很好')
+[{'情感倾向[正向,负向]': [{'text': '正向', 'probability': 0.996646058824652}]}]
+
+# 2. 评价维度级情感分析
+>>> # Aspect Term Extraction
+>>> # schema =  ["评价维度"]
+>>> # Aspect - Opinion Extraction
+>>> # schema =  [{"评价维度":["观点词"]}]
+>>> # Aspect - Sentiment Extraction
+>>> # schema =  [{"评价维度":["情感倾向[正向,负向,未提及]"]}]
+>>> # Aspect - Sentiment - Opinion Extraction
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
+
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta('蛋糕味道不错，店家服务也很热情')
+[{'评价维度': [{'text': '服务', 'start': 9, 'end': 11, 'probability': 0.9709093024793489, 'relations': { '观点词': [{'text': '热情', 'start': 13, 'end': 15, 'probability': 0.9897222206316556}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9999327669598301}]}}, {'text': '味道', 'start': 2, 'end': 4, 'probability': 0.9105472387838915, 'relations': {'观点词': [{'text': '不错', 'start': 4, 'end': 6, 'probability': 0.9946981266891619}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9998829392709467}]}}]}]
 ```
 
 #### 批量样本输入，平均速度更快
 ```python
 >>> from paddlenlp import Taskflow
->>> senta(["这个产品用起来真的很流畅，我非常喜欢", "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
-[{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}, {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive', 'score': 0.985750675201416}]
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta(["房间不大，很干净", "老板服务热情，价格也便宜"])
+[{'评价维度': [{'text': '房间', 'start': 0, 'end': 2, 'probability': 0.998526653966298, 'relations': {'观点词': [{'text': '干净', 'start': 6, 'end': 8, 'probability': 0.9899580841973474}, {'text': '不大', 'start': 2, 'end': 4, 'probability': 0.9945525066163512}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.6077412795680956}]}}]}, {'评价维度': [{'text': '服务', 'start': 2, 'end': 4, 'probability': 0.9913965811617516, 'relations': {'观点词': [{'text': '热情', 'start': 4, 'end': 6, 'probability': 0.9995530034336753}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9956709542206106}]}}, {'text': '价格', 'start': 7, 'end': 9, 'probability': 0.9970075537913772, 'relations': {'观点词': [{'text': '便宜', 'start': 10, 'end': 12, 'probability': 0.9991568497876635}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9943191048602245}]}}]}]
 ```
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，可选有`bilstm`和`skep_ernie_1.0_large_ch`。
+* `model`：选择任务使用的模型，可选有`bilstm`,`skep_ernie_1.0_large_ch`,`uie-senta-base`,`uie-senta-medium`,`uie-senta-mini`,`uie-senta-micro`,`uie-senta-nano`。
 * `task_path`：自定义任务路径，默认为None。
 </div></details>
 
@@ -1743,14 +1766,14 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td rowspan="2">命名实体识别<td>精确模式：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>快速模式：BiGRU+CRF <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/lexical_analysis"> 训练详情 <td> 百度自建数据集，包含2200万句子，覆盖多种场景
   <tr><td>依存句法分析<td>DDParser<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/dependency_parsing/ddparser"> 训练详情 <td> 百度自建数据集，DuCTB 1.0中文依存句法树库
-  <tr><td rowspan="2">信息抽取<td> UIE-Base <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/information_extraction/uie"> 训练详情 <td> 百度自建数据集
-  <tr><td> UIE-Tiny <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td>信息抽取<td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/model_zoo/uie"> 训练详情 <td> 百度自建数据集
   <tr><td rowspan="2">解语知识标注<td>词类知识标注：WordTag<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm"> 训练详情 <td> 百度自建数据集，词类体系基于TermTree构建
   <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
   <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
   <tr><td>文本相似度<td>SimBERT<td> - <td> 收集百度知道2200万对相似句组
-  <tr><td rowspan="2">情感倾向分析<td> BiLSTM <td> - <td> 百度自建数据集
+  <tr><td rowspan="3">情感分析<td> BiLSTM <td> - <td> 百度自建数据集
   <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction"> 训练详情 <td> 百度自建数据集
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据

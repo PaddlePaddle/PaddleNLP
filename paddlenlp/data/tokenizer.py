@@ -23,7 +23,6 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class BaseTokenizer(object):
-
     def __init__(self, vocab):
         self.vocab = vocab
 
@@ -39,8 +38,8 @@ class BaseTokenizer(object):
 
 class JiebaTokenizer(BaseTokenizer):
     """
-    Constructs a tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__. 
-    It supports :meth:`cut` method to split the text to tokens, and :meth:`encode` 
+    Constructs a tokenizer based on `jieba <https://github.com/fxsjy/jieba>`__.
+    It supports :meth:`cut` method to split the text to tokens, and :meth:`encode`
     method to covert text to token ids.
 
     Args:
@@ -61,17 +60,17 @@ class JiebaTokenizer(BaseTokenizer):
 
         Args:
             sentence(str): The text that needs to be cuted.
-            cut_all(bool, optional): Whether to use the full mode. If True, 
-                using full mode that gets all the possible words from the 
-                sentence, which is fast but not accurate. If False, using 
-                accurate mode that attempts to cut the sentence into the most 
-                accurate segmentations, which is suitable for text analysis. 
+            cut_all(bool, optional): Whether to use the full mode. If True,
+                using full mode that gets all the possible words from the
+                sentence, which is fast but not accurate. If False, using
+                accurate mode that attempts to cut the sentence into the most
+                accurate segmentations, which is suitable for text analysis.
                 Default: False.
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
             list[str]: A list of tokens.
-            
+
         Example:
             .. code-block:: python
 
@@ -94,23 +93,23 @@ class JiebaTokenizer(BaseTokenizer):
 
     def encode(self, sentence, cut_all=False, use_hmm=True):
         """
-        The method used to convert the text to ids. It will firstly call 
-        :meth:`cut` method to cut the text to tokens. Then, convert tokens to 
+        The method used to convert the text to ids. It will firstly call
+        :meth:`cut` method to cut the text to tokens. Then, convert tokens to
         ids using `vocab`.
 
         Args:
             sentence(str): The text that needs to be cuted.
-            cut_all(bool, optional): Whether to use the full mode. If True, 
-                using full mode that gets all the possible words from the 
-                sentence, which is fast but not accurate. If False, using 
-                accurate mode that attempts to cut the sentence into the most 
-                accurate segmentations, which is suitable for text analysis. 
+            cut_all(bool, optional): Whether to use the full mode. If True,
+                using full mode that gets all the possible words from the
+                sentence, which is fast but not accurate. If False, using
+                accurate mode that attempts to cut the sentence into the most
+                accurate segmentations, which is suitable for text analysis.
                 Default: False.
             use_hmm(bool, optional): Whether to use the HMM model. Default: True.
 
         Returns:
             list[int]: A list of ids.
-            
+
         Example:
             .. code-block:: python
 
@@ -124,13 +123,10 @@ class JiebaTokenizer(BaseTokenizer):
                     unk_token='[UNK]',
                     pad_token='[PAD]')
                 tokenizer = JiebaTokenizer(vocab)
-                
+
                 ids = tokenizer.encode('我爱你中国')
                 print(ids)
                 # [1170578, 575565]
         """
         words = self.cut(sentence, cut_all, use_hmm)
-        return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in words
-        ]
+        return [get_idx_from_word(word, self.vocab.token_to_idx, self.vocab.unk_token) for word in words]

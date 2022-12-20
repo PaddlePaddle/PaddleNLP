@@ -50,24 +50,24 @@ def set_seed(seed):
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
-    os.environ['PYTHONHASHSEED'] = str(seed)
+    os.environ["PYTHONHASHSEED"] = str(seed)
 
 
 def read_local_dataset(path):
     """
     Read dataset file
     """
-    with open(path, 'r', encoding='utf-8') as f:
+    with open(path, "r", encoding="utf-8") as f:
         for line in f:
-            items = line.strip().split('\t')
-            if items[0] == 'Text':
+            items = line.strip().split("\t")
+            if items[0] == "Text":
                 continue
             if len(items) == 3:
-                yield {'text': items[0], 'label': items[1], 'predict': items[2]}
+                yield {"text": items[0], "label": items[1], "predict": items[2]}
             elif len(items) == 2:
-                yield {'text': items[0], 'label': items[1], 'predict': ''}
+                yield {"text": items[0], "label": items[1], "predict": ""}
             elif len(items) == 1:
-                yield {'text': items[0], 'label': '', 'predict': ''}
+                yield {"text": items[0], "label": "", "predict": ""}
             else:
                 logger.info(line.strip())
                 raise ValueError("{} should be in fixed format.".format(path))
@@ -98,14 +98,12 @@ def find_positive_influence_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if os.path.exists(os.path.join(
-            args.params_path, "model_state.pdparams")) and os.path.exists(
-                os.path.join(args.params_path,
-                             "model_config.json")) and os.path.exists(
-                                 os.path.join(args.params_path,
-                                              "tokenizer_config.json")):
-        model = AutoModelForSequenceClassification.from_pretrained(
-            args.params_path)
+    if (
+        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
+        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
+        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
+    ):
+        model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
         raise ValueError("The {} should exist.".format(args.params_path))
@@ -115,56 +113,47 @@ def find_positive_influence_data():
     interpret_path = os.path.join(args.dataset_dir, args.interpret_input_file)
 
     train_ds = load_dataset(read_local_dataset, path=train_path, lazy=False)
-    interpret_ds = load_dataset(read_local_dataset,
-                                path=interpret_path,
-                                lazy=False)
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=args.max_seq_length)
+    interpret_ds = load_dataset(read_local_dataset, path=interpret_path, lazy=False)
+    trans_func = functools.partial(preprocess_function, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
     train_ds = train_ds.map(trans_func)
     interpret_ds = interpret_ds.map(trans_func)
 
     # Batchify dataset
     collate_fn = LocalDataCollatorWithPadding(tokenizer)
-    train_batch_sampler = BatchSampler(train_ds,
-                                       batch_size=args.batch_size,
-                                       shuffle=False)
-    interpret_batch_sampler = BatchSampler(interpret_ds,
-                                           batch_size=args.batch_size,
-                                           shuffle=False)
-    train_data_loader = DataLoader(dataset=train_ds,
-                                   batch_sampler=train_batch_sampler,
-                                   collate_fn=collate_fn)
-    interpret_data_loader = DataLoader(dataset=interpret_ds,
-                                       batch_sampler=interpret_batch_sampler,
-                                       collate_fn=collate_fn)
+    train_batch_sampler = BatchSampler(train_ds, batch_size=args.batch_size, shuffle=False)
+    interpret_batch_sampler = BatchSampler(interpret_ds, batch_size=args.batch_size, shuffle=False)
+    train_data_loader = DataLoader(dataset=train_ds, batch_sampler=train_batch_sampler, collate_fn=collate_fn)
+    interpret_data_loader = DataLoader(
+        dataset=interpret_ds, batch_sampler=interpret_batch_sampler, collate_fn=collate_fn
+    )
 
     # Classifier_layer_name is the layer name of the last output layer
-    feature_sim = FeatureSimilarityModel(model,
-                                         train_data_loader,
-                                         classifier_layer_name="classifier")
+    feature_sim = FeatureSimilarityModel(model, train_data_loader, classifier_layer_name="classifier")
     # Feature similarity analysis & select sparse data
     analysis_result = []
     for batch in interpret_data_loader:
         analysis_result += feature_sim(batch, sample_num=args.top_k)
-    with open(os.path.join(args.dataset_dir, args.interpret_result_file),
-              'w') as f:
+    with open(os.path.join(args.dataset_dir, args.interpret_result_file), "w") as f:
         for i in range(len(analysis_result)):
-            f.write("text: " + interpret_ds.data[i]["text"] + '\n')
-            if 'predict' in interpret_ds.data[i]:
-                f.write("predict label: " + interpret_ds.data[i]["predict"] +
-                        '\n')
-            if 'label' in interpret_ds.data[i]:
-                f.write("label: " + interpret_ds.data[i]["label"] + '\n')
+            f.write("text: " + interpret_ds.data[i]["text"] + "\n")
+            if "predict" in interpret_ds.data[i]:
+                f.write("predict label: " + interpret_ds.data[i]["predict"] + "\n")
+            if "label" in interpret_ds.data[i]:
+                f.write("label: " + interpret_ds.data[i]["label"] + "\n")
             f.write("examples with positive influence\n")
-            for i, (idx, score) in enumerate(
-                    zip(analysis_result[i].pos_indexes,
-                        analysis_result[i].pos_scores)):
-                f.write("support{} text: ".format(i + 1) +
-                        train_ds.data[idx]["text"] + '\t' + "label: " +
-                        train_ds.data[idx]["label"] + '\t' + "score: " +
-                        "{:.5f}".format(score) + '\n')
+            for i, (idx, score) in enumerate(zip(analysis_result[i].pos_indexes, analysis_result[i].pos_scores)):
+                f.write(
+                    "support{} text: ".format(i + 1)
+                    + train_ds.data[idx]["text"]
+                    + "\t"
+                    + "label: "
+                    + train_ds.data[idx]["label"]
+                    + "\t"
+                    + "score: "
+                    + "{:.5f}".format(score)
+                    + "\n"
+                )
     f.close()
 
 

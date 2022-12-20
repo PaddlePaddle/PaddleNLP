@@ -48,7 +48,6 @@ pip install -U paddlenlp ppdiffusers visualdl fastcore Pillow
 ### 1.3 使用trainner开启训练
 #### 1.3.1 硬件要求
 Tips：
-- FP16 O2 在 32GB 的显卡上可正常训练。
 - FP32 在 40GB 的显卡上可正常训练。
 
 #### 1.3.2 单机单卡训练
@@ -105,10 +104,11 @@ python -u train_txt2img_laion400m_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`，我们可以使用英文的分词器`bert-base-uncased`，也可以使用中文的分词器`ernie-1.0`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 
-#### 1.3.3 单机多卡训练
+#### 1.3.3 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)
 ```bash
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" train_txt2img_laion400m_trainer.py \
     --do_train \
@@ -188,6 +188,7 @@ python -u train_txt2img_laion400m_no_trainer.py \
 > * `--tokenizer_name`: 我们需要使用的`tokenizer_name`。
 > * `--use_ema`: 是否对`unet`使用`ema`，默认为`False`。
 > * `--max_grad_norm`: 梯度剪裁的最大norm值，`-1`表示不使用梯度裁剪策略。
+> * `--recompute`: 是否开启重计算，(`bool`, 可选, 默认为 `False`)，在开启后我们可以增大batch_size，注意在小batch_size的条件下，开启recompute后显存变化不明显，只有当开大batch_size后才能明显感受到区别。
 > * `--fp16`: 是否使用 fp16 混合精度训练而不是 fp32 训练。(`bool`, 可选, 默认为 `False`)
 > * `--fp16_opt_level`: 混合精度训练模式，可为``O1``或``O2``模式，默认``O1``模式，默认O1. 只在fp16选项开启时候生效。
 
@@ -287,6 +288,8 @@ python generate_images.py \
     --guidance_scales 3 4 5 6 7 8 \
     --seed 42 \
     --scheduler_type ddim \
+    --height 256 \
+    --width 256 \
     --num_inference_steps 50 \
     --device gpu
 ```
@@ -296,9 +299,11 @@ python generate_images.py \
 > * `--batch_size`: 生成图片所使用的batch_size。
 > * `--save_path`: 生成的图片所要保存的路径。
 > * `--guidance_scales`: guidance_scales值，我们可以输入3 4 5 6 7 8。
-> * `--seed`: 为了保证不同guidance_scales值，能够使用相同的`latents`初始值。
+> * `--seed`: 为了保证不同guidance_scales值，能够使用相同的`latents`初始值, `-1`表示不使用随机种子。
 > * `--scheduler_type`: 采样器的类型，支持`ddim`, `pndm`, `euler-ancest` 和 `lms`。
 > * `--num_inference_steps`: 推理预测时候使用的步数。
+> * `--height`: 生成图片的高度。
+> * `--width`: 生成图片的宽度。
 > * `--device`: 使用的设备，可以是`gpu`, `cpu`, `gpu:0`, `gpu:1`等。
 
 

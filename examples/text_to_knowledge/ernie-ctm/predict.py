@@ -19,6 +19,7 @@ import numpy as np
 import paddle
 from paddlenlp.layers.crf import LinearChainCrf
 from paddlenlp.utils.tools import compare_version
+
 if compare_version(paddle.version.full_version, "2.2.0") >= 0:
     # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
     from paddle.text import ViterbiDecoder
@@ -42,35 +43,21 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def do_predict(data,
-               model,
-               tokenizer,
-               viterbi_decoder,
-               tags_to_idx,
-               idx_to_tags,
-               batch_size=1,
-               summary_num=2):
+def do_predict(data, model, tokenizer, viterbi_decoder, tags_to_idx, idx_to_tags, batch_size=1, summary_num=2):
 
     examples = []
     for text in data:
         example = {"tokens": list(text)}
-        input_ids, token_type_ids, seq_len = convert_example(example,
-                                                             tokenizer,
-                                                             args.max_seq_len,
-                                                             is_test=True)
+        input_ids, token_type_ids, seq_len = convert_example(example, tokenizer, args.max_seq_len, is_test=True)
 
         examples.append((input_ids, token_type_ids, seq_len))
 
-    batches = [
-        examples[idx:idx + batch_size]
-        for idx in range(0, len(examples), batch_size)
-    ]
+    batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype='int64'),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype='int64'
-            ),  # token_type_ids
-        Stack(dtype='int64'),  # seq_len
+        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+        Stack(dtype="int64"),  # seq_len
     ): fn(samples)
 
     all_pred_tags = []
@@ -91,14 +78,13 @@ if __name__ == "__main__":
     paddle.set_device(args.device)
 
     data = [
-        '美人鱼是周星驰执导的一部电影',
+        "美人鱼是周星驰执导的一部电影",
     ]
 
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
     idx_to_tags = dict(zip(*(tags_to_idx.values(), tags_to_idx.keys())))
 
-    model = ErnieCtmWordtagModel.from_pretrained("wordtag",
-                                                 num_tag=len(tags_to_idx))
+    model = ErnieCtmWordtagModel.from_pretrained("wordtag", num_tag=len(tags_to_idx))
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -106,11 +92,7 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = do_predict(data,
-                         model,
-                         tokenizer,
-                         model.viterbi_decoder,
-                         tags_to_idx,
-                         idx_to_tags,
-                         batch_size=args.batch_size)
+    results = do_predict(
+        data, model, tokenizer, model.viterbi_decoder, tags_to_idx, idx_to_tags, batch_size=args.batch_size
+    )
     print(results)

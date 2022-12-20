@@ -24,13 +24,7 @@ def _create_model_arguments(batch):
 
 
 class Trainer(object):
-
-    def __init__(self,
-                 args,
-                 model,
-                 dataloader,
-                 num_train_steps,
-                 step_callback=None):
+    def __init__(self, args, model, dataloader, num_train_steps, step_callback=None):
         self.args = args
         self.model = model
         self.dataloader = dataloader
@@ -39,10 +33,7 @@ class Trainer(object):
 
         self.optimizer, self.scheduler = self._create_optimizer(model)
         self.scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
-        self.wd_params = [
-            p.name for n, p in model.named_parameters()
-            if not any(nd in n for nd in ["bias", "norm"])
-        ]
+        self.wd_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
 
     def train(self):
         model = self.model
@@ -53,25 +44,17 @@ class Trainer(object):
         acc = 0.0
 
         model.train()
-        model, self.optimizer = paddle.amp.decorate(models=model,
-                                                    optimizers=self.optimizer,
-                                                    level='O2',
-                                                    master_weight=None,
-                                                    save_dtype='float32')
+        model, self.optimizer = paddle.amp.decorate(
+            models=model, optimizers=self.optimizer, level="O2", master_weight=None, save_dtype="float32"
+        )
 
         with tqdm(total=self.num_train_steps) as pbar:
             while True:
                 for step, batch in enumerate(self.dataloader):
-                    with paddle.amp.auto_cast(enable=True,
-                                              custom_white_list=None,
-                                              custom_black_list=None,
-                                              level='O2'):
-                        logits = model(input_ids=batch[0],
-                                       token_type_ids=batch[1])
+                    with paddle.amp.auto_cast(enable=True, custom_white_list=None, custom_black_list=None, level="O2"):
+                        logits = model(input_ids=batch[0], token_type_ids=batch[1])
 
-                    loss = paddle.nn.CrossEntropyLoss()(logits,
-                                                        batch[2].reshape(
-                                                            (-1, )))
+                    loss = paddle.nn.CrossEntropyLoss()(logits, batch[2].reshape((-1,)))
 
                     if self.args.gradient_accumulation_steps > 1:
                         loss = loss / self.args.gradient_accumulation_steps
@@ -81,9 +64,7 @@ class Trainer(object):
                         self.scaler.minimize(self.optimizer, scaled)
                         self.scheduler.step()
                         self.optimizer.clear_grad()
-                        pbar.set_description(
-                            "epoch: {} loss: {} acc: {}".format(
-                                epoch, loss.numpy(), acc))
+                        pbar.set_description("epoch: {} loss: {} acc: {}".format(epoch, loss.numpy(), acc))
                         pbar.update()
                         global_step += 1
 
@@ -104,15 +85,18 @@ class Trainer(object):
     def _create_optimizer(self, model):
         scheduler = self._create_scheduler()
         clip = paddle.nn.ClipGradByNorm(clip_norm=1.0)
-        return AdamW(parameters=model.parameters(),
-                     grad_clip=clip,
-                     learning_rate=scheduler,
-                     beta1=0.9,
-                     apply_decay_param_fun=lambda x: x in self.wd_params,
-                     weight_decay=self.args.weight_decay,
-                     beta2=0.99), scheduler
+        return (
+            AdamW(
+                parameters=model.parameters(),
+                grad_clip=clip,
+                learning_rate=scheduler,
+                beta1=0.9,
+                apply_decay_param_fun=lambda x: x in self.wd_params,
+                weight_decay=self.args.weight_decay,
+                beta2=0.99,
+            ),
+            scheduler,
+        )
 
     def _create_scheduler(self):
-        return LinearDecayWithWarmup(self.args.learning_rate,
-                                     self.num_train_steps,
-                                     self.args.warmup_proportion)
+        return LinearDecayWithWarmup(self.args.learning_rate, self.num_train_steps, self.args.warmup_proportion)

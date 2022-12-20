@@ -1,4 +1,4 @@
-#encoding=utf8
+# encoding=utf8
 # Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,17 +38,16 @@ scheduler_type2cls = {
 
 def get_layer_lr_radios(layer_decay=0.8, n_layers=12):
     """Have lower learning rates for layers closer to the input."""
-    key_to_depths = OrderedDict({
-        "mpnet.embeddings.": 0,
-        "mpnet.encoder.relative_attention_bias.": 0,
-        "qa_outputs.": n_layers + 2,
-    })
+    key_to_depths = OrderedDict(
+        {
+            "mpnet.embeddings.": 0,
+            "mpnet.encoder.relative_attention_bias.": 0,
+            "qa_outputs.": n_layers + 2,
+        }
+    )
     for layer in range(n_layers):
         key_to_depths[f"mpnet.encoder.layer.{str(layer)}."] = layer + 1
-    return {
-        key: (layer_decay**(n_layers + 2 - depth))
-        for key, depth in key_to_depths.items()
-    }
+    return {key: (layer_decay ** (n_layers + 2 - depth)) for key, depth in key_to_depths.items()}
 
 
 def set_seed(seed):
@@ -83,12 +82,10 @@ def get_scheduler(
         raise ValueError(f"scheduler_type must be choson from {data}")
 
     if num_warmup_steps is None:
-        raise ValueError(
-            f"requires `num_warmup_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_warmup_steps`, please provide that argument.")
 
     if num_training_steps is None:
-        raise ValueError(
-            f"requires `num_training_steps`, please provide that argument.")
+        raise ValueError(f"requires `num_training_steps`, please provide that argument.")
 
     return scheduler_type2cls[scheduler_type](
         learning_rate=learning_rate,
@@ -104,7 +101,6 @@ def save_json(data, file_name):
 
 
 class CrossEntropyLossForSQuAD(nn.Layer):
-
     def forward(self, logits, labels):
         start_logits, end_logits = logits
         start_position, end_position = labels
@@ -128,33 +124,23 @@ def load_pickle(input_file):
     return data
 
 
-def create_dataloader(dataset,
-                      trans_fn=None,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None):
+def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):
     if trans_fn:
         dataset = dataset.map(trans_fn, lazy=False)
 
     # shuffle = True if mode == 'train' else False
     shuffle = False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
 
 def convert_example(example, tokenizer, is_test=False):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
 
     Args:
@@ -169,7 +155,7 @@ def convert_example(example, tokenizer, is_test=False):
     """
 
     input_ids = tokenizer.encode(example["text"])
-    input_ids = np.array(input_ids, dtype='int64')
+    input_ids = np.array(input_ids, dtype="int64")
 
     if not is_test:
         label = np.array(example["label"], dtype="int64")
@@ -207,27 +193,27 @@ def evaluate(model, criterion, metric, data_loader):
 
 
 def load_ds(datafiles):
-    '''
+    """
     intput:
         datafiles -- str or list[str] -- the path of train or dev sets
         split_train -- Boolean -- split from train or not
-        dev_size -- int -- split how much data from train 
+        dev_size -- int -- split how much data from train
 
     output:
         MapDataset
-    '''
+    """
 
     data = []
 
     def read(ds_file):
-        with open(ds_file, 'r', encoding='utf-8') as fp:
+        with open(ds_file, "r", encoding="utf-8") as fp:
             next(fp)  # Skip header
             for line in fp.readlines():
-                data = line[:-1].split('\t')
+                data = line[:-1].split("\t")
                 if len(data) == 2:
-                    yield ({'text': data[1], 'label': int(data[0])})
+                    yield ({"text": data[1], "label": int(data[0])})
                 elif len(data) == 3:
-                    yield ({'text': data[2], 'label': int(data[1])})
+                    yield ({"text": data[2], "label": int(data[1])})
 
     if isinstance(datafiles, str):
         return MapDataset(list(read(datafiles)))
@@ -239,16 +225,12 @@ def load_ds_xnli(datafiles):
     data = []
 
     def read(ds_file):
-        with open(ds_file, 'r', encoding='utf-8') as fp:
+        with open(ds_file, "r", encoding="utf-8") as fp:
             # next(fp)  # Skip header
             for line in fp.readlines():
-                data = line.strip().split('\t', 2)
+                data = line.strip().split("\t", 2)
                 first, second, third = data
-                yield ({
-                    "sentence1": first,
-                    "sentence2": second,
-                    "label": third
-                })
+                yield ({"sentence1": first, "sentence2": second, "label": third})
 
     if isinstance(datafiles, str):
         return MapDataset(list(read(datafiles)))

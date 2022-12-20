@@ -34,6 +34,10 @@
     <img src=https://user-images.githubusercontent.com/40840292/167236006-66ed845d-21b8-4647-908b-e1c6e7613eb1.png height=400 hspace='10'/>
 </div>
 
+#### News 📢: UIE-X 🧾
+
+**全新升级UIE-X，除已有纯文本抽取的全部功能外，新增文档抽取能力**，欢迎体验 👉 [信息抽取应用](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/information_extraction/#readme)
+
 #### UIE的优势
 
 - **使用简单**：用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本中的对应信息。**实现开箱即用，并满足各类信息抽取需求**。
@@ -648,7 +652,7 @@ python finetune.py  \
     --max_seq_length 512  \
     --per_device_eval_batch_size 16 \
     --per_device_train_batch_size  16 \
-    --num_train_epochs 100 \
+    --num_train_epochs 20 \
     --learning_rate 1e-5 \
     --label_names 'start_positions' 'end_positions' \
     --do_train \
@@ -659,7 +663,7 @@ python finetune.py  \
     --disable_tqdm True \
     --metric_for_best_model eval_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1 \
+    --save_total_limit 1
 
 ```
 
@@ -899,7 +903,7 @@ paddlenlp server server:app --host 0.0.0.0 --port 8989
 
 - 模型导出
 
-模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdmodel`、`*.pdiparams` 模型文件可用于推理。
+模型训练、压缩时已经自动进行了静态图的导出，保存路径`${finetuned_model}` 下应该有 `*.pdimodel`、`*.pdiparams` 模型文件可用于推理。
 
 - 推理
 
@@ -911,19 +915,33 @@ paddlenlp server server:app --host 0.0.0.0 --port 8989
     python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model
     ```
 
+    部署UIE-M模型
+
+    ```shell
+    python deploy/python/infer_cpu.py --model_path_prefix ${finetuned_model}/model --multilingual
+    ```
+
+
     可配置参数说明：
 
     - `model_path_prefix`: 用于推理的Paddle模型文件路径，需加上文件前缀名称。例如模型文件路径为`./export/model.pdiparams`，则传入`./export/model`。
     - `position_prob`：模型对于span的起始位置/终止位置的结果概率 0~1 之间，返回结果去掉小于这个阈值的结果，默认为 0.5，span 的最终概率输出为起始位置概率和终止位置概率的乘积。
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
+    - `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型是多语言模型，需要设置为 True；默认为 False。
 
   - GPU端推理样例
 
     在GPU端，请使用如下命令进行部署
 
     ```shell
-    python deploy/python/infer_gpu.py --model_path_prefix export/model --use_fp16 --device_id 0
+    python deploy/python/infer_gpu.py --model_path_prefix ${finetuned_model}/model --use_fp16 --device_id 0
+    ```
+
+    部署UIE-M模型
+
+    ```shell
+    python deploy/python/infer_gpu.py --model_path_prefix ${finetuned_model}/model --use_fp16 --device_id 0 --multilingual
     ```
 
     可配置参数说明：
@@ -934,6 +952,7 @@ paddlenlp server server:app --host 0.0.0.0 --port 8989
     - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为 512。
     - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为 4。
     - `device_id`: GPU 设备 ID，默认为 0。
+    - `multilingual`：是否是跨语言模型，用 "uie-m-base", "uie-m-large" 等模型进微调得到的模型是多语言模型，需要设置为 True；默认为 False。
 
 <a name="CCKS比赛"></a>
 

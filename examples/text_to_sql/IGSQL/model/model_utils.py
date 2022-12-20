@@ -20,12 +20,8 @@ import paddle.nn.functional as F
 import numpy as np
 
 
-def compute_loss(gold_seq,
-                 scores,
-                 index_to_token_maps,
-                 gold_tok_to_id,
-                 noise=0.00000001):
-    """ Computes the loss of a gold sequence given scores.
+def compute_loss(gold_seq, scores, index_to_token_maps, gold_tok_to_id, noise=0.00000001):
+    """Computes the loss of a gold sequence given scores.
 
     Args:
         gold_seq (`list`): A sequence of gold tokens.
@@ -53,15 +49,14 @@ def compute_loss(gold_seq,
 
         assert len(gold_indices) > 0
         noise_i = noise
-        '''
+        """
         if len(gold_indices) == 1:
             noise_i = 0
-            '''
+            """
 
         probdist = score
 
-        prob_of_tok = paddle.sum(
-            paddle.index_select(probdist, paddle.to_tensor(gold_indices)))
+        prob_of_tok = paddle.sum(paddle.index_select(probdist, paddle.to_tensor(gold_indices)))
 
         if prob_of_tok < noise_i:
             prob_of_tok = prob_of_tok + noise_i
@@ -93,7 +88,7 @@ def get_seq_from_scores(scores, index_to_token_maps):
 
 
 def per_token_accuracy(gold_seq, pred_seq):
-    """ Returns the per-token accuracy comparing two strings (recall).
+    """Returns the per-token accuracy comparing two strings (recall).
 
     Args:
         gold_seq (`list`): A list of gold tokens.
@@ -110,8 +105,8 @@ def per_token_accuracy(gold_seq, pred_seq):
     return float(num_correct) / len(gold_seq)
 
 
-def forward_one_multilayer(rnns, lstm_input, layer_states, dropout_amount=0.):
-    """ Goes forward for one multilayer RNN cell step.
+def forward_one_multilayer(rnns, lstm_input, layer_states, dropout_amount=0.0):
+    """Goes forward for one multilayer RNN cell step.
 
     Args:
         lstm_input (`Tensor`): Some input to the step.
@@ -120,7 +115,7 @@ def forward_one_multilayer(rnns, lstm_input, layer_states, dropout_amount=0.):
             between the layers.
 
     Returns:
-        (`list` , `list`), `Tensor`, (`list`): Representing (each layer's cell memory, 
+        (`list` , `list`), `Tensor`, (`list`): Representing (each layer's cell memory,
         each layer's cell hidden state), the final hidden state, and (each layer's updated RNNState).
     """
     num_layers = len(layer_states)
@@ -129,8 +124,7 @@ def forward_one_multilayer(rnns, lstm_input, layer_states, dropout_amount=0.):
     hidden_states = []
     state = lstm_input
     for i in range(num_layers):
-        layer_h, new_state = rnns[i](paddle.unsqueeze(state, 0),
-                                     layer_states[i])
+        layer_h, new_state = rnns[i](paddle.unsqueeze(state, 0), layer_states[i])
         new_states.append(new_state)
 
         layer_h = layer_h.squeeze()
@@ -147,8 +141,8 @@ def forward_one_multilayer(rnns, lstm_input, layer_states, dropout_amount=0.):
     return (cell_states, hidden_states), state, new_states
 
 
-def encode_sequence(sequence, rnns, embedder, dropout_amount=0.):
-    """ Encodes a sequence given RNN cells and an embedding function.
+def encode_sequence(sequence, rnns, embedder, dropout_amount=0.0):
+    """Encodes a sequence given RNN cells and an embedding function.
 
     Args:
         seq (`list`): The sequence to encode.
@@ -159,7 +153,7 @@ def encode_sequence(sequence, rnns, embedder, dropout_amount=0.):
         dropout_amount (`float`, optional): The amount of dropout to apply.
 
     Returns:
-        (`list`, `list`), `list`: The first pair is the (final cell memories, final cell states) 
+        (`list`, `list`), `list`: The first pair is the (final cell memories, final cell states)
         of all layers, and the second list is a list of the final layer's cell
         state for all tokens in the sequence.
     """
@@ -177,34 +171,29 @@ def encode_sequence(sequence, rnns, embedder, dropout_amount=0.):
     outputs = []
     for token in sequence:
         rnn_input = embedder(token)
-        (cell_states,
-         hidden_states), output, layer_states = forward_one_multilayer(
-             rnns, rnn_input, layer_states, dropout_amount)
+        (cell_states, hidden_states), output, layer_states = forward_one_multilayer(
+            rnns, rnn_input, layer_states, dropout_amount
+        )
         outputs.append(output)
 
     return (cell_states, hidden_states), outputs
 
 
 def mask_fill(input, mask, value):
-    return input * paddle.cast(paddle.logical_not(
-        mask), input.dtype) + paddle.cast(mask, input.dtype) * value
+    return input * paddle.cast(paddle.logical_not(mask), input.dtype) + paddle.cast(mask, input.dtype) * value
 
 
 def LSTM_output_transfer(utterance_states, final_utterance_state):
 
     if len(utterance_states) != 0:
         utterance_states = utterance_states.squeeze(0)
-        utterance_states = paddle.split(utterance_states,
-                                        utterance_states.shape[0])
+        utterance_states = paddle.split(utterance_states, utterance_states.shape[0])
         for idx in range(len(utterance_states)):
             utterance_states[idx] = utterance_states[idx].squeeze(0)
 
     if len(final_utterance_state) != 0:
         (hidden_state, cell_memory) = final_utterance_state
-        hidden_states = paddle.concat([hidden_state[0], hidden_state[1]],
-                                      axis=-1).squeeze(0)
-        cell_memories = paddle.concat([cell_memory[0], cell_memory[1]],
-                                      axis=-1).squeeze(0)
-        final_utterance_state = (hidden_states.squeeze(0),
-                                 cell_memories.squeeze(0))
+        hidden_states = paddle.concat([hidden_state[0], hidden_state[1]], axis=-1).squeeze(0)
+        cell_memories = paddle.concat([cell_memory[0], cell_memory[1]], axis=-1).squeeze(0)
+        final_utterance_state = (hidden_states.squeeze(0), cell_memories.squeeze(0))
     return utterance_states, final_utterance_state

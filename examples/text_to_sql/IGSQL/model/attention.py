@@ -23,9 +23,9 @@ import numpy as np
 np.random.seed(0)
 
 
-class AttentionResult(
-        namedtuple('AttentionResult', ('scores', 'distribution', 'vector'))):
+class AttentionResult(namedtuple("AttentionResult", ("scores", "distribution", "vector"))):
     """Stores the result of an attention calculation."""
+
     __slots__ = ()
 
 
@@ -56,13 +56,10 @@ class Attention(paddle.nn.Layer):
 
         query_weights = paddle.ParamAttr(initializer=_initializer)
 
-        self.query_linear = paddle.nn.Linear(query_size,
-                                             self.key_size,
-                                             weight_attr=query_weights,
-                                             bias_attr=False)
+        self.query_linear = paddle.nn.Linear(query_size, self.key_size, weight_attr=query_weights, bias_attr=False)
 
     def transform_arguments(self, query, keys, values):
-        """ Transforms the query/key/value inputs before attention calculations.
+        """Transforms the query/key/value inputs before attention calculations.
 
         Arguments:
             query (`Tensor`): Vector representing the query (e.g., hidden state.)
@@ -81,9 +78,9 @@ class Attention(paddle.nn.Layer):
         all_keys = paddle.stack(keys, axis=1)
         all_values = paddle.stack(values, axis=1)
 
-        assert all_keys.shape[
-            0] == self.key_size, "Expected key size of " + str(
-                self.key_size) + " but got " + str(all_keys.shape[0])
+        assert all_keys.shape[0] == self.key_size, (
+            "Expected key size of " + str(self.key_size) + " but got " + str(all_keys.shape[0])
+        )
         assert all_values.shape[0] == self.value_size
 
         if query.dim() == 1:
@@ -96,14 +93,12 @@ class Attention(paddle.nn.Layer):
         if not values:
             values = keys
 
-        query_t, keys_t, values_t = self.transform_arguments(
-            query, keys, values)
+        query_t, keys_t, values_t = self.transform_arguments(query, keys, values)
 
         scores = paddle.t(paddle.mm(query_t, keys_t))  # len(key) x len(query)
 
         distribution = F.softmax(scores, axis=0)  # len(key) x len(query)
 
-        context_vector = paddle.mm(
-            values_t, distribution).squeeze()  # value_size x len(query)
+        context_vector = paddle.mm(values_t, distribution).squeeze()  # value_size x len(query)
 
         return AttentionResult(scores, distribution, context_vector)
