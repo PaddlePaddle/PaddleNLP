@@ -510,6 +510,17 @@ support_argument_list = [
     "openai/disco-diffusion-clip-rn50",
     "openai/disco-diffusion-clip-rn101",
     "disco_diffusion_ernie_vil-2.0-base-zh",
+    "uie-base",
+    "uie-medium",
+    "uie-mini",
+    "uie-micro",
+    "uie-nano",
+    "uie-tiny",
+    "uie-medical-base",
+    "uie-base-en",
+    "uie-m-large",
+    "uie-m-base",
+    "uie-x-base",
 ]
 
 
@@ -617,11 +628,11 @@ class Taskflow(object):
     def set_schema(self, schema):
         assert (
             self.task_instance.model in support_schema_list
-        ), "This method can only be used by the task with the model of uie or wordtag."
+        ), "This method can only be used by the task based on the model of uie or wordtag."
         self.task_instance.set_schema(schema)
 
     def set_argument(self, argument):
         assert (
             self.task_instance.model in support_argument_list
-        ), "This method can only be used by the task with the model of text_to_image generation."
+        ), "This method can only be used by the task of text-to-image generation or information extraction."
         self.task_instance.set_argument(argument)
