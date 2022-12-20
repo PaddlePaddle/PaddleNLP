@@ -75,7 +75,8 @@ def main():
     label_list = raw_datasets["train"].features["ner_tags"].feature.names
     data_args.label_list = label_list
     data_args.ignore_label = -100
-    data_args.no_entity_id = len(data_args.label_list) - 1
+    data_args.no_entity_id = 0
+    print(label_list)
 
     num_classes = len(label_list)
 
