@@ -32,7 +32,7 @@ from .poetry_generation import PoetryGenerationTask
 from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
-from .sentiment_analysis import SentaTask, SkepTask
+from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
@@ -173,6 +173,26 @@ TASKS = {
             "skep_ernie_1.0_large_ch": {
                 "task_class": SkepTask,
                 "task_flag": "sentiment_analysis-skep_ernie_1.0_large_ch",
+            },
+            "uie-senta-base": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-base",
+            },
+            "uie-senta-medium": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-medium",
+            },
+            "uie-senta-mini": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-mini",
+            },
+            "uie-senta-micro": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-micro",
+            },
+            "uie-senta-nano": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-nano",
             },
         },
         "default": {"model": "bilstm"},
@@ -471,6 +491,11 @@ support_schema_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "uie-senta-base",
+    "uie-senta-medium",
+    "uie-senta-mini",
+    "uie-senta-micro",
+    "uie-senta-nano",
 ]
 
 support_argument_list = [

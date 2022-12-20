@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    DocPipeline,
-    ExtractiveQAPipeline,
-    QAGenerationPipeline,
-    SemanticSearchPipeline,
-    SentaPipeline,
-    TextToImagePipeline,
-)
+from paddlenlp import SimpleServer, Taskflow
+
+# The schema changed to your defined schema
+schema = [{"评价维度": ["观点词", "情感倾向[正向,负向,未提及]"]}]
+# define taskflow to perform sentiment analysis
+senta = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base")
+# define your server
+app = SimpleServer()
+app.register_taskflow("senta", senta)

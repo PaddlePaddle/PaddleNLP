@@ -13,35 +13,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, Any
-
+import json
 import logging
 import time
-import json
 from pathlib import Path
-from numpy import ndarray
+from typing import Any, Dict
 
 from fastapi import APIRouter
-
-import pipelines
-from pipelines.pipelines.base import Pipeline
-from rest_api.config import PIPELINE_YAML_PATH, QUERY_PIPELINE_NAME, QUERY_QA_PAIRS_NAME
-from rest_api.config import LOG_LEVEL, CONCURRENT_REQUEST_PER_WORKER
+from numpy import ndarray
+from pydantic import BaseConfig
+from rest_api.config import (
+    CONCURRENT_REQUEST_PER_WORKER,
+    LOG_LEVEL,
+    PIPELINE_YAML_PATH,
+    QUERY_PIPELINE_NAME,
+    QUERY_QA_PAIRS_NAME,
+)
+from rest_api.controller.utils import RequestLimiter
 from rest_api.schema import (
-    QueryRequest,
-    QueryResponse,
     DocumentRequest,
     DocumentResponse,
     QueryImageResponse,
-    QueryQAPairResponse,
     QueryQAPairRequest,
+    QueryQAPairResponse,
+    QueryRequest,
+    QueryResponse,
+    SentaRequest,
+    SentaResponse,
 )
-from rest_api.controller.utils import RequestLimiter
+
+import pipelines
+from pipelines.pipelines.base import Pipeline
 
 logging.getLogger("pipelines").setLevel(LOG_LEVEL)
 logger = logging.getLogger("pipelines")
-
-from pydantic import BaseConfig
 
 BaseConfig.arbitrary_types_allowed = True
 
@@ -51,8 +56,9 @@ PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=QUERY
 
 try:
     QA_PAIR_PIPELINE = Pipeline.load_from_yaml(Path(PIPELINE_YAML_PATH), pipeline_name=QUERY_QA_PAIRS_NAME)
-except Exception as e:
+except Exception:
     logger.warning(f"Request pipeline ('{QUERY_QA_PAIRS_NAME}: is null'). ")
+
 DOCUMENT_STORE = PIPELINE.get_document_store()
 logging.info(f"Loaded pipeline nodes: {PIPELINE.graph.nodes.keys()}")
 
@@ -104,9 +110,9 @@ def query_images(request: QueryRequest):
     res = PIPELINE.run(query=request.query, params=params, debug=request.debug)
     # Ensure answers and documents exist, even if they're empty lists
     result["answers"] = res["results"]
-    if not "documents" in result:
+    if "documents" not in result:
         result["documents"] = []
-    if not "answers" in result:
+    if "answers" not in result:
         result["answers"] = []
     return result
 
@@ -122,6 +128,20 @@ def query_documents(request: DocumentRequest):
     params = request.params or {}
     res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
     result["results"] = res["results"]
+    return result
+
+
+@router.post("/senta_file", response_model=SentaResponse, response_model_exclude_none=True)
+def senta_file(request: SentaRequest):
+    """
+    This endpoint receives the question as a string and allows the requester to set
+    additional parameters that will be passed on to the pipelines pipeline.
+    """
+    result = {}
+    result["meta"] = request.meta
+    params = request.params or {}
+    res = PIPELINE.run(meta=request.meta, params=params, debug=request.debug)
+    result["img_dict"] = res["img_dict"]
     return result
 
 
@@ -157,9 +177,9 @@ def _process_request(pipeline, request) -> Dict[str, Any]:
     result = pipeline.run(query=request.query, params=params, debug=request.debug)
 
     # Ensure answers and documents exist, even if they're empty lists
-    if not "documents" in result:
+    if "documents" not in result:
         result["documents"] = []
-    if not "answers" in result:
+    if "answers" not in result:
         result["answers"] = []
     # if any of the documents contains an embedding as an ndarray the latter needs to be converted to list of float
     for document in result["documents"]:
@@ -180,8 +200,8 @@ def _format_filters(filters):
     new_filters = {}
     if filters is None:
         logger.warning(
-            f"Request with deprecated filter format ('\"filters\": null'). "
-            f"Remove empty filters from params to be compliant with future versions"
+            "Request with deprecated filter format ('\"filters\": null'). "
+            "Remove empty filters from params to be compliant with future versions"
         )
     else:
         for key, values in filters.items():

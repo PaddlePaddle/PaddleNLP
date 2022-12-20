@@ -12,13 +12,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    DocPipeline,
-    ExtractiveQAPipeline,
-    QAGenerationPipeline,
-    SemanticSearchPipeline,
-    SentaPipeline,
-    TextToImagePipeline,
-)
+import json
+
+import requests
+
+url = "http://0.0.0.0:8189/taskflow/senta"
+headers = {"Content-Type": "application/json"}
+texts = ["蛋糕味道不错，店家的服务也很热情"]
+data = {
+    "data": {
+        "text": texts,
+    }
+}
+r = requests.post(url=url, headers=headers, data=json.dumps(data))
+datas = json.loads(r.text)
+print(datas)
