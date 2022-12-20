@@ -27,6 +27,8 @@ python data_distill.py \
     --model_path ../checkpoint/model_best
 ```
 
+**NOTE**：schema需要根据标注数据在`data_distill.py`中进行配置，且schema需要包含标注数据中的所有标签类型。
+
 可配置参数说明：
 
 - `data_path`: 标注数据（`doccano_ext.json`）及无监督文本（`unlabeled_data.txt`）路径。
