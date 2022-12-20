@@ -63,14 +63,14 @@ def do_predict(args):
         unimo_text,
         input_spec=[
             # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # token_type_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # attention_mask
             paddle.static.InputSpec(shape=[None, 1, None, None],
                                     dtype="float32"),
             # seq_len
-            paddle.static.InputSpec(shape=[None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None], dtype="int64"),
             args.max_dec_len,
             args.min_dec_len,
             args.topk,
