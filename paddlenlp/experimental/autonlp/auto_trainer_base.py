@@ -128,7 +128,23 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 setattr(new_arguments, hp_key, value)
         return new_arguments
 
-    def _filter_model_candidates(self, language=None, preset=None) -> List[Dict[str, Any]]:
+    def _filter_model_candidates(self, language=None, preset=None, override=None) -> List[Dict[str, Any]]:
+        """
+        Model Candidates stored as Ray hyperparameter search space, organized by
+        override, language and preset
+        """
+        model_candidates = self._model_candidates
+        if override is not None:
+            model_candidates = self._override_arguments(override, self._model_candidates)
+        else:
+            if language is not None:
+                model_candidates = filter(lambda x: x["language"] == language, model_candidates)
+            if preset is not None:
+                model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
+        hyperopt_search_space = {"candidates": hp.choice("candidates", list(model_candidates))}
+        return hyperopt_search_space
+
+    def _override_model_candidates(self, override: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         Model Candidates stored as Ray hyperparameter search space, organized by
         self.language and preset
@@ -179,6 +195,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         num_cpus: Optional[int] = None,
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
+        override: List[Dict[str, Any]] = None,
     ) -> ResultGrid:
         """
         Main logic of training models
@@ -192,13 +209,15 @@ class AutoTrainerBase(metaclass=ABCMeta):
             num_cpus (str, optional): number of CPUs to use for the job. By default, this is set based on virtual cores.
             max_concurrent_trials (int, optional): maximum number of trials to run concurrently. Must be non-negative. If None or 0, no limit will be applied.
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
+            override: (dict[str, Any], optional): Advanced users only. 
+                override the default configuration. For example, {"max_steps": 5}. When overrides is provided, preset is ignored.
 
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
         self._data_checks_and_inference(train_dataset, eval_dataset)
         trainable = self._construct_trainable(train_dataset, eval_dataset)
-        model_search_space = self._filter_model_candidates(language=self.language, preset=preset)
+        model_search_space = self._filter_model_candidates(language=self.language, preset=preset, override=override)
         algo = HyperOptSearch(space=model_search_space, metric=self.metric_for_best_model, mode="max")
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:

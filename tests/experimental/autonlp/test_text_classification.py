@@ -60,14 +60,23 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             path=os.path.join(fixture_path, "divorce", "dev.txt"),
             lazy=False,
         )
-
+            
     @parameterized.expand(
         [
-            ("finetune_test",),
-            ("prompt_test",),
+            ({
+                "trainer_type": "Trainer",
+                "TrainingArguments.max_steps": 5,
+                "TrainingArguments.model_name_or_path": "__internal_testing/bert",
+            },),
+            ({
+                "trainer_type": "PromptTrainer",
+                "template.prompt": "这句话是关于{{'mask'}}的",
+                "PromptTuningArguments.max_steps": 5,
+                "PromptTuningArguments.model_name_or_path": "__internal_testing/bert",
+            },),
         ]
     )
-    def test_multiclass(self, preset):
+    def test_multiclass(self, override):
         with TemporaryDirectory() as temp_dir_path:
             train_ds = copy.deepcopy(self.multi_class_train_ds)
             dev_ds = copy.deepcopy(self.multi_class_dev_ds)
@@ -82,11 +91,11 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             auto_trainer.train(
                 train_ds,
                 dev_ds,
-                preset=preset,
                 num_cpus=1,
                 num_gpus=0,
                 max_concurrent_trials=1,
                 num_models=2,
+                override=override
             )
 
             # check is training is valid
@@ -117,7 +126,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
-            if preset == "prompt_test":
+            if override["trainer_type"] == "PromptTrainer":
                 with self.assertRaises(NotImplementedError):
                     auto_trainer.to_taskflow()
             else:
