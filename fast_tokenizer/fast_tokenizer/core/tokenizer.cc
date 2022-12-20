@@ -12,19 +12,19 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "fast_tokenizer/core/tokenizer.h"
+
 #include <fstream>
-#include "glog/logging.h"
 
 #include "fast_tokenizer/core/added_vocabulary.h"
 #include "fast_tokenizer/core/base.h"
 #include "fast_tokenizer/core/encoding.h"
-#include "fast_tokenizer/core/tokenizer.h"
-
 #include "fast_tokenizer/decoders/decoders.h"
 #include "fast_tokenizer/models/models.h"
 #include "fast_tokenizer/normalizers/normalizers.h"
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
+#include "glog/logging.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -685,7 +685,12 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
     }
 
     // deserialize pretokenizer_
-    const auto& pretokenizer = j.at("pretokenizer");
+    nlohmann::json pretokenizer;
+    if (j.find("pretokenizer") == j.end()) {
+      pretokenizer = j.at("pre_tokenizer");
+    } else {
+      pretokenizer = j.at("pretokenizer");
+    }
     if (!pretokenizer.is_null()) {
       if (pretokenizer.at("type") == "BertPreTokenizer") {
         pretokenizers::BertPreTokenizer bert_pretokenizer;
@@ -735,7 +740,12 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
     }
 
     // deserialize post_processor_
-    const auto& post_processor = j.at("postprocessor");
+    nlohmann::json post_processor;
+    if (j.find("postprocessor") == j.end()) {
+      post_processor = j.at("post_processor");
+    } else {
+      post_processor = j.at("postprocessor");
+    }
     if (!post_processor.is_null()) {
       if (post_processor.at("type") == "BertPostProcessor") {
         postprocessors::BertPostProcessor bert_postprocessor;
