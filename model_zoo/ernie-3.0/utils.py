@@ -294,12 +294,12 @@ def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512,
         return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"]}
 
 
-def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512):
+def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512, return_length=False):
     if "labels" in example:
         labels = example["labels"]
         example = example["tokens"]
         tokenized_input = tokenizer(
-            example, is_split_into_words=True, max_seq_length=max_seq_length, return_length=False
+            example, is_split_into_words=True, max_seq_len=max_seq_length, return_length=return_length
         )
 
         # -2 for [CLS] and [SEP]
@@ -311,18 +311,18 @@ def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512):
         )
     else:
         if example["tokens"] == []:
-            tokenized_input = {
-                "labels": [],
-                "input_ids": [],
-                "token_type_ids": [],
-            }
+            if return_length:
+                tokenized_input = {"labels": [], "input_ids": [], "token_type_ids": [], "length": 0, "seq_len": 0}
+            else:
+                tokenized_input = {"labels": [], "input_ids": [], "token_type_ids": []}
+
             return tokenized_input
         tokenized_input = tokenizer(
             example["tokens"],
             max_seq_len=max_seq_length,
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
             is_split_into_words=True,
-            return_length=False,
+            return_length=return_length,
         )
         label_ids = example["ner_tags"]
         if len(tokenized_input["input_ids"]) - 2 < len(label_ids):

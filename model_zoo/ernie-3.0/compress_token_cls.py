@@ -68,6 +68,7 @@ def main():
         tokenizer=tokenizer,
         no_entity_id=data_args.no_entity_id,
         max_seq_length=data_args.max_seq_length,
+        return_length=True,
     )
 
     # Define data collector

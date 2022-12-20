@@ -1567,8 +1567,8 @@ Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
 
 ### 服务化部署
 
-- [Triton Inference Server 服务化部署指南](./deploy/triton/README.md)
-- [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/)
+- [Triton Inference Server 服务化部署指南](./deploy/triton_serving/README.md)
+- [PaddleNLp SimpleServing 服务化部署指南](./deploy/simple_serving/README.md)
 
 
 <a name="参考文献"></a>
