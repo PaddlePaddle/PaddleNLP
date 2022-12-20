@@ -27,6 +27,7 @@ from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtrac
 from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
 from ..utils.doc_parser import DocParser
 from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
 from .utils import DataCollatorGP, SchemaTree, dbc2sbc, get_id_and_prob, gp_decode
@@ -376,7 +377,7 @@ class UIETask(Task):
         },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
@@ -421,8 +422,14 @@ class UIETask(Task):
             "ch-layout": None,  # Layout-CH
             "en-layout": None,  # Layout-EN
         }
-        self._schema_tree = None
-        self.set_schema(schema)
+        if not schema:
+            logger.warning(
+                "The schema has not been set yet, please set a schema via set_schema(). "
+                "More details about the setting of schema please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/information_extraction/taskflow_text.md"
+            )
+            self._schema_tree = None
+        else:
+            self.set_schema(schema)
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
