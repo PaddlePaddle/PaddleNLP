@@ -45,6 +45,7 @@ from pipelines.pipelines.standard_pipelines import (
     ExtractiveQAPipeline,
     QAGenerationPipeline,
     SemanticSearchPipeline,
+    SentaPipeline,
     TextToImagePipeline,
 )
 from pipelines.schema import Answer, Document, Label, Span
