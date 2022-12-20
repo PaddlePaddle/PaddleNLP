@@ -13,7 +13,7 @@
 # limitations under the License.
 
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -111,7 +111,7 @@ class MBartLearnedPositionalEmbedding(Embedding):
         self.offset = 2
         super().__init__(num_embeddings + self.offset, embedding_dim)
 
-    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0):
+    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0) -> Tensor:
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
@@ -265,7 +265,7 @@ class MBartDecoder(MBartPretrainedModel):
         self,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         memory_mask: Optional[Tensor] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
@@ -398,7 +398,7 @@ class MBartModel(MBartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         inputs_embeds: Optional[Tensor] = None,
@@ -632,7 +632,7 @@ class MBartForSequenceClassification(MBartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         inputs_embeds: Optional[Tensor] = None,
@@ -787,7 +787,7 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         inputs_embeds: Optional[Tensor] = None,
@@ -980,7 +980,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         inputs_embeds: Optional[Tensor] = None,

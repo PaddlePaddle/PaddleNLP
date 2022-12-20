@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
@@ -156,7 +156,7 @@ class CodeGenAttention(Layer):
         use_cache: Optional[bool] = False,
         cache: Optional[Tuple[Tensor]] = None,
         output_attentions: Optional[bool] = False,
-    ):
+    ) -> Tuple:
         qkv = self.qkv_proj(hidden_states)
         mp_num = 4
         qkv_split = qkv.reshape(qkv.shape[:-1] + [mp_num, -1])
@@ -230,7 +230,7 @@ class CodeGenMLP(Layer):
         self.act = ACT2FN[config.activation_function]
         self.dropout = nn.Dropout(config.resid_pdrop)
 
-    def forward(self, hidden_states: Tensor):
+    def forward(self, hidden_states: Tensor) -> Tensor:
         hidden_states = self.fc_in(hidden_states)
         hidden_states = self.act(hidden_states)
         hidden_states = self.fc_out(hidden_states)
@@ -249,10 +249,10 @@ class CodeGenBlock(Layer):
         self,
         hidden_states: Tensor,
         attention_mask: Optional[Tensor] = None,
-        use_cache: Optional[Tensor] = False,
+        use_cache: Optional[bool] = False,
         cache: Optional[Tuple[Tensor]] = None,
-        output_attentions: Optional[Tensor] = False,
-    ):
+        output_attentions: Optional[bool] = False,
+    ) -> Tuple:
         residual = hidden_states
         hidden_states = self.ln_1(hidden_states)
         attn_outputs = self.attn(
@@ -352,13 +352,13 @@ class CodeGenModel(CodeGenPreTrainedModel):
         input_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
-        use_cache: Optional[Tensor] = None,
+        use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Tensor]]] = None,
         inputs_embeds: Optional[Tensor] = None,
-        output_attentions: Optional[Tensor] = None,
-        output_hidden_states: Optional[Tensor] = None,
-        return_dict: Optional[Tensor] = None,
-    ):
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, BaseModelOutputWithPastAndCrossAttentions]:
         r"""
         The CodeGenModel forward method, overrides the `__call__()` special method.
         Args:
@@ -600,14 +600,14 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         input_ids: Optional[Tensor] = None,
         attention_mask: Optional[Tensor] = None,
         token_type_ids: Optional[Tensor] = None,
-        use_cache: Optional[Tensor] = None,
+        use_cache: Optional[bool] = None,
         cache: Optional[List[Tuple[Tensor]]] = None,
         labels: Optional[Tensor] = None,
         inputs_embeds: Optional[Tensor] = None,
-        output_attentions: Optional[Tensor] = None,
-        output_hidden_states: Optional[Tensor] = None,
-        return_dict: Optional[Tensor] = None,
-    ):
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ) -> Union[Tuple, CausalLMOutputWithCrossAttentions]:
         r"""
         The CodeGenForCausalLM forward method, overrides the __call__() special method.
         Args:

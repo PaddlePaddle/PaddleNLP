@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -28,6 +28,7 @@ from paddlenlp.utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
     ModelOutput,
     Seq2SeqLMOutput,
     Seq2SeqModelOutput,
@@ -108,7 +109,7 @@ class BartLearnedPositionalEmbedding(Embedding):
         self.offset = 2
         super().__init__(num_embeddings + self.offset, embedding_dim)
 
-    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0):
+    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0) -> Tensor:
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
@@ -156,7 +157,7 @@ class BartEncoder(BartPretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
         **kwargs
-    ):
+    ) -> Union[Tensor, Tuple, BaseModelOutputWithPastAndCrossAttentions]:
         """
         The BartEncoder forward method, overrides the `__call__()` special method.
 
@@ -262,14 +263,14 @@ class BartDecoder(BartPretrainedModel):
         self,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         memory_mask: Optional[Tensor] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
         cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ):
+    ) -> Union[Tensor, Tuple, BaseModelOutputWithPastAndCrossAttentions]:
         """
         The BartDecoder forward method, overrides the `__call__()` special method.
 
@@ -387,7 +388,7 @@ class BartModel(BartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         inputs_embeds: Optional[Tensor] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -395,7 +396,7 @@ class BartModel(BartPretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ):
+    ) -> Union[Tuple, Seq2SeqModelOutput]:
         r"""
         The BartModel forward method, overrides the `__call__()` special method.
 
@@ -573,7 +574,7 @@ class BartClassificationHead(Layer):
         self.dropout = nn.Dropout(p=pooler_dropout)
         self.out_proj = nn.Linear(inner_dim, num_classes)
 
-    def forward(self, hidden_states: Tensor):
+    def forward(self, hidden_states: Tensor) -> Tensor:
         """
         Args:
             hidden_states (Tensor):
@@ -615,7 +616,7 @@ class BartForSequenceClassification(BartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         inputs_embeds: Optional[Tensor] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -624,7 +625,7 @@ class BartForSequenceClassification(BartPretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ):
+    ) -> Union[Tensor, Tuple, Seq2SeqSequenceClassifierOutput]:
         r"""
         The BartForSequenceClassification forward method, overrides the __call__() special method.
 
@@ -773,7 +774,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         inputs_embeds: Optional[Tensor] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -783,7 +784,7 @@ class BartForQuestionAnswering(BartPretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ):
+    ) -> Union[Tuple, Seq2SeqQuestionAnsweringModelOutput]:
         r"""
         The BartForQuestionAnswering forward method, overrides the __call__() special method.
 
@@ -975,7 +976,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
         attention_mask: Optional[Tensor] = None,
         decoder_input_ids: Optional[Tensor] = None,
         decoder_attention_mask: Optional[Tensor] = None,
-        encoder_output: Optional[Tuple[Tensor]] = None,
+        encoder_output: Union[Tuple[Tensor], ModelOutput, None] = None,
         inputs_embeds: Optional[Tensor] = None,
         decoder_inputs_embeds: Optional[Tensor] = None,
         use_cache: Optional[bool] = None,
@@ -984,7 +985,7 @@ class BartForConditionalGeneration(BartPretrainedModel):
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
-    ):
+    ) -> Union[Tensor, Tuple, Seq2SeqLMOutput]:
         r"""
         The BartForConditionalGeneration forward method, overrides the __call__() special method.
 
