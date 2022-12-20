@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from pipelines.pipelines.base import Pipeline, RootNode
-from pipelines.pipelines.standard_pipelines import (
-    BaseStandardPipeline,
-    DocPipeline,
-    ExtractiveQAPipeline,
-    QAGenerationPipeline,
-    SemanticSearchPipeline,
-    SentaPipeline,
-    TextToImagePipeline,
-)
+from pipelines.nodes.sentiment_analysis.senta import UIESenta
+from pipelines.nodes.sentiment_analysis.senta_preprocessor import SentaProcessor
+from pipelines.nodes.sentiment_analysis.senta_visualization import SentaVisualization
