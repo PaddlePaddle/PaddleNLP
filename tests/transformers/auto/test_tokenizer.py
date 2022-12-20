@@ -21,14 +21,10 @@ from paddlenlp.transformers import AutoTokenizer, is_fast_tokenizer_available
 
 class AutoTokenizerTest(unittest.TestCase):
     def test_fast_tokenizer_import(self):
-        tokenizer1 = AutoTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
-        )
+        tokenizer1 = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_fast=False)
         self.assertIsInstance(tokenizer1, paddlenlp.transformers.BertTokenizer)
 
-        tokenizer2 = AutoTokenizer.from_pretrained(
-            "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=True
-        )
+        tokenizer2 = AutoTokenizer.from_pretrained("__internal_testing__/bert", use_fast=True)
         if is_fast_tokenizer_available():
             self.assertIsInstance(tokenizer2, paddlenlp.transformers.BertFastTokenizer)
         else:
