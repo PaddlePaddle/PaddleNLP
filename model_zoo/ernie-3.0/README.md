@@ -4,7 +4,11 @@
    * [模型介绍](#模型介绍)
        * [在线蒸馏技术](#在线蒸馏技术)
    * [模型效果](#模型效果)
-   * [微调](#微调)
+   * [开始运行](#开始运行)
+       * [环境要求](#环境要求)
+       * [数据准备](#数据准备)
+   * [模型训练](#模型训练)
+   * [模型预测](#模型预测)
    * [模型压缩](#模型压缩)
        * [环境依赖](#环境依赖)
        * [模型压缩 API 使用](#模型压缩API使用)
@@ -17,7 +21,6 @@
    * [部署](#部署)
        * [Python 部署](#Python部署)
        * [服务化部署](#服务化部署)
-       * [Paddle2ONNX 部署](#Paddle2ONNX部署)
    * [Notebook教程](#Notebook教程)
    * [参考文献](#参考文献)
 
@@ -1287,26 +1290,29 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 ├── compress_seq_cls.py          # 分类任务的压缩脚本
 ├── compress_token_cls.py        # 序列标注任务的压缩脚本
 ├── compress_qa.py               # 阅读理解任务的压缩脚本
-├── config.yml                   # 压缩配置文件
-├── run_infer.py                 # 支持 CLUE 分类、CLUE CMRC2018、MSRA_NER 任务的预测脚本
+├── utils.py                     # 训练工具脚本
+├── configs                      # 压缩配置文件夹
+│ └── default.yml                # 默认配置文件
 ├── deploy                       # 部署目录
-│ └── paddle_inference           # paddle inference离线部署
-│   └── ernie_predictor.py
+│ └── predictor                  # onnx离线部署
 │   └── infer_cpu.py
 │   └── infer_gpu.py
 │   └── README.md
-│ └── onnx_inference             # onnx inference离线部署
-│   └── ernie_predictor.py
-│   └── infer.py
-│   └── README.md
+│   └── requirements_cpu.txt
+│   └── requirements_gpu.txt
 │ └── simple_serving            # 基于PaddleNLP SimpleServing 服务化部署
-│   └── ernie_predictor.py
-│   └── infer.py
+│   └── client_qa.py
+│   └── client_seq_cls.py
+│   └── client_token_cls.py
 │   └── README.md
+│   └── server_qa.py
+│   └── server_seq_cls.py
+│   └── server_token_cls.py
 │ └── triton_serving           # 基于Triton Serving 服务化部署
-│   └── ernie_predictor.py
-│   └── infer.py
+│   └── models
 │   └── README.md
+│   └── seq_cls_grpc_client.py
+│   └── token_cls_grpc_client.py
 └── README.md                    # 文档
 
 <a name="开始运行"></a>
@@ -1330,7 +1336,8 @@ train_ds, test_ds = load_dataset('clue', 'tnews', splits=('train', 'test'))
 
 ```
 
-### 模型训练
+<a name="模型训练"></a>
+## 模型训练
 
 使用 PaddleNLP 只需要一行代码可以拿到 ERNIE 3.0 系列模型，之后可以在自己的下游数据下进行微调，从而获得具体任务上效果更好的模型。
 
@@ -1365,6 +1372,7 @@ python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_
 python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml
 ```
 
+<a name="模型预测"></a>
 ## 模型预测
 
 ```shell
