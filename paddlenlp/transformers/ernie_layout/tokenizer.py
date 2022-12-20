@@ -57,9 +57,10 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         "ernie-layoutx-base-uncased": {"do_lower_case": True, "do_tokenize_postprocess": False},
         "uie-x-base": {"do_lower_case": True, "do_tokenize_postprocess": True},
     }
-    pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 512, "uie-x-base": 512}
+    pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 514, "uie-x-base": 514}
     max_model_input_sizes = pretrained_positional_embedding_sizes
-    model_input_names = ["input_ids", "attention_mask"]
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     SPECIAL_TOKENS_ATTRIBUTES = [
         "unk_token",
@@ -74,6 +75,8 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self,
         vocab_file,
         sentencepiece_model_file,
+        do_lower_case=True,
+        encoding="utf8",
         do_tokenize_postprocess=False,
         sep_token="[SEP]",
         cls_token="[CLS]",
@@ -88,7 +91,10 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self._unk_token = unk_token
         self._pad_token = pad_token
         self._mask_token = mask_token
+        self.do_lower_case = do_lower_case
+        self.encoding = encoding
         self.sp_model = spm.SentencePieceProcessor()
+        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.vocab_file = vocab_file
         self.sentencepiece_model_file = sentencepiece_model_file
         if os.path.isfile(sentencepiece_model_file):
