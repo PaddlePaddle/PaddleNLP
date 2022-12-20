@@ -405,6 +405,7 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     all_parallelizable_model_classes = GPTLMHeadModel
     test_missing_keys = False
     test_model_parallel = True
+    use_test_inputs_embeds = True
 
     # special case for DoubleHeads model
     def _prepare_for_class(self, inputs_dict, model_class):
