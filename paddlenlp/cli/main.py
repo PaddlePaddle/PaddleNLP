@@ -12,35 +12,41 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from genericpath import isdir
 import os
-import json
 from pathlib import Path
-from typing import Type, List, Tuple, Optional
+from typing import List, Optional, Tuple, Type
+
 from uvicorn.config import LOGGING_CONFIG
-from uvicorn.main import LEVEL_CHOICES
-from typing import Type, List, Tuple, Optional
+
 from paddlenlp.utils.import_utils import is_package_available
 
 # check whether the package is avaliable and give friendly description.
 if not is_package_available("typer"):
     raise ModuleNotFoundError(
-        f'paddlenlp-cli tools is not installed correctly, you can use the following command'
-        ' to install paddlenlp cli tool: >>> pip install paddlenlp[cli]')
+        "paddlenlp-cli tools is not installed correctly, you can use the following command"
+        " to install paddlenlp cli tool: >>> pip install paddlenlp[cli]"
+    )
+
+import importlib
+import inspect
+import shutil
 
 import typer
-from typer import Typer
-import shutil
-import importlib, inspect
-from paddlenlp import __version__
-from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.downloader import is_url
+
 from paddlenlp.cli.converter import convert_from_local_dir
-from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
-from paddlenlp.transformers.utils import find_transformer_model_type
 from paddlenlp.cli.download import load_community_models
+from paddlenlp.cli.install import install_package_from_bos
 from paddlenlp.cli.server import start_backend
+from paddlenlp.cli.utils.tabulate import print_example_code, tabulate
+from paddlenlp.transformers import (
+    AutoModel,
+    AutoTokenizer,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
+from paddlenlp.transformers.utils import find_transformer_model_type
+from paddlenlp.utils.downloader import is_url
+from paddlenlp.utils.log import logger
 
 
 def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
@@ -88,21 +94,17 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     return model_names
 
 
-app = Typer()
+app = typer.Typer()
 
 
 @app.command()
-def download(model_name: str,
-             cache_dir: str = typer.Option(
-                 './pretrained_models',
-                 '--cache-dir',
-                 '-c',
-                 help="cache_dir for download pretrained model"),
-             force_download: bool = typer.Option(
-                 False,
-                 '--force-download',
-                 '-f',
-                 help="force download pretrained model")):
+def download(
+    model_name: str,
+    cache_dir: str = typer.Option(
+        "./pretrained_models", "--cache-dir", "-c", help="cache_dir for download pretrained model"
+    ),
+    force_download: bool = typer.Option(False, "--force-download", "-f", help="force download pretrained model"),
+):
     """download the paddlenlp models with command, you can specific `model_name`
 
     >>> paddlenlp download bert \n
@@ -133,12 +135,12 @@ def download(model_name: str,
 
 
 @app.command()
-def search(query=typer.Argument(..., help='the query of searching model'),
-           include_community: bool = typer.Option(
-               False,
-               "--include-community",
-               '-i',
-               help="whether searching community models")):
+def search(
+    query=typer.Argument(..., help="the query of searching model"),
+    include_community: bool = typer.Option(
+        False, "--include-community", "-i", help="whether searching community models"
+    ),
+):
     """search the model with query, eg: paddlenlp search bert
 
     >>> paddlenlp search bert \n
@@ -156,7 +158,7 @@ def search(query=typer.Argument(..., help='the query of searching model'),
         # TODO(wj-Mcat): ignore the model_category info
         if not query or query in model_name:
             tables.append([model_type, model_name])
-    tabulate(tables, headers=['model type', 'model name'], highlight_word=query)
+    tabulate(tables, headers=["model type", "model name"], highlight_word=query)
     print_example_code()
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
@@ -180,45 +182,27 @@ def convert(input: Optional[str] = None, output: Optional[str] = None):
 @app.command(help="Start the PaddleNLP SimpleServer.")
 def server(
     app: str,
-    host: str = typer.Option('127.0.0.1',
-                             '--host',
-                             help="Bind socket to this host."),
-    port: int = typer.Option('8000', '--port',
-                             help="Bind socket to this port."),
-    app_dir: str = typer.Option(None,
-                                '--app_dir',
-                                help="The application directory path."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Bind socket to this host."),
+    port: int = typer.Option("8000", "--port", help="Bind socket to this port."),
+    app_dir: str = typer.Option(None, "--app_dir", help="The application directory path."),
     workers: int = typer.Option(
         None,
-        '--workers',
-        help=
-        "Number of worker processes. Defaults to the $WEB_CONCURRENCY environment"
-        " variable if available, or 1. Not valid with --reload."),
-    log_level: int = typer.Option(None,
-                                  '--log_level',
-                                  help="Log level. [default: info]"),
+        "--workers",
+        help="Number of worker processes. Defaults to the $WEB_CONCURRENCY environment"
+        " variable if available, or 1. Not valid with --reload.",
+    ),
+    log_level: int = typer.Option(None, "--log_level", help="Log level. [default: info]"),
     limit_concurrency: int = typer.Option(
-        None,
-        '--limit-concurrency',
-        help=
-        "Maximum number of concurrent connections or tasks to allow, before issuing"
+        None, "--limit-concurrency", help="Maximum number of concurrent connections or tasks to allow, before issuing"
     ),
     limit_max_requests: int = typer.Option(
-        None,
-        '--limit-max-requests',
-        help=
-        "Maximum number of requests to service before terminating the process."
+        None, "--limit-max-requests", help="Maximum number of requests to service before terminating the process."
     ),
     timeout_keep_alive: int = typer.Option(
-        15,
-        '--timeout-keep-alive',
-        help=
-        "Close Keep-Alive connections if no new data is received within this timeout."
+        15, "--timeout-keep-alive", help="Close Keep-Alive connections if no new data is received within this timeout."
     ),
-    reload: bool = typer.Option(
-        False,
-        '--reload',
-        help="Reload the server when the app_dir is changed.")):
+    reload: bool = typer.Option(False, "--reload", help="Reload the server when the app_dir is changed."),
+):
     """The main function for the staring the SimpleServer"""
     logger.info("starting to PaddleNLP SimpleServer...")
     if app_dir is None:
@@ -234,9 +218,42 @@ def server(
         "limit_max_requests": limit_max_requests,
         "timeout_keep_alive": timeout_keep_alive,
         "app_dir": app_dir,
-        "reload": reload
+        "reload": reload,
     }
     start_backend(app, **backend_kwargs)
+
+
+@app.command(
+    help="install the target version of paddlenlp, eg: paddlenlp install / paddlenlp install paddlepaddle==latest"
+)
+def install(
+    package: str = typer.Argument(default="paddlenlp==latest", help="install the target version of paddlenlp")
+):
+    """The main function for the staring the SimpleServer"""
+    package = package.replace(" ", "").strip()
+
+    if not package:
+        raise ValueError("please assign the package name")
+
+    # 1. parse the version of paddlenlp
+    splits = [item for item in package.split("==")]
+    if len(splits) == 0 or len(splits) > 2:
+        raise ValueError(
+            "please set the valid package: <package-name>==<version>, eg: paddlenlp==latest, paddlenlp==3099, "
+            f"but received: {package}"
+        )
+
+    tag = "latest"
+    package_name = splits[0]
+
+    # TODO(wj-Mcat): will support `pipelines`, `ppdiffusers` later.
+    assert package_name in ["paddlenlp"], "we only support paddlenlp"
+
+    if len(splits) == 2:
+        tag = splits[1]
+
+    # 2. download & install package from bos server
+    install_package_from_bos(package_name=package_name, tag=tag)
 
 
 def main():

@@ -33,23 +33,20 @@ class Verbalizer(nn.Layer):
             The tokenizer of pretrained models.
         labels (list):
             The sequence of labels in task.
-    
+
     """
 
-    def __init__(self,
-                 tokenizer: PretrainedTokenizer = None,
-                 labels: List = None):
+    def __init__(self, tokenizer: PretrainedTokenizer = None, labels: List = None):
         super().__init__()
-        assert labels is not None, 'Label list for current task is not set yet.'
+        assert labels is not None, "Label list for current task is not set yet."
         self.tokenizer = tokenizer
         self.labels = sorted(labels)
         self._process_lock = False
 
     @property
     def vocab(self):
-        if not hasattr(self, '_vocab'):
-            self._vocab = self.tokenizer.convert_ids_to_tokens(
-                np.arange(self.vocab_size).tolist())
+        if not hasattr(self, "_vocab"):
+            self._vocab = self.tokenizer.convert_ids_to_tokens(np.arange(self.vocab_size).tolist())
         return self._vocab
 
     @property
@@ -58,9 +55,8 @@ class Verbalizer(nn.Layer):
 
     @property
     def label_to_words(self):
-        if not hasattr(self, '_label_to_words'):
-            raise RuntimeError(
-                'Property label_to_words has not been set before used.')
+        if not hasattr(self, "_label_to_words"):
+            raise RuntimeError("Property label_to_words has not been set before used.")
         return self._label_to_words
 
     @label_to_words.setter
@@ -69,54 +65,51 @@ class Verbalizer(nn.Layer):
             return
         if isinstance(label_to_words, dict):
             new_keys = sorted(list(label_to_words.keys()))
-            assert new_keys == self.labels, 'label_to_words {} does not match the predefined labels {}.'.format(
-                new_keys, self.labels)
+            assert new_keys == self.labels, "label_to_words {} does not match the predefined labels {}.".format(
+                new_keys, self.labels
+            )
             self._label_to_words = {k: label_to_words[k] for k in self.labels}
         elif isinstance(label_to_words, list):
             assert len(self.labels) == len(
                 label_to_words
-            ), 'The lengths of label_to_words and predefined labels do not match.'
-            self._label_to_words = {
-                k: v
-                for k, v in zip(self.labels, label_to_words)
-            }
+            ), "The lengths of label_to_words and predefined labels do not match."
+            self._label_to_words = {k: v for k, v in zip(self.labels, label_to_words)}
         else:
-            raise TypeError('Unsupported type {} for label_to_words'.format(
-                type(label_to_words)))
+            raise TypeError("Unsupported type {} for label_to_words".format(type(label_to_words)))
         self.process_label_words()
 
     @property
     def labels_to_ids(self):
-        if not hasattr(self, 'labels'):
-            raise RuntimeError(
-                'Property labels_to_ids has not been set before used.')
+        if not hasattr(self, "labels"):
+            raise RuntimeError("Property labels_to_ids has not been set before used.")
         return {k: i for i, k in enumerate(self.labels)}
 
     @property
     def ids_to_labels(self):
-        if not hasattr(self, 'labels'):
-            raise RuntimeError(
-                'Property ids_to_labels has not been set before used.')
+        if not hasattr(self, "labels"):
+            raise RuntimeError("Property ids_to_labels has not been set before used.")
         return {i: k for i, k in enumerate(self.labels)}
 
     @abstractmethod
-    def process_label_words(self, ):
-        """ A hook to process verbalizer when it is set. """
+    def process_label_words(
+        self,
+    ):
+        """A hook to process verbalizer when it is set."""
         raise NotImplementedError
 
     @abstractmethod
     def project(self, logits, **kwargs):
-        """ 
+        """
         Project the logits with shape ```[batch_size, vocab_size]``` into
         label_word_logits with shape ```[batch_size, num_label_words]```.
         """
         raise NotImplementedError
 
     @staticmethod
-    def aggregate(label_words_logits, atype='mean', ndim=2):
+    def aggregate(label_words_logits, atype="mean", ndim=2):
         """
         Aggregate embeddings when multiple words are mapped to one label.
-        
+
         Args:
             label_words_logits (paddle.Tensor):
                 The logits of words which could be mapped to labels.
@@ -127,18 +120,18 @@ class Verbalizer(nn.Layer):
 
         """
         if label_words_logits.ndim > ndim:
-            if atype == 'mean':
+            if atype == "mean":
                 return label_words_logits.mean(axis=-1)
-            elif atype == 'max':
+            elif atype == "max":
                 return label_words_logits.max(axis=-1)
-            elif atype == 'first':
+            elif atype == "first":
                 return label_words_logits[..., 0, :]
             else:
-                raise ValueError('Unsupported aggreate type {}'.format(atype))
+                raise ValueError("Unsupported aggreate type {}".format(atype))
         return label_words_logits
 
     def normalize(self, logits):
-        """ Normalize the logits of every example. """
+        """Normalize the logits of every example."""
         new_logits = F.softmax(logits.reshape(logits.shape[0], -1), axis=-1)
         return new_logits.reshape(*logits.shape)
 
@@ -158,7 +151,7 @@ class ManualVerbalizer(Verbalizer):
             The prefix string of words, used in PLMs like RoBERTa, which is sensitive to the prefix.
     """
 
-    def __init__(self, tokenizer, labels=None, label_to_words=None, prefix=''):
+    def __init__(self, tokenizer, labels=None, label_to_words=None, prefix=""):
         super().__init__(tokenizer=tokenizer, labels=labels)
         self.tokenizer = tokenizer
         self.labels = labels
@@ -169,10 +162,11 @@ class ManualVerbalizer(Verbalizer):
         word_ids = []
         for label in self.labels:
             word_ids.append(
-                self.tokenizer.encode(self.prefix + self._label_to_words[label],
-                                      add_special_tokens=False,
-                                      return_token_type_ids=False)['input_ids'])
-        self.word_ids = paddle.to_tensor(word_ids, dtype='int64').squeeze()
+                self.tokenizer.encode(
+                    self.prefix + self._label_to_words[label], add_special_tokens=False, return_token_type_ids=False
+                )["input_ids"]
+            )
+        self.word_ids = paddle.to_tensor(word_ids, dtype="int64").squeeze()
         self.label_to_words_ids = {k: v for k, v in zip(self.labels, word_ids)}
 
     def process_logits(self, logits, mask_ids=None, **kwargs):
@@ -182,7 +176,7 @@ class ManualVerbalizer(Verbalizer):
         return label_words_logits
 
     def wrap_one_example(self, example):
-        """ Process labels in InputExample According to the predefined verbalizer. """
+        """Process labels in InputExample According to the predefined verbalizer."""
         if isinstance(example, InputExample):
             try:
                 example.label = self.labels_to_ids[example.cls_label]
@@ -191,4 +185,4 @@ class ManualVerbalizer(Verbalizer):
                 example.label = eval(example.cls_label)
             return example
         else:
-            raise TypeError('InputExample')
+            raise TypeError("InputExample")

@@ -37,13 +37,13 @@ def parse_args():
         default="gpu",
         type=str,
         choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.")
+        help="The device to select to train the model, is must be cpu/gpu/xpu.",
+    )
     parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
-        help=
-        "The maximum total input sequence length after tokenization. Sequences longer "
+        help="The maximum total input sequence length after tokenization. Sequences longer "
         "than this will be truncated, sequences shorter will be padded.",
     )
     args = parser.parse_args()
@@ -60,9 +60,7 @@ def convert_example(example, tokenizer, label_list, max_seq_length=128):
 
 
 class Predictor(object):
-
-    def __init__(self, predictor, input_handles, output_handle, tokenizer,
-                 max_seq_length):
+    def __init__(self, predictor, input_handles, output_handle, tokenizer, max_seq_length):
         self.predictor = predictor
         self.input_handles = input_handles
         self.output_handle = output_handle
@@ -72,8 +70,7 @@ class Predictor(object):
     @classmethod
     def create_predictor(cls, args):
         max_seq_length = args.max_seq_length
-        config = paddle.inference.Config(args.model_path + ".pdmodel",
-                                         args.model_path + ".pdiparams")
+        config = paddle.inference.Config(args.model_path + ".pdmodel", args.model_path + ".pdiparams")
         if args.device == "gpu":
             # Set GPU configs accordingly
             config.enable_use_gpu(100, 0)
@@ -86,40 +83,27 @@ class Predictor(object):
             config.enable_xpu(100)
         config.switch_use_feed_fetch_ops(False)
         predictor = paddle.inference.create_predictor(config)
-        input_handles = [
-            predictor.get_input_handle(name)
-            for name in predictor.get_input_names()
-        ]
-        output_handle = predictor.get_output_handle(
-            predictor.get_output_names()[0])
-        tokenizer = BertTokenizer.from_pretrained(
-            os.path.dirname(args.model_path))
+        input_handles = [predictor.get_input_handle(name) for name in predictor.get_input_names()]
+        output_handle = predictor.get_output_handle(predictor.get_output_names()[0])
+        tokenizer = BertTokenizer.from_pretrained(os.path.dirname(args.model_path))
 
-        return cls(predictor, input_handles, output_handle, tokenizer,
-                   max_seq_length)
+        return cls(predictor, input_handles, output_handle, tokenizer, max_seq_length)
 
     def predict(self, data, label_map, batch_size=1):
         examples = []
         for text in data:
             input_ids, segment_ids = convert_example(
-                text,
-                self.tokenizer,
-                label_list=label_map.values(),
-                max_seq_length=self.max_seq_length)
+                text, self.tokenizer, label_list=label_map.values(), max_seq_length=self.max_seq_length
+            )
             examples.append((input_ids, segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
-                ),  # input
-            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # input
+            Pad(axis=0, pad_val=self.tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
 
         # Seperates data into some batches.
-        batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
+        batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         outputs = []
         results = []
@@ -143,19 +127,21 @@ def main():
     predictor = Predictor.create_predictor(args)
 
     data = [
-        'against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting',
-        'the situation in a well-balanced fashion',
-        'at achieving the modest , crowd-pleasing goals it sets for itself',
-        'so pat it makes your teeth hurt',
-        'this new jangle of noise , mayhem and stupidity must be a serious contender for the title .'
+        "against shimmering cinematography that lends the setting the ethereal beauty of an asian landscape painting",
+        "the situation in a well-balanced fashion",
+        "at achieving the modest , crowd-pleasing goals it sets for itself",
+        "so pat it makes your teeth hurt",
+        "this new jangle of noise , mayhem and stupidity must be a serious contender for the title .",
     ]
-    label_map = {0: 'negative', 1: 'positive'}
+    label_map = {0: "negative", 1: "positive"}
 
     outputs, results = predictor.predict(data, label_map)
     for idx, text in enumerate(data):
         print(
-            'Data: {} \n Label: {} \n Negative prob: {} \n Positive prob: {} \n '
-            .format(text, results[idx], outputs[idx][0], outputs[idx][1]))
+            "Data: {} \n Label: {} \n Negative prob: {} \n Positive prob: {} \n ".format(
+                text, results[idx], outputs[idx][0], outputs[idx][1]
+            )
+        )
 
 
 if __name__ == "__main__":

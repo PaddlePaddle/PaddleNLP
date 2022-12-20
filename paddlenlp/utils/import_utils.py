@@ -65,12 +65,12 @@ def is_package_available(package_name: str) -> bool:
     return package_spec is not None and package_spec.has_location
 
 
-def is_faster_tokenizer_available() -> bool:
-    """check if `faster_tokenizer` ia avaliable
+def is_fast_tokenizer_available() -> bool:
+    """check if `fast_tokenizer` ia avaliable
     Returns:
-        bool: if `faster_tokenizer` is avaliable
+        bool: if `fast_tokenizer` is avaliable
     """
-    return is_package_available("faster_tokenizer")
+    return is_package_available("fast_tokenizer")
 
 
 def is_transformers_available() -> bool:
@@ -79,11 +79,6 @@ def is_transformers_available() -> bool:
         bool: if `transformers` is available
     """
     return is_package_available("transformers")
-
-
-def is_fast_tokenizer_available():
-    package_spec = importlib.util.find_spec("fast_tokenizer")
-    return package_spec is not None and package_spec.has_location
 
 
 def install_package(

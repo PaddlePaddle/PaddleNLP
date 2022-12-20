@@ -32,16 +32,13 @@ def load_community_models() -> List[Tuple[str, str]]:
         List[Tuple[str, str]]: the name tuples of community models
     """
     # 1. check & download community models.json
-    local_community_model_config_path = os.path.join(MODEL_HOME,
-                                                     "community_models.json")
+    local_community_model_config_path = os.path.join(MODEL_HOME, "community_models.json")
 
     if not os.path.exists(local_community_model_config_path):
         logger.info("download community model configuration from server ...")
-        remote_community_model_path = os.path.join(
-            COMMUNITY_MODEL_PREFIX, COMMUNITY_MODEL_CONFIG_FILE_NAME)
+        remote_community_model_path = os.path.join(COMMUNITY_MODEL_PREFIX, COMMUNITY_MODEL_CONFIG_FILE_NAME)
         cache_dir = os.path.join(MODEL_HOME)
-        local_community_model_config_path = get_path_from_url(
-            remote_community_model_path, root_dir=cache_dir)
+        local_community_model_config_path = get_path_from_url(remote_community_model_path, root_dir=cache_dir)
 
     # 2. load configuration
     #
@@ -53,7 +50,7 @@ def load_community_models() -> List[Tuple[str, str]]:
     # }
     #
 
-    with open(local_community_model_config_path, 'r', encoding='utf-8') as f:
+    with open(local_community_model_config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
 
     model_names = set()

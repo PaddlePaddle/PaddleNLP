@@ -56,8 +56,8 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
 
     [`~ConfigMixin`] takes care of storing all config attributes that are passed in the scheduler's `__init__`
     function, such as `num_train_timesteps`. They can be accessed via `scheduler.config.num_train_timesteps`.
-    [`~ConfigMixin`] also provides general loading and saving functionality via the [`~ConfigMixin.save_config`] and
-    [`~ConfigMixin.from_config`] functions.
+    [`SchedulerMixin`] provides general loading and saving functionality via the [`SchedulerMixin.save_pretrained`] and
+    [`~SchedulerMixin.from_pretrained`] functions.
 
     For more details on the parameters, see the original paper's Appendix E.: "Elucidating the Design Space of
     Diffusion-Based Generative Models." https://arxiv.org/abs/2206.00364. The grid search values used to find the
@@ -77,6 +77,8 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
 
     """
 
+    order = 2
+
     @register_to_config
     def __init__(
         self,
@@ -87,7 +89,6 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         s_min: float = 0.05,
         s_max: float = 50,
     ):
-
         # standard deviation of the initial noise distribution
         self.init_noise_sigma = sigma_max
 
@@ -96,9 +97,7 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         self.timesteps: paddle.Tensor = None
         self.schedule: paddle.Tensor = None  # sigma(t_i)
 
-    def scale_model_input(self,
-                          sample: paddle.Tensor,
-                          timestep: Optional[int] = None) -> paddle.Tensor:
+    def scale_model_input(self, sample: paddle.Tensor, timestep: Optional[int] = None) -> paddle.Tensor:
         """
         Ensures interchangeability with schedulers that need to scale the denoising model input depending on the
         current timestep.
@@ -124,15 +123,17 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         self.num_inference_steps = num_inference_steps
         timesteps = np.arange(0, self.num_inference_steps)[::-1].copy()
         self.timesteps = paddle.to_tensor(timesteps)
-        schedule = [(self.config.sigma_max**2 *
-                     (self.config.sigma_min**2 / self.config.sigma_max**2)
-                     **(i / (num_inference_steps - 1))) for i in self.timesteps]
+        schedule = [
+            (
+                self.config.sigma_max**2
+                * (self.config.sigma_min**2 / self.config.sigma_max**2) ** (i / (num_inference_steps - 1))
+            )
+            for i in self.timesteps
+        ]
         self.schedule = paddle.to_tensor(schedule, dtype="float32")
 
     def add_noise_to_input(
-        self,
-        sample: paddle.Tensor,
-        sigma: float,
+        self, sample: paddle.Tensor, sigma: float, generator: Optional[paddle.Generator] = None
     ) -> Tuple[paddle.Tensor, float]:
         """
         Explicit Langevin-like "churn" step of adding noise to the sample according to a factor gamma_i ≥ 0 to reach a
@@ -141,15 +142,14 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         TODO Args:
         """
         if self.config.s_min <= sigma <= self.config.s_max:
-            gamma = min(self.config.s_churn / self.num_inference_steps,
-                        2**0.5 - 1)
+            gamma = min(self.config.s_churn / self.num_inference_steps, 2**0.5 - 1)
         else:
             gamma = 0
 
         # sample eps ~ N(0, S_noise^2 * I)
-        eps = self.config.s_noise * paddle.randn(sample.shape)
+        eps = self.config.s_noise * paddle.randn(sample.shape, generator=generator)
         sigma_hat = sigma + gamma * sigma
-        sample_hat = sample + ((sigma_hat**2 - sigma**2)**0.5 * eps)
+        sample_hat = sample + ((sigma_hat**2 - sigma**2) ** 0.5 * eps)
 
         return sample_hat, sigma_hat
 
@@ -187,9 +187,9 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         if not return_dict:
             return (sample_prev, derivative)
 
-        return KarrasVeOutput(prev_sample=sample_prev,
-                              derivative=derivative,
-                              pred_original_sample=pred_original_sample)
+        return KarrasVeOutput(
+            prev_sample=sample_prev, derivative=derivative, pred_original_sample=pred_original_sample
+        )
 
     def step_correct(
         self,
@@ -219,15 +219,14 @@ class KarrasVeScheduler(SchedulerMixin, ConfigMixin):
         """
         pred_original_sample = sample_prev + sigma_prev * model_output
         derivative_corr = (sample_prev - pred_original_sample) / sigma_prev
-        sample_prev = sample_hat + (sigma_prev - sigma_hat) * (
-            0.5 * derivative + 0.5 * derivative_corr)
+        sample_prev = sample_hat + (sigma_prev - sigma_hat) * (0.5 * derivative + 0.5 * derivative_corr)
 
         if not return_dict:
             return (sample_prev, derivative)
 
-        return KarrasVeOutput(prev_sample=sample_prev,
-                              derivative=derivative,
-                              pred_original_sample=pred_original_sample)
+        return KarrasVeOutput(
+            prev_sample=sample_prev, derivative=derivative, pred_original_sample=pred_original_sample
+        )
 
     def add_noise(self, original_samples, noise, timesteps):
         raise NotImplementedError()

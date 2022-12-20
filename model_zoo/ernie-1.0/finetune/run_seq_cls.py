@@ -93,7 +93,6 @@ def main():
     )
 
     data_args.label_list = getattr(raw_datasets["train"], "label_list", None)
-    # num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
     num_classes = 1 if raw_datasets["train"].label_list is None else len(raw_datasets["train"].label_list)
 
     # Define tokenizer, model, loss function.

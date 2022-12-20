@@ -29,22 +29,15 @@ from config import MILVUS_HOST, MILVUS_PORT, data_dim, index_config, top_k, sear
 fmt = "\n=== {:30} ===\n"
 text_max_len = 1000
 fields = [
-    FieldSchema(name="pk",
-                dtype=DataType.INT64,
-                is_primary=True,
-                auto_id=False,
-                max_length=100),
-    FieldSchema(name="question",
-                dtype=DataType.VARCHAR,
-                max_length=text_max_len),
+    FieldSchema(name="pk", dtype=DataType.INT64, is_primary=True, auto_id=False, max_length=100),
+    FieldSchema(name="question", dtype=DataType.VARCHAR, max_length=text_max_len),
     FieldSchema(name="answer", dtype=DataType.VARCHAR, max_length=text_max_len),
-    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=data_dim)
+    FieldSchema(name="embeddings", dtype=DataType.FLOAT_VECTOR, dim=data_dim),
 ]
 schema = CollectionSchema(fields, "Neural Search Index")
 
 
-class VecToMilvus():
-
+class VecToMilvus:
     def __init__(self):
         print(fmt.format("start connecting to Milvus"))
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
@@ -61,9 +54,7 @@ class VecToMilvus():
     def creat_collection(self, collection_name):
         try:
             print(fmt.format("Create collection {}".format(collection_name)))
-            self.collection = Collection(collection_name,
-                                         schema,
-                                         consistency_level="Strong")
+            self.collection = Collection(collection_name, schema, consistency_level="Strong")
         except Exception as e:
             print("Milvus create collection error:", e)
 
@@ -92,9 +83,9 @@ class VecToMilvus():
     def create_partition(self, partition_tag):
         try:
             self.collection.create_partition(partition_tag)
-            print('create partition {} successfully'.format(partition_tag))
+            print("create partition {} successfully".format(partition_tag))
         except Exception as e:
-            print('Milvus create partition error: ', e)
+            print("Milvus create partition error: ", e)
 
     def insert(self, entities, collection_name, index_name, partition_tag=None):
         try:
@@ -103,20 +94,16 @@ class VecToMilvus():
                 self.create_index(index_name)
             else:
                 self.collection = Collection(collection_name)
-            if (partition_tag
-                    is not None) and (not self.has_partition(partition_tag)):
+            if (partition_tag is not None) and (not self.has_partition(partition_tag)):
                 self.create_partition(partition_tag)
 
             self.collection.insert(entities, partition_name=partition_tag)
-            print(
-                f"Number of entities in Milvus: {self.collection.num_entities}"
-            )  # check the num_entites
+            print(f"Number of entities in Milvus: {self.collection.num_entities}")  # check the num_entites
         except Exception as e:
             print("Milvus insert error:", e)
 
 
-class RecallByMilvus():
-
+class RecallByMilvus:
     def __init__(self):
         print(fmt.format("start connecting to Milvus"))
         connections.connect("default", host=MILVUS_HOST, port=MILVUS_PORT)
@@ -129,55 +116,50 @@ class RecallByMilvus():
         except Exception as e:
             print("Milvus create collection error:", e)
 
-    def search(self,
-               vectors,
-               embedding_name,
-               collection_name,
-               partition_names=[],
-               output_fields=[]):
+    def search(self, vectors, embedding_name, collection_name, partition_names=[], output_fields=[]):
         try:
             self.get_collection(collection_name)
-            result = self.collection.search(vectors,
-                                            embedding_name,
-                                            search_params,
-                                            limit=top_k,
-                                            partition_names=partition_names,
-                                            output_fields=output_fields)
+            result = self.collection.search(
+                vectors,
+                embedding_name,
+                search_params,
+                limit=top_k,
+                partition_names=partition_names,
+                output_fields=output_fields,
+            )
             return result
         except Exception as e:
-            print('Milvus recall error: ', e)
+            print("Milvus recall error: ", e)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     print(fmt.format("Start inserting entities"))
     rng = np.random.default_rng(seed=19530)
     num_entities = 3000
     entities = [
         # provide the pk field because `auto_id` is set to False
         [i for i in range(num_entities)],
-        ['第{}个样本'.format(i)
-         for i in range(num_entities)],  # field text, only supports list
-        rng.random(
-            (num_entities,
-             data_dim)),  # field embeddings, supports numpy.ndarray and list
+        ["第{}个样本".format(i) for i in range(num_entities)],  # field text, only supports list
+        rng.random((num_entities, data_dim)),  # field embeddings, supports numpy.ndarray and list
     ]
     print(entities[-1].shape)
-    collection_name = 'test1'
-    partition_tag = 'partition_1'
-    embedding_name = 'embeddings'
+    collection_name = "test1"
+    partition_tag = "partition_1"
+    embedding_name = "embeddings"
     client = VecToMilvus()
-    client.insert(collection_name=collection_name,
-                  entities=entities,
-                  index_name=embedding_name,
-                  partition_tag=partition_tag)
+    client.insert(
+        collection_name=collection_name, entities=entities, index_name=embedding_name, partition_tag=partition_tag
+    )
     print(fmt.format("Start searching entities"))
     vectors_to_search = entities[-1][-2:]
     recall_client = RecallByMilvus()
-    result = recall_client.search(vectors_to_search,
-                                  embedding_name,
-                                  collection_name,
-                                  partition_names=[partition_tag],
-                                  output_fields=['pk', 'text'])
+    result = recall_client.search(
+        vectors_to_search,
+        embedding_name,
+        collection_name,
+        partition_names=[partition_tag],
+        output_fields=["pk", "text"],
+    )
     for hits in result:
         for hit in hits:
             print(f"hit: {hit}, random field: {hit.entity.get('text')}")

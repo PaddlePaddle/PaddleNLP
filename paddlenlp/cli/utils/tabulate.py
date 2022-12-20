@@ -50,9 +50,11 @@ def print_example_code():
     console.print(Markdown(markdown))
 
 
-def tabulate(tables: List[Union[List[str], Dict[str, str]]],
-             headers: Optional[List[str]] = None,
-             highlight_word: Optional[str] = None):
+def tabulate(
+    tables: List[Union[List[str], Dict[str, str]]],
+    headers: Optional[List[str]] = None,
+    highlight_word: Optional[str] = None,
+):
     """print tabulate data into console
 
     Args:
@@ -63,10 +65,9 @@ def tabulate(tables: List[Union[List[str], Dict[str, str]]],
     # 1. define the console
     theme = Theme({"paddlenlp.keyword": "bold magenta"})
     console = Console(highlighter=_get_highlighter(highlight_word), theme=theme)
-    table_instance = Table(title="PaddleNLP 模型检索结果",
-                           show_header=headers is not None,
-                           header_style="bold magenta",
-                           highlight=True)
+    table_instance = Table(
+        title="PaddleNLP 模型检索结果", show_header=headers is not None, header_style="bold magenta", highlight=True
+    )
 
     # 2. add column
     headers = headers or []

@@ -13,12 +13,11 @@
 # limitations under the License.
 
 import os
+import unicodedata
+from typing import List, Optional
 
 import sentencepiece as spm
-import unicodedata
-from typing import TYPE_CHECKING, Any, Dict, List, NamedTuple, Optional, Sequence, Tuple, Union
 
-from ..tokenizer_utils_base import TensorType, PaddingStrategy, TruncationStrategy
 from .. import PretrainedTokenizer
 
 __all__ = ["ErnieMTokenizer"]
@@ -64,17 +63,23 @@ class ErnieMTokenizer(PretrainedTokenizer):
         "vocab_file": {
             "ernie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
             "ernie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
+            "uie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
+            "uie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.vocab.txt",
         },
         "sentencepiece_model_file": {
             "ernie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
             "ernie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
+            "uie-m-base": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
+            "uie-m-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_m/ernie_m.sentencepiece.bpe.model",
         },
     }
     pretrained_init_configuration = {
         "ernie-m-base": {"do_lower_case": False},
         "ernie-m-large": {"do_lower_case": False},
+        "uie-m-base": {"do_lower_case": False},
+        "uie-m-large": {"do_lower_case": False},
     }
-    max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514}
+    max_model_input_sizes = {"ernie-m-base": 514, "ernie-m-large": 514, "uie-m-base": 514, "uie-m-large": 514}
     # Ernie-M model doesn't have token_type embedding.
     model_input_names: List[str] = ["input_ids"]
 

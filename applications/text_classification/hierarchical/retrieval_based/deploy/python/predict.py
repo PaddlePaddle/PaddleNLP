@@ -26,7 +26,7 @@ from paddlenlp.data import Stack, Tuple, Pad
 from paddlenlp.datasets import load_dataset
 from paddlenlp.utils.log import logger
 
-sys.path.append('.')
+sys.path.append(".")
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -57,19 +57,16 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example,
-                    tokenizer,
-                    max_seq_length=512,
-                    pad_to_max_seq_len=False):
+def convert_example(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
     A BERT sequence has the following format:
     - single sequence: ``[CLS] X [SEP]``
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
     Returns:
@@ -79,19 +76,14 @@ def convert_example(example,
 
     result = []
     for key, text in example.items():
-        encoded_inputs = tokenizer(text=text,
-                                   max_seq_len=max_seq_length,
-                                   pad_to_max_seq_len=pad_to_max_seq_len)
+        encoded_inputs = tokenizer(text=text, max_seq_len=max_seq_length, pad_to_max_seq_len=pad_to_max_seq_len)
         input_ids = encoded_inputs["input_ids"]
         token_type_ids = encoded_inputs["token_type_ids"]
         result += [input_ids, token_type_ids]
     return result
 
 
-def convert_query_example(example,
-                          tokenizer,
-                          max_seq_length=512,
-                          pad_to_max_seq_len=False):
+def convert_query_example(example, tokenizer, max_seq_length=512, pad_to_max_seq_len=False):
     """
     Builds model inputs from a sequence.
 
@@ -101,9 +93,9 @@ def convert_query_example(example,
 
     Args:
         example(obj:`list(str)`): The list of text to be converted to ids.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
         is_test(obj:`False`, defaults to `False`): Whether the example contains label or not.
 
@@ -112,10 +104,12 @@ def convert_query_example(example,
         token_type_ids(obj: `list[int]`): List of query sequence pair mask.
     """
     result = []
-    encoded_inputs = tokenizer(text=example['sentence'],
-                               max_seq_len=max_seq_length,
-                               pad_to_max_seq_len=pad_to_max_seq_len,
-                               truncation_strategy="longest_first")
+    encoded_inputs = tokenizer(
+        text=example["sentence"],
+        max_seq_len=max_seq_length,
+        pad_to_max_seq_len=pad_to_max_seq_len,
+        truncation_strategy="longest_first",
+    )
     input_ids = encoded_inputs["input_ids"]
     token_type_ids = encoded_inputs["token_type_ids"]
     result += [input_ids, token_type_ids]
@@ -123,16 +117,17 @@ def convert_query_example(example,
 
 
 class Predictor(object):
-
-    def __init__(self,
-                 model_dir,
-                 device="gpu",
-                 max_seq_length=128,
-                 batch_size=32,
-                 use_tensorrt=False,
-                 precision="fp32",
-                 cpu_threads=10,
-                 enable_mkldnn=False):
+    def __init__(
+        self,
+        model_dir,
+        device="gpu",
+        max_seq_length=128,
+        batch_size=32,
+        use_tensorrt=False,
+        precision="fp32",
+        cpu_threads=10,
+        enable_mkldnn=False,
+    ):
         self.max_seq_length = max_seq_length
         self.batch_size = batch_size
 
@@ -151,14 +146,14 @@ class Predictor(object):
             precision_map = {
                 "fp16": inference.PrecisionType.Half,
                 "fp32": inference.PrecisionType.Float32,
-                "int8": inference.PrecisionType.Int8
+                "int8": inference.PrecisionType.Int8,
             }
             precision_mode = precision_map[precision]
 
             if args.use_tensorrt:
-                config.enable_tensorrt_engine(max_batch_size=batch_size,
-                                              min_subgraph_size=30,
-                                              precision_mode=precision_mode)
+                config.enable_tensorrt_engine(
+                    max_batch_size=batch_size, min_subgraph_size=30, precision_mode=precision_mode
+                )
         elif device == "cpu":
             # set CPU configs accordingly,
             # such as enable_mkldnn, set_cpu_math_library_num_threads
@@ -174,12 +169,8 @@ class Predictor(object):
 
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
     def extract_embedding(self, data, tokenizer):
         """
@@ -187,7 +178,7 @@ class Predictor(object):
 
         Args:
             data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
 
         Returns:
@@ -201,8 +192,7 @@ class Predictor(object):
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # segment
         ): fn(samples)
 
         input_ids, segment_ids = batchify_fn(examples)
@@ -218,7 +208,7 @@ class Predictor(object):
 
         Args:
             data (obj:`List(str)`): The batch data whose each element is a raw text.
-            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+            tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
                 which contains most of the methods. Users should refer to the superclass for more information regarding methods.
 
         Returns:
@@ -227,23 +217,18 @@ class Predictor(object):
 
         examples = []
         for idx, text in enumerate(data):
-            input_ids, segment_ids, title_ids, title_segment_ids = convert_example(
-                text, tokenizer)
+            input_ids, segment_ids, title_ids, title_segment_ids = convert_example(text, tokenizer)
 
-            examples.append(
-                (input_ids, segment_ids, title_ids, title_segment_ids))
+            examples.append((input_ids, segment_ids, title_ids, title_segment_ids))
 
         batchify_fn = lambda samples, fn=Tuple(
             Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
             Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"
-                ),  # segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # segment
         ): fn(samples)
 
-        query_ids, query_segment_ids, title_ids, title_segment_ids = batchify_fn(
-            examples)
+        query_ids, query_segment_ids, title_ids, title_segment_ids = batchify_fn(examples)
         self.input_handles[0].copy_from_cpu(query_ids)
         self.input_handles[1].copy_from_cpu(query_segment_ids)
         self.predictor.run()
@@ -254,39 +239,32 @@ class Predictor(object):
         self.predictor.run()
         title_logits = self.output_handle.copy_to_cpu()
 
-        result = [
-            float(1 - spatial.distance.cosine(arr1, arr2))
-            for arr1, arr2 in zip(query_logits, title_logits)
-        ]
+        result = [float(1 - spatial.distance.cosine(arr1, arr2)) for arr1, arr2 in zip(query_logits, title_logits)]
         return result
 
 
 if __name__ == "__main__":
     # Define predictor to do prediction.
-    predictor = Predictor(args.model_dir, args.device, args.max_seq_length,
-                          args.batch_size, args.use_tensorrt, args.precision,
-                          args.cpu_threads, args.enable_mkldnn)
+    predictor = Predictor(
+        args.model_dir,
+        args.device,
+        args.max_seq_length,
+        args.batch_size,
+        args.use_tensorrt,
+        args.precision,
+        args.cpu_threads,
+        args.enable_mkldnn,
+    )
 
     output_emb_size = 256
-    tokenizer = AutoTokenizer.from_pretrained(
-        "rocketqa-zh-dureader-query-encoder")
-    id2corpus = {
-        0: {
-            "sentence":
-            "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"
-        }
-    }
+    tokenizer = AutoTokenizer.from_pretrained("rocketqa-zh-dureader-query-encoder")
+    id2corpus = {0: {"sentence": "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？"}}
     res = predictor.extract_embedding(id2corpus, tokenizer)
     print(res.shape)
     print(res)
-    corpus_list = [{
-        "sentence":
-        "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '电脑/网络,硬件'
-    }, {
-        "sentence":
-        "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？",
-        'label': '商业/理财,股票'
-    }]
+    corpus_list = [
+        {"sentence": "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？", "label": "电脑/网络,硬件"},
+        {"sentence": "CPU每秒执行的指令数CPU频率3.0G，执行一条指令需要1.5,频率3.0G，执行一条指令需要1.5个周期，每秒执行的指令数为？是20亿吗？", "label": "商业/理财,股票"},
+    ]
     res = predictor.predict(corpus_list, tokenizer)
     print(res)

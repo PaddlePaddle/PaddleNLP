@@ -21,6 +21,7 @@ import numpy as np
 import paddle
 from paddle import inference
 from paddlenlp.data import Stack, Tuple, Pad
+
 # yapf: disable
 parser = argparse.ArgumentParser(__doc__)
 parser.add_argument("--model_file", type=str, required=True, default='./static_graph_params.pdmodel', help="The path to model info in static graph.")
@@ -43,14 +44,10 @@ def normalize_token(token, normlize_vocab):
     return token
 
 
-def convert_tokens_to_ids(tokens,
-                          vocab,
-                          oov_replace_token=None,
-                          normlize_vocab=None):
+def convert_tokens_to_ids(tokens, vocab, oov_replace_token=None, normlize_vocab=None):
     """Convert tokens to token indexs"""
     token_ids = []
-    oov_replace_token = vocab.get(
-        oov_replace_token) if oov_replace_token else None
+    oov_replace_token = vocab.get(oov_replace_token) if oov_replace_token else None
     for token in tokens:
         token = normalize_token(token, normlize_vocab)
         token_id = vocab.get(token, oov_replace_token)
@@ -63,10 +60,7 @@ def convert_example(tokens, max_seq_len, word_vocab, normlize_vocab=None):
     """Convert tokens of sequences to token ids"""
     tokens = tokens[:max_seq_len]
 
-    token_ids = convert_tokens_to_ids(tokens,
-                                      word_vocab,
-                                      oov_replace_token="OOV",
-                                      normlize_vocab=normlize_vocab)
+    token_ids = convert_tokens_to_ids(tokens, word_vocab, oov_replace_token="OOV", normlize_vocab=normlize_vocab)
     length = len(token_ids)
     return token_ids, length
 
@@ -75,7 +69,7 @@ def load_vocab(dict_path):
     """Load vocab from file"""
     vocab = {}
     reverse = None
-    with open(dict_path, "r", encoding='utf8') as fin:
+    with open(dict_path, "r", encoding="utf8") as fin:
         for i, line in enumerate(fin):
             terms = line.strip("\n").split("\t")
             if len(terms) == 2:
@@ -88,26 +82,19 @@ def load_vocab(dict_path):
             elif len(terms) == 1:
                 key, value = terms[0], i
             else:
-                raise ValueError("Error line: %s in file: %s" %
-                                 (line, dict_path))
+                raise ValueError("Error line: %s in file: %s" % (line, dict_path))
             vocab[key] = value
     return vocab
 
 
 def parse_result(words, preds, lengths, word_vocab, label_vocab):
-    """ Parse padding result """
+    """Parse padding result"""
     batch_out = []
     id2word_dict = dict(zip(word_vocab.values(), word_vocab.keys()))
     id2label_dict = dict(zip(label_vocab.values(), label_vocab.keys()))
     for sent_index in range(len(lengths)):
-        sent = [
-            id2word_dict[index]
-            for index in words[sent_index][:lengths[sent_index]]
-        ]
-        tags = [
-            id2label_dict[index]
-            for index in preds[sent_index][:lengths[sent_index]]
-        ]
+        sent = [id2word_dict[index] for index in words[sent_index][: lengths[sent_index]]]
+        tags = [id2label_dict[index] for index in preds[sent_index][: lengths[sent_index]]]
 
         sent_out = []
         tags_out = []
@@ -116,13 +103,13 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
             # for the first word
             if parital_word == "":
                 parital_word = sent[ind]
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 continue
 
             # for the beginning of word
             if tag.endswith("-B") or (tag == "O" and tags[ind - 1] != "O"):
                 sent_out.append(parital_word)
-                tags_out.append(tag.split('-')[0])
+                tags_out.append(tag.split("-")[0])
                 parital_word = sent[ind]
                 continue
 
@@ -137,7 +124,6 @@ def parse_result(words, preds, lengths, word_vocab, label_vocab):
 
 
 class Predictor(object):
-
     def __init__(self, model_file, params_file, device, max_seq_length):
         self.max_seq_length = max_seq_length
 
@@ -152,20 +138,11 @@ class Predictor(object):
         config.switch_use_feed_fetch_ops(False)
         self.predictor = paddle.inference.create_predictor(config)
 
-        self.input_handles = [
-            self.predictor.get_input_handle(name)
-            for name in self.predictor.get_input_names()
-        ]
+        self.input_handles = [self.predictor.get_input_handle(name) for name in self.predictor.get_input_names()]
 
-        self.output_handle = self.predictor.get_output_handle(
-            self.predictor.get_output_names()[0])
+        self.output_handle = self.predictor.get_output_handle(self.predictor.get_output_names()[0])
 
-    def predict(self,
-                data,
-                word_vocab,
-                label_vocab,
-                normlize_vocab,
-                batch_size=1):
+    def predict(self, data, word_vocab, label_vocab, normlize_vocab, batch_size=1):
         """
         Predicts the data labels.
 
@@ -184,10 +161,9 @@ class Predictor(object):
 
         for text in data:
             tokens = list(text.strip())
-            token_ids, length = convert_example(tokens,
-                                                self.max_seq_length,
-                                                word_vocab=word_vocab,
-                                                normlize_vocab=normlize_vocab)
+            token_ids, length = convert_example(
+                tokens, self.max_seq_length, word_vocab=word_vocab, normlize_vocab=normlize_vocab
+            )
             examples.append((token_ids, length))
 
         batchify_fn = lambda samples, fn=Tuple(
@@ -195,10 +171,7 @@ class Predictor(object):
             Stack(axis=0),  # length
         ): fn(samples)
 
-        batches = [
-            examples[idx:idx + batch_size]
-            for idx in range(0, len(examples), batch_size)
-        ]
+        batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         results = []
 
@@ -208,35 +181,28 @@ class Predictor(object):
             self.input_handles[1].copy_from_cpu(length)
             self.predictor.run()
             preds = self.output_handle.copy_to_cpu()
-            result = parse_result(token_ids, preds, length, word_vocab,
-                                  label_vocab)
+            result = parse_result(token_ids, preds, length, word_vocab, label_vocab)
             results.extend(result)
         return results
 
 
 if __name__ == "__main__":
-    word_vocab = load_vocab(os.path.join(args.data_dir, 'word.dic'))
-    label_vocab = load_vocab(os.path.join(args.data_dir, 'tag.dic'))
-    normlize_vocab = load_vocab(os.path.join(args.data_dir, 'q2b.dic'))
+    word_vocab = load_vocab(os.path.join(args.data_dir, "word.dic"))
+    label_vocab = load_vocab(os.path.join(args.data_dir, "tag.dic"))
+    normlize_vocab = load_vocab(os.path.join(args.data_dir, "q2b.dic"))
     infer_ds = []
-    with open(os.path.join(args.data_dir, 'infer.tsv'), "r",
-              encoding="utf-8") as fp:
+    with open(os.path.join(args.data_dir, "infer.tsv"), "r", encoding="utf-8") as fp:
         for line in fp.readlines():
             infer_ds += [line.strip()]
-    predictor = Predictor(args.model_file, args.params_file, args.device,
-                          args.max_seq_len)
+    predictor = Predictor(args.model_file, args.params_file, args.device, args.max_seq_len)
     start = time.time()
     for _ in range(args.epochs):
-        results = predictor.predict(infer_ds,
-                                    word_vocab,
-                                    label_vocab,
-                                    normlize_vocab,
-                                    batch_size=args.batch_size)
+        results = predictor.predict(infer_ds, word_vocab, label_vocab, normlize_vocab, batch_size=args.batch_size)
     end = time.time()
     for idx, result in enumerate(results):
-        print('Text: {}'.format(infer_ds[idx]))
+        print("Text: {}".format(infer_ds[idx]))
         sent_tags = []
         sent, tags = result
-        sent_tag = ['(%s, %s)' % (ch, tag) for ch, tag in zip(sent, tags)]
-        print('Result: {}\n'.format(sent_tag))
+        sent_tag = ["(%s, %s)" % (ch, tag) for ch, tag in zip(sent, tags)]
+        print("Result: {}\n".format(sent_tag))
     print("Total predict time: {:.4f} s".format(end - start))

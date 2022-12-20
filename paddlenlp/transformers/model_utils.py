@@ -20,13 +20,22 @@ import json
 import os
 import re
 import shutil
+import tempfile
 from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import six
-from huggingface_hub import hf_hub_download
+from huggingface_hub import (
+    create_repo,
+    get_hf_file_metadata,
+    hf_hub_download,
+    hf_hub_url,
+    repo_type_and_id_from_hf_id,
+    upload_folder,
+)
+from huggingface_hub.utils import EntryNotFoundError
 from paddle import Tensor
 from paddle.nn import Embedding, Layer
 
@@ -39,7 +48,12 @@ from paddlenlp.utils.downloader import (
     download_check,
     get_path_from_url_with_filelock,
 )
-from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
+from paddlenlp.utils.env import (
+    CONFIG_NAME,
+    HF_CACHE_HOME,
+    LEGACY_CONFIG_NAME,
+    MODEL_HOME,
+)
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
@@ -191,7 +205,10 @@ class PretrainedModel(Layer, GenerationMixin):
     by which subclasses can track arguments for initialization automatically.
     """
 
-    model_config_file = "model_config.json"
+    # Deprecated(wj-Mcat): after 2.6.* version
+    # save the old-school `LEGACY_CONFIG_NAME`, and will be changed to `CONFIG_NAME` after 2.6.* version
+    model_config_file = LEGACY_CONFIG_NAME
+
     pretrained_init_configuration = {}
     # TODO: more flexible resource handle, namedtuple with fields as:
     # resource_name, saved_file, handle_name_for_load(None for used as __init__
@@ -227,12 +244,13 @@ class PretrainedModel(Layer, GenerationMixin):
                 break
         if config is not None:
             self.config: PretrainedConfig = config
+            self.model_config_file = CONFIG_NAME
             return
 
         # extract config from kwargs
         if "config" not in kwargs:
             raise ValueError(
-                "PretarinedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
+                "PretrainedConfig instance not found in the arguments, you can set it as args or kwargs with config field"
             )
 
         config = kwargs["config"]
@@ -240,6 +258,7 @@ class PretrainedModel(Layer, GenerationMixin):
             raise TypeError("config parameter should be the instance of PretraiendConfig")
 
         self.config: PretrainedConfig = kwargs["config"]
+        self.model_config_file = CONFIG_NAME
         self.warnings_issued = {}
 
     def _post_init(self, original_init, *args, **kwargs):
@@ -348,6 +367,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
+            from_hf_hub (bool): whether to load from Huggingface Hub
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -622,6 +642,7 @@ class PretrainedModel(Layer, GenerationMixin):
             download_check(pretrained_model_name_or_path, "from_pretrained")
         return model, state_to_load
 
+    # NOTE: backward support for old models. Models with PretrainedConfig should be able to use .config
     def get_model_config(self):
         """Get model configuration.
 
@@ -631,6 +652,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # If init_config contains a Layer, use the layer's init_config to save
         def get_config(model):
+            if model.config is not None and isinstance(model.config, PretrainedConfig):
+                return model.config
             model_config = model.init_config
             for key, value in model_config.items():
                 if key == "init_args":
@@ -647,16 +670,19 @@ class PretrainedModel(Layer, GenerationMixin):
 
     def save_model_config(self, save_dir: str):
         """
-        Saves model configuration to a file named "model_config.json" under `save_dir`.
+        Saves model configuration to a file named "config.json" under `save_dir`.
 
         Args:
             save_dir (str): Directory to save model_config file into.
         """
         # Save model config
-        model_config_file = os.path.join(save_dir, self.model_config_file)
         model_config = self.get_model_config()
-        with io.open(model_config_file, "w", encoding="utf-8") as f:
-            f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
+        if isinstance(model_config, PretrainedConfig):
+            model_config.save_pretrained(save_dir)
+        else:
+            model_config_file = os.path.join(save_dir, self.model_config_file)
+            with io.open(model_config_file, "w", encoding="utf-8") as f:
+                f.write(json.dumps(model_config, ensure_ascii=False, indent=2))
 
     def save_pretrained(self, save_dir: str):
         """
@@ -694,6 +720,62 @@ class PretrainedModel(Layer, GenerationMixin):
             paddle.save(self.state_dict(), file_name)
         else:
             logger.warning("Save pretrained model only supported dygraph mode for now!")
+
+    def save_to_hf_hub(
+        self,
+        repo_id: str,
+        private: Optional[bool] = None,
+        commit_message: Optional[bool] = None,
+        revision: Optional[str] = None,
+        create_pr: bool = False,
+    ):
+        """
+        Uploads all elements of this model to a new HuggingFace Hub repository.
+        Args:
+            repo_id (str): Repository name for your model/tokenizer in the Hub.
+            private (bool, optional): Whether the model/tokenizer is set to private
+            commit_message (str, optional) — The summary / title / first line of the generated commit. Defaults to: f"Upload {path_in_repo} with huggingface_hub"
+            revision (str, optional) — The git revision to commit from. Defaults to the head of the "main" branch.
+            create_pr (boolean, optional) — Whether or not to create a Pull Request with that commit. Defaults to False.
+                If revision is not set, PR is opened against the "main" branch. If revision is set and is a branch, PR is opened against this branch.
+                If revision is set and is not a branch name (example: a commit oid), an RevisionNotFoundError is returned by the server.
+
+        Returns: The url of the commit of your model in the given repository.
+        """
+        repo_url = create_repo(repo_id, private=private, exist_ok=True)
+
+        # Infer complete repo_id from repo_url
+        # Can be different from the input `repo_id` if repo_owner was implicit
+        _, repo_owner, repo_name = repo_type_and_id_from_hf_id(repo_url)
+
+        repo_id = f"{repo_owner}/{repo_name}"
+
+        # Check if README file already exist in repo
+        try:
+            get_hf_file_metadata(hf_hub_url(repo_id=repo_id, filename="README.md", revision=revision))
+            has_readme = True
+        except EntryNotFoundError:
+            has_readme = False
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            # save model
+            self.save_pretrained(tmp_dir)
+            # Add readme if does not exist
+            logger.info("README.md not found, adding the default README.md")
+            if not has_readme:
+                with open(os.path.join(tmp_dir, "README.md"), "w") as f:
+                    f.write(f"---\nlibrary_name: paddlenlp\n---\n# {repo_id}")
+
+            # Upload model and return
+            logger.info(f"Pushing to the {repo_id}. This might take a while")
+            return upload_folder(
+                repo_id=repo_id,
+                repo_type="model",
+                folder_path=tmp_dir,
+                commit_message=commit_message,
+                revision=revision,
+                create_pr=create_pr,
+            )
 
     def resize_token_embeddings(self, new_num_tokens: Optional[int] = None) -> nn.Embedding:
         """
@@ -1062,7 +1144,7 @@ class PretrainedModel(Layer, GenerationMixin):
         return model_to_load, missing_keys, unexpected_keys, mismatched_keys
 
     @classmethod
-    def from_pretrained_v2(cls, pretrained_model_name_or_path, *args, **kwargs):
+    def from_pretrained_v2(cls, pretrained_model_name_or_path, from_hf_hub: bool = False, *args, **kwargs):
         """
         Creates an instance of `PretrainedModel`. Model weights are loaded
         by specifying name of a built-in pretrained model, a pretrained model from HF Hub, a community contributed model,
@@ -1077,6 +1159,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 - Name of a community-contributed pretrained model.
                 - Local directory path which contains model weights file("model_state.pdparams")
                   and model config file ("model_config.json").
+            from_hf_hub (bool): load model from huggingface hub. Default to `False`.
             *args (tuple): Position arguments for model `__init__`. If provided,
                 use these as position argument values for model initialization.
             **kwargs (dict): Keyword arguments for model `__init__`. If provided,
@@ -1116,12 +1199,11 @@ class PretrainedModel(Layer, GenerationMixin):
         load_state_as_np = kwargs.pop("load_state_as_np", False)
         config = kwargs.pop("config", None)
         force_download = kwargs.pop("force_download", False)
-        from_hf_hub = kwargs.pop("from_hf_hub", False)
         ignore_mismatched_sizes = kwargs.pop("ignore_mismatched_sizes", None)
         dtype = kwargs.pop("dtype", None)
         cache_dir = kwargs.pop("cache_dir", None)
 
-        cache_dir = resolve_cache_dir(pretrained_model_name_or_path=pretrained_model_name_or_path, cache_dir=cache_dir)
+        cache_dir = resolve_cache_dir(pretrained_model_name_or_path, from_hf_hub, cache_dir)
 
         model_kwargs = kwargs
         # 1. get the PretrainedConfig to init model

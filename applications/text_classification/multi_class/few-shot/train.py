@@ -12,27 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass, field
 import os
 from collections import defaultdict
-
-import numpy as np
+from dataclasses import dataclass, field
 
 import paddle
-from paddle.static import InputSpec
 from paddle.metric import Accuracy
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer, AutoModelForMaskedLM
-from paddlenlp.trainer import PdArgumentParser, EarlyStoppingCallback
+from utils import load_local_dataset
+
 from paddlenlp.prompt import (
     AutoTemplate,
-    SoftVerbalizer,
-    PromptTuningArguments,
-    PromptTrainer,
     PromptModelForSequenceClassification,
+    PromptTrainer,
+    PromptTuningArguments,
+    SoftVerbalizer,
 )
-
-from utils import load_local_dataset
+from paddlenlp.trainer import EarlyStoppingCallback, PdArgumentParser
+from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -51,8 +48,7 @@ class ModelArguments:
 
 def main():
     # Parse the arguments.
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, PromptTuningArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, PromptTuningArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -64,10 +60,7 @@ def main():
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Define the template for preprocess and the verbalizer for postprocess.
-    template = AutoTemplate.create_from(data_args.prompt,
-                                        tokenizer,
-                                        training_args.max_seq_length,
-                                        model=model)
+    template = AutoTemplate.create_from(data_args.prompt, tokenizer, training_args.max_seq_length, model=model)
     logger.info("Using template: {}".format(template.prompt))
 
     label_file = os.path.join(data_args.data_dir, "label.txt")
@@ -81,45 +74,39 @@ def main():
 
     # Load the few-shot datasets.
     train_ds, dev_ds, test_ds = load_local_dataset(
-        data_path=data_args.data_dir,
-        splits=["train", "dev", "test"],
-        label_list=verbalizer.labels_to_ids)
+        data_path=data_args.data_dir, splits=["train", "dev", "test"], label_list=verbalizer.labels_to_ids
+    )
 
     # Define the criterion.
     criterion = paddle.nn.CrossEntropyLoss()
 
     # Initialize the prompt model with the above variables.
     prompt_model = PromptModelForSequenceClassification(
-        model,
-        template,
-        verbalizer,
-        freeze_plm=training_args.freeze_plm,
-        freeze_dropout=training_args.freeze_dropout)
+        model, template, verbalizer, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
+    )
 
     # Define the metric function.
     def compute_metrics(eval_preds):
         metric = Accuracy()
-        correct = metric.compute(paddle.to_tensor(eval_preds.predictions),
-                                 paddle.to_tensor(eval_preds.label_ids))
+        correct = metric.compute(paddle.to_tensor(eval_preds.predictions), paddle.to_tensor(eval_preds.label_ids))
         metric.update(correct)
         acc = metric.accumulate()
-        return {'accuracy': acc}
+        return {"accuracy": acc}
 
     # Deine the early-stopping callback.
-    callbacks = [
-        EarlyStoppingCallback(early_stopping_patience=4,
-                              early_stopping_threshold=0.)
-    ]
+    callbacks = [EarlyStoppingCallback(early_stopping_patience=4, early_stopping_threshold=0.0)]
 
     # Initialize the trainer.
-    trainer = PromptTrainer(model=prompt_model,
-                            tokenizer=tokenizer,
-                            args=training_args,
-                            criterion=criterion,
-                            train_dataset=train_ds,
-                            eval_dataset=dev_ds,
-                            callbacks=callbacks,
-                            compute_metrics=compute_metrics)
+    trainer = PromptTrainer(
+        model=prompt_model,
+        tokenizer=tokenizer,
+        args=training_args,
+        criterion=criterion,
+        train_dataset=train_ds,
+        eval_dataset=dev_ds,
+        callbacks=callbacks,
+        compute_metrics=compute_metrics,
+    )
 
     # Traininig.
     if training_args.do_train:
@@ -137,29 +124,9 @@ def main():
 
     # Export static model.
     if training_args.do_export:
-        template = prompt_model.template
-        template_keywords = template.extract_template_keywords(template.prompt)
-        input_spec = [
-            InputSpec(shape=[None, None], dtype="int64"),  # input_ids,
-            InputSpec(shape=[None, None], dtype="int64"),  # token_type_ids
-            InputSpec(shape=[None, None], dtype="int64"),  # position_ids
-            InputSpec(shape=[None, None, None, None],
-                      dtype="float32")  # attention_mask
-        ]
-        if "mask" in template_keywords:
-            input_spec.append(InputSpec(shape=[None],
-                                        dtype="int64"))  # masked_positions
-        if "soft" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None],
-                                        dtype="int64"))  # soft_token_ids
-        if "encoder" in template_keywords:
-            input_spec.append(InputSpec(shape=[None, None],
-                                        dtype="int64"))  # encoder_ids
-        export_path = os.path.join(training_args.output_dir, 'export')
-        trainer.export_model(export_path,
-                             input_spec=input_spec,
-                             export_type=model_args.export_type)
+        export_path = os.path.join(training_args.output_dir, "export")
+        trainer.export_model(export_path, export_type=model_args.export_type)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

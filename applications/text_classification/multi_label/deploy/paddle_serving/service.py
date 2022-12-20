@@ -46,10 +46,8 @@ args = parser.parse_args()
 
 
 class Op(Op):
-
     def init_op(self):
-        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name,
-                                                       use_fast=True)
+        self.tokenizer = AutoTokenizer.from_pretrained(args.model_name, use_fast=True)
         # Output nodes may differ from model to model
         # You can see the output node name in the conf.prototxt file of serving_server
         self.fetch_names = [
@@ -58,25 +56,26 @@ class Op(Op):
 
     def preprocess(self, input_dicts, data_id, log_id):
         # Convert input format
-        (_, input_dict), = input_dicts.items()
+        ((_, input_dict),) = input_dicts.items()
         data = input_dict["sentence"]
         if isinstance(data, str) and "array(" in data:
             data = eval(data)
         else:
             _LOGGER.error("input value  {}is not supported.".format(data))
-        data = [i.decode('utf-8') for i in data]
+        data = [i.decode("utf-8") for i in data]
 
         # tokenizer + pad
-        data = self.tokenizer(data,
-                              max_length=args.max_seq_length,
-                              padding=True,
-                              truncation=True,
-                              return_position_ids=False,
-                              return_attention_mask=False)
+        data = self.tokenizer(
+            data,
+            max_length=args.max_seq_length,
+            padding=True,
+            truncation=True,
+            return_position_ids=False,
+            return_attention_mask=False,
+        )
         tokenized_data = {}
         for tokenizer_key in data:
-            tokenized_data[tokenizer_key] = np.array(data[tokenizer_key],
-                                                     dtype="int64")
+            tokenized_data[tokenizer_key] = np.array(data[tokenizer_key], dtype="int64")
 
         return tokenized_data, False, None, ""
 
@@ -92,12 +91,11 @@ class Op(Op):
             for i, p in enumerate(result):
                 if p > 0.5:
                     label.append(str(i))
-            labels.append(','.join(label))
+            labels.append(",".join(label))
         return {"label": labels}, None, ""
 
 
 class Service(WebService):
-
     def get_pipeline_response(self, read_op):
         return Op(name="seq_cls", input_ops=[read_op])
 

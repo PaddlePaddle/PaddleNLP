@@ -32,8 +32,7 @@ from layout_trainer import LayoutTrainer
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, TrainingArguments))
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
@@ -42,23 +41,20 @@ def main():
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(
-            training_args.output_dir
-    ) and training_args.do_train and not training_args.overwrite_output_dir:
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
         last_checkpoint = get_last_checkpoint(training_args.output_dir)
-        if last_checkpoint is None and len(os.listdir(
-                training_args.output_dir)) > 0:
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
             raise ValueError(
                 f"Output directory ({training_args.output_dir}) already exists and is not empty. "
-                "Use --overwrite_output_dir to overcome.")
+                "Use --overwrite_output_dir to overcome."
+            )
         elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
             )
 
-    train_ds, dev_ds, test_ds = load_dataset(
-        data_args.dataset_name, split=["train", "validation", "test"])
+    train_ds, dev_ds, test_ds = load_dataset(data_args.dataset_name, split=["train", "validation", "test"])
 
     if training_args.do_train:
         column_names = train_ds.column_names
@@ -67,13 +63,10 @@ def main():
     elif training_args.do_predict:
         column_names = test_ds.column_names
     else:
-        logger.info(
-            "There is nothing to do. Please pass `do_train`, `do_eval` and/or `do_predict`."
-        )
+        logger.info("There is nothing to do. Please pass `do_train`, `do_eval` and/or `do_predict`.")
         raise NotImplementedError
 
-    label_list, label_to_id = get_label_ld(
-        train_ds["qas"], scheme=data_args.pattern.split("-")[1])
+    label_list, label_to_id = get_label_ld(train_ds["qas"], scheme=data_args.pattern.split("-")[1])
     num_labels = len(label_list)
 
     # Load Model and Tokenizer
@@ -81,9 +74,8 @@ def main():
         tokenizer = AutoTokenizer.from_pretrained("layoutxlm-base-uncased")
     else:
         tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
-    model = AutoModelForTokenClassification.from_pretrained(
-        model_args.model_name_or_path, num_classes=num_labels)
-    model.config['has_visual_segment_embedding'] = False
+    model = AutoModelForTokenClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_labels)
+    model.config["has_visual_segment_embedding"] = False
 
     preprocessor = PreProcessor()
     postprocessor = PostProcessor()
@@ -101,13 +93,13 @@ def main():
         use_segment_box=data_args.use_segment_box,
         preprocessing_num_workers=data_args.preprocessing_num_workers,
         scheme=data_args.pattern.split("-")[1],
-        lang=data_args.lang)
+        lang=data_args.lang,
+    )
     preprocess_func_for_valid = preprocess_func
 
-    postprocess_func = partial(postprocessor.postprocess_ner,
-                               label_list=label_list,
-                               tokenizer=tokenizer,
-                               lang=data_args.lang)
+    postprocess_func = partial(
+        postprocessor.postprocess_ner, label_list=label_list, tokenizer=tokenizer, lang=data_args.lang
+    )
 
     # Dataset pre-process
     if training_args.do_train:
@@ -136,19 +128,15 @@ def main():
         )
 
     # Data collator
-    data_collator = DataCollator(tokenizer,
-                                 padding="max_length",
-                                 label_pad_token_id=-100,
-                                 max_length=max_seq_length,
-                                 return_tensors="pd")
+    data_collator = DataCollator(
+        tokenizer, padding="max_length", label_pad_token_id=-100, max_length=max_seq_length, return_tensors="pd"
+    )
 
     def compute_metrics(eval_preds):
         preds = eval_preds.predictions
         labels = eval_preds.label_ids
 
-        report = classification_report(y_true=labels,
-                                       y_pred=preds,
-                                       output_dict=True)
+        report = classification_report(y_true=labels, y_pred=preds, output_dict=True)
 
         report.pop("macro avg")
         report.pop("weighted avg")
@@ -181,7 +169,8 @@ def main():
         eval_examples=dev_ds,
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
-        post_process_function=postprocess_func)
+        post_process_function=postprocess_func,
+    )
 
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
@@ -195,9 +184,9 @@ def main():
         metrics = train_result.metrics
         trainer.save_model()
 
-        max_train_samples = (data_args.max_train_samples
-                             if data_args.max_train_samples is not None else
-                             len(train_dataset))
+        max_train_samples = (
+            data_args.max_train_samples if data_args.max_train_samples is not None else len(train_dataset)
+        )
         metrics["train_samples"] = min(max_train_samples, len(train_dataset))
 
         trainer.log_metrics("train", metrics)
@@ -208,9 +197,7 @@ def main():
     if training_args.do_eval:
         eval_metrics = trainer.evaluate()
 
-        max_val_samples = (data_args.max_val_samples
-                           if data_args.max_val_samples is not None else
-                           len(eval_dataset))
+        max_val_samples = data_args.max_val_samples if data_args.max_val_samples is not None else len(eval_dataset)
         metrics["eval_samples"] = min(max_val_samples, len(eval_dataset))
 
         trainer.log_metrics("eval", eval_metrics)

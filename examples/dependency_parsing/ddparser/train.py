@@ -77,8 +77,7 @@ def batch_evaluate(
     metric.reset()
     losses = []
     for batch in data_loader():
-        if args.encoding_model.startswith(
-                "ernie") or args.encoding_model == "lstm-pe":
+        if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
             words, arcs, rels = batch
             words, feats = flat_words(words)
             s_arc, s_rel, words = model(words, feats)
@@ -87,8 +86,7 @@ def batch_evaluate(
             s_arc, s_rel, words = model(words, feats)
 
         mask = paddle.logical_and(
-            paddle.logical_and(words != word_pad_index,
-                               words != word_bos_index),
+            paddle.logical_and(words != word_pad_index, words != word_bos_index),
             words != word_eos_index,
         )
 
@@ -186,9 +184,7 @@ def do_train(args):
     )
 
     # Load pretrained model if encoding model is ernie-3.0-medium-zh, ernie-1.0, ernie-tiny or ernie-gram-zh
-    if args.encoding_model in [
-            "ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"
-    ]:
+    if args.encoding_model in ["ernie-3.0-medium-zh", "ernie-1.0", "ernie-tiny", "ernie-gram-zh"]:
         pretrained_model = AutoModel.from_pretrained(args.encoding_model)
     else:
         pretrained_model = None
@@ -223,8 +219,7 @@ def do_train(args):
     num_training_steps = len(list(train_data_loader)) * args.epochs
 
     # Define the training strategy
-    lr_scheduler = LinearDecayWithWarmup(lr, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(lr, num_training_steps, args.warmup_proportion)
     grad_clip = paddle.nn.ClipGradByGlobalNorm(clip_norm=args.clip)
     if args.encoding_model.startswith("ernie"):
         optimizer = paddle.optimizer.AdamW(
@@ -253,8 +248,7 @@ def do_train(args):
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):
         for inputs in train_data_loader():
-            if args.encoding_model.startswith(
-                    "ernie") or args.encoding_model == "lstm-pe":
+            if args.encoding_model.startswith("ernie") or args.encoding_model == "lstm-pe":
                 words, arcs, rels = inputs
                 words, feats = flat_words(words)
                 s_arc, s_rel, words = model(words, feats)
@@ -263,8 +257,7 @@ def do_train(args):
                 s_arc, s_rel, words = model(words, feats)
 
             mask = paddle.logical_and(
-                paddle.logical_and(words != word_pad_index,
-                                   words != word_bos_index),
+                paddle.logical_and(words != word_pad_index, words != word_bos_index),
                 words != word_eos_index,
             )
 
@@ -278,8 +271,8 @@ def do_train(args):
             if global_step % 10 == 0 and rank == 0:
                 print(
                     "global step %d, epoch: %d, loss: %.5f, speed: %.2f step/s"
-                    % (global_step, epoch, loss.numpy().item(), 10 /
-                       (time.time() - tic_train)))
+                    % (global_step, epoch, loss.numpy().item(), 10 / (time.time() - tic_train))
+                )
                 tic_train = time.time()
 
         if rank == 0:
@@ -293,8 +286,7 @@ def do_train(args):
                 word_bos_index,
                 word_eos_index,
             )
-            print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" %
-                  (loss, uas * 100, las * 100))
+            print("eval loss: %.5f, UAS: %.2f%%, LAS: %.2f%%" % (loss, uas * 100, las * 100))
             # Save model parameter of last epoch
             save_param_path = os.path.join(args.save_dir, "last_epoch.pdparams")
             paddle.save(model.state_dict(), save_param_path)

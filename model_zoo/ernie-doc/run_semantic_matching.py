@@ -74,10 +74,7 @@ def set_seed(args):
 
 
 def init_memory(batch_size, memory_length, d_model, n_layers):
-    return [
-        paddle.zeros([batch_size, memory_length, d_model], dtype="float32")
-        for _ in range(n_layers)
-    ]
+    return [paddle.zeros([batch_size, memory_length, d_model], dtype="float32") for _ in range(n_layers)]
 
 
 @paddle.no_grad()
@@ -94,21 +91,36 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
     label_dict = dict()
     global_steps = 0
     for step, batch in enumerate(data_loader, start=1):
-        input_ids, position_ids, token_type_ids, attn_mask, \
-            pair_input_ids, pair_position_ids, pair_token_type_ids, pair_attn_mask, \
-            labels, qids, gather_idx, need_cal_loss = batch
+        (
+            input_ids,
+            position_ids,
+            token_type_ids,
+            attn_mask,
+            pair_input_ids,
+            pair_position_ids,
+            pair_token_type_ids,
+            pair_attn_mask,
+            labels,
+            qids,
+            gather_idx,
+            need_cal_loss,
+        ) = batch
 
-        logits, memories, pair_memories = model(input_ids, pair_input_ids,
-                                                memories, pair_memories,
-                                                token_type_ids, position_ids,
-                                                attn_mask, pair_token_type_ids,
-                                                pair_position_ids,
-                                                pair_attn_mask)
-        logits, labels, qids = list(
-            map(lambda x: paddle.gather(x, gather_idx), [logits, labels, qids]))
+        logits, memories, pair_memories = model(
+            input_ids,
+            pair_input_ids,
+            memories,
+            pair_memories,
+            token_type_ids,
+            position_ids,
+            attn_mask,
+            pair_token_type_ids,
+            pair_position_ids,
+            pair_attn_mask,
+        )
+        logits, labels, qids = list(map(lambda x: paddle.gather(x, gather_idx), [logits, labels, qids]))
         # Need to collect probs for each qid, so use softmax_with_cross_entropy
-        loss, probs = nn.functional.softmax_with_cross_entropy(
-            logits, labels, return_softmax=True)
+        loss, probs = nn.functional.softmax_with_cross_entropy(logits, labels, return_softmax=True)
         losses.append(loss.mean().numpy())
         # Shape: [B, NUM_LABELS]
         np_probs = probs.numpy()
@@ -120,9 +132,10 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
             label_dict[qid] = np_labels[i]  # Same qid share same label.
 
         if step % eval_logging_step == 0:
-            logger.info("Step %d: loss:  %.5f, speed: %.5f steps/s" %
-                        (step, np.mean(losses), eval_logging_step /
-                         (time.time() - tic_train)))
+            logger.info(
+                "Step %d: loss:  %.5f, speed: %.5f steps/s"
+                % (step, np.mean(losses), eval_logging_step / (time.time() - tic_train))
+            )
             tic_train = time.time()
 
     # Collect predicted labels
@@ -133,13 +146,12 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
         preds.append(mean_prob)
         labels.append(label_dict[qid])
 
-    preds = paddle.to_tensor(np.array(preds, dtype='float32'))
-    labels = paddle.to_tensor(np.array(labels, dtype='int64'))
+    preds = paddle.to_tensor(np.array(preds, dtype="float32"))
+    labels = paddle.to_tensor(np.array(labels, dtype="int64"))
 
     metric.update(metric.compute(preds, labels))
     acc_or_f1 = metric.accumulate()
-    logger.info("Eval loss: %.5f, %s: %.5f" %
-                (np.mean(losses), metric.__class__.__name__, acc_or_f1))
+    logger.info("Eval loss: %.5f, %s: %.5f" % (np.mean(losses), metric.__class__.__name__, acc_or_f1))
     metric.reset()
     model.train()
     return acc_or_f1
@@ -147,13 +159,11 @@ def evaluate(model, metric, data_loader, memories0, pair_memories0):
 
 def do_train(args):
     set_seed(args)
-    tokenizer_class, eval_name, test_name, eval_metric = DATASET_INFO[
-        args.dataset]
+    tokenizer_class, eval_name, test_name, eval_metric = DATASET_INFO[args.dataset]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
 
     # Get dataset
-    train_ds, eval_ds, test_ds = load_dataset(
-        args.dataset, splits=["train", eval_name, test_name])
+    train_ds, eval_ds, test_ds = load_dataset(args.dataset, splits=["train", eval_name, test_name])
 
     num_classes = len(train_ds.label_list)
 
@@ -167,8 +177,7 @@ def do_train(args):
         if os.path.exists(args.model_name_or_path):
             logger.info("init checkpoint from %s" % args.model_name_or_path)
 
-    ernie_doc = ErnieDocModel.from_pretrained(args.model_name_or_path,
-                                              cls_token_idx=0)
+    ernie_doc = ErnieDocModel.from_pretrained(args.model_name_or_path, cls_token_idx=0)
     model = ErnieDocForTextMatching(ernie_doc, num_classes, args.dropout)
 
     model_config = model.ernie_doc.config
@@ -183,7 +192,8 @@ def do_train(args):
         trainer_id=rank,
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
-        random_seed=args.seed)
+        random_seed=args.seed,
+    )
 
     eval_ds_iter = SemanticMatchingIterator(
         eval_ds,
@@ -194,7 +204,8 @@ def do_train(args):
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
         random_seed=args.seed,
-        mode="eval")
+        mode="eval",
+    )
 
     test_ds_iter = SemanticMatchingIterator(
         test_ds,
@@ -205,16 +216,14 @@ def do_train(args):
         memory_len=model_config["memory_len"],
         max_seq_length=args.max_seq_length,
         random_seed=args.seed,
-        mode="test")
+        mode="test",
+    )
 
-    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
-                                                           return_list=True)
+    train_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
     train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
-    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
-                                                          return_list=True)
+    eval_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
     eval_dataloader.set_batch_generator(eval_ds_iter, paddle.get_device())
-    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70,
-                                                          return_list=True)
+    test_dataloader = paddle.io.DataLoader.from_generator(capacity=70, return_list=True)
     test_dataloader.set_batch_generator(test_ds_iter, paddle.get_device())
 
     num_training_examples = train_ds_iter.get_num_examples()
@@ -222,40 +231,40 @@ def do_train(args):
     logger.info("Device count: %d, trainer_id: %d" % (trainer_num, rank))
     logger.info("Num train examples: %d" % num_training_examples)
     logger.info("Max train steps: %d" % num_training_steps)
-    logger.info("Num warmup steps: %d" %
-                int(num_training_steps * args.warmup_proportion))
+    logger.info("Num warmup steps: %d" % int(num_training_steps * args.warmup_proportion))
 
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps,
-                                         args.warmup_proportion)
+    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_proportion)
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
-    decay_params = [
-        p.name for n, p in model.named_parameters()
-        if not any(nd in n for nd in ["bias", "norm"])
-    ]
+    decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     # Construct dict
     name_dict = dict()
     for n, p in model.named_parameters():
         name_dict[p.name] = n
 
-    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay,
-                                name_dict, model_config["num_hidden_layers"])
+    simple_lr_setting = partial(layerwise_lr_decay, args.layerwise_decay, name_dict, model_config["num_hidden_layers"])
 
-    optimizer = AdamW(learning_rate=lr_scheduler,
-                      parameters=model.parameters(),
-                      weight_decay=args.weight_decay,
-                      apply_decay_param_fun=lambda x: x in decay_params,
-                      lr_ratio=simple_lr_setting)
+    optimizer = AdamW(
+        learning_rate=lr_scheduler,
+        parameters=model.parameters(),
+        weight_decay=args.weight_decay,
+        apply_decay_param_fun=lambda x: x in decay_params,
+        lr_ratio=simple_lr_setting,
+    )
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Accuracy()
 
     global_steps = 0
     best_acc = -1
-    create_memory = partial(init_memory, args.batch_size, args.memory_length,
-                            model_config["hidden_size"],
-                            model_config["num_hidden_layers"])
+    create_memory = partial(
+        init_memory,
+        args.batch_size,
+        args.memory_length,
+        model_config["hidden_size"],
+        model_config["num_hidden_layers"],
+    )
     # Copy the memory
     memories = create_memory()
     pair_memories = create_memory()
@@ -266,17 +275,35 @@ def do_train(args):
         train_dataloader.set_batch_generator(train_ds_iter, paddle.get_device())
         for step, batch in enumerate(train_dataloader, start=1):
             global_steps += 1
-            input_ids, position_ids, token_type_ids, attn_mask, \
-                pair_input_ids, pair_position_ids, pair_token_type_ids, pair_attn_mask, \
-                labels, qids, gather_idx, need_cal_loss = batch
+            (
+                input_ids,
+                position_ids,
+                token_type_ids,
+                attn_mask,
+                pair_input_ids,
+                pair_position_ids,
+                pair_token_type_ids,
+                pair_attn_mask,
+                labels,
+                qids,
+                gather_idx,
+                need_cal_loss,
+            ) = batch
 
             logits, memories, pair_memories = model(
-                input_ids, pair_input_ids, memories, pair_memories,
-                token_type_ids, position_ids, attn_mask, pair_token_type_ids,
-                pair_position_ids, pair_attn_mask)
+                input_ids,
+                pair_input_ids,
+                memories,
+                pair_memories,
+                token_type_ids,
+                position_ids,
+                attn_mask,
+                pair_token_type_ids,
+                pair_position_ids,
+                pair_attn_mask,
+            )
 
-            logits, labels = list(
-                map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
+            logits, labels = list(map(lambda x: paddle.gather(x, gather_idx), [logits, labels]))
             loss = criterion(logits, labels) * need_cal_loss
             mean_loss = loss.mean()
             mean_loss.backward()
@@ -290,46 +317,45 @@ def do_train(args):
             if global_steps % args.logging_steps == 0:
                 logger.info(
                     "train: global step %d, epoch: %d, loss: %f, acc:%f, lr: %f, speed: %.2f step/s"
-                    % (global_steps, epoch, mean_loss, metric.accumulate(),
-                       lr_scheduler.get_lr(), args.logging_steps /
-                       (time.time() - tic_train)))
+                    % (
+                        global_steps,
+                        epoch,
+                        mean_loss,
+                        metric.accumulate(),
+                        lr_scheduler.get_lr(),
+                        args.logging_steps / (time.time() - tic_train),
+                    )
+                )
                 tic_train = time.time()
 
             if global_steps % args.save_steps == 0:
                 # Evaluate
                 logger.info("Eval:")
-                eval_acc = evaluate(model, eval_metric, eval_dataloader,
-                                    create_memory(), create_memory())
+                eval_acc = evaluate(model, eval_metric, eval_dataloader, create_memory(), create_memory())
                 # Save
                 if rank == 0:
-                    output_dir = os.path.join(args.output_dir,
-                                              "model_%d" % (global_steps))
+                    output_dir = os.path.join(args.output_dir, "model_%d" % (global_steps))
                     if not os.path.exists(output_dir):
                         os.makedirs(output_dir)
-                    model_to_save = model._layers if isinstance(
-                        model, paddle.DataParallel) else model
-                    save_param_path = os.path.join(output_dir,
-                                                   'model_state.pdparams')
+                    model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
+                    save_param_path = os.path.join(output_dir, "model_state.pdparams")
                     paddle.save(model_to_save.state_dict(), save_param_path)
                     tokenizer.save_pretrained(output_dir)
                     if eval_acc > best_acc:
                         logger.info("Save best model......")
                         best_acc = eval_acc
-                        best_model_dir = os.path.join(args.output_dir,
-                                                      "best_model")
+                        best_model_dir = os.path.join(args.output_dir, "best_model")
                         if not os.path.exists(best_model_dir):
                             os.makedirs(best_model_dir)
 
-                        save_param_path = os.path.join(best_model_dir,
-                                                       'model_state.pdparams')
+                        save_param_path = os.path.join(best_model_dir, "model_state.pdparams")
                         paddle.save(model_to_save.state_dict(), save_param_path)
                         tokenizer.save_pretrained(best_model_dir)
 
             if args.max_steps > 0 and global_steps >= args.max_steps:
                 return
     logger.info("Final test result:")
-    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory(),
-                        create_memory())
+    eval_acc = evaluate(model, eval_metric, test_dataloader, create_memory(), create_memory())
 
 
 if __name__ == "__main__":

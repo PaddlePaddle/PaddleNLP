@@ -37,10 +37,10 @@ TOKENIZER_CLASSES = {
 
 
 def term2id(string, tokenizer, max_seqlen):
-    #string = string.split("\t")[1]
+    # string = string.split("\t")[1]
     tokens = tokenizer._tokenize(string)
     ids = tokenizer.convert_tokens_to_ids(tokens)
-    ids = ids[:max_seqlen - 1]
+    ids = ids[: max_seqlen - 1]
     ids = ids + [tokenizer.sep_token_id]
     ids = ids + [tokenizer.pad_token_id] * (max_seqlen - len(ids))
     return ids
@@ -54,7 +54,7 @@ def load_graph(config, str2id, term_file, terms, item_distribution):
                 log.info("%s readed %s lines" % (config.graph_data, idx))
             slots = []
             for col_idx, col in enumerate(line.strip("\n").split("\t")):
-                s = col[:config.max_seqlen]
+                s = col[: config.max_seqlen]
                 if s not in str2id:
                     str2id[s] = len(str2id)
                     term_file.write(str(col_idx) + "\t" + col + "\n")
@@ -70,8 +70,7 @@ def load_graph(config, str2id, term_file, terms, item_distribution):
     return edges
 
 
-def load_link_prediction_train_data(config, str2id, term_file, terms,
-                                    item_distribution):
+def load_link_prediction_train_data(config, str2id, term_file, terms, item_distribution):
     train_data = []
     neg_samples = []
     with io.open(config.train_data, encoding=config.encoding) as f:
@@ -80,7 +79,7 @@ def load_link_prediction_train_data(config, str2id, term_file, terms,
                 log.info("%s readed %s lines" % (config.train_data, idx))
             slots = []
             for col_idx, col in enumerate(line.strip("\n").split("\t")):
-                s = col[:config.max_seqlen]
+                s = col[: config.max_seqlen]
                 if s not in str2id:
                     str2id[s] = len(str2id)
                     term_file.write(str(col_idx) + "\t" + col + "\n")
@@ -94,24 +93,20 @@ def load_link_prediction_train_data(config, str2id, term_file, terms,
     train_data = np.array(train_data, dtype="int64")
     np.save(os.path.join(config.graph_work_path, "train_data.npy"), train_data)
     if len(neg_samples) != 0:
-        np.save(os.path.join(config.graph_work_path, "neg_samples.npy"),
-                np.array(neg_samples))
+        np.save(os.path.join(config.graph_work_path, "neg_samples.npy"), np.array(neg_samples))
 
 
 def dump_graph(config):
     if not os.path.exists(config.graph_work_path):
         os.makedirs(config.graph_work_path)
     str2id = dict()
-    term_file = io.open(os.path.join(config.graph_work_path, "terms.txt"),
-                        "w",
-                        encoding=config.encoding)
+    term_file = io.open(os.path.join(config.graph_work_path, "terms.txt"), "w", encoding=config.encoding)
     terms = []
     item_distribution = []
 
     edges = load_graph(config, str2id, term_file, terms, item_distribution)
     if config.task == "link_prediction":
-        load_link_prediction_train_data(config, str2id, term_file, terms,
-                                        item_distribution)
+        load_link_prediction_train_data(config, str2id, term_file, terms, item_distribution)
     else:
         raise ValueError
 
@@ -129,7 +124,7 @@ def dump_graph(config):
     # dump alias sample table
     item_distribution = np.array(item_distribution)
     item_distribution = np.sqrt(item_distribution)
-    distribution = 1. * item_distribution / item_distribution.sum()
+    distribution = 1.0 * item_distribution / item_distribution.sum()
     alias, events = alias_sample_build_table(distribution)
     np.save(os.path.join(config.graph_work_path, "alias.npy"), alias)
     np.save(os.path.join(config.graph_work_path, "events.npy"), events)
@@ -140,8 +135,7 @@ def dump_node_feat(config):
     log.info("Dump node feat starting...")
     id2str = [
         line.strip("\n").split("\t")[-1]
-        for line in io.open(os.path.join(config.graph_work_path, "terms.txt"),
-                            encoding=config.encoding)
+        for line in io.open(os.path.join(config.graph_work_path, "terms.txt"), encoding=config.encoding)
     ]
     # pool = multiprocessing.Pool()
 
@@ -150,13 +144,12 @@ def dump_node_feat(config):
     fn = partial(term2id, tokenizer=tokenizer, max_seqlen=config.max_seqlen)
     term_ids = [fn(x) for x in id2str]
 
-    np.save(os.path.join(config.graph_work_path, "term_ids.npy"),
-            np.array(term_ids, np.uint16))
+    np.save(os.path.join(config.graph_work_path, "term_ids.npy"), np.array(term_ids, np.uint16))
     log.info("Dump node feat done.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='main')
+    parser = argparse.ArgumentParser(description="main")
     parser.add_argument("--conf", type=str, default="./config.yaml")
     args = parser.parse_args()
     config = edict(yaml.load(open(args.conf), Loader=yaml.FullLoader))
