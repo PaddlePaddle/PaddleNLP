@@ -115,14 +115,17 @@ def create_pretrained_dataset(
         size = num_mask = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
-        if size % 80 != 0:
-            size += 80 - (size % 80)
+        if args.device == "npu":
+            # For NPU device, fixed input sentence length, in
+            # order to reduce the number of op compile.
+            if size % 80 != 0:
+                size += 80 - (size % 80)
+        else:
+            if size % 8 != 0:
+                size += 8 - (size % 8)
         out[3] = np.full(size, 0, dtype=np.int32)
         # masked_lm_labels
-        if args.device == "npu":
-            out[4] = np.full([size, 1], -1, dtype=np.int32)
-        else:
-            out[4] = np.full([size, 1], -1, dtype=np.int64)
+        out[4] = np.full([size, 1], -1, dtype=np.int64)
         mask_token_num = 0
         for i, x in enumerate(data):
             for j, pos in enumerate(x[3]):

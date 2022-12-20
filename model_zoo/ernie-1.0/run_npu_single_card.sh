@@ -16,6 +16,7 @@ set -x
 
 export FLAGS_selected_npus=0
 export ASCEND_GLOBAL_LOG_LEVEL=3
+export FLAGS_allocator_strategy=naive_best_fit
 
 rm -rf core.*
 
