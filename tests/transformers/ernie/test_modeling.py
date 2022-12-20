@@ -19,6 +19,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    UIE,
     ErnieConfig,
     ErnieForMaskedLM,
     ErnieForMultipleChoice,
@@ -237,6 +238,23 @@ class ErnieModelTester:
         self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
         self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
 
+    def create_and_check_for_uie(
+        self,
+        config,
+        input_ids,
+        token_type_ids,
+        input_mask,
+        sequence_labels,
+        token_labels,
+        choice_labels,
+    ):
+        model = UIE(config)
+        model.eval()
+        start_prob, end_prob = model(input_ids, attention_mask=input_mask, token_type_ids=token_type_ids)
+
+        self.parent.assertEqual(start_prob.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_prob.shape, [self.batch_size, self.seq_length])
+
     def create_and_check_for_sequence_classification(
         self,
         config,
@@ -373,6 +391,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
         ErnieForQuestionAnswering,
         ErnieForSequenceClassification,
         ErnieForTokenClassification,
+        UIE,
     )
 
     def setUp(self):
@@ -401,6 +420,10 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_token_classification(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_for_token_classification(*config_and_inputs)
+
+    def test_for_uie(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_for_uie(*config_and_inputs)
 
     def test_for_model_cache(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
