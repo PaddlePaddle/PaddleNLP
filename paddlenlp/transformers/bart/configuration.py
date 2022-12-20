@@ -43,6 +43,7 @@ BART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.1,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": False,
     },
     "bart-large": {
         "vocab_size": 50265,
@@ -64,6 +65,7 @@ BART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.1,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": False,
     },
 }
 
@@ -183,11 +185,7 @@ class BartConfig(PretrainedConfig):
         self.activation_function = activation_function
         self.init_std = init_std
         self.num_hidden_layers = encoder_layers
-        if scale_embedding:
-            logger.warning(
-                "scale_embedding will be forced to False sine only support embedding without scaling for BartModel."
-            )
-        self.scale_embedding = False
+        self.scale_embedding = scale_embedding
 
         # ensure backward compatibility for BART CNN models
         if self.forced_bos_token_id is None and kwargs.get("force_bos_token_to_be_generated", False):

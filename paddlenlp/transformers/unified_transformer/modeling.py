@@ -13,9 +13,12 @@
 # limitations under the License.
 """Modeling classes for UnifiedTransformer model."""
 
+from typing import Optional, Tuple
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 
 from paddlenlp.utils.env import CONFIG_NAME
 
@@ -86,7 +89,14 @@ class UnifiedTransformerEmbeddings(nn.Layer):
 
         self.pad_token_id = config.pad_token_id
 
-    def forward(self, input_ids, token_type_ids=None, position_ids=None, role_ids=None, input_embeddings=None):
+    def forward(
+        self,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        role_ids: Optional[Tensor] = None,
+        input_embeddings: Optional[Tensor] = None,
+    ):
         if input_ids is None and input_embeddings is None:
             raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
         elif input_ids is not None:
@@ -181,17 +191,17 @@ class UnifiedTransformerModel(UnifiedTransformerPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        use_cache=None,
-        cache=None,
-        role_ids=None,
-        inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[Tuple[Tensor]] = None,
+        role_ids: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The UnifiedTransformerModel forward method, overrides the special
@@ -330,7 +340,11 @@ class UnifiedTransformerLMHead(nn.Layer):
         )
         self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
 
-    def forward(self, hidden_states, masked_positions=None):
+    def forward(
+        self,
+        hidden_states: Tensor,
+        masked_positions: Optional[Tensor] = None,
+    ):
         if masked_positions is not None:
             hidden_states = paddle.reshape(hidden_states, [-1, hidden_states.shape[-1]])
             hidden_states = paddle.tensor.gather(hidden_states, masked_positions)
@@ -364,19 +378,19 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        token_type_ids=None,
-        position_ids=None,
-        attention_mask=None,
-        masked_positions=None,
-        use_cache=None,
-        cache=None,
-        role_ids=None,
-        labels=None,
-        inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        token_type_ids: Optional[Tensor] = None,
+        position_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        masked_positions: Optional[Tensor] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[Tuple[Tensor]] = None,
+        role_ids: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The UnifiedTransformerLMHeadModel forward method, overrides the special

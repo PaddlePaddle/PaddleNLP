@@ -18,8 +18,6 @@ from typing import Dict
 
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-from ...utils.log import logger
-
 __all__ = ["MBART_PRETRAINED_INIT_CONFIGURATION", "MBartConfig", "MBART_PRETRAINED_RESOURCE_FILES_MAP"]
 
 MBART_PRETRAINED_INIT_CONFIGURATION = {
@@ -41,6 +39,7 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": True,
     },
     "mbart-large-en-ro": {
         "vocab_size": 250027,
@@ -61,6 +60,7 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": True,
     },
     "mbart-large-50-one-to-many-mmt": {
         "vocab_size": 250054,
@@ -81,6 +81,7 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": True,
     },
     "mbart-large-50-many-to-one-mmt": {
         "vocab_size": 250054,
@@ -102,6 +103,7 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": True,
     },
     "mbart-large-50-many-to-many-mmt": {
         "vocab_size": 250054,
@@ -122,6 +124,7 @@ MBART_PRETRAINED_INIT_CONFIGURATION = {
         "activation_dropout": 0.0,
         "max_position_embeddings": 1024,
         "init_std": 0.02,
+        "scale_embedding": True,
     },
 }
 
@@ -265,9 +268,4 @@ class MBartConfig(PretrainedConfig):
         self.activation_dropout = activation_dropout
         self.activation_function = activation_function
         self.init_std = init_std
-
-        if not scale_embedding:
-            logger.warning(
-                "scale_embedding will be forced to True sine only support embedding with scaling for MBartModel."
-            )
-        self.scale_embedding = True  # scale factor will be sqrt(d_model) if True
+        self.scale_embedding = scale_embedding

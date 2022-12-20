@@ -13,13 +13,14 @@
 # limitations under the License.
 
 
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import Embedding, Layer
+from paddle import Tensor
+from paddle.nn import Embedding, Layer, MultiHeadAttention
 
 from paddlenlp.utils.env import CONFIG_NAME
 
@@ -49,6 +50,9 @@ __all__ = [
     "MBartForQuestionAnswering",
     "MBartForConditionalGeneration",
 ]
+
+Cache = MultiHeadAttention.Cache
+StaticCache = MultiHeadAttention.StaticCache
 
 
 def shift_tokens_right(input_ids, pad_token_id):
@@ -107,7 +111,7 @@ class MBartLearnedPositionalEmbedding(Embedding):
         self.offset = 2
         super().__init__(num_embeddings + self.offset, embedding_dim)
 
-    def forward(self, input_ids_shape, past_key_values_length=0):
+    def forward(self, input_ids_shape: Tuple, past_key_values_length: int = 0):
         """`input_ids_shape` is expected to be [bsz x seqlen]."""
         bsz, seq_len = input_ids_shape[:2]
         positions = paddle.arange(past_key_values_length, past_key_values_length + seq_len, dtype="int64")
@@ -129,6 +133,7 @@ class MBartEncoder(MBartPretrainedModel):
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
 
+        self.embed_scale = (config.d_model**0.5) if config.scale_embedding else 1.0
         self.encoder_embed_positions = MBartLearnedPositionalEmbedding(config.max_position_embeddings, config.d_model)
 
         self.encoder_dropout = nn.Dropout(config.dropout)
@@ -148,12 +153,12 @@ class MBartEncoder(MBartPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
         **kwargs
     ):
         """
@@ -198,7 +203,7 @@ class MBartEncoder(MBartPretrainedModel):
             raise ValueError("You have to specify either input_ids or inputs_embeds")
 
         if inputs_embeds is None:
-            inputs_embeds = self.d_model**0.5 * self.embed_tokens(input_ids)
+            inputs_embeds = self.embed_tokens(input_ids) * self.embed_scale
 
         inputs_embed_pos = self.encoder_embed_positions(input_shape)
         hidden_states = inputs_embeds + inputs_embed_pos
@@ -238,7 +243,7 @@ class MBartDecoder(MBartPretrainedModel):
             self.embed_tokens = embed_tokens
         else:
             self.embed_tokens = nn.Embedding(config.vocab_size, config.d_model)
-
+        self.embed_scale = (config.d_model**0.5) if config.scale_embedding else 1.0
         self.decoder_embed_positions = MBartLearnedPositionalEmbedding(config.max_position_embeddings, config.d_model)
         self.decoder_dropout = nn.Dropout(config.dropout)
         self.decoder_layernorm_embedding = nn.LayerNorm(config.d_model)
@@ -258,15 +263,15 @@ class MBartDecoder(MBartPretrainedModel):
 
     def forward(
         self,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        memory_mask=None,
-        cache=None,
-        decoder_inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Optional[Tuple[Tensor]] = None,
+        memory_mask: Optional[Tensor] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        decoder_inputs_embeds: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         """
         The MBartDecoder forward method, overrides the `__call__()` special method.
@@ -324,7 +329,7 @@ class MBartDecoder(MBartPretrainedModel):
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
         if decoder_inputs_embeds is None:
-            decoder_inputs_embeds = self.d_model**0.5 * self.embed_tokens(decoder_input_ids)
+            decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
 
         past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(decoder_input_shape, past_key_values_length)
@@ -389,18 +394,18 @@ class MBartModel(MBartPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=None,
-        cache=None,
-        inputs_embeds=None,
-        decoder_inputs_embeds=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Optional[Tuple[Tensor]] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        decoder_inputs_embeds: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The MBartModel forward method, overrides the `__call__()` special method.
@@ -586,7 +591,7 @@ class MBartClassificationHead(Layer):
         self.dropout = nn.Dropout(p=pooler_dropout)
         self.out_proj = nn.Linear(inner_dim, num_classes)
 
-    def forward(self, hidden_states):
+    def forward(self, hidden_states: Tensor):
         """
         Args:
             hidden_states (Tensor):
@@ -623,19 +628,19 @@ class MBartForSequenceClassification(MBartPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=None,
-        cache=None,
-        inputs_embeds=None,
-        decoder_inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Optional[Tuple[Tensor]] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        decoder_inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The MBartForSequenceClassification forward method, overrides the __call__() special method.
@@ -778,20 +783,20 @@ class MBartForQuestionAnswering(MBartPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=None,
-        cache=None,
-        inputs_embeds=None,
-        decoder_inputs_embeds=None,
-        start_positions=None,
-        end_positions=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Optional[Tuple[Tensor]] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        decoder_inputs_embeds: Optional[Tensor] = None,
+        start_positions: Optional[Tensor] = None,
+        end_positions: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The MBartForQuestionAnswering forward method, overrides the __call__() special method.
@@ -971,19 +976,19 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
 
     def forward(
         self,
-        input_ids=None,
-        attention_mask=None,
-        decoder_input_ids=None,
-        decoder_attention_mask=None,
-        encoder_output=None,
-        use_cache=None,
-        cache=None,
-        inputs_embeds=None,
-        decoder_inputs_embeds=None,
-        labels=None,
-        output_attentions=None,
-        output_hidden_states=None,
-        return_dict=None,
+        input_ids: Optional[Tensor] = None,
+        attention_mask: Optional[Tensor] = None,
+        decoder_input_ids: Optional[Tensor] = None,
+        decoder_attention_mask: Optional[Tensor] = None,
+        encoder_output: Optional[Tuple[Tensor]] = None,
+        use_cache: Optional[bool] = None,
+        cache: Optional[List[Tuple[Cache, StaticCache]]] = None,
+        inputs_embeds: Optional[Tensor] = None,
+        decoder_inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_attentions: Optional[bool] = None,
+        output_hidden_states: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
     ):
         r"""
         The MBartForConditionalGeneration forward method, overrides the __call__() special method.
