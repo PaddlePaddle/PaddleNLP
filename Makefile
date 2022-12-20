@@ -52,6 +52,7 @@ install:
 deploy-ppdiffusers:
 	cd ppdiffusers && make
 
+
 .PHONY: install-ppdiffusers
 install-ppdiffusers:
 	cd ppdiffusers && make install
@@ -64,3 +65,11 @@ deploy-paddle-pipelines:
 install-paddle-pipelines:
 	cd pipelines && make install
 
+.PHONY: deploy-paddlenlp
+deploy-paddlenlp:
+	# deploy version
+	echo "VERSION = '$$(cat VERSION)'" > paddlenlp/version.py
+	# build
+	python3 setup.py sdist bdist_wheel
+	# upload
+	twine upload --skip-existing dist/*

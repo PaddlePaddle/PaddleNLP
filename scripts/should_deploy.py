@@ -67,6 +67,16 @@ def should_ppdiffusers_deploy():
     print(f"should_deploy={should_deploy}")
 
 
+def should_paddlenlp_deploy():
+    """print the result to terminal"""
+    local_version_file = os.path.join(PROJECT_ROOT, "VERSION")
+    remote_version = read_version_of_remote_package("paddlenlp")
+    local_version = read_version_of_local_package(local_version_file)
+
+    should_deploy = str(remote_version != local_version).lower()
+    print(f"should_deploy={should_deploy}")
+
+
 def should_paddle_pipelines_deploy():
     """print the result to terminal"""
     local_version_file = os.path.join(PROJECT_ROOT, "pipelines/VERSION")
@@ -87,5 +97,7 @@ if __name__ == "__main__":
         should_ppdiffusers_deploy()
     elif args.name == "paddle-pipelines":
         should_paddle_pipelines_deploy()
+    elif args.name == "paddlenlp":
+        should_paddlenlp_deploy()
     else:
         raise ValueError(f"package<{args.name}> not supported")
