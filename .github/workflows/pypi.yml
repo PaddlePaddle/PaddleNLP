@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       package:
-        description: 'Package to be Deploied'
+        description: 'Package to be Deployed'
         required: true
         default: 'paddlenlp'
         type: choice
