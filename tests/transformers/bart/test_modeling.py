@@ -21,6 +21,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    BartConfig,
     BartForConditionalGeneration,
     BartForQuestionAnswering,
     BartForSequenceClassification,
@@ -50,13 +51,11 @@ def prepare_bart_inputs_dict(
 ):
     if attention_mask is None:
         attention_mask = (
-            paddle.cast(input_ids == config["pad_token_id"], dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+            paddle.cast(input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
         )
     if decoder_attention_mask is None:
         decoder_attention_mask = (
-            paddle.cast(decoder_input_ids == config["pad_token_id"], dtype=paddle.get_default_dtype()).unsqueeze(
-                [1, 2]
-            )
+            paddle.cast(decoder_input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
             * -1e4
         )
     return {
@@ -122,38 +121,38 @@ class BartModelTester:
         return config, inputs_dict
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "d_model": self.hidden_size,
-            "num_encoder_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.num_hidden_layers,
-            "encoder_attention_heads": self.num_attention_heads,
-            "decoder_attention_heads": self.num_attention_heads,
-            "encoder_ffn_dim": self.intermediate_size,
-            "decoder_ffn_dim": self.intermediate_size,
-            "dropout": self.hidden_dropout_prob,
-            "attention_dropout": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.bos_token_id,
-            "pad_token_id": self.pad_token_id,
-            "forced_eos_token_id": self.forced_eos_token_id,
-        }
+        return BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            encoder_layers=self.num_hidden_layers,
+            decoder_layers=self.num_hidden_layers,
+            encoder_attention_heads=self.num_attention_heads,
+            decoder_attention_heads=self.num_attention_heads,
+            encoder_ffn_dim=self.intermediate_size,
+            decoder_ffn_dim=self.intermediate_size,
+            dropout=self.hidden_dropout_prob,
+            attention_dropout=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.bos_token_id,
+            pad_token_id=self.pad_token_id,
+            forced_eos_token_id=self.forced_eos_token_id,
+        )
 
     def prepare_config_and_inputs_for_common(self):
         config, inputs_dict = self.prepare_config_and_inputs()
         return config, inputs_dict
 
     def create_and_check_decoder_model_past_large_inputs(self, config, inputs_dict):
-        encoder = BartModel(**config).get_encoder()
-        decoder = BartModel(**config).get_decoder()
-
+        model = BartModel(config)
+        encoder = model.get_encoder()
+        decoder = model.get_decoder()
         encoder.eval()
         decoder.eval()
 
         input_ids = inputs_dict["input_ids"]
         decoder_input_ids = (
-            paddle.zeros_like(input_ids[:, :1], dtype="int64") + BartModel(**config).decoder_start_token_id
+            paddle.zeros_like(input_ids[:, :1], dtype="int64") + BartModel(config).decoder_start_token_id
         )
 
         attention_mask = inputs_dict["attention_mask"]
@@ -173,7 +172,7 @@ class BartModelTester:
         output, cache = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3], dtype=paddle.get_default_dtype())
 
         # append to next input_ids and
@@ -240,30 +239,29 @@ class BartHeadTests(unittest.TestCase):
         )
 
         batch_size = input_ids.shape[0]
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 32,
-            "decoder_ffn_dim": 32,
-            "max_position_embeddings": 48,
-            "eos_token_id": 2,
-            "pad_token_id": 1,
-            "bos_token_id": 0,
-        }
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
+            eos_token_id=2,
+            pad_token_id=1,
+            bos_token_id=0,
+        )
         return config, input_ids, batch_size
 
     def test_sequence_classification_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        bart_model = BartModel(**config)
-        num_labels = 2
+        config.num_labels = 2
         labels = _long_tensor([1] * batch_size) if self.use_labels else None
-        model = BartForSequenceClassification(bart_model, num_labels=num_labels)
+        model = BartForSequenceClassification(config)
         outputs = model(input_ids=input_ids, decoder_input_ids=input_ids, labels=labels, return_dict=self.return_dict)
-        expected_shape = [batch_size, num_labels]
+        expected_shape = [batch_size, config.num_labels]
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)  # test loss
             self.assertEqual(outputs[1].shape, expected_shape)  # test logits
@@ -275,8 +273,7 @@ class BartHeadTests(unittest.TestCase):
     def test_question_answering_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
         sequence_labels = ids_tensor([batch_size], 2) if self.use_labels else None
-        bart_model = BartModel(**config)
-        model = BartForQuestionAnswering(bart_model)
+        model = BartForQuestionAnswering(config)
         outputs = model(
             input_ids=input_ids,
             start_positions=sequence_labels,
@@ -294,11 +291,10 @@ class BartHeadTests(unittest.TestCase):
 
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        bart_model = BartModel(**config)
         lm_labels = ids_tensor([batch_size, input_ids.shape[1]], self.vocab_size) if self.use_labels else None
-        lm_model = BartForConditionalGeneration(bart_model)
+        lm_model = BartForConditionalGeneration(config)
         outputs = lm_model(input_ids=input_ids, labels=lm_labels, return_dict=self.return_dict)
-        expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
+        expected_shape = [batch_size, input_ids.shape[1], config.vocab_size]
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)
             self.assertEqual(outputs[1].shape, expected_shape)
@@ -308,19 +304,18 @@ class BartHeadTests(unittest.TestCase):
             self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_lm_uneven_forward(self):
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 14,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 8,
-            "decoder_ffn_dim": 8,
-            "max_position_embeddings": 48,
-        }
-        bart_model = BartModel(**config)
-        lm_model = BartForConditionalGeneration(bart_model)
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=14,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=8,
+            decoder_ffn_dim=8,
+            max_position_embeddings=48,
+        )
+        lm_model = BartForConditionalGeneration(config)
         context = paddle.to_tensor([[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]], dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]], dtype="int64")
         outputs = lm_model(
@@ -330,7 +325,7 @@ class BartHeadTests(unittest.TestCase):
             return_dict=self.return_dict,
         )
         expected_shape = summary.shape
-        expected_shape.append(config["vocab_size"])
+        expected_shape.append(config.vocab_size)
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)
         elif isinstance(outputs, paddle.Tensor):
@@ -340,22 +335,21 @@ class BartHeadTests(unittest.TestCase):
 
     def test_generate_beam_search(self):
         input_ids = paddle.to_tensor([[71, 82, 2], [68, 34, 2]], dtype="int64")
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 32,
-            "decoder_ffn_dim": 32,
-            "max_position_embeddings": 48,
-            "eos_token_id": 2,
-            "pad_token_id": 1,
-            "bos_token_id": 0,
-        }
-        bart_model = BartModel(**config)
-        lm_model = BartForConditionalGeneration(bart_model)
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
+            eos_token_id=2,
+            pad_token_id=1,
+            bos_token_id=0,
+        )
+        lm_model = BartForConditionalGeneration(config)
         lm_model.eval()
 
         max_length = 5
@@ -648,7 +642,7 @@ class BartModelIntegrationTests(unittest.TestCase):
         input_ids = paddle.to_tensor([[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]], dtype="int64")
 
         attention_mask = (
-            paddle.cast(input_ids == model.config["pad_token_id"], dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+            paddle.cast(input_ids == model.config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
             * -1e4
         )
         with paddle.no_grad():
@@ -890,5 +884,8 @@ class BartModelIntegrationTests(unittest.TestCase):
         #     "say the marriages were part of an immigration scam. She pleaded not guilty at State Supreme Court in the "
         #     "Bronx on Friday. If convicted, she faces up to four years in prison.",
         # ]
+        # will be used to check generation result
 
-        tok.batch_decode(hypotheses_batch.tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True)
+        tok.batch_decode(
+            hypotheses_batch.tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
+        )  # assigned generated_summaries but never used

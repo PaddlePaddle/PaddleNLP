@@ -165,6 +165,8 @@ else()
   set(PYTHON_PATH ${PY_CMD} CACHE STRING "Python path")
 endif()
 
+add_definitions(-w)
+
 if(BUILD_PD)
   add_definitions(-DPADDLE_WITH_CUDA)
 
