@@ -1,6 +1,21 @@
 name: PyPI
 
-on: [push, pull_request]
+on: 
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to be Deploied'
+        required: true
+        default: 'paddlenlp'
+        type: choice
+        options:
+        - paddlenlp
+        - paddle-pipelines
+        - ppdiffusers
+        
+  push:
+    branches: 
+      - 'develop'
 
 jobs:
   build:
@@ -31,8 +46,13 @@ jobs:
           pip install setuptools wheel twine
           make install
 
+      - name: Set Default should_deploy Step Value
+        id: default-should-deploy
+        run:  echo "should_deploy='false'" >> $GITHUB_OUTPUT
+
       - name: Should Deploy to Pypi Server
         id: should-deploy
+        if: ${{ inputs.package == 'paddlenlp' }}
         run: python scripts/should_deploy.py  --name paddlenlp >> $GITHUB_OUTPUT
       - name: Check Branch
         id: check-branch
