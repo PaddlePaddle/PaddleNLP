@@ -33,7 +33,7 @@ from paddlenlp.transformers import LinearDecayWithWarmup
 from paddlenlp.metrics import Mcc, PearsonAndSpearman
 from paddlenlp.utils.log import logger
 
-from paddle.static import sparsity
+from paddle.incubate import asp
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -343,10 +343,10 @@ def do_train(args):
 
         # Keep Pooler and task-specific layer dense.
         # Please note, excluded_layers must be set before calling `optimizer.minimize()`.
-        sparsity.set_excluded_layers(main_program, [model.bert.pooler.dense.full_name(), model.classifier.full_name()])
-        # Calling sparsity.decorate() to wrap minimize() in optimizer, which
+        asp.set_excluded_layers(main_program, [model.bert.pooler.dense.full_name(), model.classifier.full_name()])
+        # Calling asp.decorate() to wrap minimize() in optimizer, which
         # will insert necessary masking operations for ASP workflow.
-        optimizer = sparsity.decorate(optimizer)
+        optimizer = asp.decorate(optimizer)
         optimizer.minimize(loss)
 
     # Create the metric pass for the validation
@@ -364,8 +364,8 @@ def do_train(args):
     paddle.static.set_program_state(main_program, reset_state_dict)
 
     # Pruning model to be 2:4 sparse pattern
-    # Must call `exe.run(startup_program)` first before calling `sparsity.prune_model`
-    sparsity.prune_model(place, main_program)
+    # Must call `exe.run(startup_program)` first before calling `asp.prune_model`
+    asp.prune_model(place, main_program)
 
     global_step = 0
     tic_train = time.time()
