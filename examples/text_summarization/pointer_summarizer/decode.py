@@ -1,18 +1,31 @@
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 # Except for the paddle part, content of this file is copied from https://github.com/abisee/pointer-generator/blob/master/
 
 import os
-import sys
 import re
-
+import sys
 import time
-import paddle
 
-from data import Batcher, Vocab
-import data
 import config
+import data
+import paddle
+from data import Batcher, Vocab
 from model import Model
-from utils import write_for_rouge, rouge_eval, rouge_log
 from train_util import get_input_from_batch
+from utils import rouge_eval, rouge_log, write_for_rouge
 
 
 class Beam(object):
@@ -66,7 +79,7 @@ class BeamSearch(object):
         start = time.time()
         counter = 0
         batch = self.batcher.next_batch()
-        while batch is not None:  #  and counter <= 100 # 11490
+        while batch is not None:
             # Run beam search to get best Hypothesis
             best_summary = self.beam_search(batch)
 
@@ -185,8 +198,8 @@ class BeamSearch(object):
 
                 for j in range(config.beam_size * 2):  # for each of the top 2*beam_size hyps:
                     new_beam = h.extend(
-                        token=topk_ids[i, j].numpy()[0],
-                        log_prob=topk_log_probs[i, j].numpy()[0],
+                        token=int(topk_ids[i, j]),
+                        log_prob=float(topk_log_probs[i, j]),
                         state=state_i,
                         context=context_i,
                         coverage=coverage_i,
