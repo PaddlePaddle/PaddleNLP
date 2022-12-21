@@ -16,6 +16,7 @@ import os
 import unittest
 from tempfile import TemporaryDirectory
 
+import ray
 from pandas import DataFrame
 from parameterized import parameterized
 
@@ -60,6 +61,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             path=os.path.join(fixture_path, "divorce", "dev.txt"),
             lazy=False,
         )
+        ray.init(local_mode=True)
 
     @parameterized.expand(
         [
