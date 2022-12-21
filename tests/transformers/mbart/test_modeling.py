@@ -21,6 +21,7 @@ from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
     AutoTokenizer,
+    MBartConfig,
     MBartForConditionalGeneration,
     MBartForQuestionAnswering,
     MBartForSequenceClassification,
@@ -41,11 +42,9 @@ def prepare_mbart_inputs_dict(
     decoder_attention_mask=None,
 ):
     if attention_mask is None:
-        attention_mask = (input_ids == config["pad_token_id"]).astype("float32").unsqueeze([1, 2]) * -1e4
+        attention_mask = (input_ids == config.pad_token_id).astype("float32").unsqueeze([1, 2]) * -1e4
     if decoder_attention_mask is None:
-        decoder_attention_mask = (decoder_input_ids == config["pad_token_id"]).astype("float32").unsqueeze(
-            [1, 2]
-        ) * -1e4
+        decoder_attention_mask = (decoder_input_ids == config.pad_token_id).astype("float32").unsqueeze([1, 2]) * -1e4
     return {
         "input_ids": input_ids,
         "decoder_input_ids": decoder_input_ids,
@@ -118,41 +117,39 @@ class MBartModelTester:
         return config, inputs_dict
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "d_model": self.hidden_size,
-            "num_encoder_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.num_hidden_layers,
-            "encoder_attention_heads": self.num_attention_heads,
-            "decoder_attention_heads": self.num_attention_heads,
-            "encoder_ffn_dim": self.intermediate_size,
-            "decoder_ffn_dim": self.intermediate_size,
-            "dropout": self.hidden_dropout_prob,
-            "attention_dropout": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.bos_token_id,
-            "pad_token_id": self.pad_token_id,
-            "forced_bos_token_id": self.forced_bos_token_id,
-            "decoder_start_token_id": self.decoder_start_token_id,
-            "activation_function": self.activation_function,
-            "activation_dropout": self.activation_dropout,
-            "init_std": self.init_std,
-        }
+        return MBartConfig(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            encoder_layers=self.num_hidden_layers,
+            decoder_layers=self.num_hidden_layers,
+            encoder_attention_heads=self.num_attention_heads,
+            decoder_attention_heads=self.num_attention_heads,
+            encoder_ffn_dim=self.intermediate_size,
+            decoder_ffn_dim=self.intermediate_size,
+            dropout=self.hidden_dropout_prob,
+            attention_dropout=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.bos_token_id,
+            pad_token_id=self.pad_token_id,
+            forced_bos_token_id=self.forced_bos_token_id,
+            decoder_start_token_id=self.decoder_start_token_id,
+            activation_function=self.activation_function,
+            activation_dropout=self.activation_dropout,
+            init_std=self.init_std,
+        )
 
     def prepare_config_and_inputs_for_common(self):
         config, inputs_dict = self.prepare_config_and_inputs()
         return config, inputs_dict
 
     def create_and_check_decoder_model_past_large_inputs(self, config, inputs_dict):
-        model = MBartModel(**config).get_decoder()
+        model = MBartModel(config).get_decoder()
         model.eval()
         input_ids = inputs_dict["input_ids"]
         attention_mask = inputs_dict["attention_mask"]
 
-        cache = model.decoder.gen_cache(
-            paddle.randn(shape=[input_ids.shape[0], input_ids.shape[1], config["d_model"]])
-        )
+        cache = model.decoder.gen_cache(paddle.randn(shape=[input_ids.shape[0], input_ids.shape[1], config.d_model]))
 
         # first forward pass
         outputs = model(
@@ -162,7 +159,7 @@ class MBartModelTester:
         output, past_key_values = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_attn_mask = (1 - ids_tensor((self.batch_size, 3), 2, dtype="int64").unsqueeze([1, 2])).astype(
             "float32"
         ) * -1e4
@@ -221,7 +218,7 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest
 
             with tempfile.TemporaryDirectory() as tmpdirname:
                 model.save_pretrained(tmpdirname)
-                model_class.from_pretrained(tmpdirname)
+                model_class.from_pretrained(tmpdirname)  # assign a model but never use
 
     def test_decoder_model_past_with_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -231,7 +228,7 @@ class MBartModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest
         # NOTE: rewrite test inputs embeds for mbart model since scaler not equal to 1.0
         # get config for model and inputs_dict for model forward
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
-        scaler = config["d_model"] ** 0.5
+        scaler = config.d_model**0.5
         # test all model classes
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
@@ -346,25 +343,24 @@ class MBartEnroIntegrationTest(AbstractSeq2SeqIntegrationTest):
             assert str(self.tgt_text[i]) == str(decoded[i]), f"{i}"
 
     def test_mbart_fast_forward(self):
-        config = {
-            "vocab_size": 99,
-            "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 32,
-            "decoder_ffn_dim": 32,
-            "max_position_embeddings": 48,
-        }
-        base_model = MBartModel(**config)
-        lm_model = MBartForConditionalGeneration(base_model)
+        config = MBartConfig(
+            vocab_size=99,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
+        )
+        lm_model = MBartForConditionalGeneration(config)
         context = paddle.to_tensor([[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]], dtype="int64")
         summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]], dtype="int64")
         loss, logits = lm_model(
             input_ids=context, decoder_input_ids=summary, labels=summary, return_dict=self.return_dict
         )[:2]
-        expected_shape = [*summary.shape, config["vocab_size"]]
+        expected_shape = [*summary.shape, config.vocab_size]
         self.assertIsInstance(loss.item(), float)
         self.assertEqual(logits.shape, expected_shape)
 
@@ -457,20 +453,15 @@ class MBartStandaloneDecoderModelTester:
         if self.parent.use_labels:
             lm_labels = ids_tensor([self.batch_size, self.decoder_seq_length], self.vocab_size, dtype="int64")
 
-        config = {
-            "embed_tokens": None,
-            "vocab_size": self.vocab_size,
-            "d_model": self.d_model,
-            "num_decoder_layers": self.decoder_layers,
-            "decoder_ffn_dim": self.decoder_ffn_dim,
-            # "encoder_attention_heads": self.encoder_attention_heads,
-            "decoder_attention_heads": self.decoder_attention_heads,
-            # "eos_token_id": self.eos_token_id,
-            # "bos_token_id": self.bos_token_id,
-            # "pad_token_id": self.pad_token_id,
-            # "decoder_start_token_id": self.decoder_start_token_id,
-            "max_position_embeddings": self.max_position_embeddings,
-        }
+        config = MBartConfig(
+            embed_tokens=None,
+            vocab_size=self.vocab_size,
+            d_model=self.d_model,
+            decoder_layers=self.decoder_layers,
+            decoder_ffn_dim=self.decoder_ffn_dim,
+            decoder_attention_heads=self.decoder_attention_heads,
+            max_position_embeddings=self.max_position_embeddings,
+        )
 
         return (
             config,
@@ -487,7 +478,7 @@ class MBartStandaloneDecoderModelTester:
         lm_labels,
     ):
         # self.use_cache = True
-        model = MBartDecoder(**config)
+        model = MBartDecoder(config)
         model.eval()
 
         encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
@@ -507,7 +498,7 @@ class MBartStandaloneDecoderModelTester:
         past_key_values = outputs[1]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # append to next input_ids and
         next_input_ids = paddle.concat([input_ids, next_tokens], axis=-1)
@@ -531,7 +522,7 @@ class MBartStandaloneDecoderModelTester:
         attention_mask,
         lm_labels,
     ):
-        model = MBartDecoder(**config)
+        model = MBartDecoder(config)
         model.eval()
 
         # create attention mask
@@ -543,9 +534,7 @@ class MBartStandaloneDecoderModelTester:
 
         encoder_output = paddle.randn(shape=input_ids.shape + [self.d_model])
         origin_cache = model.decoder.gen_cache(encoder_output)
-
         # first forward pass
-
         past_key_values = model(
             input_ids,
             # attention_mask=attn_mask,
@@ -555,11 +544,11 @@ class MBartStandaloneDecoderModelTester:
         )[1]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
 
         # change a random masked slice from input_ids
         random_seq_idx_to_change = ids_tensor((1,), half_seq_length, dtype="int64").item() + 1
-        random_other_next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64").squeeze(-1)
+        random_other_next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64").squeeze(-1)
         input_ids[:, -random_seq_idx_to_change] = random_other_next_tokens
 
         # append to next input_ids and attn_mask
