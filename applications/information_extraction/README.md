@@ -71,12 +71,11 @@
 
 - 多模态数据集实验效果
 
-我们在通用、金融、医疗三大场景自建多模态测试集上进行了实验：
+我们在通用、金融、医疗三大场景自建多模态测试集上对UIE-X的零样本效果进行了实验：
 
 <table>
-<tr><th row_span='2'><th>通用<th>金融<th colspan='2'>医疗
-<tr><td><th>0-shot<th>0-shot<th>0-shot<th>5-shot
-<tr><td>🧾 🎓<b>uie-x-base (12L768H)</b><td>65.03<td>73.51<td>84.24<td>-
+<tr><th ><th>通用<th>金融<th colspan='2'>医疗
+<tr><td>🧾 🎓<b>uie-x-base (12L768H)</b><td>65.03<td>73.51<td>84.24
 </table>
 
 通用测试集包含了不同领域的复杂样本，抽取难度最大。
