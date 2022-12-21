@@ -12,7 +12,5 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .word_substitute import *
-from .word_insert import *
-from .word_delete import *
-from .word_swap import *
+from .sentence import *
+from .word import *

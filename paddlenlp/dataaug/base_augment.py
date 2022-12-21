@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import math
 import os
 import re
-import math
-import random
 from typing import Iterable
 
-import numpy as np
-import paddle
 from paddle.dataset.common import md5file
 from paddle.utils.download import get_path_from_url
 
+from ..data import JiebaTokenizer, Vocab
 from ..utils.env import DATA_HOME
-from ..data import Vocab, JiebaTokenizer
 
 
 class BaseAugment(object):
@@ -44,7 +41,7 @@ class BaseAugment(object):
             Maximum number of augmented words in sequences.
     """
 
-    def __init__(self, create_n, aug_n=None, aug_percent=0.02, aug_min=1, aug_max=10):
+    def __init__(self, create_n=1, aug_n=None, aug_percent=0.1, aug_min=1, aug_max=10):
         self._DATA = {
             "stop_words": (
                 "stopwords.txt",
@@ -60,6 +57,11 @@ class BaseAugment(object):
                 "word_synonym.json",
                 "aaa9f864b4af4123bce4bf138a5bfa0d",
                 "https://bj.bcebos.com/paddlenlp/data/word_synonym.json",
+            ),
+            "word_embedding": (
+                "word_embedding.json",
+                "534aa4ad274def4deff585cefd8ead32",
+                "https://bj.bcebos.com/paddlenlp/data/word_embedding.json",
             ),
             "word_homonym": (
                 "word_homonym.json",
@@ -150,7 +152,7 @@ class BaseAugment(object):
         # Single Thread
         if num_thread == 1:
             if isinstance(sequences, str):
-                return self._augment(sequences)
+                return [self._augment(sequences)]
             else:
                 output = []
                 for sequence in sequences:
