@@ -86,7 +86,7 @@ def predict(args, ext_model, cls_model, tokenizer, ext_id2label, cls_id2label):
             token_type_ids = paddle.to_tensor([encoded_inputs["token_type_ids"]])
 
             logits = cls_model(input_ids, token_type_ids=token_type_ids)
-            prediction = logits.argmax(axis=1).numpy()[0]
+            prediction = int(logits.argmax(axis=1))
 
             result = {"aspect": aspect, "opinions": opinion_words, "sentiment_polarity": cls_id2label[prediction]}
             results.append(result)
