@@ -147,22 +147,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "PromptTuningArguments.model_name_or_path": "ernie-3.0-base-zh",
                 "PromptTuningArguments.learning_rate": 1e-5,
             },
-            # {
-            #     "preset": "finetune_test",
-            #     "language": "Chinese",
-            #     "trainer_type": "Trainer",
-            #     "TrainingArguments.max_steps": 5,
-            #     "TrainingArguments.model_name_or_path": "__internal_testing/bert",
-            # },
-            # {
-            #     "preset": "prompt_test",
-            #     "language": "Chinese",
-            #     "trainer_type": "PromptTrainer",
-            #     "template.prompt": f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
-            #     # "template.prompt": f"“{{'text': '{self.text_column}'}}”这句话是关于{{'mask'}}的",
-            #     "PromptTuningArguments.max_steps": 5,
-            #     "PromptTuningArguments.model_name_or_path": "ernie-3.0-nano-zh",
-            # },
         ]
 
     def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
