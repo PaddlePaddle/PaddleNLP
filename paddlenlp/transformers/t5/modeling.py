@@ -697,7 +697,7 @@ class T5PretrainedModel(PretrainedModel):
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids = paddle.where(
             shifted_input_ids == -100,
-            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids))),
+            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids)).reshape([1])),
             shifted_input_ids,
         )
 
