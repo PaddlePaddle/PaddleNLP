@@ -18,6 +18,8 @@ import paddle
 import paddle.nn as nn
 from paddle import Tensor
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -114,7 +116,7 @@ class ErnieMPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieMConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
 

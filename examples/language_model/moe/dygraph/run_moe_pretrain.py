@@ -12,37 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
-import math
 import os
 import random
 import time
+import types
+from types import MethodType
 
+import lr
 import numpy as np
 import paddle
-from visualdl import LogWriter
-from modeling import GPTModel, GPTForPretraining, GPTPretrainingCriterion, GPTForPretrainingPipe
-from paddlenlp.transformers import GPTTokenizer, GPTChineseTokenizer
-from paddlenlp.utils.log import logger
-
-from dataset import create_pretrained_dataset
+import paddle.distributed as dist
 from args import parse_args
-import lr
+from checkpointing import load_checkpoint, save_checkpoint
+from dataset import create_pretrained_dataset
+from framework import AdamW, group_sharded_parallel, obtain_storage
+from modeling import (
+    GPTForPretraining,
+    GPTForPretrainingPipe,
+    GPTModel,
+    GPTPretrainingCriterion,
+)
+from paddle import _legacy_C_ops
 from paddle.distributed import fleet
 from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-import types
-from utils import get_timers, set_timers
-from types import MethodType
-from paddle import _legacy_C_ops
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
+    GroupShardedScaler,
+)
+from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import (
+    ShardingScaler,
+)
 from paddle.fluid.framework import core, in_dygraph_mode
-import paddle.distributed as dist
-from framework import assign_group_by_size, flatten_dense_tensors, obtain_storage, AdamW, group_sharded_parallel
 from paddle.incubate.distributed.models import moe
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import ShardingScaler
-from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import GroupShardedScaler
+from utils import get_timers, set_timers
+from visualdl import LogWriter
 
-from checkpointing import save_checkpoint, load_checkpoint
+from paddlenlp.transformers import GPTChineseTokenizer, GPTTokenizer
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "gpt": (GPTForPretraining, GPTTokenizer),
@@ -172,7 +177,7 @@ def unscale_method(self, optimizer):
     if dist.get_world_size() > 1:
         is_found_inf = paddle.to_tensor([self._found_inf], dtype="int32")
         paddle.distributed.all_reduce(is_found_inf, op=paddle.distributed.ReduceOp.MAX, group=None)
-        self._found_inf = is_found_inf.numpy()[0]
+        self._found_inf = int(is_found_inf)
 
 
 def all_reduce_parameters(params, group):
@@ -437,7 +442,7 @@ def do_train(args):
 
     clip = None
     if args.grad_clip > 0:
-        is_expert_param_fun = lambda param: param.name in expert_fusion_names
+        is_expert_param_fun = lambda param: param.name in expert_fusion_names  # noqa: E731
         clip = moe.ClipGradByGlobalNorm(
             clip_norm=args.grad_clip,
             is_expert_param_func=is_expert_param_fun,
