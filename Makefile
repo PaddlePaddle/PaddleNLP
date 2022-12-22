@@ -50,23 +50,16 @@ install:
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	cd ppdiffusers && make
-
-
-.PHONY: install-ppdiffusers
-install-ppdiffusers:
-	cd ppdiffusers && make install
+	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	cd pipelines && make
-
-.PHONY: install-paddle-pipelines
-install-paddle-pipelines:
-	cd pipelines && make install
+	cd pipelines && make install && make
 
 .PHONY: deploy-paddlenlp
 deploy-paddlenlp:
+	# install related package
+	make install
 	# deploy version
 	echo "VERSION = '$$(cat VERSION)'" > paddlenlp/version.py
 	# build
