@@ -12,28 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import datetime
-import math
-import unittest
-import numpy as np
 import random
+import unittest
 
-from tests.testing_utils import slow
-from parameterized import parameterized_class
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor, random_attention_mask
-
+import numpy as np
 import paddle
 import paddle.nn as nn
+from parameterized import parameterized_class
+
+from paddlenlp.data import Pad
 from paddlenlp.transformers import (
-    UnifiedTransformerModel,
+    UnifiedTransformerConfig,
     UnifiedTransformerLMHeadModel,
-    UnifiedTransformerForMaskedLM,
+    UnifiedTransformerModel,
     UnifiedTransformerTokenizer,
 )
-from paddlenlp.data import Pad
-from paddlenlp.data import DataCollatorWithPadding
+from tests.testing_utils import slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 UNIFIED_TRANSFORMER_PRETRAINED_MODEL_ARCHIVE_LIST = [
     "unified_transformer-12L-cn",
@@ -150,26 +147,26 @@ class UnifiedTransformerModelTester:
         return (config, input_ids, input_mask, token_type_ids, position_ids, lm_labels)
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "normalize_before": self.normalize_before,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "unk_token_id": self.unk_token_id,
-            "pad_token_id": self.pad_token_id,
-            "bos_token_id": self.bos_token_id,
-            "eos_token_id": self.eos_token_id,
-            "mask_token_id": self.mask_token_id,
-            "role_type_size": self.role_type_size,
-        }
+        return UnifiedTransformerConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            hidden_act=self.hidden_act,
+            hidden_dropout_prob=self.hidden_dropout_prob,
+            attention_probs_dropout_prob=self.attention_probs_dropout_prob,
+            normalize_before=self.normalize_before,
+            max_position_embeddings=self.max_position_embeddings,
+            type_vocab_size=self.type_vocab_size,
+            initializer_range=self.initializer_range,
+            unk_token_id=self.unk_token_id,
+            pad_token_id=self.pad_token_id,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            mask_token_id=self.mask_token_id,
+            role_type_size=self.role_type_size,
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (config, input_ids, input_mask, token_type_ids, position_ids, lm_labels) = self.prepare_config_and_inputs()
@@ -178,7 +175,7 @@ class UnifiedTransformerModelTester:
     def create_and_check_unified_transformer_model(
         self, config, input_ids, input_mask, token_type_ids, position_ids, *args
     ):
-        model = UnifiedTransformerModel(**config)
+        model = UnifiedTransformerModel(config)
         model.eval()
 
         result, cache = model(
@@ -191,12 +188,12 @@ class UnifiedTransformerModelTester:
         )[:2]
 
         self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(len(cache), config["num_hidden_layers"])
+        self.parent.assertEqual(len(cache), config.num_hidden_layers)
 
     def create_and_check_unified_transformer_model_past(
         self, config, input_ids, input_mask, token_type_ids, position_ids, *args
     ):
-        model = UnifiedTransformerModel(**config)
+        model = UnifiedTransformerModel(config)
         model.eval()
 
         # first forward pass
@@ -229,7 +226,7 @@ class UnifiedTransformerModelTester:
         output, past = outputs[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 1), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 1), config.vocab_size, dtype="int64")
         next_token_types = ids_tensor([self.batch_size, 1], self.type_vocab_size, dtype="int64")
         next_position = position_ids[:, -1:] + 1
 
@@ -274,7 +271,7 @@ class UnifiedTransformerModelTester:
     def create_and_check_unified_transformer_model_past_large_inputs(
         self, config, input_ids, input_mask, token_type_ids, position_ids, *args
     ):
-        model = UnifiedTransformerModel(**config)
+        model = UnifiedTransformerModel(config)
         model.eval()
 
         # first forward pass
@@ -288,7 +285,7 @@ class UnifiedTransformerModelTester:
         )[:2]
 
         # create hypothetical next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3), config["vocab_size"], dtype="int64")
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
         next_token_types = ids_tensor([self.batch_size, 3], self.type_vocab_size, dtype="int64")
         next_position = position_ids[:, -3:] + 3
 
@@ -341,8 +338,7 @@ class UnifiedTransformerModelTester:
     def create_and_check_lm_head_model(
         self, config, input_ids, input_mask, token_type_ids, position_ids, lm_labels, *args
     ):
-        base_model = UnifiedTransformerModel(**config)
-        model = UnifiedTransformerLMHeadModel(base_model)
+        model = UnifiedTransformerLMHeadModel(config)
         model.eval()
 
         outputs = model(
@@ -363,8 +359,7 @@ class UnifiedTransformerModelTester:
     def create_and_check_forward_and_backwards(
         self, config, input_ids, input_mask, token_type_ids, position_ids, lm_head, *args
     ):
-        base_model = UnifiedTransformerModel(**config)
-        model = UnifiedTransformerLMHeadModel(base_model)
+        model = UnifiedTransformerLMHeadModel(config)
 
         loss, logits = model(
             input_ids,
@@ -408,7 +403,7 @@ class UnifiedTransformerModelTest(ModelTesterMixin, GenerationTesterMixin, unitt
     all_model_classes = (UnifiedTransformerModel, UnifiedTransformerLMHeadModel)
     all_generative_model_classes = {UnifiedTransformerLMHeadModel: (UnifiedTransformerModel, "unified_transformer")}
     test_missing_keys = False
-
+    use_test_inputs_embeds = True
     use_labels = False
     return_dict = False
 

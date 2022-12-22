@@ -20,4 +20,4 @@ schema = ["出发地", "目的地", "费用", "时间"]
 uie = Taskflow("information_extraction", schema=schema, task_path="../../checkpoint/model_best/")
 # If you want to define the finetuned uie service
 app = SimpleServer()
-app.register_taskflow("uie", uie)
+app.register_taskflow("taskflow/uie", uie)

@@ -123,6 +123,13 @@ class NoTrainerTrainingArguments:
     report_to: str = field(
         default="visualdl", metadata={"help": "The list of integrations to report the results and logs to."}
     )
+    recompute: bool = field(
+        default=False,
+        metadata={
+            "help": "Recompute the forward pass to calculate gradients. Used for saving memory. "
+            "Only support for networks with transformer blocks."
+        },
+    )
 
     def __str__(self):
         self_as_dict = asdict(self)
