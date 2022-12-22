@@ -1591,6 +1591,9 @@ class Trainer:
             if max_eval_iters > 0:
                 logger.info(f"  Total prediction steps = {max_eval_iters}")
 
+        logger.info(f"  Pre device batch size = {batch_size}")
+        logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
+
         model.eval()
 
         self.callback_handler.eval_dataloader = dataloader
