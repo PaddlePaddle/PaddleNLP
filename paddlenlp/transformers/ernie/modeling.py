@@ -631,7 +631,7 @@ class ErnieForTokenClassification(ErniePretrainedModel):
     """
 
     def __init__(self, config: ErnieConfig):
-        super().__init__(config)
+        super(ErnieForTokenClassification, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.num_labels = config.num_labels
         self.dropout = nn.Dropout(
