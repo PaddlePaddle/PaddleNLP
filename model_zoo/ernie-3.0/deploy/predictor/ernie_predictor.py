@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
 import os
+
 import numpy as np
 import paddle
+import six
 from psutil import cpu_count
+
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -112,9 +114,9 @@ class InferBackend(object):
                 self.predictor.get_output_handle(name) for name in self.predictor.get_output_names()
             ]
         else:
-            import paddle2onnx
+
             import onnxruntime as ort
-            import copy
+            import paddle2onnx
 
             onnx_model = paddle2onnx.command.c_paddle_to_onnx(
                 model_file=model_path + ".pdmodel",
@@ -139,8 +141,8 @@ class InferBackend(object):
                 use_quantize = False
 
             if use_fp16:
-                from onnxconverter_common import float16
                 import onnx
+                from onnxconverter_common import float16
 
                 deploy_onnx_model = "fp16_model.onnx"
                 onnx_model_proto = onnx.ModelProto()
@@ -241,7 +243,7 @@ def seq_cls_print_ret(infer_result, input_data):
 class ErniePredictor(object):
     def __init__(self, args):
         if not isinstance(args.device, six.string_types):
-            print(">>> [InferBackend] The type of device must be string, but the type you set is: ", type(device))
+            print(">>> [InferBackend] The type of device must be string, but the type you set is: ", type(args.device))
             exit(0)
         args.device = args.device.lower()
         if args.device not in ["cpu", "gpu", "xpu"]:

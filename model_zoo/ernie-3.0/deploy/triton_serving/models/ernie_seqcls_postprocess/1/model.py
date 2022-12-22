@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import json
-import paddle
+
 import numpy as np
-import time
 
 # triton_python_backend_utils is available in every Triton Python model. You
 # need to use this module to create inference requests and responses. It also
@@ -44,7 +43,7 @@ class TritonPythonModel:
           * model_version: Model version
           * model_name: Model name
         """
-        self.model_config = model_config = json.loads(args["model_config"])
+        self.model_config = json.loads(args["model_config"])
         print("model_config:", self.model_config)
 
         self.input_names = []
@@ -59,8 +58,6 @@ class TritonPythonModel:
             dtype = pb_utils.triton_string_to_numpy(output_config["data_type"])
             self.output_dtype.append(dtype)
         print("output:", self.output_names)
-        # The label names of NER models trained by different data sets may be different
-        self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]
 
     def execute(self, requests):
         """`execute` must be implemented in every Python model. `execute`
@@ -87,39 +84,15 @@ class TritonPythonModel:
             data = pb_utils.get_input_tensor_by_name(request, self.input_names[0])
             data = data.as_numpy()
             # print("post data:", data)
-            tokens_label = data.argmax(axis=-1).tolist()
-            value = []
-            for _, token_label in enumerate(tokens_label):
-                start = -1
-                label_name = ""
-                items = []
-                for i, label in enumerate(token_label):
-                    if self.label_names[label] == "O" and start >= 0:
-                        items.append(
-                            {
-                                "pos": [start, i - 2],
-                                "label": label_name,
-                            }
-                        )
-                        start = -1
-                    elif "B-" in self.label_names[label]:
-                        start = i - 1
-                        label_name = self.label_names[label][2:]
-                if start >= 0:
-                    items.append(
-                        {
-                            "pos": [start, len(token_label) - 1],
-                            "label": label_name,
-                        }
-                    )
-                value.append(items)
-            out_result = np.array(value, dtype="object")
-            out_tensor = pb_utils.Tensor(self.output_names[0], out_result)
-            inference_response = pb_utils.InferenceResponse(
-                output_tensors=[
-                    out_tensor,
-                ]
-            )
+            max_value = np.max(data, axis=1, keepdims=True)
+            exp_data = np.exp(data - max_value)
+            probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+            probs = probs.max(axis=-1)
+            # print("label:", data.argmax(axis=-1))
+            # print("probs:", probs)
+            out_tensor1 = pb_utils.Tensor(self.output_names[0], data.argmax(axis=-1))
+            out_tensor2 = pb_utils.Tensor(self.output_names[1], probs)
+            inference_response = pb_utils.InferenceResponse(output_tensors=[out_tensor1, out_tensor2])
             responses.append(inference_response)
         return responses
 
