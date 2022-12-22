@@ -30,8 +30,12 @@ from paddlenlp.transformers import (
 class PromptModelTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/ernie")
-        cls.model = AutoModelForMaskedLM.from_pretrained("__internal_testing__/ernie")
+        cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
+        cls.model = AutoModelForMaskedLM.from_pretrained("__internal_testing__/tiny-random-ernie")
+        cls.num_labels = 2
+        cls.seq_cls_model = AutoModelForSequenceClassification.from_pretrained(
+            "__internal_testing__/tiny-random-ernie", num_labels=cls.num_labels
+        )
 
         cls.template = AutoTemplate.create_from(
             prompt="{'soft'}{'text': 'text'}{'mask'}", tokenizer=cls.tokenizer, max_length=512, model=cls.model
@@ -71,36 +75,32 @@ class PromptModelTest(unittest.TestCase):
         self.assertEqual(model_outputs.hidden_states.shape[0], len(examples))
 
     def test_efl_no_labels(self):
-        num_labels = 2
-        model = AutoModelForSequenceClassification.from_pretrained("__internal_testing__/ernie", num_labels=num_labels)
-        prompt_model = PromptModelForSequenceClassification(model, self.template, verbalizer=None)
+        prompt_model = PromptModelForSequenceClassification(self.seq_cls_model, self.template, verbalizer=None)
         examples = [{"text": "百度飞桨深度学习框架"}, {"text": "这是一个测试"}]
         encoded_examples = [self.template(i) for i in examples]
         logits, hidden_states = prompt_model(**self.data_collator(encoded_examples))
         self.assertEqual(logits.shape[0], len(examples))
-        self.assertEqual(logits.shape[1], num_labels)
+        self.assertEqual(logits.shape[1], self.num_labels)
         self.assertEqual(hidden_states.shape[0], len(examples))
 
         model_outputs = prompt_model(**self.data_collator(encoded_examples), return_dict=True)
         self.assertIsNone(model_outputs.loss)
         self.assertEqual(model_outputs.logits.shape[0], len(examples))
-        self.assertEqual(model_outputs.logits.shape[1], num_labels)
+        self.assertEqual(model_outputs.logits.shape[1], self.num_labels)
         self.assertEqual(model_outputs.hidden_states.shape[0], len(examples))
 
     def test_efl_with_labels(self):
-        num_labels = 2
-        model = AutoModelForSequenceClassification.from_pretrained("__internal_testing__/ernie", num_labels=num_labels)
-        prompt_model = PromptModelForSequenceClassification(model, self.template, verbalizer=None)
+        prompt_model = PromptModelForSequenceClassification(self.seq_cls_model, self.template, verbalizer=None)
         examples = [{"text": "百度飞桨深度学习框架", "labels": 0}, {"text": "这是一个测试", "labels": 1}]
         encoded_examples = [self.template(i) for i in examples]
         loss, logits, hidden_states = prompt_model(**self.data_collator(encoded_examples))
         self.assertIsNotNone(loss)
         self.assertEqual(logits.shape[0], len(examples))
-        self.assertEqual(logits.shape[1], num_labels)
+        self.assertEqual(logits.shape[1], self.num_labels)
         self.assertEqual(hidden_states.shape[0], len(examples))
 
         model_outputs = prompt_model(**self.data_collator(encoded_examples), return_dict=True)
         self.assertIsNotNone(model_outputs.loss)
         self.assertEqual(model_outputs.logits.shape[0], len(examples))
-        self.assertEqual(model_outputs.logits.shape[1], num_labels)
+        self.assertEqual(model_outputs.logits.shape[1], self.num_labels)
         self.assertEqual(model_outputs.hidden_states.shape[0], len(examples))

@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ast
 import logging
-import numpy as np
-import time
 from typing import Optional
 
-from tritonclient import utils as client_utils
-from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput, service_pb2_grpc, service_pb2
+import numpy as np
+from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput
 
 LOGGER = logging.getLogger("run_inference_on_triton")
 
@@ -97,31 +94,50 @@ class SyncGRPCTritonRunner:
         return None
 
 
+def test_tnews_dataset(runner):
+    from paddlenlp.datasets import load_dataset
+
+    dev_ds = load_dataset("clue", "tnews", splits="dev")
+
+    batches = []
+    labels = []
+    idx = 0
+    batch_size = 32
+    while idx < len(dev_ds):
+        data = []
+        label = []
+        for i in range(batch_size):
+            if idx + i >= len(dev_ds):
+                break
+            data.append(dev_ds[idx + i]["sentence"])
+            label.append(dev_ds[idx + i]["label"])
+        batches.append(data)
+        labels.append(np.array(label))
+        idx += batch_size
+
+    accuracy = 0
+    for i, data in enumerate(batches):
+        ret = runner.Run([data])
+        # print("ret:", ret)
+        accuracy += np.sum(labels[i] == ret["label"])
+    print("acc:", 1.0 * accuracy / len(dev_ds))
+
+
 if __name__ == "__main__":
-    model_name = "ernie_tokencls"
+    model_name = "ernie_seqcls"
     model_version = "1"
     url = "localhost:8001"
     runner = SyncGRPCTritonRunner(url, model_name, model_version)
-    dataset = [
+    texts = [
+        ["你家拆迁，要钱还是要房？答案一目了然", "军嫂探亲拧包入住，部队家属临时来队房标准有了规定，全面落实！"],
         [
-            "北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。",
-            "原产玛雅故国的玉米，早已成为华夏大地主要粮食作物之一。",
+            "区块链投资心得，能做到就不会亏钱",
         ],
     ]
 
-    for batch_input in dataset:
+    for text in texts:
         # input format:[input1, input2 ... inputn], n = len(self._input_names)
-        result = runner.Run([batch_input])
-        for i, ret in enumerate(result["OUTPUT"]):
-            ret = ast.literal_eval(ret.decode("utf-8"))
-            print("input data:", batch_input[i])
-            print("The model detects all entities:")
-            for iterm in ret:
-                print(
-                    "entity:",
-                    batch_input[i][iterm["pos"][0] : iterm["pos"][1] + 1],
-                    "  label:",
-                    iterm["label"],
-                    "  pos:",
-                    iterm["pos"],
-                )
+        result = runner.Run([text])
+        print(result)
+
+    test_tnews_dataset(runner)
