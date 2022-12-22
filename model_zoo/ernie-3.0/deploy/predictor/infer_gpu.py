@@ -12,9 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import argparse
-from psutil import cpu_count
+
 from ernie_predictor import ErniePredictor
 
 
@@ -40,6 +39,12 @@ def parse_args():
         help="The path prefix of inference model to be used.",
     )
     parser.add_argument(
+        "--batch_size",
+        default=32,
+        type=int,
+        help="Batch size for predict.",
+    )
+    parser.add_argument(
         "--max_seq_length",
         default=128,
         type=int,
@@ -47,17 +52,22 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
+        "--set_dynamic_shape",
+        action="store_true",
+        help="Whether to automatically set dynamic shape.",
+    )
+    parser.add_argument(
+        "--shape_info_file",
+        default="shape_info.txt",
+        type=str,
+        help="The collected dynamic shape info file.",
+    )
+    parser.add_argument(
         "--precision_mode",
         type=str,
         default="fp32",
-        choices=["fp32", "int8"],
-        help="Inference precision, set int8 to use dynamic quantization for acceleration.",
-    )
-    parser.add_argument(
-        "--num_threads",
-        default=cpu_count(logical=False),
-        type=int,
-        help="num_threads for cpu.",
+        choices=["fp32", "fp16", "int8"],
+        help="Inference precision.",
     )
     args = parser.parse_args()
     return args
@@ -65,9 +75,8 @@ def parse_args():
 
 def main():
     args = parse_args()
-
     args.task_name = args.task_name.lower()
-    args.device = "cpu"
+    args.device = "gpu"
     predictor = ErniePredictor(args)
 
     if args.task_name == "seq_cls":
@@ -76,6 +85,7 @@ def main():
         text = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
 
     outputs = predictor.predict(text)
+    print(outputs)
 
 
 if __name__ == "__main__":
