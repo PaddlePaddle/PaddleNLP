@@ -25,8 +25,8 @@ from paddlenlp.transformers import AutoModelForMaskedLM, AutoTokenizer
 class TemplateTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-nano-zh")
-        cls.model = AutoModelForMaskedLM.from_pretrained("ernie-3.0-nano-zh")
+        cls.tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
+        cls.model = AutoModelForMaskedLM.from_pretrained("__internal_testing__/tiny-random-ernie")
         cls.example = {"text_a": "天气晴朗", "text_b": "下雪了", "choices": ["不", "很"], "labels": 0}
         cls.max_length = 20
         cls.tokenizer.add_special_tokens({"additional_special_tokens": ["[O-MASK]"]})
