@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-from ernie_predictor import ErniePredictor
 import argparse
+
+from ernie_predictor import ErniePredictor
+from psutil import cpu_count
 
 
 def parse_args():
@@ -46,9 +47,17 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
-        "--use_fp16",
-        action="store_true",
-        help="Whether to use fp16 inference, only takes effect when deploying on gpu.",
+        "--precision_mode",
+        type=str,
+        default="fp32",
+        choices=["fp32", "int8"],
+        help="Inference precision, set int8 to use dynamic quantization for acceleration.",
+    )
+    parser.add_argument(
+        "--num_threads",
+        default=cpu_count(logical=False),
+        type=int,
+        help="num_threads for cpu.",
     )
     args = parser.parse_args()
     return args
@@ -56,6 +65,9 @@ def parse_args():
 
 def main():
     args = parse_args()
+
+    args.task_name = args.task_name.lower()
+    args.device = "cpu"
     predictor = ErniePredictor(args)
 
     if args.task_name == "seq_cls":
@@ -64,6 +76,7 @@ def main():
         text = ["北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。", "乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。"]
 
     outputs = predictor.predict(text)
+    print(outputs)
 
 
 if __name__ == "__main__":
