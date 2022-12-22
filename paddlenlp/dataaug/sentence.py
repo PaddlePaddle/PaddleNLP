@@ -337,7 +337,7 @@ class SentenceBackTranslate:
                     eos_pos = len(output) - 1
                 else:
                     eos_pos = eos[0]
-                translated_texts.append(tokenizer.convert_ids_to_string(output[1:eos_pos]))
+                translated_texts.append([tokenizer.convert_ids_to_string(output[1:eos_pos])])
         return translated_texts
 
 
@@ -400,7 +400,7 @@ class SentenceBackTranslateAPI:
         for sequence in sequences:
             sequence = module.translate(sequence, self.src_lang, self.tgt_lang)
             sequence = module.translate(sequence, self.tgt_lang, self.src_lang)
-            translated_texts.append(sequence)
+            translated_texts.append([sequence])
         return translated_texts
 
     def _back_translate_api(self, sequences):
