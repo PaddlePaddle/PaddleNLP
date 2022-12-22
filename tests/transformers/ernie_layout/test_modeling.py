@@ -214,10 +214,13 @@ class ErnieLayoutModelTester:
             end_positions=sequence_labels,
         )
 
-        start_logits, end_logits = result[0]
+        if sequence_labels is not None:
+            start_logits, end_logits = result[1], result[2]
+        else:
+            start_logits, end_logits = result[0], result[1]
 
-        self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length, self.num_classes])
-        self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length, self.num_classes])
+        self.parent.assertEqual(start_logits.shape, [self.batch_size, self.seq_length])
+        self.parent.assertEqual(end_logits.shape, [self.batch_size, self.seq_length])
 
     def create_and_check_for_uie(
         self,

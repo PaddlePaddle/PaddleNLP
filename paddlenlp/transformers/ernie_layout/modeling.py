@@ -1066,7 +1066,7 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
         self.dropout = nn.Dropout(classifier_dropout)
-        self.qa_outputs = nn.Linear(config["hidden_size"], config.num_labels)
+        self.qa_outputs = nn.Linear(config["hidden_size"], 2)
         self.qa_outputs.apply(self.init_weights)
 
     def get_input_embeddings(self):
