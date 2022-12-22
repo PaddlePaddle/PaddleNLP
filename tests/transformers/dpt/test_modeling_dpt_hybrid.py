@@ -236,6 +236,7 @@ class DPTModelTest(ModelTesterMixin, unittest.TestCase):
             loss = model(**inputs).loss
             loss.backward()
 
+    @slow
     def test_training_gradient_checkpointing(self):
         for model_class in self.all_model_classes:
             if model_class.__name__ in ["DPTModel", "DPTForDepthEstimation"]:
