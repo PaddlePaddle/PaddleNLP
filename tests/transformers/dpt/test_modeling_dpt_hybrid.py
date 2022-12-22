@@ -31,7 +31,7 @@ from paddlenlp.transformers import (
     DPTModel,
 )
 
-from ...testing_utils import slow
+from ...testing_utils import get_tests_dir, slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
 
@@ -274,7 +274,8 @@ class DPTModelTest(ModelTesterMixin, unittest.TestCase):
 
 # We will verify our results on an image of cute cats
 def prepare_img():
-    image = Image.open("./tests/fixtures/tests_samples/COCO/000000039769.png")
+    CUTE_CATS = get_tests_dir("fixtures/tests_samples/COCO/000000039769.png")
+    image = Image.open(CUTE_CATS)
     return image
 
 
