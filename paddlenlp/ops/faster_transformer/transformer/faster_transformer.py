@@ -26,6 +26,7 @@ from paddlenlp.ops import (
     InferMBartDecoding,
     InferOptDecoding,
     InferPegasusDecoding,
+    InferT5Decoding,
     InferTransformerDecoding,
     InferUnifiedDecoding,
 )
@@ -41,6 +42,7 @@ from paddlenlp.transformers import (
     OPTPretrainedModel,
     PegasusPretrainedModel,
     PositionalEmbedding,
+    T5PretrainedModel,
     TransformerModel,
     UnifiedTransformerPretrainedModel,
     UNIMOPretrainedModel,
@@ -1739,5 +1741,104 @@ class FasterPegasus(PegasusPretrainedModel):
                 ids = ids.transpose([1, 0])
 
         return ids
+
+    generate = forward
+
+
+class FasterT5(T5PretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+        super(FasterT5, self).__init__()
+        self.use_fp16_decoding = use_fp16_decoding
+        self._model = model
+        if use_fp16_decoding:
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(model.mbart.encoder.embed_tokens.weight))
+            model.mbart.encoder.embed_tokens = nn.Embedding(
+                *model.mbart.encoder.embed_tokens.weight.shape, weight_attr=weight_attr
+            )
+        self.encoder = model.t5.get_encoder()
+        self.decoder = model.t5.get_decoder()
+        self.pad_token_id = model.t5.config["pad_token_id"]
+
+        self.decoding = InferT5Decoding(
+            model=self._model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding
+        )
+
+    def get_encoder(self):
+        return self.encoder
+
+    def get_decoder(self):
+        return self.decoder
+
+    def forward(
+        self,
+        input_ids=None,
+        encoder_output=None,
+        seq_len=None,
+        max_length=128,
+        min_length=0,
+        top_k=4,
+        top_p=0.0,
+        num_beams=4,
+        decode_strategy="sampling",
+        decoder_start_token_id=None,
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        diversity_rate=0.0,
+        temperature=1.0,
+        num_return_sequences=1,
+        length_penalty=0.6,
+        early_stopping=False,
+        forced_eos_token_id=None,
+        **model_kwargs
+    ):
+
+        bos_token_id = bos_token_id if bos_token_id is not None else getattr(self._model, "bos_token_id", None)
+        eos_token_id = eos_token_id if eos_token_id is not None else getattr(self._model, "eos_token_id", None)
+        pad_token_id = pad_token_id if pad_token_id is not None else getattr(self._model, "pad_token_id", None)
+
+        if encoder_output is None:
+            assert input_ids is not None, "You have to specify either input_ids or encoder_output."
+            encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)[
+                "encoder_output"
+            ]
+
+            if isinstance(encoder_output, (list, tuple)):
+                encoder_output = encoder_output[0]
+
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id, dtype="int32"), axis=-1, dtype="int32")
+        if self.use_fp16_decoding:
+            encoder_output = paddle.cast(encoder_output, "float16")
+        if decode_strategy.startswith("beam_search") and num_beams > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_beams, seq_len=seq_len
+            )
+            seq_len = expanded_kwargs["seq_len"]
+        elif decode_strategy == "sampling" and num_return_sequences > 1:
+            encoder_output, expanded_kwargs = self.expand_inputs_for_generation(
+                encoder_output, expand_size=num_return_sequences, seq_len=seq_len
+            )
+            seq_len = expanded_kwargs["seq_len"]
+        if decoder_start_token_id is not None:
+            bos_token_id = decoder_start_token_id
+
+        return self.decoding(
+            enc_output=encoder_output,
+            memory_seq_lens=seq_len,
+            beam_size=num_beams,
+            top_k=top_k,
+            top_p=top_p,
+            decoding_strategy=decode_strategy,
+            max_out_len=max_length,
+            diversity_rate=diversity_rate,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            alpha=length_penalty,
+            temperature=temperature,
+            early_stopping=early_stopping,
+        )
 
     generate = forward

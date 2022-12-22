@@ -20,12 +20,14 @@ import re
 
 import numpy as np
 import paddle
+from huggingface_hub import hf_hub_download
 
 from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
 from ..utils.doc_parser import DocParser
 from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
 from .utils import DataCollatorGP, SchemaTree, dbc2sbc, get_id_and_prob, gp_decode
@@ -375,7 +377,7 @@ class UIETask(Task):
         },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
@@ -384,7 +386,7 @@ class UIETask(Task):
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
-        self.use_fast = kwargs.get("use_fast", False)
+        self._use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
         self._schema_lang = kwargs.get("schema_lang", "ch")
@@ -392,9 +394,17 @@ class UIETask(Task):
 
         if self.model in ["uie-m-base", "uie-m-large", "uie-x-base"]:
             self.resource_files_names["sentencepiece_model_file"] = "sentencepiece.bpe.model"
-        self._check_task_files()
-        with open(os.path.join(self._task_path, "model_config.json")) as f:
-            self._init_class = json.load(f)["init_class"]
+
+        # TODO: temporary solution to support HF Hub due to lack of AutoModel
+        # change this logic to use AutoConfig when available
+        if self.from_hf_hub:
+            config_file_path = hf_hub_download(repo_id=self._task_path, filename="model_config.json")
+            with open(config_file_path) as f:
+                self._init_class = json.load(f)["init_class"]
+        else:
+            self._check_task_files()
+            with open(os.path.join(self._task_path, "model_config.json")) as f:
+                self._init_class = json.load(f)["init_class"]
 
         if self._init_class not in ["UIEX", "UIEM"]:
             if "sentencepiece_model_file" in self.resource_files_names.keys():
@@ -406,13 +416,30 @@ class UIETask(Task):
         else:
             self._summary_token_num = 3  # [CLS] prompt [SEP] text [SEP]
 
-        self._doc_parser = None
-        self._schema_tree = None
-        self.set_schema(schema)
+        self._parser_map = {
+            "ch": None,  # OCR-CH
+            "en": None,  # OCR-EN
+            "ch-layout": None,  # Layout-CH
+            "en-layout": None,  # Layout-EN
+        }
+        if not schema:
+            logger.warning(
+                "The schema has not been set yet, please set a schema via set_schema(). "
+                "More details about the setting of schema please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/information_extraction/taskflow_text.md"
+            )
+            self._schema_tree = None
+        else:
+            self.set_schema(schema)
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._construct_tokenizer()
+
+    def set_argument(self, argument: dict):
+        for k, v in argument.items():
+            if k == "input":
+                continue
+            setattr(self, f"_{k}", v)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -449,7 +476,7 @@ class UIETask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path)
+        model_instance = MODEL_MAP[self._init_class].from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._model = model_instance
         self._model.eval()
 
@@ -457,7 +484,9 @@ class UIETask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, use_fast=self.use_fast)
+        self._tokenizer = AutoTokenizer.from_pretrained(
+            self._task_path, use_fast=self._use_fast, from_hf_hub=self.from_hf_hub
+        )
 
     def _preprocess(self, inputs):
         """
@@ -474,6 +503,7 @@ class UIETask(Task):
         """
         Check whether the input meet the requirement.
         """
+        self._ocr_lang_choice = (self._ocr_lang + "-layout") if self._layout_analysis else self._ocr_lang
         inputs = inputs[0]
         if isinstance(inputs, dict) or isinstance(inputs, str):
             inputs = [inputs]
@@ -483,17 +513,17 @@ class UIETask(Task):
                 data = {}
                 if isinstance(example, dict):
                     if "doc" in example.keys():
-                        if not self._doc_parser:
-                            self._doc_parser = DocParser(
+                        if not self._parser_map[self._ocr_lang_choice]:
+                            self._parser_map[self._ocr_lang_choice] = DocParser(
                                 ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
                             )
                         if "layout" in example.keys():
-                            data = self._doc_parser.parse(
+                            data = self._parser_map[self._ocr_lang_choice].parse(
                                 {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
                             )
                             data["layout"] = example["layout"]
                         else:
-                            data = self._doc_parser.parse(
+                            data = self._parser_map[self._ocr_lang_choice].parse(
                                 {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
                             )
                     elif "text" in example.keys():
@@ -920,7 +950,7 @@ class UIETask(Task):
                             org_box[2] + offset_x,
                             org_box[3] + offset_y,
                         ]
-                        box = self._doc_parser._normalize_box(box, [img_w, img_h], [1000, 1000])
+                        box = self._parser_map[self._ocr_lang_choice]._normalize_box(box, [img_w, img_h], [1000, 1000])
                         text += segment[1]
                         bbox.extend([box] * len(segment[1]))
                     _inputs.append({"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"]})

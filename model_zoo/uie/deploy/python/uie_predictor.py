@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-import os
 import math
-import numpy as np
-import onnxruntime as ort
+import os
+import re
 
-import paddle
+import onnxruntime as ort
 import paddle2onnx
+import six
 
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.tools import get_bool_ids_greater_than, get_span
@@ -45,8 +44,8 @@ class InferBackend(object):
             print(">>> [InferBackend] Use GPU to inference ...")
             if use_fp16:
                 print(">>> [InferBackend] Use FP16 to inference ...")
-                from onnxconverter_common import float16
                 import onnx
+                from onnxconverter_common import float16
 
                 fp16_model_file = os.path.join(infer_model_dir, "fp16_model.onnx")
                 onnx_model = onnx.load_model(float_onnx_file)
@@ -62,7 +61,7 @@ class InferBackend(object):
         self.predictor = ort.InferenceSession(onnx_model, sess_options=sess_options, providers=providers)
         if device == "gpu":
             assert "CUDAExecutionProvider" in self.predictor.get_providers(), (
-                f"The environment for GPU inference is not set properly. "
+                "The environment for GPU inference is not set properly. "
                 "A possible cause is that you had installed both onnxruntime and onnxruntime-gpu. "
                 "Please run the following commands to reinstall: \n "
                 "1) pip uninstall -y onnxruntime onnxruntime-gpu \n 2) pip install onnxruntime-gpu"
@@ -87,6 +86,7 @@ class UIEPredictor(object):
         self._position_prob = args.position_prob
         self._max_seq_len = args.max_seq_len
         self._batch_size = args.batch_size
+        self._multilingual = args.multilingual
         self._schema_tree = None
         self.set_schema(args.schema)
         if args.device == "cpu":
@@ -167,12 +167,18 @@ class UIEPredictor(object):
         end_probs = []
         for idx in range(0, len(texts), self._batch_size):
             l, r = idx, idx + self._batch_size
-            input_dict = {
-                "input_ids": encoded_inputs["input_ids"][l:r].astype("int64"),
-                "token_type_ids": encoded_inputs["token_type_ids"][l:r].astype("int64"),
-                "pos_ids": encoded_inputs["position_ids"][l:r].astype("int64"),
-                "att_mask": encoded_inputs["attention_mask"][l:r].astype("int64"),
-            }
+            if self._multilingual:
+                input_dict = {
+                    "input_ids": encoded_inputs["input_ids"][l:r].astype("int64"),
+                    "position_ids": encoded_inputs["position_ids"][l:r].astype("int64"),
+                }
+            else:
+                input_dict = {
+                    "input_ids": encoded_inputs["input_ids"][l:r].astype("int64"),
+                    "token_type_ids": encoded_inputs["token_type_ids"][l:r].astype("int64"),
+                    "position_ids": encoded_inputs["position_ids"][l:r].astype("int64"),
+                    "attention_mask": encoded_inputs["attention_mask"][l:r].astype("int64"),
+                }
             start_prob, end_prob = self._infer(input_dict)
             start_prob = start_prob.tolist()
             end_prob = end_prob.tolist()

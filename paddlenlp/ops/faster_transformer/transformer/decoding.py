@@ -11,24 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from collections import defaultdict
-from contextlib import contextmanager
-import os
 import functools
-import numpy as np
+import os
+from collections import defaultdict
 from functools import partial
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-
 from paddle.common_ops_import import LayerHelper
-import paddle
+
 import paddlenlp
-from paddlenlp.ops.ext_utils import load, LOADED_EXT
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers.utils import fn_args_to_dict
+from paddlenlp.ops.ext_utils import LOADED_EXT, load
 from paddlenlp.transformers import OPTForCausalLM
+from paddlenlp.transformers.t5.modeling import T5DenseGatedGeluDense, T5DenseReluDense
+from paddlenlp.transformers.utils import fn_args_to_dict
+from paddlenlp.utils.log import logger
 
 if getattr(paddle.fluid.framework, "_in_eager_mode_", False):
     from paddle.framework import core
@@ -1468,6 +1466,195 @@ def infer_pegasus_decoding(
     )
 
 
+def infer_t5_decoding(
+    enc_output,
+    memory_seq_lens,
+    word_emb,
+    slf_ln_weight,
+    slf_ln_bias,
+    slf_q_weight,
+    slf_q_bias,
+    slf_k_weight,
+    slf_k_bias,
+    slf_v_weight,
+    slf_v_bias,
+    slf_out_weight,
+    slf_out_bias,
+    cross_ln_weight,
+    cross_ln_bias,
+    cross_q_weight,
+    cross_q_bias,
+    cross_k_weight,
+    cross_k_bias,
+    cross_v_weight,
+    cross_v_bias,
+    cross_out_weight,
+    cross_out_bias,
+    ffn_ln_weight,
+    ffn_ln_bias,
+    ffn_inter_weight_0,
+    ffn_inter_bias_0,
+    ffn_inter_weight_1,
+    ffn_inter_bias_1,
+    ffn_out_weight,
+    ffn_out_bias,
+    relative_attention_bias_weight,
+    decoder_ln_weight,
+    decoder_ln_bias,
+    linear_weight,
+    linear_bias,
+    decoding_strategy,
+    beam_size,
+    top_k,
+    top_p,
+    head_num,
+    size_per_head,
+    num_decoder_layers,
+    start_id,
+    end_id,
+    max_out_len,
+    diversity_rate,
+    rel_len,
+    alpha,
+    temperature,
+    early_stopping,
+    max_distance,
+    relative_attention_num_buckets,
+    tie_word_embeddings,
+    act,
+):
+
+    inputs_names = [
+        "Input",
+        "MemSeqLen",
+        "WordEmbedding",
+        "SelfLayernormWeight@VECTOR",
+        "SelfLayernormBias@VECTOR",
+        "SelfQueryWeight@VECTOR",
+        "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR",
+        "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR",
+        "SelfValueBias@VECTOR",
+        "SelfOutWeight@VECTOR",
+        "SelfOutBias@VECTOR",
+        "CrossLayernormWeight@VECTOR",
+        "CrossLayernormBias@VECTOR",
+        "CrossQueryWeight@VECTOR",
+        "CrossQueryBias@VECTOR",
+        "CrossKeyWeight@VECTOR",
+        "CrossKeyBias@VECTOR",
+        "CrossValueWeight@VECTOR",
+        "CrossValueBias@VECTOR",
+        "CrossOutWeight@VECTOR",
+        "CrossOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR",
+        "FFNLayernormBias@VECTOR",
+        "FFNInterWeight0@VECTOR",
+        "FFNInterBias0@VECTOR",
+        "FFNInterWeight1@VECTOR",
+        "FFNInterBias1@VECTOR",
+        "FFNOutWeight@VECTOR",
+        "FFNOutBias@VECTOR",
+        "SelfRelativeAttentionBiasWeight",
+        "DecoderLayernormWeight",
+        "DecoderLayernormBias",
+        "EmbWeight",
+        "EmbBias",
+    ]
+
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight_0,
+        ffn_inter_bias_0,
+        ffn_inter_weight_1,
+        ffn_inter_bias_1,
+        ffn_out_weight,
+        ffn_out_bias,
+        relative_attention_bias_weight,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        linear_weight,
+        linear_bias,
+    ]
+
+    attrs_names = [
+        "decoding_strategy",
+        "beam_size",
+        "topk",
+        "topp",
+        "n_head",
+        "size_per_head",
+        "num_layer",
+        "bos_id",
+        "eos_id",
+        "max_len",
+        "beam_search_diversity_rate",
+        "rel_len",
+        "alpha",
+        "temperature",
+        "early_stopping",
+        "max_distance",
+        "num_buckets",
+        "tie_word_embeddings",
+        "act",
+    ]
+
+    attrs_val = [
+        decoding_strategy,
+        beam_size,
+        top_k,
+        top_p,
+        head_num,
+        size_per_head,
+        num_decoder_layers,
+        start_id,
+        end_id,
+        max_out_len,
+        diversity_rate,
+        rel_len,
+        alpha,
+        temperature,
+        early_stopping,
+        max_distance,
+        relative_attention_num_buckets,
+        tie_word_embeddings,
+        act,
+    ]
+
+    outputs_names = ["OutputIds", "ParentIds", "SequenceLength"]
+
+    outputs_dtype = ["int32"] * len(outputs_names)
+
+    return run_custom(
+        "fusion_t5_decoding", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype
+    )
+
+
 def finalize(
     beam_size,
     output_ids,
@@ -1609,6 +1796,9 @@ def convert_params(faster_model, model, fuse_qkv=1, use_fp16=False, restore_data
 
     class _list(list):
         def append(self, item):
+            def attr_handle_func(x):
+                return x
+
             if isinstance(item[0], nn.Layer):
                 # Axis is used for tensor slice in tensor parallel.
                 # Use None to make no slice on the tensor.
@@ -1642,7 +1832,7 @@ def convert_params(faster_model, model, fuse_qkv=1, use_fp16=False, restore_data
                 # here since the param passed in might have been processed.
                 if len(item) == 2:
                     param, is_bias = item
-                    attr_handle = lambda x: x
+                    attr_handle = attr_handle_func
                 else:
                     param, is_bias, attr_handle = item
                 param = transfer_param(
@@ -1757,9 +1947,173 @@ def convert_params(faster_model, model, fuse_qkv=1, use_fp16=False, restore_data
             if getattr(module, "norm", None) is not None:
                 params["decoder_ln_weight"].append((module.norm, "weight"))
                 params["decoder_ln_bias"].append((module.norm, "bias"))
+        elif isinstance(module, (paddlenlp.transformers.t5.modeling.T5Stack)) and module.is_decoder:
+            num_layer = len(module.block)
+            for i, block in enumerate(module.block):
+                if not ft_para_conf.is_load(i, num_layer):
+                    continue
+                # fuse_qkv: 0 for nofuse, 1 for fuse,
+                # 2 for fuse and delete the unfused
+                if fuse_qkv == 0:
+                    params["slf_q_weight"].append((block.layer[0].SelfAttention.q, "weight", 1))
+                    if getattr(block.layer[0].SelfAttention.q, "bias", None) is not None:
+                        params["slf_q_bias"].append((block.layer[0].SelfAttention.q, "bias", 1))
+
+                    params["slf_k_weight"].append((block.layer[0].SelfAttention.k, "weight", 1))
+                    if getattr(block.layer[0].SelfAttention.k, "bias", None) is not None:
+                        params["slf_k_bias"].append((block.layer[0].SelfAttention.k, "bias", 1))
+
+                    params["slf_v_weight"].append((block.layer[0].SelfAttention.v, "weight", 1))
+                    if getattr(block.layer[0].SelfAttention.v, "bias", None) is not None:
+                        params["slf_k_bias"].append((block.layer[0].SelfAttention.v, "bias", 1))
+
+                else:
+                    dummy_tensor = paddle.zeros([1, 1])
+                    w = _convert_qkv(
+                        block.layer[0].SelfAttention.q,
+                        block.layer[0].SelfAttention.k,
+                        block.layer[0].SelfAttention.v,
+                        attr="weight",
+                        use_numpy=(fuse_qkv == 2),
+                        del_param=(fuse_qkv == 2),
+                        dummy_tensor=dummy_tensor,
+                    )
+                    params["slf_q_weight"].append((w, False))
+
+                    if (
+                        getattr(block.layer[0].SelfAttention.q, "bias", None) is not None
+                        and getattr(block.layer[0].SelfAttention.k, "bias", None) is not None
+                        and getattr(block.layer[0].SelfAttention.v, "bias", None) is not None
+                    ):
+                        b = _convert_qkv(
+                            block.layer[0].SelfAttention.q,
+                            block.layer[0].SelfAttention.k,
+                            block.layer[0].SelfAttention.v,
+                            attr="bias",
+                            use_numpy=(fuse_qkv == 2),
+                            del_param=(fuse_qkv == 2),
+                            dummy_tensor=dummy_tensor,
+                        )
+                        params["slf_q_bias"].append((b, True))
+
+                    # NOTE: Use `params["slf_q_weight"][-1]` rather than `w`,
+                    # since the appended tensor might be a new transfered tensor.
+                    # Besides, to allow convert_params be called more than once,
+                    # we find a attr name not existing to avoid overwriting the
+                    # existing attr.
+                    attr = "slf_q_weight_" + str(i)
+                    while hasattr(faster_model, attr):
+                        attr += "_"
+                    setattr(faster_model, attr, params["slf_q_weight"][-1])
+
+                    param_type = "weight"
+                    if "slf_q_bias" in params.keys():
+                        attr = "slf_q_bias_" + str(i)
+                        while hasattr(faster_model, attr):
+                            attr += "_"
+                        setattr(faster_model, attr, params["slf_q_bias"][-1])
+                        param_type.append("bias")
+
+                    for key in [f"slf_{m}_{n}" for m in ("k", "v") for n in param_type]:
+                        params[key].append((dummy_tensor, True if key.endswith("bias") else False))
+                        attr = key + "_" + str(i)
+                        while hasattr(faster_model, attr):
+                            attr += "_"
+                        setattr(faster_model, attr, params[key][-1])
+
+                ffn_index = 1
+                if len(block.layer) == 3:
+                    ffn_index = 2
+
+                    params["cross_q_weight"].append((block.layer[1].EncDecAttention.q, "weight", 1))
+                    if getattr(block.layer[1].EncDecAttention.q, "bias", None) is not None:
+                        params["cross_q_bias"].append((block.layer[1].EncDecAttention.q, "bias", 1))
+
+                    params["cross_k_weight"].append((block.layer[1].EncDecAttention.k, "weight", 1))
+                    if getattr(block.layer[1].EncDecAttention.k, "bias", None) is not None:
+                        params["cross_k_bias"].append((block.layer[1].EncDecAttention.k, "bias", 1))
+
+                    params["cross_v_weight"].append((block.layer[1].EncDecAttention.v, "weight", 1))
+                    if getattr(block.layer[1].EncDecAttention.v, "bias", None) is not None:
+                        params["cross_v_bias"].append((block.layer[1].EncDecAttention.v, "bias", 1))
+
+                    params["cross_out_weight"].append((block.layer[1].EncDecAttention.o, "weight", 0))
+                    if getattr(block.layer[1].EncDecAttention.o, "bias", None) is not None:
+                        params["cross_out_bias"].append((block.layer[1].EncDecAttention.o, "bias", 0))
+
+                    params["cross_ln_weight"].append((block.layer[1].layer_norm, "weight", 0))
+                    if getattr(block.layer[1].layer_norm, "bias", None) is not None:
+                        params["cross_ln_bias"].append((block.layer[1].layer_norm, "bias", 0))
+
+                if hasattr(block.layer[ffn_index], "DenseReluDense"):
+                    if isinstance(block.layer[ffn_index].DenseReluDense, (T5DenseReluDense)):
+                        params["ffn_inter_weight_0"].append((block.layer[ffn_index].DenseReluDense.wi, "weight", 1))
+                        if getattr(block.layer[ffn_index].DenseReluDense.wi, "bias", None) is not None:
+                            params["ffn_inter_bias_0"].append((block.layer[ffn_index].DenseReluDense.wi, "bias", 1))
+
+                        params["ffn_out_weight"].append((block.layer[ffn_index].DenseReluDense.wo, "weight", 0))
+                        if getattr(block.layer[ffn_index].DenseReluDense.wo, "bias", None) is not None:
+                            params["ffn_out_bias"].append((block.layer[ffn_index].DenseReluDense.wo, "bias"))
+                    elif isinstance(block.layer[ffn_index].DenseReluDense, (T5DenseGatedGeluDense)):
+                        params["ffn_inter_weight_0"].append((block.layer[ffn_index].DenseReluDense.wi_0, "weight", 1))
+                        if getattr(block.layer[ffn_index].DenseReluDense.wi_0, "bias", None) is not None:
+                            params["ffn_inter_bias_0"].append((block.layer[ffn_index].DenseReluDense.wi_0, "bias", 1))
+
+                        params["ffn_inter_weight_1"].append((block.layer[ffn_index].DenseReluDense.wi_1, "weight", 1))
+                        if getattr(block.layer[ffn_index].DenseReluDense.wi_1, "bias", None) is not None:
+                            params["ffn_inter_bias_1"].append((block.layer[ffn_index].DenseReluDense.wi_1, "bias", 1))
+
+                        params["ffn_out_weight"].append((block.layer[ffn_index].DenseReluDense.wo, "weight", 0))
+                        if getattr(block.layer[ffn_index].DenseReluDense.wo, "bias", None) is not None:
+                            params["ffn_out_bias"].append((block.layer[ffn_index].DenseReluDense.wo, "bias"))
+                    else:
+                        raise NotImplementedError("Faster only support T5DenseReluDense and T5DenseGatedGeluDense. ")
+
+                params["ffn_ln_weight"].append((block.layer[ffn_index].layer_norm, "weight"))
+                if getattr(block.layer[ffn_index].layer_norm, "bias", None) is not None:
+                    params["ffn_ln_bias"].append((block.layer[ffn_index].layer_norm, "bias"))
+
+                params["slf_out_weight"].append((block.layer[0].SelfAttention.o, "weight", 0))
+                if getattr(block.layer[0].SelfAttention.o, "bias", None) is not None:
+                    params["slf_out_bias"].append((block.layer[0].SelfAttention.o, "bias"))
+
+                params["slf_ln_weight"].append((block.layer[0].layer_norm, "weight"))
+                if getattr(block.layer[0].layer_norm, "bias", None) is not None:
+                    params["slf_ln_bias"].append((block.layer[0].layer_norm, "bias"))
+
+            if getattr(module, "norm", None) is not None:
+                params["decoder_ln_weight"].append((module.final_layer_norm, "weight"))
+                if getattr(module.final_layer_norm, "bias", None) is not None:
+                    params["decoder_ln_bias"].append((module.final_layer_norm, "bias"))
 
     model.apply(_convert)
     return params
+
+
+class InferBase(nn.Layer):
+    def __init__(self, use_fp16_decoding):
+        super(InferBase, self).__init__()
+        self._use_fp16_decoding = use_fp16_decoding
+
+    def default_bias(self, weight, index, is_null=False):
+        if is_null:
+            size = 1
+        elif isinstance(weight, (list, tuple)):
+            size = weight[0].shape[index]
+        else:
+            size = weight.shape[index]
+
+        if not hasattr(self, "default_bias_" + str(size)):
+            setattr(
+                self,
+                "default_bias_" + str(size),
+                paddle.zeros(shape=[size], dtype="float16" if self._use_fp16_decoding else "float32"),
+            )
+
+        if isinstance(weight, (list, tuple)):
+            return [getattr(self, "default_bias_" + str(size))] * len(weight)
+        else:
+            return [getattr(self, "default_bias_" + str(size))]
 
 
 class InferTransformerDecoding(nn.Layer):
@@ -2232,7 +2586,6 @@ def get_ft_para_conf():
     return _ft_para_conf
 
 
-# @contextmanager
 def enable_ft_para(tensor_para_size=None, layer_para_size=None, layer_para_batch_size=1):
     r"""
     Enable model parallel with the given settings in FasterTransformer. Currently only
@@ -2376,9 +2729,6 @@ class InferOptDecoding(nn.Layer):
         self.inner_size = self.model.opt.config["intermediate_size"]
 
         params = convert_params(self, model, fuse_qkv=1, use_fp16=use_fp16_decoding, restore_data=True)
-
-        word_embedding = self.model.opt.embeddings.word_embeddings
-        linear_weight = self.model.lm_head.decoder_weight
 
         if self.model.opt.embeddings.project_in is not None:
             self.word_emb = paddle.matmul(
@@ -3308,6 +3658,9 @@ def convert_gptj_params(faster_model, model, fuse_qkv=1, use_fp16=False, restore
 
     class _list(list):
         def append(self, item):
+            def attr_handle_func(x):
+                return x
+
             if isinstance(item[0], nn.Layer):
                 # Axis is used for tensor slice in tensor parallel.
                 # Use None to make no slice on the tensor.
@@ -3341,7 +3694,7 @@ def convert_gptj_params(faster_model, model, fuse_qkv=1, use_fp16=False, restore
                 # here since the param passed in might have been processed.
                 if len(item) == 2:
                     param, is_bias = item
-                    attr_handle = lambda x: x
+                    attr_handle = attr_handle_func
                 else:
                     param, is_bias, attr_handle = item
                 param = transfer_param(
@@ -3696,4 +4049,209 @@ class InferPegasusDecoding(nn.Layer):
             forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy,
         )
+        return ids
+
+
+class InferT5Decoding(InferBase):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
+
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
+            load("FasterTransformer", verbose=True)
+
+        super(InferT5Decoding, self).__init__(use_fp16_decoding)
+        for arg, value in locals().items():
+            if arg not in ["self", "model"]:
+                setattr(self, "_" + arg, value)
+
+        self._num_decoder_layers = model.config.num_decoder_layers
+        self._n_head = model.config.num_heads
+        self._d_model = model.config.d_model
+        self._relative_attention_num_buckets = model.config.relative_attention_num_buckets
+        self.tie_word_embeddings = model.config.tie_word_embeddings
+        self.act = model.config.feed_forward_proj
+
+        if "gelu" in self.act:
+            self.act = "gelu"
+        elif "relu" in self.act:
+            self.act = "relu"
+        else:
+            raise ValueError("Only gelu and relu are available in Faster. ")
+
+        # NOTE: using config when support.
+        self._max_distance = 128
+
+        params = convert_params(self, model.t5.decoder, fuse_qkv=2, use_fp16=use_fp16_decoding, restore_data=True)
+
+        self.decoder_ln_weight = [
+            transfer_param(
+                model.t5.decoder.final_layer_norm.weight,
+                is_bias=False,
+                dtype="float16" if use_fp16_decoding else "float32",
+                restore_data=True,
+            )
+        ]
+
+        self.word_emb = [
+            transfer_param(
+                model.t5.decoder.embed_tokens.weight,
+                is_bias=False,
+                dtype="float16" if use_fp16_decoding else "float32",
+                restore_data=True,
+            )
+        ]
+
+        if self.tie_word_embeddings:
+            setattr(
+                self,
+                "lm_head_weight_",
+                transfer_param(
+                    model.t5.decoder.embed_tokens.weight.t(),
+                    is_bias=False,
+                    dtype="float16" if use_fp16_decoding else "float32",
+                    restore_data=True,
+                ),
+            )
+        else:
+            setattr(
+                self,
+                "lm_head_weight_",
+                transfer_param(
+                    paddle.assign(model.lm_head.weight),
+                    is_bias=False,
+                    dtype="float16" if use_fp16_decoding else "float32",
+                    restore_data=True,
+                ),
+            )
+
+        self.linear_weight = [getattr(self, "lm_head_weight_")]
+        self.linear_bias = self.default_bias(self.linear_weight, 1)
+
+        setattr(
+            self,
+            "relative_attn_bias_w",
+            transfer_param(
+                model.t5.decoder.block[0].layer[0].SelfAttention.relative_attention_bias.weight,
+                is_bias=False,
+                dtype="float16" if use_fp16_decoding else "float32",
+                restore_data=True,
+            ),
+        )
+        self.relative_attention_bias_weight = [getattr(self, "relative_attn_bias_w")]
+        for k, v in params.items():
+            setattr(self, k, v)
+
+        self.zeros_t = paddle.zeros(shape=[1, 1], dtype="float16" if use_fp16_decoding else "float32")
+        if getattr(self, "slf_k_weight", None) is None:
+            self.slf_k_weight = [self.zeros_t] * model.t5.config["num_decoder_layers"]
+        if getattr(self, "slf_v_weight", None) is None:
+            self.slf_v_weight = [self.zeros_t] * model.t5.config["num_decoder_layers"]
+
+    def forward(
+        self,
+        enc_output,
+        memory_seq_lens,
+        beam_size=4,
+        top_k=1,
+        top_p=0.0,
+        decoding_strategy="beam_search_v3",
+        max_out_len=256,
+        diversity_rate=0.0,
+        rel_len=False,
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        alpha=0.6,
+        temperature=1.0,
+        early_stopping=False,
+    ):
+        # Beam_search/beam_search_v2/beam_search_v3 should be corrected to beam_search_v3.
+        if decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v3"
+        elif decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
+            top_k = 1
+            top_p = 0.0
+        elif decoding_strategy in ["sampling", "topk_sampling", "topp_sampling"]:
+            if top_p == 1 and top_k > 0:
+                decoding_strategy = "topk_sampling"
+                top_p = 0.0
+            elif top_p > 0 and top_k == 0:
+                decoding_strategy = "topp_sampling"
+            else:
+                raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. "
+                    "Topk sampling and topp sampling cannot be both applied in the faster version. "
+                )
+
+        output_ids, parent_ids, sequence_length = infer_t5_decoding(
+            enc_output=[enc_output],
+            memory_seq_lens=[memory_seq_lens],
+            word_emb=self.word_emb,
+            slf_ln_weight=self.slf_ln_weight,
+            slf_ln_bias=getattr(self, "slf_ln_bias", self.default_bias(self.slf_ln_weight, 0, True)),
+            slf_q_weight=self.slf_q_weight,
+            slf_q_bias=getattr(self, "slf_q_bias", self.default_bias(self.slf_q_weight, 1)),
+            slf_k_weight=self.slf_k_weight,
+            slf_k_bias=getattr(self, "slf_k_bias", self.default_bias(self.slf_k_weight, 1)),
+            slf_v_weight=self.slf_v_weight,
+            slf_v_bias=getattr(self, "slf_v_bias", self.default_bias(self.slf_v_weight, 1)),
+            slf_out_weight=self.slf_out_weight,
+            slf_out_bias=getattr(self, "slf_out_bias", self.default_bias(self.slf_out_weight, 1)),
+            relative_attention_bias_weight=self.relative_attention_bias_weight,
+            cross_ln_weight=self.cross_ln_weight,
+            cross_ln_bias=getattr(self, "cross_ln_bias", self.default_bias(self.cross_ln_weight, 0, True)),
+            cross_q_weight=self.cross_q_weight,
+            cross_q_bias=getattr(self, "cross_q_bias", self.default_bias(self.cross_q_weight, 1)),
+            cross_k_weight=self.cross_k_weight,
+            cross_k_bias=getattr(self, "cross_k_bias", self.default_bias(self.cross_k_weight, 1)),
+            cross_v_weight=self.cross_v_weight,
+            cross_v_bias=getattr(self, "cross_v_bias", self.default_bias(self.cross_v_weight, 1)),
+            cross_out_weight=self.cross_out_weight,
+            cross_out_bias=getattr(self, "cross_out_bias", self.default_bias(self.cross_out_weight, 1)),
+            ffn_ln_weight=self.ffn_ln_weight,
+            ffn_ln_bias=getattr(self, "ffn_ln_bias", self.default_bias(self.ffn_ln_weight, 0, True)),
+            ffn_inter_weight_0=self.ffn_inter_weight_0,
+            ffn_inter_bias_0=getattr(self, "ffn_inter_bias_0", self.default_bias(self.ffn_inter_weight_0, 1)),
+            ffn_inter_weight_1=getattr(
+                self, "ffn_inter_weight_1", self.default_bias(self.ffn_inter_weight_0, 1, True)
+            ),
+            ffn_inter_bias_1=getattr(self, "ffn_inter_bias_1", self.default_bias(self.ffn_inter_weight_1, 1))
+            if hasattr(self, "ffn_inter_weight_1")
+            else getattr(self, "ffn_inter_bias_1", self.default_bias(self.ffn_inter_weight_0, 1, True)),
+            ffn_out_weight=self.ffn_out_weight,
+            ffn_out_bias=getattr(self, "ffn_out_bias", self.default_bias(self.ffn_out_weight, 1)),
+            decoder_ln_weight=self.decoder_ln_weight,
+            decoder_ln_bias=getattr(self, "decoder_ln_bias", self.default_bias(self.decoder_ln_weight, 0, True)),
+            linear_weight=self.linear_weight,
+            linear_bias=getattr(self, "linear_bias", self.default_bias(self.linear_weight, 1)),
+            decoding_strategy=decoding_strategy,
+            beam_size=beam_size,
+            top_k=top_k,
+            top_p=top_p,
+            head_num=self._n_head,
+            size_per_head=int(self._d_model / self._n_head),
+            num_decoder_layers=self._num_decoder_layers,
+            start_id=bos_token_id,
+            end_id=eos_token_id,
+            max_out_len=max_out_len,
+            diversity_rate=-diversity_rate,
+            rel_len=rel_len,
+            alpha=alpha,
+            temperature=temperature,
+            early_stopping=early_stopping,
+            max_distance=self._max_distance,
+            relative_attention_num_buckets=self._relative_attention_num_buckets,
+            tie_word_embeddings=self.tie_word_embeddings,
+            act=self.act,
+        )
+
+        ids = finalize(beam_size, output_ids, parent_ids, sequence_length, decoding_strategy=decoding_strategy)
+
         return ids
