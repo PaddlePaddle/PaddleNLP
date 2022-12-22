@@ -75,8 +75,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self,
         vocab_file,
         sentencepiece_model_file,
-        do_lower_case=True,
-        encoding="utf8",
         do_tokenize_postprocess=False,
         sep_token="[SEP]",
         cls_token="[CLS]",
@@ -91,10 +89,7 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self._unk_token = unk_token
         self._pad_token = pad_token
         self._mask_token = mask_token
-        self.do_lower_case = do_lower_case
-        self.encoding = encoding
         self.sp_model = spm.SentencePieceProcessor()
-        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.vocab_file = vocab_file
         self.sentencepiece_model_file = sentencepiece_model_file
         if os.path.isfile(sentencepiece_model_file):
