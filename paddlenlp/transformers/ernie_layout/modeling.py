@@ -24,6 +24,11 @@ from paddle.nn import Layer
 from paddlenlp.utils.log import logger
 
 from .. import PretrainedModel, register_base_model
+from .configuration import (
+    ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
+    ERNIE_LAYOUT_PRETRAINED_RESOURCE_FILES_MAP,
+    ErnieLayoutConfig,
+)
 from .visual_backbone import ResNet
 
 __all__ = [
@@ -105,21 +110,21 @@ class ErnieLayoutEmbeddings(Layer):
     Include embeddings from word, position and token_type embeddings
     """
 
-    def __init__(self, config):
+    def __init__(self, config: ErnieLayoutConfig):
         super(ErnieLayoutEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(config["vocab_size"], config["hidden_size"])
-        self.position_embeddings = nn.Embedding(config["max_position_embeddings"], config["hidden_size"])
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
-        self.x_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
-        self.y_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
-        self.h_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
-        self.w_position_embeddings = nn.Embedding(config["max_2d_position_embeddings"], config["hidden_size"])
+        self.x_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.y_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.h_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
+        self.w_position_embeddings = nn.Embedding(config.max_2d_position_embeddings, config.hidden_size)
 
-        self.token_type_embeddings = nn.Embedding(config["type_vocab_size"], config["hidden_size"])
-        self.LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
-        self.dropout = nn.Dropout(config["hidden_dropout_prob"])
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.LayerNorm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
-        self.register_buffer("position_ids", paddle.arange(config["max_position_embeddings"]).expand((1, -1)))
+        self.register_buffer("position_ids", paddle.arange(config.max_position_embeddings).expand((1, -1)))
 
     def _cal_spatial_position_embeddings(self, bbox):
         try:
@@ -166,79 +171,11 @@ class ErnieLayoutEmbeddings(Layer):
 
 
 class ErnieLayoutPretrainedModel(PretrainedModel):
-    model_config_file = "model_config.json"
-    pretrained_init_configuration = {
-        "ernie-layoutx-base-uncased": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 0,
-            "coordinate_size": 128,
-            "eos_token_id": 2,
-            "gradient_checkpointing": False,
-            "has_relative_attention_bias": True,
-            "has_spatial_attention_bias": True,
-            "has_visual_segment_embedding": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 514,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "ernie_layout",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 1,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 100,
-            "vocab_size": 250002,
-        },
-        "uie-x-base": {
-            "attention_probs_dropout_prob": 0.1,
-            "bos_token_id": 0,
-            "coordinate_size": 128,
-            "eos_token_id": 2,
-            "gradient_checkpointing": False,
-            "has_relative_attention_bias": True,
-            "has_spatial_attention_bias": True,
-            "has_visual_segment_embedding": False,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "hidden_size": 768,
-            "image_feature_pool_shape": [7, 7, 256],
-            "initializer_range": 0.02,
-            "intermediate_size": 3072,
-            "layer_norm_eps": 1e-12,
-            "max_2d_position_embeddings": 1024,
-            "max_position_embeddings": 514,
-            "max_rel_2d_pos": 256,
-            "max_rel_pos": 128,
-            "model_type": "ernie_layout",
-            "num_attention_heads": 12,
-            "num_hidden_layers": 12,
-            "output_past": True,
-            "pad_token_id": 1,
-            "shape_size": 128,
-            "rel_2d_pos_bins": 64,
-            "rel_pos_bins": 32,
-            "type_vocab_size": 100,
-            "vocab_size": 250002,
-        },
-    }
-    # resource_files_names = {"model_state": "model_state.pdparams"}
-    pretrained_resource_files_map = {
-        "model_state": {
-            "ernie-layoutx-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_layout/ernie_layoutx_base_uncased.pdparams",
-            "uie-x-base": "https://bj.bcebos.com/paddlenlp/models/transformers/uie_x/uie_x_base.pdparams",
-        }
-    }
+    model_config_file = "config.json"
+    pretrained_init_configuration = ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = ERNIE_LAYOUT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "ernie_layout"
+    config_class = ErnieLayoutConfig
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -307,7 +244,7 @@ class ErnieLayoutSelfAttention(nn.Layer):
         head_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        past_key_value=None,
+        past_key_values=None,
         output_attentions=False,
         rel_pos=None,
         rel_2d_pos=None,
@@ -365,7 +302,7 @@ class ErnieLayoutAttention(nn.Layer):
         head_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        past_key_value=None,
+        past_key_values=None,
         output_attentions=False,
         rel_pos=None,
         rel_2d_pos=None,
@@ -377,7 +314,7 @@ class ErnieLayoutAttention(nn.Layer):
             head_mask,
             encoder_hidden_states,
             encoder_attention_mask,
-            past_key_value,
+            past_key_values,
             output_attentions,
             rel_pos=rel_pos,
             rel_2d_pos=rel_2d_pos,
@@ -481,7 +418,7 @@ class ErnieLayoutEncoder(nn.Layer):
                 all_hidden_states = all_hidden_states + (hidden_states,)
 
             layer_head_mask = head_mask[i] if head_mask is not None else None
-            past_key_value = past_key_values[i] if past_key_values is not None else None
+            past_key_values = past_key_values[i] if past_key_values is not None else None
 
             # gradient_checkpointing is set as False here so we remove some codes here
             hidden_save["input_attention_mask"] = attention_mask
@@ -492,7 +429,7 @@ class ErnieLayoutEncoder(nn.Layer):
                 layer_head_mask,
                 encoder_hidden_states,
                 encoder_attention_mask,
-                past_key_value,
+                past_key_values,
                 output_attentions,
                 rel_pos=rel_pos,
                 rel_2d_pos=rel_2d_pos,
@@ -556,19 +493,19 @@ class ErnieLayoutLayer(nn.Layer):
         head_mask=None,
         encoder_hidden_states=None,
         encoder_attention_mask=None,
-        past_key_value=None,
+        past_key_values=None,
         output_attentions=False,
         rel_pos=None,
         rel_2d_pos=None,
     ):
         # decoder uni-directional self-attention cached key/values tuple is at positions 1,2
-        self_attn_past_key_value = past_key_value[:2] if past_key_value is not None else None
+        self_attn_past_key_values = past_key_values[:2] if past_key_values is not None else None
         self_attention_outputs = self.attention(
             hidden_states,
             attention_mask,
             head_mask,
             output_attentions=output_attentions,
-            past_key_value=self_attn_past_key_value,
+            past_key_values=self_attn_past_key_values,
             rel_pos=rel_pos,
             rel_2d_pos=rel_2d_pos,
         )
@@ -616,42 +553,42 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (`int`):
-            Vocabulary size of the XLNet model. Defines the number of different tokens that can
-            be represented by the `inputs_ids` passed when calling ErnieLayoutModel.
-        hidden_size (`int`, optional):
-            Dimensionality of the encoder layers and the pooler layer. Defaults to ``768``.
-        num_hidden_layers (`int`, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to ``12``.
-        num_attention_heads (`int`, optional):
+       vocab_size (`int`, *optional*, defaults to 250002):
+            Vocabulary size of the ErnieLayout model. Defines the number of different tokens that can be represented by the
+            `inputs_ids` passed when calling [`ErnieLayoutModel`].
+        hidden_size (`int`, *optional*, defaults to 768):
+            Dimensionality of the encoder layers and the pooler layer.
+        num_hidden_layers (`int`, *optional*, defaults to 12):
+            Number of hidden layers in the Transformer encoder.
+        num_attention_heads (`int`, *optional*, defaults to 12):
             Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to ``12``.
-        intermediate_size (`int`, optional):
+        intermediate_size (`int`, *optional*, defaults to 3072):
             Dimensionality of the "intermediate" (often named feed-forward) layer in the Transformer encoder.
-            Defaults to ``3072``.
-        hidden_act (`str`, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to ``"gelu"``.
-        hidden_dropout_prob (`float`, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to ``0.1``.
-        attention_probs_dropout_prob (`float`, optional):
-            The dropout probability for all fully connected layers in the pooler.
-            Defaults to ``0.1``.
-        initializer_range (`float`, optional):
+        hidden_act (`str` or `Callable`, *optional*, defaults to `"gelu"`):
+            The non-linear activation function (function or string) in the encoder and pooler. If string, `"gelu"`,
+            `"relu"`, `"silu"` and `"gelu_new"` are supported.
+        hidden_dropout_prob (`float`, *optional*, defaults to 0.1):
+            The dropout probability for all fully connected layers in the embeddings, encoder, and pooler.
+        attention_probs_dropout_prob (`float`, *optional*, defaults to 0.1):
+            The dropout ratio for the attention probabilities.
+        max_position_embeddings (`int`, *optional*, defaults to 514):
+            The maximum sequence length that this model might ever be used with. Typically set this to something large
+            just in case (e.g., 514 or 1028 or 2056).
+        type_vocab_size (`int`, *optional*, defaults to 100):
+            The vocabulary size of the `token_type_ids` passed when calling [`ErnieModel`].
+        initializer_range (`float`, *optional*, defaults to 0.02):
             The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
-            Defaults to ``0.02``.
+        layer_norm_eps (`float`, *optional*, defaults to 1e-12):
+            The epsilon used by the layer normalization layers.
+        use_cache (`bool`, *optional*, defaults to `True`):
+            Whether or not the model should return the last key/values attentions (not used by all models). Only
+            relevant if `config.is_decoder=True`.
+        classifier_dropout (`float`, *optional*, defaults to 0.0):
+            The dropout ratio for classifier.
     """
 
-    def __init__(
-        self,
-        with_pool="tanh",
-        **kwargs,
-    ):
-        super(ErnieLayoutModel, self).__init__()
-        config = kwargs
-        self.config = kwargs
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutModel, self).__init__(config)
         self.has_visual_segment_embedding = config["has_visual_segment_embedding"]
         self.embeddings = ErnieLayoutEmbeddings(config)
 
@@ -668,7 +605,7 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
         self.visual_LayerNorm = nn.LayerNorm(config["hidden_size"], epsilon=config["layer_norm_eps"])
         self.visual_dropout = nn.Dropout(config["hidden_dropout_prob"])
         self.encoder = ErnieLayoutEncoder(config)
-        self.pooler = ErnieLayoutPooler(config["hidden_size"], with_pool)
+        self.pooler = ErnieLayoutPooler(config["hidden_size"], "tanh")
 
     def _calc_text_embeddings(self, input_ids, bbox, position_ids, token_type_ids):
         words_embeddings = self.embeddings.word_embeddings(input_ids)
@@ -845,16 +782,15 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
 
 
 class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
-    def __init__(self, ernie_layout, num_classes=2, dropout=None):
-        super(ErnieLayoutForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(ernie_layout, dict):
-            self.ernie_layout = ErnieLayoutModel(**ernie_layout)
-        else:
-            self.ernie_layout = ernie_layout
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"] * 3, num_classes)
-        self.classifier.apply(self.init_weights)
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForSequenceClassification, self).__init__(config)
+        self.ernie_layout = ErnieLayoutModel(config)
+        self.num_labels = config.num_labels
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.classifier = nn.Linear(config["hidden_size"] * 3, config.num_labels)
 
     def get_input_embeddings(self):
         return self.ernie_layout.embeddings.word_embeddings
@@ -932,7 +868,7 @@ class ErnieLayoutForSequenceClassification(ErnieLayoutPretrainedModel):
             loss_fct = nn.CrossEntropyLoss()
 
             loss = loss_fct(
-                logits.reshape([-1, self.num_classes]),
+                logits.reshape([-1, self.num_labels]),
                 labels.reshape(
                     [
                         -1,
@@ -985,13 +921,13 @@ class ErnieLayoutPretrainingHeads(Layer):
 
 
 class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
-    def __init__(self, ernie_layout):
-        super(ErnieLayoutForPretraining, self).__init__()
-        self.ernie_layout = ernie_layout
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForPretraining, self).__init__(config)
+        self.ernie_layout = ErnieLayoutModel(config)
         self.cls = ErnieLayoutPretrainingHeads(
-            self.ernie_layout.config["hidden_size"],
-            self.ernie_layout.config["vocab_size"],
-            self.ernie_layout.config["hidden_act"],
+            config.hidden_size,
+            config.vocab_size,
+            config.hidden_act,
             embedding_weights=self.ernie_layout.embeddings.word_embeddings.weight,
         )
 
@@ -1033,15 +969,15 @@ class ErnieLayoutForPretraining(ErnieLayoutPretrainedModel):
 
 
 class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
-    def __init__(self, ernie_layout, num_classes=2, dropout=None):
-        super(ErnieLayoutForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(ernie_layout, dict):
-            self.ernie_layout = ErnieLayoutModel(**ernie_layout)
-        else:
-            self.ernie_layout = ernie_layout
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_layout.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForTokenClassification, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.ernie_layout = ErnieLayoutModel(config)
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.classifier = nn.Linear(config["hidden_size"], config.num_labels)
         self.classifier.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1098,7 +1034,7 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
                     )
                     == 1
                 )
-                active_logits = logits.reshape([-1, self.num_classes])[active_loss]
+                active_logits = logits.reshape([-1, self.num_labels])[active_loss]
                 active_labels = labels.reshape(
                     [
                         -1,
@@ -1107,7 +1043,7 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
                 loss = loss_fct(active_logits, active_labels)
             else:
                 loss = loss_fct(
-                    logits.reshape([-1, self.num_classes]),
+                    logits.reshape([-1, self.num_labels]),
                     labels.reshape(
                         [
                             -1,
@@ -1121,16 +1057,16 @@ class ErnieLayoutForTokenClassification(ErnieLayoutPretrainedModel):
 
 
 class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
-    def __init__(self, ernie_layout, num_classes=2, dropout=None, has_visual_segment_embedding=False):
-        super(ErnieLayoutForQuestionAnswering, self).__init__()
-        self.num_classes = num_classes
-        if isinstance(ernie_layout, dict):
-            self.ernie_layout = ErnieLayoutModel(**ernie_layout)
-        else:
-            self.ernie_layout = ernie_layout
-        self.has_visual_segment_embedding = has_visual_segment_embedding
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_layout.config["hidden_dropout_prob"])
-        self.qa_outputs = nn.Linear(self.ernie_layout.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieLayoutConfig):
+        super(ErnieLayoutForQuestionAnswering, self).__init__(config)
+        self.num_labels = config.num_labels
+        self.ernie_layout = ErnieLayoutModel(config)
+        self.has_visual_segment_embedding = config.has_visual_segment_embedding
+        classifier_dropout = (
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.dropout = nn.Dropout(classifier_dropout)
+        self.qa_outputs = nn.Linear(config["hidden_size"], 2)
         self.qa_outputs.apply(self.init_weights)
 
     def get_input_embeddings(self):
@@ -1198,13 +1134,12 @@ class ErnieLayoutForQuestionAnswering(ErnieLayoutPretrainedModel):
 
 
 class UIEX(ErnieLayoutPretrainedModel):
-    def __init__(self, ernie_layout):
-        super(UIEX, self).__init__()
-        self.ernie_layout = ernie_layout
-        hidden_size = self.ernie_layout.config["hidden_size"]
-        self.linear_start = paddle.nn.Linear(hidden_size, 1)
-        self.linear_end = paddle.nn.Linear(hidden_size, 1)
-        self.sigmoid = paddle.nn.Sigmoid()
+    def __init__(self, config: ErnieLayoutConfig):
+        super(UIEX, self).__init__(config)
+        self.ernie_layout = ErnieLayoutModel(config)
+        self.linear_start = nn.Linear(config.hidden_size, 1)
+        self.linear_end = nn.Linear(config.hidden_size, 1)
+        self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None, bbox=None, image=None):
