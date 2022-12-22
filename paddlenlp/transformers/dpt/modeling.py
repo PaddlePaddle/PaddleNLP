@@ -823,6 +823,8 @@ class DPTModel(DPTPreTrainedModel):
     Args:
         config (:class:`DPTConfig`):
             An instance of DPTConfig used to construct DPTModel.
+        add_pooling_layer (`bool`, *optional*, defaults to True):
+            Whether to add a pooler layer.
     """
 
     def __init__(self, config, add_pooling_layer=True):
@@ -868,8 +870,15 @@ class DPTModel(DPTPreTrainedModel):
                 Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
                 more detail.
             return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                Whether to return a :class:`BaseModelOutputWithPoolingAndIntermediateActivations` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `None`.
+
+        Returns:
+            An instance of :class:`BaseModelOutputWithPoolingAndIntermediateActivations` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`BaseModelOutputWithPoolingAndIntermediateActivations`.
+
         """
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -1033,10 +1042,27 @@ class DPTForDepthEstimation(DPTPreTrainedModel):
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[paddle.Tensor], DepthEstimatorOutput]:
         r"""
-        labels (`paddle.Tensor` of shape `(batch_size, height, width)`, *optional*):
-            Ground truth depth estimation maps for computing the loss.
+        Args:
+            pixel_values (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values. Pixel values can be obtained using [`DPTImageProcessor`]. See [`DPTImageProcessor.__call__`]
+                for details.
+            labels (`paddle.Tensor` of shape `(batch_size, height, width)`, *optional*):
+                Ground truth depth estimation maps for computing the loss.
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (bool, optional):
+                Whether to return a :class:`DepthEstimatorOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `None`.
 
         Returns:
+            An instance of :class:`DepthEstimatorOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`DepthEstimatorOutput`.
 
         Examples:
 
@@ -1209,11 +1235,28 @@ class DPTForSemanticSegmentation(DPTPreTrainedModel):
         return_dict: Optional[bool] = None,
     ) -> Union[Tuple[paddle.Tensor], SemanticSegmenterOutput]:
         r"""
-        labels (`paddle.Tensor` of shape `(batch_size, height, width)`, *optional*):
-            Ground truth semantic segmentation maps for computing the loss. Indices should be in `[0, ...,
-            config.num_labels - 1]`. If `config.num_labels > 1`, a classification loss is computed (Cross-Entropy).
+        Args:
+            pixel_values (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+                Pixel values. Pixel values can be obtained using [`DPTImageProcessor`]. See [`DPTImageProcessor.__call__`]
+                for details.
+            labels (`paddle.Tensor` of shape `(batch_size, height, width)`, *optional*):
+                Ground truth semantic segmentation maps for computing the loss. Indices should be in `[0, ...,
+                config.num_labels - 1]`. If `config.num_labels > 1`, a classification loss is computed (Cross-Entropy).
+            output_attentions (`bool`, *optional*):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail.
+            output_hidden_states (`bool`, *optional*):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail.
+            return_dict (bool, optional):
+                Whether to return a :class:`SemanticSegmenterOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `None`.
 
         Returns:
+            An instance of :class:`SemanticSegmenterOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`SemanticSegmenterOutput`.
 
         Examples:
         ```python

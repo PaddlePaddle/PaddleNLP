@@ -703,7 +703,7 @@ class BitModel(BitPreTrainedModel):
                 Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
                 more detail.
             return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                Whether to return a :class:`BaseModelOutputWithPoolingAndNoAttention` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `None`.
         """
         output_hidden_states = (
@@ -783,7 +783,7 @@ class BitForImageClassification(BitPreTrainedModel):
                 Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
                 more detail.
             return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                Whether to return a :class:`ImageClassifierOutputWithNoAttention` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `None`.
         """
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
@@ -872,7 +872,7 @@ class BitBackbone(BitPreTrainedModel, BackboneMixin):
                 Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
                 more detail.
             return_dict (bool, optional):
-                Whether to return a :class:`~paddlenlp.transformers.model_outputs.ModelOutput` object. If `False`, the output
+                Whether to return a :class:`BackboneOutput` object. If `False`, the output
                 will be a tuple of tensors. Defaults to `None`.
 
         Returns:

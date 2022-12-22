@@ -1194,7 +1194,7 @@ class CLIPTextModel(CLIPPretrainedModel):
                 Defaults to `False`.
             return_dict (bool, optional):
                 Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
             An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
@@ -1309,7 +1309,7 @@ class CLIPVisionModel(CLIPPretrainedModel):
         pixel_values=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
         r"""
         The CLIPVisionModel forward method, overrides the `__call__()` special method.
@@ -1326,7 +1326,7 @@ class CLIPVisionModel(CLIPPretrainedModel):
                 Defaults to `False`.
             return_dict (bool, optional):
                 Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
             An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
@@ -2016,7 +2016,7 @@ class CLIPTextModelWithProjection(CLIPPretrainedModel):
         position_ids=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
         r"""
         The CLIPTextModelWithProjection forward method, overrides the `__call__()` special method.
@@ -2045,12 +2045,12 @@ class CLIPTextModelWithProjection(CLIPPretrainedModel):
                 Whether to return the attentions tensors of all attention layers.
                 Defaults to `False`.
             return_dict (bool, optional):
-                Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                Whether to return a :class:`CLIPTextModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
-            An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
-            corresponding to ordered and not None (depending on the input arguments) fields of :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
+            An instance of :class:`CLIPTextModelOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`CLIPTextModelOutput`.
 
         Example:
             .. code-block::
@@ -2090,6 +2090,48 @@ class CLIPTextModelWithProjection(CLIPPretrainedModel):
 
 @register_base_model
 class CLIPVisionModelWithProjection(CLIPPretrainedModel):
+    r"""
+    CLIP Vision Model with a projection layer on top (a linear layer on top of the pooled output).
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        image_resolution (int, optional):
+            The size (resolution) of each image.
+            Defaults to `224`.
+        vision_layers (int, optional):
+            Number of hidden layers in the vision model.
+            Defaults to `12`.
+        vision_heads (int, optional):
+            Number of attention heads for each attention layer in the vision attention.
+            Defaults to `12`.
+        vision_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in vision model.
+            Defaults to `768`.
+        vision_patch_size(int, optional):
+            The size (resolution) of each patch.
+            Defaults to `32`.
+        vision_mlp_ratio(int, optional):
+            The ratio between dim_feedforward and vision_hidden_dim. `radio = dim_feedforward/vision_hidden_dim`
+            Defaults to `4`.
+        vision_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the vision model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.
+        projection_dim (int, optional):
+            Dimentionality of text and vision projection layers.
+            Defaults to `512`.
+    """
     base_model_class = None
 
     def __init__(
@@ -2137,8 +2179,47 @@ class CLIPVisionModelWithProjection(CLIPPretrainedModel):
         pixel_values=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
+        r"""
+        The CLIPVisionModelWithProjection forward method, overrides the `__call__()` special method.
+
+        Args:
+            pixel_values (Tensor):
+                Pixel values. Padding will be ignored by default should you provide it.
+                Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`CLIPVisionModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `True`.
+
+        Returns:
+            An instance of :class:`CLIPVisionModelOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`CLIPVisionModelOutput`.
+
+        Example:
+            .. code-block::
+
+            from PIL import Image
+            import requests
+            from paddlenlp.transformers import CLIPProcessor, CLIPVisionModelWithProjection
+
+            model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+            processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+            url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            image = Image.open(requests.get(url, stream=True).raw)
+            inputs = processor(images=image, return_tensors="pd")
+            outputs = model(**inputs)
+
+            image_embeds = outputs.image_embeds
+
+        """
         vision_outputs = self.vision_model(
             pixel_values,
             output_attentions=output_attentions,
