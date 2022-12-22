@@ -1282,6 +1282,7 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 <a name="代码结构"></a>
 ## 代码结构
 以下是本项目代码结构
+
 ```text
 .
 ├── run_seq_cls.py               # 分类任务的微调脚本
@@ -1314,6 +1315,9 @@ batch_size=32 和 1，预测精度为 FP16 时，GPU 下的效果-时延图：
 │   └── seq_cls_grpc_client.py
 │   └── token_cls_grpc_client.py
 └── README.md                    # 文档
+
+```
+
 
 <a name="开始运行"></a>
 ## 开始运行
