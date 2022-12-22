@@ -296,8 +296,6 @@ class _BaseAutoModelClass:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
                         try:
-                            # if pattern in SPECTIAL_MODELS:
-                            #     init_class = SPECTIAL_MODELS[pattern]
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
                             logger.error(err)
