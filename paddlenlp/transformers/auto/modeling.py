@@ -130,15 +130,13 @@ MAPPING_TASKS = OrderedDict(
 )
 
 
-SPECTIAL_MODELS = OrderedDict(
-    [
-        ("uie-senta-base", "UIE"),
-        ("uie-senta-medium", "UIE"),
-        ("uie-senta-mini", "UIE"),
-        ("uie-senta-micro", "UIE"),
-        ("uie-senta-nano", "UIE"),
-    ]
-)
+SPECTIAL_MODELS = {
+    "uie-senta-base": {"init_class": "UIE", "base_model": "Ernie"},
+    "uie-senta-medium": {"init_class": "UIE", "base_model": "Ernie"},
+    "uie-senta-mini": {"init_class": "UIE", "base_model": "Ernie"},
+    "uie-senta-micro": {"init_class": "UIE", "base_model": "Ernie"},
+    "uie-senta-nano": {"init_class": "UIE", "base_model": "Ernie"},
+}
 
 
 def get_name_mapping(task="Model"):
@@ -176,6 +174,19 @@ def get_init_configurations():
         CONFIGURATION_MODEL_MAPPING[name] = key + "Model"
 
     return CONFIGURATION_MODEL_MAPPING
+
+
+def correct_name_mapping(pretrained_model_name, name_mapping):
+
+    init_class = SPECTIAL_MODELS[pretrained_model_name]["init_class"]
+    base_model = SPECTIAL_MODELS[pretrained_model_name]["base_model"]
+
+    import_key = base_model + "Model_Import_Class"
+    if import_key not in name_mapping:
+        raise ValueError("{} not in name_mapping.".format(import_key))
+    prev_import_class = name_mapping[import_key]
+    name_mapping[import_key] = init_class
+    name_mapping[init_class] = name_mapping[prev_import_class]
 
 
 class _BaseAutoModelClass:
@@ -285,8 +296,8 @@ class _BaseAutoModelClass:
                         class_name = cls._name_mapping[init_class]
                         import_class = importlib.import_module(f"paddlenlp.transformers.{class_name}.modeling")
                         try:
-                            if pattern in SPECTIAL_MODELS:
-                                init_class = SPECTIAL_MODELS[pattern]
+                            # if pattern in SPECTIAL_MODELS:
+                            #     init_class = SPECTIAL_MODELS[pattern]
                             model_class = getattr(import_class, init_class)
                         except AttributeError as err:
                             logger.error(err)
@@ -421,6 +432,8 @@ class AutoModel(_BaseAutoModelClass):
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertForPretraining'>
         """
+        if pretrained_model_name_or_path in SPECTIAL_MODELS:
+            correct_name_mapping(pretrained_model_name_or_path, cls._name_mapping)
         return cls._from_pretrained(pretrained_model_name_or_path, task, *model_args, **kwargs)
 
 
