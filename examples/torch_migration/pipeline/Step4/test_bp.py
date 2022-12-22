@@ -121,7 +121,7 @@ if __name__ == "__main__":
     hf_reprod_logger.save("bp_align_torch.npy")
 
     pd_reprod_logger = ReprodLogger()
-    pd_loss_list = hf_train_some_iters(fake_data, fake_label, 10)
+    pd_loss_list = pd_train_some_iters(fake_data, fake_label, 10)
     for idx, loss in enumerate(pd_loss_list):
         pd_reprod_logger.add(f"loss_{idx}", loss.detach().cpu().numpy())
     pd_reprod_logger.save("bp_align_paddle.npy")
