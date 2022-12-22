@@ -373,13 +373,13 @@ class AutoBackbone(_BaseAutoModelClass):
                 from paddlenlp.transformers import AutoBackbone
 
                 # Name of built-in pretrained model
-                model = AutoBackbone.from_pretrained('dalle-mini')
+                model = AutoBackbone.from_pretrained("google/bit-50")
                 print(type(model))
                 # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
 
 
                 # Load from local directory path
-                model = AutoBackbone.from_pretrained('./my_dalle_mini/')
+                model = AutoBackbone.from_pretrained("./bit-50")
                 print(type(model))
                 # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
         """
