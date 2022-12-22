@@ -102,7 +102,7 @@ class DPTConfig(PretrainedConfig):
     Examples:
 
     ```python
-    >>> from transformers import DPTModel, DPTConfig
+    >>> from paddlenlp.transformers import DPTModel, DPTConfig
 
     >>> # Initializing a DPT dpt-large style configuration
     >>> configuration = DPTConfig()
