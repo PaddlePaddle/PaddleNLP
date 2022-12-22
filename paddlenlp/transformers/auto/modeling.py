@@ -130,15 +130,6 @@ MAPPING_TASKS = OrderedDict(
 )
 
 
-SPECTIAL_MODELS = {
-    "uie-senta-base": {"init_class": "UIE", "base_model": "Ernie"},
-    "uie-senta-medium": {"init_class": "UIE", "base_model": "Ernie"},
-    "uie-senta-mini": {"init_class": "UIE", "base_model": "Ernie"},
-    "uie-senta-micro": {"init_class": "UIE", "base_model": "Ernie"},
-    "uie-senta-nano": {"init_class": "UIE", "base_model": "Ernie"},
-}
-
-
 def get_name_mapping(task="Model"):
     """
     Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
@@ -174,19 +165,6 @@ def get_init_configurations():
         CONFIGURATION_MODEL_MAPPING[name] = key + "Model"
 
     return CONFIGURATION_MODEL_MAPPING
-
-
-def correct_name_mapping(pretrained_model_name, name_mapping):
-
-    init_class = SPECTIAL_MODELS[pretrained_model_name]["init_class"]
-    base_model = SPECTIAL_MODELS[pretrained_model_name]["base_model"]
-
-    import_key = base_model + "Model_Import_Class"
-    if import_key not in name_mapping:
-        raise ValueError("{} not in name_mapping.".format(import_key))
-    prev_import_class = name_mapping[import_key]
-    name_mapping[import_key] = init_class
-    name_mapping[init_class] = name_mapping[prev_import_class]
 
 
 class _BaseAutoModelClass:
@@ -430,8 +408,6 @@ class AutoModel(_BaseAutoModelClass):
                 print(type(model))
                 # <class 'paddlenlp.transformers.bert.modeling.BertForPretraining'>
         """
-        if pretrained_model_name_or_path in SPECTIAL_MODELS:
-            correct_name_mapping(pretrained_model_name_or_path, cls._name_mapping)
         return cls._from_pretrained(pretrained_model_name_or_path, task, *model_args, **kwargs)
 
 
