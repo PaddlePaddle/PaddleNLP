@@ -71,7 +71,7 @@ class CharSubstitute(BaseAugment):
 
         if isinstance(aug_type, str):
             self.type = aug_type
-            if aug_type in ["homonym", "custom"]:
+            if aug_type in ["antonym", "homonym", "custom"]:
                 self.dict = self._load_substitue_dict(aug_type)
             elif aug_type in ["mlm"]:
                 self.mlm_model = AutoModelForMaskedLM.from_pretrained(self.model_name)
@@ -87,7 +87,7 @@ class CharSubstitute(BaseAugment):
             self.dict = {}
             # Merge dictionaries from different sources
             for t in aug_type:
-                if t in ["homonym", "custom"]:
+                if t in ["antonym", "homonym", "custom"]:
                     t_dict = self._load_substitue_dict(t)
                     for k in t_dict:
                         if k in self.dict:
@@ -99,7 +99,7 @@ class CharSubstitute(BaseAugment):
 
     def _load_substitue_dict(self, source_type):
         """Load substitution dictionary"""
-        if source_type in ["homonym"]:
+        if source_type in ["antonym", "homonym"]:
             fullname = self._load_file("char_" + source_type)
         elif source_type in ["custom"]:
             fullname = self.custom_file_path
@@ -174,7 +174,7 @@ class CharSubstitute(BaseAugment):
     def _augment_multi(self, seq_tokens, aug_n, aug_indexes, p):
         sentences = []
         aug_n = min(aug_n, len(aug_indexes))
-        if self.type in ["homonym", "combination", "custom"]:
+        if self.type in ["antonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             pp = []
             for i, aug_index in enumerate(aug_indexes):
@@ -213,7 +213,7 @@ class CharSubstitute(BaseAugment):
     def _augment_single(self, seq_tokens, aug_indexes, p):
         sentences = []
         aug_tokens = []
-        if self.type in ["homonym", "combination", "custom"]:
+        if self.type in ["antonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             pp = []
             for i, aug_index in enumerate(aug_indexes):
@@ -281,7 +281,7 @@ class CharInsert(BaseAugment):
         self.model_name = "ernie-1.0-large-zh-cw"
         if isinstance(aug_type, str):
             self.type = aug_type
-            if aug_type in ["homonym", "custom"]:
+            if aug_type in ["antonym", "homonym", "custom"]:
                 self.dict = self._load_insert_dict(aug_type)
             elif aug_type in ["mlm"]:
                 self.mlm_model = AutoModelForMaskedLM.from_pretrained(self.model_name)
@@ -291,7 +291,7 @@ class CharInsert(BaseAugment):
             self.dict = {}
             # Merge dictionaries from different sources
             for t in aug_type:
-                if t in ["homonym", "custom"]:
+                if t in ["antonym", "homonym", "custom"]:
                     t_dict = self._load_insert_dict(t)
                     for k in t_dict:
                         if k in self.dict:
@@ -303,7 +303,7 @@ class CharInsert(BaseAugment):
 
     def _load_insert_dict(self, source_type):
         """Load insert dictionary"""
-        if source_type in ["homonym"]:
+        if source_type in ["antonym", "homonym"]:
             fullname = self._load_file("char_" + source_type)
         elif source_type in ["custom"]:
             fullname = self.custom_file_path
@@ -368,7 +368,7 @@ class CharInsert(BaseAugment):
 
     def _augment_multi(self, seq_tokens, aug_n, aug_indexes):
         sentences = []
-        if self.type in ["homonym", "combination", "custom"]:
+        if self.type in ["antonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             for aug_index in aug_indexes:
                 if seq_tokens[aug_index] in self.dict:
@@ -406,7 +406,7 @@ class CharInsert(BaseAugment):
 
         sentences = []
         aug_tokens = []
-        if self.type in ["homonym", "combination", "custom"]:
+        if self.type in ["antonym", "homonym", "combination", "custom"]:
             candidate_tokens = []
             for aug_index in aug_indexes:
                 if seq_tokens[aug_index] in self.dict:

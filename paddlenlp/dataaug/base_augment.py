@@ -73,6 +73,16 @@ class BaseAugment(object):
                 "dd98d5d5d32a3d3dd45c8f7ca503c7df",
                 "https://bj.bcebos.com/paddlenlp/data/char_homonym.json",
             ),
+            "char_antonym": (
+                "char_antonym.json",
+                "f892f5dce06f17d19949ebcbe0ed52b7",
+                "https://bj.bcebos.com/paddlenlp/data/char_antonym.json",
+            ),
+            "word_antonym": (
+                "word_antonym.json",
+                "cbea11fa99fbe9d07e8185750b37e84a",
+                "https://bj.bcebos.com/paddlenlp/data/word_antonym.json",
+            ),
         }
         self.stop_words = self._get_data("stop_words")
         self.aug_n = aug_n
