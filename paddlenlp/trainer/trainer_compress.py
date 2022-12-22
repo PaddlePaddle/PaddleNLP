@@ -383,9 +383,8 @@ def evaluate_token_cls(self, model, data_loader):
         if isinstance(model, paddleslim.nas.ofa.OFA):
             logits = logits[0]
         preds = logits.argmax(axis=2)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            batch["seq_len"], preds, batch["labels"]
-        )
+        seq_len = paddle.sum(batch["labels"] != self.train_dataset.ignore_label, axis=-1)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(seq_len, preds, batch["labels"])
         metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
     res = metric.accumulate()
     logger.info("precision: %f, recall: %f, f1_score: %f" % (res[0], res[1], res[2]))
