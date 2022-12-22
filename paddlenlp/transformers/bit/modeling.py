@@ -581,7 +581,7 @@ class BitEncoder(nn.Layer):
 
         layer_dropouts = [
             x.tolist()
-            for x in paddle.Tensor(np.linspace(0, config.drop_path_rate, sum(config.depths))).split(config.depths)
+            for x in paddle.to_tensor(np.linspace(0, config.drop_path_rate, sum(config.depths))).split(config.depths)
         ]
 
         for stage_idx, (current_depth, current_hidden_size, layer_dropout) in enumerate(
