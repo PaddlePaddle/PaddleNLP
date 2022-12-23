@@ -77,6 +77,7 @@ from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
+from .ernie_layout.configuration import *
 from .ernie_m.configuration import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *

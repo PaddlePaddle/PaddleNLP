@@ -18,6 +18,8 @@ import os
 import subprocess
 import sys
 
+from packaging import version
+
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -57,35 +59,23 @@ def read_version_of_local_package(version_file_path: str) -> str:
     return version
 
 
-def should_ppdiffusers_deploy():
-    """print the result to terminal"""
-    local_version_file = os.path.join(PROJECT_ROOT, "ppdiffusers/VERSION")
-    remote_version = read_version_of_remote_package("ppdiffusers")
-    local_version = read_version_of_local_package(local_version_file)
-
-    should_deploy = str(remote_version != local_version).lower()
-    print(f"should_deploy={should_deploy}")
-
-
-def should_paddle_pipelines_deploy():
-    """print the result to terminal"""
-    local_version_file = os.path.join(PROJECT_ROOT, "pipelines/VERSION")
-    remote_version = read_version_of_remote_package("pipelines")
-    local_version = read_version_of_local_package(local_version_file)
-
-    should_deploy = str(remote_version != local_version).lower()
-    print(f"should_deploy={should_deploy}")
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", required=True)
 
     args = parser.parse_args()
 
-    if args.name == "ppdiffusers":
-        should_ppdiffusers_deploy()
-    elif args.name == "paddle-pipelines":
-        should_paddle_pipelines_deploy()
-    else:
+    version_file_map = {
+        "paddlenlp": "VERSION",
+        "ppdiffusers": "ppdiffusers/VERSION",
+        "paddle-pipelines": "pipelines/VERSION",
+    }
+    if args.name not in version_file_map:
         raise ValueError(f"package<{args.name}> not supported")
+
+    local_version_file = os.path.join(PROJECT_ROOT, version_file_map[args.name])
+    remote_version = read_version_of_remote_package(args.name)
+    local_version = read_version_of_local_package(local_version_file)
+
+    should_deploy = str(version.parse(remote_version) < version.parse(local_version)).lower()
+    print(f"should_deploy={should_deploy}")

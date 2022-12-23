@@ -50,17 +50,19 @@ install:
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	cd ppdiffusers && make
-
-.PHONY: install-ppdiffusers
-install-ppdiffusers:
-	cd ppdiffusers && make install
+	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	cd pipelines && make
+	cd pipelines && make install && make
 
-.PHONY: install-paddle-pipelines
-install-paddle-pipelines:
-	cd pipelines && make install
-
+.PHONY: deploy-paddlenlp
+deploy-paddlenlp:
+	# install related package
+	make install
+	# deploy version
+	echo "VERSION = '$$(cat VERSION)'" > paddlenlp/version.py
+	# build
+	python3 setup.py sdist bdist_wheel
+	# upload
+	twine upload --skip-existing dist/*
