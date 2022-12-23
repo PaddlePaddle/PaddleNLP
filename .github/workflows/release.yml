@@ -14,9 +14,8 @@ on:
         - ppdiffusers
 
 jobs:
-  Deployment:
-    name: Pack
-    needs: build
+  Release:
+    name: Release
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
