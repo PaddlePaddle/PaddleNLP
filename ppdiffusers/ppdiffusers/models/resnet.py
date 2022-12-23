@@ -20,6 +20,75 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 
+class Upsample1D(nn.Layer):
+    """
+    An upsampling layer with an optional convolution.
+
+    Parameters:
+            channels: channels in the inputs and outputs.
+            use_conv: a bool determining if a convolution is applied.
+            use_conv_transpose:
+            out_channels:
+    """
+
+    def __init__(self, channels, use_conv=False, use_conv_transpose=False, out_channels=None, name="conv"):
+        super().__init__()
+        self.channels = channels
+        self.out_channels = out_channels or channels
+        self.use_conv = use_conv
+        self.use_conv_transpose = use_conv_transpose
+        self.name = name
+
+        self.conv = None
+        if use_conv_transpose:
+            self.conv = nn.Conv1DTranspose(channels, self.out_channels, 4, 2, 1)
+        elif use_conv:
+            self.conv = nn.Conv1D(self.channels, self.out_channels, 3, padding=1)
+
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        if self.use_conv_transpose:
+            return self.conv(x)
+
+        x = F.interpolate(x, scale_factor=2.0, mode="nearest")
+
+        if self.use_conv:
+            x = self.conv(x)
+
+        return x
+
+
+class Downsample1D(nn.Layer):
+    """
+    A downsampling layer with an optional convolution.
+
+    Parameters:
+        channels: channels in the inputs and outputs.
+        use_conv: a bool determining if a convolution is applied.
+        out_channels:
+        padding:
+    """
+
+    def __init__(self, channels, use_conv=False, out_channels=None, padding=1, name="conv"):
+        super().__init__()
+        self.channels = channels
+        self.out_channels = out_channels or channels
+        self.use_conv = use_conv
+        self.padding = padding
+        stride = 2
+        self.name = name
+
+        if use_conv:
+            self.conv = nn.Conv1D(self.channels, self.out_channels, 3, stride=stride, padding=padding)
+        else:
+            assert self.channels == self.out_channels
+            self.conv = nn.AvgPool1D(kernel_size=stride, stride=stride)
+
+    def forward(self, x):
+        assert x.shape[1] == self.channels
+        return self.conv(x)
+
+
 class Upsample2D(nn.Layer):
     """
     An upsampling layer with an optional convolution.
@@ -27,15 +96,11 @@ class Upsample2D(nn.Layer):
     Parameters:
         channels: channels in the inputs and outputs.
         use_conv: a bool determining if a convolution is applied.
-        dims: determines if the signal is 1D, 2D, or 3D. If 3D, then upsampling occurs in the inner-two dimensions.
+        use_conv_transpose:
+        out_channels:
     """
 
-    def __init__(self,
-                 channels,
-                 use_conv=False,
-                 use_conv_transpose=False,
-                 out_channels=None,
-                 name="conv"):
+    def __init__(self, channels, use_conv=False, use_conv_transpose=False, out_channels=None, name="conv"):
         super().__init__()
         self.channels = channels
         self.out_channels = out_channels or channels
@@ -66,22 +131,18 @@ class Upsample2D(nn.Layer):
         # https://github.com/pytorch/pytorch/issues/86679
         dtype = hidden_states.dtype
         if dtype == paddle.bfloat16:
-            hidden_states = hidden_states.astype(paddle.float32)
+            hidden_states = hidden_states.cast("float32")
 
         # if `output_size` is passed we force the interpolation output
         # size and do not make use of `scale_factor=2`
         if output_size is None:
-            hidden_states = F.interpolate(hidden_states,
-                                          scale_factor=2.0,
-                                          mode="nearest")
+            hidden_states = F.interpolate(hidden_states, scale_factor=2.0, mode="nearest")
         else:
-            hidden_states = F.interpolate(hidden_states,
-                                          size=output_size,
-                                          mode="nearest")
+            hidden_states = F.interpolate(hidden_states, size=output_size, mode="nearest")
 
         # If the input is bfloat16, we cast back to bfloat16
         if dtype == paddle.bfloat16:
-            hidden_states = hidden_states.astype(dtype)
+            hidden_states = hidden_states.cast(dtype)
 
         # TODO(Suraj, Patrick) - clean up after weight dicts are correctly renamed
         if self.use_conv:
@@ -100,15 +161,11 @@ class Downsample2D(nn.Layer):
     Parameters:
         channels: channels in the inputs and outputs.
         use_conv: a bool determining if a convolution is applied.
-        dims: determines if the signal is 1D, 2D, or 3D. If 3D, then downsampling occurs in the inner-two dimensions.
+        out_channels:
+        padding:
     """
 
-    def __init__(self,
-                 channels,
-                 use_conv=False,
-                 out_channels=None,
-                 padding=1,
-                 name="conv"):
+    def __init__(self, channels, use_conv=False, out_channels=None, padding=1, name="conv"):
         super().__init__()
         self.channels = channels
         self.out_channels = out_channels or channels
@@ -118,11 +175,7 @@ class Downsample2D(nn.Layer):
         self.name = name
 
         if use_conv:
-            conv = nn.Conv2D(self.channels,
-                             self.out_channels,
-                             3,
-                             stride=stride,
-                             padding=padding)
+            conv = nn.Conv2D(self.channels, self.out_channels, 3, stride=stride, padding=padding)
         else:
             assert self.channels == self.out_channels
             conv = nn.AvgPool2D(kernel_size=stride, stride=stride)
@@ -149,30 +202,16 @@ class Downsample2D(nn.Layer):
 
 
 class FirUpsample2D(nn.Layer):
-
-    def __init__(self,
-                 channels=None,
-                 out_channels=None,
-                 use_conv=False,
-                 fir_kernel=(1, 3, 3, 1)):
+    def __init__(self, channels=None, out_channels=None, use_conv=False, fir_kernel=(1, 3, 3, 1)):
         super().__init__()
         out_channels = out_channels if out_channels else channels
         if use_conv:
-            self.Conv2d_0 = nn.Conv2D(channels,
-                                      out_channels,
-                                      kernel_size=3,
-                                      stride=1,
-                                      padding=1)
+            self.Conv2d_0 = nn.Conv2D(channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.use_conv = use_conv
         self.fir_kernel = fir_kernel
         self.out_channels = out_channels
 
-    def _upsample_2d(self,
-                     hidden_states,
-                     weight=None,
-                     kernel=None,
-                     factor=2,
-                     gain=1):
+    def _upsample_2d(self, hidden_states, weight=None, kernel=None, factor=2, gain=1):
         """Fused `upsample_2d()` followed by `Conv2d()`.
 
         Padding is performed only once at the beginning, not between the operations. The fused op is considerably more
@@ -221,10 +260,8 @@ class FirUpsample2D(nn.Layer):
                 (hidden_states.shape[3] - 1) * factor + convW,
             )
             output_padding = (
-                output_shape[0] - (hidden_states.shape[2] - 1) * stride[0] -
-                convH,
-                output_shape[1] - (hidden_states.shape[3] - 1) * stride[1] -
-                convW,
+                output_shape[0] - (hidden_states.shape[2] - 1) * stride[0] - convH,
+                output_shape[1] - (hidden_states.shape[3] - 1) * stride[1] - convW,
             )
             assert output_padding[0] >= 0 and output_padding[1] >= 0
             num_groups = hidden_states.shape[1] // inC
@@ -234,11 +271,9 @@ class FirUpsample2D(nn.Layer):
             weight = paddle.flip(weight, axis=[3, 4]).transpose([0, 2, 1, 3, 4])
             weight = weight.reshape([num_groups * inC, -1, convH, convW])
 
-            inverse_conv = F.conv2d_transpose(hidden_states,
-                                              weight,
-                                              stride=stride,
-                                              output_padding=output_padding,
-                                              padding=0)
+            inverse_conv = F.conv2d_transpose(
+                hidden_states, weight, stride=stride, output_padding=output_padding, padding=0
+            )
 
             output = upfirdn2d_native(
                 inverse_conv,
@@ -258,43 +293,25 @@ class FirUpsample2D(nn.Layer):
 
     def forward(self, hidden_states):
         if self.use_conv:
-            height = self._upsample_2d(hidden_states,
-                                       self.Conv2d_0.weight,
-                                       kernel=self.fir_kernel)
+            height = self._upsample_2d(hidden_states, self.Conv2d_0.weight, kernel=self.fir_kernel)
             height = height + self.Conv2d_0.bias.reshape([1, -1, 1, 1])
         else:
-            height = self._upsample_2d(hidden_states,
-                                       kernel=self.fir_kernel,
-                                       factor=2)
+            height = self._upsample_2d(hidden_states, kernel=self.fir_kernel, factor=2)
 
         return height
 
 
 class FirDownsample2D(nn.Layer):
-
-    def __init__(self,
-                 channels=None,
-                 out_channels=None,
-                 use_conv=False,
-                 fir_kernel=(1, 3, 3, 1)):
+    def __init__(self, channels=None, out_channels=None, use_conv=False, fir_kernel=(1, 3, 3, 1)):
         super().__init__()
         out_channels = out_channels if out_channels else channels
         if use_conv:
-            self.Conv2d_0 = nn.Conv2D(channels,
-                                      out_channels,
-                                      kernel_size=3,
-                                      stride=1,
-                                      padding=1)
+            self.Conv2d_0 = nn.Conv2D(channels, out_channels, kernel_size=3, stride=1, padding=1)
         self.fir_kernel = fir_kernel
         self.use_conv = use_conv
         self.out_channels = out_channels
 
-    def _downsample_2d(self,
-                       hidden_states,
-                       weight=None,
-                       kernel=None,
-                       factor=2,
-                       gain=1):
+    def _downsample_2d(self, hidden_states, weight=None, kernel=None, factor=2, gain=1):
         """Fused `Conv2d()` followed by `downsample_2d()`.
         Padding is performed only once at the beginning, not between the operations. The fused op is considerably more
         efficient than performing the same calculation using standard TensorFlow ops. It supports gradients of
@@ -336,10 +353,7 @@ class FirDownsample2D(nn.Layer):
                 paddle.to_tensor(kernel),
                 pad=((pad_value + 1) // 2, pad_value // 2),
             )
-            output = F.conv2d(upfirdn_input,
-                              weight,
-                              stride=stride_value,
-                              padding=0)
+            output = F.conv2d(upfirdn_input, weight, stride=stride_value, padding=0)
         else:
             pad_value = kernel.shape[0] - factor
             output = upfirdn2d_native(
@@ -353,21 +367,15 @@ class FirDownsample2D(nn.Layer):
 
     def forward(self, hidden_states):
         if self.use_conv:
-            downsample_input = self._downsample_2d(hidden_states,
-                                                   weight=self.Conv2d_0.weight,
-                                                   kernel=self.fir_kernel)
-            hidden_states = downsample_input + self.Conv2d_0.bias.reshape(
-                [1, -1, 1, 1])
+            downsample_input = self._downsample_2d(hidden_states, weight=self.Conv2d_0.weight, kernel=self.fir_kernel)
+            hidden_states = downsample_input + self.Conv2d_0.bias.reshape([1, -1, 1, 1])
         else:
-            hidden_states = self._downsample_2d(hidden_states,
-                                                kernel=self.fir_kernel,
-                                                factor=2)
+            hidden_states = self._downsample_2d(hidden_states, kernel=self.fir_kernel, factor=2)
 
         return hidden_states
 
 
 class ResnetBlock2D(nn.Layer):
-
     def __init__(
         self,
         *,
@@ -403,30 +411,18 @@ class ResnetBlock2D(nn.Layer):
         if groups_out is None:
             groups_out = groups
 
-        self.norm1 = nn.GroupNorm(num_groups=groups,
-                                  num_channels=in_channels,
-                                  epsilon=eps)
+        self.norm1 = nn.GroupNorm(num_groups=groups, num_channels=in_channels, epsilon=eps)
 
-        self.conv1 = nn.Conv2D(in_channels,
-                               out_channels,
-                               kernel_size=3,
-                               stride=1,
-                               padding=1)
+        self.conv1 = nn.Conv2D(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if temb_channels is not None:
             self.time_emb_proj = nn.Linear(temb_channels, out_channels)
         else:
             self.time_emb_proj = None
 
-        self.norm2 = nn.GroupNorm(num_groups=groups_out,
-                                  num_channels=out_channels,
-                                  epsilon=eps)
+        self.norm2 = nn.GroupNorm(num_groups=groups_out, num_channels=out_channels, epsilon=eps)
         self.dropout = nn.Dropout(dropout)
-        self.conv2 = nn.Conv2D(out_channels,
-                               out_channels,
-                               kernel_size=3,
-                               stride=1,
-                               padding=1)
+        self.conv2 = nn.Conv2D(out_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if non_linearity == "swish":
             self.nonlinearity = lambda x: F.silu(x)
@@ -441,9 +437,7 @@ class ResnetBlock2D(nn.Layer):
                 fir_kernel = (1, 3, 3, 1)
                 self.upsample = lambda x: upsample_2d(x, kernel=fir_kernel)
             elif kernel == "sde_vp":
-                self.upsample = partial(F.interpolate,
-                                        scale_factor=2.0,
-                                        mode="nearest")
+                self.upsample = partial(F.interpolate, scale_factor=2.0, mode="nearest")
             else:
                 self.upsample = Upsample2D(in_channels, use_conv=False)
         elif self.down:
@@ -453,20 +447,13 @@ class ResnetBlock2D(nn.Layer):
             elif kernel == "sde_vp":
                 self.downsample = partial(F.avg_pool2d, kernel_size=2, stride=2)
             else:
-                self.downsample = Downsample2D(in_channels,
-                                               use_conv=False,
-                                               padding=1,
-                                               name="op")
+                self.downsample = Downsample2D(in_channels, use_conv=False, padding=1, name="op")
 
         self.use_in_shortcut = self.in_channels != self.out_channels if use_in_shortcut is None else use_in_shortcut
 
         self.conv_shortcut = None
         if self.use_in_shortcut:
-            self.conv_shortcut = nn.Conv2D(in_channels,
-                                           out_channels,
-                                           kernel_size=1,
-                                           stride=1,
-                                           padding=0)
+            self.conv_shortcut = nn.Conv2D(in_channels, out_channels, kernel_size=1, stride=1, padding=0)
 
     def forward(self, input_tensor, temb):
         hidden_states = input_tensor
@@ -496,16 +483,77 @@ class ResnetBlock2D(nn.Layer):
         if self.conv_shortcut is not None:
             input_tensor = self.conv_shortcut(input_tensor)
 
-        output_tensor = (input_tensor +
-                         hidden_states) / self.output_scale_factor
+        output_tensor = (input_tensor + hidden_states) / self.output_scale_factor
 
         return output_tensor
 
 
 class Mish(nn.Layer):
-
     def forward(self, hidden_states):
         return hidden_states * paddle.tanh(F.softplus(hidden_states))
+
+
+# unet_rl.py
+def rearrange_dims(tensor):
+    if len(tensor.shape) == 2:
+        return tensor[:, :, None]
+    if len(tensor.shape) == 3:
+        return tensor[:, :, None, :]
+    elif len(tensor.shape) == 4:
+        return tensor[:, :, 0, :]
+    else:
+        raise ValueError(f"`len(tensor)`: {len(tensor)} has to be 2, 3 or 4.")
+
+
+class Conv1dBlock(nn.Layer):
+    """
+    Conv1d --> GroupNorm --> Mish
+    """
+
+    def __init__(self, inp_channels, out_channels, kernel_size, n_groups=8):
+        super().__init__()
+
+        self.conv1d = nn.Conv1D(inp_channels, out_channels, kernel_size, padding=kernel_size // 2)
+        self.group_norm = nn.GroupNorm(n_groups, out_channels)
+        self.mish = nn.Mish()
+
+    def forward(self, x):
+        x = self.conv1d(x)
+        x = rearrange_dims(x)
+        x = self.group_norm(x)
+        x = rearrange_dims(x)
+        x = self.mish(x)
+        return x
+
+
+# unet_rl.py
+class ResidualTemporalBlock1D(nn.Layer):
+    def __init__(self, inp_channels, out_channels, embed_dim, kernel_size=5):
+        super().__init__()
+        self.conv_in = Conv1dBlock(inp_channels, out_channels, kernel_size)
+        self.conv_out = Conv1dBlock(out_channels, out_channels, kernel_size)
+
+        self.time_emb_act = nn.Mish()
+        self.time_emb = nn.Linear(embed_dim, out_channels)
+
+        self.residual_conv = (
+            nn.Conv1D(inp_channels, out_channels, 1) if inp_channels != out_channels else nn.Identity()
+        )
+
+    def forward(self, x, t):
+        """
+        Args:
+            x : [ batch_size x inp_channels x horizon ]
+            t : [ batch_size x embed_dim ]
+
+        returns:
+            out : [ batch_size x out_channels x horizon ]
+        """
+        t = self.time_emb_act(t)
+        t = self.time_emb(t)
+        out = self.conv_in(x) + rearrange_dims(t)
+        out = self.conv_out(out)
+        return out + self.residual_conv(x)
 
 
 def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
@@ -534,7 +582,10 @@ def upsample_2d(hidden_states, kernel=None, factor=2, gain=1):
         kernel = paddle.outer(kernel, kernel)
     kernel /= paddle.sum(kernel)
 
-    kernel = kernel * (gain * (factor**2))
+    if gain != 1:
+        kernel = kernel * (gain * (factor**2))
+    else:
+        kernel = kernel * (factor**2)
     pad_value = kernel.shape[0] - factor
     output = upfirdn2d_native(
         hidden_states,
@@ -574,11 +625,34 @@ def downsample_2d(hidden_states, kernel=None, factor=2, gain=1):
 
     kernel = kernel * gain
     pad_value = kernel.shape[0] - factor
-    output = upfirdn2d_native(hidden_states,
-                              kernel,
-                              down=factor,
-                              pad=((pad_value + 1) // 2, pad_value // 2))
+    output = upfirdn2d_native(hidden_states, kernel, down=factor, pad=((pad_value + 1) // 2, pad_value // 2))
     return output
+
+
+def dummy_pad(tensor, up_x=0, up_y=0):
+    if up_x > 0:
+        tensor = paddle.concat(
+            [
+                tensor,
+                paddle.zeros(
+                    [tensor.shape[0], tensor.shape[1], tensor.shape[2], tensor.shape[3], up_x, tensor.shape[5]],
+                    dtype=tensor.dtype,
+                ),
+            ],
+            axis=4,
+        )
+    if up_y > 0:
+        tensor = paddle.concat(
+            [
+                tensor,
+                paddle.zeros(
+                    [tensor.shape[0], tensor.shape[1], up_y, tensor.shape[3], tensor.shape[4], tensor.shape[5]],
+                    dtype=tensor.dtype,
+                ),
+            ],
+            axis=2,
+        )
+    return tensor
 
 
 def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
@@ -594,31 +668,31 @@ def upfirdn2d_native(tensor, kernel, up=1, down=1, pad=(0, 0)):
     kernel_h, kernel_w = kernel.shape
 
     out = tensor.reshape([-1, in_h, 1, in_w, 1, minor])
-
-    # TODO F.pad
-    out = F.pad(out, [0, 0, 0, up_x - 1, 0, 0, 0, up_y - 1])
+    # (TODO, junnyu F.pad bug)
+    # F.pad(out, [0, 0, 0, up_x - 1, 0, 0, 0, up_y - 1])
+    out = dummy_pad(out, up_x - 1, up_y - 1)
     out = out.reshape([-1, in_h * up_y, in_w * up_x, minor])
 
-    out = F.pad(
-        out,
-        [0, 0,
-         max(pad_x0, 0),
-         max(pad_x1, 0),
-         max(pad_y0, 0),
-         max(pad_y1, 0)])
-    out = out[:,
-              max(-pad_y0, 0):out.shape[1] - max(-pad_y1, 0),
-              max(-pad_x0, 0):out.shape[2] - max(-pad_x1, 0), :, ]
+    # (TODO, junnyu F.pad bug)
+    # out = F.pad(out, [0, 0, max(pad_x0, 0), max(pad_x1, 0), max(pad_y0, 0), max(pad_y1, 0)])
+    out = out.unsqueeze(0)
+    out = F.pad(out, [max(pad_x0, 0), max(pad_x1, 0), max(pad_y0, 0), max(pad_y1, 0), 0, 0], data_format="NDHWC")
+    out = out.squeeze(0)
+
+    out = out[
+        :,
+        max(-pad_y0, 0) : out.shape[1] - max(-pad_y1, 0),
+        max(-pad_x0, 0) : out.shape[2] - max(-pad_x1, 0),
+        :,
+    ]
 
     out = out.transpose([0, 3, 1, 2])
-    out = out.reshape(
-        [-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
+    out = out.reshape([-1, 1, in_h * up_y + pad_y0 + pad_y1, in_w * up_x + pad_x0 + pad_x1])
     w = paddle.flip(kernel, [0, 1]).reshape([1, 1, kernel_h, kernel_w])
     out = F.conv2d(out, w)
-    out = out.reshape([
-        -1, minor, in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1,
-        in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1
-    ])
+    out = out.reshape(
+        [-1, minor, in_h * up_y + pad_y0 + pad_y1 - kernel_h + 1, in_w * up_x + pad_x0 + pad_x1 - kernel_w + 1]
+    )
     out = out.transpose([0, 2, 3, 1])
     out = out[:, ::down_y, ::down_x, :]
 

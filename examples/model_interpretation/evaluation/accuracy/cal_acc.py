@@ -25,10 +25,10 @@ def get_args():
     """
     get args
     """
-    parser = argparse.ArgumentParser('Acc eval')
-    parser.add_argument('--golden_path', required=True)
-    parser.add_argument('--pred_path', required=True)
-    parser.add_argument('--language', required=True, choices=['ch', 'en'])
+    parser = argparse.ArgumentParser("Acc eval")
+    parser.add_argument("--golden_path", required=True)
+    parser.add_argument("--pred_path", required=True)
+    parser.add_argument("--language", required=True, choices=["ch", "en"])
 
     args = parser.parse_args()
     return args
@@ -40,24 +40,24 @@ def load_from_file(args):
     :return: golden_raw: {sent_id, rationales_lists}, pred_raw: {sent_id, rationales_list},
              golden_label: {sent_id, label}, pred_label: {sent_id, label}
     """
-    golden_f = open(args.golden_path, 'r')
-    pred_f = open(args.pred_path, 'r')
+    golden_f = open(args.golden_path, "r")
+    pred_f = open(args.pred_path, "r")
 
     golden_labels, pred_labels = {}, {}
 
     for golden_line in golden_f.readlines():
         golden_dict = json.loads(golden_line)
-        id = golden_dict['sent_id']
-        golden_labels[id] = int(golden_dict['sent_label'])
+        id = golden_dict["sent_id"]
+        golden_labels[id] = int(golden_dict["sent_label"])
 
     for pred_line in pred_f.readlines():
         pred_dict = json.loads(pred_line)
-        id = pred_dict['id']
-        pred_labels[id] = int(pred_dict['pred_label'])
+        id = pred_dict["id"]
+        pred_labels[id] = int(pred_dict["pred_label"])
 
     result = {}
-    result['golden_labels'] = golden_labels
-    result['pred_labels'] = pred_labels
+    result["golden_labels"] = golden_labels
+    result["pred_labels"] = pred_labels
 
     return result
 
@@ -82,15 +82,14 @@ def main(args):
     main function
     """
     result = load_from_file(args)
-    golden_label = result['golden_labels']
-    pred_label = result['pred_labels']
+    golden_label = result["golden_labels"]
+    pred_label = result["pred_labels"]
 
     acc = cal_acc(golden_label, pred_label)
     return acc, len(pred_label)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = get_args()
     acc, num = main(args)
-    print('total\tnum: %d\tacc: %.1f' \
-        % (num, acc * 100))
+    print("total\tnum: %d\tacc: %.1f" % (num, acc * 100))

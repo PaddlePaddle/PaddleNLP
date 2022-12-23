@@ -23,7 +23,7 @@ from paddlenlp.utils.env import MODEL_HOME
 
 from ..ernie.tokenizer import ErnieTokenizer
 
-__all__ = ['ErnieGramTokenizer']
+__all__ = ["ErnieGramTokenizer"]
 
 
 class ErnieGramTokenizer(ErnieTokenizer):
@@ -35,37 +35,37 @@ class ErnieGramTokenizer(ErnieTokenizer):
     For more information regarding those methods, please refer to this superclass.
 
     Args:
-        vocab_file (str): 
+        vocab_file (str):
             The vocabulary file path (ends with '.txt') required to instantiate
             a `WordpieceTokenizer`.
         do_lower_case (str, optional):
             Whether or not to lowercase the input when tokenizing.
             Defaults to `True`.
-        unk_token (str, optional): 
+        unk_token (str, optional):
             A special token representing the *unknown (out-of-vocabulary)* token.
             An unknown token is set to be `unk_token` inorder to be converted to an ID.
             Defaults to "[UNK]".
-        sep_token (str, optional): 
+        sep_token (str, optional):
             A special token separating two different sentences in the same input.
             Defaults to "[SEP]".
-        pad_token (str, optional): 
+        pad_token (str, optional):
             A special token used to make arrays of tokens the same size for batching purposes.
             Defaults to "[PAD]".
-        cls_token (str, optional): 
+        cls_token (str, optional):
             A special token used for sequence classification. It is the last token
             of the sequence when built with special tokens. Defaults to "[CLS]".
-        mask_token (str, optional): 
+        mask_token (str, optional):
             A special token representing a masked token. This is the token used
             in the masked language modeling task which the model tries to predict the original unmasked ones.
             Defaults to "[MASK]".
-    
+
     Examples:
         .. code-block::
 
             from paddlenlp.transformers import ErnieGramTokenizer
             tokenizer = ErnieGramTokenizer.from_pretrained('ernie-gram-zh')
             encoded_inputs = tokenizer('He was a puppeteer')
-            # encoded_inputs: 
+            # encoded_inputs:
             # {
             #   'input_ids': [1, 4444, 4385, 1545, 6712, 10062, 9568, 9756, 9500, 2],
             #   'token_type_ids': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
@@ -75,39 +75,37 @@ class ErnieGramTokenizer(ErnieTokenizer):
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "ernie-gram-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
-            "ernie-gram-zh-finetuned-dureader-robust":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
+            "ernie-gram-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
+            "ernie-gram-zh-finetuned-dureader-robust": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_gram_zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {
-        "ernie-gram-zh": {
-            "do_lower_case": True
-        },
-        "ernie-gram-zh-finetuned-dureader-robust": {
-            "do_lower_case": True
-        },
+        "ernie-gram-zh": {"do_lower_case": True},
+        "ernie-gram-zh-finetuned-dureader-robust": {"do_lower_case": True},
     }
     max_model_input_sizes = {
         "ernie-gram-zh": 512,
         "ernie-gram-zh-finetuned-dureader-robust": 512,
     }
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
-        super(ErnieGramTokenizer, self).__init__(vocab_file,
-                                                 do_lower_case=do_lower_case,
-                                                 unk_token=unk_token,
-                                                 sep_token=sep_token,
-                                                 pad_token=pad_token,
-                                                 cls_token=cls_token,
-                                                 mask_token=mask_token,
-                                                 **kwargs)
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
+        super(ErnieGramTokenizer, self).__init__(
+            vocab_file,
+            do_lower_case=do_lower_case,
+            unk_token=unk_token,
+            sep_token=sep_token,
+            pad_token=pad_token,
+            cls_token=cls_token,
+            mask_token=mask_token,
+            **kwargs,
+        )

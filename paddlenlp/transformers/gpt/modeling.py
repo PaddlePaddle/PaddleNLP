@@ -15,25 +15,33 @@
 # limitations under the License.
 
 import collections
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.tensor as tensor
 from paddle.fluid import layers
+from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
 from .. import PretrainedModel, register_base_model
+from ..model_outputs import (
+    BaseModelOutputWithPastAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    SequenceClassifierOutputWithPast,
+    TokenClassifierOutput,
+)
 
 __all__ = [
-    'GPTModel',
-    'GPTPretrainedModel',
-    'GPTForPretraining',
-    'GPTPretrainingCriterion',
-    'GPTForGreedyGeneration',
-    'GPTLMHeadModel',
-    'GPTForTokenClassification',
-    'GPTForSequenceClassification',
-    'GPTForCausalLM',
+    "GPTModel",
+    "GPTPretrainedModel",
+    "GPTForPretraining",
+    "GPTPretrainingCriterion",
+    "GPTForGreedyGeneration",
+    "GPTLMHeadModel",
+    "GPTForTokenClassification",
+    "GPTForSequenceClassification",
+    "GPTForCausalLM",
 ]
 
 
@@ -48,17 +56,19 @@ class MultiHeadAttention(nn.Layer):
     Cache = collections.namedtuple("Cache", ["k", "v"])
     StaticCache = collections.namedtuple("StaticCache", ["k", "v"])
 
-    def __init__(self,
-                 embed_dim,
-                 num_heads,
-                 dropout=0.,
-                 kdim=None,
-                 vdim=None,
-                 need_weights=False,
-                 weight_attr=None,
-                 bias_attr=None,
-                 topo=None,
-                 fuse=False):
+    def __init__(
+        self,
+        embed_dim,
+        num_heads,
+        dropout=0.0,
+        kdim=None,
+        vdim=None,
+        need_weights=False,
+        weight_attr=None,
+        bias_attr=None,
+        topo=None,
+        fuse=False,
+    ):
         super(MultiHeadAttention, self).__init__()
         self.embed_dim = embed_dim
         self.kdim = kdim if kdim is not None else embed_dim
@@ -74,32 +84,16 @@ class MultiHeadAttention(nn.Layer):
         if self.fuse:
             assert self.kdim == embed_dim
             assert self.vdim == embed_dim
-            self.qkv_proj = nn.Linear(embed_dim,
-                                      3 * embed_dim,
-                                      weight_attr,
-                                      bias_attr=bias_attr)
+            self.qkv_proj = nn.Linear(embed_dim, 3 * embed_dim, weight_attr, bias_attr=bias_attr)
         else:
-            self.q_proj = nn.Linear(embed_dim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-            self.k_proj = nn.Linear(self.kdim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-            self.v_proj = nn.Linear(self.vdim,
-                                    embed_dim,
-                                    weight_attr,
-                                    bias_attr=bias_attr)
-        self.out_proj = nn.Linear(embed_dim,
-                                  embed_dim,
-                                  weight_attr,
-                                  bias_attr=bias_attr)
+            self.q_proj = nn.Linear(embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
+            self.k_proj = nn.Linear(self.kdim, embed_dim, weight_attr, bias_attr=bias_attr)
+            self.v_proj = nn.Linear(self.vdim, embed_dim, weight_attr, bias_attr=bias_attr)
+        self.out_proj = nn.Linear(embed_dim, embed_dim, weight_attr, bias_attr=bias_attr)
 
     def _fuse_prepare_qkv(self, query):
         mix_layer = self.qkv_proj(query)
-        mix_layer = paddle.reshape_(mix_layer,
-                                    [0, 0, self.num_heads, 3 * self.head_dim])
+        mix_layer = paddle.reshape_(mix_layer, [0, 0, self.num_heads, 3 * self.head_dim])
         mix_layer = paddle.transpose(mix_layer, [0, 2, 1, 3])
         q, k, v = paddle.split(mix_layer, num_or_sections=3, axis=-1)
         return q, k, v
@@ -161,27 +155,17 @@ class MultiHeadAttention(nn.Layer):
             return self.StaticCache(k, v)
         elif value is None:  # incremental_state
             k = layers.fill_constant_batch_size_like(
-                input=key,
-                shape=[-1, self.num_heads, 0, self.head_dim],
-                dtype=key.dtype,
-                value=0)
+                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            )
             v = layers.fill_constant_batch_size_like(
-                input=key,
-                shape=[-1, self.num_heads, 0, self.head_dim],
-                dtype=key.dtype,
-                value=0)
+                input=key, shape=[-1, self.num_heads, 0, self.head_dim], dtype=key.dtype, value=0
+            )
             return self.Cache(k, v)
         else:
             # incremental_state with initial value, mainly for usage like UniLM
             return self.Cache(key, value)
 
-    def forward(self,
-                query,
-                key,
-                value,
-                attn_mask=None,
-                use_cache=False,
-                cache=None):
+    def forward(self, query, key, value, attn_mask=None, use_cache=False, cache=None):
         r"""
         Applies multi-head attention to map queries and a set of key-value pairs
         to outputs.
@@ -195,22 +179,16 @@ class MultiHeadAttention(nn.Layer):
             else:
                 q, k, v = self._prepare_qkv(query, key, value, use_cache, cache)
         else:
-            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache,
-                                               cache)
+            q, k, v, cache = self._prepare_qkv(query, key, value, use_cache, cache)
         # scale dot product attention
-        product = paddle.matmul(x=q * (self.head_dim**-0.5),
-                                y=k,
-                                transpose_y=True)
+        product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
 
         if attn_mask is not None:
             product = product + attn_mask
 
         weights = F.softmax(product)
         if self.dropout:
-            weights = F.dropout(weights,
-                                self.dropout,
-                                training=self.training,
-                                mode="upscale_in_train")
+            weights = F.dropout(weights, self.dropout, training=self.training, mode="upscale_in_train")
 
         out = tensor.matmul(weights, v)
 
@@ -234,12 +212,7 @@ class TransformerDecoder(nn.Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self,
-                 decoder_layers,
-                 num_layers,
-                 norm=None,
-                 hidden_size=None,
-                 topo=None):
+    def __init__(self, decoder_layers, num_layers, norm=None, hidden_size=None, topo=None):
         super(TransformerDecoder, self).__init__()
 
         self.topo = topo
@@ -252,50 +225,67 @@ class TransformerDecoder(nn.Layer):
             raise ValueError("Only support LayerNorm")
         self.checkpoints = []
 
-    def forward(self,
-                tgt,
-                memory,
-                tgt_mask=None,
-                memory_mask=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self,
+        tgt,
+        memory,
+        tgt_mask=None,
+        memory_mask=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
         layer.
         """
         output = tgt
-        new_caches = []
+        new_caches = [] if use_cache else None
         self.checkpoints = []
+        all_self_attentions = () if output_attentions else None
+        all_hidden_states = () if output_hidden_states else None
 
         for i, mod in enumerate(self.layers):
-            if cache is None:
-                if use_cache:
-                    output, new_cache = mod(output,
-                                            memory,
-                                            tgt_mask=tgt_mask,
-                                            use_cache=use_cache,
-                                            cache=cache)
-                    new_caches.append(new_cache)
-                else:
-                    output = mod(output,
-                                 memory,
-                                 tgt_mask=tgt_mask,
-                                 use_cache=use_cache,
-                                 cache=cache)
-
-            else:
-                output, new_cache = mod(output,
-                                        memory,
-                                        tgt_mask=tgt_mask,
-                                        use_cache=use_cache,
-                                        cache=cache[i])
-                new_caches.append(new_cache)
+            outputs = mod(
+                output,
+                memory,
+                tgt_mask=tgt_mask,
+                use_cache=use_cache,
+                cache=cache[i] if cache is not None else cache,
+                output_attentions=output_attentions,
+            )
+            # outputs = hidden_states if both use_cache and output_attentions are False
+            # Otherwise, outputs = (hidden_states, attention if output_attentions, cache if use_cache)
+            output = outputs[0] if (use_cache or output_attentions) else outputs
+            if output_attentions:
+                all_self_attentions = all_self_attentions + (outputs[1],)
+            if use_cache:
+                new_caches.append(outputs[-1])
+            if output_hidden_states:
+                all_hidden_states = all_hidden_states + (output,)
             self.checkpoints.append(output.name)
 
         if self.norm is not None:
             output = self.norm(output)
-        return output if use_cache is False else (output, new_caches)
+
+        if not return_dict:
+            temp_list = [output, all_hidden_states, new_caches, all_self_attentions]
+
+            if not (use_cache or output_attentions or output_hidden_states):
+                return output
+
+            return tuple(v for v in temp_list if v is not None)
+
+        return BaseModelOutputWithPastAndCrossAttentions(
+            last_hidden_state=output,
+            past_key_values=new_caches,
+            hidden_states=all_hidden_states,
+            attentions=all_self_attentions,
+            cross_attentions=None,
+        )
 
     def gen_cache(self, memory, do_zip=False):
         r"""
@@ -304,7 +294,7 @@ class TransformerDecoder(nn.Layer):
         produced by `TransformerDecoderLayer.gen_cache`. See `TransformerDecoderLayer.gen_cache`
         for more details. If `do_zip` is True, apply `zip` on these tuples to get
         a list with two elements.
-       """
+        """
         cache = [layer.gen_cache(memory) for layer in self.layers]
         if do_zip:
             cache = list(zip(*cache))
@@ -318,18 +308,20 @@ class TransformerDecoderLayer(nn.Layer):
     It contains multiheadattention and some linear layers.
     """
 
-    def __init__(self,
-                 d_model,
-                 nhead,
-                 dim_feedforward,
-                 dropout=0.1,
-                 activation="gelu",
-                 attn_dropout=None,
-                 act_dropout=None,
-                 normalize_before=True,
-                 weight_attr=None,
-                 bias_attr=None,
-                 topo=None):
+    def __init__(
+        self,
+        d_model,
+        nhead,
+        dim_feedforward,
+        dropout=0.1,
+        activation="gelu",
+        attn_dropout=None,
+        act_dropout=None,
+        normalize_before=True,
+        weight_attr=None,
+        bias_attr=None,
+        topo=None,
+    ):
         self._config = locals()
         self._config.pop("self")
         self._config.pop("__class__", None)  # py3
@@ -342,42 +334,39 @@ class TransformerDecoderLayer(nn.Layer):
         weight_attrs = _convert_param_attr_to_list(weight_attr, 3)
         bias_attrs = _convert_param_attr_to_list(bias_attr, 3)
 
-        self.self_attn = MultiHeadAttention(d_model,
-                                            nhead,
-                                            dropout=attn_dropout,
-                                            weight_attr=weight_attrs[0],
-                                            bias_attr=bias_attrs[0],
-                                            topo=topo)
-        self.linear1 = nn.Linear(d_model,
-                                 dim_feedforward,
-                                 weight_attrs[2],
-                                 bias_attr=bias_attrs[2])
-        self.linear2 = nn.Linear(dim_feedforward,
-                                 d_model,
-                                 weight_attrs[2],
-                                 bias_attr=bias_attrs[2])
+        self.self_attn = MultiHeadAttention(
+            d_model,
+            nhead,
+            dropout=attn_dropout,
+            need_weights=True,
+            weight_attr=weight_attrs[0],
+            bias_attr=bias_attrs[0],
+            topo=topo,
+        )
+        self.linear1 = nn.Linear(d_model, dim_feedforward, weight_attrs[2], bias_attr=bias_attrs[2])
+        self.linear2 = nn.Linear(dim_feedforward, d_model, weight_attrs[2], bias_attr=bias_attrs[2])
 
         self.norm1 = nn.LayerNorm(d_model, epsilon=1e-5)
         self.norm2 = nn.LayerNorm(d_model, epsilon=1e-5)
         self.dropout1 = nn.Dropout(dropout, mode="upscale_in_train")
         self.dropout2 = nn.Dropout(act_dropout, mode="upscale_in_train")
 
-        if activation == 'gelu':
+        if activation == "gelu":
             self.activation = nn.GELU(approximate=True)
         else:
             self.activation = getattr(F, activation)
 
-    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None):
+    def forward(self, tgt, memory, tgt_mask=None, use_cache=False, cache=None, output_attentions=False):
         residual = tgt
 
         if self.normalize_before:
             tgt = self.norm1(tgt)
 
+        # self.self_attn(...) --> hidden_states, weights, (cache)
         if use_cache is False:
-            tgt = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
+            tgt, attn_weights = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         else:
-            tgt, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask,
-                                                    use_cache, cache)
+            tgt, attn_weights, incremental_cache = self.self_attn(tgt, tgt, tgt, tgt_mask, use_cache, cache)
         tgt = residual + self.dropout1(tgt)
         if not self.normalize_before:
             tgt = self.norm1(tgt)
@@ -391,11 +380,15 @@ class TransformerDecoderLayer(nn.Layer):
         if not self.normalize_before:
             tgt = self.norm2(tgt)
 
-        return tgt if use_cache is False else (tgt, incremental_cache)
+        if not (output_attentions or use_cache):
+            return tgt
+
+        temp_list = [tgt, attn_weights if output_attentions else None, incremental_cache if use_cache else None]
+
+        return tuple(v for v in temp_list if v is not None)
 
     def gen_cache(self, memory):
-        incremental_cache = self.self_attn.gen_cache(memory,
-                                                     type=self.self_attn.Cache)
+        incremental_cache = self.self_attn.gen_cache(memory, type=self.self_attn.Cache)
         return incremental_cache
 
 
@@ -404,38 +397,45 @@ class GPTEmbeddings(nn.Layer):
     Include embeddings from word and position embeddings.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 hidden_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 topo=None):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        hidden_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        topo=None,
+    ):
         super(GPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
 
         self.position_embeddings = nn.Embedding(
             max_position_embeddings,
             hidden_size,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
+        if input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_embeddings = self.word_embeddings(input_ids)
+        else:
+            input_shape = paddle.shape(inputs_embeddings)[:-1]
+
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
+            ones = paddle.ones(input_shape, dtype="int64")
             seq_length = paddle.cumsum(ones, axis=-1)
             position_ids = seq_length - ones
 
-        input_embedings = self.word_embeddings(input_ids)
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embedings + position_embeddings
+        embeddings = input_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -450,7 +450,7 @@ class GPTPretrainedModel(PretrainedModel):
     """
 
     pretrained_init_configuration = {
-        "gpt-cpm-large-cn": { # 2.6B
+        "gpt-cpm-large-cn": {  # 2.6B
             "vocab_size": 30000,
             "hidden_size": 2560,
             "num_hidden_layers": 32,
@@ -467,7 +467,7 @@ class GPTPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "eol_token_id": 3,
         },
-        "gpt-cpm-small-cn-distill": { # 109M
+        "gpt-cpm-small-cn-distill": {  # 109M
             "vocab_size": 30000,
             "hidden_size": 768,
             "num_hidden_layers": 12,
@@ -484,7 +484,7 @@ class GPTPretrainedModel(PretrainedModel):
             "bos_token_id": 0,
             "eol_token_id": 3,
         },
-        "gpt3-13B-en": { # 13B
+        "gpt3-13B-en": {  # 13B
             "vocab_size": 50304,
             "hidden_size": 5120,
             "num_hidden_layers": 40,
@@ -499,7 +499,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt3-1.3B-en": { # 1.3B
+        "gpt3-1.3B-en": {  # 1.3B
             "vocab_size": 50304,
             "hidden_size": 2048,
             "num_hidden_layers": 24,
@@ -514,7 +514,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt2-xl-en": { # 1558M
+        "gpt2-xl-en": {  # 1558M
             "vocab_size": 50257,
             "hidden_size": 1600,
             "num_hidden_layers": 48,
@@ -529,7 +529,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt2-large-en": { # 774M
+        "gpt2-large-en": {  # 774M
             "vocab_size": 50257,
             "hidden_size": 1280,
             "num_hidden_layers": 36,
@@ -544,7 +544,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt2-medium-en": { #345M
+        "gpt2-medium-en": {  # 345M
             "vocab_size": 50304,
             "hidden_size": 1024,
             "num_hidden_layers": 24,
@@ -559,7 +559,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt2-en": { #117M
+        "gpt2-en": {  # 117M
             "vocab_size": 50257,
             "hidden_size": 768,
             "num_hidden_layers": 12,
@@ -574,7 +574,7 @@ class GPTPretrainedModel(PretrainedModel):
             "eos_token_id": 50256,
             "eol_token_id": 198,
         },
-        "gpt2-small-en": { # config for CE
+        "gpt2-small-en": {  # config for CE
             "vocab_size": 50304,
             "hidden_size": 1024,
             "num_hidden_layers": 4,
@@ -592,24 +592,18 @@ class GPTPretrainedModel(PretrainedModel):
     }
     pretrained_resource_files_map = {
         "model_state": {
-            "gpt-cpm-large-cn":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
-            "gpt-cpm-small-cn-distill":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
-            "gpt2-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
-            "gpt2-medium-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
-            "gpt2-large-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
-            "gpt2-xl-en":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
+            "gpt-cpm-large-cn": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+            "gpt-cpm-small-cn-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+            "gpt2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
+            "gpt2-medium-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
+            "gpt2-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
+            "gpt2-xl-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
         }
     }
     base_model_prefix = "gpt"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         # no hook
         return
         if isinstance(layer, (nn.Linear, nn.Embedding)):
@@ -617,11 +611,14 @@ class GPTPretrainedModel(PretrainedModel):
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(mean=0.0,
-                                         std=self.initializer_range if hasattr(
-                                             self, "initializer_range") else
-                                         self.gpt.config["initializer_range"],
-                                         shape=layer.weight.shape))
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.gpt.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
 
 
 @register_base_model
@@ -684,23 +681,25 @@ class GPTModel(GPTPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size,
-                 hidden_size=768,
-                 num_hidden_layers=12,
-                 num_attention_heads=12,
-                 intermediate_size=3072,
-                 hidden_act="gelu",
-                 hidden_dropout_prob=0.1,
-                 attention_probs_dropout_prob=0.1,
-                 max_position_embeddings=512,
-                 type_vocab_size=16,
-                 initializer_range=0.02,
-                 pad_token_id=0,
-                 eos_token_id=7,
-                 bos_token_id=0,
-                 eol_token_id=3,
-                 topo=None):
+    def __init__(
+        self,
+        vocab_size,
+        hidden_size=768,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.1,
+        attention_probs_dropout_prob=0.1,
+        max_position_embeddings=512,
+        type_vocab_size=16,
+        initializer_range=0.02,
+        pad_token_id=0,
+        eos_token_id=7,
+        bos_token_id=0,
+        eol_token_id=3,
+        topo=None,
+    ):
         super(GPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -711,16 +710,17 @@ class GPTModel(GPTPretrainedModel):
         self.topo = topo
         self.hidden_size = hidden_size
         self.vocab_size = vocab_size
-        self.bias = paddle.tril(
-            paddle.ones(
-                [1, 1, max_position_embeddings, max_position_embeddings],
-                dtype="int64"))
+        self.bias = paddle.tril(paddle.ones([1, 1, max_position_embeddings, max_position_embeddings], dtype="int64"))
 
-        self.embeddings = GPTEmbeddings(vocab_size, hidden_size,
-                                        hidden_dropout_prob,
-                                        max_position_embeddings,
-                                        type_vocab_size, self.initializer_range,
-                                        topo)
+        self.embeddings = GPTEmbeddings(
+            vocab_size,
+            hidden_size,
+            hidden_dropout_prob,
+            max_position_embeddings,
+            type_vocab_size,
+            self.initializer_range,
+            topo,
+        )
 
         decoder_layers = nn.LayerList()
         for i in range(num_hidden_layers):
@@ -734,16 +734,16 @@ class GPTModel(GPTPretrainedModel):
                     attn_dropout=attention_probs_dropout_prob,
                     act_dropout=hidden_dropout_prob,
                     weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(
-                            mean=0.0, std=self.initializer_range)),
+                        initializer=nn.initializer.Normal(mean=0.0, std=self.initializer_range)
+                    ),
                     bias_attr=None,
-                    topo=topo))
+                    topo=topo,
+                )
+            )
 
-        self.decoder = TransformerDecoder(decoder_layers,
-                                          num_hidden_layers,
-                                          norm="LayerNorm",
-                                          hidden_size=hidden_size,
-                                          topo=topo)
+        self.decoder = TransformerDecoder(
+            decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size, topo=topo
+        )
 
         self.apply(self.init_weights)
         self.checkpoints = []
@@ -754,20 +754,27 @@ class GPTModel(GPTPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                use_cache=False,
-                cache=None):
-        r'''
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=False,
+        cache=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
+        r"""
         The GPTModel forward method, overrides the `__call__()` special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 Indices of input sequence tokens in the vocabulary. They are
                 numerical representations of tokens that build the input sequence.
                 Its data type should be `int64` and it has a shape of [batch_size, sequence_length].
+                Defaults to None.
             position_ids(Tensor, optional):
                 Indices of positions of each input sequence tokens in the position embeddings. Selected in the range ``[0,
                 max_position_embeddings - 1]``.
@@ -782,6 +789,11 @@ class GPTModel(GPTPretrainedModel):
                 Its data type should be int64.
                 The `masked` tokens have `0` values, and the `unmasked` tokens have `1` values.
                 Defaults to `None`, which means nothing needed to be prevented attention to.
+            inputs_embeds (Tensor, optional):
+                Optionally, instead of passing `input_ids` you can choose to directly pass an embedded representation
+                of shape `(batch_size, sequence_length, hidden_size)`. This is useful if you want more control over
+                how to convert `input_ids` indices into associated vectors than the model's internal embedding lookup matrix.
+                Default to None.
             use_cache (bool, optional):
                 Whether or not to use cache. Defaults to `False`. If set to `True`, key value states will be returned and
                 can be used to speed up decoding.
@@ -790,9 +802,24 @@ class GPTModel(GPTPretrainedModel):
                 See `TransformerDecoder.gen_cache <https://github.com/PaddlePaddle/Paddle/blob/release/2.1/python/paddle/nn/layer/transformer.py#L1060>`__ for more details.
                 It is only used for inference and should be None for training.
                 Default to `None`.
+            output_attentions (bool, optional):
+                Whether or not to return the attentions tensors of all attention layers. See `attentions` under returned
+                tensors for more detail. Defaults to `False`.
+            output_hidden_states (bool, optional):
+                Whether or not to return the hidden states of all layers. See `hidden_states` under returned tensors for
+                more detail. Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `False`.
 
         Returns:
-            Tensor: Returns tensor `encoder_output`, which is the output at the last layer of the model.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
+
+            Especially, When `return_dict=output_hidden_states=output_attentions=False`,
+            returns tensor `outputs` which is the output at the last layer of the model.
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         Example:
@@ -807,22 +834,30 @@ class GPTModel(GPTPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         self.checkpoints = []
+        if input_ids is not None and inputs_embeds is not None:
+            raise ValueError("You cannot specify both input_ids and inputs_embeds at the same time")
+        elif input_ids is not None:
+            input_shape = paddle.shape(input_ids)
+            input_ids = input_ids.reshape((-1, input_shape[-1]))
+        elif inputs_embeds is not None:
+            input_shape = paddle.shape(inputs_embeds)[:-1]
+        else:
+            raise ValueError("You have to specify either input_ids or inputs_embeds")
+
         if position_ids is None:
             past_length = 0
             if cache is not None:
                 past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length,
-                                         paddle.shape(input_ids)[-1] +
-                                         past_length,
-                                         dtype=input_ids.dtype)
+            position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
-            position_ids = paddle.expand_as(position_ids, input_ids)
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids)
+            position_ids = paddle.expand(position_ids, input_shape)
+        embedding_output = self.embeddings(
+            input_ids=input_ids, position_ids=position_ids, inputs_embeddings=inputs_embeds
+        )
 
         # TODO, use registered buffer
         length = paddle.shape(input_ids)[-1]
@@ -844,13 +879,27 @@ class GPTModel(GPTPretrainedModel):
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
-        encoder_outputs = self.decoder(embedding_output,
-                                       memory=None,
-                                       tgt_mask=attention_mask,
-                                       use_cache=use_cache,
-                                       cache=cache)
+        outputs = self.decoder(
+            embedding_output,
+            memory=None,
+            tgt_mask=attention_mask,
+            use_cache=use_cache,
+            cache=cache,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
+        )
+
+        if output_hidden_states:
+            if return_dict:
+                outputs.hidden_states = (embedding_output,) + outputs.hidden_states
+            else:  # outputs is a tuple
+                idx = 2 if use_cache else 1
+                all_hidden_states = (embedding_output,) + outputs[idx]
+                outputs = outputs[:idx] + all_hidden_states + outputs[idx + 1 :]
         self.checkpoints.extend(self.decoder.checkpoints)
-        return encoder_outputs
+
+        return outputs
 
 
 class GPTForPretraining(GPTPretrainedModel):
@@ -868,17 +917,13 @@ class GPTForPretraining(GPTPretrainedModel):
         self.gpt = gpt
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                masked_positions=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+    ):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
@@ -913,18 +958,14 @@ class GPTForPretraining(GPTPretrainedModel):
 
         """
 
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
+        outputs = self.gpt(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+        )
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(encoder_outputs,
-                               self.gpt.embeddings.word_embeddings.weight,
-                               transpose_y=True)
+        logits = paddle.matmul(encoder_outputs, self.gpt.embeddings.word_embeddings.weight, transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
@@ -960,8 +1001,7 @@ class GPTPretrainingCriterion(paddle.nn.Layer):
             Tensor: The pretraining loss. Its data type should be float32 and its shape is [1].
 
         """
-        masked_lm_loss = self.loss_func(prediction_scores,
-                                        masked_lm_labels.unsqueeze(2))
+        masked_lm_loss = self.loss_func(prediction_scores, masked_lm_labels.unsqueeze(2))
 
         loss_mask = loss_mask.reshape([-1])
         masked_lm_loss = paddle.sum(masked_lm_loss.reshape([-1]) * loss_mask)
@@ -985,21 +1025,17 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
     def __init__(self, gpt, max_predict_len, eol_token_id=3):
         super(GPTForGreedyGeneration, self).__init__()
         self.gpt = gpt
-        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype='int32')
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
         self.eol_token_id = eol_token_id
         self.apply(self.init_weights)
 
-    def model(self,
-              input_ids,
-              position_ids=None,
-              attention_mask=None,
-              masked_positions=None,
-              use_cache=False,
-              cache=None):
+    def model(
+        self, input_ids, position_ids=None, attention_mask=None, masked_positions=None, use_cache=False, cache=None
+    ):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
@@ -1018,18 +1054,14 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
         """
 
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
+        outputs = self.gpt(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+        )
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
         else:
             encoder_outputs = outputs
-        logits = paddle.matmul(encoder_outputs,
-                               self.gpt.embeddings.word_embeddings.weight,
-                               transpose_y=True)
+        logits = paddle.matmul(encoder_outputs, self.gpt.embeddings.word_embeddings.weight, transpose_y=True)
 
         if use_cache:
             return logits, cached_kvs
@@ -1052,10 +1084,8 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
         nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
         src_ids = paddle.concat([src_ids, nid], axis=1)
         cur_len = 0
-        while (cur_len < self.max_predict_len):
-            output, cached_kvs = self.model(nid,
-                                            use_cache=True,
-                                            cache=cached_kvs)
+        while cur_len < self.max_predict_len:
+            output, cached_kvs = self.model(nid, use_cache=True, cache=cached_kvs)
 
             nid = paddle.argmax(output[:, -1, :], axis=-1).reshape([-1, 1])
             src_ids = paddle.concat([src_ids, nid], axis=1)
@@ -1066,18 +1096,16 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
 
 class GPTLMHead(nn.Layer):
-
     def __init__(self, hidden_size, vocab_size, embedding_weights=None):
         super(GPTLMHead, self).__init__()
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=paddle.get_default_dtype(),
-            is_bias=True) if embedding_weights is None else embedding_weights
+        self.decoder_weight = (
+            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            if embedding_weights is None
+            else embedding_weights
+        )
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(hidden_states,
-                                      self.decoder_weight,
-                                      transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
@@ -1094,89 +1122,128 @@ class GPTLMHeadModel(GPTPretrainedModel):
     def __init__(self, gpt):
         super(GPTLMHeadModel, self).__init__()
         self.gpt = gpt
-        self.lm_head = GPTLMHead(self.gpt.config["hidden_size"],
-                                 self.gpt.config["vocab_size"],
-                                 self.gpt.embeddings.word_embeddings.weight)
+        self.lm_head = GPTLMHead(
+            self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
+        )
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                use_cache=False,
-                cache=None):
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        use_cache=False,
+        cache=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids (Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (Tensor, optional):
                 See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`GPTModel`.
             use_cache (bool, optional):
                 See :class:`GPTModel`.
             cache (Tensor, optional):
                 See :class:`GPTModel`.
+            labels (paddle.Tensor, optional):
+                A Tensor of shape `(batch_size, sequence_length)`.
+                Labels for language modeling. Note that the labels are shifted inside the model, i.e. you can set
+                `labels = input_ids` Indices are selected in `[-100, 0, ..., vocab_size]` All labels set to `-100`
+                are ignored (masked), the loss is only computed for labels in `[0, ..., vocab_size]`
+                Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor or tuple: Returns tensor `logits` or tuple `(logits, cached_kvs)`. If `use_cache` is True,
-            tuple (`logits, cached_kvs`) will be returned. Otherwise, tensor `logits` will be returned.
-            `logits` is the output of the gpt model.
-            `cache_kvs` is the cache output of gpt model if `use_cache` is True.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.BaseModelOutputWithPastAndCrossAttentions`.
 
+            Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
+            returns a tensor `logits` which is the output of the gpt model.
         """
-        outputs = self.gpt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
-
-        if use_cache:
-            encoder_outputs, cached_kvs = outputs[:2]
+        outputs = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            cache=cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(outputs, type(input_ids)):
+            hidden_states = outputs
         else:
-            encoder_outputs = outputs
+            hidden_states = outputs[0]
 
-        logits = self.lm_head(encoder_outputs)
+        logits = self.lm_head(hidden_states)
 
-        if use_cache:
-            return logits, cached_kvs
-        else:
-            return logits
+        loss = None
+        if labels is not None:
+            # Shift so that tokens < n predict n
+            shift_logits = logits[:, :-1, :]
+            shift_labels = labels[:, 1:]
+            # Flatten the tokens
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(shift_logits.reshape((-1, shift_logits.shape[-1])), shift_labels.reshape((-1,)))
+
+        # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
+        if not return_dict:
+            if isinstance(outputs, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
+
+            outputs = (logits,) + outputs[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return CausalLMOutputWithCrossAttentions(
+            loss=loss,
+            logits=logits,
+            past_key_values=outputs.past_key_values,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+            cross_attentions=outputs.cross_attentions,
+        )
 
     def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
-        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        decode_strategy = kwargs.get('decode_strategy')
+
+        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
+        decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "beam_search":
-            raise AttributeError(
-                "'beam_search' is not supported yet in the faster version of GPT"
-            )
+            raise AttributeError("'beam_search' is not supported yet in the faster version of GPT")
         # Currently, FasterTransformer only support restricted size_per_head.
-        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config[
-            "num_attention_heads"]
+        size_per_head = self.gpt.config["hidden_size"] // self.gpt.config["num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPT"
-                % size_per_head)
-        if kwargs['forced_bos_token_id'] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'forced_bos_token_id != None' is not supported yet in the faster version"
+                "'size_per_head = %d' is not supported yet in the faster version of GPT" % size_per_head
             )
-        if kwargs['min_length'] != 0:
+        if kwargs["forced_bos_token_id"] is not None:
             # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterGPT(
-            self, use_fp16_decoding=use_fp16_decoding).forward
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
+        if kwargs["min_length"] != 0:
+            # not support for min_length yet in the faster version
+            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
+        self._faster_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._faster_entry
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      use_cache=False,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
@@ -1191,16 +1258,17 @@ class GPTLMHeadModel(GPTPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
         }
 
     @staticmethod
-    def prepare_attention_mask_for_generation(input_ids, pad_token_id,
-                                              eos_token_id):
+    def prepare_attention_mask_for_generation(input_ids, pad_token_id, eos_token_id):
         is_pad_token_in_inputs_ids = (pad_token_id is not None) and paddle.any(
-            input_ids == pad_token_id).numpy().item()
+            input_ids == pad_token_id
+        ).numpy().item()
         is_pad_token_not_equal_to_eos_token_id = (eos_token_id is None) or (
-            (eos_token_id is not None) and (pad_token_id != eos_token_id))
+            (eos_token_id is not None) and (pad_token_id != eos_token_id)
+        )
         if is_pad_token_in_inputs_ids and is_pad_token_not_equal_to_eos_token_id:
             attention_mask = (input_ids != pad_token_id).astype("int64")
         else:
@@ -1240,25 +1308,52 @@ class GPTForTokenClassification(GPTPretrainedModel):
         super(GPTForTokenClassification, self).__init__()
         self.num_classes = num_classes
         self.gpt = gpt  # allow gpt to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gpt.
-                                  config["hidden_dropout_prob"])
+        self.dropout = nn.Dropout(dropout if dropout is not None else self.gpt.config["hidden_dropout_prob"])
         self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTForTokenClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids(Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.TokenClassifierOutput`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input token classification logits.
             Shape as `[batch_size, sequence_length, num_classes]` and dtype as `float32`.
 
         Example:
@@ -1275,13 +1370,40 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 logits = model(**inputs)
 
         """
-        sequence_output = self.gpt(input_ids,
-                                   position_ids=position_ids,
-                                   attention_mask=attention_mask)
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
+        hidden_states = self.dropout(hidden_states)
+        logits = self.classifier(hidden_states)
 
-        sequence_output = self.dropout(sequence_output)
-        logits = self.classifier(sequence_output)
-        return logits
+        loss = None
+        if labels is not None:
+            loss_fct = CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+
+        if not return_dict:
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss, logits) if loss is not None else logits
+
+            outputs = (logits,) + sequence_output[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return TokenClassifierOutput(
+            loss=loss,
+            logits=logits,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 class GPTForSequenceClassification(GPTPretrainedModel):
@@ -1294,31 +1416,62 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             An instance of GPTModel.
         num_classes (int, optional):
             The number of classes. Defaults to `2`.
-            
+
     """
 
-    def __init__(self, gpt, num_classes=2):
+    def __init__(self, gpt, num_classes=2, problem_type=None):
         super(GPTForSequenceClassification, self).__init__()
         self.gpt = gpt  # allow gpt to be config
-        self.score = nn.Linear(self.gpt.config["hidden_size"],
-                               num_classes,
-                               bias_attr=False)
+        self.num_classes = num_classes
+        self.problem_type = problem_type
+        self.score = nn.Linear(self.gpt.config["hidden_size"], num_classes, bias_attr=False)
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None, attention_mask=None):
+    def forward(
+        self,
+        input_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        inputs_embeds=None,
+        labels=None,
+        use_cache=False,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=False,
+    ):
         r"""
         The GPTForSequenceClassification forward method, overrides the __call__() special method.
 
         Args:
-            input_ids (Tensor):
+            input_ids (Tensor, optional):
                 See :class:`GPTModel`.
             position_ids(Tensor, optional):
                 See :class:`GPTModel`.
             attention_mask (list, optional):
                 See :class:`GPTModel`.
+            inputs_embeds (Tensor, optional):
+                See :class:`GPTModel`.
+            labels (Tensor, optional):
+                Labels of shape `(batch_size, sequence_length)` for computing the sequence classification/regression loss. Indices should be in
+                `[0, ..., num_labels - 1]`. If `num_labels == 1` a regression loss is computed (Mean-Square loss), If
+                `num_labels > 1` a classification loss is computed (Cross-Entropy). Defaults to None.
+            use_cache (bool, optional):
+                See :classL `GPTModel`.
+            output_attentions (bool, optional):
+                See :class:`GPTModel`.
+            output_hidden_states (bool, optional):
+                See :class:`GPTModel`.
+            return_dict (bool, optional):
+                See :class:`GPTModel`.
 
         Returns:
-            Tensor: Returns tensor `logits`, a tensor of the input text classification logits.
+            An instance of :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast` if
+            `return_dict=True`. Otherwise it returns a tuple of tensors corresponding
+            to ordered and not None (depending on the input arguments) fields of
+            :class:`~paddlenlp.transformers.model_outputs.SequenceClassifierOutputWithPast`.
+
+            Especialy, when `return_dict=output_attentions=output_hidden_states=False`,
+            returns tensor `logits`, a tensor of the input text classification logits.
             Shape as `[batch_size, num_classes]` and dtype as float32.
 
         Example:
@@ -1337,22 +1490,55 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         """
 
         # sequence_output shape [bs, seq_len, hidden_size]
-        sequence_output = self.gpt(input_ids,
-                                   position_ids=position_ids,
-                                   attention_mask=attention_mask)
+        sequence_output = self.gpt(
+            input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            use_cache=use_cache,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        if isinstance(sequence_output, type(input_ids)):
+            hidden_states = sequence_output
+        else:
+            hidden_states = sequence_output[0]
         # logits shape [bs, seq_len, num_class]
-        logits = self.score(sequence_output)
+        logits = self.score(hidden_states)
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
         # sequence_lengths shape [bs,]
-        sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(
-            axis=-1) - 1
-        pooled_logits = logits.gather_nd(
-            paddle.stack(
-                [paddle.arange(sequence_output.shape[0]), sequence_lengths],
-                axis=-1))
+        sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
 
-        return pooled_logits
+        pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
+
+        loss = None
+        if labels is not None:
+            if self.num_classes == 1:
+                loss_fct = MSELoss()
+                loss = loss_fct(pooled_logits, labels)
+            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+                loss_fct = CrossEntropyLoss()
+                loss = loss_fct(pooled_logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
+            else:
+                loss_fct = BCEWithLogitsLoss()
+                loss = loss_fct(pooled_logits, labels)
+
+        if not return_dict:
+            if isinstance(sequence_output, type(input_ids)):
+                return (loss, pooled_logits) if loss is not None else pooled_logits
+
+            outputs = (pooled_logits,) + sequence_output[1:]
+            return ((loss,) + outputs) if loss is not None else outputs
+
+        return SequenceClassifierOutputWithPast(
+            loss=loss,
+            logits=pooled_logits,
+            past_key_values=sequence_output.past_key_values,
+            hidden_states=sequence_output.hidden_states,
+            attentions=sequence_output.attentions,
+        )
 
 
 GPTForCausalLM = GPTLMHeadModel

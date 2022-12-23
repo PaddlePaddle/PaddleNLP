@@ -21,9 +21,7 @@ model_name_or_path = sys.argv[1]
 
 # CLUE classification dataset warmup
 logger.info("Download model and data for CLUE classification tasks.")
-for task in [
-        "afqmc", "tnews", "iflytek", "ocnli", "cmnli", "cluewsc2020", "csl"
-]:
+for task in ["afqmc", "tnews", "iflytek", "ocnli", "cmnli", "cluewsc2020", "csl"]:
     load_dataset("clue", task, splits=("train", "dev", "test"))
 
 # Downloads HF dataset
@@ -34,9 +32,7 @@ load_dataset("clue", "cmrc2018")
 load_dataset("clue", "c3")
 
 # HF dataset process and cache
-logger.info(
-    "Data process for CHID tasks, and this will take some time. If cache exists, this will skip."
-)
+logger.info("Data process for CHID tasks, and this will take some time. If cache exists, this will skip.")
 status = os.system(
     f"python ../mrc/run_chid.py --do_train --max_steps 0 --model_name_or_path {model_name_or_path} --batch_size 1 --gradient_accumulation_steps 1"
 )

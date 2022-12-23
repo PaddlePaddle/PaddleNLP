@@ -32,8 +32,7 @@ def parse_args():
         default=None,
         type=str,
         required=True,
-        help="Model type selected in the list: " +
-        ", ".join(MODEL_CLASSES.keys()),
+        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
     )
     parser.add_argument(
         "--model_path",
@@ -61,18 +60,16 @@ def main():
 
     # Suild model and load trained parameters
     tokenizer = tokenizer_class.from_pretrained(args.model_path)
-    model = model_class.from_pretrained(args.model_path,
-                                        max_predict_len=32,
-                                        eol_token_id=tokenizer.eol_token_id)
+    model = model_class.from_pretrained(args.model_path, max_predict_len=32, eol_token_id=tokenizer.eol_token_id)
     # Switch to eval model
     model.eval()
     # Convert to static graph with specific input description
     model = paddle.jit.to_static(
         model,
         input_spec=[
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64"),  # input_ids
-        ])
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        ],
+    )
 
     # Save converted static graph model
     paddle.jit.save(model, args.output_path)

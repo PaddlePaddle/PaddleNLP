@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "{'mask'}{'soft'}本文关键词有{'text': 'keyword'}{'text': 'abst'}"}
+    ],
+    "verbalizer": [
+        {"0": "不", "1": "很"}
+    ]
+}

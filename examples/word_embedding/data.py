@@ -36,12 +36,12 @@ def load_vocab(vocab_file):
 
 
 def convert_tokens_to_ids(tokens, vocab):
-    """ Converts a token id (or a sequence of id) in a token string
-        (or a sequence of tokens), using the vocabulary.
+    """Converts a token id (or a sequence of id) in a token string
+    (or a sequence of tokens), using the vocabulary.
     """
 
     ids = []
-    unk_id = vocab.get('[UNK]', None)
+    unk_id = vocab.get("[UNK]", None)
     for token in tokens:
         wid = vocab.get(token, unk_id)
         if wid:
@@ -51,7 +51,7 @@ def convert_tokens_to_ids(tokens, vocab):
 
 def convert_example(example, vocab, unk_token_id=1, is_test=False):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
@@ -65,7 +65,7 @@ def convert_example(example, vocab, unk_token_id=1, is_test=False):
     """
 
     input_ids = []
-    for token in tokenizer.cut(example['text']):
+    for token in tokenizer.cut(example["text"]):
         token_id = vocab.get(token, unk_token_id)
         input_ids.append(token_id)
     valid_length = np.array([len(input_ids)])
@@ -108,7 +108,7 @@ def preprocess_prediction_data(data, vocab):
     """
     examples = []
     for text in data:
-        tokens = " ".join(tokenizer.cut(text)).split(' ')
+        tokens = " ".join(tokenizer.cut(text)).split(" ")
         ids = convert_tokens_to_ids(tokens, vocab)
         examples.append([ids, len(ids)])
     return examples

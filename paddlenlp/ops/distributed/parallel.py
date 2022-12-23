@@ -14,26 +14,25 @@
 
 import paddle
 import paddle.nn as nn
+
 try:
     from paddle.distributed.fleet import fleet
 except Exception as e:
     import warnings
+
     warnings.warn("paddle.distributed is not contains in you paddle!")
 
 __all__ = [
-    'guard',
-    'ParallelEmbedding',
-    'ColumnParallelLiner',
-    'RowParallelLiner',
+    "guard",
+    "ParallelEmbedding",
+    "ColumnParallelLiner",
+    "RowParallelLiner",
 ]
 
 
 def guard(device):
-
     def decorator(Layer):
-
         class WrapperClass(Layer):
-
             def __init__(self, *args, **kw):
                 with paddle.static.device_guard(device):
                     print("Init {} on {}".format(Layer.__name__, device))
@@ -70,21 +69,16 @@ class ParallelEmbedding(nn.Layer):
             Defaults to None.
     """
 
-    def __init__(self,
-                 num_embeddings,
-                 embedding_dim,
-                 rank,
-                 world_size,
-                 weight_attr=None,
-                 name=None):
+    def __init__(self, num_embeddings, embedding_dim, rank, world_size, weight_attr=None, name=None):
         super(ParallelEmbedding, self).__init__()
         self.rank = rank
         self.world_size = world_size
         self.num_embeddings = num_embeddings
-        self.is_mp = (self.world_size > 1)
+        self.is_mp = self.world_size > 1
 
-        assert num_embeddings % self.world_size == 0, \
-            "The length of the vocabulary must be divisible by the parallelism degree of MP"
+        assert (
+            num_embeddings % self.world_size == 0
+        ), "The length of the vocabulary must be divisible by the parallelism degree of MP"
 
         per_part_size = num_embeddings // self.world_size
 
@@ -94,10 +88,7 @@ class ParallelEmbedding(nn.Layer):
         self._weight_attr = weight_attr
         self._name = name
 
-        self.weight = self.create_parameter(attr=self._weight_attr,
-                                            shape=self._size,
-                                            dtype=self._dtype,
-                                            is_bias=False)
+        self.weight = self.create_parameter(attr=self._weight_attr, shape=self._size, dtype=self._dtype, is_bias=False)
         self.weight.is_distributed = True
 
         startup_block = paddle.static.default_startup_program().global_block()
@@ -117,21 +108,15 @@ class ParallelEmbedding(nn.Layer):
         """
         if self.is_mp:
             output_parallel = paddle.distributed.collective._c_lookup_table(
-                self.weight,
-                x,
-                start_index=self.vocab_start_index,
-                name=self._name)
+                self.weight, x, start_index=self.vocab_start_index, name=self._name
+            )
             output = paddle.distributed.collective._mp_allreduce(
-                output_parallel,
-                group=None,
-                use_calc_stream=True,
-                use_model_parallel=True)
+                output_parallel, group=None, use_calc_stream=True, use_model_parallel=True
+            )
         else:
-            output = paddle.nn.functional.embedding(x,
-                                                    weight=self.weight,
-                                                    padding_idx=None,
-                                                    sparse=False,
-                                                    name=self._name)
+            output = paddle.nn.functional.embedding(
+                x, weight=self.weight, padding_idx=None, sparse=False, name=self._name
+            )
         return output
 
 
@@ -158,21 +143,14 @@ class ColumnParallelLiner(nn.Layer):
 
     """
 
-    def __init__(self,
-                 size,
-                 num_partitions=1,
-                 gather_out=True,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
+    def __init__(self, size, num_partitions=1, gather_out=True, param_attr=None, bias_attr=None, name=None):
         super().__init__()
 
         if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
+            assert fleet._role_maker, "To use paddle.distributed.split, " "you must call fleet.init() firstly."
             rank = fleet.worker_index()
             nranks = fleet.worker_num()
 
@@ -180,9 +158,11 @@ class ColumnParallelLiner(nn.Layer):
         inner_rank = rank % num_partitions
         self.gather_out = gather_out
 
-        assert size[1] % num_partitions == 0, (
-            "Number of column of the weight for linear ({}) must be"
-            " divisible by num_partitions ({})".format(size[1], num_partitions))
+        assert (
+            size[1] % num_partitions == 0
+        ), "Number of column of the weight for linear ({}) must be" " divisible by num_partitions ({})".format(
+            size[1], num_partitions
+        )
         self.per_part_size = size[1] // num_partitions
         linear_size = (size[0], self.per_part_size)
 
@@ -193,11 +173,7 @@ class ColumnParallelLiner(nn.Layer):
         else:
             name = name + "_by_col_rank_%d" % inner_rank
 
-        self.linear = paddle.nn.Linear(num_rows,
-                                       num_cols,
-                                       weight_attr=param_attr,
-                                       bias_attr=bias_attr,
-                                       name=name)
+        self.linear = paddle.nn.Linear(num_rows, num_cols, weight_attr=param_attr, bias_attr=bias_attr, name=name)
 
         weight = self.linear.weight
         weight.is_distributed = True
@@ -230,8 +206,7 @@ class ColumnParallelLiner(nn.Layer):
         if self.gather_out is False:
             return output_parallel
 
-        return paddle.distributed.collective._c_concat(output_parallel,
-                                                       group=group)
+        return paddle.distributed.collective._c_concat(output_parallel, group=group)
 
 
 class RowParallelLiner(nn.Layer):
@@ -257,21 +232,14 @@ class RowParallelLiner(nn.Layer):
 
     """
 
-    def __init__(self,
-                 size,
-                 num_partitions=1,
-                 input_is_parallel=False,
-                 param_attr=None,
-                 bias_attr=None,
-                 name=None):
+    def __init__(self, size, num_partitions=1, input_is_parallel=False, param_attr=None, bias_attr=None, name=None):
         super().__init__()
 
         if paddle.in_dynamic_mode():
             rank = paddle.distributed.get_rank()
             nranks = paddle.distributed.get_world_size()
         else:
-            assert fleet._role_maker, ("To use paddle.distributed.split, "
-                                       "you must call fleet.init() firstly.")
+            assert fleet._role_maker, "To use paddle.distributed.split, " "you must call fleet.init() firstly."
             rank = fleet.worker_index()
             nranks = fleet.worker_num()
 
@@ -279,9 +247,11 @@ class RowParallelLiner(nn.Layer):
         inner_rank = rank % num_partitions
         self.input_is_parallel = input_is_parallel
 
-        assert size[0] % num_partitions == 0, (
-            "Number of rows of the weight for linear ({}) must be"
-            " divisible by num_partitions ({})".format(size[0], num_partitions))
+        assert (
+            size[0] % num_partitions == 0
+        ), "Number of rows of the weight for linear ({}) must be" " divisible by num_partitions ({})".format(
+            size[0], num_partitions
+        )
         self.per_part_size = size[0] // num_partitions
         linear_size = (self.per_part_size, size[1])
 
@@ -297,7 +267,8 @@ class RowParallelLiner(nn.Layer):
             weight_attr=param_attr,
             # NOTE(wangxi): row split, bias need add after allreduce
             bias_attr=False,
-            name=name)
+            name=name,
+        )
 
         weight = self.linear.weight
         weight.is_distributed = True
@@ -313,10 +284,7 @@ class RowParallelLiner(nn.Layer):
         # if a linear layer is splited by row, each rank would hold a complete bias
 
         if bias_attr is not False:
-            self.bias = self.create_parameter(shape=[num_cols],
-                                              attr=bias_attr,
-                                              dtype=self._dtype,
-                                              is_bias=True)
+            self.bias = self.create_parameter(shape=[num_cols], attr=bias_attr, dtype=self._dtype, is_bias=True)
         else:
             self.bias = None
 
@@ -334,16 +302,14 @@ class RowParallelLiner(nn.Layer):
             assert x.shape[-1] == self.per_part_size, (
                 "The width ({}) of the input "
                 "x must be equal to the height ({}) of the weight. Maybe you "
-                "should split the input x using paddle.split.".format(
-                    x.shape[-1], self.per_part_size))
+                "should split the input x using paddle.split.".format(x.shape[-1], self.per_part_size)
+            )
         else:
             # split last dim
             x = paddle.distributed.collective._c_split(x, group=group)
         output_parallel = self.linear(x)
         output = paddle.distributed.collective._mp_allreduce(
-            output_parallel,
-            group=group,
-            use_calc_stream=True,
-            use_model_parallel=True)
+            output_parallel, group=group, use_calc_stream=True, use_model_parallel=True
+        )
         output = output + self.bias if self.bias is not None else output
         return output

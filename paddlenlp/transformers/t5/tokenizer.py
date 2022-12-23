@@ -21,7 +21,7 @@ import sentencepiece as spm
 from ..albert.tokenizer import AlbertEnglishTokenizer
 
 __all__ = [
-    'T5Tokenizer',
+    "T5Tokenizer",
 ]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
@@ -62,76 +62,53 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             Defaults to "<pad>".
 
     """
+
     resource_files_names = {"sentencepiece_model_file": "spiece.model"}
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "t5-small":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/spiece.model",
-            "t5-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/spiece.model",
-            "t5-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/spiece.model",
-            "t5-3b":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/spiece.model",
-            "t5-11b":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/spiece.model",
-            "t5-v1_1-base":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/spiece.model",
-            "t5-v1_1-large":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/spiece.model",
+            "t5-small": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-small/spiece.model",
+            "t5-base": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-base/spiece.model",
+            "t5-large": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-large/spiece.model",
+            "t5-3b": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-3b/spiece.model",
+            "t5-11b": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-11b/spiece.model",
+            "t5-v1_1-base": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-base/spiece.model",
+            "t5-v1_1-large": "https://bj.bcebos.com/paddlenlp/models/transformers/t5/t5-v1_1-large/spiece.model",
         },
     }
 
     pretrained_init_configuration = {
-        "t5-small": {
-            "do_lower_case": False
-        },
-        "t5-base": {
-            "do_lower_case": False
-        },
-        "t5-large": {
-            "do_lower_case": False
-        },
-        "t5-3b": {
-            "do_lower_case": False
-        },
-        "t5-11b": {
-            "do_lower_case": False
-        },
-        "t5-v1_1-base": {
-            "do_lower_case": False
-        },
-        "t5-v1_1-large": {
-            "do_lower_case": False
-        },
+        "t5-small": {"do_lower_case": False},
+        "t5-base": {"do_lower_case": False},
+        "t5-large": {"do_lower_case": False},
+        "t5-3b": {"do_lower_case": False},
+        "t5-11b": {"do_lower_case": False},
+        "t5-v1_1-base": {"do_lower_case": False},
+        "t5-v1_1-large": {"do_lower_case": False},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 sentencepiece_model_file,
-                 do_lower_case=False,
-                 remove_space=True,
-                 keep_accents=True,
-                 eos_token="</s>",
-                 unk_token="<unk>",
-                 pad_token="<pad>",
-                 extra_ids=100,
-                 additional_special_tokens=[],
-                 sp_model_kwargs=None,
-                 **kwargs):
+    def __init__(
+        self,
+        sentencepiece_model_file,
+        do_lower_case=False,
+        remove_space=True,
+        keep_accents=True,
+        eos_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        extra_ids=100,
+        additional_special_tokens=[],
+        sp_model_kwargs=None,
+        **kwargs
+    ):
 
         # Add extra_ids to the special token list
         if extra_ids > 0 and len(additional_special_tokens) == 0:
-            self._additional_special_tokens = [
-                f"<extra_id_{i}>" for i in range(extra_ids)
-            ]
+            self._additional_special_tokens = [f"<extra_id_{i}>" for i in range(extra_ids)]
         elif extra_ids > 0 and len(additional_special_tokens) != 0:
             # Check that we have the right number of extra_id special tokens
-            extra_tokens = len(
-                set(
-                    filter(lambda x: bool("extra_id" in str(x)),
-                           additional_special_tokens)))
+            extra_tokens = len(set(filter(lambda x: bool("extra_id" in str(x)), additional_special_tokens)))
             if extra_tokens != extra_ids:
                 raise ValueError(
                     f"Both extra_ids ({extra_ids}) and additional_special_tokens ({additional_special_tokens}) are provided to T5Tokenizer. "
@@ -149,21 +126,23 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         self.sp_model = spm.SentencePieceProcessor(**self.sp_model_kwargs)
         self.sp_model.Load(sentencepiece_model_file)
 
-    def __call__(self,
-                 text,
-                 text_pair=None,
-                 max_length=None,
-                 stride=0,
-                 is_split_into_words=False,
-                 padding=None,
-                 truncation="longest_first",
-                 return_position_ids=False,
-                 return_token_type_ids=False,
-                 return_attention_mask=True,
-                 return_length=False,
-                 return_overflowing_tokens=False,
-                 return_special_tokens_mask=False,
-                 **kwargs):
+    def __call__(
+        self,
+        text,
+        text_pair=None,
+        max_length=None,
+        stride=0,
+        is_split_into_words=False,
+        padding=None,
+        truncation="longest_first",
+        return_position_ids=False,
+        return_token_type_ids=False,
+        return_attention_mask=True,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+        **kwargs
+    ):
         if "pad_to_max_seq_len" in kwargs and padding is None:
             pad_to_max_seq_len = kwargs.pop("pad_to_max_seq_len")
             padding = "max_length" if pad_to_max_seq_len else False
@@ -173,8 +152,7 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         if "max_seq_len" in kwargs and max_length is None:
             max_length = kwargs["max_seq_len"]
 
-        if "truncation_strategy" in kwargs and kwargs[
-                "truncation_strategy"] != "longest_first":
+        if "truncation_strategy" in kwargs and kwargs["truncation_strategy"] != "longest_first":
             truncation = kwargs["truncation_strategy"]
 
         return super(T5Tokenizer, self).__call__(
@@ -191,7 +169,8 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             return_length=return_length,
             return_overflowing_tokens=return_overflowing_tokens,
             return_special_tokens_mask=return_special_tokens_mask,
-            **kwargs)
+            **kwargs,
+        )
 
     @property
     def vocab_size(self):
@@ -233,9 +212,7 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             token_ids_1 = self._add_eos_if_not_present(token_ids_1)
             return token_ids_0 + token_ids_1
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences.
 
@@ -249,17 +226,14 @@ class T5Tokenizer(AlbertEnglishTokenizer):
 
         Returns:
             List[int]: List of token_type_id according to the given sequence(s).
-            
+
         """
         eos = [self.eos_token_id]
         if token_ids_1 is None:
             return len(token_ids_0 + eos) * [0]
         return len(token_ids_0 + eos + token_ids_1 + eos) * [0]
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is called when adding
         special tokens using the tokenizer ``encode`` methods.
@@ -293,8 +267,7 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         for token in tokens:
             # make sure that special tokens are not decoded using sentencepiece model
             if token in self.all_special_tokens:
-                out_string += (self.sp_model.decode_pieces(current_sub_tokens) +
-                               token + " ")
+                out_string += self.sp_model.decode_pieces(current_sub_tokens) + token + " "
                 current_sub_tokens = []
             else:
                 current_sub_tokens.append(token)
@@ -317,10 +290,7 @@ class T5Tokenizer(AlbertEnglishTokenizer):
             token = f"<extra_id_{self.vocab_size - 1 - index}>"
         return token
 
-    def batch_decode(self,
-                     sequences,
-                     skip_special_tokens=False,
-                     clean_up_tokenization_spaces=True):
+    def batch_decode(self, sequences, skip_special_tokens=False, clean_up_tokenization_spaces=True):
         """
         Convert a list of lists of token ids into a list of strings by calling decode.
 
@@ -337,9 +307,8 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         """
         return [
             self.decode(
-                seq,
-                skip_special_tokens=skip_special_tokens,
-                clean_up_tokenization_spaces=clean_up_tokenization_spaces)
+                seq, skip_special_tokens=skip_special_tokens, clean_up_tokenization_spaces=clean_up_tokenization_spaces
+            )
             for seq in sequences
         ]
 
@@ -354,11 +323,18 @@ class T5Tokenizer(AlbertEnglishTokenizer):
         Returns:
             str: The cleaned-up string.
         """
-        out_string = (out_string.replace(" .", ".").replace(" ?", "?").replace(
-            " !", "!").replace(" ,", ",").replace(" ' ", "'").replace(
-                " n't",
-                "n't").replace(" 'm", "'m").replace(" 's", "'s").replace(
-                    " 've", "'ve").replace(" 're", "'re"))
+        out_string = (
+            out_string.replace(" .", ".")
+            .replace(" ?", "?")
+            .replace(" !", "!")
+            .replace(" ,", ",")
+            .replace(" ' ", "'")
+            .replace(" n't", "n't")
+            .replace(" 'm", "'m")
+            .replace(" 's", "'s")
+            .replace(" 've", "'ve")
+            .replace(" 're", "'re")
+        )
         return out_string
 
     def __getstate__(self):

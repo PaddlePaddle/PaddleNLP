@@ -50,33 +50,28 @@ from utils import is_float
 # }
 ################################
 
-CLAUSE_KEYWORDS = ('select', 'from', 'where', 'group', 'order', 'limit',
-                   'intersect', 'union', 'except')
-JOIN_KEYWORDS = ('join', 'on', 'as')
+CLAUSE_KEYWORDS = ("select", "from", "where", "group", "order", "limit", "intersect", "union", "except")
+JOIN_KEYWORDS = ("join", "on", "as")
 
-COND_OPS = ('not_in', 'between', '==', '>', '<', '>=', '<=', '!=', 'in', 'like')
-UNIT_OPS = ('none', '-', '+', "*", '/')
-AGG_OPS = ('none', 'max', 'min', 'count', 'sum', 'avg')
+COND_OPS = ("not_in", "between", "==", ">", "<", ">=", "<=", "!=", "in", "like")
+UNIT_OPS = ("none", "-", "+", "*", "/")
+AGG_OPS = ("none", "max", "min", "count", "sum", "avg")
 TABLE_TYPE = {
-    'sql': "sql",
-    'table_unit': "table_unit",
+    "sql": "sql",
+    "table_unit": "table_unit",
 }
 
-LOGIC_AND_OR = ('and', 'or')
-SQL_OPS = ('intersect', 'union', 'except')
-ORDER_OPS = ('desc', 'asc')
+LOGIC_AND_OR = ("and", "or")
+SQL_OPS = ("intersect", "union", "except")
+ORDER_OPS = ("desc", "asc")
 
-CONST_COLUMN = set(['time_now'])
+CONST_COLUMN = set(["time_now"])
 
-EXPECT_BRACKET_PRE_TOKENS = set(AGG_OPS + SQL_OPS + COND_OPS + CLAUSE_KEYWORDS +
-                                ('from', ',', 'distinct'))
+EXPECT_BRACKET_PRE_TOKENS = set(AGG_OPS + SQL_OPS + COND_OPS + CLAUSE_KEYWORDS + ("from", ",", "distinct"))
 
 g_empty_sql = {
     "select": [],
-    "from": {
-        "conds": [],
-        "table_units": []
-    },
+    "from": {"conds": [], "table_units": []},
     "where": [],
     "groupBy": [],
     "having": [],
@@ -84,10 +79,10 @@ g_empty_sql = {
     "limit": None,
     "except": None,
     "intersect": None,
-    "union": None
+    "union": None,
 }
 
-VALUE = '1'
+VALUE = "1"
 
 
 def tokenize(string, single_equal=False, math=True):
@@ -97,7 +92,7 @@ def tokenize(string, single_equal=False, math=True):
     Returns:
     """
 
-    string = string.replace("\'", "\"").lower()
+    string = string.replace("'", '"').lower()
     assert string.count('"') % 2 == 0, "Unexpected quote"
 
     def _extract_value(string):
@@ -115,7 +110,7 @@ def tokenize(string, single_equal=False, math=True):
             token = token.strip()
             if fn_omit(token):
                 new_tokens.append(token)
-            elif re.match(r'\d\d\d\d-\d\d(-\d\d)?', token):
+            elif re.match(r"\d\d\d\d-\d\d(-\d\d)?", token):
                 new_tokens.append('"%s"' % (token))
             else:
                 new_tokens.extend(fn_split(token))
@@ -123,41 +118,32 @@ def tokenize(string, single_equal=False, math=True):
 
     tokens_tmp = _extract_value(string)
 
-    two_bytes_op = ['==', '!=', '>=', '<=', '<>', '<in>']
+    two_bytes_op = ["==", "!=", ">=", "<=", "<>", "<in>"]
     if single_equal:
-        sep1 = re.compile(r'([ \+\-\*/\(\)=,><;])')  # 单字节运算符
+        sep1 = re.compile(r"([ \+\-\*/\(\)=,><;])")  # 单字节运算符
     else:
-        sep1 = re.compile(r'([ \+\-\*/\(\),><;])')  # 单字节运算符
-    sep2 = re.compile('(' + '|'.join(two_bytes_op) + ')')  # 多字节运算符
-    tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(' '),
-                          lambda x: x.startswith('"'))
-    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep2, x),
-                          lambda x: x.startswith('"'))
-    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep1, x),
-                          lambda x: x in two_bytes_op or x.startswith('"'))
-    tokens = list(
-        filter(lambda x: x.strip() not in ('', 'distinct', 'DISTINCT'),
-               tokens_tmp))
+        sep1 = re.compile(r"([ \+\-\*/\(\),><;])")  # 单字节运算符
+    sep2 = re.compile("(" + "|".join(two_bytes_op) + ")")  # 多字节运算符
+    tokens_tmp = _resplit(tokens_tmp, lambda x: x.split(" "), lambda x: x.startswith('"'))
+    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep2, x), lambda x: x.startswith('"'))
+    tokens_tmp = _resplit(tokens_tmp, lambda x: re.split(sep1, x), lambda x: x in two_bytes_op or x.startswith('"'))
+    tokens = list(filter(lambda x: x.strip() not in ("", "distinct", "DISTINCT"), tokens_tmp))
 
     def _post_merge(tokens):
         """merge:
-              * col name with "(", ")"
-              * values with +/-
+        * col name with "(", ")"
+        * values with +/-
         """
         idx = 1
         while idx < len(tokens):
-            if tokens[idx] == '(' and tokens[
-                    idx -
-                    1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx -
-                                                                   1] != '=':
+            if tokens[idx] == "(" and tokens[idx - 1] not in EXPECT_BRACKET_PRE_TOKENS and tokens[idx - 1] != "=":
                 # 兼容单引号，这里可能有问题
                 while idx < len(tokens):
                     tmp_tok = tokens.pop(idx)
                     tokens[idx - 1] += tmp_tok
-                    if tmp_tok == ')':
+                    if tmp_tok == ")":
                         break
-            elif tokens[idx] in ('+', '-') and tokens[
-                    idx - 1] in COND_OPS and idx + 1 < len(tokens):
+            elif tokens[idx] in ("+", "-") and tokens[idx - 1] in COND_OPS and idx + 1 < len(tokens):
                 tokens[idx] += tokens[idx + 1]
                 tokens.pop(idx + 1)
                 idx += 1
@@ -167,13 +153,13 @@ def tokenize(string, single_equal=False, math=True):
 
     tokens = _post_merge(tokens)
     if single_equal:
-        tokens = [i if i != '=' else '==' for i in tokens]
+        tokens = [i if i != "=" else "==" for i in tokens]
     return tokens
 
 
 def scan_alias(toks):
     """Scan the index of 'as' and build the map for all alias"""
-    as_idxs = [idx for idx, tok in enumerate(toks) if tok == 'as']
+    as_idxs = [idx for idx, tok in enumerate(toks) if tok == "as"]
     alias = {}
     for idx in as_idxs:
         alias[toks[idx + 1]] = toks[idx - 1]
@@ -188,15 +174,14 @@ def get_tables_with_alias(schema, toks):
     """
     tables = scan_alias(toks)
     for key in schema:
-        assert key not in tables, "Alias {} has the same name in table".format(
-            key)
+        assert key not in tables, "Alias {} has the same name in table".format(key)
         tables[key] = key
     return tables
 
 
 def parse_col(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
-        :returns next idx, column id
+    :returns next idx, column id
     """
     tok = toks[start_idx]
     if tok == "*":
@@ -204,13 +189,12 @@ def parse_col(toks, start_idx, tables_with_alias, schema, default_tables=None):
     if tok in CONST_COLUMN:
         return start_idx + 1, tok
 
-    if '.' in tok:  # if token is a composite
-        alias, col = tok.split('.')
+    if "." in tok:  # if token is a composite
+        alias, col = tok.split(".")
         key = tables_with_alias[alias] + "." + col
         return start_idx + 1, schema.id_map[key]
 
-    assert default_tables is not None and len(
-        default_tables) > 0, "Default tables should not be None or empty"
+    assert default_tables is not None and len(default_tables) > 0, "Default tables should not be None or empty"
 
     for alias in default_tables:
         table = tables_with_alias[alias]
@@ -221,53 +205,43 @@ def parse_col(toks, start_idx, tables_with_alias, schema, default_tables=None):
     raise RuntimeError("Error col: {},{}".format(tok, toks))
 
 
-def parse_col_unit(toks,
-                   start_idx,
-                   tables_with_alias,
-                   schema,
-                   default_tables=None):
+def parse_col_unit(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
-        :returns next idx, (agg_op id, col_id)
+    :returns next idx, (agg_op id, col_id)
     """
     idx = start_idx
     len_ = len(toks)
     isBlock = False
-    if toks[idx] == '(':
+    if toks[idx] == "(":
         isBlock = True
         idx += 1
 
     if toks[idx] in AGG_OPS:
         agg_id = AGG_OPS.index(toks[idx])
         idx += 1
-        assert idx < len_ and toks[idx] == '('
+        assert idx < len_ and toks[idx] == "("
         idx += 1
         if toks[idx] == "distinct":
             idx += 1
             isDistinct = True
-        idx, col_id = parse_col(toks, idx, tables_with_alias, schema,
-                                default_tables)
-        assert idx < len_ and toks[idx] == ')'
+        idx, col_id = parse_col(toks, idx, tables_with_alias, schema, default_tables)
+        assert idx < len_ and toks[idx] == ")"
         idx += 1
         return idx, (agg_id, col_id)
     if toks[idx] == "distinct":
         idx += 1
         isDistinct = True
     agg_id = AGG_OPS.index("none")
-    idx, col_id = parse_col(toks, idx, tables_with_alias, schema,
-                            default_tables)
+    idx, col_id = parse_col(toks, idx, tables_with_alias, schema, default_tables)
 
     if isBlock:
-        assert toks[idx] == ')'
+        assert toks[idx] == ")"
         idx += 1  # skip ')'
 
     return idx, (agg_id, col_id)
 
 
-def parse_val_unit(toks,
-                   start_idx,
-                   tables_with_alias,
-                   schema,
-                   default_tables=None):
+def parse_val_unit(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
     Args:
 
@@ -276,26 +250,24 @@ def parse_val_unit(toks,
     idx = start_idx
     len_ = len(toks)
     isBlock = False
-    if toks[idx] == '(':
+    if toks[idx] == "(":
         isBlock = True
         idx += 1
 
     col_unit1 = None
     col_unit2 = None
-    unit_op = UNIT_OPS.index('none')
+    unit_op = UNIT_OPS.index("none")
 
-    idx, col_unit1 = parse_col_unit(toks, idx, tables_with_alias, schema,
-                                    default_tables)
+    idx, col_unit1 = parse_col_unit(toks, idx, tables_with_alias, schema, default_tables)
     if idx < len_ and toks[idx] in UNIT_OPS:
         unit_op = UNIT_OPS.index(toks[idx])
         idx += 1
-        idx, col_unit2 = parse_col_unit(toks, idx, tables_with_alias, schema,
-                                        default_tables)
+        idx, col_unit2 = parse_col_unit(toks, idx, tables_with_alias, schema, default_tables)
 
     if isBlock:
-        assert toks[idx] == ')'
+        assert toks[idx] == ")"
         idx += 1  # skip ')'
-    if unit_op in (UNIT_OPS.index('+'), UNIT_OPS.index('*')):
+    if unit_op in (UNIT_OPS.index("+"), UNIT_OPS.index("*")):
         col_unit1, col_unit2 = sorted([col_unit1, col_unit2])
 
     return idx, (unit_op, col_unit1, col_unit2)
@@ -303,7 +275,7 @@ def parse_val_unit(toks,
 
 def parse_table_unit(toks, start_idx, tables_with_alias, schema):
     """
-        :returns next idx, table id, table name
+    :returns next idx, table id, table name
     """
     idx = start_idx
     len_ = len(toks)
@@ -317,11 +289,7 @@ def parse_table_unit(toks, start_idx, tables_with_alias, schema):
     return idx, schema.id_map[key], key
 
 
-def parse_value(toks,
-                start_idx,
-                tables_with_alias,
-                schema,
-                default_tables=None):
+def parse_value(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
     Args:
 
@@ -331,59 +299,58 @@ def parse_value(toks,
     len_ = len(toks)
 
     isBlock = False
-    if toks[idx] == '(':
+    if toks[idx] == "(":
         isBlock = True
         idx += 1
 
     def _force_float(str_num):
         """force float, just for debug"""
-        last = ''
+        last = ""
         while len(str_num) > 0:
             try:
                 n = float(str_num)
-                if last == '%':
+                if last == "%":
                     n /= 100
                 return n
             except:
                 last = str_num[-1]
                 str_num = str_num[:-1]
-        raise ValueError('not a float number')
+        raise ValueError("not a float number")
 
-    if toks[idx] == 'select':
+    if toks[idx] == "select":
         idx, val = parse_sql(toks, idx, tables_with_alias, schema)
-    elif toks[idx].startswith('"') and toks[idx].endswith(
-            '"'):  # token is a string value
+    elif toks[idx].startswith('"') and toks[idx].endswith('"'):  # token is a string value
         val = toks[idx]
         idx += 1
     else:
         try:
             val_str = toks[idx]
-            #val = float(val_str) if val_str[-1] != '%' else float(val_str[:-1]) / 100
+            # val = float(val_str) if val_str[-1] != '%' else float(val_str[:-1]) / 100
             val = _force_float(val_str)
             idx += 1
         except:
             end_idx = idx
-            while end_idx < len_ and toks[end_idx] != ',' and toks[end_idx] != ')' \
-                and toks[end_idx] != 'and' and toks[end_idx] not in CLAUSE_KEYWORDS \
-                and toks[end_idx] not in JOIN_KEYWORDS:
+            while (
+                end_idx < len_
+                and toks[end_idx] != ","
+                and toks[end_idx] != ")"
+                and toks[end_idx] != "and"
+                and toks[end_idx] not in CLAUSE_KEYWORDS
+                and toks[end_idx] not in JOIN_KEYWORDS
+            ):
                 end_idx += 1
 
-            idx, val = parse_col_unit(toks[start_idx:end_idx], 0,
-                                      tables_with_alias, schema, default_tables)
+            idx, val = parse_col_unit(toks[start_idx:end_idx], 0, tables_with_alias, schema, default_tables)
             idx = end_idx
 
     if isBlock:
-        assert toks[idx] == ')'
+        assert toks[idx] == ")"
         idx += 1
 
     return idx, val
 
 
-def parse_condition(toks,
-                    start_idx,
-                    tables_with_alias,
-                    schema,
-                    default_tables=None):
+def parse_condition(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
     Args:
 
@@ -399,38 +366,33 @@ def parse_condition(toks,
             agg_id = AGG_OPS.index(toks[idx])
             idx += 1
 
-        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema,
-                                       default_tables)
+        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema, default_tables)
 
         op_str = toks[idx]
-        if op_str == 'not':
-            assert toks[idx + 1] == 'in', '"not" must followed by "in"'
-            op_str = 'not_in'
+        if op_str == "not":
+            assert toks[idx + 1] == "in", '"not" must followed by "in"'
+            op_str = "not_in"
             idx += 1
         assert idx < len_ and op_str in COND_OPS, "Error condition: idx: {}, tok: {},, toks: {}".format(
-            idx, op_str, toks)
+            idx, op_str, toks
+        )
         op_id = COND_OPS.index(op_str)
         idx += 1
         val1 = val2 = None
         # idx, val1 = parse_value(toks, idx, tables_with_alias, schema, default_tables)
         # val2 = None
-        if op_id == COND_OPS.index(
-                'between'):  # between..and... special case: dual values
-            idx, val1 = parse_value(toks, idx, tables_with_alias, schema,
-                                    default_tables)
-            assert toks[idx] == 'and'
+        if op_id == COND_OPS.index("between"):  # between..and... special case: dual values
+            idx, val1 = parse_value(toks, idx, tables_with_alias, schema, default_tables)
+            assert toks[idx] == "and"
             idx += 1
-            idx, val2 = parse_value(toks, idx, tables_with_alias, schema,
-                                    default_tables)
+            idx, val2 = parse_value(toks, idx, tables_with_alias, schema, default_tables)
         else:  # normal case: single value
-            idx, val1 = parse_value(toks, idx, tables_with_alias, schema,
-                                    default_tables)
+            idx, val1 = parse_value(toks, idx, tables_with_alias, schema, default_tables)
             val2 = None
 
         conds.append((agg_id, op_id, val_unit, val1, val2))
 
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx]
-                           in (")", ";") or toks[idx] in JOIN_KEYWORDS):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in (")", ";") or toks[idx] in JOIN_KEYWORDS):
             break
 
         if idx < len_ and toks[idx] in LOGIC_AND_OR:
@@ -440,11 +402,7 @@ def parse_condition(toks,
     return idx, conds
 
 
-def parse_select(toks,
-                 start_idx,
-                 tables_with_alias,
-                 schema,
-                 default_tables=None):
+def parse_select(toks, start_idx, tables_with_alias, schema, default_tables=None):
     """
     Args:
 
@@ -453,10 +411,10 @@ def parse_select(toks,
     idx = start_idx
     len_ = len(toks)
 
-    assert toks[idx] == 'select', "'select' not found"
+    assert toks[idx] == "select", "'select' not found"
     idx += 1
     isDistinct = False
-    if idx < len_ and toks[idx] == 'distinct':
+    if idx < len_ and toks[idx] == "distinct":
         idx += 1
         isDistinct = True
     val_units = []
@@ -466,10 +424,9 @@ def parse_select(toks,
         if toks[idx] in AGG_OPS:
             agg_id = AGG_OPS.index(toks[idx])
             idx += 1
-        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema,
-                                       default_tables)
+        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema, default_tables)
         val_units.append((agg_id, val_unit))
-        if idx < len_ and toks[idx] == ',':
+        if idx < len_ and toks[idx] == ",":
             idx += 1  # skip ','
 
     return idx, val_units
@@ -479,10 +436,10 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
     """
     Assume in the from clause, all table units are combined with join
     """
-    assert 'from' in toks[start_idx:], "'from' not found"
+    assert "from" in toks[start_idx:], "'from' not found"
 
     len_ = len(toks)
-    idx = toks.index('from', start_idx) + 1
+    idx = toks.index("from", start_idx) + 1
     default_tables = []
     table_units = []
     conds = []
@@ -490,42 +447,39 @@ def parse_from(toks, start_idx, tables_with_alias, schema):
 
     while idx < len_:
         isBlock = False
-        if toks[idx] == '(':
+        if toks[idx] == "(":
             isBlock = True
             idx += 1
 
-        if toks[idx] == 'select':
+        if toks[idx] == "select":
             idx, sql = parse_sql(toks, idx, tables_with_alias, schema)
-            table_units.append((TABLE_TYPE['sql'], sql))
-            last_table = sql['from']['table_units'][0][1].strip('_')
+            table_units.append((TABLE_TYPE["sql"], sql))
+            last_table = sql["from"]["table_units"][0][1].strip("_")
         else:
-            if idx < len_ and toks[idx] == 'join':
+            if idx < len_ and toks[idx] == "join":
                 idx += 1  # skip join
-            idx, table_unit, table_name = parse_table_unit(
-                toks, idx, tables_with_alias, schema)
-            table_units.append((TABLE_TYPE['table_unit'], table_unit))
+            idx, table_unit, table_name = parse_table_unit(toks, idx, tables_with_alias, schema)
+            table_units.append((TABLE_TYPE["table_unit"], table_unit))
             default_tables.append(table_name)
         if idx < len_ and toks[idx] == "on":
             idx += 1  # skip on
-            idx, this_conds = parse_condition(toks, idx, tables_with_alias,
-                                              schema, default_tables)
+            idx, this_conds = parse_condition(toks, idx, tables_with_alias, schema, default_tables)
             if len(conds) > 0:
-                conds.append('and')
+                conds.append("and")
             conds.extend(this_conds)
 
         if isBlock:
-            assert toks[idx] == ')'
+            assert toks[idx] == ")"
             idx += 1
-        if idx < len_ and toks[idx] == 'a':
-            assert last_table is not None, 'last_table should be a table name strin, not None'
-            tables_with_alias['a'] = last_table
+        if idx < len_ and toks[idx] == "a":
+            assert last_table is not None, "last_table should be a table name strin, not None"
+            tables_with_alias["a"] = last_table
             idx += 2
-        elif idx < len_ and toks[idx] == 'b':
-            assert last_table is not None, 'last_table should be a table name strin, not None'
-            tables_with_alias['b'] = last_table
+        elif idx < len_ and toks[idx] == "b":
+            assert last_table is not None, "last_table should be a table name strin, not None"
+            tables_with_alias["b"] = last_table
             idx += 1
-        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS
-                           or toks[idx] in (")", ";")):
+        if idx < len_ and (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in (")", ";")):
             break
 
     return [idx, table_units, conds, default_tables]
@@ -540,12 +494,11 @@ def parse_where(toks, start_idx, tables_with_alias, schema, default_tables):
     idx = start_idx
     len_ = len(toks)
 
-    if idx >= len_ or toks[idx] != 'where':
+    if idx >= len_ or toks[idx] != "where":
         return idx, []
 
     idx += 1
-    idx, conds = parse_condition(toks, idx, tables_with_alias, schema,
-                                 default_tables)
+    idx, conds = parse_condition(toks, idx, tables_with_alias, schema, default_tables)
     return idx, conds
 
 
@@ -559,19 +512,17 @@ def parse_group_by(toks, start_idx, tables_with_alias, schema, default_tables):
     len_ = len(toks)
     col_units = []
 
-    if idx >= len_ or toks[idx] != 'group':
+    if idx >= len_ or toks[idx] != "group":
         return idx, col_units
 
     idx += 1
-    assert toks[idx] == 'by'
+    assert toks[idx] == "by"
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
-                              or toks[idx] in (")", ";")):
-        idx, col_unit = parse_col_unit(toks, idx, tables_with_alias, schema,
-                                       default_tables)
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in (")", ";")):
+        idx, col_unit = parse_col_unit(toks, idx, tables_with_alias, schema, default_tables)
         col_units.append(col_unit)
-        if idx < len_ and toks[idx] == ',':
+        if idx < len_ and toks[idx] == ",":
             idx += 1  # skip ','
         else:
             break
@@ -588,28 +539,26 @@ def parse_order_by(toks, start_idx, tables_with_alias, schema, default_tables):
     idx = start_idx
     len_ = len(toks)
     val_units = []
-    order_type = 'asc'  # default type is 'asc'
+    order_type = "asc"  # default type is 'asc'
 
-    if idx >= len_ or toks[idx] != 'order':
+    if idx >= len_ or toks[idx] != "order":
         return idx, val_units
 
     idx += 1
-    assert toks[idx] == 'by'
+    assert toks[idx] == "by"
     idx += 1
 
-    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS
-                              or toks[idx] in (")", ";")):
+    while idx < len_ and not (toks[idx] in CLAUSE_KEYWORDS or toks[idx] in (")", ";")):
         agg_id = AGG_OPS.index("none")
         if toks[idx] in AGG_OPS:
             agg_id = AGG_OPS.index(toks[idx])
             idx += 1
-        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema,
-                                       default_tables)
+        idx, val_unit = parse_val_unit(toks, idx, tables_with_alias, schema, default_tables)
         val_units.append((agg_id, val_unit))
         if idx < len_ and toks[idx] in ORDER_OPS:
             order_type = toks[idx]
             idx += 1
-        if idx < len_ and toks[idx] == ',':
+        if idx < len_ and toks[idx] == ",":
             idx += 1  # skip ','
         else:
             break
@@ -626,12 +575,11 @@ def parse_having(toks, start_idx, tables_with_alias, schema, default_tables):
     idx = start_idx
     len_ = len(toks)
 
-    if idx >= len_ or toks[idx] != 'having':
+    if idx >= len_ or toks[idx] != "having":
         return idx, []
 
     idx += 1
-    idx, conds = parse_condition(toks, idx, tables_with_alias, schema,
-                                 default_tables)
+    idx, conds = parse_condition(toks, idx, tables_with_alias, schema, default_tables)
     return idx, conds
 
 
@@ -644,7 +592,7 @@ def parse_limit(toks, start_idx):
     idx = start_idx
     len_ = len(toks)
 
-    if idx < len_ and toks[idx] == 'limit':
+    if idx < len_ and toks[idx] == "limit":
         idx += 2
         return idx, int(toks[idx - 1])
 
@@ -662,42 +610,36 @@ def parse_sql(toks, start_idx, tables_with_alias, schema):
     idx = start_idx
 
     sql = {}
-    if toks[idx] == '(':
+    if toks[idx] == "(":
         isBlock = True
         idx += 1
 
     # parse from clause in order to get default tables
-    from_end_idx, table_units, conds, default_tables = parse_from(
-        toks, start_idx, tables_with_alias, schema)
-    sql['from'] = {'table_units': table_units, 'conds': conds}
+    from_end_idx, table_units, conds, default_tables = parse_from(toks, start_idx, tables_with_alias, schema)
+    sql["from"] = {"table_units": table_units, "conds": conds}
     # select clause
-    _, select_col_units = parse_select(toks, idx, tables_with_alias, schema,
-                                       default_tables)
+    _, select_col_units = parse_select(toks, idx, tables_with_alias, schema, default_tables)
     idx = from_end_idx
-    sql['select'] = select_col_units
+    sql["select"] = select_col_units
     # where clause
-    idx, where_conds = parse_where(toks, idx, tables_with_alias, schema,
-                                   default_tables)
-    sql['where'] = where_conds
+    idx, where_conds = parse_where(toks, idx, tables_with_alias, schema, default_tables)
+    sql["where"] = where_conds
     # group by clause
-    idx, group_col_units = parse_group_by(toks, idx, tables_with_alias, schema,
-                                          default_tables)
-    sql['groupBy'] = group_col_units
+    idx, group_col_units = parse_group_by(toks, idx, tables_with_alias, schema, default_tables)
+    sql["groupBy"] = group_col_units
     # having clause
-    idx, having_conds = parse_having(toks, idx, tables_with_alias, schema,
-                                     default_tables)
-    sql['having'] = having_conds
+    idx, having_conds = parse_having(toks, idx, tables_with_alias, schema, default_tables)
+    sql["having"] = having_conds
     # order by clause
-    idx, order_col_units = parse_order_by(toks, idx, tables_with_alias, schema,
-                                          default_tables)
-    sql['orderBy'] = order_col_units
+    idx, order_col_units = parse_order_by(toks, idx, tables_with_alias, schema, default_tables)
+    sql["orderBy"] = order_col_units
     # limit clause
     idx, limit_val = parse_limit(toks, idx)
-    sql['limit'] = limit_val
+    sql["limit"] = limit_val
 
     idx = skip_semicolon(toks, idx)
     if isBlock:
-        assert toks[idx] == ')'
+        assert toks[idx] == ")"
         idx += 1  # skip ')'
     idx = skip_semicolon(toks, idx)
 
@@ -760,41 +702,36 @@ class Evaluator(object):
 
     def _eval_exact_match(self, pred, gold, value_match=True):
         """eval_exact_match"""
-        partial_scores = self.eval_partial_match(pred,
-                                                 gold,
-                                                 value_match=value_match)
+        partial_scores = self.eval_partial_match(pred, gold, value_match=value_match)
         self.partial_scores = partial_scores
 
         for _, score in partial_scores.items():
-            if score['f1'] != 1:
+            if score["f1"] != 1:
                 return 0
 
-        gold_table_units = gold['from']['table_units']
-        pred_table_units = pred['from']['table_units']
-        if len(pred_table_units) != len(gold_table_units) or \
-                any(map(lambda x: type(x[0][1]) != type(x[1][1]), zip(pred_table_units, gold_table_units))):
+        gold_table_units = gold["from"]["table_units"]
+        pred_table_units = pred["from"]["table_units"]
+        if len(pred_table_units) != len(gold_table_units) or any(
+            map(lambda x: type(x[0][1]) != type(x[1][1]), zip(pred_table_units, gold_table_units))
+        ):
             return 0
         if type(gold_table_units[0][1]) is not dict:
-            return 1 if sorted(gold_table_units) == sorted(
-                pred_table_units) else 0
+            return 1 if sorted(gold_table_units) == sorted(pred_table_units) else 0
 
         # TODO: 严格考虑顺序
         def __eval_from_sql(pred_tables, gold_tables):
             """eval from sql"""
-            for pred_table_unit, gold_table_unit in zip(pred_tables,
-                                                        gold_tables):
+            for pred_table_unit, gold_table_unit in zip(pred_tables, gold_tables):
                 pred_table_sql = pred_table_unit[1]
                 gold_table_sql = gold_table_unit[1]
-                _, _, correct = eval_nested(pred_table_sql, gold_table_sql,
-                                            value_match)
+                _, _, correct = eval_nested(pred_table_sql, gold_table_sql, value_match)
                 if correct == 0:
                     return 0
             return 1
 
         correct = __eval_from_sql(pred_table_units, gold_table_units)
         if len(gold_table_units) > 1 and correct == 0:
-            return __eval_from_sql(pred_table_units,
-                                   list(reversed(gold_table_units)))
+            return __eval_from_sql(pred_table_units, list(reversed(gold_table_units)))
         else:
             return correct
 
@@ -814,22 +751,18 @@ class Evaluator(object):
         if score == 1:
             return score
 
-        if gold['union'] is not None:
+        if gold["union"] is not None:
             gold_tmp = copy.deepcopy(gold)
-            new_gold = gold_tmp['union']
-            gold_tmp['union'] = None
-            new_gold['union'] = gold_tmp
-            return self._eval_exact_match(pred,
-                                          new_gold,
-                                          value_match=value_match)
-        elif gold['intersect'] is not None:
+            new_gold = gold_tmp["union"]
+            gold_tmp["union"] = None
+            new_gold["union"] = gold_tmp
+            return self._eval_exact_match(pred, new_gold, value_match=value_match)
+        elif gold["intersect"] is not None:
             gold_tmp = copy.deepcopy(gold)
-            new_gold = gold_tmp['intersect']
-            gold_tmp['intersect'] = None
-            new_gold['intersect'] = gold_tmp
-            return self._eval_exact_match(pred,
-                                          new_gold,
-                                          value_match=value_match)
+            new_gold = gold_tmp["intersect"]
+            gold_tmp["intersect"] = None
+            new_gold["intersect"] = gold_tmp
+            return self._eval_exact_match(pred, new_gold, value_match=value_match)
         else:
             return 0
 
@@ -839,106 +772,39 @@ class Evaluator(object):
 
         gold_total, pred_total, cnt, cnt_wo_agg = eval_sel(pred, gold)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['select'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["select"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
         acc, rec, f1 = get_scores(cnt_wo_agg, pred_total, gold_total)
-        res['select(no AGG)'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["select(no AGG)"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
-        gold_total, pred_total, cnt, cnt_wo_agg = eval_where(
-            pred, gold, value_match=value_match)
+        gold_total, pred_total, cnt, cnt_wo_agg = eval_where(pred, gold, value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['where'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["where"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
         acc, rec, f1 = get_scores(cnt_wo_agg, pred_total, gold_total)
-        res['where(no OP)'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["where(no OP)"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
         gold_total, pred_total, cnt = eval_group(pred, gold)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['group'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["group"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
-        gold_total, pred_total, cnt = eval_having(pred,
-                                                  gold,
-                                                  value_match=value_match)
+        gold_total, pred_total, cnt = eval_having(pred, gold, value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['having'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["having"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
-        gold_total, pred_total, cnt = eval_order(pred,
-                                                 gold,
-                                                 value_match=value_match)
+        gold_total, pred_total, cnt = eval_order(pred, gold, value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['order'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["order"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
         gold_total, pred_total, cnt = eval_and_or(pred, gold)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['and/or'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["and/or"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
-        gold_total, pred_total, cnt = eval_IUEN(pred,
-                                                gold,
-                                                value_match=value_match)
+        gold_total, pred_total, cnt = eval_IUEN(pred, gold, value_match=value_match)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['IUEN'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["IUEN"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
         gold_total, pred_total, cnt = eval_keywords(pred, gold)
         acc, rec, f1 = get_scores(cnt, pred_total, gold_total)
-        res['keywords'] = {
-            'acc': acc,
-            'rec': rec,
-            'f1': f1,
-            'gold_total': gold_total,
-            'pred_total': pred_total
-        }
+        res["keywords"] = {"acc": acc, "rec": rec, "f1": f1, "gold_total": gold_total, "pred_total": pred_total}
 
         return res
 
@@ -973,12 +839,9 @@ class Schema(object):
 
         Raises: NULL
         """
-        tables = [
-            x.lower() for x in db.get('table_names_original', db['table_names'])
-        ]
+        tables = [x.lower() for x in db.get("table_names_original", db["table_names"])]
         dct_table2cols = defaultdict(list)
-        for table_id, column in db.get('column_names_original',
-                                       db['column_names']):
+        for table_id, column in db.get("column_names_original", db["column_names"]):
             if table_id < 0:
                 continue
             dct_table2cols[tables[table_id]].append(column.lower())
@@ -986,12 +849,10 @@ class Schema(object):
 
     def _map(self, schema):
         """map"""
-        id_map = {'*': "__all__"}
+        id_map = {"*": "__all__"}
         for key, vals in schema.items():
             for val in vals:
-                id_map[
-                    key.lower() + "." +
-                    val.lower()] = "__" + key.lower() + "." + val.lower() + "__"
+                id_map[key.lower() + "." + val.lower()] = "__" + key.lower() + "." + val.lower() + "__"
 
         for key in schema:
             id_map[key.lower()] = "__" + key.lower() + "__"
@@ -1018,8 +879,8 @@ def eval_sel(pred, gold):
 
     Returns:
     """
-    pred_sel = copy.deepcopy(pred['select'])
-    gold_sel = copy.deepcopy(gold['select'])
+    pred_sel = copy.deepcopy(pred["select"])
+    gold_sel = copy.deepcopy(gold["select"])
     gold_wo_agg = [unit[1] for unit in gold_sel]
     pred_total = len(pred_sel)
     gold_total = len(gold_sel)
@@ -1071,8 +932,8 @@ def eval_cond(pred, gold, value_match=True):
     """
 
     def _equal(p, g):
-        p = p.strip('"\'') if type(p) is str else p
-        g = g.strip('"\'') if type(g) is str else g
+        p = p.strip("\"'") if type(p) is str else p
+        g = g.strip("\"'") if type(g) is str else g
         if str(p) == str(g):
             return True
         if is_float(p) and is_float(g) and float(p) == float(g):
@@ -1108,14 +969,8 @@ def eval_where(pred, gold, value_match=True):
 
     Returns:
     """
-    pred_conds = copy.deepcopy([
-        unit for unit in sorted(pred['where'][::2],
-                                key=lambda x: [str(i) for i in x])
-    ])
-    gold_conds = copy.deepcopy([
-        unit for unit in sorted(gold['where'][::2],
-                                key=lambda x: [str(i) for i in x])
-    ])
+    pred_conds = copy.deepcopy([unit for unit in sorted(pred["where"][::2], key=lambda x: [str(i) for i in x])])
+    gold_conds = copy.deepcopy([unit for unit in sorted(gold["where"][::2], key=lambda x: [str(i) for i in x])])
     gold_wo_agg = [unit[2] for unit in gold_conds]
     pred_total = len(pred_conds)
     gold_total = len(gold_conds)
@@ -1138,17 +993,13 @@ def eval_group(pred, gold):
 
     Returns:
     """
-    pred_cols = [unit[1] for unit in pred['groupBy']]
-    gold_cols = [unit[1] for unit in gold['groupBy']]
+    pred_cols = [unit[1] for unit in pred["groupBy"]]
+    gold_cols = [unit[1] for unit in gold["groupBy"]]
     pred_total = len(pred_cols)
     gold_total = len(gold_cols)
     cnt = 0
-    pred_cols = [
-        pred.split(".")[1] if "." in pred else pred for pred in pred_cols
-    ]
-    gold_cols = [
-        gold.split(".")[1] if "." in gold else gold for gold in gold_cols
-    ]
+    pred_cols = [pred.split(".")[1] if "." in pred else pred for pred in pred_cols]
+    gold_cols = [gold.split(".")[1] if "." in gold else gold for gold in gold_cols]
     for col in pred_cols:
         if col in gold_cols:
             cnt += 1
@@ -1162,23 +1013,16 @@ def eval_having(pred, gold, value_match=True):
 
     Returns:
     """
-    if len(pred['having']) != len(gold['having']):
+    if len(pred["having"]) != len(gold["having"]):
         return [1, 1, 0]
 
-    pred_conds = copy.deepcopy([
-        unit for unit in sorted(pred['having'][::2],
-                                key=lambda x: [str(i) for i in x])
-    ])
-    gold_conds = copy.deepcopy([
-        unit for unit in sorted(gold['having'][::2],
-                                key=lambda x: [str(i) for i in x])
-    ])
+    pred_conds = copy.deepcopy([unit for unit in sorted(pred["having"][::2], key=lambda x: [str(i) for i in x])])
+    gold_conds = copy.deepcopy([unit for unit in sorted(gold["having"][::2], key=lambda x: [str(i) for i in x])])
 
-    pred_total = len(pred['having'][::2])
-    gold_total = len(gold['having'][::2])
+    pred_total = len(pred["having"][::2])
+    gold_total = len(gold["having"][::2])
     cnt = 0
-    for pred_cond, gold_cond in zip(sorted(pred['having'][::2]),
-                                    sorted(gold['having'][::2])):
+    for pred_cond, gold_cond in zip(sorted(pred["having"][::2]), sorted(gold["having"][::2])):
         if eval_cond(pred_cond, gold_cond, value_match) == 1:
             cnt += 1
 
@@ -1192,17 +1036,16 @@ def eval_order(pred, gold, value_match=True):
     Returns:
     """
     pred_total = gold_total = cnt = 0
-    if len(pred['orderBy']) > 0:
+    if len(pred["orderBy"]) > 0:
         pred_total = 1
-    if len(gold['orderBy']) > 0:
+    if len(gold["orderBy"]) > 0:
         gold_total = 1
 
     if value_match:
-        if len(gold['orderBy']) > 0 and pred['orderBy'] == gold[
-                'orderBy'] and pred['limit'] == gold['limit']:
+        if len(gold["orderBy"]) > 0 and pred["orderBy"] == gold["orderBy"] and pred["limit"] == gold["limit"]:
             cnt = 1
     else:
-        if len(gold['orderBy']) > 0 and pred['orderBy'] == gold['orderBy']:
+        if len(gold["orderBy"]) > 0 and pred["orderBy"] == gold["orderBy"]:
             cnt = 1
 
     return [gold_total, pred_total, cnt]
@@ -1222,18 +1065,18 @@ def eval_and_or(pred, gold):
             left = conds[i - 1][:3]
             right = conds[i + 1][:3]
             left, right = list(sorted([left, right]))
-            op_set.add(f'{left}{conds[i].lower()}{right}')
+            op_set.add(f"{left}{conds[i].lower()}{right}")
         return op_set
 
     # eval where and/or
-    pred_op_set = _extract(pred['where'])
-    gold_op_set = _extract(gold['where'])
+    pred_op_set = _extract(pred["where"])
+    gold_op_set = _extract(gold["where"])
     if pred_op_set != gold_op_set:
         return [1, 1, 0]
 
     # eval having and/or
-    pred_op_set = _extract(pred['having'])
-    gold_op_set = _extract(gold['having'])
+    pred_op_set = _extract(pred["having"])
+    gold_op_set = _extract(gold["having"])
     if pred_op_set != gold_op_set:
         return [1, 1, 0]
 
@@ -1247,25 +1090,21 @@ def get_nestedSQL(sql):
     Returns:
     """
     nested = []
-    for cond_unit in sql['from']['conds'][::2] + sql['where'][::2] + sql[
-            'having'][::2]:
+    for cond_unit in sql["from"]["conds"][::2] + sql["where"][::2] + sql["having"][::2]:
         if type(cond_unit[3]) is dict:
             nested.append(cond_unit[3])
         if type(cond_unit[4]) is dict:
             nested.append(cond_unit[4])
     ##
-    for from_nest_sql in [
-            table_unit[1] for table_unit in sql['from']['table_units']
-            if table_unit[0] == 'sql'
-    ]:
+    for from_nest_sql in [table_unit[1] for table_unit in sql["from"]["table_units"] if table_unit[0] == "sql"]:
         nested.append(from_nest_sql)
 
-    if sql['intersect'] is not None:
-        nested.append(sql['intersect'])
-    if sql['except'] is not None:
-        nested.append(sql['except'])
-    if sql['union'] is not None:
-        nested.append(sql['union'])
+    if sql["intersect"] is not None:
+        nested.append(sql["intersect"])
+    if sql["except"] is not None:
+        nested.append(sql["except"])
+    if sql["union"] is not None:
+        nested.append(sql["union"])
     return nested
 
 
@@ -1293,15 +1132,9 @@ def eval_IUEN(pred, gold, value_match=True):
 
     Returns:
     """
-    lt1, pt1, cnt1 = eval_nested(pred['intersect'],
-                                 gold['intersect'],
-                                 value_match=value_match)
-    lt2, pt2, cnt2 = eval_nested(pred['except'],
-                                 gold['except'],
-                                 value_match=value_match)
-    lt3, pt3, cnt3 = eval_nested(pred['union'],
-                                 gold['union'],
-                                 value_match=value_match)
+    lt1, pt1, cnt1 = eval_nested(pred["intersect"], gold["intersect"], value_match=value_match)
+    lt2, pt2, cnt2 = eval_nested(pred["except"], gold["except"], value_match=value_match)
+    lt3, pt3, cnt3 = eval_nested(pred["union"], gold["union"], value_match=value_match)
     gold_total = lt1 + lt2 + lt3
     pred_total = pt1 + pt2 + pt3
     cnt = cnt1 + cnt2 + cnt3
@@ -1315,49 +1148,42 @@ def get_keywords(sql):
     Returns:
     """
     res = set()
-    if len(sql['where']) > 0:
-        res.add('where')
-    if len(sql['groupBy']) > 0:
-        res.add('group')
-    if len(sql['having']) > 0:
-        res.add('having')
-    if len(sql['orderBy']) > 0:
-        res.add(sql['orderBy'][0])
-        res.add('order')
-    if sql['limit'] is not None:
-        res.add('limit')
-    if sql['except'] is not None:
-        res.add('except')
-    if sql['union'] is not None:
-        res.add('union')
-    if sql['intersect'] is not None:
-        res.add('intersect')
+    if len(sql["where"]) > 0:
+        res.add("where")
+    if len(sql["groupBy"]) > 0:
+        res.add("group")
+    if len(sql["having"]) > 0:
+        res.add("having")
+    if len(sql["orderBy"]) > 0:
+        res.add(sql["orderBy"][0])
+        res.add("order")
+    if sql["limit"] is not None:
+        res.add("limit")
+    if sql["except"] is not None:
+        res.add("except")
+    if sql["union"] is not None:
+        res.add("union")
+    if sql["intersect"] is not None:
+        res.add("intersect")
 
     # or keyword
-    ao = sql['from']['conds'][1::2] + sql['where'][1::2] + sql['having'][1::2]
-    if len([token for token in ao if token == 'or']) > 0:
-        res.add('or')
+    ao = sql["from"]["conds"][1::2] + sql["where"][1::2] + sql["having"][1::2]
+    if len([token for token in ao if token == "or"]) > 0:
+        res.add("or")
 
     ## TODO
-    cond_units = sql['from']['conds'][::2] + sql['where'][::2] + sql[
-        'having'][::2]
+    cond_units = sql["from"]["conds"][::2] + sql["where"][::2] + sql["having"][::2]
     # not keyword
     if len([cond_unit for cond_unit in cond_units if cond_unit[0]]) > 0:
-        res.add('not')
+        res.add("not")
 
     # in keyword
-    if len([
-            cond_unit
-            for cond_unit in cond_units if cond_unit[1] == COND_OPS.index('in')
-    ]) > 0:
-        res.add('in')
+    if len([cond_unit for cond_unit in cond_units if cond_unit[1] == COND_OPS.index("in")]) > 0:
+        res.add("in")
 
     # like keyword
-    if len([
-            cond_unit for cond_unit in cond_units
-            if cond_unit[1] == COND_OPS.index('like')
-    ]) > 0:
-        res.add('like')
+    if len([cond_unit for cond_unit in cond_units if cond_unit[1] == COND_OPS.index("like")]) > 0:
+        res.add("like")
 
     return res
 
@@ -1387,14 +1213,11 @@ def build_valid_col_units(table_units, schema):
 
     Returns:
     """
-    col_ids = [
-        table_unit[1] for table_unit in table_units
-        if table_unit[0] == TABLE_TYPE['table_unit']
-    ]
+    col_ids = [table_unit[1] for table_unit in table_units if table_unit[0] == TABLE_TYPE["table_unit"]]
     prefixs = [col_id[:-2] for col_id in col_ids]
     valid_col_units = []
     for value in schema.id_map.values():
-        if '.' in value and value[:value.index('.')] in prefixs:
+        if "." in value and value[: value.index(".")] in prefixs:
             valid_col_units.append(value)
     return valid_col_units
 
@@ -1440,11 +1263,9 @@ def rebuild_table_unit_col(valid_col_units, table_unit, kmap):
 
     table_type, col_unit_or_sql = table_unit
     if isinstance(col_unit_or_sql, dict):
-        col_unit_or_sql = rebuild_sql_col(valid_col_units, col_unit_or_sql,
-                                          kmap)
+        col_unit_or_sql = rebuild_sql_col(valid_col_units, col_unit_or_sql, kmap)
     elif isinstance(col_unit_or_sql, tuple):
-        col_unit_or_sql = rebuild_col_unit_col(valid_col_units, col_unit_or_sql,
-                                               kmap)
+        col_unit_or_sql = rebuild_col_unit_col(valid_col_units, col_unit_or_sql, kmap)
     return table_type, col_unit_or_sql
 
 
@@ -1476,8 +1297,7 @@ def rebuild_condition_col(valid_col_units, condition, kmap):
     """
     for idx in range(len(condition)):
         if idx % 2 == 0:
-            condition[idx] = rebuild_cond_unit_col(valid_col_units,
-                                                   condition[idx], kmap)
+            condition[idx] = rebuild_cond_unit_col(valid_col_units, condition[idx], kmap)
     return condition
 
 
@@ -1492,8 +1312,7 @@ def rebuild_select_col(valid_col_units, sel, kmap):
     new_list = []
     for it in sel:
         agg_id, val_unit = it
-        new_list.append(
-            (agg_id, rebuild_val_unit_col(valid_col_units, val_unit, kmap)))
+        new_list.append((agg_id, rebuild_val_unit_col(valid_col_units, val_unit, kmap)))
     return new_list
 
 
@@ -1507,11 +1326,8 @@ def rebuild_from_col(valid_col_units, from_, kmap):
         return from_
 
     fn_proc = lambda x: rebuild_table_unit_col(valid_col_units, x, kmap)
-    from_['table_units'] = [
-        fn_proc(table_unit) for table_unit in from_['table_units']
-    ]
-    from_['conds'] = rebuild_condition_col(valid_col_units, from_['conds'],
-                                           kmap)
+    from_["table_units"] = [fn_proc(table_unit) for table_unit in from_["table_units"]]
+    from_["conds"] = rebuild_condition_col(valid_col_units, from_["conds"], kmap)
     return from_
 
 
@@ -1524,10 +1340,7 @@ def rebuild_group_by_col(valid_col_units, group_by, kmap):
     if group_by is None:
         return group_by
 
-    return [
-        rebuild_col_unit_col(valid_col_units, col_unit, kmap)
-        for col_unit in group_by
-    ]
+    return [rebuild_col_unit_col(valid_col_units, col_unit, kmap) for col_unit in group_by]
 
 
 def rebuild_order_by_col(valid_col_units, order_by, kmap):
@@ -1540,9 +1353,7 @@ def rebuild_order_by_col(valid_col_units, order_by, kmap):
         return order_by
 
     direction, val_units = order_by
-    new_val_units = [(agg_id,
-                      rebuild_val_unit_col(valid_col_units, val_unit, kmap))
-                     for agg_id, val_unit in val_units]
+    new_val_units = [(agg_id, rebuild_val_unit_col(valid_col_units, val_unit, kmap)) for agg_id, val_unit in val_units]
     return direction, new_val_units
 
 
@@ -1555,15 +1366,15 @@ def rebuild_sql_col(valid_col_units, sql, kmap):
     if sql is None:
         return sql
 
-    sql['select'] = rebuild_select_col(valid_col_units, sql['select'], kmap)
-    sql['from'] = rebuild_from_col(valid_col_units, sql['from'], kmap)
-    sql['where'] = rebuild_condition_col(valid_col_units, sql['where'], kmap)
-    sql['groupBy'] = rebuild_group_by_col(valid_col_units, sql['groupBy'], kmap)
-    sql['orderBy'] = rebuild_order_by_col(valid_col_units, sql['orderBy'], kmap)
-    sql['having'] = rebuild_condition_col(valid_col_units, sql['having'], kmap)
-    sql['intersect'] = rebuild_sql_col(valid_col_units, sql['intersect'], kmap)
-    sql['except'] = rebuild_sql_col(valid_col_units, sql['except'], kmap)
-    sql['union'] = rebuild_sql_col(valid_col_units, sql['union'], kmap)
+    sql["select"] = rebuild_select_col(valid_col_units, sql["select"], kmap)
+    sql["from"] = rebuild_from_col(valid_col_units, sql["from"], kmap)
+    sql["where"] = rebuild_condition_col(valid_col_units, sql["where"], kmap)
+    sql["groupBy"] = rebuild_group_by_col(valid_col_units, sql["groupBy"], kmap)
+    sql["orderBy"] = rebuild_order_by_col(valid_col_units, sql["orderBy"], kmap)
+    sql["having"] = rebuild_condition_col(valid_col_units, sql["having"], kmap)
+    sql["intersect"] = rebuild_sql_col(valid_col_units, sql["intersect"], kmap)
+    sql["except"] = rebuild_sql_col(valid_col_units, sql["except"], kmap)
+    sql["union"] = rebuild_sql_col(valid_col_units, sql["union"], kmap)
 
     return sql
 
@@ -1624,11 +1435,11 @@ def build_foreign_key_map_from_json(table):
         data = json.load(f)
     tables = {}
     for entry in data:
-        tables[entry['db_id']] = build_foreign_key_map(entry)
+        tables[entry["db_id"]] = build_foreign_key_map(entry)
     return tables
 
 
-def evaluate_complex(table, gold, predict, mode='exact', single_equal=False):
+def evaluate_complex(table, gold, predict, mode="exact", single_equal=False):
     """evaluate main
 
     Args:
@@ -1646,143 +1457,63 @@ def evaluate_complex(table, gold, predict, mode='exact', single_equal=False):
         table_list = json.load(ifs)
         table_dict = {}
         for table in table_list:
-            if table['db_id'] in table_dict:
+            if table["db_id"] in table_dict:
                 continue
-            table_dict[table['db_id']] = table
+            table_dict[table["db_id"]] = table
     with open(gold) as ifs:
-        gold_list = [l.strip().split('\t') for l in ifs if len(l.strip()) > 0]
+        gold_list = [l.strip().split("\t") for l in ifs if len(l.strip()) > 0]
         gold_dict = dict([(x[0], x[1:]) for x in gold_list])
 
     with open(predict) as ifs:
-        pred_list = [l.strip().split('\t') for l in ifs if len(l.strip()) > 0]
+        pred_list = [l.strip().split("\t") for l in ifs if len(l.strip()) > 0]
         pred_dict = dict([(x[0], x[1:]) for x in pred_list])
 
     evaluator = Evaluator()
 
     partial_types = [
-        'select', 'select(no AGG)', 'where', 'where(no OP)', 'group(no Having)',
-        'group', 'order', 'and/or', 'IUEN', 'keywords'
+        "select",
+        "select(no AGG)",
+        "where",
+        "where(no OP)",
+        "group(no Having)",
+        "group",
+        "order",
+        "and/or",
+        "IUEN",
+        "keywords",
     ]
     scores = {
-        'all': {
-            'count': 0,
-            'exact': 0,
-            'acc': 0
-        },
-        'select': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'select(no AGG)': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'where': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'where(no OP)': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'group': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'having': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'order': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'and/or': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'IUEN': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'keywords': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
+        "all": {"count": 0, "exact": 0, "acc": 0},
+        "select": {"acc": 0, "rec": 0, "f1": 0},
+        "select(no AGG)": {"acc": 0, "rec": 0, "f1": 0},
+        "where": {"acc": 0, "rec": 0, "f1": 0},
+        "where(no OP)": {"acc": 0, "rec": 0, "f1": 0},
+        "group": {"acc": 0, "rec": 0, "f1": 0},
+        "having": {"acc": 0, "rec": 0, "f1": 0},
+        "order": {"acc": 0, "rec": 0, "f1": 0},
+        "and/or": {"acc": 0, "rec": 0, "f1": 0},
+        "IUEN": {"acc": 0, "rec": 0, "f1": 0},
+        "keywords": {"acc": 0, "rec": 0, "f1": 0},
     }
 
     scores_novalue = {
-        'all': {
-            'count': 0,
-            'exact': 0,
-            'acc': 0
-        },
-        'select': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'select(no AGG)': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'where': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'where(no OP)': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'group': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'having': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'order': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'and/or': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'IUEN': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
-        'keywords': {
-            'acc': 0,
-            'rec': 0,
-            'f1': 0
-        },
+        "all": {"count": 0, "exact": 0, "acc": 0},
+        "select": {"acc": 0, "rec": 0, "f1": 0},
+        "select(no AGG)": {"acc": 0, "rec": 0, "f1": 0},
+        "where": {"acc": 0, "rec": 0, "f1": 0},
+        "where(no OP)": {"acc": 0, "rec": 0, "f1": 0},
+        "group": {"acc": 0, "rec": 0, "f1": 0},
+        "having": {"acc": 0, "rec": 0, "f1": 0},
+        "order": {"acc": 0, "rec": 0, "f1": 0},
+        "and/or": {"acc": 0, "rec": 0, "f1": 0},
+        "IUEN": {"acc": 0, "rec": 0, "f1": 0},
+        "keywords": {"acc": 0, "rec": 0, "f1": 0},
     }
 
     eval_err_num = 0
     for ins_id, g in gold_dict.items():
-        scores['all']['count'] += 1
-        scores_novalue['all']['count'] += 1
+        scores["all"]["count"] += 1
+        scores_novalue["all"]["count"] += 1
         if ins_id not in pred_dict:
             continue
         p = pred_dict[ins_id]
@@ -1790,137 +1521,107 @@ def evaluate_complex(table, gold, predict, mode='exact', single_equal=False):
         pred_str = p[0]
         gold_str, db_id = g
         schema = Schema(table_dict[db_id])
-        gold_str = gold_str.replace('==', '=')
+        gold_str = gold_str.replace("==", "=")
         gold_sql = get_sql(schema, gold_str, single_equal=single_equal)
 
         kmap = kmaps[db_id]
         # rebuild sql for value evaluation
-        g_valid_col_units = build_valid_col_units(
-            gold_sql['from']['table_units'], schema)
+        g_valid_col_units = build_valid_col_units(gold_sql["from"]["table_units"], schema)
         gold_sql = rebuild_sql_col(g_valid_col_units, gold_sql, kmap)
 
         try:
-            pred_str = pred_str.replace('==', '=')
+            pred_str = pred_str.replace("==", "=")
             pred_sql = get_sql(schema, pred_str, single_equal=single_equal)
 
-            p_valid_col_units = build_valid_col_units(
-                pred_sql['from']['table_units'], schema)
+            p_valid_col_units = build_valid_col_units(pred_sql["from"]["table_units"], schema)
             pred_sql = rebuild_sql_col(p_valid_col_units, pred_sql, kmap)
         except Exception as e:
             # If pred_sql is not valid, then we will use an empty sql to evaluate with the correct sql
             pred_sql = g_empty_sql
             eval_err_num += 1
 
-        exact_score = evaluator.eval_exact_match(pred_sql,
-                                                 gold_sql,
-                                                 value_match=True)
-        exact_score_novalue = evaluator.eval_exact_match(pred_sql,
-                                                         gold_sql,
-                                                         value_match=False)
+        exact_score = evaluator.eval_exact_match(pred_sql, gold_sql, value_match=True)
+        exact_score_novalue = evaluator.eval_exact_match(pred_sql, gold_sql, value_match=False)
         if exact_score == 0:
-            logging.debug("error instance %s:\npred: %s\ngold: %s" %
-                          (ins_id, pred_str, gold_str))
-        scores['all']['exact'] += exact_score
-        scores_novalue['all']['exact'] += exact_score_novalue
-        score = evaluator.eval_partial_match(pred_sql,
-                                             gold_sql,
-                                             value_match=True)
+            logging.debug("error instance %s:\npred: %s\ngold: %s" % (ins_id, pred_str, gold_str))
+        scores["all"]["exact"] += exact_score
+        scores_novalue["all"]["exact"] += exact_score_novalue
+        score = evaluator.eval_partial_match(pred_sql, gold_sql, value_match=True)
         for k, v in score.items():
             for k1, v1 in v.items():
                 if k1 in scores[k].keys():
                     scores[k][k1] += v1
 
-        score_novalue = evaluator.eval_partial_match(pred_sql,
-                                                     gold_sql,
-                                                     value_match=False)
+        score_novalue = evaluator.eval_partial_match(pred_sql, gold_sql, value_match=False)
         for k, v in score_novalue.items():
             for k1, v1 in v.items():
                 if k1 in scores_novalue[k].keys():
                     scores_novalue[k][k1] += v1
 
-    if scores['all']['count'] == 0:
-        logging.warn('the number of evaluated instance is zero')
+    if scores["all"]["count"] == 0:
+        logging.warn("the number of evaluated instance is zero")
         return 0.0, 0.0
-    if scores_novalue['all']['count'] == 0:
-        logging.warn('the number of evaluated no value instance is zero')
+    if scores_novalue["all"]["count"] == 0:
+        logging.warn("the number of evaluated no value instance is zero")
         return 0.0, 0.0
 
     for k, v in scores.items():
-        if 'acc' in v.keys() and 'rec' in v.keys():
-            scores[k]['acc'] = scores[k]['acc'] / scores['all']['count'] * 1.0
-            scores[k]['rec'] = scores[k]['rec'] / scores['all']['count'] * 1.0
-            scores[k]['f1'] = 2 * scores[k]['acc'] * scores[k]['rec'] / (
-                scores[k]['acc'] + scores[k]['rec'])
+        if "acc" in v.keys() and "rec" in v.keys():
+            scores[k]["acc"] = scores[k]["acc"] / scores["all"]["count"] * 1.0
+            scores[k]["rec"] = scores[k]["rec"] / scores["all"]["count"] * 1.0
+            scores[k]["f1"] = 2 * scores[k]["acc"] * scores[k]["rec"] / (scores[k]["acc"] + scores[k]["rec"])
 
     for k, v in scores_novalue.items():
-        if 'acc' in v.keys() and 'rec' in v.keys():
-            scores_novalue[k]['acc'] = scores_novalue[k][
-                'acc'] / scores_novalue['all']['count'] * 1.0
-            scores_novalue[k]['rec'] = scores_novalue[k][
-                'rec'] / scores_novalue['all']['count'] * 1.0
-            scores_novalue[k]['f1'] = 2 * scores_novalue[k][
-                'acc'] * scores_novalue[k]['rec'] / (scores_novalue[k]['acc'] +
-                                                     scores_novalue[k]['rec'])
-    scores['all']['acc'] = scores['all']['exact'] / scores['all']['count']
-    scores_novalue['all'][
-        'acc'] = scores_novalue['all']['exact'] / scores_novalue['all']['count']
+        if "acc" in v.keys() and "rec" in v.keys():
+            scores_novalue[k]["acc"] = scores_novalue[k]["acc"] / scores_novalue["all"]["count"] * 1.0
+            scores_novalue[k]["rec"] = scores_novalue[k]["rec"] / scores_novalue["all"]["count"] * 1.0
+            scores_novalue[k]["f1"] = (
+                2
+                * scores_novalue[k]["acc"]
+                * scores_novalue[k]["rec"]
+                / (scores_novalue[k]["acc"] + scores_novalue[k]["rec"])
+            )
+    scores["all"]["acc"] = scores["all"]["exact"] / scores["all"]["count"]
+    scores_novalue["all"]["acc"] = scores_novalue["all"]["exact"] / scores_novalue["all"]["count"]
 
     return scores, scores_novalue
 
 
-def evaluate(table, gold, predict, mode='exact', dataset='DuSQL'):
+def evaluate(table, gold, predict, mode="exact", dataset="DuSQL"):
     """
     dataset:['CSpider', 'DuSQL', 'NL2SQL']
     """
-    if dataset == 'NL2SQL':
-        scores, scores_novalue = evaluate_NL2SQL(table,
-                                                 gold,
-                                                 predict,
-                                                 mode=mode,
-                                                 single_equal=True)
-    elif dataset == 'DuSQL':
-        scores, scores_novalue = evaluate_complex(table,
-                                                  gold,
-                                                  predict,
-                                                  mode=mode,
-                                                  single_equal=True)
+    if dataset == "NL2SQL":
+        scores, scores_novalue = evaluate_NL2SQL(table, gold, predict, mode=mode, single_equal=True)
+    elif dataset == "DuSQL":
+        scores, scores_novalue = evaluate_complex(table, gold, predict, mode=mode, single_equal=True)
     else:
-        scores, scores_novalue = evaluate_complex(table,
-                                                  gold,
-                                                  predict,
-                                                  mode=mode,
-                                                  single_equal=True)
+        scores, scores_novalue = evaluate_complex(table, gold, predict, mode=mode, single_equal=True)
     return scores, scores_novalue
 
 
 if __name__ == "__main__":
     from argparse import ArgumentParser
+
     arg_parser = ArgumentParser()
-    arg_parser.add_argument('-g', '--gold', dest='gold', type=str)
-    arg_parser.add_argument('-p', '--pred', dest='pred', type=str)
-    arg_parser.add_argument('-t', '--table', dest='table', type=str)
-    arg_parser.add_argument('-d',
-                            '--dataset',
-                            choices=('NL2SQL', 'CSpider', 'DuSQL'),
-                            required=True,
-                            type=str)
-    arg_parser.add_argument('--debug', default=False, action="store_true")
+    arg_parser.add_argument("-g", "--gold", dest="gold", type=str)
+    arg_parser.add_argument("-p", "--pred", dest="pred", type=str)
+    arg_parser.add_argument("-t", "--table", dest="table", type=str)
+    arg_parser.add_argument("-d", "--dataset", choices=("NL2SQL", "CSpider", "DuSQL"), required=True, type=str)
+    arg_parser.add_argument("--debug", default=False, action="store_true")
     args = arg_parser.parse_args()
 
     logging.basicConfig(
         level=logging.DEBUG if args.debug else logging.INFO,
-        format=
-        '%(levelname)s: %(asctime)s %(filename)s [%(funcName)s:%(lineno)d][%(process)d] %(message)s',
-        datefmt='%m-%d %H:%M:%S',
-        filename='eval.log',
-        filemode='a')
+        format="%(levelname)s: %(asctime)s %(filename)s [%(funcName)s:%(lineno)d][%(process)d] %(message)s",
+        datefmt="%m-%d %H:%M:%S",
+        filename="eval.log",
+        filemode="a",
+    )
 
-    out, out_novalue = evaluate(args.table,
-                                args.gold,
-                                args.pred,
-                                dataset=args.dataset)
-    print('with value:')
-    print(out['all'])
-    print('*' * 20)
+    out, out_novalue = evaluate(args.table, args.gold, args.pred, dataset=args.dataset)
+    print("with value:")
+    print(out["all"])
+    print("*" * 20)
     print("without_value")
-    print(out_novalue['all'] if out_novalue else 'None')
+    print(out_novalue["all"] if out_novalue else "None")

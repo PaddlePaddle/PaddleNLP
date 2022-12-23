@@ -13,30 +13,30 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import tempfile
-import unittest
-import numpy as np
 import random
+import unittest
+
+import numpy as np
+import paddle
 from parameterized import parameterized_class
 
-from tests.testing_utils import slow
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import ModelTesterMixin, floats_tensor, ids_tensor
-from paddlenlp.transformers.tokenizer_utils_base import PaddingStrategy, TruncationStrategy
-
-import paddle
-
 from paddlenlp.transformers import (
-    AutoModelForSequenceClassification,
+    BartConfig,
     BartForConditionalGeneration,
     BartForQuestionAnswering,
     BartForSequenceClassification,
     BartModel,
     BartTokenizer,
 )
-from paddlenlp.transformers.bart.modeling import BartDecoder, BartEncoder, shift_tokens_right
+from paddlenlp.transformers.bart.modeling import shift_tokens_right
+from paddlenlp.transformers.tokenizer_utils_base import (
+    PaddingStrategy,
+    TruncationStrategy,
+)
+from tests.testing_utils import slow
+
+from ..test_generation_utils import GenerationTesterMixin
+from ..test_modeling_common import ModelTesterMixin, ids_tensor
 
 
 def prepare_bart_inputs_dict(
@@ -50,13 +50,14 @@ def prepare_bart_inputs_dict(
     cross_attn_head_mask=None,
 ):
     if attention_mask is None:
-        attention_mask = paddle.cast(
-            input_ids == config["pad_token_id"],
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        attention_mask = (
+            paddle.cast(input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        )
     if decoder_attention_mask is None:
-        decoder_attention_mask = paddle.cast(
-            decoder_input_ids == config["pad_token_id"],
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        decoder_attention_mask = (
+            paddle.cast(decoder_input_ids == config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+            * -1e4
+        )
     return {
         "input_ids": input_ids,
         "decoder_input_ids": decoder_input_ids,
@@ -66,7 +67,6 @@ def prepare_bart_inputs_dict(
 
 
 class BartModelTester:
-
     def __init__(
         self,
         parent,
@@ -110,130 +110,109 @@ class BartModelTester:
         self.forced_eos_token_id = None
 
     def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length],
-                               self.vocab_size,
-                               dtype="int64")
-        input_ids = paddle.clip(
-            ids_tensor([self.batch_size, self.seq_length],
-                       self.vocab_size,
-                       dtype="int64"), 3)
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
+        input_ids = paddle.clip(ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64"), 3)
         input_ids[:, -1] = self.eos_token_id  # Eos Token
 
-        decoder_input_ids = ids_tensor([self.batch_size, self.seq_length],
-                                       self.vocab_size,
-                                       dtype="int64")
+        decoder_input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size, dtype="int64")
 
         config = self.get_config()
-        inputs_dict = prepare_bart_inputs_dict(config, input_ids,
-                                               decoder_input_ids)
+        inputs_dict = prepare_bart_inputs_dict(config, input_ids, decoder_input_ids)
         return config, inputs_dict
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "d_model": self.hidden_size,
-            "num_encoder_layers": self.num_hidden_layers,
-            "num_decoder_layers": self.num_hidden_layers,
-            "encoder_attention_heads": self.num_attention_heads,
-            "decoder_attention_heads": self.num_attention_heads,
-            "encoder_ffn_dim": self.intermediate_size,
-            "decoder_ffn_dim": self.intermediate_size,
-            "dropout": self.hidden_dropout_prob,
-            "attention_dropout": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "eos_token_id": self.eos_token_id,
-            "bos_token_id": self.bos_token_id,
-            "pad_token_id": self.pad_token_id,
-            "forced_eos_token_id": self.forced_eos_token_id,
-        }
+        return BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=self.hidden_size,
+            encoder_layers=self.num_hidden_layers,
+            decoder_layers=self.num_hidden_layers,
+            encoder_attention_heads=self.num_attention_heads,
+            decoder_attention_heads=self.num_attention_heads,
+            encoder_ffn_dim=self.intermediate_size,
+            decoder_ffn_dim=self.intermediate_size,
+            dropout=self.hidden_dropout_prob,
+            attention_dropout=self.attention_probs_dropout_prob,
+            max_position_embeddings=self.max_position_embeddings,
+            eos_token_id=self.eos_token_id,
+            bos_token_id=self.bos_token_id,
+            pad_token_id=self.pad_token_id,
+            forced_eos_token_id=self.forced_eos_token_id,
+        )
 
     def prepare_config_and_inputs_for_common(self):
         config, inputs_dict = self.prepare_config_and_inputs()
         return config, inputs_dict
 
-    def create_and_check_decoder_model_past_large_inputs(
-            self, config, inputs_dict):
-        encoder = BartModel(**config).get_encoder()
-        decoder = BartModel(**config).get_decoder()
-
+    def create_and_check_decoder_model_past_large_inputs(self, config, inputs_dict):
+        model = BartModel(config)
+        encoder = model.get_encoder()
+        decoder = model.get_decoder()
         encoder.eval()
         decoder.eval()
 
         input_ids = inputs_dict["input_ids"]
-        decoder_input_ids = paddle.zeros_like(
-            input_ids[:, :1],
-            dtype="int64") + BartModel(**config).decoder_start_token_id
+        decoder_input_ids = (
+            paddle.zeros_like(input_ids[:, :1], dtype="int64") + BartModel(config).decoder_start_token_id
+        )
 
         attention_mask = inputs_dict["attention_mask"]
-        decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1],
-                                              dtype=paddle.get_default_dtype())
+        decoder_attention_mask = paddle.zeros([input_ids.shape[0], 1, 1, 1], dtype=paddle.get_default_dtype())
 
-        encoder_output = encoder(input_ids,
-                                 attention_mask,
-                                 return_dict=self.parent.return_dict)
+        encoder_output = encoder(input_ids, attention_mask, return_dict=self.parent.return_dict)
         origin_cache = decoder.decoder.gen_cache(encoder_output)
-        outputs = decoder(decoder_input_ids,
-                          decoder_attention_mask,
-                          encoder_output,
-                          attention_mask,
-                          cache=origin_cache,
-                          return_dict=self.parent.return_dict)
+        outputs = decoder(
+            decoder_input_ids,
+            decoder_attention_mask,
+            encoder_output,
+            attention_mask,
+            cache=origin_cache,
+            return_dict=self.parent.return_dict,
+        )
 
         output, cache = outputs[:2]
 
         # create hypothetical multiple next token and extent to next_input_ids
-        next_tokens = ids_tensor((self.batch_size, 3),
-                                 config["vocab_size"],
-                                 dtype="int64")
-        next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3],
-                                      dtype=paddle.get_default_dtype())
+        next_tokens = ids_tensor((self.batch_size, 3), config.vocab_size, dtype="int64")
+        next_attn_mask = paddle.zeros([self.batch_size, 1, 1, 3], dtype=paddle.get_default_dtype())
 
         # append to next input_ids and
-        next_input_ids = paddle.concat([decoder_input_ids, next_tokens],
-                                       axis=-1)
-        next_attention_mask = paddle.concat(
-            [decoder_attention_mask, next_attn_mask], axis=-1)
+        next_input_ids = paddle.concat([decoder_input_ids, next_tokens], axis=-1)
+        next_attention_mask = paddle.concat([decoder_attention_mask, next_attn_mask], axis=-1)
 
-        output_from_no_past = decoder(next_input_ids,
-                                      next_attention_mask,
-                                      encoder_output,
-                                      attention_mask,
-                                      return_dict=self.parent.return_dict)
+        output_from_no_past = decoder(
+            next_input_ids, next_attention_mask, encoder_output, attention_mask, return_dict=self.parent.return_dict
+        )
         if self.parent.return_dict:
             output_from_no_past = output_from_no_past[0]
-        output_from_past, _ = decoder(next_tokens,
-                                      next_attention_mask,
-                                      encoder_output,
-                                      attention_mask,
-                                      cache=cache,
-                                      return_dict=self.parent.return_dict)[:2]
+        output_from_past, _ = decoder(
+            next_tokens,
+            next_attention_mask,
+            encoder_output,
+            attention_mask,
+            cache=cache,
+            return_dict=self.parent.return_dict,
+        )[:2]
 
         # select random slice
-        random_slice_idx = ids_tensor((1, ),
-                                      output_from_past.shape[-1],
-                                      dtype="int64").item()
-        output_from_no_past_slice = output_from_no_past[:, -3:,
-                                                        random_slice_idx].detach(
-                                                        )
-        output_from_past_slice = output_from_past[:, :,
-                                                  random_slice_idx].detach()
+        random_slice_idx = ids_tensor((1,), output_from_past.shape[-1], dtype="int64").item()
+        output_from_no_past_slice = output_from_no_past[:, -3:, random_slice_idx].detach()
+        output_from_past_slice = output_from_past[:, :, random_slice_idx].detach()
 
-        self.parent.assertTrue(
-            output_from_past_slice.shape[1] == next_tokens.shape[1])
+        self.parent.assertTrue(output_from_past_slice.shape[1] == next_tokens.shape[1])
 
         # test that outputs are equal for slice
-        self.parent.assertTrue(
-            paddle.allclose(output_from_past_slice,
-                            output_from_no_past_slice,
-                            atol=1e-3))
+        self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
 
-@parameterized_class(("return_dict", "use_labels"), [
-    [False, False],
-    [False, True],
-    [True, False],
-    [True, True],
-])
+@parameterized_class(
+    ("return_dict", "use_labels"),
+    [
+        [False, False],
+        [False, True],
+        [True, False],
+        [True, True],
+    ],
+)
 class BartHeadTests(unittest.TestCase):
     vocab_size = 99
     use_labels = False
@@ -260,33 +239,29 @@ class BartHeadTests(unittest.TestCase):
         )
 
         batch_size = input_ids.shape[0]
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 32,
-            "decoder_ffn_dim": 32,
-            "max_position_embeddings": 48,
-            "eos_token_id": 2,
-            "pad_token_id": 1,
-            "bos_token_id": 0,
-        }
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
+            eos_token_id=2,
+            pad_token_id=1,
+            bos_token_id=0,
+        )
         return config, input_ids, batch_size
 
     def test_sequence_classification_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        bart_model = BartModel(**config)
-        num_labels = 2
+        config.num_labels = 2
         labels = _long_tensor([1] * batch_size) if self.use_labels else None
-        model = BartForSequenceClassification(bart_model, num_labels=num_labels)
-        outputs = model(input_ids=input_ids,
-                        decoder_input_ids=input_ids,
-                        labels=labels,
-                        return_dict=self.return_dict)
-        expected_shape = [batch_size, num_labels]
+        model = BartForSequenceClassification(config)
+        outputs = model(input_ids=input_ids, decoder_input_ids=input_ids, labels=labels, return_dict=self.return_dict)
+        expected_shape = [batch_size, config.num_labels]
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)  # test loss
             self.assertEqual(outputs[1].shape, expected_shape)  # test logits
@@ -297,14 +272,14 @@ class BartHeadTests(unittest.TestCase):
 
     def test_question_answering_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        sequence_labels = ids_tensor([batch_size],
-                                     2) if self.use_labels else None
-        bart_model = BartModel(**config)
-        model = BartForQuestionAnswering(bart_model)
-        outputs = model(input_ids=input_ids,
-                        start_positions=sequence_labels,
-                        end_positions=sequence_labels,
-                        return_dict=self.return_dict)
+        sequence_labels = ids_tensor([batch_size], 2) if self.use_labels else None
+        model = BartForQuestionAnswering(config)
+        outputs = model(
+            input_ids=input_ids,
+            start_positions=sequence_labels,
+            end_positions=sequence_labels,
+            return_dict=self.return_dict,
+        )
 
         if self.use_labels:
             loss, start_logits, end_logits = outputs[:3]
@@ -316,14 +291,10 @@ class BartHeadTests(unittest.TestCase):
 
     def test_lm_forward(self):
         config, input_ids, batch_size = self._get_config_and_data()
-        bart_model = BartModel(**config)
-        lm_labels = ids_tensor([batch_size, input_ids.shape[1]],
-                               self.vocab_size) if self.use_labels else None
-        lm_model = BartForConditionalGeneration(bart_model)
-        outputs = lm_model(input_ids=input_ids,
-                           labels=lm_labels,
-                           return_dict=self.return_dict)
-        expected_shape = [batch_size, input_ids.shape[1], config["vocab_size"]]
+        lm_labels = ids_tensor([batch_size, input_ids.shape[1]], self.vocab_size) if self.use_labels else None
+        lm_model = BartForConditionalGeneration(config)
+        outputs = lm_model(input_ids=input_ids, labels=lm_labels, return_dict=self.return_dict)
+        expected_shape = [batch_size, input_ids.shape[1], config.vocab_size]
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)
             self.assertEqual(outputs[1].shape, expected_shape)
@@ -333,30 +304,28 @@ class BartHeadTests(unittest.TestCase):
             self.assertEqual(outputs[0].shape, expected_shape)
 
     def test_lm_uneven_forward(self):
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 14,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 8,
-            "decoder_ffn_dim": 8,
-            "max_position_embeddings": 48,
-        }
-        bart_model = BartModel(**config)
-        lm_model = BartForConditionalGeneration(bart_model)
-        context = paddle.to_tensor(
-            [[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]],
-            dtype="int64")
-        summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]],
-                                   dtype="int64")
-        outputs = lm_model(input_ids=context,
-                           decoder_input_ids=summary,
-                           labels=summary if self.use_labels else None,
-                           return_dict=self.return_dict)
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=14,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=8,
+            decoder_ffn_dim=8,
+            max_position_embeddings=48,
+        )
+        lm_model = BartForConditionalGeneration(config)
+        context = paddle.to_tensor([[71, 82, 18, 33, 46, 91, 2], [68, 34, 26, 58, 30, 2, 1]], dtype="int64")
+        summary = paddle.to_tensor([[82, 71, 82, 18, 2], [58, 68, 2, 1, 1]], dtype="int64")
+        outputs = lm_model(
+            input_ids=context,
+            decoder_input_ids=summary,
+            labels=summary if self.use_labels else None,
+            return_dict=self.return_dict,
+        )
         expected_shape = summary.shape
-        expected_shape.append(config["vocab_size"])
+        expected_shape.append(config.vocab_size)
         if self.use_labels:
             self.assertIsInstance(outputs[0].item(), float)
         elif isinstance(outputs, paddle.Tensor):
@@ -366,22 +335,21 @@ class BartHeadTests(unittest.TestCase):
 
     def test_generate_beam_search(self):
         input_ids = paddle.to_tensor([[71, 82, 2], [68, 34, 2]], dtype="int64")
-        config = {
-            "vocab_size": self.vocab_size,
-            "d_model": 24,
-            "num_encoder_layers": 2,
-            "num_decoder_layers": 2,
-            "encoder_attention_heads": 2,
-            "decoder_attention_heads": 2,
-            "encoder_ffn_dim": 32,
-            "decoder_ffn_dim": 32,
-            "max_position_embeddings": 48,
-            "eos_token_id": 2,
-            "pad_token_id": 1,
-            "bos_token_id": 0,
-        }
-        bart_model = BartModel(**config)
-        lm_model = BartForConditionalGeneration(bart_model)
+        config = BartConfig(
+            vocab_size=self.vocab_size,
+            d_model=24,
+            encoder_layers=2,
+            decoder_layers=2,
+            encoder_attention_heads=2,
+            decoder_attention_heads=2,
+            encoder_ffn_dim=32,
+            decoder_ffn_dim=32,
+            max_position_embeddings=48,
+            eos_token_id=2,
+            pad_token_id=1,
+            bos_token_id=0,
+        )
+        lm_model = BartForConditionalGeneration(config)
         lm_model.eval()
 
         max_length = 5
@@ -395,9 +363,7 @@ class BartHeadTests(unittest.TestCase):
         self.assertEqual(generated_ids.shape, [input_ids.shape[0], max_length])
 
     def test_shift_tokens_right(self):
-        input_ids = paddle.to_tensor(
-            [[71, 82, 18, 33, 2, 1, 1], [68, 34, 26, 58, 30, 82, 2]],
-            dtype="int64")
+        input_ids = paddle.to_tensor([[71, 82, 18, 33, 2, 1, 1], [68, 34, 26, 58, 30, 82, 2]], dtype="int64")
         shifted = shift_tokens_right(input_ids, 2)
         n_pad_before = paddle.equal(input_ids, 1).sum().numpy()
         n_pad_after = paddle.equal(shifted, 1).sum().numpy()
@@ -408,34 +374,34 @@ class BartHeadTests(unittest.TestCase):
     @slow
     def test_tokenization(self):
         tokenizer = BartTokenizer.from_pretrained("bart-large")
-        examples = [" Hello world",
-                    " DomDramg"]  # need leading spaces for equality
+        examples = [" Hello world", " DomDramg"]  # need leading spaces for equality
         fairseq_results = [
             paddle.to_tensor([0, 20920, 232, 2]),
             paddle.to_tensor([0, 11349, 495, 4040, 571, 2]),
         ]
         for ex, desired_result in zip(examples, fairseq_results):
-            bart_toks = tokenizer.encode(
-                ex, return_tensors="pd")["input_ids"].squeeze()
+            bart_toks = tokenizer.encode(ex, return_tensors="pd")["input_ids"].squeeze()
             assert_tensors_close(desired_result, bart_toks, prefix=ex)
 
 
 class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
     base_model_class = BartModel
 
-    all_model_classes = (BartModel, BartForConditionalGeneration,
-                         BartForSequenceClassification,
-                         BartForQuestionAnswering)
+    all_model_classes = (
+        BartModel,
+        BartForConditionalGeneration,
+        BartForSequenceClassification,
+        BartForQuestionAnswering,
+    )
 
-    all_generative_model_classes = {
-        BartForConditionalGeneration: (BartModel, "bart")
-    }
+    all_generative_model_classes = {BartForConditionalGeneration: (BartModel, "bart")}
     is_encoder_decoder = True
     fx_compatible = True
     test_pruning = False
     test_missing_keys = False
     use_labels = False
     return_dict = False
+    use_test_inputs_embeds = True
 
     def setUp(self):
         self.model_tester = BartModelTester(self)
@@ -445,8 +411,7 @@ class BartModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCase):
 
     def test_decoder_model_past_with_large_inputs(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_decoder_model_past_large_inputs(
-            *config_and_inputs)
+        self.model_tester.create_and_check_decoder_model_past_large_inputs(*config_and_inputs)
 
 
 def assert_tensors_close(a, b, atol=1e-12, prefix=""):
@@ -523,17 +488,12 @@ class FastIntegrationTests(unittest.TestCase):
             " will include alleged war crimes committed since June. The International Criminal Court was set up in"
             " 2002 to prosecute genocide, crimes against humanity and war crimes."
         )
-        EXPECTED = (
-            'The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC\'s founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians\' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday\'s ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court\'s treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What\'s objectionable is the attempts to undermine international justice, not Palestine\'s decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court\'s decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes.'
-        )
+        EXPECTED = 'The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a step that gives the court jurisdiction over alleged crimes in Palestinian territories. The formal accession was marked with a ceremony at The Hague, in the Netherlands, where the court is based. The Palestinians signed the ICC\'s founding Rome Statute in January, when they also accepted its jurisdiction over alleged crimes committed "in the occupied Palestinian territory, including East Jerusalem, since June 13, 2014." Later that month, the ICC opened a preliminary examination into the situation in Palestinian territories, paving the way for possible war crimes investigations against Israelis. As members of the court, Palestinians may be subject to counter-charges as well. Israel and the United States, neither of which is an ICC member, opposed the Palestinians\' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki, speaking at Wednesday\'s ceremony, said it was a move toward greater justice. "As Palestine formally becomes a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Rome Statute today, the world is also a step closer to ending a long era of impunity and injustice," he said, according to an ICC news release. "Indeed, today brings us closer to our shared goals of justice and peace." Judge Kuniko Ozaki, a vice president of the ICC, said acceding to the treaty was just the first step for the Palestinians. "As the Rome Statute today enters into force for the State of Palestine, Palestine acquires all the rights as well as responsibilities that come with being a State Party to the Statute. These are substantive commitments, which cannot be taken lightly," she said. Rights group Human Rights Watch welcomed the development. "Governments seeking to penalize Palestine for joining the ICC should immediately end their pressure, and countries that support universal acceptance of the court\'s treaty should speak out to welcome its membership," said Balkees Jarrah, international justice counsel for the group. "What\'s objectionable is the attempts to undermine international justice, not Palestine\'s decision to join a treaty to which over 100 countries around the world are members." In January, when the preliminary ICC examination was opened, Israeli Prime Minister Benjamin Netanyahu described it as an outrage, saying the court was overstepping its boundaries. The United States also said it "strongly" disagreed with the court\'s decision. "As we have said repeatedly, we do not believe that Palestine is a state and therefore we do not believe that it is eligible to join the ICC," the State Department said in a statement. It urged the warring sides to resolve their differences through direct negotiations. "We will continue to oppose actions against Israel at the ICC as counterproductive to the cause of peace," it said. But the ICC begs to differ with the definition of a state for its purposes and refers to the territories as "Palestine." While a preliminary examination is not a formal investigation, it allows the court to review evidence and determine whether to investigate suspects on both sides. Prosecutor Fatou Bensouda said her office would "conduct its analysis in full independence and impartiality." The war between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry will include alleged war crimes committed since June. The International Criminal Court was set up in 2002 to prosecute genocide, crimes against humanity and war crimes.'
 
         dct = tok(ARTICLE, return_tensors="pd")
 
         dct.pop("token_type_ids")
-        generated_ids, _ = model.generate(**dct,
-                                          num_beams=4,
-                                          decode_strategy="beam_search",
-                                          max_length=1024)
+        generated_ids, _ = model.generate(**dct, num_beams=4, decode_strategy="beam_search", max_length=1024)
         result = tok.batch_decode(generated_ids, skip_special_tokens=True)[0]
         assert EXPECTED == result, f"{EXPECTED}\n{result}"
 
@@ -659,23 +619,19 @@ class FastIntegrationTests(unittest.TestCase):
         model = self.bart_base()
         model.eval()
 
-        generated_ids, _ = model.generate(**batch,
-                                          num_beams=4,
-                                          decode_strategy="beam_search")
-        result = self.tok().batch_decode(generated_ids,
-                                         skip_special_tokens=True)
+        generated_ids, _ = model.generate(**batch, num_beams=4, decode_strategy="beam_search")
+        result = self.tok().batch_decode(generated_ids, skip_special_tokens=True)
         assert (
-            result[0] ==
-            "The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a"
+            result[0]
+            == "The Palestinian Authority officially became the 123rd member of the International Criminal Court on Wednesday, a"
         )
         assert (
-            result[1] ==
-            "The French prosecutor leading an investigation into the crash of Germanwings Flight 9525 insisted Wednesday that"
+            result[1]
+            == "The French prosecutor leading an investigation into the crash of Germanwings Flight 9525 insisted Wednesday that"
         )
 
 
 class BartModelIntegrationTests(unittest.TestCase):
-
     def default_tokenizer(self):
         return BartTokenizer.from_pretrained("bart-large")
 
@@ -683,13 +639,12 @@ class BartModelIntegrationTests(unittest.TestCase):
     def test_inference_no_head(self):
         model = BartModel.from_pretrained("bart-large")
         model.eval()
-        input_ids = paddle.to_tensor(
-            [[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]],
-            dtype="int64")
+        input_ids = paddle.to_tensor([[0, 31414, 232, 328, 740, 1140, 12695, 69, 46078, 1588, 2]], dtype="int64")
 
-        attention_mask = paddle.cast(
-            input_ids == model.config["pad_token_id"],
-            dtype=paddle.get_default_dtype()).unsqueeze([1, 2]) * -1e4
+        attention_mask = (
+            paddle.cast(input_ids == model.config.pad_token_id, dtype=paddle.get_default_dtype()).unsqueeze([1, 2])
+            * -1e4
+        )
         with paddle.no_grad():
             output = model(input_ids=input_ids, attention_mask=attention_mask)
         expected_shape = [1, 11, 1024]
@@ -773,7 +728,8 @@ class BartModelIntegrationTests(unittest.TestCase):
             ' problems." Germanwings crash compensation: What we know . Who was the captain of Germanwings Flight'
             " 9525? CNN's Margot Haddad reported from Marseille and Pamela Brown from Dusseldorf, while Laura"
             " Smith-Spark wrote from London. CNN's Frederik Pleitgen, Pamela Boykoff, Antonia Mortensen, Sandrine"
-            " Amiel and Anna-Maja Rappard contributed to this report.")
+            " Amiel and Anna-Maja Rappard contributed to this report."
+        )
 
         SHORTER_ARTICLE = (
             " (CNN)The Palestinian Authority officially became the 123rd member of the International Criminal Court on"
@@ -811,7 +767,8 @@ class BartModelIntegrationTests(unittest.TestCase):
             " between Israel and Hamas militants in Gaza last summer left more than 2,000 people dead. The inquiry"
             " will include alleged war crimes committed since June. The International Criminal Court was set up in"
             " 2002 to prosecute genocide, crimes against humanity and war crimes. CNN's Vasco Cotovio, Kareem Khadder"
-            " and Faith Karimi contributed to this report.")
+            " and Faith Karimi contributed to this report."
+        )
 
         # The below article tests that we don't add any hypotheses outside of the top n_beams
         IRAN_ARTICLE = (
@@ -910,25 +867,25 @@ class BartModelIntegrationTests(unittest.TestCase):
             max_length=1024,
         )
 
-        EXPECTED = [
-            "A French prosecutor says he is not aware of any video footage from on board the plane. Two German "
-            "magazines claim to have found a cell phone video showing the crash. The publications say they watched "
-            "the video, which was found by a source close to the investigation. All 150 on board Germanwings Flight "
-            "9525 were killed.",
-            "Palestinian Authority becomes 123rd member of the International Criminal Court. The move gives the court "
-            "jurisdiction over alleged crimes in Palestinian territories. Israel and the United States opposed the "
-            "Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki said it was a "
-            "move toward greater justice.",
-            "U.S. and its negotiating partners reached a strong framework agreement with Iran. Peter Bergen: The "
-            "debate that has already begun will likely result in more heat than light. He says critics have made "
-            "dubious assumptions and doubtful assertions. Bergen says the goal was to block Iran from building a "
-            "nuclear weapon.",
-            "Liana Barrientos, 39, has been married 10 times, sometimes within two weeks of each other. Prosecutors "
-            "say the marriages were part of an immigration scam. She pleaded not guilty at State Supreme Court in the "
-            "Bronx on Friday. If convicted, she faces up to four years in prison.",
-        ]
+        # EXPECTED = [
+        #     "A French prosecutor says he is not aware of any video footage from on board the plane. Two German "
+        #     "magazines claim to have found a cell phone video showing the crash. The publications say they watched "
+        #     "the video, which was found by a source close to the investigation. All 150 on board Germanwings Flight "
+        #     "9525 were killed.",
+        #     "Palestinian Authority becomes 123rd member of the International Criminal Court. The move gives the court "
+        #     "jurisdiction over alleged crimes in Palestinian territories. Israel and the United States opposed the "
+        #     "Palestinians' efforts to join the body. But Palestinian Foreign Minister Riad al-Malki said it was a "
+        #     "move toward greater justice.",
+        #     "U.S. and its negotiating partners reached a strong framework agreement with Iran. Peter Bergen: The "
+        #     "debate that has already begun will likely result in more heat than light. He says critics have made "
+        #     "dubious assumptions and doubtful assertions. Bergen says the goal was to block Iran from building a "
+        #     "nuclear weapon.",
+        #     "Liana Barrientos, 39, has been married 10 times, sometimes within two weeks of each other. Prosecutors "
+        #     "say the marriages were part of an immigration scam. She pleaded not guilty at State Supreme Court in the "
+        #     "Bronx on Friday. If convicted, she faces up to four years in prison.",
+        # ]
+        # will be used to check generation result
 
-        generated_summaries = tok.batch_decode(
-            hypotheses_batch.tolist(),
-            clean_up_tokenization_spaces=True,
-            skip_special_tokens=True)
+        tok.batch_decode(
+            hypotheses_batch.tolist(), clean_up_tokenization_spaces=True, skip_special_tokens=True
+        )  # assigned generated_summaries but never used

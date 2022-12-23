@@ -13,11 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict, List, Optional, Union, Any
-from pydantic import BaseModel, Field, Extra
-from pipelines.schema import Answer, Document, Label, Span
-from pydantic import BaseConfig
+from typing import Dict, List, Optional, Union
+
+from pydantic import BaseConfig, BaseModel, Extra, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+from pipelines.schema import Answer, Document, Label
 
 try:
     from typing import Literal
@@ -99,6 +100,21 @@ class DocumentResponse(BaseModel):
     meta: dict
     results: List[List[dict]] = []
     debug: Optional[Dict] = Field(None, alias="_debug")
+
+
+class SentaRequest(BaseModel):
+    meta: dict
+    params: Optional[dict] = None
+    debug: Optional[bool] = False
+
+    class Config:
+        # Forbid any extra fields in the request to avoid silent failures
+        extra = Extra.forbid
+
+
+class SentaResponse(BaseModel):
+    img_dict: dict = []
+    debug: Optional[bool] = False
 
 
 class QueryImageResponse(BaseModel):

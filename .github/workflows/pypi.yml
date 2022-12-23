@@ -1,27 +1,23 @@
 name: PyPI
 
-on: [push, pull_request]
+on: 
+  workflow_dispatch:
+    inputs:
+      package:
+        description: 'Package to be deployed'
+        required: true
+        default: 'paddlenlp'
+        type: choice
+        options:
+        - paddlenlp
+        - paddle-pipelines
+        - ppdiffusers
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
-        with:
-          python-version: 3.8
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r docs/requirements.txt
-          pip install -r ppdiffusers/requirements.txt
-
-  ppdiffusers:
+  Deployment:
     name: Pack
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v1
@@ -31,11 +27,12 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install setuptools wheel twine
-          make install-ppdiffusers
+      - name: Deploy Package
+        id: deploy-package
+        env: 
+          PACKAGE: ${{ inputs.package }}
+        run: python scripts/should_deploy.py  --name $PACKAGE >> $GITHUB_OUTPUT
 
-      - name: Should Deploy to Pypi Server
-        id: should-deploy
-        run: python scripts/should_deploy.py  --name ppdiffusers >> $GITHUB_OUTPUT
       - name: Check Branch
         id: check-branch
         run: |
@@ -48,8 +45,9 @@ jobs:
         env:
           TWINE_USERNAME: paddle-dev
           TWINE_PASSWORD: ${{ secrets.paddlenlp }}
+          PACKAGE: ${{ inputs.package }}
         run: |
-          make deploy-ppdiffusers
+          make deploy-$PACKAGE
 
       - name: Should Not Deploy To Pypi Server
         if: steps.should-deploy.outputs.should_deploy != 'true'

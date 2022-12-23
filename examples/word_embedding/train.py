@@ -43,11 +43,7 @@ args = parser.parse_args()
 WORD_DICT_URL = "https://bj.bcebos.com/paddlenlp/data/dict.txt"
 
 
-def create_dataloader(dataset,
-                      trans_fn=None,
-                      mode='train',
-                      batch_size=1,
-                      pad_token_id=0):
+def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, pad_token_id=0):
     """
     Creats dataloader.
     Args:
@@ -61,21 +57,16 @@ def create_dataloader(dataset,
     if trans_fn:
         dataset = dataset.map(trans_fn, lazy=True)
 
-    shuffle = True if mode == 'train' else False
-    sampler = paddle.io.BatchSampler(dataset=dataset,
-                                     batch_size=batch_size,
-                                     shuffle=shuffle)
+    shuffle = True if mode == "train" else False
+    sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
 
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=vocab.get('[PAD]', 0)),  # input_ids
+        Pad(axis=0, pad_val=vocab.get("[PAD]", 0)),  # input_ids
         Stack(dtype="int32"),  # seq len
-        Stack(dtype="int64")  # label
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
 
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      return_list=True,
-                                      collate_fn=batchify_fn)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, return_list=True, collate_fn=batchify_fn)
     return dataloader
 
 
@@ -94,24 +85,23 @@ class BoWModel(nn.Layer):
         num_classes (obj:`int`): All the labels that the data has.
     """
 
-    def __init__(self,
-                 vocab_size,
-                 num_classes,
-                 vocab_path,
-                 emb_dim=300,
-                 hidden_size=128,
-                 fc_hidden_size=96,
-                 use_token_embedding=True):
+    def __init__(
+        self,
+        vocab_size,
+        num_classes,
+        vocab_path,
+        emb_dim=300,
+        hidden_size=128,
+        fc_hidden_size=96,
+        use_token_embedding=True,
+    ):
         super().__init__()
         if use_token_embedding:
-            self.embedder = TokenEmbedding(args.embedding_name,
-                                           extended_vocab_path=vocab_path)
+            self.embedder = TokenEmbedding(args.embedding_name, extended_vocab_path=vocab_path)
             emb_dim = self.embedder.embedding_dim
         else:
             padding_idx = vocab_size - 1
-            self.embedder = nn.Embedding(vocab_size,
-                                         emb_dim,
-                                         padding_idx=padding_idx)
+            self.embedder = nn.Embedding(vocab_size, emb_dim, padding_idx=padding_idx)
         self.bow_encoder = paddlenlp.seq2vec.BoWEncoder(emb_dim)
         self.fc1 = nn.Linear(self.bow_encoder.get_output_dim(), hidden_size)
         self.fc2 = nn.Linear(hidden_size, fc_hidden_size)
@@ -136,10 +126,8 @@ class BoWModel(nn.Layer):
         return logits
 
 
-if __name__ == '__main__':
-    assert args.device in [
-        "cpu", "gpu", "xpu"
-    ], "Invalid device! Available device should be cpu, gpu, or xpu."
+if __name__ == "__main__":
+    assert args.device in ["cpu", "gpu", "xpu"], "Invalid device! Available device should be cpu, gpu, or xpu."
     paddle.set_device(args.device)
 
     # Loads vocab.
@@ -149,16 +137,18 @@ if __name__ == '__main__':
         get_path_from_url(WORD_DICT_URL, "./")
     vocab = data.load_vocab(vocab_path)
 
-    if '[PAD]' not in vocab:
-        vocab['[PAD]'] = len(vocab)
+    if "[PAD]" not in vocab:
+        vocab["[PAD]"] = len(vocab)
     # Loads dataset.
     train_ds, dev_ds = load_dataset("chnsenticorp", splits=["train", "dev"])
 
     # Constructs the newtork.
-    model = BoWModel(vocab_size=len(vocab),
-                     num_classes=len(train_ds.label_list),
-                     vocab_path=vocab_path,
-                     use_token_embedding=args.use_token_embedding)
+    model = BoWModel(
+        vocab_size=len(vocab),
+        num_classes=len(train_ds.label_list),
+        vocab_path=vocab_path,
+        use_token_embedding=args.use_token_embedding,
+    )
     if args.use_token_embedding:
         vocab = model.embedder.vocab
         data.set_tokenizer(vocab)
@@ -169,23 +159,15 @@ if __name__ == '__main__':
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
-    trans_fn = partial(data.convert_example,
-                       vocab=vocab,
-                       unk_token_id=vocab['[UNK]'],
-                       is_test=False)
-    train_loader = create_dataloader(train_ds,
-                                     trans_fn=trans_fn,
-                                     batch_size=args.batch_size,
-                                     mode='train',
-                                     pad_token_id=vocab['[PAD]'])
-    dev_loader = create_dataloader(dev_ds,
-                                   trans_fn=trans_fn,
-                                   batch_size=args.batch_size,
-                                   mode='validation',
-                                   pad_token_id=vocab['[PAD]'])
+    trans_fn = partial(data.convert_example, vocab=vocab, unk_token_id=vocab["[UNK]"], is_test=False)
+    train_loader = create_dataloader(
+        train_ds, trans_fn=trans_fn, batch_size=args.batch_size, mode="train", pad_token_id=vocab["[PAD]"]
+    )
+    dev_loader = create_dataloader(
+        dev_ds, trans_fn=trans_fn, batch_size=args.batch_size, mode="validation", pad_token_id=vocab["[PAD]"]
+    )
 
-    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
-                                      learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(), learning_rate=args.lr)
 
     # Defines loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -199,13 +181,9 @@ if __name__ == '__main__':
         print("Loaded checkpoint from %s" % args.init_from_ckpt)
 
     # Starts training and evaluating.
-    log_dir = 'use_normal_embedding'
+    log_dir = "use_normal_embedding"
     if args.use_token_embedding:
-        log_dir = 'use_token_embedding'
+        log_dir = "use_token_embedding"
     log_dir = osp.join(args.vdl_dir, log_dir)
     callback = paddle.callbacks.VisualDL(log_dir=log_dir)
-    model.fit(train_loader,
-              dev_loader,
-              epochs=args.epochs,
-              save_dir=args.save_dir,
-              callbacks=callback)
+    model.fit(train_loader, dev_loader, epochs=args.epochs, save_dir=args.save_dir, callbacks=callback)

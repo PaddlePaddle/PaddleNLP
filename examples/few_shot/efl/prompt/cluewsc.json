@@ -1,0 +1,8 @@
+{
+    "template": [
+        {"text": "{'text': 'text'}{'text': 'pronoun'}指的{'text': 'candidate_label'}{'text': 'entity'}"}
+    ],
+    "verbalizer": [
+        {"false": "不是", "true": "是"}
+    ]
+}

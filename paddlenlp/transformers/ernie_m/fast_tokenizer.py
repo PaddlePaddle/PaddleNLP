@@ -27,7 +27,7 @@ from ...utils.log import logger
 VOCAB_FILES_NAMES = {
     "sentencepiece_model_file": "sentencepiece.bpe.model",
     "vocab_file": "vocab.txt",
-    "tokenizer_file": "tokenizer.json"
+    "tokenizer_file": "tokenizer.json",
 }
 
 SPIECE_UNDERLINE = "▁"
@@ -39,18 +39,20 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
     pretrained_resource_files_map = slow_tokenizer_class.pretrained_resource_files_map
     pretrained_init_configuration = slow_tokenizer_class.pretrained_init_configuration
 
-    def __init__(self,
-                 vocab_file,
-                 sentencepiece_model_file,
-                 tokenizer_file=None,
-                 do_lower_case=True,
-                 encoding="utf8",
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        sentencepiece_model_file,
+        tokenizer_file=None,
+        do_lower_case=True,
+        encoding="utf8",
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
         super().__init__(
             vocab_file,
             sentencepiece_model_file=sentencepiece_model_file,
@@ -69,48 +71,46 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
         self.sentencepiece_model_file = sentencepiece_model_file
         self.can_save_slow_tokenizer = False if not self.vocab_file else True
 
-    def save_vocabulary(self,
-                        save_directory: str,
-                        filename_prefix: Optional[str] = None) -> Tuple[str]:
+    def save_vocabulary(self, save_directory: str, filename_prefix: Optional[str] = None) -> Tuple[str]:
         if not self.can_save_slow_tokenizer:
             raise ValueError(
                 "Your faster tokenizer does not have the necessary information to save the vocabulary for a slow "
-                "tokenizer.")
+                "tokenizer."
+            )
         if not os.path.isdir(save_directory):
-            logger.error(
-                f"Vocabulary path ({save_directory}) should be a directory")
+            logger.error(f"Vocabulary path ({save_directory}) should be a directory")
             return
         out_sentencepiece_model_file = os.path.join(
-            save_directory, (filename_prefix + "-" if filename_prefix else "") +
-            VOCAB_FILES_NAMES["sentencepiece_model_file"])
-        if os.path.abspath(self.sentencepiece_model_file) != os.path.abspath(
-                out_sentencepiece_model_file):
-            copyfile(self.sentencepiece_model_file,
-                     out_sentencepiece_model_file)
-        return (out_sentencepiece_model_file, )
+            save_directory,
+            (filename_prefix + "-" if filename_prefix else "") + VOCAB_FILES_NAMES["sentencepiece_model_file"],
+        )
+        if os.path.abspath(self.sentencepiece_model_file) != os.path.abspath(out_sentencepiece_model_file):
+            copyfile(self.sentencepiece_model_file, out_sentencepiece_model_file)
+        return (out_sentencepiece_model_file,)
 
-    def __call__(self,
-                 text: Union[str, List[str], List[List[str]]],
-                 text_pair: Optional[Union[str, List[str],
-                                           List[List[str]]]] = None,
-                 max_length: Optional[int] = None,
-                 stride: int = 0,
-                 is_split_into_words: bool = False,
-                 padding: Union[bool, str, PaddingStrategy] = False,
-                 truncation: Union[bool, str, TruncationStrategy] = False,
-                 return_position_ids: bool = True,
-                 return_token_type_ids: bool = False,
-                 return_attention_mask: bool = True,
-                 return_length: bool = False,
-                 return_overflowing_tokens: bool = False,
-                 return_special_tokens_mask: bool = False,
-                 return_dict: bool = True,
-                 return_offsets_mapping: bool = False,
-                 add_special_tokens: bool = True,
-                 pad_to_multiple_of: Optional[int] = None,
-                 return_tensors: Optional[Union[str, TensorType]] = None,
-                 verbose: bool = True,
-                 **kwargs):
+    def __call__(
+        self,
+        text: Union[str, List[str], List[List[str]]],
+        text_pair: Optional[Union[str, List[str], List[List[str]]]] = None,
+        max_length: Optional[int] = None,
+        stride: int = 0,
+        is_split_into_words: bool = False,
+        padding: Union[bool, str, PaddingStrategy] = False,
+        truncation: Union[bool, str, TruncationStrategy] = False,
+        return_position_ids: bool = True,
+        return_token_type_ids: bool = False,
+        return_attention_mask: bool = True,
+        return_length: bool = False,
+        return_overflowing_tokens: bool = False,
+        return_special_tokens_mask: bool = False,
+        return_dict: bool = True,
+        return_offsets_mapping: bool = False,
+        add_special_tokens: bool = True,
+        pad_to_multiple_of: Optional[int] = None,
+        return_tensors: Optional[Union[str, TensorType]] = None,
+        verbose: bool = True,
+        **kwargs
+    ):
         return super(ErnieMFastTokenizer, self).__call__(
             text=text,
             text_pair=text_pair,
@@ -133,4 +133,5 @@ class ErnieMFastTokenizer(PretrainedFastTokenizer):
             pad_to_multiple_of=pad_to_multiple_of,
             return_tensors=return_tensors,
             verbose=verbose,
-            **kwargs)
+            **kwargs,
+        )

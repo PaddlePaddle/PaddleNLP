@@ -35,16 +35,12 @@ args = parser.parse_args()
 # yapf: enable
 
 
-def convert_example(example,
-                    tokenizer,
-                    label_list,
-                    max_seq_length=512,
-                    is_test=False):
+def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=False):
     """
     Builds model inputs from a sequence or a pair of sequence for sequence classification tasks
-    by concatenating and adding special tokens. And creates a mask from the two sequences passed 
+    by concatenating and adding special tokens. And creates a mask from the two sequences passed
     to be used in a sequence-pair classification task.
-        
+
     A skep_ernie_1.0_large_ch/skep_ernie_2.0_large_en sequence has the following format:
     ::
         - single sequence: ``[CLS] X [SEP]``
@@ -60,15 +56,15 @@ def convert_example(example,
 
     Args:
         example(obj:`list[str]`): List of input data, containing text and label if it have label.
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         label_list(obj:`list[str]`): All the labels that the data has.
-        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization. 
+        max_seq_len(obj:`int`): The maximum total input sequence length after tokenization.
             Sequences longer than this will be truncated, sequences shorter will be padded.
 
     Returns:
         input_ids(obj:`list[int]`): The list of token ids.
-        token_type_ids(obj: `list[int]`): List of sequence pair mask. 
+        token_type_ids(obj: `list[int]`): List of sequence pair mask.
     """
     encoded_inputs = tokenizer(text=example, max_seq_len=max_seq_length)
     input_ids = np.array(encoded_inputs["input_ids"], dtype="int64")
@@ -86,7 +82,7 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
         model (obj:`paddle.nn.Layer`): A model to classify texts.
         data (obj:`List(Example)`): The processed data whose each element is a Example (numedtuple) object.
             A Example object contains `text`(word_ids) and `seq_len`(sequence length).
-        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer` 
+        tokenizer(obj:`PretrainedTokenizer`): This tokenizer inherits from :class:`~paddlenlp.transformers.PretrainedTokenizer`
             which contains most of the methods. Users should refer to the superclass for more information regarding methods.
         label_map(obj:`dict`): The label id (key) to label str (value) map.
         batch_size(obj:`int`, defaults to 1): The number of batch.
@@ -97,18 +93,12 @@ def predict(model, data, tokenizer, label_map, batch_size=1):
     examples = []
     for text in data:
         input_ids, token_type_ids = convert_example(
-            text,
-            tokenizer,
-            label_list=label_map.values(),
-            max_seq_length=args.max_seq_length,
-            is_test=True)
+            text, tokenizer, label_list=label_map.values(), max_seq_length=args.max_seq_length, is_test=True
+        )
         examples.append((input_ids, token_type_ids))
 
     # Seperates data into some batches.
-    batches = [
-        examples[idx:idx + batch_size]
-        for idx in range(0, len(examples), batch_size)
-    ]
+    batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
     batchify_fn = lambda samples, fn=Tuple(
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token type ids
@@ -135,14 +125,13 @@ if __name__ == "__main__":
     # These data samples is in Chinese.
     # If you use the english model, you should change the test data in English.
     data = [
-        '这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般',
-        '怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片',
-        '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。',
+        "这个宾馆比较陈旧了，特价的房间也很一般。总体来说一般",
+        "怀着十分激动的心情放映，可是看着看着发现，在放映完毕后，出现一集米老鼠的动画片",
+        "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。",
     ]
-    label_map = {0: 'negative', 1: 'positive'}
+    label_map = {0: "negative", 1: "positive"}
 
-    model = SkepForSequenceClassification.from_pretrained(
-        args.model_name, num_classes=len(label_map))
+    model = SkepForSequenceClassification.from_pretrained(args.model_name, num_classes=len(label_map))
     tokenizer = SkepTokenizer.from_pretrained(args.model_name)
 
     if args.params_path and os.path.isfile(args.params_path):
@@ -150,10 +139,6 @@ if __name__ == "__main__":
         model.set_dict(state_dict)
         print("Loaded parameters from %s" % args.params_path)
 
-    results = predict(model,
-                      data,
-                      tokenizer,
-                      label_map,
-                      batch_size=args.batch_size)
+    results = predict(model, data, tokenizer, label_map, batch_size=args.batch_size)
     for idx, text in enumerate(data):
-        print('Data: {} \t Label: {}'.format(text, results[idx]))
+        print("Data: {} \t Label: {}".format(text, results[idx]))

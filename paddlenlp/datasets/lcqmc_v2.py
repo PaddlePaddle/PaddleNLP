@@ -21,7 +21,7 @@ from paddle.utils.download import get_path_from_url
 from paddlenlp.utils.env import DATA_HOME
 from . import DatasetBuilder
 
-__all__ = ['LCQMC_V2']
+__all__ = ["LCQMC_V2"]
 
 
 class LCQMC_V2(DatasetBuilder):
@@ -33,32 +33,25 @@ class LCQMC_V2(DatasetBuilder):
 
     URL = "https://bj.bcebos.com/paddlenlp/datasets/lcqmc_v2.tar.gz"
     MD5 = "e44825d8e6d5117bc04caf3982cf934f"
-    META_INFO = collections.namedtuple('META_INFO', ('file', 'md5'))
+    META_INFO = collections.namedtuple("META_INFO", ("file", "md5"))
     SPLITS = {
-        'train':
-        META_INFO(os.path.join('lcqmc', 'train.tsv'),
-                  '2193c022439b038ac12c0ae918b211a1'),
-        'dev':
-        META_INFO(os.path.join('lcqmc', 'dev.tsv'),
-                  'c5dcba253cb4105d914964fd8b3c0e94'),
-        'test':
-        META_INFO(os.path.join('lcqmc', 'test.tsv'),
-                  '8f4b71e15e67696cc9e112a459ec42bd'),
+        "train": META_INFO(os.path.join("lcqmc", "train.tsv"), "2193c022439b038ac12c0ae918b211a1"),
+        "dev": META_INFO(os.path.join("lcqmc", "dev.tsv"), "c5dcba253cb4105d914964fd8b3c0e94"),
+        "test": META_INFO(os.path.join("lcqmc", "test.tsv"), "8f4b71e15e67696cc9e112a459ec42bd"),
     }
 
     def _get_data(self, mode, **kwargs):
         default_root = os.path.join(DATA_HOME, self.__class__.__name__)
         filename, data_hash = self.SPLITS[mode]
         fullname = os.path.join(default_root, filename)
-        if not os.path.exists(fullname) or (data_hash and
-                                            not md5file(fullname) == data_hash):
+        if not os.path.exists(fullname) or (data_hash and not md5file(fullname) == data_hash):
             get_path_from_url(self.URL, default_root, self.MD5)
 
         return fullname
 
     def _read(self, filename):
         """Reads data."""
-        with open(filename, 'r', encoding='utf-8') as f:
+        with open(filename, "r", encoding="utf-8") as f:
             head = True
             for line in f:
                 data = line.strip().split("\t")
@@ -70,7 +63,7 @@ class LCQMC_V2(DatasetBuilder):
                         yield {"query": query, "title": title, "label": label}
                     elif len(data) == 2:
                         query, title = data
-                        yield {"query": query, "title": title, "label": ''}
+                        yield {"query": query, "title": title, "label": ""}
                     else:
                         continue
 
