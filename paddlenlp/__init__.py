@@ -12,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .version import VERSION
-
-__version__ = VERSION  # Maybe dev is better
+import os
 import sys
+
+with open(os.path.join(os.path.dirname(__file__), "VERSION")) as fp:
+    __version__ = fp.read().strip()
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
