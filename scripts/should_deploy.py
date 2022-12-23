@@ -66,7 +66,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     version_file_map = {
-        "paddlenlp": "VERSION",
+        "paddlenlp": "paddlenlp/VERSION",
         "ppdiffusers": "ppdiffusers/VERSION",
         "paddle-pipelines": "pipelines/VERSION",
     }

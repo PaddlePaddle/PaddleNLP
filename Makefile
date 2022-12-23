@@ -60,8 +60,6 @@ deploy-paddle-pipelines:
 deploy-paddlenlp:
 	# install related package
 	make install
-	# deploy version
-	echo "VERSION = '$$(cat VERSION)'" > paddlenlp/version.py
 	# build
 	python3 setup.py sdist bdist_wheel
 	# upload
