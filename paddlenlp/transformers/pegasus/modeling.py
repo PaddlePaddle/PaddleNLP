@@ -576,7 +576,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     def get_decoder(self):
         return self.pegasus.get_decoder()
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterPegasus
 
         decode_strategy = kwargs.get("decode_strategy")
@@ -586,18 +586,18 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
-        self._faster_entry = FasterPegasus(
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
+        self._fast_entry = FasterPegasus(
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
             enable_faster_encoder=enable_faster_encoder,
         ).forward
-        return self._faster_entry
+        return self._fast_entry
 
     def forward(
         self,

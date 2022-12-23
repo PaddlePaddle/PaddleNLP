@@ -41,7 +41,7 @@
   * 💪 框架升级：🏆 [**小样本 Prompt API**](./docs/advanced_guide/prompt.md) 升级，提示定义更加灵活，支撑 [FewCLUE AutoPrompt 方案](https://mp.weixin.qq.com/s/_JPiAzFA1f0BZ0igdv-EKA)；🕸 [**Trainer API**](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持。
   * 🔨 产业应用：🏃[**通用信息抽取 UIE 能力升级**](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。
 * 🔥 **2022.10.27 发布 [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)**
-  * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FasterGeneration高性能推理，训练推理部署全流程打通。
+  * NLG能力扩充：新增📄[**基于Pegasus的中文文本摘要方案**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增❓[**问题生成解决方案**](./examples/question_generation)，提供基于业界领先模型UNIMO-Text和大规模多领域问题生成数据集训练的通用问题生成预训练模型。均支持Taskflow一键调用，支持FastGeneration高性能推理，训练推理部署全流程打通。
   * 发布 🖼[**PPDiffusers**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱，可快速体验、二次开发 **Stable Diffusion**，持续支持更多模型。
 
 * 🔥 **2022.10.14 发布 [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)**
@@ -257,7 +257,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_fast=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
 
-#### ⚡️ FasterGeneration：高性能生成加速库
+#### ⚡️ FastGeneration：高性能生成加速库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -268,10 +268,10 @@ model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
 ...
 outputs, _ = model.generate(
     input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_faster=True)
+    use_fast=True)
 ```
 
-简单地在`generate()`API上打开`use_faster=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
+简单地在`generate()`API上打开`use_fast=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FastGeneration文档](./fast_generation)。
 
 #### 🚀 Fleet：飞桨4D混合并行分布式训练技术
 
