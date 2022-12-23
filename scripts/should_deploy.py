@@ -20,8 +20,6 @@ import sys
 
 from pkg_resources import parse_version
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-
 
 def read_version_of_remote_package(name: str) -> str:
     """get version of remote package,
@@ -66,16 +64,23 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     version_file_map = {
-        "paddlenlp": "paddlenlp/VERSION",
         "ppdiffusers": "ppdiffusers/VERSION",
         "paddle-pipelines": "pipelines/VERSION",
     }
-    if args.name not in version_file_map:
-        raise ValueError(f"package<{args.name}> not supported")
-
-    local_version_file = os.path.join(PROJECT_ROOT, version_file_map[args.name])
     remote_version = read_version_of_remote_package(args.name)
-    local_version = read_version_of_local_package(local_version_file)
+
+    # tmp fix
+    if args.name == "paddlenlp":
+        sys.path.append(".")
+        from paddlenlp import __version__
+
+        local_version = __version__
+    elif args.name in version_file_map:
+        PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        local_version_file = os.path.join(PROJECT_ROOT, version_file_map[args.name])
+        local_version = read_version_of_local_package(local_version_file)
+    else:
+        raise ValueError(f"package<{args.name}> not supported")
 
     should_deploy = str(parse_version(remote_version) < parse_version(local_version)).lower()
     print(f"should_deploy={should_deploy}")
