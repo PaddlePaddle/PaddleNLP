@@ -17,8 +17,12 @@ import paddle
 from . import optimizer
 from .distributed import *
 from .einsum import *
-from .fast_transformer.transformer.decoder import *
+
+# isort: split
 from .fast_transformer.transformer.decoding import *
+
+# isort: split
+from .fast_transformer.transformer.decoder import *
 from .fast_transformer.transformer.encoder import *
 from .fast_transformer.transformer.fast_transformer import *
 
