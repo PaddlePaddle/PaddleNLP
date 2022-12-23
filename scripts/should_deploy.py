@@ -18,7 +18,7 @@ import os
 import subprocess
 import sys
 
-from packaging import version
+from pkg_resources import parse_version
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -77,5 +77,5 @@ if __name__ == "__main__":
     remote_version = read_version_of_remote_package(args.name)
     local_version = read_version_of_local_package(local_version_file)
 
-    should_deploy = str(version.parse(remote_version) < version.parse(local_version)).lower()
+    should_deploy = str(parse_version(remote_version) < parse_version(local_version)).lower()
     print(f"should_deploy={should_deploy}")
