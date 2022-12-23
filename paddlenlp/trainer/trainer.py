@@ -260,10 +260,13 @@ class Trainer:
             logger.info("Using half precision")
             self.do_grad_scaling = True
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+            # fix for load saved fp16 or bf16 ckpt, decorate model first.
+            if self.args.fp16_opt_level == "O2":
+                paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
 
             if self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.amp_dtype == "float16":
+                if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
@@ -291,7 +294,9 @@ class Trainer:
         if args.recompute:
 
             def fn(layer):
-                if hasattr(layer, "enable_recompute") and layer.enable_recompute is False:
+                if hasattr(layer, "enable_recompute") and (
+                    layer.enable_recompute is False or layer.enable_recompute == 0
+                ):
                     layer.enable_recompute = True
 
             model.apply(fn)
@@ -453,9 +458,9 @@ class Trainer:
 
         # delay_optimizer_creation = (
         #     self.sharding is not None
-        #     and ShardingOption.SHARD_OP not in self.args.sharding
+        #     and ShardingOption.SHARD_OP in self.args.sharding
         # )
-        delay_optimizer_creation = self.sharding is None
+        delay_optimizer_creation = False
 
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
@@ -757,7 +762,7 @@ class Trainer:
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
-            logs["learning_rate"] = self._get_learning_rate()
+            logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
             total_train_batch_size = (
@@ -967,6 +972,8 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
+                optimizer_kwargs["multi_precision"] = True
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
@@ -1575,9 +1582,15 @@ class Trainer:
         logger.info(f"***** Running {description} *****")
         if has_length(dataloader):
             logger.info(f"  Num examples = {self.num_examples(dataloader)}")
-            logger.info(f"  Total prediction steps = {len(dataloader)}")
+            if max_eval_iters > 0:
+                logger.info(f"  Total prediction steps = {max_eval_iters}")
+            else:
+                logger.info(f"  Total prediction steps = {len(dataloader)}")
         else:
             logger.info("  Num examples: Unknown")
+            if max_eval_iters > 0:
+                logger.info(f"  Total prediction steps = {max_eval_iters}")
+
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
 
