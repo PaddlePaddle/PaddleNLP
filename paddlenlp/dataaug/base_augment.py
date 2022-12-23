@@ -178,3 +178,59 @@ class BaseAugment(object):
 
     def _augment(self, sequence):
         raise NotImplementedError
+
+
+class FileAugment(object):
+    """
+    File data augmentation
+
+    Args:
+        strategies (List):
+            List of augmentation strategies.
+    """
+
+    def __init__(self, strategies):
+        self.strategies = strategies
+
+    def augment(self, input_file, output_file="aug.txt", separator=None, separator_id=0):
+        output_sequences = []
+        sequences = []
+
+        input_sequences = self.file_read(input_file)
+
+        if separator:
+            for input_sequence in input_sequences:
+                sequences.append(input_sequence.split(separator)[separator_id])
+        else:
+            sequences = input_sequences
+
+        for strategy in self.strategies:
+            aug_sequences = strategy.augment(sequences)
+            if separator:
+                for aug_sequence, input_sequence in zip(aug_sequences, input_sequences):
+                    input_items = input_sequence.split(separator)
+                    for s in aug_sequence:
+                        input_items[separator_id] = s
+                        output_sequences.append(separator.join(input_items))
+            else:
+                for aug_sequence in aug_sequences:
+                    output_sequences += aug_sequence
+
+        if output_file:
+            self.file_write(output_sequences, output_file)
+
+        return output_sequences
+
+    def file_read(self, input_file):
+        input_sequences = []
+        with open(input_file, "r", encoding="utf-8") as f:
+            for line in f:
+                input_sequences.append(line.strip())
+        f.close()
+        return input_sequences
+
+    def file_write(self, output_sequences, output_file):
+        with open(output_file, "w", encoding="utf-8") as f:
+            for output_sequence in output_sequences:
+                f.write(output_sequence + "\n")
+        f.close()

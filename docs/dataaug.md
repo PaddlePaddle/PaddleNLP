@@ -18,6 +18,7 @@ PaddleNLP提供了Data Augmentation数据增强API，可用于训练数据数据
     * [3.2 字插入](#字插入)
     * [3.3 字删除](#字删除)
     * [3.4 字交换](#字交换)
+* [4. 文档一键增强](#文档一键增强)
 
 
 <a name="词级别数据增强策略"></a>
@@ -1102,4 +1103,65 @@ print(augmented)
 augmented = aug.augment(s)
 print(augmented)
 # [['人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以松地很轻理解其中的含义。'], ['而计算机只能处理化数值的信息，无法直接理解人类语言，所以需要将人类语言进行数值转换化。']]
+```
+
+
+<a name="文档一键增强"></a>
+
+## 4. 文档一键增强
+
+数据增强API也提供了文档一键增强功能，可以输入指定格式文件进行数据增强。
+```text
+FileAugment 初始化参数介绍：
+
+    strategies(list)：
+        输入应用的数据增强策略。
+```
+
+我们接下来将以下面的例子介绍文档一键增强的使用。
+
+只需要传入固定格式的`txt`文件，如下自定义输入文件`data.txt`：
+
+```text
+25岁已经感觉脸部松弛了怎么办
+小孩的眉毛剪了会长吗？
+...
+```
+
+我们对文件`data.txt`应用词替换和词插入数据增强策略。
+
+```python
+from paddlenlp.dataaug import WordSubstitute, WordInsert, FileAugment
+aug1 =  WordSubstitute('synonym', create_n=1, aug_percent=0.1)
+aug2 = WordInsert('synonym', create_n=1, aug_percent=0.1)
+aug = FileAugment([aug1,aug2])
+aug.augment(input_file='data.txt', output_file="aug.txt")
+```
+
+数据增强结果保存在`aug.txt`中，如下：
+```text
+25岁已经感觉面松弛了怎么办
+小朋友的眉毛剪了会长吗？
+25岁已经感觉脸部松驰松弛了怎么办
+幼儿小孩的眉毛剪了会长吗？
+```
+
+如果输入的文件中带有文本标签，如下自定义输入文件`data.txt`：
+
+```text
+25岁已经感觉脸部松弛了怎么办	治疗方案
+小孩的眉毛剪了会长吗？	其他
+```
+我们可以通过定义`separator`和`separator_id`选择只对其中部分文本进行数据增强策略。
+```python
+aug.augment(input_file='data.txt', output_file="aug.txt", separator='\t', separator_id=0)
+```
+
+数据增强结果保存在`aug.txt`中，如下：
+
+```text
+25阴历年已经感觉脸部松弛了怎么办	治疗方案
+小孩子的眉毛剪了会长吗？	其他
+25岁已经感觉面庞脸部松弛了怎么办	治疗方案
+小孩小朋友的眉毛剪了会长吗？	其他
 ```
