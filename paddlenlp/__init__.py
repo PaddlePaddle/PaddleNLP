@@ -14,7 +14,9 @@
 
 import sys
 
-__version__ = "2.4.7"
+from .version import version
+
+__version__ = version
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
