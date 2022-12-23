@@ -12,11 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import sys
 
-with open(os.path.join(os.path.dirname(__file__), "VERSION")) as fp:
-    __version__ = fp.read().strip()
+__version__ = "2.4.7"
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
