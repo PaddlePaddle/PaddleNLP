@@ -1295,6 +1295,7 @@ class Trainer:
         self.save_model(output_dir)
 
         if self.sharding is not None:
+            dist.barrier()
             if self.dp_group.rank == 0:
                 paddle.save(
                     self.optimizer.state_dict(),
