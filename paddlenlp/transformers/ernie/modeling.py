@@ -47,6 +47,7 @@ __all__ = [
     "ErnieForMaskedLM",
     "ErnieForMultipleChoice",
     "UIE",
+    "UTC",
 ]
 
 
@@ -1267,3 +1268,94 @@ class UIE(ErniePretrainedModel):
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
         return start_prob, end_prob
+
+
+class UTC(ErniePretrainedModel):
+    """
+    Ernie Model with two linear layer on the top of the hidden-states output to compute
+    probability of candidate labels, designed for Unified Tag Classification.
+    """
+
+    def __init__(self, config: ErnieConfig):
+        super(UTC, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        self.predict_size = 64
+        self.linear_q = paddle.nn.Linear(config.hidden_size, self.predict_size)
+        self.linear_k = paddle.nn.Linear(config.hidden_size, self.predict_size)
+        self.apply(self.init_weights)
+
+    def forward(
+        self,
+        input_ids,
+        token_type_ids,
+        position_ids,
+        attention_mask,
+        omask_positions,
+        cls_positions,
+        inputs_embeds: Optional[Tensor] = None,
+        labels: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel`.
+            token_type_ids (Tensor):
+                See :class:`ErnieModel`.
+            position_ids (Tensor):
+                See :class:`ErnieModel`.
+            attention_mask (Tensor):
+                See :class:`ErnieModel`.
+            omask_positions (Tensor of shape `(batch_size, max_option)`):
+                Masked positions of [O-MASK] tokens padded with 0.
+            cls_positions (Tensor of shape `(batch_size)`):
+                Masked positions of the second [CLS] token.
+            labels (Tensor of shape `(num_labels_in_batch,)`, optional):
+                Labels for computing classification loss.
+        """
+        outputs = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
+
+        batch_size, seq_len, hidden_size = sequence_output.shape
+        flat_sequence_output = paddle.reshape(sequence_output, [-1, hidden_size])
+
+        cls_output = paddle.tensor.gather(flat_sequence_output, cls_positions)
+        q = self.linear_q(cls_output)
+
+        flat_length = paddle.unsqueeze(paddle.to_tensor([seq_len * i for i in range(batch_size)]), axis=1)
+        option_output = paddle.tensor.gather(flat_sequence_output, paddle.reshape(omask_positions + flat_length, [-1]))
+        option_output = paddle.reshape(option_output, [batch_size, -1, hidden_size])
+        k = self.linear_k(option_output)
+
+        logits = paddle.einsum("bh,bmh->bm", q, k)
+        logits[omask_positions == 0] -= 1e12
+        logits = logits / self.predict_size**0.5
+        option_logits = paddle.reshape(logits, [-1])[paddle.reshape(omask_positions, [-1]) >= 0]
+
+        print(option_logits.shape)
+
+        loss = None
+        if labels is not None:
+            loss = paddle.nn.functional.binary_cross_entropy_with_logits(option_logits, labels)
+
+        if not return_dict:
+            output = (option_logits,) + outputs[2:]
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=option_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

@@ -17,13 +17,13 @@ This module defines the itermediate data structure of inputs.
 """
 
 import inspect
-from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
 
-from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
+from ..transformers.tokenizer_utils_base import PaddingStrategy, PretrainedTokenizerBase
 
 
 def signature(function):
@@ -99,7 +99,13 @@ class PromptDataCollatorWithPadding:
                 elif key in ("soft_token_ids", "encoder_ids"):
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
-                elif key != "labels":
+                elif key in ("omask_positions"):
+                    for index, value in enumerate(values):
+                        values[index] = value + [-1] * (max_length - len(value))
+                elif key == "labels":
+                    if isinstance(values[0], list):
+                        values = np.concatenate([np.array(x) for x in values])
+                elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)
         return batch

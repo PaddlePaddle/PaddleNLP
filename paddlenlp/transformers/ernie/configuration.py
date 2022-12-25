@@ -934,6 +934,20 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
+    "utc-large": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "relu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 1024,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,  # it is 3072 instead of 4096
+        "max_position_embeddings": 512,
+        "num_attention_heads": 16,
+        "num_hidden_layers": 24,
+        "type_vocab_size": 2,
+        "vocab_size": 18000,
+        "pad_token_id": 0,
+    },
 }
 
 ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
@@ -1003,6 +1017,7 @@ ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
         "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
         "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
         "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
+        "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_large_zh_cw.pdparams",
     }
 }
 

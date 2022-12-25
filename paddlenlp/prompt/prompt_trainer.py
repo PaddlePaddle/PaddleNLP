@@ -231,8 +231,44 @@ class PromptTrainer(Trainer):
         if self.criterion is not None:
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
+            """
+            print(input_dict)
+            for line in input_dict["attention_mask"][0][0]:
+                l = []
+                zeros = 0
+                ones = 0
+                for i, x in enumerate(line):
+                    ""
+                    if i > 0 and x != line[i - 1]:
+                        if x != 0:
+                            l.append(-zeros)
+                            zeros = 0
+                            ones += 1
+                        else:
+                            l.append(ones)
+                            ones = 0
+                            zeros += 1
+                    else:
+                        if x != 0:
+                            ones += 1
+                        else:
+                            zeros += 1
+                if zeros != 0:
+                    l.append(-zeros)
+                if ones != 0:
+                    l.append(ones)
+                ""
+                    if x != 0:
+                        l.append(0)
+                    else:
+                        l.append(1)
+                print(" ".join([str(x) for x in l]))
+            """
             logits, hidden_states = model(**input_dict)
-            loss = self.criterion(logits, labels)
+            print(logits.shape)
+            print(labels.shape)
+            loss = self.criterion(logits, labels.astype(logits.dtype))
+            print("loss", loss)
 
             if self.args.use_rdrop:
                 loss = self._compute_rdrop_loss(model, input_dict, logits, loss)

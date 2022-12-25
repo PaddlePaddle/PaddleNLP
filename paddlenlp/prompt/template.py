@@ -23,6 +23,7 @@ import traceback
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
@@ -32,7 +33,7 @@ from paddlenlp.utils.log import logger
 
 from .prompt_tokenizer import MLMPromptTokenizer
 
-__all__ = ["Template", "ManualTemplate", "SoftTemplate", "PrefixTemplate", "AutoTemplate"]
+__all__ = ["Template", "ManualTemplate", "SoftTemplate", "PrefixTemplate", "AutoTemplate", "UTCTemplate"]
 
 # Template used to be saved in a file.
 TEMPLATE_CONFIG_FILE = "template_config.json"
@@ -245,6 +246,9 @@ class Template(nn.Layer):
         inputs = []
         for value in list(zip(*input_values)):
             inputs.append(dict(zip(input_names, value)))
+
+        print("inputs")
+        print(inputs)
 
         input_dict = self.prompt_tokenizer(inputs)
         unused_example = {k: v for k, v in example.items() if k not in self.example_keys}
@@ -819,3 +823,63 @@ class AutoTemplate(object):
         if os.path.isfile(template_param_file):
             template.set_state_dict(paddle.load(template_param_file))
         return template
+
+
+class UTCTemplate(Template):
+    """
+    Template for Unified Tag Classification.
+    """
+
+    template_special_tokens = ["text", "hard", "sep", "cls", "options"]
+
+    def __init__(self, prompt: str, tokenizer: PretrainedTokenizer, max_length: int, max_position_id: int = None):
+        super(UTCTemplate, self).__init__(prompt, tokenizer, max_length)
+        self.max_position_id = max_position_id
+        self.max_length = max_length
+        if not self._has_options():
+            raise ValueError(
+                "Expected `options` and `add_omask` are in defined prompt, but got {}".format(self.prompt)
+            )
+
+    def _has_options(self):
+        for part in self.prompt:
+            if "options" in part and "add_omask" in part:
+                return True
+        return False
+
+    def build_inputs_with_prompt(
+        self, example: Dict[str, Any], prompt: Optional[List[Dict[str, Any]]] = None
+    ) -> List[str]:
+        inputs = super(UTCTemplate, self).build_inputs_with_prompt(example, prompt)
+        for index, part in enumerate(inputs):
+            if "cls" in part:
+                inputs[index] = self.tokenizer.cls_token
+        return inputs
+
+    def encode(self, example: Dict[str, Any], use_mask: bool = False):
+        input_dict = super(UTCTemplate, self).encode(example)
+
+        # Set OMASK and MASK positions and labels for options.
+        omask_token_id = self.tokenizer.convert_tokens_to_ids("[O-MASK]")
+        input_dict["omask_positions"] = (
+            np.where(np.array(input_dict["input_ids"]) == omask_token_id)[0].squeeze().tolist()
+        )
+
+        cls_positions = (
+            np.where(np.array(input_dict["input_ids"]) == self.tokenizer.cls_token_id)[0].squeeze().tolist()
+        )
+        input_dict["cls_positions"] = cls_positions[-1]
+
+        # Limit the maximum position ids.
+        if self.max_position_id is not None:
+            position_ids = np.array(input_dict["position_ids"])
+            position_ids[position_ids > self.max_position_id] = self.max_position_id
+            input_dict["position_ids"] = position_ids.tolist()
+
+        return input_dict
+
+    def create_prompt_parameters(self):
+        return None
+
+    def process_batch(self, input_dict):
+        return input_dict
