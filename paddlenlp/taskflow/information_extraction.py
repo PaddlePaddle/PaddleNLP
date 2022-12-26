@@ -26,6 +26,7 @@ from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
 from ..utils.doc_parser import DocParser
+from ..utils.env import CONFIG_NAME
 from ..utils.ie_utils import map_offset, pad_image_data
 from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
@@ -398,9 +399,9 @@ class UIETask(Task):
         # TODO: temporary solution to support HF Hub due to lack of AutoModel
         # change this logic to use AutoConfig when available
         if self.from_hf_hub:
-            config_file_path = hf_hub_download(repo_id=self._task_path, filename="model_config.json")
+            config_file_path = hf_hub_download(repo_id=self._task_path, filename=CONFIG_NAME)
             with open(config_file_path) as f:
-                self._init_class = json.load(f)["init_class"]
+                self._init_class = json.load(f)["architectures"].pop()
         else:
             self._check_task_files()
             with open(os.path.join(self._task_path, "model_config.json")) as f:
