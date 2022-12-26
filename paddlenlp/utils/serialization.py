@@ -40,6 +40,12 @@ class TensorMeta:
         return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}"
 
 
+class SerializationError(Exception):
+    """Exception for serialization"""
+
+    pass
+
+
 @lru_cache(maxsize=None)
 def _storage_type_to_dtype_to_map():
     """convert storage type to numpy dtype"""
@@ -150,6 +156,8 @@ def seek_by_string(file_handler: BufferedReader, string: str, file_size: int) ->
         else:
             word_index = 0
 
+    if file_handler.tell() >= file_size - 1:
+        raise SerializationError(f"can't find the find the target string<{string}> in the file")
     return file_handler.tell()
 
 
