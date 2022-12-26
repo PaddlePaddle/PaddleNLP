@@ -497,7 +497,7 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
     <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
 </div>
 
-为方便用户使用，针对酒店场景，本项目提供了300+条标注数据，可点击[label_studio.json](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.json)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
+为方便用户使用，本项目提供了300+条酒店场景的标注数据，可点击[label_studio.json](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.json)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
 
 
 <a name="5.1.1"></a>
