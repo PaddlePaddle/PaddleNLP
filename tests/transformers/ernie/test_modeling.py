@@ -310,7 +310,6 @@ class ErnieModelTester:
     def check_old_attribute(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
-        config.num_labels = None
         model = ErnieModel(config)
         model.eval()
         assert model.num_classes == config.num_labels
