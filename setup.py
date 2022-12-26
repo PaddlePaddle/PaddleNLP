@@ -71,7 +71,6 @@ setuptools.setup(
         exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "faster_generation*", "model_zoo*"),
     ),
     package_data={
-        ""
         "paddlenlp.ops": get_package_data_files(
             "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "faster_transformer", "patches", "optimizer"]
         ),
