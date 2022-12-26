@@ -13,6 +13,7 @@
 # limitations under the License.
 """Test taskflow."""
 import os
+
 from paddlenlp import Taskflow
 
 
