@@ -270,7 +270,10 @@ class PretrainedModel(Layer, GenerationMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
-    def __getattribute__(self, name: str):
+    def __getattr__(self, name: str):
+        """
+        If the attribute is not in the config, then it will be searched in the parent class
+        """
         if not self.constructed_from_pretrained_config():
             raise AttributeError(f"'{type(self)}' object has no attribute '{name}'")
 
@@ -284,7 +287,7 @@ class PretrainedModel(Layer, GenerationMixin):
             logger.warning(f"do not access config from `model.{name}`, you should use: `model.config.{name}`")
             return self.config[name]
 
-        return super().__getattribute__(name)
+        return Layer.__getattr__(self, name)
 
     @property
     def base_model(self):
