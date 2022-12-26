@@ -20,4 +20,4 @@ schema = [{"评价维度": ["观点词", "情感倾向[正向,负向,未提及]"
 senta = Taskflow("sentiment_analysis", schema=schema, model="uie-senta-base")
 # define your server
 app = SimpleServer()
-app.register_taskflow("senta", senta)
+app.register_taskflow("taskflow/senta", senta)
