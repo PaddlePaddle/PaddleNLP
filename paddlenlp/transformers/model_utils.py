@@ -270,6 +270,22 @@ class PretrainedModel(Layer, GenerationMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
+    def __getattribute__(self, name: str):
+        if not self.constructed_from_pretrained_config():
+            raise AttributeError(f"'{type(self)}' object has no attribute '{name}'")
+
+        # FIXME(wj-Mcat): for details, please refer to: https://github.com/PaddlePaddle/PaddleNLP/pull/4201#discussion_r1057063402
+        # this condition branch code will be removed later.
+        if name in self.config.attribute_map:
+            logger.warning(f"do not access config from `model.{name}`, you should use: `model.config.{name}`")
+            return self.config[name]
+
+        if name in self.config.standard_config_map:
+            logger.warning(f"do not access config from `model.{name}`, you should use: `model.config.{name}`")
+            return self.config[name]
+
+        return super().__getattribute__(name)
+
     @property
     def base_model(self):
         """

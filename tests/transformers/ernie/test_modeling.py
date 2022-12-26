@@ -307,6 +307,14 @@ class ErnieModelTester:
 
         self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.num_classes])
 
+    def check_old_attribute(
+        self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
+    ):
+        config.num_labels = None
+        model = ErnieModel(config)
+        model.eval()
+        assert model.num_classes == config.num_labels
+
     def create_and_check_model_cache(
         self, config, input_ids, token_type_ids, input_mask, sequence_labels, token_labels, choice_labels
     ):
@@ -428,6 +436,10 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
     def test_for_model_cache(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_model_cache(*config_and_inputs)
+
+    def test_for_old_attribute(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.check_old_attribute(*config_and_inputs)
 
     @slow
     def test_model_from_pretrained(self):
