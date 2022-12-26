@@ -14,6 +14,7 @@ addopts = "-ra -q"
 testpaths = [
     "tests/data",
     "tests/datasets",
+    "tests/embeddings",
     "tests/metrics",
     "tests/ops",
     "tests/transformers",
