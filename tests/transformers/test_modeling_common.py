@@ -525,6 +525,27 @@ class ModelTesterMixin:
         fields = [key for key, value in config.to_dict() if value]
         return random.choice(fields)
 
+    def test_for_missed_attribute(self):
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            if not model_class.constructed_from_pretrained_config():
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
+            all_maps.update(model_class.config_class.standard_config_map)
+
+            for old_attribute, new_attribute in all_maps.items():
+                old_value = getattr(model, old_attribute)
+                new_value = getattr(model, new_attribute)
+
+                # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
+                if type(new_value) != type(old_value):
+                    continue
+
+                assert old_value == new_value
+
 
 class ModelTesterPretrainedMixin:
     base_model_class: PretrainedModel = None
