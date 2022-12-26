@@ -166,6 +166,15 @@ def register_base_model(cls):
     return cls
 
 
+class BackboneMixin:
+    def forward_with_filtered_kwargs(self, *args, **kwargs):
+
+        signature = dict(inspect.signature(self.forward).parameters)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
+
+        return self(*args, **filtered_kwargs)
+
+
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedModel(Layer, GenerationMixin):
     """
