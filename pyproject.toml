@@ -12,6 +12,8 @@ exclude = ['.flake8']
 minversion = "6.0"
 addopts = "-ra -q"
 testpaths = [
+    "tests/data",
+    "tests/datasets",
     "tests/transformers",
     "tests/prompt",
     "tests/taskflow",
