@@ -13,11 +13,6 @@
 # limitations under the License.
 """Test taskflow."""
 import os
-import numpy as np
-
-import paddle
-import paddlenlp
-
 from paddlenlp import Taskflow
 
 

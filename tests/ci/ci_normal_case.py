@@ -14,11 +14,10 @@
 """
 RUN PaddleNLP CI Case
 """
-import io
-import re
 import os
-import sys
+import re
 import subprocess
+import sys
 
 
 def get_mode_info(case_path):

@@ -13,9 +13,7 @@
 # limitations under the License.
 """Get PaddleNLP develop model list && before merge pr """
 import io
-import re
 import os
-import warnings
 
 
 def get_model_list():
