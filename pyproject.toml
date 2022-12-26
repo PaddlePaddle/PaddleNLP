@@ -1,5 +1,6 @@
 [tool.isort]
 profile = 'black'
+known_third_party = ["paddle"]
 skip = ['paddlenlp/transformers/__init__.py']
 
 [tool.black]
@@ -9,8 +10,10 @@ exclude = ['.flake8']
 
 [tool.pytest.ini_options]
 minversion = "6.0"
-addopts = "-ra -q --ignore tests/transformers/t5/test_modeling.py"
+addopts = "-ra -q"
 testpaths = [
+    "tests/data",
+    "tests/datasets",
     "tests/transformers",
     "tests/prompt",
     "tests/taskflow",

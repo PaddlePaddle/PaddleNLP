@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "2.4.0.dev"  # Maybe dev is better
 import sys
+
+__version__ = "2.4.7"
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
@@ -23,46 +24,49 @@ if "datasets" in sys.modules.keys():
         "This may cause PaddleNLP datasets to be unavalible in intranet. "
         "Please import paddlenlp before datasets module to avoid download issues"
     )
-from . import data
-from . import datasets
-from . import embeddings
-from . import ops
-from . import layers
-from . import metrics
-from . import seq2vec
-from . import transformers
-from . import utils
-from . import losses
-from . import experimental
-from .taskflow import Taskflow
-from .server import SimpleServer
-from . import trainer
-from . import prompt
-from . import dataaug
 import paddle
+
+from . import (
+    data,
+    dataaug,
+    datasets,
+    embeddings,
+    experimental,
+    layers,
+    losses,
+    metrics,
+    ops,
+    prompt,
+    seq2vec,
+    trainer,
+    transformers,
+    utils,
+)
+from .server import SimpleServer
+from .taskflow import Taskflow
 
 paddle.disable_signal_handler()
 
-# Patches for DataLoader/BatchSamper to allow using other than paddle.io.Dataset
-# in Paddle version lower than 2.3
-from paddle.fluid.reader import (
-    _current_expected_place,
-    _get_paddle_place_list,
-    _get_paddle_place,
-    _convert_places,
-    IterableDataset,
-    _DatasetKind,
-    _InfiniteIterableSampler,
-    BatchSampler,
-    use_pinned_memory,
-)
+import sys
+import warnings
 
 # BatchSampler use `_non_static_mode` which is not included in version <= 2.3,
 # thus use `in_dynamic_mode` instead.
 from paddle import in_dynamic_mode
 
-import warnings
-import sys
+# Patches for DataLoader/BatchSamper to allow using other than paddle.io.Dataset
+# in Paddle version lower than 2.3
+from paddle.fluid.reader import (
+    BatchSampler,
+    IterableDataset,
+    _convert_places,
+    _current_expected_place,
+    _DatasetKind,
+    _get_paddle_place,
+    _get_paddle_place_list,
+    _InfiniteIterableSampler,
+    use_pinned_memory,
+)
 
 
 def _patch_data_loader_init(
@@ -157,7 +161,11 @@ def _patch_data_loader_init(
     self._iterator = None
 
 
-from paddle.fluid.dataloader.batch_sampler import Sampler, RandomSampler, SequenceSampler
+from paddle.fluid.dataloader.batch_sampler import (
+    RandomSampler,
+    Sampler,
+    SequenceSampler,
+)
 
 
 def _patch_batch_sampler_init(self, dataset=None, sampler=None, shuffle=False, batch_size=1, drop_last=False):

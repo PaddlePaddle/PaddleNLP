@@ -1,11 +1,6 @@
 paddlepaddle>=2.3.0,<2.4.0
 pre-commit
 pytest
-isort
-pylint
-flake8
-black
-yapf
 parameterized
 pytest-cov
 regex

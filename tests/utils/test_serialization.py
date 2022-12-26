@@ -21,7 +21,7 @@ from huggingface_hub import hf_hub_download
 from parameterized import parameterized
 
 from paddlenlp.utils import load_torch
-from tests.testing_utils import require_package, slow
+from tests.testing_utils import require_package
 
 
 class SerializationTest(TestCase):
@@ -54,14 +54,20 @@ class SerializationTest(TestCase):
                     torch_data[key].numpy(),
                 )
 
-    @slow
     @require_package("torch")
-    def test_load_bert_model(self):
+    @parameterized.expand(
+        [
+            "hf-internal-testing/tiny-random-codegen",
+            "hf-internal-testing/tiny-random-Data2VecTextModel",
+            "hf-internal-testing/tiny-random-SwinModel",
+        ]
+    )
+    def test_load_bert_model(self, repo_id):
         import torch
 
         with tempfile.TemporaryDirectory() as tempdir:
             weight_file = hf_hub_download(
-                repo_id="hf-internal-testing/tiny-random-codegen",
+                repo_id=repo_id,
                 filename="pytorch_model.bin",
                 cache_dir=tempdir,
                 library_name="PaddleNLP",

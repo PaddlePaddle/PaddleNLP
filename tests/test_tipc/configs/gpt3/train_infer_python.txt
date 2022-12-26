@@ -17,7 +17,7 @@ norm_train:../examples/language_model/gpt-3/dygraph/run_pretrain.py --model_type
 pact_train:null
 fpgm_train:null
 distill_train:null
-to_static_train:--to_static
+null:null
 null:null
 ##
 ===========================eval_params=========================== 
@@ -49,6 +49,8 @@ null:null
 null:null
 null:null
 null:null
+===========================to_static_train_benchmark_params===========================
+to_static_train:--to_static
 ===========================train_benchmark_params==========================
 batch_size:8
 fp_items:fp16|fp32
