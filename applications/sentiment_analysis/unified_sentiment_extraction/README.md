@@ -334,7 +334,7 @@ python batch_predict.py \
     --file_path "./data/test_hotel.txt" \
     --save_path "./data/sentiment_analysis.json" \
     --model "uie-senta-base" \
-    --schema "[{'评价维度': ['观点词']}]" \
+    --schema "[{'评价维度': ['观点词', '情感倾向[正向,负向,未提及]']}]" \
     --batch_size 4 \
     --max_seq_len 512
 ```
@@ -491,13 +491,15 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
 
 本项目建议用户使用 label-studio 平台标注数据，同时提供了一套用于情感信息标注的规则，可以参考[情感分析任务Label Studio使用指南](./label_studio.md)获取更多信息，这里不再赘述。
 
-同时本项目打通了标注平台 label-studio， 支持用户自己标注业务侧数据进行模型训练，同时支持将label-studio平台导出数据一键转换成模型训练样本形式，在利用 label-studio 导出标注好的json数据之后，基于`label_studio.py`脚本，可以将导出数据一键转换为模型训练数据。
+本项目同时打通了从 label-studio 标注平台到转换为模型输入形式数据的流程， 即支持用户在基于 label_studio 标注业务侧数据后，通过label-studio 导出标注好的json数据， 然后利用本项目提供的  `label_studio.py` 脚本，可以将导出数据一键转换为模型训练数据。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
 </div>
 
-在数据转换时，需要考虑任务的不同，进行相应的样本构建，整体可以分为 `分类` 和 `抽取` 任务。
+为方便用户使用，针对酒店场景，本项目提供了300+条标注数据，可点击[label_studio.json](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.json)进行下载。
+
+在利用 `label_studio.py` 脚本进行数据转换时，需要考虑任务类型的不同，选择相应的样本构建方式，整体可以分为 `分类` 和 `抽取` 任务。
 
 <a name="5.1.1"></a>
 
@@ -639,7 +641,7 @@ python -u -m paddle.distributed.launch --gpus "0" finetune.py \
   --learning_rate 1e-5 \
   --batch_size 16 \
   --max_seq_len 512 \
-  --num_epochs 10 \
+  --num_epochs 3 \
   --model uie-senta-base \
   --seed 1000 \
   --logging_steps 10 \
