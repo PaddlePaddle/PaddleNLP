@@ -1338,15 +1338,16 @@ class UTC(ErniePretrainedModel):
         option_output = paddle.reshape(option_output, [batch_size, -1, hidden_size])
         k = self.linear_k(option_output)
 
-        logits = paddle.einsum("bh,bmh->bm", q, k)
-        logits[omask_positions == 0] -= 1e12
-        logits = logits / self.predict_size**0.5
-        option_logits = paddle.reshape(logits, [-1])[paddle.reshape(omask_positions, [-1]) >= 0]
-
-        print(option_logits.shape)
+        option_logits = paddle.einsum("bh,bmh->bm", q, k)
+        for index, logit in enumerate(option_logits):
+            if (omask_positions[index] == 0).any():
+                option_logits[index] -= (omask_positions[index] == 0) * 1e12
+        option_logits = option_logits / self.predict_size**0.5
 
         loss = None
         if labels is not None:
+            option_logits = option_logits[omask_positions > 0]
+            labels = labels[omask_positions > 0]
             loss = paddle.nn.functional.binary_cross_entropy_with_logits(option_logits, labels)
 
         if not return_dict:

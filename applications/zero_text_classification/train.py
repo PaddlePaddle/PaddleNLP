@@ -15,7 +15,7 @@
 from dataclasses import dataclass, field
 
 import paddle
-from utils import MetricReport, read_local_dataset
+from utils import BCEWithLogitsLossPaddedWithMinusOne, MetricReport, read_local_dataset
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -64,7 +64,7 @@ def main():
         "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True}"
         "{'cls': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
     )
-    template = UTCTemplate(prompt, tokenizer, training_args.max_seq_length)  # , max_position_id=511)
+    template = UTCTemplate(prompt, tokenizer, training_args.max_seq_length, max_position_id=511)
 
     # Load and preprocess dataset.
     train_ds = load_dataset(
@@ -83,7 +83,7 @@ def main():
     )
 
     # Define the criterion.
-    criterion = paddle.nn.BCEWithLogitsLoss()
+    criterion = BCEWithLogitsLossPaddedWithMinusOne()
 
     # Initialize the prompt model.
     prompt_model = PromptModelForSequenceClassification(
@@ -93,9 +93,10 @@ def main():
     # Define the metric function.
     def compute_metrics(eval_preds):
         metric = MetricReport()
-        preds = paddle.nn.functional.sigmoid(paddle.to_tensor(eval_preds.predictions))
-        preds = paddle.reshape(preds[preds > 0], [-1])
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
+        preds = paddle.nn.functional.sigmoid(paddle.to_tensor(eval_preds.predictions))
+        labels = labels[preds > 0]
+        preds = preds[preds > 0]
         acc = float(((preds > data_args.threshold).astype("int64") == labels).mean().numpy())
         metric.update(preds, labels)
         micro_f1, macro_f1 = metric.accumulate()

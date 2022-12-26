@@ -83,6 +83,7 @@ from .utils.helper import (  # nested_truncate,
     nested_concat,
     nested_detach,
     nested_numpify,
+    nested_truncate,
 )
 
 DEFAULT_CALLBACKS = [DefaultFlowCallback]
@@ -1660,12 +1661,12 @@ class Trainer:
 
         # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
         # samplers has been rounded to a multiple of batch_size, so we truncate.
-        # if all_losses is not None:
-        #    all_losses = all_losses[:num_samples]
-        # if all_preds is not None:
-        #    all_preds = nested_truncate(all_preds, num_samples)
-        # if all_labels is not None:
-        #    all_labels = nested_truncate(all_labels, num_samples)
+        if all_losses is not None:
+            all_losses = all_losses[:num_samples]
+        if all_preds is not None:
+            all_preds = nested_truncate(all_preds, num_samples)
+        if all_labels is not None:
+            all_labels = nested_truncate(all_labels, num_samples)
 
         model.train()
 

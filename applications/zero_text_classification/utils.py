@@ -18,6 +18,7 @@ import os
 
 import numpy as np
 from paddle.metric import Metric
+from paddle.nn import BCEWithLogitsLoss
 from sklearn.metrics import classification_report, f1_score
 
 from paddlenlp.utils.log import logger
@@ -36,7 +37,10 @@ def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test
         with open(file_path, "r", encoding="utf-8") as fp:
             for example in fp:
                 example = json.loads(example.strip())
-                if len(" ".join(example["choices"])) + len(example["question"]) + 6 >= 2400:
+                if (
+                    len(" ".join(example["choices"])) + len(example["question"]) + 6 >= 2400
+                    or len(example["choices"]) < 2
+                ):
                     logger.warning("Skip example: " + json.dumps(example, ensure_ascii=False))
                     continue
                 if "text_b" not in example:
@@ -55,6 +59,18 @@ def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test
                     if not is_test:
                         example["labels"] = [example["labels"][index] for index in rand_index]
                 yield example
+
+
+class BCEWithLogitsLossPaddedWithMinusOne(BCEWithLogitsLoss):
+    def __init__(self, weight=None, reduction="mean", pos_weight=None, name=None):
+        super(BCEWithLogitsLossPaddedWithMinusOne, self).__init__(
+            weight=weight, reduction=reduction, pos_weight=pos_weight, name=name
+        )
+
+    def forward(self, logit, label):
+        logit = logit[label != -100]
+        label = label[label != -100]
+        return super(BCEWithLogitsLossPaddedWithMinusOne, self).forward(logit, label)
 
 
 class MetricReport(Metric):

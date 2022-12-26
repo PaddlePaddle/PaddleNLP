@@ -247,9 +247,6 @@ class Template(nn.Layer):
         for value in list(zip(*input_values)):
             inputs.append(dict(zip(input_names, value)))
 
-        print("inputs")
-        print(inputs)
-
         input_dict = self.prompt_tokenizer(inputs)
         unused_example = {k: v for k, v in example.items() if k not in self.example_keys}
 
@@ -352,10 +349,6 @@ class Template(nn.Layer):
                     part["length"] = len(labels)
                 elif "length" not in "options":
                     part["length"] = DEFAULT_MAX_OPTIONS
-                    logger.warning(
-                        "[options]: The maximum number of options not defined,"
-                        " set as {} by default.".format(DEFAULT_MAX_OPTIONS)
-                    )
             if "length" in part:
                 assert part["length"] > 0
                 if "hard" in part:

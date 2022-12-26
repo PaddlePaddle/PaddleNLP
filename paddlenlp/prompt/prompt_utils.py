@@ -100,11 +100,13 @@ class PromptDataCollatorWithPadding:
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
                 elif key in ("omask_positions"):
+                    max_num_option = max([len(x) for x in values])
                     for index, value in enumerate(values):
-                        values[index] = value + [-1] * (max_length - len(value))
+                        values[index] = value + [0] * (max_num_option - len(value))
                 elif key == "labels":
-                    if isinstance(values[0], list):
-                        values = np.concatenate([np.array(x) for x in values])
+                    max_num_label = max([len(x) for x in values])
+                    for index, value in enumerate(values):
+                        values[index] = value + [-100] * (max_num_label - len(value))
                 elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)

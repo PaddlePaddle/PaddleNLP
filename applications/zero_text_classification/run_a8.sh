@@ -13,22 +13,21 @@
 # limitations under the License.
 
 #device=$1
-#python -m paddle.distributed.launch --gpus "5,6" train.py \
-
-CUDA_VISIBLE_DEVICES=2 python -u train.py \
-    --dataset_dir processed_orderv2 \
-    --output_dir ckpt_a5_12262028 \
-    --shuffle_choices True \
+python -m paddle.distributed.launch --gpus "5,6" train.py \
+    --dataset_dir mrc_data_v3 \
+    --output_dir ckpt_a8_12262204 \
+    --shuffle_choices False \
     --do_train \
     --do_eval \
     --num_train_epochs 10 \
     --learning_rate 5e-5 \
-    --eval_steps 10 \
-    --save_steps 10 \
+    --eval_steps 1000 \
+    --save_steps 1000 \
     --logging_steps 10 \
-    --per_device_train_batch_size 4 \
+    --per_device_train_batch_size 2 \
+    --per_device_eval_batch_size 2 \
     --gradient_accumulation_steps 4 \
-    --max_seq_length 800 \
+    --max_seq_length 1024 \
     --load_best_model_at_end \
     --metric_for_best_model macro_f1 \
     --save_total_limit 1 \
