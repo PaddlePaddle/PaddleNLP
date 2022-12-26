@@ -38,7 +38,7 @@ from models.pt_bert import (
 )
 
 
-def pd_train_some_iters(model, criterion, optimizer, fake_data, fake_label, max_iter=2):
+def pd_train_some_iters(fake_data, fake_label, max_iter=2):
     paddle_dump_path = "../weights/paddle_weight.pdparams"
     config = PDBertConfig()
     model = PDBertForSequenceClassification(config)
