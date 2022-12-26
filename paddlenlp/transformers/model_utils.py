@@ -286,8 +286,8 @@ class PretrainedModel(Layer, GenerationMixin):
             result = getattr(self.config, name)
 
             logger.warning(
-                f"do not access config from `model.{name}` which will be deprecated after v2.6.0, "
-                f"you should use: `model.config.{name}`"
+                f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
+                f"Instead, do `model.config.{name}`"
             )
             return result
 
