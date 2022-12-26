@@ -30,7 +30,7 @@ glue:
 
 pretrain:
   model_name_or_path: __internal_testing__/gpt
-  input_dir: ./input_dir
+  input_dir: ./data
   output_dir: ./output_dir
   weight_decay: 0.01
   grad_clip: 1.0

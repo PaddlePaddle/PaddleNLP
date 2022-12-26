@@ -22,6 +22,10 @@ sys.path.insert(0, CURRENT_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
 
+def setup():
+    pass
+
+
 def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
     """parse config file to argv
 
@@ -51,7 +55,7 @@ def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
 
 def test_pretrain():
     init_argv("pretrain", config_file="./configs/test.yaml")
-    from run_pretrain import do_train
+    from run_pretrain_temp import do_train
 
     do_train()
 
