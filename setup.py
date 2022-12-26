@@ -16,6 +16,8 @@ import os
 
 import setuptools
 
+from paddlenlp import __version__
+
 
 def read_requirements_file(filepath):
     with open(filepath) as fin:
@@ -59,7 +61,7 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version="2.4.1.dev",  # modify this for each release
+    version=__version__,
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",

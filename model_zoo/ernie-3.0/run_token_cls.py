@@ -12,255 +12,211 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
+import json
 import os
-import random
-import time
 from functools import partial
 
-from datasets import load_dataset
-
+import numpy as np
 import paddle
-from paddle.io import DataLoader
+import paddle.nn as nn
+from datasets import load_dataset, load_metric
+from utils import DataArguments, ModelArguments, load_config, token_convert_example
 
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
-from paddlenlp.metrics import ChunkEvaluator
+import paddlenlp
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+)
+from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
-parser = argparse.ArgumentParser()
 
-
-def parse_args():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--model_name_or_path", default=None, type=str, required=True)
-    parser.add_argument(
-        "--task_name",
-        default="msra_ner",
-        type=str,
-        choices=["msra_ner"],
-        help="The named entity recognition datasets.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        default="best_msra_ner_model",
-        type=str,
-        help="The output directory where the model predictions and checkpoints will be written.",
-    )
-    parser.add_argument(
-        "--max_seq_length",
-        default=128,
-        type=int,
-        help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.",
-    )
-    parser.add_argument("--batch_size", default=8, type=int, help="Batch size per GPU/CPU for training.")
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--do_train", action="store_true", help="Whether to train.")
-    parser.add_argument("--do_eval", action="store_true", help="Whether to predict.")
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
-    )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
-    parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        default="gpu",
-        type=str,
-        choices=["cpu", "gpu", "xpu"],
-        help="The device to select to train the model, is must be cpu/gpu/xpu.",
-    )
-    args = parser.parse_args()
-    return args
-
-
-@paddle.no_grad()
-def evaluate(model, loss_fct, metric, data_loader, label_num, mode="valid"):
-    model.eval()
-    metric.reset()
-    avg_loss, precision, recall, f1_score = 0, 0, 0, 0
-    for batch in data_loader:
-        logits = model(batch["input_ids"], batch["token_type_ids"])
-        loss = loss_fct(logits, batch["labels"])
-        avg_loss = paddle.mean(loss)
-        preds = logits.argmax(axis=2)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            batch["seq_len"], preds, batch["labels"]
-        )
-        metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
-        precision, recall, f1_score = metric.accumulate()
-    print("%s: eval loss: %f, precision: %f, recall: %f, f1: %f" % (mode, avg_loss, precision, recall, f1_score))
-    model.train()
-    return f1_score
-
-
-def run(args):
-    paddle.set_device(args.device)
-    if paddle.distributed.get_world_size() > 1:
-        paddle.distributed.init_parallel_env()
-
-    raw_datasets = load_dataset(args.task_name)
-
-    tokenizer = AutoTokenizer.from_pretrained(args.model_name_or_path)
-    train_ds = raw_datasets["train"]
-    column_names = train_ds.column_names
-
-    label_list = train_ds.features["ner_tags"].feature.names
-    label_num = len(label_list)
-
-    batchify_fn = DataCollatorForTokenClassification(tokenizer=tokenizer)
-
-    # Define the model netword and its loss
-    model = AutoModelForTokenClassification.from_pretrained(args.model_name_or_path, num_classes=label_num)
-
-    if paddle.distributed.get_world_size() > 1:
-        model = paddle.DataParallel(model)
-
-    def tokenize_and_align_labels(examples, no_entity_id=0):
-        tokenized_inputs = tokenizer(
-            examples["tokens"],
-            max_seq_len=args.max_seq_length,
-            # We use this argument because the texts in our dataset are lists of words (with a label for each word).
-            is_split_into_words=True,
-            return_length=True,
-        )
-        labels = []
-
-        for i, label in enumerate(examples["ner_tags"]):
-            label_ids = label
-            if len(tokenized_inputs["input_ids"][i]) - 2 < len(label_ids):
-                label_ids = label_ids[: len(tokenized_inputs["input_ids"][i]) - 2]
-            label_ids = [no_entity_id] + label_ids + [no_entity_id]
-            label_ids += [no_entity_id] * (len(tokenized_inputs["input_ids"][i]) - len(label_ids))
-
-            labels.append(label_ids)
-        tokenized_inputs["labels"] = labels
-        return tokenized_inputs
-
-    test_ds = raw_datasets["test"]
-    test_ds = test_ds.select(range(len(test_ds) - 1))
-    test_ds = test_ds.map(tokenize_and_align_labels, batched=True, remove_columns=column_names)
-    test_data_loader = DataLoader(
-        dataset=test_ds, collate_fn=batchify_fn, num_workers=0, batch_size=args.batch_size, return_list=True
+def main():
+    parser = PdArgumentParser((ModelArguments, DataArguments, TrainingArguments))
+    model_args, data_args, training_args = parser.parse_args_into_dataclasses()
+    # Log model and data config
+    model_args, data_args, training_args = load_config(
+        model_args.config, "TokenClassification", data_args.dataset, model_args, data_args, training_args
     )
 
-    if args.do_train:
-        train_ds = train_ds.select(range(len(train_ds) - 1))
+    # Print model and data config
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(data_args, "Data")
 
-        train_ds = train_ds.map(tokenize_and_align_labels, batched=True, remove_columns=column_names)
+    paddle.set_device(training_args.device)
 
-        train_batch_sampler = paddle.io.DistributedBatchSampler(
-            train_ds, batch_size=args.batch_size, shuffle=True, drop_last=True
-        )
+    # Log on each process the small summary:
+    logger.warning(
+        f"Process rank: {training_args.local_rank}, device: {training_args.device}, world_size: {training_args.world_size}, "
+        + f"distributed training: {bool(training_args.local_rank != -1)}, 16-bits training: {training_args.fp16}"
+    )
 
-        train_data_loader = DataLoader(
-            dataset=train_ds,
-            collate_fn=batchify_fn,
-            num_workers=0,
-            batch_sampler=train_batch_sampler,
-            return_list=True,
-        )
-
-        num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
-
-        lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps)
-
-        # Generate parameter names needed to perform weight decay.
-        # All bias and LayerNorm parameters are excluded.
-        decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
-        optimizer = paddle.optimizer.AdamW(
-            learning_rate=lr_scheduler,
-            epsilon=args.adam_epsilon,
-            parameters=model.parameters(),
-            weight_decay=args.weight_decay,
-            apply_decay_param_fun=lambda x: x in decay_params,
-        )
-
-        loss_fct = paddle.nn.loss.CrossEntropyLoss()
-
-        metric = ChunkEvaluator(label_list=label_list)
-
-        global_step = 0
-        best_f1 = 0.0
-        last_step = args.num_train_epochs * len(train_data_loader)
-        tic_train = time.time()
-        for epoch in range(args.num_train_epochs):
-            for step, batch in enumerate(train_data_loader):
-                global_step += 1
-                logits = model(batch["input_ids"], batch["token_type_ids"])
-                loss = loss_fct(logits, batch["labels"])
-                avg_loss = paddle.mean(loss)
-                if global_step % args.logging_steps == 0:
-                    print(
-                        "global step %d, epoch: %d, batch: %d, loss: %f, speed: %.2f step/s"
-                        % (global_step, epoch, step, avg_loss, args.logging_steps / (time.time() - tic_train))
-                    )
-                    tic_train = time.time()
-                avg_loss.backward()
-                optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_grad()
-                if global_step % args.save_steps == 0 or global_step == num_training_steps:
-                    if paddle.distributed.get_rank() == 0:
-                        f1 = evaluate(model, loss_fct, metric, test_data_loader, label_num, "test")
-                        if f1 > best_f1:
-                            best_f1 = f1
-                            output_dir = args.output_dir
-                            if not os.path.exists(output_dir):
-                                os.makedirs(output_dir)
-                            # Need better way to get inner model of DataParallel
-                            model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                            model_to_save.save_pretrained(output_dir)
-                            tokenizer.save_pretrained(output_dir)
-                if global_step >= num_training_steps:
-                    print("best_f1: ", best_f1)
-                    return
-        print("best_f1: ", best_f1)
-
-    if args.do_eval:
-        eval_data_loader = DataLoader(
-            dataset=test_ds, collate_fn=batchify_fn, num_workers=0, batch_size=args.batch_size, return_list=True
-        )
-
-        # Define the model netword and its loss
-        model = AutoModelForTokenClassification.from_pretrained(args.model_name_or_path, num_classes=label_num)
-        loss_fct = paddle.nn.loss.CrossEntropyLoss()
-
-        metric = ChunkEvaluator(label_list=label_list)
-
-        model.eval()
-        metric.reset()
-        for step, batch in enumerate(eval_data_loader):
-            logits = model(batch["input_ids"], batch["token_type_ids"])
-            loss = loss_fct(logits, batch["labels"])
-            avg_loss = paddle.mean(loss)
-            preds = logits.argmax(axis=2)
-            num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-                batch["length"], preds, batch["labels"]
+    data_args.dataset = data_args.dataset.strip()
+    training_args.output_dir = os.path.join(training_args.output_dir, data_args.dataset)
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
             )
-            metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
-            precision, recall, f1_score = metric.accumulate()
-        print("eval loss: %f, precision: %f, recall: %f, f1: %f" % (avg_loss, precision, recall, f1_score))
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
 
+    raw_datasets = load_dataset(data_args.dataset)
+    label_list = raw_datasets["train"].features["ner_tags"].feature.names
+    data_args.label_list = label_list
+    data_args.ignore_label = -100
+    data_args.no_entity_id = 0
+    print(label_list)
 
-def print_arguments(args):
-    """print arguments"""
-    print("-----------  Configuration Arguments -----------")
-    for arg, value in sorted(vars(args).items()):
-        print("%s: %s" % (arg, value))
-    print("------------------------------------------------")
+    num_classes = len(label_list)
+
+    # Define tokenizer, model, loss function.
+    tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
+    model = ErnieForTokenClassification.from_pretrained(model_args.model_name_or_path, num_classes=num_classes)
+
+    class criterion(nn.Layer):
+        def __init__(self):
+            super(criterion, self).__init__()
+            self.loss_fn = paddle.nn.loss.CrossEntropyLoss(ignore_index=data_args.ignore_label)
+
+        def forward(self, *args, **kwargs):
+            return paddle.mean(self.loss_fn(*args, **kwargs))
+
+    loss_fct = criterion()
+
+    # Define dataset pre-process function
+    trans_fn = partial(
+        token_convert_example,
+        tokenizer=tokenizer,
+        no_entity_id=data_args.no_entity_id,
+        max_seq_length=data_args.max_seq_length,
+    )
+    # Define data collector
+    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=data_args.ignore_label)
+
+    # Dataset pre-process
+    if training_args.do_train:
+        train_dataset = raw_datasets["train"].map(trans_fn)
+    if training_args.do_eval:
+        # The msra_ner dataset do not have the dev dataset, use the test dataset for the evaluation
+        eval_dataset = raw_datasets["test"].map(trans_fn)
+    if training_args.do_predict:
+        test_dataset = raw_datasets["test"].map(trans_fn)
+
+    # Define the metrics of tasks.
+    # Metrics
+    metric = load_metric("seqeval")
+
+    def compute_metrics(p):
+        predictions, labels = p
+        predictions = np.argmax(predictions, axis=2)
+
+        # Remove ignored index (special tokens)
+        true_predictions = [
+            [label_list[p] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        true_labels = [
+            [label_list[l] for (p, l) in zip(prediction, label) if l != -100]
+            for prediction, label in zip(predictions, labels)
+        ]
+        results = metric.compute(predictions=true_predictions, references=true_labels)
+        return {
+            "precision": results["overall_precision"],
+            "recall": results["overall_recall"],
+            "f1": results["overall_f1"],
+            "accuracy": results["overall_accuracy"],
+        }
+
+    trainer = Trainer(
+        model=model,
+        criterion=loss_fct,
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=eval_dataset if training_args.do_eval else None,
+        tokenizer=tokenizer,
+        compute_metrics=compute_metrics,
+    )
+
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
+    # Training
+    if training_args.do_train:
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
+
+    # Evaluate and tests model
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_dataset)
+        trainer.log_metrics("test", test_ret.metrics)
+        tokens_label = test_ret.predictions.argmax(axis=-1)
+        tokens_label = tokens_label.tolist()
+        value = []
+        for idx, token_label in enumerate(tokens_label):
+            label_name = ""
+            items = []
+            input_data = tokenizer.convert_ids_to_tokens(test_dataset[idx]["input_ids"])[1:-1]
+            input_len = len(input_data)
+            words = ""
+            tag = " "
+            start = 0
+            for i, label in enumerate(token_label[1 : input_len + 1]):
+                label_name = data_args.label_list[label]
+                if label_name == "O" or label_name.startswith("B-"):
+                    if len(words):
+                        items.append({"pos": [start, i], "entity": words, "label": tag})
+
+                    if label_name.startswith("B-"):
+                        tag = label_name.split("-")[1]
+                    else:
+                        tag = label_name
+                    start = i
+                    words = input_data[i]
+                else:
+                    words += input_data[i]
+            if len(words) > 0:
+                items.append({"pos": [start, i], "entity": words, "label": tag})
+            value.append(items)
+
+        out_dict = {"value": value, "tokens_label": tokens_label}
+        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
+        json.dump(out_dict, out_file, ensure_ascii=True)
+
+    # Export inference model
+    if training_args.do_export:
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        ]
+        model_args.export_model_dir = os.path.join(model_args.export_model_dir, data_args.dataset, "export")
+        paddlenlp.transformers.export_model(
+            model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir
+        )
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    print_arguments(args)
-    run(args)
+    main()

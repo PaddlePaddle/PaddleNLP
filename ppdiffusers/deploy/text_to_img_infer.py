@@ -49,7 +49,7 @@ def parse_arguments():
         type=str,
         default="paddle",
         # Note(zhoushunjie): Will support 'tensorrt', 'paddle-tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddlelite"],
+        choices=["onnx_runtime", "paddle", "paddle-tensorrt", "tensorrt", "paddlelite"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -133,7 +133,11 @@ def create_paddle_lite_runtime(model_dir, model_prefix, device="cpu", device_id=
         option.use_cann()
         option.set_lite_nnadapter_device_names(["huawei_ascend_npu"])
         option.set_lite_nnadapter_model_cache_dir(os.path.join(model_dir, model_prefix))
-        option.set_lite_nnadapter_context_properties("HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={}".format(device_id))
+        option.set_lite_nnadapter_context_properties(
+            "HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={};HUAWEI_ASCEND_NPU_PRECISION_MODE=allow_mix_precision".format(
+                device_id
+            )
+        )
     elif device == "kunlunxin_xpu":
         # TODO(shentanyue): Add kunlunxin_xpu code
         pass
