@@ -279,6 +279,27 @@ class PretrainedModel(Layer, GenerationMixin):
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
 
+    def __getattr__(self, name):
+        """
+        called when the attribute name is missed in the model
+
+        Args:
+            name: the name of attribute
+
+        Returns: the value of attribute
+
+        """
+        try:
+            return super(PretrainedModel, self).__getattr__(name)
+        except AttributeError:
+            result = getattr(self.config, name)
+
+            logger.warning(
+                f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
+                f"Instead, do `model.config.{name}`"
+            )
+            return result
+
     @property
     def base_model(self):
         """
