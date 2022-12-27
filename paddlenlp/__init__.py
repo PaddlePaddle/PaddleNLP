@@ -1,4 +1,4 @@
-# Copyright (c) 2020 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-__version__ = "2.4.0.dev"  # Maybe dev is better
 import functools
 import sys
+
+__version__ = "2.4.8"
 
 if "datasets" in sys.modules.keys():
     from paddlenlp.utils.log import logger
@@ -25,8 +26,6 @@ if "datasets" in sys.modules.keys():
         "Please import paddlenlp before datasets module to avoid download issues"
     )
 import paddle
-
-from paddlenlp.trainer.trainer_utils import set_seed
 
 from . import (
     data,

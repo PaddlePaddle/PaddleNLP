@@ -46,7 +46,7 @@ def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
 
 def test_pretrain():
     init_argv("pretrain")
-    from run_pretrain_temp import do_train
+    from run_pretrain import do_train
 
     do_train()
 

@@ -67,6 +67,7 @@ class ModelTesterMixin:
     test_resize_position_embeddings = False
     test_mismatched_shapes = True
     test_missing_keys = True
+    test_model_compatibility_keys = False
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False
@@ -94,30 +95,48 @@ class ModelTesterMixin:
 
     def test_save_load(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        def check_save_load(out1, out2):
+            # make sure we don't have nans
+            out_2 = out2.numpy()
+            out_2[np.isnan(out_2)] = 0
+
+            out_1 = out1.numpy()
+            out_1[np.isnan(out_1)] = 0
+            max_diff = np.amax(np.abs(out_1 - out_2))
+            self.assertLessEqual(max_diff, 1e-5)
+
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
             with paddle.no_grad():
-                outputs = model(**self._prepare_for_class(inputs_dict, model_class))
-
-            out_2 = outputs[0].numpy()
-            out_2[np.isnan(out_2)] = 0
+                first = model(**self._prepare_for_class(inputs_dict, model_class))[0]
 
             with tempfile.TemporaryDirectory() as tmpdirname:
                 model.save_pretrained(tmpdirname)
                 model = model_class.from_pretrained(tmpdirname)
                 model.eval()
                 with paddle.no_grad():
-                    after_outputs = model(**self._prepare_for_class(inputs_dict, model_class))
+                    second = model(**self._prepare_for_class(inputs_dict, model_class))[0]
 
-                # Make sure we don't have nans
-                out_1 = after_outputs[0].numpy()
-                out_1[np.isnan(out_1)] = 0
-                max_diff = np.amax(np.abs(out_1 - out_2))
-                self.assertLessEqual(max_diff, 1e-5)
+            # support tuple of tensor
+            if isinstance(first, tuple) and isinstance(second, tuple):
+                for tensor1, tensor2 in zip(first, second):
+                    check_save_load(tensor1, tensor2)
+            else:
+                check_save_load(first, second)
 
     def test_determinism(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+
+        def check_determinism(first, second):
+            out_1 = first.numpy()
+            out_2 = second.numpy()
+            out_1 = out_1[~np.isnan(out_1)]
+            out_2 = out_2[~np.isnan(out_2)]
+            max_diff = np.amax(np.abs(out_1 - out_2))
+            self.assertLessEqual(max_diff, 1e-5)
+
         for model_class in self.all_model_classes:
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -125,12 +144,11 @@ class ModelTesterMixin:
                 first = model(**self._prepare_for_class(inputs_dict, model_class))[0]
                 second = model(**self._prepare_for_class(inputs_dict, model_class))[0]
 
-            out_1 = first.numpy()
-            out_2 = second.numpy()
-            out_1 = out_1[~np.isnan(out_1)]
-            out_2 = out_2[~np.isnan(out_2)]
-            max_diff = np.amax(np.abs(out_1 - out_2))
-            self.assertLessEqual(max_diff, 1e-5)
+            if isinstance(first, tuple) and isinstance(second, tuple):
+                for tensor1, tensor2 in zip(first, second):
+                    check_determinism(tensor1, tensor2)
+            else:
+                check_determinism(first, second)
 
     def test_forward_signature(self):
         config, _ = self.model_tester.prepare_config_and_inputs_for_common()
@@ -513,7 +531,8 @@ class ModelTesterMixin:
             shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
 
             loaded_config = config.__class__.from_pretrained(tempdir)
-            self.assertEqual(config.hidden_size, loaded_config.hidden_size)
+            for key in config.__dict__.keys():
+                self.assertEqual(getattr(config, key), getattr(loaded_config, key))
 
     def random_choice_pretrained_config_field(self) -> Optional[str]:
 
@@ -523,6 +542,31 @@ class ModelTesterMixin:
         config = self.base_model_class.config_class()
         fields = [key for key, value in config.to_dict() if value]
         return random.choice(fields)
+
+    def test_for_missed_attribute(self):
+        if not self.test_model_compatibility_keys:
+            self.skipTest(f"Do not test model_compatibility_keys on {self.base_model_class}")
+            return
+
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
+        for model_class in self.all_model_classes:
+            if not model_class.constructed_from_pretrained_config():
+                continue
+
+            model = self._make_model_instance(config, model_class)
+
+            all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
+            all_maps.update(model_class.config_class.standard_config_map)
+
+            for old_attribute, new_attribute in all_maps.items():
+                old_value = getattr(model, old_attribute)
+                new_value = getattr(model, new_attribute)
+
+                # eg: dropout can be an instance of nn.Dropout, so we should check it attribute
+                if type(new_value) != type(old_value):
+                    continue
+
+                self.assertEqual(old_value, new_value)
 
 
 class ModelTesterPretrainedMixin:
@@ -584,6 +628,7 @@ class ModelTesterPretrainedMixin:
                     os.path.join(MODEL_HOME, model_name),
                     tempdirname,
                 )
+
                 saved_model_state_file = os.path.join(
                     tempdirname, self.base_model_class.resource_files_names["model_state"]
                 )

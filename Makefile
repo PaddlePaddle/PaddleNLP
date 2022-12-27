@@ -35,10 +35,9 @@ lint:
 test: unit-test
 
 unit-test:
-	# only enable bert-test: there are many failed tests
-	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert \
-		tests/prompt \
-		tests/transformers/test_configuration_utils.py
+	PYTHONPATH=$(shell pwd) pytest \
+		-n auto --cov paddlenlp \
+		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -51,17 +50,17 @@ install:
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	cd ppdiffusers && make
-
-.PHONY: install-ppdiffusers
-install-ppdiffusers:
-	cd ppdiffusers && make install
+	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	cd pipelines && make
+	cd pipelines && make install && make
 
-.PHONY: install-paddle-pipelines
-install-paddle-pipelines:
-	cd pipelines && make install
-
+.PHONY: deploy-paddlenlp
+deploy-paddlenlp:
+	# install related package
+	make install
+	# build
+	python3 setup.py sdist bdist_wheel
+	# upload
+	twine upload --skip-existing dist/*

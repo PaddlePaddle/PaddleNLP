@@ -30,6 +30,9 @@
 
 ## News 📢
 
+* 🔥 **2022.12.9 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
+  * 📃 Release **UIE-X**, an universal information extraction model which supports both document and text inputs.
+  * 🔨 Industrial application: Release [**Complete Solution of Information Extraction**](./applications/information_extraction), supports most extraction tasks, and we provide a comprehensive and easy-to-use fine-tuning customization workflow。
 * 🔥 **2022.11.28 [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)**
   * 💪 Framework upgrade: Introduced [**Huggingface Hub Integration**](https://huggingface.co/PaddlePaddle) with a plan to gradually support all Models, Tokenizers and Taskflows to directly load from [Huggingface Hub](https://huggingface.co/PaddlePaddle); Added PET implementation to [**Prompt API**](./docs/advanced_guide/prompt.md).
   * 💎 NLP Tool: [**Pipelines**](./pipelines) now supports Cross-Encoder [Ernie-Search](./pipelines/API.md) for Semantic Search; Released [**SimpleServing**](./docs/server.md), a quick out-of-box solution to deploy Taskflows and Pretrained Models.

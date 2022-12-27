@@ -13,28 +13,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Tuple, Optional, Union
+from dataclasses import dataclass
+from typing import Any, Optional, Tuple, Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
 from .. import PretrainedModel, register_base_model
-from ..stable_diffusion_utils import (
-    StableDiffusionMixin,
-    AutoencoderKL,
-    PNDMScheduler,
-    LMSDiscreteScheduler,
-    DDIMScheduler,
-    UNet2DConditionModel,
-)
 from ..guided_diffusion_utils import (
     DiscoDiffusionMixin,
     create_gaussian_diffusion,
-    create_unet_model,
     create_secondary_model,
+    create_unet_model,
+)
+from ..model_outputs import BaseModelOutputWithPoolingAndCrossAttentions, ModelOutput
+from ..stable_diffusion_utils import (
+    AutoencoderKL,
+    DDIMScheduler,
+    LMSDiscreteScheduler,
+    PNDMScheduler,
+    StableDiffusionMixin,
+    UNet2DConditionModel,
 )
 
 __all__ = [
@@ -46,6 +46,8 @@ __all__ = [
     "CLIPModel",
     "CLIPForImageGeneration",
     "ModifiedResNet",
+    "CLIPTextModelWithProjection",
+    "CLIPVisionModelWithProjection",
 ]
 
 
@@ -84,6 +86,64 @@ class CLIPOutput(ModelOutput):
             self[k] if k not in ["text_model_output", "vision_model_output"] else getattr(self, k).to_tuple()
             for k in self.keys()
         )
+
+
+@dataclass
+class CLIPVisionModelOutput(ModelOutput):
+    """
+    Base class for vision model's outputs that also contains image embeddings of the pooling of the last hidden states.
+
+    Args:
+        image_embeds (`paddle.Tensor` of shape `(batch_size, output_dim)` *optional* returned when model is initialized with `with_projection=True`):
+            The image embeddings obtained by applying the projection layer to the pooler_output.
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    image_embeds: Optional[paddle.Tensor] = None
+    last_hidden_state: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class CLIPTextModelOutput(ModelOutput):
+    """
+    Base class for text model's outputs that also contains a pooling of the last hidden states.
+
+    Args:
+        text_embeds (`paddle.Tensor` of shape `(batch_size, output_dim)` *optional* returned when model is initialized with `with_projection=True`):
+            The text embeddings obtained by applying the projection layer to the pooler_output.
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, sequence_length, hidden_size)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, sequence_length, hidden_size)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    text_embeds: Optional[paddle.Tensor] = None
+    last_hidden_state: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
 
 
 # contrastive loss function, adapted from
@@ -908,7 +968,7 @@ class CLIPModel(CLIPPretrainedModel):
         return_loss=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
         r"""
         The CLIPModel forward method, overrides the `__call__()` special method.
@@ -941,7 +1001,7 @@ class CLIPModel(CLIPPretrainedModel):
                 Defaults to `False`.
             return_dict (bool, optional):
                 Whether to return a :class:`CLIPOutput` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
             An instance of :class:`CLIPOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
@@ -1023,12 +1083,8 @@ class CLIPModel(CLIPPretrainedModel):
         )
 
 
-class CLIPTextPretrainedModel(CLIPPretrainedModel):
-    pass
-
-
 @register_base_model
-class CLIPTextModel(CLIPTextPretrainedModel):
+class CLIPTextModel(CLIPPretrainedModel):
     r"""
     The bare CLIPTextModel outputting :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -1065,6 +1121,7 @@ class CLIPTextModel(CLIPTextPretrainedModel):
             testing). Default to `1.`.
 
     """
+    base_model_class = None
 
     def __init__(
         self,
@@ -1107,7 +1164,7 @@ class CLIPTextModel(CLIPTextPretrainedModel):
         position_ids=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
         r"""
         The CLIPTextModel forward method, overrides the `__call__()` special method.
@@ -1137,7 +1194,7 @@ class CLIPTextModel(CLIPTextPretrainedModel):
                 Defaults to `False`.
             return_dict (bool, optional):
                 Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
             An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
@@ -1167,12 +1224,8 @@ class CLIPTextModel(CLIPTextPretrainedModel):
         )
 
 
-class CLIPVisionPretrainedModel(CLIPPretrainedModel):
-    pass
-
-
 @register_base_model
-class CLIPVisionModel(CLIPVisionPretrainedModel):
+class CLIPVisionModel(CLIPPretrainedModel):
     r"""
     The bare CLIPVisionModel outputting :class:`BaseModelOutputWithPoolingAndCrossAttentions`.
     This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
@@ -1212,6 +1265,7 @@ class CLIPVisionModel(CLIPVisionPretrainedModel):
             testing). Default to `1.`.
 
     """
+    base_model_class = None
 
     def __init__(
         self,
@@ -1255,7 +1309,7 @@ class CLIPVisionModel(CLIPVisionPretrainedModel):
         pixel_values=None,
         output_attentions=False,
         output_hidden_states=False,
-        return_dict=False,
+        return_dict=True,
     ):
         r"""
         The CLIPVisionModel forward method, overrides the `__call__()` special method.
@@ -1272,7 +1326,7 @@ class CLIPVisionModel(CLIPVisionPretrainedModel):
                 Defaults to `False`.
             return_dict (bool, optional):
                 Whether to return a :class:`BaseModelOutputWithPoolingAndCrossAttentions` object. If `False`, the output
-                will be a tuple of tensors. Defaults to `False`.
+                will be a tuple of tensors. Defaults to `True`.
 
         Returns:
             An instance of :class:`BaseModelOutputWithPoolingAndCrossAttentions` if `return_dict=True`. Otherwise it returns a tuple of tensors
@@ -1874,3 +1928,319 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin, StableDif
                     return getattr(self, self.base_model_prefix).config[name]
                 except KeyError:
                     raise e
+
+
+@register_base_model
+class CLIPTextModelWithProjection(CLIPPretrainedModel):
+    r"""
+    CLIP Text Model with a projection layer on top (a linear layer on top of the pooled output).
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        max_text_length (int, optional):
+            The maximum value of the dimensionality of text position encoding, which dictates the maximum supported length of the text
+            input sequence. Defaults to `64`.
+        vocab_size (int, optional):
+            Vocabulary size of `inputs_ids` in `CLIPModel`. Also is the vocab size of text token embedding matrix.
+            Defaults to `49408`.
+        text_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in text model.
+            Defaults to `768`.
+        text_heads (int, optional):
+            Number of attention heads for each attention layer in the text attention.
+            Defaults to `8`.
+        text_layers (int, optional):
+            Number of hidden layers in the text model.
+            Defaults to `12`.
+        text_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the text model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.
+        projection_dim (int, optional):
+            Dimentionality of text and vision projection layers.
+            Defaults to `512`.
+    """
+    base_model_class = None
+
+    def __init__(
+        self,
+        max_text_length=77,
+        text_embed_dim=512,
+        text_heads=8,
+        text_layers=12,
+        vocab_size=49408,
+        text_hidden_act="quick_gelu",
+        initializer_range=0.02,
+        initializer_factor=1.0,
+        projection_dim=512,
+        **kwargs
+    ):
+        super().__init__()
+        self.initializer_range = initializer_range
+        self.initializer_factor = initializer_factor
+        self.text_embed_dim = text_embed_dim
+        self.text_layers = text_layers
+        self.text_model = TextTransformer(
+            context_length=max_text_length,
+            transformer_width=text_embed_dim,
+            transformer_heads=text_heads,
+            transformer_layers=text_layers,
+            vocab_size=vocab_size,
+            activation=text_hidden_act,
+            normalize_before=True,
+        )
+        self.text_projection = paddle.create_parameter((text_embed_dim, projection_dim), paddle.get_default_dtype())
+        self.apply(self._init_weights)
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.text_model.token_embedding
+
+    def set_input_embeddings(self, value):
+        self.text_model.token_embedding = value
+
+    def forward(
+        self,
+        input_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=True,
+    ):
+        r"""
+        The CLIPTextModelWithProjection forward method, overrides the `__call__()` special method.
+
+        Args:
+            input_ids (Tensor):
+                Indices of input sequence tokens in the vocabulary. Padding will be ignored by default should you provide it.
+                Its data type should be `int64` and it has a shape of [text_batch_size, sequence_length].
+            attention_mask (Tensor, optional):
+                Mask used in multi-head attention (TextTransformer) to avoid performing attention on to some unwanted positions,
+                usually the paddings or the subsequent positions.
+                Its data type can be int, float and bool.
+                When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
+                When the data type is int, the `masked` tokens have `0` values and the others have `1` values.
+                When the data type is float, the `masked` tokens have `0.0` values and the others have `1.0` values.
+                It is a tensor with shape `[batch_size, sequence_length`.
+                Defaults to `None`, which means nothing needed to be prevented attention to.
+            position_ids(Tensor, optional):
+                Indices of positions of each input sequence tokens in the position embeddings (TextTransformer). Selected in
+                the range ``[0, max_text_length - 1]``.
+                Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`CLIPTextModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `True`.
+
+        Returns:
+            An instance of :class:`CLIPTextModelOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`CLIPTextModelOutput`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import CLIPTokenizer, CLIPTextModelWithProjection
+
+                model = CLIPTextModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+                tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+
+                inputs = tokenizer(["a photo of a cat", "a photo of a dog"], padding=True, return_tensors="pd")
+                outputs = model(**inputs, return_dict=True)
+                text_embeds = outputs.text_embeds
+
+        """
+        text_outputs = self.text_model(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = text_outputs[1]
+        text_embeds = paddle.matmul(pooled_output, self.text_projection)
+
+        if not return_dict:
+            outputs = (text_embeds, text_outputs[0]) + text_outputs[2:]
+            return tuple(output for output in outputs if output is not None)
+
+        return CLIPTextModelOutput(
+            text_embeds=text_embeds,
+            last_hidden_state=text_outputs.last_hidden_state,
+            hidden_states=text_outputs.hidden_states,
+            attentions=text_outputs.attentions,
+        )
+
+
+@register_base_model
+class CLIPVisionModelWithProjection(CLIPPretrainedModel):
+    r"""
+    CLIP Vision Model with a projection layer on top (a linear layer on top of the pooled output).
+
+    This model inherits from :class:`~paddlenlp.transformers.model_utils.PretrainedModel`.
+    Refer to the superclass documentation for the generic methods.
+    This model is also a Paddle `paddle.nn.Layer <https://www.paddlepaddle.org.cn/documentation
+    /docs/en/api/paddle/fluid/dygraph/layers/Layer_en.html>`__ subclass. Use it as a regular Paddle Layer
+    and refer to the Paddle documentation for all matter related to general usage and behavior.
+
+    Args:
+        image_resolution (int, optional):
+            The size (resolution) of each image.
+            Defaults to `224`.
+        vision_layers (int, optional):
+            Number of hidden layers in the vision model.
+            Defaults to `12`.
+        vision_heads (int, optional):
+            Number of attention heads for each attention layer in the vision attention.
+            Defaults to `12`.
+        vision_embed_dim (int, optional):
+            Dimensionality of the embedding layer and encoder layers in vision model.
+            Defaults to `768`.
+        vision_patch_size(int, optional):
+            The size (resolution) of each patch.
+            Defaults to `32`.
+        vision_mlp_ratio(int, optional):
+            The ratio between dim_feedforward and vision_hidden_dim. `radio = dim_feedforward/vision_hidden_dim`
+            Defaults to `4`.
+        vision_hidden_act (str, optional):
+            The non-linear activation function of the ffn layer in the vision model.
+            ``"gelu"``, ``"relu"``, ``"quick_gelu"`` and any other paddle supported activation functions are supported.
+            Defaults to `"quick_gelu"`.
+        initializer_range (float, optional):
+            The standard deviation of the truncated_normal_initializer for initializing all weight matrices.
+            Default to `0.02`.
+        initializer_factor (float, optional):
+            A factor for initializing all weight matrices (should be kept to 1, used internally for initialization
+            testing). Default to `1.`.
+        projection_dim (int, optional):
+            Dimentionality of text and vision projection layers.
+            Defaults to `512`.
+    """
+    base_model_class = None
+
+    def __init__(
+        self,
+        image_resolution=224,
+        vision_patch_size=32,
+        vision_embed_dim=768,
+        vision_layers=12,
+        vision_heads=12,
+        vision_hidden_act="quick_gelu",
+        vision_mlp_ratio=4,
+        initializer_range=0.02,
+        initializer_factor=1.0,
+        projection_dim=512,
+        **kwargs
+    ):
+        super().__init__()
+        self.initializer_range = initializer_range
+        self.initializer_factor = initializer_factor
+        self.vision_embed_dim = vision_embed_dim
+        self.vision_layers = vision_layers
+
+        if vision_heads is None:
+            vision_heads = vision_embed_dim // 64
+        self.vision_model = VisionTransformer(
+            input_resolution=image_resolution,
+            patch_size=vision_patch_size,
+            width=vision_embed_dim,
+            layers=vision_layers,
+            heads=vision_heads,
+            activation=vision_hidden_act,
+            mlp_ratio=vision_mlp_ratio,
+            normalize_before=True,
+        )
+        self.vision_projection = paddle.create_parameter(
+            (vision_embed_dim, projection_dim), paddle.get_default_dtype()
+        )
+        self.apply(self._init_weights)
+
+    def get_input_embeddings(self) -> nn.Layer:
+        return self.vision_model.conv1
+
+    def forward(
+        self,
+        pixel_values=None,
+        output_attentions=False,
+        output_hidden_states=False,
+        return_dict=True,
+    ):
+        r"""
+        The CLIPVisionModelWithProjection forward method, overrides the `__call__()` special method.
+
+        Args:
+            pixel_values (Tensor):
+                Pixel values. Padding will be ignored by default should you provide it.
+                Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
+            output_hidden_states (bool, optional):
+                Whether to return the hidden states of all layers.
+                Defaults to `False`.
+            output_attentions (bool, optional):
+                Whether to return the attentions tensors of all attention layers.
+                Defaults to `False`.
+            return_dict (bool, optional):
+                Whether to return a :class:`CLIPVisionModelOutput` object. If `False`, the output
+                will be a tuple of tensors. Defaults to `True`.
+
+        Returns:
+            An instance of :class:`CLIPVisionModelOutput` if `return_dict=True`. Otherwise it returns a tuple of tensors
+            corresponding to ordered and not None (depending on the input arguments) fields of :class:`CLIPVisionModelOutput`.
+
+        Example:
+            .. code-block::
+
+            from PIL import Image
+            import requests
+            from paddlenlp.transformers import CLIPProcessor, CLIPVisionModelWithProjection
+
+            model = CLIPVisionModelWithProjection.from_pretrained("openai/clip-vit-base-patch32")
+            processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+
+            url = "http://images.cocodataset.org/val2017/000000039769.jpg"
+            image = Image.open(requests.get(url, stream=True).raw)
+            inputs = processor(images=image, return_tensors="pd")
+            outputs = model(**inputs)
+
+            image_embeds = outputs.image_embeds
+
+        """
+        vision_outputs = self.vision_model(
+            pixel_values,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        pooled_output = vision_outputs[1]  # pooled_output
+        image_embeds = paddle.matmul(pooled_output, self.vision_projection)
+        if not return_dict:
+            outputs = (image_embeds, vision_outputs[0]) + vision_outputs[2:]
+            return tuple(output for output in outputs if output is not None)
+
+        return CLIPVisionModelOutput(
+            image_embeds=image_embeds,
+            last_hidden_state=vision_outputs.last_hidden_state,
+            hidden_states=vision_outputs.hidden_states,
+            attentions=vision_outputs.attentions,
+        )
+
+
+CLIPTextModel.base_model_class = CLIPTextModel
+CLIPVisionModel.base_model_class = CLIPVisionModel
+CLIPTextModelWithProjection.base_model_class = CLIPTextModelWithProjection
+CLIPVisionModelWithProjection.base_model_class = CLIPVisionModelWithProjection

@@ -57,9 +57,10 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         "ernie-layoutx-base-uncased": {"do_lower_case": True, "do_tokenize_postprocess": False},
         "uie-x-base": {"do_lower_case": True, "do_tokenize_postprocess": True},
     }
-    pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 512, "uie-x-base": 512}
+    pretrained_positional_embedding_sizes = {"ernie-layoutx-base-uncased": 514, "uie-x-base": 514}
     max_model_input_sizes = pretrained_positional_embedding_sizes
-    model_input_names = ["input_ids", "attention_mask"]
+    # Ernie-M model doesn't have token_type embedding.
+    model_input_names: List[str] = ["input_ids"]
 
     SPECIAL_TOKENS_ATTRIBUTES = [
         "unk_token",

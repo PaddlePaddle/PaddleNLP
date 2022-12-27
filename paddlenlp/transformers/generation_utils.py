@@ -442,7 +442,9 @@ class GenerationMixin(object):
             encoder_kwargs = {
                 argument: value
                 for argument, value in model_kwargs.items()
-                if not (argument.startswith("decoder_") or argument.startswith("cross_attn"))
+                if not (
+                    argument.startswith("decoder_") or argument.startswith("cross_attn") or argument == "use_cache"
+                )
             }
 
             model_kwargs["encoder_output"] = encoder(input_ids, **encoder_kwargs)
