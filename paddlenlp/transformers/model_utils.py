@@ -294,10 +294,11 @@ class PretrainedModel(Layer, GenerationMixin):
         except AttributeError:
             result = getattr(self.config, name)
 
-            logger.warning(
-                f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
-                f"Instead, do `model.config.{name}`"
-            )
+            # FIXME(wj-Mcat): there are a lot of consistent errors, so temporary disable.
+            # logger.warning(
+            #     f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
+            #     f"Instead, do `model.config.{name}`"
+            # )
             return result
 
     @property
