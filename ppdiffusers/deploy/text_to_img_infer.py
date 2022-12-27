@@ -49,7 +49,7 @@ def parse_arguments():
         type=str,
         default="paddle",
         # Note(zhoushunjie): Will support 'tensorrt' soon.
-        choices=["onnx_runtime", "paddle", "paddlelite", "paddle-tensorrt"],
+        choices=["onnx_runtime", "paddle", "paddlelite", "paddle_tensorrt"],
         help="The inference runtime backend of unet model and text encoder model.",
     )
     parser.add_argument(
@@ -252,8 +252,8 @@ if __name__ == "__main__":
             args.model_dir, args.unet_model_prefix, args.model_format, device_id=device_id
         )
         print(f"Spend {time.time() - start : .2f} s to load unet model.")
-    elif args.backend == "paddle" or args.backend == "paddle-tensorrt":
-        use_trt = True if args.backend == "paddle-tensorrt" else False
+    elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
+        use_trt = True if args.backend == "paddle_tensorrt" else False
         # Note(zhoushunjie): Will change to paddle-trt runtime later
         text_encoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
