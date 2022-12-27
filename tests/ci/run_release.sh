@@ -31,7 +31,7 @@ set -x
 python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 nlp1_build (){
     echo -e "\033[35m ---- only install paddlenlp \033[0m"
-    python -m pip install -U paddlenlp
+    python -m pip install --force-reinstall paddlenlp
 }
 nlp2_build (){
     echo -e "\033[35m ---- build and install paddlenlp  \033[0m"
@@ -41,7 +41,7 @@ nlp2_build (){
 
     python -m pip install -r requirements.txt
     python setup.py bdist_wheel
-    python -m pip install dist/paddlenlp****.whl
+    python -m pip install --force-reinstall dist/paddlenlp****.whl
 }
 nlp2_build
 python -c 'from visualdl import LogWriter'
@@ -58,6 +58,8 @@ if [[ ${Testcase} == 'all' ]];then
     P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
     nptag ernie-m clue taskflow transformers)
+elif [[ ${Testcase} == 'p0' ]];then
+    P0case_list=(waybill_ie glue bert skep electra gpt ernie-1.0 tinybert transformer ernie-doc clue taskflow)
 else
     P0case_list=${Testcase}
 fi

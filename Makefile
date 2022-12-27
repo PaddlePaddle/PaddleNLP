@@ -64,3 +64,17 @@ deploy-paddlenlp:
 	python3 setup.py sdist bdist_wheel
 	# upload
 	twine upload --skip-existing dist/*
+
+.PHONY: release
+install-ppdiffusers:
+    export Testcase=all
+    export cudaid1=0
+    export cudaid2=0,1
+    bash ./tests/ci/run_release.sh $(cudaid1) ${cudaid2} ${Testcase};
+
+.PHONY: examples
+install-ppdiffusers:
+    export Testcase=p0
+    export cudaid1=0
+    export cudaid2=0,1
+    bash ./tests/ci/run_release.sh $(cudaid1) ${cudaid2} ${Testcase};
