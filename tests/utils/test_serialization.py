@@ -25,13 +25,13 @@ from tests.testing_utils import require_package
 
 
 class SerializationTest(TestCase):
-    @require_package("torch")
     @parameterized.expand(
         [
             "float32",
             "float16",
         ]
     )
+    @require_package("torch")
     def test_simple_load(self, dtype: str):
         import torch
 
@@ -54,7 +54,6 @@ class SerializationTest(TestCase):
                     torch_data[key].numpy(),
                 )
 
-    @require_package("torch")
     @parameterized.expand(
         [
             "hf-internal-testing/tiny-random-codegen",
@@ -62,6 +61,7 @@ class SerializationTest(TestCase):
             "hf-internal-testing/tiny-random-SwinModel",
         ]
     )
+    @require_package("torch")
     def test_load_bert_model(self, repo_id):
         import torch
 

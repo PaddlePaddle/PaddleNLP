@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,9 +48,6 @@ class TestEinsum(CommonTest):
         result = ops.einsum(self.sample["paradigm"], *pd_operands)
 
         self.check_output_equal(result.numpy(), expected_result)
-
-        result2 = ops.einsum(self.sample["paradigm"], pd_operands)
-        self.check_output_equal(result2.numpy(), expected_result)
 
 
 class TestEinsumVectorDot(TestEinsum):
