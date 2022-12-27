@@ -15,169 +15,161 @@
 from __future__ import annotations
 
 from typing import Dict
+
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
-__all__ = [
-    "GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig",
-    "GPT_PRETRAINED_RESOURCE_FILES_MAP"
-]
+__all__ = ["GPT_PRETRAINED_INIT_CONFIGURATION", "GPTConfig", "GPT_PRETRAINED_RESOURCE_FILES_MAP"]
 
 GPT_PRETRAINED_INIT_CONFIGURATION = {
-            "gpt-cpm-large-cn": { # 2.6B
-            "vocab_size": 30000,
-            "hidden_size": 2560,
-            "num_hidden_layers": 32,
-            "num_attention_heads": 32,
-            "intermediate_size": 10240,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 7,
-            "bos_token_id": 0,
-            "eol_token_id": 3,
-        },
-        "gpt-cpm-small-cn-distill": { # 109M
-            "vocab_size": 30000,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 7,
-            "bos_token_id": 0,
-            "eol_token_id": 3,
-        },
-        "gpt3-13B-en": { # 13B
-            "vocab_size": 50304,
-            "hidden_size": 5120,
-            "num_hidden_layers": 40,
-            "num_attention_heads": 128,
-            "intermediate_size": 20480,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt3-1.3B-en": { # 1.3B
-            "vocab_size": 50304,
-            "hidden_size": 2048,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 8192,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-xl-en": { # 1558M
-            "vocab_size": 50257,
-            "hidden_size": 1600,
-            "num_hidden_layers": 48,
-            "num_attention_heads": 25,
-            "intermediate_size": 6400,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-large-en": { # 774M
-            "vocab_size": 50257,
-            "hidden_size": 1280,
-            "num_hidden_layers": 36,
-            "num_attention_heads": 20,
-            "intermediate_size": 5120,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-medium-en": { #345M
-            "vocab_size": 50304,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-en": { #117M
-            "vocab_size": 50257,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-small-en": { # config for CE
-            "vocab_size": 50304,
-            "hidden_size": 1024,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 4,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        }
+    "gpt-cpm-large-cn": {  # 2.6B
+        "vocab_size": 30000,
+        "hidden_size": 2560,
+        "num_hidden_layers": 32,
+        "num_attention_heads": 32,
+        "intermediate_size": 10240,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 0,
+        "eos_token_id": 7,
+        "bos_token_id": 0,
+        "eol_token_id": 3,
+    },
+    "gpt-cpm-small-cn-distill": {  # 109M
+        "vocab_size": 30000,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "pad_token_id": 0,
+        "eos_token_id": 7,
+        "bos_token_id": 0,
+        "eol_token_id": 3,
+    },
+    "gpt3-13B-en": {  # 13B
+        "vocab_size": 50304,
+        "hidden_size": 5120,
+        "num_hidden_layers": 40,
+        "num_attention_heads": 128,
+        "intermediate_size": 20480,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt3-1.3B-en": {  # 1.3B
+        "vocab_size": 50304,
+        "hidden_size": 2048,
+        "num_hidden_layers": 24,
+        "num_attention_heads": 16,
+        "intermediate_size": 8192,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt2-xl-en": {  # 1558M
+        "vocab_size": 50257,
+        "hidden_size": 1600,
+        "num_hidden_layers": 48,
+        "num_attention_heads": 25,
+        "intermediate_size": 6400,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt2-large-en": {  # 774M
+        "vocab_size": 50257,
+        "hidden_size": 1280,
+        "num_hidden_layers": 36,
+        "num_attention_heads": 20,
+        "intermediate_size": 5120,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt2-medium-en": {  # 345M
+        "vocab_size": 50304,
+        "hidden_size": 1024,
+        "num_hidden_layers": 24,
+        "num_attention_heads": 16,
+        "intermediate_size": 4096,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt2-en": {  # 117M
+        "vocab_size": 50257,
+        "hidden_size": 768,
+        "num_hidden_layers": 12,
+        "num_attention_heads": 12,
+        "intermediate_size": 3072,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
+    "gpt2-small-en": {  # config for CE
+        "vocab_size": 50304,
+        "hidden_size": 1024,
+        "num_hidden_layers": 4,
+        "num_attention_heads": 4,
+        "intermediate_size": 4096,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "attention_probs_dropout_prob": 0.1,
+        "max_position_embeddings": 1024,
+        "type_vocab_size": 1,  # no use
+        "initializer_range": 0.02,
+        "eos_token_id": 50256,
+        "eol_token_id": 198,
+    },
 }
 
 GPT_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "gpt-cpm-large-cn":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
-        "gpt-cpm-small-cn-distill":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
-        "gpt2-en":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
-        "gpt2-medium-en":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
-        "gpt2-large-en":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
-        "gpt2-xl-en":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
+        "gpt-cpm-large-cn": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
+        "gpt-cpm-small-cn-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
+        "gpt2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
+        "gpt2-medium-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
+        "gpt2-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
+        "gpt2-xl-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
     }
 }
 
@@ -248,30 +240,29 @@ class GPTConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "gpt"
-    attribute_map: Dict[str, str] = {
-        "num_classes": "num_labels",
-        "dropout": "classifier_dropout"
-    }
+    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
     pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
 
-    def __init__(self,
-                 vocab_size: int = 50304,
-                 hidden_size: int = 768,
-                 num_hidden_layers: int = 12,
-                 num_attention_heads: int = 12,
-                 intermediate_size: int = 3072,
-                 hidden_act: str = "gelu",
-                 hidden_dropout_prob: float = 0.1,
-                 attention_probs_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: int = 16,
-                 initializer_range: float = 0.02,
-                 pad_token_id: int = 0,
-                 eos_token_id: int = 7,
-                 bos_token_id: int = 0,
-                 eol_token_id: int = 3,
-                 topo: int = None,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size: int = 50304,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "gelu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 16,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+        eos_token_id: int = 7,
+        bos_token_id: int = 0,
+        eol_token_id: int = 3,
+        topo: int = None,
+        **kwargs
+    ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
         self.vocab_size = vocab_size
