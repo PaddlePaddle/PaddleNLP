@@ -582,7 +582,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         decode_strategy = kwargs.get("decode_strategy")
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
-        enable_faster_encoder = kwargs.get("enable_faster_encoder", True)
+        enable_fast_encoder = kwargs.get("enable_fast_encoder", True)
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
@@ -595,7 +595,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
-            enable_faster_encoder=enable_faster_encoder,
+            enable_fast_encoder=enable_fast_encoder,
         ).forward
         return self._fast_entry
 

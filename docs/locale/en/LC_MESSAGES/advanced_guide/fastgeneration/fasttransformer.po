@@ -69,8 +69,8 @@ msgstr ""
 
 #: ../advanced_guide/fastgeneration/fasttransformer.rst:28
 msgid ""
-"我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速文本生成模型在 GPU "
-"上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FasterTransformer 自定义 op 的方式，包括 op "
+"我们实现了基于 FasterTransformer 的自定义 op 的接入，打造了 FastGeneration 的能力，用于加速文本生成模型在 GPU "
+"上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FastGeneration 自定义 op 的方式，包括 op "
 "的编译与使用。"
 msgstr ""
 
@@ -84,7 +84,7 @@ msgstr ""
 
 #: ../advanced_guide/fastgeneration/fasttransformer.rst:36
 msgid ""
-"目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time "
+"目前当基于动态图使用 FastGeneration 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time "
 "的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。"
 msgstr ""
 
@@ -186,7 +186,7 @@ msgstr ""
 
 #: ../advanced_guide/fastgeneration/fasttransformer.rst:87
 msgid ""
-"最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FasterTransformer "
+"最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FastGeneration "
 "decoding 执行的库。"
 msgstr ""
 
@@ -255,7 +255,7 @@ msgstr ""
 
 #: ../advanced_guide/fastgeneration/fasttransformer.rst:161
 msgid ""
-"首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterTransformer 相关 "
+"首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FastGeneration 相关 "
 "lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 "
 "PaddleNLP，并重新编译:"
 msgstr ""

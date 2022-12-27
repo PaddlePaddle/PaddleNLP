@@ -56,7 +56,7 @@ def infer_transformer_encoder(
     normalize_before=False,
 ):
     """
-    Fusion Encoder API intergrating Encoder inference in FasterTransformer. It
+    Fusion Encoder API intergrating Encoder inference in FastGeneration. It
     accepts the weight and bias of TransformerEncoder and some other parameters
     for inference.
     """
@@ -144,14 +144,14 @@ def infer_transformer_encoder(
 def encoder_layer_forward(self, src, src_mask, cache=None, sequence_id_offset=None, trt_seq_len=None):
     """
     Redefines `forward` function of `paddle.nn.TransformerEncoderLayer` for
-    integrating FasterTransformer for inference.
+    integrating FastGeneration for inference.
 
     The original `forward` function would not be replaced unless
-    `enable_faster_encoder` is called by objects of its base class. After
+    `enable_fast_encoder` is called by objects of its base class. After
     replacing, objects of `paddle.nn.TransformerEncoderLayer` also have the
     same member variables as before.
 
-    After inference, `disable_faster_encoder` could be called to restore the
+    After inference, `disable_fast_encoder` could be called to restore the
     `forward` function of `paddle.nn.TransformerEncoder` and
     `paddle.nn.TransformerEncoderLayer`.
 
@@ -218,14 +218,14 @@ def encoder_layer_forward(self, src, src_mask, cache=None, sequence_id_offset=No
 def encoder_forward(self, src, src_mask=None, cache=None):
     """
     Redefines `forward` function of `paddle.nn.TransformerEncoder` for
-    integrating FasterTransformer for inference.
+    integrating FastGeneration for inference.
 
     The original `forward` function would not be replaced unless
-    `enable_faster_encoder` is called by objects of its base class. After
+    `enable_fast_encoder` is called by objects of its base class. After
     replacing, objects of `paddle.nn.TransformerEncoder` also have the same
     member variables as before.
 
-    After inference, `disable_faster_encoder` could be called to restore the
+    After inference, `disable_fast_encoder` could be called to restore the
     `forward` function of `paddle.nn.TransformerEncoder` and
     `paddle.nn.TransformerEncoderLayer`.
 
@@ -333,23 +333,23 @@ def encoder_forward(self, src, src_mask=None, cache=None):
     return output
 
 
-def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
+def enable_fast_encoder(self, use_fp16=False, encoder_lib=None):
     """
-    Compiles fusion encoder operator intergrated FasterTransformer using the
+    Compiles fusion encoder operator intergrated FastGeneration using the
     method of JIT(Just-In-Time) and replaces the `forward` function of
     `paddle.nn.TransformerEncoder` and `paddle.nn.TransformerEncoderLayer`
-    objects inherited from `self` to support inference using FasterTransformer.
+    objects inherited from `self` to support inference using FastGeneration.
 
     Examples:
 
         .. code-block:: python
 
-            from paddlenlp.ops import enable_faster_encoder, disable_faster_encoder
+            from paddlenlp.ops import enable_fast_encoder, disable_fast_encoder
 
             model.eval()
-            model = enable_faster_encoder(model)
+            model = enable_fast_encoder(model)
             enc_out = model(src, src_mask)
-            model = disable_faster_encoder(model)
+            model = disable_fast_encoder(model)
     """
 
     def init_func(layer):
@@ -359,7 +359,7 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
                 logger.warning(
                     "`False` for paddle.nn.TransformerEncoder's"
                     " parameter `bias_attr` is not supported in "
-                    "FasterTransformer by now. The original forward"
+                    "FastGeneration by now. The original forward"
                     " will be involved."
                 )
                 is_usable = False
@@ -378,11 +378,11 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
             # Pass decoding lib to prevent re-building encoder.
             # Todo: check weather decoding lib have contained encoder or not.
             if encoder_lib is not None:
-                if "FasterTransformer" not in LOADED_EXT.keys():
+                if "FastGeneration" not in LOADED_EXT.keys():
                     ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(encoder_lib)
-                    LOADED_EXT["FasterTransformer"] = ops
+                    LOADED_EXT["FastGeneration"] = ops
             else:
-                load("FasterTransformer", verbose=True)
+                load("FastGeneration", verbose=True)
         except Exception:
             logger.warning("Exception occurs when using FasterEncoder. " "The original forward will be involved. ")
             return self
@@ -391,7 +391,7 @@ def enable_faster_encoder(self, use_fp16=False, encoder_lib=None):
     return self
 
 
-def disable_faster_encoder(self):
+def disable_fast_encoder(self):
     """
     Restores the original `forward` function of `paddle.nn.TransformerEncoder`
     and `paddle.nn.TransformerEncoderLayer` objects inherited from `self`.
@@ -400,12 +400,12 @@ def disable_faster_encoder(self):
 
         .. code-block:: python
 
-            from paddlenlp.ops import enable_faster_encoder, disable_faster_encoder
+            from paddlenlp.ops import enable_fast_encoder, disable_fast_encoder
 
             model.eval()
-            model = enable_faster_encoder(model)
+            model = enable_fast_encoder(model)
             enc_out = model(src, src_mask)
-            model = disable_faster_encoder(model)
+            model = disable_fast_encoder(model)
     """
 
     def init_func(layer):

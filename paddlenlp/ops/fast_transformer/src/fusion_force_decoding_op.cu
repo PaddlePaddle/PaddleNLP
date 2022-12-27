@@ -386,7 +386,7 @@ std::vector<paddle::Tensor> decoding_kernel(
   } else {
     PD_THROW(
         "Only beam_search, beam_search_v2 and sampling are supported for "
-        "FasterTransformer. ");
+        "FastGeneration. ");
   }
   delete[] params;
 

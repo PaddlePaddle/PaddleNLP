@@ -57,8 +57,8 @@ def infer(args):
         inputs, add_start_token_for_decoding=True, return_length=True, is_split_into_words=False
     )
 
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
 
     config = paddle_infer.Config(
         args.inference_model_dir + "unimo_text.pdmodel", args.inference_model_dir + "unimo_text.pdiparams"

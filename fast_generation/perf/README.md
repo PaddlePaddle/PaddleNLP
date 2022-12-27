@@ -231,7 +231,7 @@ bash run_perf_gpt.sh
 
 ```sh
 ...
-[2021-12-10 08:11:37,255] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
+[2021-12-10 08:11:37,255] [   DEBUG] - skipping 'FastGeneration' extension (up-to-date) build
 Namespace(decode_strategy='sampling', max_length=32, model_name_or_path='bart-base', num_beams=1, top_k=1, top_p=1.0, use_fp16_decoding=False)
 Faster FP32 cost: 40.13654176145792
 PD cost: 511.413540635258
@@ -240,7 +240,7 @@ Speed up Faster FP32/PD: 12.741843671403577
 Speed up Faster FP32/HF: 3.4506897796177394
 ...
 ...
-[2021-12-10 08:13:42,858] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
+[2021-12-10 08:13:42,858] [   DEBUG] - skipping 'FastGeneration' extension (up-to-date) build
 Namespace(decode_strategy='sampling', max_length=32, model_name_or_path='bart-base', num_beams=1, top_k=1, top_p=1.0, use_fp16_decoding=True)
 Faster FP16 cost: 34.004870522767305
 ...

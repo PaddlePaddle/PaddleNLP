@@ -56,8 +56,8 @@ def infer(args):
     # Input ids
     input_ids = tokenizer.encode("translate English to French: " + inputs, return_tensors="np")["input_ids"]
 
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
 
     config = paddle_infer.Config(
         os.path.join(args.inference_model_dir, "t5.pdmodel"), os.path.join(args.inference_model_dir, "t5.pdiparams")

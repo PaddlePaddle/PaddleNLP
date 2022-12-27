@@ -179,13 +179,13 @@ class InferTransformerDecoder(nn.Layer):
 
         if decoder_lib is not None and os.path.isfile(decoder_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoder_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoder_lib is not None:
                 logger.warning("The specified decoder_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         super(InferTransformerDecoder, self).__init__()
         self.n_head = n_head

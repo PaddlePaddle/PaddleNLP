@@ -747,7 +747,7 @@ class GenerationMixin(object):
             model_kwargs = args.pop("model_kwargs")
             args.update(model_kwargs)
             try:
-                if not hasattr(self, "_fast_entry"):
+                if getattr(self, "_fast_entry", None) is None:
                     self._build_fast(args)
                 if self._fast_entry:
                     output = self._fast_entry(**args)

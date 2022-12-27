@@ -42,7 +42,7 @@ def predict(args):
         num_beams=args.beam_size,
         max_length=args.max_length,
         decode_strategy="beam_search",
-        use_fast=args.use_faster,
+        use_fast=True,  # args.use_faster,
         use_fp16_decoding=args.use_fp16_decoding,
     )
 

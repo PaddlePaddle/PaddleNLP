@@ -64,8 +64,8 @@ def infer(args):
     # Forced bos token ids
     forced_bos_token = np.ones([args.batch_size, 1], dtype="int32") * bos_id
 
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
 
     config = paddle_infer.Config(
         os.path.join(args.inference_model_dir, "mbart.pdmodel"),

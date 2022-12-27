@@ -340,7 +340,7 @@ std::vector<paddle::Tensor> bart_decoding_kernel(
   } else {
     PD_THROW(
         "Only beam_search, topk_sampling and topp_sampling are supported for "
-        "FasterTransformer. ");
+        "FastGeneration. ");
   }
   delete[] params;
 

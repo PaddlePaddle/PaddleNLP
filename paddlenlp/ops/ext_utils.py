@@ -137,9 +137,9 @@ class FasterTransformerExtension(CMakeExtension):
         if CUDA_HOME is None:  # GPU only
             # TODO(guosheng): should we touch a dummy file or add a quick exit
             # method to avoid meaningless process in `load`
-            logger.warning("FasterTransformer is not available because CUDA can not be found.")
+            logger.warning("FastGeneration is not available because CUDA can not be found.")
             raise NotImplementedError
-        # TODO(guosheng): Multiple -std seems be passed in FasterTransformer,
+        # TODO(guosheng): Multiple -std seems be passed in FastGeneration,
         # which is not allowed by NVCC. Fix it later.
         self.cmake_args = [f"-DPY_CMD={sys.executable}"]
         # `GetCUDAComputeCapability` is not exposed yet, and detect CUDA/GPU
@@ -150,7 +150,7 @@ class FasterTransformerExtension(CMakeExtension):
             self.cmake_args += ["-DWITH_PARALLEL=ON"]
         try:
             super(FasterTransformerExtension, self).build_with_command(ext_builder)
-            # FasterTransformer cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
+            # FastGeneration cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
             # to `CMAKE_BINARY_DIR/lib`, thus copy the lib back to `build_ext.build_lib`.
             # Maybe move this copy to CMakeList.
             # `copy_tree` or `copy_file`, boost lib might be included
@@ -159,7 +159,7 @@ class FasterTransformerExtension(CMakeExtension):
             # when it is in the dir of paddlenlp package.
             # os.remove(ext_builder.build_temp)
         except Exception as e:
-            logger.warning("FasterTransformer is not available due to build errors.")
+            logger.warning("FastGeneration is not available due to build errors.")
             raise e
 
     def get_target_filename(self):
@@ -194,7 +194,7 @@ class BuildExtension(PaddleBuildExtension):
 
 
 EXTENSIONS = {
-    "FasterTransformer": FasterTransformerExtension,
+    "FastGeneration": FasterTransformerExtension,
     # NOTE: Since model parallel code is supported by definitions, to avoid
     # performance degrading on non-parallel mode, we use a separated lib for
     # model parallel.

@@ -42,7 +42,7 @@ def parse_args():
     )
     parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
-        "--enable_faster_encoder",
+        "--enable_fast_encoder",
         action="store_true",
         help="Whether to use fast version encoder to predict. This is experimental option for now. ",
     )
@@ -172,7 +172,7 @@ def do_predict(args):
         diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
-        enable_faster_encoder=args.enable_faster_encoder,
+        enable_fast_encoder=args.enable_fast_encoder,
         use_fp16_encoder=args.use_fp16_encoder,
     )
 
@@ -240,7 +240,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
-    args.enable_faster_encoder = ARGS.enable_faster_encoder
+    args.enable_fast_encoder = ARGS.enable_fast_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy
     args.beam_size = ARGS.beam_size

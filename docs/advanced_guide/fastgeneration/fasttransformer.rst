@@ -25,7 +25,7 @@ Transformer高性能加速
 快速开始
 ------------
 
-我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FasterTransformer 自定义 op 的方式，包括 op 的编译与使用。
+我们实现了基于 FasterTransformer 的自定义 op 的接入，打造了 FastGeneration 的能力用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FastGeneration 自定义 op 的方式，包括 op 的编译与使用。
 
 Python 动态图使用自定义 op
 ------------
@@ -33,7 +33,7 @@ Python 动态图使用自定义 op
 JIT 自动编译
 ^^^^^^^^^^^^
 
-目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
+目前当基于动态图使用 FastGeneration 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
 
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。使用示例可以参考 `Transformer 预测加速使用示例-sample <https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/fast_transformer/sample/decoding_sample.py>`_，`Transformer 预测加速使用示例-机器翻译 <https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/machine_translation/transformer/fast_transformer>`_。
 
@@ -84,7 +84,7 @@ PaddleNLP 准备
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
 
-最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FasterTransformer decoding 执行的库。
+最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FastGeneration decoding 执行的库。
 
 使用 Transformer decoding 高性能推理
 ^^^^^^^^^^^^
@@ -158,7 +158,7 @@ C++ 预测库使用自定义 op
 PaddleNLP 准备
 """"""""""""
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterTransformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FastGeneration 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 

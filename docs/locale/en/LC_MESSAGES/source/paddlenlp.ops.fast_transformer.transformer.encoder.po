@@ -48,7 +48,7 @@ msgstr ""
 #: of paddlenlp.ops.fast_transformer.transformer.encoder.encoder_forward:9
 #: paddlenlp.ops.fast_transformer.transformer.encoder.encoder_layer_forward:9
 msgid ""
-"After inference, `disable_faster_encoder` could be called to restore the "
+"After inference, `disable_fast_encoder` could be called to restore the "
 "`forward` function of `paddle.nn.TransformerEncoder` and "
 "`paddle.nn.TransformerEncoderLayer`."
 msgstr ""
@@ -112,7 +112,7 @@ msgstr ""
 #: of paddlenlp.ops.fast_transformer.transformer.encoder.encoder_forward:4
 msgid ""
 "The original `forward` function would not be replaced unless "
-"`enable_faster_encoder` is called by objects of its base class. After "
+"`enable_fast_encoder` is called by objects of its base class. After "
 "replacing, objects of `paddle.nn.TransformerEncoder` also have the same "
 "member variables as before."
 msgstr ""
@@ -143,7 +143,7 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.ops.fast_transformer.transformer.encoder.enable_faster_encoder:1
+#: paddlenlp.ops.fast_transformer.transformer.encoder.enable_fast_encoder:1
 msgid ""
 "Compiles fusion encoder operator intergrated FasterTransformer using the "
 "method of JIT(Just-In-Time) and replaces the `forward` function of "
@@ -153,13 +153,13 @@ msgid ""
 msgstr ""
 
 #: of
-#: paddlenlp.ops.fast_transformer.transformer.encoder.disable_faster_encoder:5
-#: paddlenlp.ops.fast_transformer.transformer.encoder.enable_faster_encoder:7
+#: paddlenlp.ops.fast_transformer.transformer.encoder.disable_fast_encoder:5
+#: paddlenlp.ops.fast_transformer.transformer.encoder.enable_fast_encoder:7
 msgid "实际案例"
 msgstr ""
 
 #: of
-#: paddlenlp.ops.fast_transformer.transformer.encoder.disable_faster_encoder:1
+#: paddlenlp.ops.fast_transformer.transformer.encoder.disable_fast_encoder:1
 msgid ""
 "Restores the original `forward` function of "
 "`paddle.nn.TransformerEncoder` and `paddle.nn.TransformerEncoderLayer` "

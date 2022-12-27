@@ -1,6 +1,6 @@
 # FastGenerartion 使用
 
-在这里我们集成了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。以下是FastGenerartion相关的使用说明。
+在这里我们集成了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速，打造了 FastGeneration 的能力。以下是 FastGenerartion 相关的使用说明。
 
 ## 使用环境说明
 

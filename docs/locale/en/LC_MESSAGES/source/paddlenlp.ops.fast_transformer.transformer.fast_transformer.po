@@ -29,7 +29,7 @@ msgstr ""
 #: of
 #: paddlenlp.ops.fast_transformer.transformer.fast_transformer.FasterTransformer:1
 msgid ""
-"FasterTransformer is a fast version for generation with the Transformer"
+"FastGeneration is a fast version for generation with the Transformer"
 " model. It uses a custom op based on and enhancing NV FasterTransformer "
 "to do fast generation."
 msgstr ""
@@ -201,7 +201,7 @@ msgstr ""
 #: of
 #: paddlenlp.ops.fast_transformer.transformer.fast_transformer.FasterTransformer:68
 msgid ""
-"Whether to use fp16 for encoder. Only works when enable_faster_encoder is"
+"Whether to use fp16 for encoder. Only works when enable_fast_encoder is"
 " True. Defaults to False."
 msgstr ""
 
@@ -311,9 +311,9 @@ msgid ""
 " data layout would be batch major with shape `[batch_size, seq_len, "
 "beam_size]`. If  `True`, the data layout would be time major with shape "
 "`[seq_len, batch_size, beam_size]`. Default to `False`.  - `use_ft(bool, "
-"optional)`: Whether to use FasterTransformer for decoding. Default to "
+"optional)`: Whether to use FastGeneration for decoding. Default to "
 "True if not set.  - `use_fp16_decoding(bool, optional)`: Whether to use "
-"fp16 for decoding.  Only works when using FasterTransformer.  - "
+"fp16 for decoding.  Only works when using FastGeneration.  - "
 "`beam_search_version(str, optional)`: Indicating the strategy of beam "
 "search. It can be 'v1' or 'v2'. 'v2' would select the top `beam_size * 2`"
 " beams and process the top `beam_size` alive and finish beams in them "
@@ -333,7 +333,7 @@ msgid ""
 " Generation <https://arxiv.org/abs/1611.08562>`_ for details. Bigger "
 "`diversity_rate` would lead to more diversity. if `diversity_rate == 0` "
 "is equivalent to naive BeamSearch. Default to 0 if not set. **NOTE**: "
-"Only works when using FasterTransformer temporarily."
+"Only works when using FastGeneration temporarily."
 msgstr ""
 
 #: of
@@ -359,7 +359,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.ops.fast_transformer.transformer.fast_transformer.TransformerGenerator:44
-msgid "`use_ft(bool, optional)`: Whether to use FasterTransformer"
+msgid "`use_ft(bool, optional)`: Whether to use FastGeneration"
 msgstr ""
 
 #: of
@@ -374,7 +374,7 @@ msgstr ""
 
 #: of
 #: paddlenlp.ops.fast_transformer.transformer.fast_transformer.TransformerGenerator:48
-msgid "for decoding.  Only works when using FasterTransformer."
+msgid "for decoding.  Only works when using FastGeneration."
 msgstr ""
 
 #: of
@@ -432,7 +432,7 @@ msgid ""
 "<https://arxiv.org/abs/1611.08562>`_ for details. Bigger `diversity_rate`"
 " would lead to more diversity. if `diversity_rate == 0` is equivalent to "
 "naive BeamSearch. Default to 0 if not set. **NOTE**: Only works when "
-"using FasterTransformer temporarily."
+"using FastGeneration temporarily."
 msgstr ""
 
 #: of
@@ -460,7 +460,7 @@ msgstr ""
 msgid ""
 "An int64 tensor shaped indicating the predicted ids. Its shape is "
 "`[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]` "
-"according to `output_time_major`. While, when using FasterTransformer and"
+"according to `output_time_major`. While, when using FastGeneration and"
 " beam search v2, the beam dimension would be doubled to include both the "
 "top `beam_size` alive and finish beams, thus the tensor shape is "
 "`[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, "

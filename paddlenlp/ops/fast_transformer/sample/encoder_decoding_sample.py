@@ -22,7 +22,7 @@ import yaml
 from attrdict import AttrDict
 
 from paddlenlp.data import Pad
-from paddlenlp.ops import FasterTransformer, enable_faster_encoder
+from paddlenlp.ops import FasterTransformer, enable_fast_encoder
 from paddlenlp.utils.log import logger
 
 
@@ -39,7 +39,7 @@ def parse_args():
     )
     parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
     parser.add_argument(
-        "--enable_faster_encoder",
+        "--enable_fast_encoder",
         action="store_true",
         help="Whether to use fast version encoder to predict. This is experimental option for now. ",
     )
@@ -85,15 +85,15 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
-        enable_faster_encoder=args.enable_faster_encoder,
+        enable_fast_encoder=args.enable_fast_encoder,
         use_fp16_encoder=args.use_fp16_encoder,
     )
 
     # Set evaluate mode
     transformer.eval()
 
-    if args.enable_faster_encoder:
-        transformer = enable_faster_encoder(transformer, use_fp16=args.use_fp16_encoder)
+    if args.enable_fast_encoder:
+        transformer = enable_fast_encoder(transformer, use_fp16=args.use_fp16_encoder)
 
     src_word = generate_src_word(
         batch_size=args.infer_batch_size,
@@ -121,7 +121,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
-    args.enable_faster_encoder = ARGS.enable_faster_encoder
+    args.enable_fast_encoder = ARGS.enable_fast_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
     pprint(args)
 

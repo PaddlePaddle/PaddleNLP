@@ -296,7 +296,7 @@ export CUDA_VISIBLE_DEVICES=0
 再次运行脚本，输出结果如下（由于我们已经编译过高性能算子，所以这里不会重新编译）：
 
 ```sh
-[2021-11-23 13:38:09,200] [   DEBUG] - skipping 'FasterTransformer' extension (up-to-date) build
+[2021-11-23 13:38:09,200] [   DEBUG] - skipping 'FastGeneration' extension (up-to-date) build
 step 10 - 0.250s/step
 step 20 - 0.156s/step
 step 30 - 0.141s/step

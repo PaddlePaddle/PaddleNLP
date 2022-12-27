@@ -470,7 +470,7 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     PD_THROW(
         "Only beam_search, beam_search_v2, topk_sampling and topp_sampling are "
         "supported for "
-        "FasterTransformer. ");
+        "FastGeneration. ");
   }
   delete[] params;
 

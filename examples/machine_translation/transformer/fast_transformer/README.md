@@ -1,6 +1,6 @@
-# FasterTransformer 预测
+# FastGeneration 预测
 
-在这里我们集成了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 FasterTransformer float32 以及 float16 预测。以下是使用 FasterTransformer 的说明。
+在这里我们集成了 NVIDIA [FasterTransformer](https://github.com/NVIDIA/FasterTransformer/tree/v3.1) 用于预测加速。同时集成了 FasterTransformer float32 以及 float16 预测，打造了 FastGeneration 的能力。以下是使用 FastGeneration 的说明。
 
 ## 使用环境说明
 
@@ -19,9 +19,9 @@
 
 ## 快速开始
 
-我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速当前机器翻译 example 在 GPU 上的预测性能。
+我们实现了基于 FastGeneration 的自定义 op 的接入，用于加速当前机器翻译 example 在 GPU 上的预测性能。
 
-## 使用 FasterTransformer 完成预测
+## 使用 FastGeneration 完成预测
 
 编写 python 脚本的时候，调用 [`FasterTransformer` API](https://paddlenlp.readthedocs.io/zh/latest/source/paddlenlp.ops.fast_transformer.transformer.fast_transformer.html#paddlenlp.ops.fast_transformer.transformer.fast_transformer.FasterTransformer) 即可实现 Transformer 模型的高性能预测。
 
@@ -92,7 +92,7 @@ python encoder_decoding_predict.py \
 
 其中:
 * `--config`: 选项用于指明配置文件的位置
-* `--decoding_lib`: 选项用于指明编译好的 FasterTransformer decoding lib 的位置
+* `--decoding_lib`: 选项用于指明编译好的 FastGeneration decoding lib 的位置
 * `--decoding_strategy`: 选项用于指定解码使用的策略，可以选择是 `beam_search`，`topk_sampling`，`topp_sampling`。
   * 当使用 `beam_search` 的时候，需要指定 `--beam_size` 的值
   * 当使用 `topk_sampling` 的时候，需要指定 `--topk` 的值
@@ -122,7 +122,7 @@ python encoder_decoding_predict.py \
     --beam_size 5
 ```
 
-其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FasterTransformer decoding lib 的位置。
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FastGeneration decoding lib 的位置。
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
@@ -169,7 +169,7 @@ python encoder_decoding_predict.py \
     --unk_token "<unk>"
 ```
 
-#### 导出基于 FasterTransformer 的预测库使用模型文件
+#### 导出基于 FastGeneration 的预测库使用模型文件
 
 我们提供一个已经基于动态图训练好的 base model 的 checkpoint 以供使用，当前 checkpoint 是基于 WMT 英德翻译的任务训练。可以通过[transformer-base-wmt_ende_bpe](https://bj.bcebos.com/paddlenlp/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz)下载。
 
@@ -197,7 +197,7 @@ python export_model.py \
 
 #### C++ 预测库使用高性能加速
 
-C++ 预测库使用 FasterTransformer 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
+C++ 预测库使用 FastGeneration 的高性能加速需要自行编译，可以参考 [文本生成高性能加速](../../../../paddlenlp/ops/README.md) 文档完成基于 C++ 预测库的编译，同时也可以参考相同文档执行对应的 C++ 预测库的 demo 完成预测。
 
 具体的使用 demo 可以参考 [Transformer 预测库 C++ demo](../../../../paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc)。
 

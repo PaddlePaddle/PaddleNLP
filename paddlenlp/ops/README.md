@@ -2,12 +2,12 @@
 
 ## 子目录结构
 
-以下是 FasterTransformer 的高性能加速自定义 op 相关文件的目录结构。
+以下是 FastGeneration 的高性能加速自定义 op 相关文件的目录结构。
 
 ```text
 .
-├── fast_transformer/       # 基于自定义 op FasterTransformer 子路径
-  ├── sample/                 # 基于 FasterTransformer 使用样例
+├── fast_transformer/         # 基于自定义 op FastGeneration 子路径
+  ├── sample/                 # 基于 FastGeneration 使用样例
   ├── src/                    # 自定义 OP C++ CUDA 代码
   └── transformer/            # Python API 封装脚本
 └── patches                   # 自定义 op 第三方库自定义补丁代码
@@ -30,13 +30,13 @@
 
 ## 快速开始
 
-我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FasterTransformer 自定义 op 的方式，包括 op 的编译与使用。
+我们实现了基于 FastGeneration 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FastGeneration 自定义 op 的方式，包括 op 的编译与使用。
 
 ## Python 动态图使用自定义 op
 
 ### JIT 自动编译
 
-目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
+目前当基于动态图使用 FastGeneration 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
 
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
 
@@ -94,7 +94,7 @@ cd ../
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
 
-最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FasterTransformer decoding 执行的库。
+最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FastGeneration decoding 执行的库。
 
 ### 使用 Transformer decoding 高性能推理
 
@@ -157,7 +157,7 @@ python ./fast_transformer/sample/decoding_sample.py --config ./fast_transformer/
 
 ### 使用 GPT-2 decoding 高性能推理
 
-与 `FasterTransformer` 类似，可以通过一下方式调用 GPT-2 相关优化：
+与 `FasterTransformer` API 类似，可以通过一下方式调用 GPT-2 相关优化：
 
 ``` python
 from paddlenlp.ops import FasterGPT
@@ -215,7 +215,7 @@ python ./fast_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-
 
 #### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterTransformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FastGeneration 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 

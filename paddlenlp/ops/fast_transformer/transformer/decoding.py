@@ -2141,18 +2141,18 @@ class InferTransformerDecoding(nn.Layer):
     ):
         # if decoding_lib is None:
         #     raise ValueError(
-        #         "The args decoding_lib must be set to use FasterTransformer. ")
+        #         "The args decoding_lib must be set to use FastGeneration. ")
         # elif not os.path.exists(decoding_lib):
         #     raise ValueError("The path to decoding lib is not exist.")
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         size_per_head = d_model / n_head
         # fuse_qkv can only support size_per_head of [32, 64, 128].
@@ -2391,7 +2391,7 @@ class InferTransformerDecoding(nn.Layer):
 # Patch for parallel inference to save memory
 class FTParaConf(object):
     r"""
-    Configurations for model parallel in FasterTransformer. Currently only
+    Configurations for model parallel in FastGeneration. Currently only
     support GPT. Please refer to  `Megatron <https://arxiv.org/pdf/2104.04473.pdf>`__
     for details.
 
@@ -2489,7 +2489,7 @@ class FTParaConf(object):
             axis (int): The axis to perform slice.
             phase (int, optional): 0 is used for creating partial model when
                 initializing and `from_pretrained`. While 1 is used in converting
-                parameters to FasterTransformer. No slice would be performed if
+                parameters to FastGeneration. No slice would be performed if
                 it is 1, since parameters have been sliced in `phase=0`.
             out_param (bool, optional): If true, `weight` should be a Parameter
                 and force the output to be a Parameter.
@@ -2588,7 +2588,7 @@ def get_ft_para_conf():
 
 def enable_ft_para(tensor_para_size=None, layer_para_size=None, layer_para_batch_size=1):
     r"""
-    Enable model parallel with the given settings in FasterTransformer. Currently only
+    Enable model parallel with the given settings in FastGeneration. Currently only
     support GPT. Please refer to `Megatron <https://arxiv.org/pdf/2104.04473.pdf>`__
     for details.
 
@@ -2707,14 +2707,14 @@ class InferOptDecoding(nn.Layer):
 
     def __init__(self, model: OPTForCausalLM, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
             load(
-                "FasterTransformer" if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                "FastGeneration" if get_ft_para_conf().no_para else "FasterTransformerParallel",
                 verbose=True,
                 need_parallel=not get_ft_para_conf().no_para,
             )
@@ -2839,14 +2839,14 @@ class InferOptDecoding(nn.Layer):
 class InferGptDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
             load(
-                "FasterTransformer" if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                "FastGeneration" if get_ft_para_conf().no_para else "FasterTransformerParallel",
                 verbose=True,
                 need_parallel=not get_ft_para_conf().no_para,
             )
@@ -2961,14 +2961,14 @@ class InferUnifiedDecoding(nn.Layer):
     ):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
             load(
-                "FasterTransformer" if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                "FastGeneration" if get_ft_para_conf().no_para else "FasterTransformerParallel",
                 verbose=True,
                 need_parallel=not get_ft_para_conf().no_para,
             )
@@ -3134,13 +3134,13 @@ class InferBartDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         super(InferBartDecoding, self).__init__()
         for arg, value in locals().items():
@@ -3379,13 +3379,13 @@ class InferMBartDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         super(InferMBartDecoding, self).__init__()
         for arg, value in locals().items():
@@ -3761,14 +3761,14 @@ def convert_gptj_params(fast_model, model, fuse_qkv=1, use_fp16=False, restore_d
 class InferGptJDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, transpose_qkv=False):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
             load(
-                "FasterTransformer" if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                "FastGeneration" if get_ft_para_conf().no_para else "FasterTransformerParallel",
                 verbose=True,
                 need_parallel=not get_ft_para_conf().no_para,
             )
@@ -3878,13 +3878,13 @@ class InferPegasusDecoding(nn.Layer):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, hidden_act="gelu"):
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         super(InferPegasusDecoding, self).__init__()
         self._hidden_act = hidden_act
@@ -4057,13 +4057,13 @@ class InferT5Decoding(InferBase):
 
         if decoding_lib is not None and os.path.isfile(decoding_lib):
             # Maybe it has been loadad by `ext_utils.load`
-            if "FasterTransformer" not in LOADED_EXT.keys():
+            if "FastGeneration" not in LOADED_EXT.keys():
                 ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
-                LOADED_EXT["FasterTransformer"] = ops
+                LOADED_EXT["FastGeneration"] = ops
         else:
             if decoding_lib is not None:
                 logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
-            load("FasterTransformer", verbose=True)
+            load("FastGeneration", verbose=True)
 
         super(InferT5Decoding, self).__init__(use_fp16_decoding)
         for arg, value in locals().items():

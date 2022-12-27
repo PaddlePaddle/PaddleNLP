@@ -51,7 +51,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.utils.log import logger
 
-from .encoder import enable_faster_encoder
+from .encoder import enable_fast_encoder
 
 
 class FasterTransformer(TransformerModel):
@@ -123,11 +123,11 @@ class FasterTransformer(TransformerModel):
             to 0 if not set.
         use_fp16_decoding(bool, optional):
             Whether to use fp16 for decoding.
-        enable_faster_encoder(bool, optional):
+        enable_fast_encoder(bool, optional):
             Whether to use the fast version of encoder. This is experimental option for now.
             Defaults to False.
         use_fp16_encoder(bool, optional):
-            Whether to use fp16 for encoder. Only works when enable_faster_encoder is True.
+            Whether to use fp16 for encoder. Only works when enable_fast_encoder is True.
             Defaults to False.
         rel_len(bool, optional):
             Indicating whether `max_out_len` in is the length relative to that
@@ -165,7 +165,7 @@ class FasterTransformer(TransformerModel):
         diversity_rate=0.0,
         decoding_lib=None,
         use_fp16_decoding=False,
-        enable_faster_encoder=False,
+        enable_fast_encoder=False,
         use_fp16_encoder=False,
         rel_len=False,
         alpha=0.6,
@@ -187,7 +187,7 @@ class FasterTransformer(TransformerModel):
         self.diversity_rate = args.pop("diversity_rate")
         self.decoding_lib = args.pop("decoding_lib")
         self.use_fp16_decoding = args.pop("use_fp16_decoding")
-        self.enable_faster_encoder = args.pop("enable_faster_encoder")
+        self.enable_fast_encoder = args.pop("enable_fast_encoder")
         self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
@@ -200,8 +200,8 @@ class FasterTransformer(TransformerModel):
         self.max_length = max_length
         super(FasterTransformer, self).__init__(**args)
 
-        if self.enable_faster_encoder:
-            logger.warning("enable_faster_encoder is an experimental option and subject to change.")
+        if self.enable_fast_encoder:
+            logger.warning("enable_fast_encoder is an experimental option and subject to change.")
         elif self.use_fp16_encoder:
             self.use_fp16_encoder = False
 
@@ -246,7 +246,7 @@ class FasterTransformer(TransformerModel):
         src_emb = src_emb + src_pos_emb
         enc_input = F.dropout(src_emb, p=self.dropout, training=False) if self.dropout else src_emb
 
-        if self.enable_faster_encoder and self.use_fp16_encoder:
+        if self.enable_fast_encoder and self.use_fp16_encoder:
             enc_input = paddle.cast(enc_input, dtype="float16")
 
         enc_output = self.transformer.encoder(enc_input, src_slf_attn_bias)
@@ -313,8 +313,8 @@ class FasterTransformer(TransformerModel):
 
         self.load_dict(state_dict)
 
-        if self.enable_faster_encoder:
-            self = enable_faster_encoder(self, use_fp16=self.use_fp16_encoder)
+        if self.enable_fast_encoder:
+            self = enable_fast_encoder(self, use_fp16=self.use_fp16_encoder)
 
     def export_params(self, init_from_params, place):
         """
@@ -491,11 +491,11 @@ class TransformerGenerator(paddle.nn.Layer):
             be time major with shape `[seq_len, batch_size, beam_size]`. Default
             to `False`.
 
-            - `use_ft(bool, optional)`: Whether to use FasterTransformer
+            - `use_ft(bool, optional)`: Whether to use FastGeneration
             for decoding. Default to True if not set.
 
             - `use_fp16_decoding(bool, optional)`: Whether to use fp16
-            for decoding.  Only works when using FasterTransformer.
+            for decoding.  Only works when using FastGeneration.
 
             - `beam_search_version(str, optional)`: Indicating the strategy of
             beam search. It can be 'v1' or 'v2'. 'v2' would select the top
@@ -520,7 +520,7 @@ class TransformerGenerator(paddle.nn.Layer):
             Decoding Algorithm for Neural Generation <https://arxiv.org/abs/1611.08562>`_
             for details. Bigger `diversity_rate` would lead to more diversity.
             if `diversity_rate == 0` is equivalent to naive BeamSearch. Default
-            to 0 if not set. **NOTE**: Only works when using FasterTransformer
+            to 0 if not set. **NOTE**: Only works when using FastGeneration
             temporarily.
     """
 
@@ -547,13 +547,13 @@ class TransformerGenerator(paddle.nn.Layer):
     ):
         logger.warning("TransformerGenerator is an experimental API and subject to change.")
         # `kwargs` can include output_time_major, use_fp16_decoding, topk, topp.
-        # The later three arguments can only work when using FasterTransformer,
+        # The later three arguments can only work when using FastGeneration,
         # and expose topk, topp later.
         super(TransformerGenerator, self).__init__()
         self.d_model = d_model
         self.max_length = max_length
         self.output_time_major = kwargs.pop("output_time_major", True)
-        # Only works for FasterTransformer.
+        # Only works for FastGeneration.
         # TODO: original version supports diversity rate.
         diversity_rate = kwargs.pop("diversity_rate", 0.0)
         use_fp16_decoding = kwargs.pop("use_fp16_decoding", False)
@@ -591,11 +591,11 @@ class TransformerGenerator(paddle.nn.Layer):
                 )
             except Exception:
                 logger.warning(
-                    "Exception occurs when using FasterTransformer. " "The original forward will be involved. "
+                    "Exception occurs when using FastGeneration. " "The original forward will be involved. "
                 )
                 if diversity_rate != 0:
                     logger.warning(
-                        "diversity_rate would not work since it is only " "supported by FasterTransformer temporarily."
+                        "diversity_rate would not work since it is only " "supported by FastGeneration temporarily."
                     )
                 self.transformer = InferTransformerModel(
                     src_vocab_size=src_vocab_size,
@@ -623,7 +623,7 @@ class TransformerGenerator(paddle.nn.Layer):
         else:
             if diversity_rate != 0:
                 logger.warning(
-                    "diversity_rate would not work since it is only " "supported by FasterTransformer temporarily."
+                    "diversity_rate would not work since it is only " "supported by FastGeneration temporarily."
                 )
             self.transformer = InferTransformerModel(
                 src_vocab_size=src_vocab_size,
@@ -667,7 +667,7 @@ class TransformerGenerator(paddle.nn.Layer):
             Tensor:
                 An int64 tensor shaped indicating the predicted ids. Its shape is
                 `[batch_size, seq_len, beam_size]` or `[seq_len, batch_size, beam_size]`
-                according to `output_time_major`. While, when using FasterTransformer
+                according to `output_time_major`. While, when using FastGeneration
                 and beam search v2, the beam dimension would be doubled to include
                 both the top `beam_size` alive and finish beams, thus the tensor
                 shape is `[batch_size, seq_len, beam_size * 2]` or `[seq_len, batch_size, beam_size * 2]`.
@@ -1274,9 +1274,9 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
 
 class FasterBART(BartPretrainedModel):
-    enable_faster_encoder_func = enable_faster_encoder
+    enable_faster_encoder_func = enable_fast_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_faster_encoder=True):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_fast_encoder=True):
         super(FasterBART, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1288,13 +1288,13 @@ class FasterBART(BartPretrainedModel):
         self.encoder = model.bart.get_encoder()
         self.decoder = model.bart.get_decoder()
         self.pad_token_id = model.bart.config["pad_token_id"]
-        self.enable_faster_encoder = enable_faster_encoder
+        self.enable_fast_encoder = enable_fast_encoder
 
         self.decoding = InferBartDecoding(
             model=self._model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding
         )
-        if self.enable_faster_encoder:
-            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+        if self.enable_fast_encoder:
+            # Must use `enable_fast_encoder` in `__init__` when dygraph to static graph.
             self.encoder = FasterBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
@@ -1370,9 +1370,9 @@ class FasterBART(BartPretrainedModel):
 
 
 class FasterMBART(MBartPretrainedModel):
-    enable_faster_encoder_func = enable_faster_encoder
+    enable_faster_encoder_func = enable_fast_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_faster_encoder=False):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_fast_encoder=False):
         super(FasterMBART, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
@@ -1384,7 +1384,7 @@ class FasterMBART(MBartPretrainedModel):
         self.encoder = model.mbart.get_encoder()
         self.decoder = model.mbart.get_decoder()
         self.pad_token_id = model.mbart.config["pad_token_id"]
-        self.enable_faster_encoder = enable_faster_encoder
+        self.enable_fast_encoder = enable_fast_encoder
 
         self.decoding = InferMBartDecoding(
             model=self._model,
@@ -1393,8 +1393,8 @@ class FasterMBART(MBartPretrainedModel):
             hidden_act=model.mbart.config["activation_function"],
         )
 
-        if self.enable_faster_encoder:
-            # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+        if self.enable_fast_encoder:
+            # Must use `enable_fast_encoder` in `__init__` when dygraph to static graph.
             self.encoder = FasterMBART.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):
@@ -1436,7 +1436,7 @@ class FasterMBART(MBartPretrainedModel):
             else getattr(self._model, "decoder_start_token_id", None)
         )
 
-        # (gongenlei) Not enable_faster_encoder temporarily
+        # (gongenlei) Not enable_fast_encoder temporarily
         if encoder_output is None:
             assert input_ids is not None, "You have to specify either input_ids or encoder_output."
             encoder_output = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)[
@@ -1627,16 +1627,16 @@ class FasterCodeGen(CodeGenPreTrainedModel):
 
 
 class FasterPegasus(PegasusPretrainedModel):
-    enable_faster_encoder_func = enable_faster_encoder
+    enable_faster_encoder_func = enable_fast_encoder
 
-    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_faster_encoder=False, **kwargs):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_fast_encoder=False, **kwargs):
         super(FasterPegasus, self).__init__()
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         self.encoder = model.get_encoder()
         self.decoder = model.get_decoder()
         self.pad_token_id = model.pegasus.config["pad_token_id"]
-        self.enable_faster_encoder = enable_faster_encoder
+        self.enable_fast_encoder = enable_fast_encoder
         self.trans_out = kwargs.get("trans_out", False)
 
         self.decoding = InferPegasusDecoding(
@@ -1647,8 +1647,8 @@ class FasterPegasus(PegasusPretrainedModel):
         )
 
         # TODO(gongenlei): Support faster_encoder
-        # if self.enable_faster_encoder:
-        #     # Must use `enable_faster_encoder` in `__init__` when dygraph to static graph.
+        # if self.enable_fast_encoder:
+        #     # Must use `enable_fast_encoder` in `__init__` when dygraph to static graph.
         #     self.encoder = FasterPegasus.enable_faster_encoder_func(self.encoder)
 
     def get_encoder(self):

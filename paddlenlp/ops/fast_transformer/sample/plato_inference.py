@@ -73,8 +73,8 @@ def infer(args):
         position_style=args.position_style,
     )
 
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
 
     config = paddle_infer.Config(
         args.inference_model_dir + "plato.pdmodel", args.inference_model_dir + "plato.pdiparams"

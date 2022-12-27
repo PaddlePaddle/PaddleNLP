@@ -67,8 +67,8 @@ def infer(args):
 
     input_ids = prepare_input(tokenizer, sentences)
 
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
 
     config = paddle_infer.Config(
         os.path.join(args.inference_model_dir, "bart.pdmodel"),

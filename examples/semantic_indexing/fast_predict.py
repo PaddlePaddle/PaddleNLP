@@ -25,7 +25,7 @@ from data import convert_example, create_dataloader, read_text_pair
 
 from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.ops import disable_faster_encoder, enable_faster_encoder
+from paddlenlp.ops import disable_fast_encoder, enable_fast_encoder
 from paddlenlp.transformers import ErnieModel, ErnieTokenizer
 
 
@@ -155,7 +155,7 @@ def do_predict(args):
     )
     model.eval()
     model.load(args.params_path)
-    model = enable_faster_encoder(model, use_fp16=args.use_fp16)
+    model = enable_fast_encoder(model, use_fp16=args.use_fp16)
 
     cosine_sims = []
     for batch_data in valid_data_loader:
@@ -175,7 +175,7 @@ def do_predict(args):
     cosine_sims = np.concatenate(cosine_sims, axis=0)
     for cosine in cosine_sims:
         print("{}".format(cosine))
-    model = disable_faster_encoder(model)
+    model = disable_fast_encoder(model)
 
 
 if __name__ == "__main__":
