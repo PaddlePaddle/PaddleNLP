@@ -19,6 +19,9 @@
 ####################################
 # ${PWD}=PaddleNLP/
 # for logs env
+export Testcase=$3
+export cudaid2=$2
+export cudaid1=$1
 export nlp_dir=${PWD}
 mkdir ${nlp_dir}/logs
 mkdir ${nlp_dir}/model_logs
@@ -43,7 +46,7 @@ nlp2_build (){
     python setup.py bdist_wheel
     python -m pip install --force-reinstall dist/paddlenlp****.whl
 }
-nlp2_build
+# nlp2_build
 python -c 'from visualdl import LogWriter'
 pip list
 set +x
@@ -54,16 +57,15 @@ export P0case_time=0
 export all_P0case_time=0
 declare -A all_P0case_dic
 get_diff_TO_P0case(){
-if [ $3=="all" ];then
+if [[ ${Testcase} =~ "all" ]];then
     P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
     nptag ernie-m clue taskflow transformers)
-elif [ $3=="p0" ];then
+elif [[ ${Testcase} =~ "p0" ]];then
     P0case_list=(glue bert skep gpt ernie-1.0 transformer clue)
 else
-    P0case_list=$3
+    P0case_list=${Testcase}
 fi
-}
 }
 get_diff_TO_P0case
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
@@ -73,7 +75,7 @@ get_diff_TO_P0case
     case_num=1
     for p0case in ${P0case_list[*]};do
         echo -e "\033[35m ---- running P0case $case_num/${#P0case_list[*]}: ${p0case} \033[0m"
-        bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} $1 $2
+        bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
         let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"
