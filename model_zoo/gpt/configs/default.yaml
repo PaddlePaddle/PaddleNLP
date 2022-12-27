@@ -11,18 +11,17 @@ msra_ner:
   do_train: true
 
 glue:
-  model_type: gpt
   model_name_or_path: gpt2-medium-en
   task_name: SST-2
   max_seq_length: 128
-  batch_size: 32  
+  per_device_train_batch_size: 32  
   learning_rate: 2e-5
   num_train_epochs: 3
   logging_steps: 1
   save_steps: 500
   output_dir: ./tmp/
   device: gpu
-  use_amp: False
+  do_train: true
 
 pretrain:
   model_type: gpt
@@ -30,10 +29,13 @@ pretrain:
   input_dir: ./data
   output_dir: output
   weight_decay: 0.01
-  grad_clip: 1.0
   max_steps: 500000
   save_steps: 100000
   decay_steps: 320000
   warmup_rate: 0.01
   micro_batch_size: 4
   device: gpu
+
+generation:
+  model_type: gpt2-cn
+  model_name_or_path: gpt-cpm-small-cn-distill

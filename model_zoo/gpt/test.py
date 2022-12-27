@@ -22,10 +22,6 @@ sys.path.insert(0, CURRENT_DIR)
 sys.path.insert(0, os.path.dirname(os.path.dirname(CURRENT_DIR)))
 
 
-def setup():
-    pass
-
-
 def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
     """parse config file to argv
 
@@ -33,13 +29,8 @@ def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
         config_file (str, optional): the path of config file. Defaults to None.
     """
     # add tag if it's slow test
-    if os.environ.get("slow_test", False):
-        # eg: /path/to/file.json -> /path/to/file, .json
-        config_file_name, file_suffix = os.path.splitext(config_file)
-
-        # eg: /path/to/file.slow.json
-        config_file_name, file_suffix = os.path.splitext(config_file)
-        config_file = f"{config_file_name}.test{file_suffix}"
+    if not os.getenv("slow_test", False):
+        config_file = "./configs/test.yaml"
 
     config_file = os.path.join(CURRENT_DIR, config_file)
 
@@ -54,31 +45,39 @@ def init_argv(config_name: str, config_file: str = "./configs/default.yaml"):
 
 
 def test_pretrain():
-    init_argv("pretrain", config_file="./configs/test.yaml")
+    init_argv("pretrain")
     from run_pretrain_temp import do_train
 
     do_train()
 
 
 def test_run_eval():
-    init_argv("eval", config_file="./configs/test.yaml")
+    init_argv("eval")
     from run_glue import do_train
 
     do_train()
 
 
 def test_run_glue():
-    init_argv("glue", config_file="./configs/test.yaml")
+    init_argv("glue")
     from run_glue import do_train
 
     do_train()
 
 
 def test_msra_ner():
-    init_argv("msra_ner", config_file="./configs/test.yaml")
+    init_argv("msra_ner")
     from run_msra_ner import do_train
 
     do_train()
 
 
-test_pretrain()
+def test_generation():
+    # do not test under the slow_test
+    if not os.getenv("slow_test", False):
+        return
+
+    init_argv("generation")
+    from run_generation import run
+
+    run()
