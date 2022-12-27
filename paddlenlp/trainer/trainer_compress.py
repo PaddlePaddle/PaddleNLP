@@ -93,7 +93,6 @@ def compress(self, custom_evaluate=None):
             input_dir = args.output_dir
             export_model(model=self.model, input_spec=input_spec, path=input_dir)
             output_dir_list = self.quant(input_dir, "ptq")
-        print(output_dir_list)
         if "embeddings" in args.strategy:
             for output_dir in output_dir_list:
                 self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
