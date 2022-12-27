@@ -236,7 +236,7 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
             python ${nlp_dir}/tests/ci/ci_normal_case.py ${Normal_dic[${p0case}]}
             let case_num++
         else
-            bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case}
+            bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
             let case_num++
         fi
     done

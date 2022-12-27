@@ -54,15 +54,16 @@ export P0case_time=0
 export all_P0case_time=0
 declare -A all_P0case_dic
 get_diff_TO_P0case(){
-if [[ ${Testcase} == 'all' ]];then
+if [ $3=="all" ];then
     P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
     nptag ernie-m clue taskflow transformers)
-elif [[ ${Testcase} == 'p0' ]];then
-    P0case_list=(waybill_ie glue bert skep electra gpt ernie-1.0 tinybert transformer ernie-doc clue taskflow)
+elif [ $3=="p0" ];then
+    P0case_list=(glue bert skep gpt ernie-1.0 transformer clue)
 else
-    P0case_list=${Testcase}
+    P0case_list=$3
 fi
+}
 }
 get_diff_TO_P0case
     echo -e "\033[35m =======CI Check P0case========= \033[0m"
@@ -72,7 +73,7 @@ get_diff_TO_P0case
     case_num=1
     for p0case in ${P0case_list[*]};do
         echo -e "\033[35m ---- running P0case $case_num/${#P0case_list[*]}: ${p0case} \033[0m"
-        bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case}
+        bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} $1 $2
         let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"

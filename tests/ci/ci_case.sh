@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
-
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+export nlp_dir=${PWD}
+export log_path=${nlp_dir}/logs
+export cudaid1=$2
+export cudaid1=$3
 print_info(){
 if [ $1 -ne 0 ];then
     if [[ $2 =~ 'tests' ]];then
@@ -800,15 +803,15 @@ print_info $? transformer_deploy_C_FT
 # 23 pet
 pet (){
 path="examples/few_shot/pet"
-python ci_normal_case.py ${path}
+python tests/ci/ci_normal_case.py ${path}
 }
 efl(){
 path="examples/few_shot/efl"
-python ci_normal_case.py ${path}
+python tests/ci/ci_normal_case.py ${path}
 }
 p-tuning(){
 path="examples/few_shot/p-tuning"
-python ci_normal_case.py ${path}
+python tests/ci/ci_normal_case.py ${path}
 }
 #24 simbert
 simbert(){
@@ -1011,6 +1014,7 @@ python -m paddle.distributed.launch run_cmrc2018.py \
     --max_steps 1 \
     --output_dir ./tmp >${log_path}/clue-mrc >>${log_path}/clue-mrc 2>&1
 print_info $? clue-mrc
+}
 #32 textcnn
 textcnn(){
 cd ${nlp_dir}/examples/sentiment_analysis/textcnn
@@ -1042,7 +1046,7 @@ print_info $? textcnn_predict
 #33 taskflow
 taskflow (){
 cd ${nlp_dir}
-python ${nlp_dir}/tests/ci/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
+python tests/ci/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
 transformers(){
