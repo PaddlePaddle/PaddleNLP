@@ -146,29 +146,6 @@ class ErnieLayoutEmbeddings(Layer):
             w_position_embeddings,
         )
 
-    def forward(self, input_ids, bbox=None, token_type_ids=None, position_ids=None):
-        if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-
-            position_ids = seq_length - ones
-            position_ids.stop_gradient = True
-        if token_type_ids is None:
-            token_type_ids = paddle.zeros_like(input_ids, dtype="int64")
-
-        input_embedings = self.word_embeddings(input_ids)
-        position_embeddings = self.position_embeddings(position_ids)
-
-        x1, y1, x2, y2, h, w = self.embeddings._cal_spatial_position_embeddings(bbox)
-
-        token_type_embeddings = self.token_type_embeddings(token_type_ids)
-
-        embeddings = input_embedings + position_embeddings + x1 + y1 + x2 + y2 + h + w + token_type_embeddings
-
-        embeddings = self.layer_norm(embeddings)
-        embeddings = self.dropout(embeddings)
-        return embeddings
-
 
 class ErnieLayoutPretrainedModel(PretrainedModel):
     model_config_file = "config.json"
@@ -704,9 +681,9 @@ class ErnieLayoutModel(ErnieLayoutPretrainedModel):
         input_ids=None,
         bbox=None,
         image=None,
+        attention_mask=None,
         token_type_ids=None,
         position_ids=None,
-        attention_mask=None,
         head_mask=None,
         output_hidden_states=False,
         output_attentions=False,
