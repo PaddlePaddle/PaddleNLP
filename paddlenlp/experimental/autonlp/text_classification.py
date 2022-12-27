@@ -116,37 +116,30 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
         return [
+            # fast learning: high LR, small epoch
             {
                 "preset": "finetune",
                 "language": "Chinese",
                 "trainer_type": "Trainer",
-                "PreprocessArguments.max_length": 128,
                 "EarlyStoppingCallback.early_stopping_patience": 2,
                 "TrainingArguments.per_device_train_batch_size": 16,
                 "TrainingArguments.per_device_eval_batch_size": 16,
                 "TrainingArguments.num_train_epochs": 10,
                 "TrainingArguments.model_name_or_path": "ernie-3.0-base-zh",
-                "TrainingArguments.learning_rate": 1e-5,
+                "TrainingArguments.learning_rate": 3e-5,
             },
+            # slow learning: small LR, rely on early stopping to end training
             {
-                "preset": "prompt",
+                "preset": "finetune",
                 "language": "Chinese",
-                "trainer_type": "PromptTrainer",
-                "template.prompt": hp.choice(
-                    "template.prompt",
-                    [
-                        f"{{'soft'}}{{'text': '{self.text_column}'}}{{'mask'}}",
-                        f"“{{'text': '{self.text_column}'}}”这句话是关于{{'mask'}}的",
-                    ],
-                ),
-                "PreprocessArguments.max_length": 128,
-                "EarlyStoppingCallback.early_stopping_patience": 2,
-                "PromptTuningArguments.per_device_train_batch_size": 16,
-                "PromptTuningArguments.per_device_eval_batch_size": 16,
-                "PromptTuningArguments.num_train_epochs": 10,
-                "PromptTuningArguments.model_name_or_path": "ernie-3.0-base-zh",
-                "PromptTuningArguments.learning_rate": 1e-5,
-            },
+                "trainer_type": "Trainer",
+                "EarlyStoppingCallback.early_stopping_patience": 5,
+                "TrainingArguments.per_device_train_batch_size": 16,
+                "TrainingArguments.per_device_eval_batch_size": 16,
+                "TrainingArguments.num_train_epochs": 100,
+                "TrainingArguments.model_name_or_path": "ernie-3.0-base-zh",
+                "TrainingArguments.learning_rate": 5e-6,
+            }
         ]
 
     def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
@@ -184,14 +177,16 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             if config["trainer_type"] == "Trainer":
                 model_path = config["TrainingArguments.model_name_or_path"]
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
+                model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
                 trans_func = functools.partial(
                     self._preprocess_fn,
                     tokenizer=tokenizer,
-                    max_length=max_length,
+                    max_length=model.config.max_position_embeddings  # truncate to the max length allowed by the model
                 )
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
-                model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
+                max_length = self._calculate_max_length(processed_train_dataset, processed_eval_dataset)
+                # https://www.paddlepaddle.org.cn/documentation/docs/en/api/paddle/device/cuda/get_device_properties_en.html
                 training_args = self._override_arguments(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
@@ -313,7 +308,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
-        result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
+        result = tokenizer(text=example[self.text_column], max_length=max_length)
         if not is_test:
             example_with_labels = self._preprocess_labels(example)
             result["labels"] = example_with_labels["labels"]
@@ -331,5 +326,5 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 model=self.problem_type,
                 task_path=exported_model_path,
                 id2label=self.id2label,
-                max_length=model_config.get("PreprocessArguments.max_length", 128),
+                # max_length=model_config.get("PreprocessArguments.max_length", 128),
             )

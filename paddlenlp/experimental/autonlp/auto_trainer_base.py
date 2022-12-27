@@ -19,7 +19,9 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from hyperopt import hp
+import paddle
 from paddle.io import Dataset
+import numpy as np
 from ray import tune
 from ray.air import RunConfig
 from ray.tune.result_grid import ResultGrid
@@ -106,6 +108,27 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
+
+    @staticmethod
+    def _calculate_max_length(*datasets, quantile:float=1.0) -> int:
+        data_length = []
+        for dataset in datasets:
+            for example in dataset:
+                data_length.append(len(example["input_ids"]))
+        return np.quantile(data_length, quantile, method="nearest")
+    
+    @staticmethod
+    def _calculate_batch_size(model, input, train_dataset) -> int:
+
+#         (16000 - model_size) / (forward_back_ward_size)
+# (16000 - 4.3) / 18.25 = 1148.29
+# rounded to powers of 2 results in batch size 1024
+
+        data_length = []
+        for dataset in datasets:
+            for example in dataset:
+                data_length.append(len(example["input_ids"]))
+        return np.quantile(data_length, quantile, method="nearest")
 
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
