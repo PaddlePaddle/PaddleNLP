@@ -11,13 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
 import unittest
-import paddle
-from paddlenlp.metrics import Perplexity
 
-from util import stable_softmax, cross_entropy
-from common_test import CommonTest
+import numpy as np
+import paddle
+
+from paddlenlp.metrics import Perplexity
+from tests.common_test import CommonTest
+from tests.testing_utils import cross_entropy, stable_softmax
 
 
 class NpPerplexity(object):
