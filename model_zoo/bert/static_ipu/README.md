@@ -20,36 +20,35 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 - Pretraining dataset
 
-   Wikipedia dataset is used to do pretraining. Please refer to the Wikipedia dataset generator provided by [Nvidia](https://github.com/NVIDIA/DeepLearningExamples.git) to generate pretraining dataset.
+  Wikipedia dataset is used to do pretraining. Please refer to the Wikipedia dataset generator provided by [Nvidia](https://github.com/NVIDIA/DeepLearningExamples.git) to generate pretraining dataset.
 
-   The sequence length used in pretraining phase1 and phase2 are: 128 and 384. Following steps are provided for dataset generation.
+  The sequence length used in pretraining phase1 and phase2 are: 128 and 384. Following steps are provided for dataset generation.
 
-   ```bash
-   # Here we use a specific commmit, the latest commit should also be fine.
-   git clone https://github.com/NVIDIA/DeepLearningExamples.git
-   git checkout 88eb3cff2f03dad85035621d041e23a14345999e
+  ```bash
+  # Here we use a specific commmit, the latest commit should also be fine.
+  git clone https://github.com/NVIDIA/DeepLearningExamples.git
+  git checkout 88eb3cff2f03dad85035621d041e23a14345999e
 
-   cd DeepLearningExamples/PyTorch/LanguageModeling/BERT
+  cd DeepLearningExamples/PyTorch/LanguageModeling/BERT
 
-   # Modified the parameters `--max_seq_length 512` to `--max_seq_length 384` at line 50 and
-   # `--max_predictions_per_seq 80` to `--max_predictions_per_seq 56` at line 51.
-   vim data/create_datasets_from_start.sh
+  # Modified the parameters `--max_seq_length 512` to `--max_seq_length 384` at line 50 and
+  # `--max_predictions_per_seq 80` to `--max_predictions_per_seq 56` at line 51.
+  vim data/create_datasets_from_start.sh
 
-   # Build docker image
-   bash scripts/docker/build.sh
+  # Build docker image
+  bash scripts/docker/build.sh
 
-   # Use NV's docker to download and generate hdf5 file. This may requires GPU available.
-   # You can Remove `--gpus $NV_VISIBLE_DEVICES` to avoid GPU requirements.
-   bash scripts/docker/launch.sh
+  # Use NV's docker to download and generate hdf5 file. This may requires GPU available.
+  # You can Remove `--gpus $NV_VISIBLE_DEVICES` to avoid GPU requirements.
+  bash scripts/docker/launch.sh
 
-   # generate dataset with wiki_only
-   bash data/create_datasets_from_start.sh wiki_only
-   ```
+  # generate dataset with wiki_only
+  bash data/create_datasets_from_start.sh wiki_only
+  ```
 
 - SQuAD v1.1 dataset
 
-   SQuAD v1.1 dataset will be downloaded automatically. You don't have to download manually.
-
+  SQuAD v1.1 dataset will be downloaded automatically. You don't have to download manually.
 
 ## Quick Start Guide
 
@@ -59,7 +58,7 @@ This project enabled BERT-Base pre-training and SQuAD fine-tuning task using [Pa
 
 ```bash
 # clone paddle repo
-git clone https://github.com/paddlepaddle/Paddle.git -b release/2.3
+git clone https://github.com/paddlepaddle/Paddle.git -b release/2.4
 cd Paddle
 
 # build docker image
@@ -92,7 +91,7 @@ All of later processes are required to be executed in the container.
 
 ```bash
 # clone paddle repo
-git clone https://github.com/paddlepaddle/Paddle.git -b release/2.3
+git clone https://github.com/paddlepaddle/Paddle.git -b release/2.4
 cd Paddle
 
 mkdir build && cd build

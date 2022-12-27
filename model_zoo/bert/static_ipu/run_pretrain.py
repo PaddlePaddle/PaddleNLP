@@ -78,8 +78,10 @@ def reset_program_state_dict(state_dict, mean=0, scale=0.02):
             continue
 
         dtype_str = "float32"
-        if p._dtype == paddle.float64:
+        if p._dtype() == paddle.float64:
             dtype_str = "float64"
+        elif p._dtype() == paddle.float16:
+            dtype_str = "float16"
 
         if "layer_norm" in n and n.endswith(".w_0"):
             new_state_dict[n] = np.ones(p.shape()).astype(dtype_str)
@@ -273,6 +275,14 @@ def main(args):
         with open(args.load_params_path, "rb") as file:
             params = pickle.load(file)
         paddle.static.set_program_state(main_program, params)
+
+    amp_list = paddle.static.amp.CustomOpLists()
+    amp_list.unsupported_list = {}
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+        main_program, amp_list, use_fp16_guard=False)
+
+    paddle.static.amp.cast_parameters_to_fp16(
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     # Create ipu_strategy
     ipu_strategy = create_ipu_strategy(args)

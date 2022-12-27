@@ -1,4 +1,4 @@
-datasets
+datasets==2.4.0
 h5py
 multiprocess
 numpy

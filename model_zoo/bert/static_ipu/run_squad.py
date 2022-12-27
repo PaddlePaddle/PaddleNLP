@@ -310,6 +310,14 @@ def main(args):
     exe = paddle.static.Executor(place)
     exe.run(startup_program)
 
+    if not args.is_training:
+        amp_list = paddle.static.amp.CustomOpLists()
+        amp_list.unsupported_list = {}
+        to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+            main_program, amp_list, use_fp16_guard=False)
+        paddle.static.amp.cast_parameters_to_fp16(
+            paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
+
     # Set initial weights
     state_dict = main_program.state_dict()
     reset_state_dict = reset_program_state_dict(state_dict)
@@ -333,6 +341,14 @@ def main(args):
         logging.info(f"loading weights from: {args.tf_checkpoint}")
         initializers, _ = load_initializers_from_tf(args.tf_checkpoint, args)
         paddle.static.set_program_state(main_program, initializers)
+
+    if args.is_training:
+        amp_list = paddle.static.amp.CustomOpLists()
+        amp_list.unsupported_list = {}
+        to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+            main_program, amp_list, use_fp16_guard=False)
+        paddle.static.amp.cast_parameters_to_fp16(
+            paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     # Create ipu_strategy
     ipu_strategy = create_ipu_strategy(args)
