@@ -37,12 +37,13 @@ In layman's terms, information extraction is the process of extracting structure
 
 Multiple model selection, satisfying accuracy and speed, and adapting to different information extraction scenarios.
 
-| Model Name | Usage Scenarios | Supporting Tasks |
-| :------------------------------------------------ ----------: | :------------------------------------- -------------------- | :---------------------------- ----------------------- |
-| `uie-base`<br />`uie-medium`<br />`uie-mini`<br />`uie-micro`<br />`uie-nano` | For **plain text** The **extractive** model of the scene supports **Chinese** | has the ability to extract general information such as entities, relationships, events, and comments |
-| `uie-base-en` | An **extractive** model for **plain text** scenarios, supports **English** | has general information extraction capabilities such as entities, relationships, events, comments, etc. |
-| `uie-m-base`<br />`uie-m-large` | An **extractive** model for **plain text** scenarios, supporting **Chinese and English** | with entities, relationships, General information extraction capabilities such as events and comments |
-| <b>`uie-x-base`</b> | An **extractive** model for **plain text** and **document** scenarios, supports **Chinese and English** | supports plain text All the functions of the scene, and also support the end-to-end information extraction of documents/pictures/tables |
+|                           Model Name                           | Usage Scenarios                                                 | Supporting Tasks                                            |
+| :----------------------------------------------------------: | :--------------------------------------------------------- | :--------------------------------------------------- |
+| `uie-base`<br />`uie-medium`<br />`uie-mini`<br />`uie-micro`<br />`uie-nano` | For **plain text** The **extractive** model of the scene supports **Chinese**         | Supports entity, relation, event, opinion extraction |
+|                       `uie-base-en`                          | An **extractive** model for **plain text** scenarios, supports **English**         | Supports entity, relation, event, opinion extraction |
+|                     `uie-m-base`<br />`uie-m-large`          | An **extractive** model for **plain text** scenarios, supporting **Chinese and English**     | Supports entity, relation, event, opinion extraction |
+|                      <b>`uie-x-base`</b>                     | An **extractive** model for **plain text** and **document** scenarios, supports **Chinese and English** | supports plain text All the functions of the scene, and also support the end-to-end information extraction of documents/pictures/tables |
+
 
 <a name="22"></a>
 
