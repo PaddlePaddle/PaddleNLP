@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -25,6 +26,7 @@ from .tokenizer_utils import (
 )
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
+from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
@@ -46,8 +48,12 @@ from .electra.tokenizer import *
 from .electra.converter import *
 from .albert.modeling import *
 from .albert.tokenizer import *
+from .bit.modeling import *
+from .bit.configuration import *
+from .bit.image_processing import *
 from .bart.modeling import *
 from .bart.tokenizer import *
+from .bart.configuration import *
 from .bert_japanese.tokenizer import *
 from .bigbird.modeling import *
 from .bigbird.tokenizer import *
@@ -61,6 +67,9 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
+from .dpt.modeling import *
+from .dpt.configuration import *
+from .dpt.image_processing import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
 from .ernie.configuration import *
@@ -75,6 +84,7 @@ from .ernie_gram.modeling import *
 from .ernie_gram.tokenizer import *
 from .ernie_layout.modeling import *
 from .ernie_layout.tokenizer import *
+from .ernie_layout.configuration import *
 from .ernie_m.configuration import *
 from .ernie_m.modeling import *
 from .ernie_m.tokenizer import *
@@ -92,6 +102,7 @@ from .luke.modeling import *
 from .luke.tokenizer import *
 from .mbart.modeling import *
 from .mbart.tokenizer import *
+from .mbart.configuration import *
 from .megatronbert.modeling import *
 from .megatronbert.tokenizer import *
 from .prophetnet.modeling import *
@@ -123,12 +134,14 @@ from .tinybert.tokenizer import *
 from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
+from .unified_transformer.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
 from .ernie_vil.procesing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
+from .unimo.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
 from .xlnet.converter import *
@@ -144,6 +157,7 @@ from .auto.modeling import *
 from .auto.tokenizer import *
 from .codegen.modeling import *
 from .codegen.tokenizer import *
+from .codegen.configuration import *
 from .artist.modeling import *
 from .artist.tokenizer import *
 from .dallebart.modeling import *
@@ -153,6 +167,7 @@ from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
 from .clip.converter import *
+from .clip.image_processing import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *

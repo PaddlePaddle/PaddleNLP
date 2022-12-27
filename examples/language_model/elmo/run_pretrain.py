@@ -14,14 +14,14 @@
 
 import os
 import time
-import paddle
-import paddle.nn as nn
-from paddle.io import DataLoader
-import paddle.distributed as dist
 
+import paddle
+import paddle.distributed as dist
+import paddle.nn as nn
 from args import parse_args, print_args
+from dataset import OneBillionWordDataset, load_vocab
 from elmo import ELMo, ELMoLoss
-from dataset import load_vocab, OneBillionWordDataset
+from paddle.io import DataLoader
 
 
 def save_params(elmo, optimizer, save_dir, name):
@@ -104,7 +104,7 @@ def train(args):
         if step % args.log_freq == 0:
             print(
                 "step %d/%d - loss: %.4f - Perplexity: %.4f - %.3fs/step"
-                % (step, n_steps_total, loss.numpy()[0], ppl.numpy()[0], total_time / args.log_freq)
+                % (step, n_steps_total, float(loss), float(ppl), total_time / args.log_freq)
             )
             total_time = 0.0
         if rank == 0 and step % args.save_freq == 0:
