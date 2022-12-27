@@ -13,12 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+""" run  release """
 
-# set python env
-
-####################################
-# ${PWD}=PaddleNLP/
-# for logs env
 export Testcase=$3
 export cudaid2=$2
 export cudaid1=$1
@@ -46,7 +42,7 @@ nlp2_build (){
     python setup.py bdist_wheel
     python -m pip install --force-reinstall dist/paddlenlp****.whl
 }
-# nlp2_build
+nlp2_build
 python -c 'from visualdl import LogWriter'
 pip list
 set +x
