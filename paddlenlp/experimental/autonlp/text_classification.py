@@ -115,6 +115,18 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     @property
     def _model_candidates(self) -> List[Dict[str, Any]]:
+        train_batch_size = hp.choice("batch_size", [2, 4, 8, 16, 32])
+        chinese_models = hp.choice(
+            "models",
+            [
+                "ernie-3.0-xbase-zh",  # 20-layer, 1024-hidden, 16-heads, 296M parameters.
+                "ernie-3.0-base-zh",  # 12-layer, 768-hidden, 12-heads, 118M parameters.
+                "ernie-3.0-medium-zh",  # 6-layer, 768-hidden, 12-heads, 75M parameters.
+                "ernie-3.0-mini-zh",  # 6-layer, 384-hidden, 12-heads, 27M parameters
+                "ernie-3.0-micro-zh",  # 4-layer, 384-hidden, 12-heads, 23M parameters
+                "ernie-3.0-nano-zh",  # 4-layer, 312-hidden, 12-heads, 18M parameters.
+            ],
+        )
         return [
             # fast learning: high LR, small epoch
             {
@@ -122,10 +134,10 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "Chinese",
                 "trainer_type": "Trainer",
                 "EarlyStoppingCallback.early_stopping_patience": 2,
-                "TrainingArguments.per_device_train_batch_size": 16,
-                "TrainingArguments.per_device_eval_batch_size": 16,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 10,
-                "TrainingArguments.model_name_or_path": "ernie-3.0-base-zh",
+                "TrainingArguments.model_name_or_path": chinese_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
             # slow learning: small LR, rely on early stopping to end training
@@ -134,12 +146,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "language": "Chinese",
                 "trainer_type": "Trainer",
                 "EarlyStoppingCallback.early_stopping_patience": 5,
-                "TrainingArguments.per_device_train_batch_size": 16,
-                "TrainingArguments.per_device_eval_batch_size": 16,
+                "TrainingArguments.per_device_train_batch_size": train_batch_size,
+                "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
                 "TrainingArguments.num_train_epochs": 100,
-                "TrainingArguments.model_name_or_path": "ernie-3.0-base-zh",
+                "TrainingArguments.model_name_or_path": chinese_models,
                 "TrainingArguments.learning_rate": 5e-6,
-            }
+            },
         ]
 
     def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
@@ -181,7 +193,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 trans_func = functools.partial(
                     self._preprocess_fn,
                     tokenizer=tokenizer,
-                    max_length=model.config.max_position_embeddings  # truncate to the max length allowed by the model
+                    max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
                 )
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
