@@ -104,9 +104,10 @@ class PromptDataCollatorWithPadding:
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_num_option - len(value))
                 elif key == "labels":
-                    max_num_label = max([len(x) for x in values])
-                    for index, value in enumerate(values):
-                        values[index] = value + [-100] * (max_num_label - len(value))
+                    if isinstance(values[0], list):
+                        max_num_label = max([len(x) for x in values])
+                        for index, value in enumerate(values):
+                            values[index] = value + [-100] * (max_num_label - len(value))
                 elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)

@@ -232,7 +232,7 @@ class PromptTrainer(Trainer):
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
             logits, hidden_states = model(**input_dict)
-            loss = self.criterion(logits, labels.astype(logits.dtype))
+            loss = self.criterion(logits, labels)
 
             if self.args.use_rdrop:
                 loss = self._compute_rdrop_loss(model, input_dict, logits, loss)

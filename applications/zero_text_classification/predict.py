@@ -33,7 +33,6 @@ from paddlenlp.transformers import UTC, AutoTokenizer
 class DataArguments:
     test_path: str = field(default="test.txt", metadata={"help": "Test dataset file name."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
-    num_labels: int = field(default=2, metadata={"help": "The threshold to produce predictions."})
 
 
 @dataclass
@@ -85,9 +84,10 @@ def main():
         print(eval_preds.label_ids.shape)
 
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
-        preds = paddle.to_tensor(eval_preds.predictions).reshape([-1, data_args.num_labels])
+        preds = paddle.to_tensor(eval_preds.predictions)
+        print("preds", preds)
+        print("labels", labels)
         preds = paddle.nn.functional.softmax(preds, axis=1)
-        labels = labels.reshape([-1, data_args.num_labels])
         labels = paddle.argmax(labels, axis=1)
         print("preds", preds)
         print("labels", labels)
