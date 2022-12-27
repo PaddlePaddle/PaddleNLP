@@ -858,10 +858,10 @@ class UTCTemplate(Template):
             np.where(np.array(input_dict["input_ids"]) == omask_token_id)[0].squeeze().tolist()
         )
 
-        cls_positions = (
-            np.where(np.array(input_dict["input_ids"]) == self.tokenizer.cls_token_id)[0].squeeze().tolist()
+        sep_positions = (
+            np.where(np.array(input_dict["input_ids"]) == self.tokenizer.sep_token_id)[0].squeeze().tolist()
         )
-        input_dict["cls_positions"] = cls_positions[-1]
+        input_dict["cls_positions"] = sep_positions[1]
 
         # Limit the maximum position ids.
         if self.max_position_id is not None:

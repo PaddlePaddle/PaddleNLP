@@ -231,6 +231,7 @@ class PromptTrainer(Trainer):
         if self.criterion is not None:
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
+
             logits, hidden_states = model(**input_dict)
             loss = self.criterion(logits, labels)
 

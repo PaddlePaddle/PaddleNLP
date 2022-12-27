@@ -174,9 +174,6 @@ class MLMPromptTokenizer(object):
         omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
         input_ids = np.array(input_ids)
         attention_mask = np.ones([len(input_ids), len(input_ids)])
-        pad_index = np.where(input_ids == self.tokenizer.pad_token_id)[0]
-        attention_mask[:, pad_index] = 0
-        attention_mask[pad_index, :] = 0
         omask_index = np.where(input_ids == omask_id)[0].tolist()
         cls_indices = np.where(input_ids == self.tokenizer.cls_token_id)[0]
         sep_indices = np.where(input_ids == self.tokenizer.sep_token_id)[0]
@@ -192,8 +189,7 @@ class MLMPromptTokenizer(object):
                 break
         opt_begin = omask_index[0]
         opt_end = min(cls_index, sep_index)
-        attention_mask[opt_begin:opt_end, :] = 0
-        attention_mask[:, opt_begin:opt_end] = 0
+        attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 0
         omask_index.append(opt_end)
         for opt_begin, opt_end in zip(omask_index[:-1], omask_index[1:]):
             attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 1

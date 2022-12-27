@@ -62,7 +62,7 @@ def main():
     # Define template for preprocess and verbalizer for postprocess.
     prompt = (
         "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True}"
-        "{'cls': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+        "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
     )
     template = UTCTemplate(prompt, tokenizer, training_args.max_seq_length, max_position_id=511)
 

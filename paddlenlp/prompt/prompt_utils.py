@@ -91,7 +91,7 @@ class PromptDataCollatorWithPadding:
                         new_values.extend(value.tolist())
                     values = new_values
                 elif key == "attention_mask":
-                    new_values = np.zeros([len(values), 1, max_length, max_length])
+                    new_values = np.ones([len(values), 1, max_length, max_length]) * -1e12
                     for index, value in enumerate(values):
                         length = len(value)
                         new_values[index][0, :length, :length] = value
