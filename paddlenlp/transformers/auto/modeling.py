@@ -33,6 +33,7 @@ from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = [
+    "AutoBackbone",
     "AutoModel",
     "AutoModelForPretraining",
     "AutoModelForSequenceClassification",
@@ -107,11 +108,14 @@ MAPPING_NAMES = OrderedDict(
         ("OPT", "opt"),
         ("ErnieViL", "ernie_vil"),
         ("Pegasus", "pegasus"),
+        ("DPT", "dpt"),
+        ("Bit", "bit"),
     ]
 )
 
 MAPPING_TASKS = OrderedDict(
     [
+        ("Backbone", "AutoBackbone"),
         ("Model", "AutoModel"),
         ("ForPretraining", "AutoModelForPretraining"),
         ("ForSequenceClassification", "AutoModelForSequenceClassification"),
@@ -132,7 +136,7 @@ MAPPING_TASKS = OrderedDict(
 
 def get_name_mapping(task="Model"):
     """
-    Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
+    Task can be 'Backbone', 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
     'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
     'Generator', 'Discriminator', 'ForConditionalGeneration', 'ForImageGeneration'.
     """
@@ -337,6 +341,49 @@ class _BaseAutoModelClass:
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{resolved_vocab_file}  is not a valid path to a model config file")
+
+
+class AutoBackbone(_BaseAutoModelClass):
+    """
+    AutoBackbone.
+    """
+
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping = get_name_mapping("Backbone")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        """
+        Creates an instance of `AutoBackbone`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): See :class:`AutoModel`.
+            *args (tuple): See :class:`AutoModel`.
+            **kwargs (dict): See :class:`AutoModel`.
+
+        Returns:
+            PretrainedModel: An instance of `AutoBackbone`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import AutoBackbone
+
+                # Name of built-in pretrained model
+                model = AutoBackbone.from_pretrained("google/bit-50")
+                print(type(model))
+                # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
+
+
+                # Load from local directory path
+                model = AutoBackbone.from_pretrained("./bit-50")
+                print(type(model))
+                # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
+        """
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 class AutoModel(_BaseAutoModelClass):

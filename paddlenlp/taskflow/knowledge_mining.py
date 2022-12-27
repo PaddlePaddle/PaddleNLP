@@ -40,6 +40,7 @@ from paddlenlp.utils.tools import compare_version
 from ..datasets import MapDataset, load_dataset
 from ..data import Stack, Pad, Tuple
 from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
+from ..transformers.ernie_ctm.configuration import ErnieCtmConfig
 from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
 from .utils import TermTree, BurkhardKellerTree
 from .utils import Customization, WordTagRelationExtractor
@@ -395,6 +396,7 @@ class WordTagTask(Task):
                     continue
             else:
                 target_type_can = LABEL_TO_SCHEMA[item["wordtag_label"]]
+            high_priority = False
             for target_type_raw in target_type_can:
                 target_type_ = target_type_raw.split("|")
                 target_src = None
@@ -411,14 +413,17 @@ class WordTagTask(Task):
                     term_id = list(filter(lambda d: self._termtree[d].base.startswith(target_src.lower()), term_id))
                     if len(term_id) == 0:
                         continue
-                term_id.sort(
-                    key=lambda d: (
-                        self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype,
-                        self._termtree[d].term == item["item"],
-                    ),
-                    reverse=True,
-                )
-                item["termid"] = term_id[0]
+
+                term_id.sort(key=lambda d: (self._termtree[
+                    d].termtype == target_type or target_type in self._termtree[
+                        d].subtype, self._termtree[d].term == item["item"]),
+                             reverse=True)
+                if self._termtree[term_id[0]].term == item["item"]:
+                    high_priority = True
+                    item["termid"] = term_id[0]
+                if high_priority:
+                    break
+
 
     def _construct_input_spec(self):
         """
@@ -434,7 +439,11 @@ class WordTagTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = ErnieCtmWordtagModel.from_pretrained(self._task_path, num_tag=len(self._tags_to_index))
+
+        model_config = ErnieCtmConfig.from_pretrained(self._task_path, num_labels=len(self._tags_to_index))
+        model_instance = ErnieCtmWordtagModel.from_pretrained(
+            self._task_path, config=model_config)
+
         if self._params_path is not None:
             state_dict = paddle.load(self._params_path)
             model_instance.set_dict(state_dict)

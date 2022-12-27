@@ -15,12 +15,11 @@
 import os
 
 import paddle
-import paddle.fluid.core as core
 import paddle.nn as nn
 
-from paddlenlp.experimental import FasterTokenizer, FasterPretrainedModel
-from paddlenlp.transformers.model_utils import register_base_model
+from paddlenlp.experimental import FasterPretrainedModel, FasterTokenizer
 from paddlenlp.transformers.ernie.modeling import ErnieEmbeddings, ErniePooler
+from paddlenlp.transformers.model_utils import register_base_model
 
 __all__ = ["FasterErnieModel", "FasterErnieForSequenceClassification", "FasterErnieForTokenClassification"]
 

@@ -13,17 +13,18 @@
 # limitations under the License.
 
 import unittest
-from unittest import TestCase
+
 from paddle import nn
-from tests.testing_utils import slow
-from paddlenlp.utils.converter import Converter, StateDictKeysChecker
+
 from paddlenlp.transformers import (
-    PretrainedModel,
-    BertModel,
     BertConfig,
-    BertForTokenClassification,
     BertForSequenceClassification,
+    BertForTokenClassification,
+    BertModel,
+    PretrainedModel,
 )
+from paddlenlp.utils.converter import Converter, StateDictKeysChecker
+from tests.testing_utils import require_package, slow
 
 
 class TestPretrainedModel(PretrainedModel):
@@ -59,11 +60,13 @@ class TestConverter(unittest.TestCase):
 
         self.downstream_model = DownstreamModel()
 
+    @require_package("torch")
     def test_base_base_checking(self):
         checker = StateDictKeysChecker(self.base_model, Converter.get_model_state_dict(self.base_model, True))
         diff_keys = checker.get_diff_keys()
         self.assertEqual(len(diff_keys), 0)
 
+    @require_package("torch")
     def test_base_downstream_checking(self):
         checker = StateDictKeysChecker(self.base_model, Converter.get_model_state_dict(self.downstream_model, True))
 
@@ -73,6 +76,7 @@ class TestConverter(unittest.TestCase):
         mismatched_keys = checker.get_mismatched_keys()
         self.assertEqual(len(mismatched_keys), 0)
 
+    @require_package("torch")
     def test_downstream_base_checking(self):
         checker = StateDictKeysChecker(self.downstream_model, Converter.get_model_state_dict(self.base_model, True))
 
@@ -82,6 +86,7 @@ class TestConverter(unittest.TestCase):
         mismatched_keys = checker.get_mismatched_keys()
         self.assertEqual(len(mismatched_keys), 4)
 
+    @require_package("torch")
     def test_downstream_downstream_checking(self):
         checker = StateDictKeysChecker(
             self.downstream_model, Converter.get_model_state_dict(SecondDownstreamModel(), True)
@@ -94,6 +99,7 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(len(mismatched_keys), 4)
 
     @slow
+    @require_package("torch")
     def test_bert_case(self):
         config = BertConfig()
         bert_model = BertModel(config)

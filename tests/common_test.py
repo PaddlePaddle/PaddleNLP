@@ -11,10 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
 import unittest
-import paddle
 import warnings
+
+import numpy as np
+import paddle
 
 __all__ = ["CommonTest", "CpuCommonTest"]
 
@@ -92,7 +93,7 @@ class CommonTest(unittest.TestCase):
         error_msg = "Output has diff at place:{}. \nExpect: {} \nBut Got: {} in class {}"
         if result_t in [list, tuple]:
             result_t = get_container_type(result)
-        if result_t in [str, int, bool, set, np.bool, np.int32, np.int64, np.str]:
+        if result_t in [str, int, bool, set, bool, np.int32, np.int64]:
             assertForNormalType(
                 result,
                 expected_result,
