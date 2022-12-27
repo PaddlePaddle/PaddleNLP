@@ -695,6 +695,9 @@ public:
     PRINT_FUNC_NAME_();
 #endif
     const int m = l_parallel_param_.local_batch_size;
+    if (inner_size_ <= 0) {
+      inner_size_ = inner_coeff_ * t_parallel_param_.local_hidden_units_;
+    }
     try {
       /* masked multi-head attention */
       /* layernorm(from_tensor) -> norm_from_tensor_buf_ */

@@ -900,7 +900,7 @@ class FasterGPT(GPTPretrainedModel):
 
 class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterUnifiedTransformer, self).__init__()
+        super(FasterUnifiedTransformer, self).__init__(model.config)
         self._model = model
         self._use_fp16_decoding = use_fp16_decoding
         self.vocab_size = model.lm_head.decoder_bias.shape[0]
@@ -1104,7 +1104,7 @@ class FasterUnifiedTransformer(UnifiedTransformerPretrainedModel):
 
 class FasterUNIMOText(UNIMOPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, **kwargs):
-        super(FasterUNIMOText, self).__init__()
+        super(FasterUNIMOText, self).__init__(model.config)
         self._model = model
         self._use_fp16_decoding = use_fp16_decoding
         self.unk_token_id = self._model.unk_token_id
@@ -1277,7 +1277,7 @@ class FasterBART(BartPretrainedModel):
     enable_faster_encoder_func = enable_faster_encoder
 
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_faster_encoder=True):
-        super(FasterBART, self).__init__()
+        super(FasterBART, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         if use_fp16_decoding:
@@ -1373,7 +1373,7 @@ class FasterMBART(MBartPretrainedModel):
     enable_faster_encoder_func = enable_faster_encoder
 
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, enable_faster_encoder=False):
-        super(FasterMBART, self).__init__()
+        super(FasterMBART, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         if use_fp16_decoding:
@@ -1562,7 +1562,7 @@ class FasterGPTJ(GPTJPretrainedModel):
 
 class FasterCodeGen(CodeGenPreTrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterCodeGen, self).__init__()
+        super(FasterCodeGen, self).__init__(model.config)
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptJDecoding(
@@ -1747,7 +1747,7 @@ class FasterPegasus(PegasusPretrainedModel):
 
 class FasterT5(T5PretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterT5, self).__init__()
+        super(FasterT5, self).__init__(model.config)
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         if use_fp16_decoding:

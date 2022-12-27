@@ -3146,7 +3146,7 @@ class InferBartDecoding(nn.Layer):
         for arg, value in locals().items():
             if arg not in ["self", "model", "word_embedding", "positional_embedding", "linear"]:
                 setattr(self, "_" + arg, value)
-        self._num_decoder_layers = model.bart.config["num_decoder_layers"]
+        self._num_decoder_layers = model.bart.config["decoder_layers"]
         self._n_head = model.bart.config["decoder_attention_heads"]
         self._d_model = model.bart.config["d_model"]
 
@@ -3391,7 +3391,7 @@ class InferMBartDecoding(nn.Layer):
         for arg, value in locals().items():
             if arg not in ["self", "model", "word_embedding", "positional_embedding", "linear"]:
                 setattr(self, "_" + arg, value)
-        self._num_decoder_layers = model.mbart.config["num_decoder_layers"]
+        self._num_decoder_layers = model.mbart.config["decoder_layers"]
         self._n_head = model.mbart.config["decoder_attention_heads"]
         self._d_model = model.mbart.config["d_model"]
 

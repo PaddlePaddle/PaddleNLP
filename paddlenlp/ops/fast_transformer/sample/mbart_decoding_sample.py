@@ -85,9 +85,9 @@ def do_predict(args):
     place = "gpu"
     paddle.set_device(place)
 
-    tokenizer = MBartTokenizer.from_pretrained(args.model_name_or_path)
+    tokenizer = MBartTokenizer.from_pretrained(args.model_name_or_path, src_lang="en_XX")
     logger.info("Loading the model parameters, please wait...")
-    model = MBartForConditionalGeneration.from_pretrained(args.model_name_or_path, src_lang="en_XX")
+    model = MBartForConditionalGeneration.from_pretrained(args.model_name_or_path)
     # Set evaluate mode
     model.eval()
     sentences = [
