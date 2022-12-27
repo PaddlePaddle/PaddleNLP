@@ -12,23 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import os
 from functools import partial
 
 import paddle
 import paddle.nn as nn
-
-# import paddle.nn.functional as F
 from paddle.metric import Accuracy
-
-# sys.path.insert(0, os.path.abspath("."))
 from sequence_classification import clue_trans_fn, seq_trans_fn
 from utils import ALL_DATASETS, DataArguments, ModelArguments
 
 import paddlenlp
-
-# import paddlenlp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
@@ -82,7 +75,7 @@ def main():
             for arg in vars(args):
                 if arg in config.keys():
                     setattr(args, arg, config[arg])
-        config["batch_size"] = 32
+
         training_args.per_device_train_batch_size = config["batch_size"]
         training_args.per_device_eval_batch_size = config["batch_size"]
 
@@ -117,9 +110,6 @@ def main():
     if training_args.do_predict:
         test_dataset = raw_datasets["test"].map(trans_fn)
 
-    training_args.skip_memory_metrics = False
-    training_args.num_train_epochs = 1
-
     # Define the metrics of tasks.
     def compute_metrics(p):
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -127,7 +117,6 @@ def main():
         preds = paddle.to_tensor(preds)
         label = paddle.to_tensor(p.label_ids)
 
-        # probs = F.softmax(preds, axis=1)
         metric = Accuracy()
         metric.reset()
         result = metric.compute(preds, label)
