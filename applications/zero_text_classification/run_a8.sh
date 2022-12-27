@@ -13,7 +13,7 @@
 # limitations under the License.
 
 #device=$1
-python -m paddle.distributed.launch --gpus "2,5,6" train.py \
+python -m paddle.distributed.launch --gpus "5,6,2" train.py \
     --dataset_dir data_v4 \
     --output_dir ckpt_v4_12271738 \
     --shuffle_choices True \
@@ -21,9 +21,9 @@ python -m paddle.distributed.launch --gpus "2,5,6" train.py \
     --do_eval \
     --num_train_epochs 10 \
     --learning_rate 2e-5 \
-    --eval_steps 1000 \
-    --save_steps 1000 \
-    --logging_steps 10 \
+    --eval_steps 500 \
+    --save_steps 500 \
+    --logging_steps 5 \
     --per_device_train_batch_size 4 \
     --per_device_eval_batch_size 4 \
     --gradient_accumulation_steps 8 \

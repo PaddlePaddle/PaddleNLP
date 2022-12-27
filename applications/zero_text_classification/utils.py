@@ -58,7 +58,9 @@ def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test
                     example["choices"] = [example["choices"][index] for index in rand_index]
                     if not is_test:
                         example["labels"] = [example["labels"][index] for index in rand_index]
-                yield example
+                std_keys = ["text_a", "text_b", "question", "choices", "labels"]
+                std_example = {k: example[k] for k in std_keys}
+                yield std_example
 
 
 class BCEWithLogitsLossPaddedWithMinusOne(BCEWithLogitsLoss):
