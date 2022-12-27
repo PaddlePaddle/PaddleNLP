@@ -15,7 +15,7 @@
 import os.path
 import subprocess
 
-from paddlenlp.utils.downloader import get_path_from_url_with_filelock, url_file_exists
+from paddlenlp.utils.downloader import _download, url_file_exists
 from paddlenlp.utils.env import PACKAGE_HOME
 from paddlenlp.utils.log import logger
 
@@ -40,7 +40,7 @@ def install_package_from_bos(package_name: str, tag: str):
     file_path = os.path.join(PACKAGE_HOME, file_name)
 
     # force download
-    file_path = get_path_from_url_with_filelock(package_url, PACKAGE_HOME, check_exist=False)
+    file_path = _download(package_url, PACKAGE_HOME)
 
     # force reinstall the local package but ignore the dependencies
     command = f"python -m pip install --force-reinstall --no-dependencies {file_path}".split()
