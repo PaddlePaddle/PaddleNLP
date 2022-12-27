@@ -16,12 +16,11 @@ import argparse
 from functools import partial
 
 import paddle
-from model import UIE
-from span import SpanEvaluator
 from utils import convert_example, reader, unify_prompt_name
 
 from paddlenlp.datasets import MapDataset, load_dataset
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.metrics import SpanEvaluator
+from paddlenlp.transformers import UIE, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -87,7 +86,7 @@ if __name__ == "__main__":
     parser.add_argument("--batch_size", type=int, default=16, help="Batch size per GPU/CPU for training.")
     parser.add_argument("--max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization.")
     parser.add_argument("--debug", action='store_true', help="Precision, recall and F1 score are calculated for each class separately if this option is enabled.")
-    parser.add_argument("--limit", type=float, default=0.5, help="The limit when using SpanEvaluator")
+    parser.add_argument("--limit", type=float, default=0.5, help="The limit when using SpanEvaluator, when the last dimension in probability arrays is greater than the limit, the corresponding span will be returned.")
 
     args = parser.parse_args()
     # yapf: enable

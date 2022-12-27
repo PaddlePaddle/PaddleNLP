@@ -19,13 +19,11 @@ from functools import partial
 
 import paddle
 from evaluate import evaluate
-from model import UIE
-from paddle.utils.download import get_path_from_url
-from utils import MODEL_MAP, convert_example, reader, set_seed
+from utils import convert_example, reader, set_seed
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.metrics import SpanEvaluator
-from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.transformers import UIE, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -36,14 +34,6 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(args.seed)
-
-    resource_file_urls = MODEL_MAP[args.model]["resource_file_urls"]
-
-    logger.info("Downloading resource files...")
-    for key, val in resource_file_urls.items():
-        file_path = os.path.join(args.model, key)
-        if not os.path.exists(file_path):
-            get_path_from_url(val, args.model)
 
     tokenizer = AutoTokenizer.from_pretrained(args.model)
     model = UIE.from_pretrained(args.model)

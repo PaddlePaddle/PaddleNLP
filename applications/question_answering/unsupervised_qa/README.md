@@ -24,11 +24,11 @@
   - [References](#References)
 
 ## 简介
-问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的QA问答对。
+问答（QA）系统中最关键的挑战之一是标记数据的稀缺性，这是因为对目标领域获取问答对或常见问答对（FAQ）的成本很高，需要消耗大量的人力和时间。由于上述制约，这导致检索式问答系统落地困难，解决此问题的一种方法是依据问题上下文或大量非结构化文本自动生成的QA问答对。
 
-在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](../faq_system/README.md)，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
+在此背景下，无监督检索式问答系统（即问答对自动生成智能检索式问答），基于PaddleNLP[问题生成](../../../examples/question_generation/README.md)、[UIE](../../../model_zoo/uie/README.md)、[检索式问答](../supervised_qa/faq_finance/README.md)，支持以非结构化文本形式为上下文自动生成QA问答对，生成的问答对语料可以通过无监督的方式构建检索式问答系统。
 
-若已有FAQ语料，请参考[supervised_qa](../supervised_qa)。
+若开发者已有FAQ语料，请参考[supervised_qa](../supervised_qa)。
 
 ### 项目优势
 具体来说，本项目具有以下优势：
@@ -55,20 +55,20 @@
 **问答对生成**：问答对生成使用的指标是软召回率Recall@K，
 **语义索引**：语义索引使用的指标是Recall@K，表示的是预测的前topK（从最后的按得分排序的召回列表中返回前K个结果）结果和语料库中真实的前K个相关结果的重叠率，衡量的是检索系统的查全率。 -->
 ### 流程图
-本项目的流程图如下，对于给定的非结构化文本，我们首先通过答案抽取、问题生成、以及问答对过滤模块，得到大量语料相关的问答对。针对这得到的问答对，用户可以通过可以人工筛查和删除的方式来调整生成的问答对，也可以进一步添加人工标注的问答对。随后开发者就可以通过语义索引模块，来构建向量索引库。在构造完索引库之后，我们就可以通过召回模块和排序模块对问答对进行查询，得到最终的查询结果。
+本项目的流程图如下，对于给定的非结构化文本，我们首先通过答案抽取、问题生成、以及往返过滤模块，得到大量语料相关的问答对。针对这些得到的问答对，用户可以通过可以人工筛查和删除的方式来调整生成的问答对，也可以进一步添加人工标注的问答对。随后开发者就可以通过语义索引模块，来构建向量索引库。在构造完索引库之后，我们就可以通过召回模块和排序模块对问答对进行查询，得到最终的查询结果。
 
 <div align="center">
-    <img width="900" alt="image" src="https://user-images.githubusercontent.com/20476674/208813932-b39d0853-8b18-454a-978f-4350d65f30c2.jpg">
+    <img width="700" alt="image" src="https://user-images.githubusercontent.com/20476674/208813932-b39d0853-8b18-454a-978f-4350d65f30c2.jpg">
 </div>
 
 ### 技术方案
-由于本项目涉及较多的模块，本项目将基于PaddleNLP Pipelines进行模块的组合和项目的构建。PaddleNLP Pipelines是一个端到端NLP流水线系统框架，它可以通过插拔式组件产线化设计来构建一个完整的无监督问答系统。具体来说，我们的技术方案包含以下方面：
+由于涉及较多的模块，本项目将基于PaddleNLP Pipelines进行模块的组合和项目的构建。PaddleNLP Pipelines是一个端到端NLP流水线系统框架，它可以通过插拔式组件产线化设计来构建一个完整的无监督问答系统。具体来说，我们的技术方案包含以下方面：
 
 **答案抽取**：我们基于UIE训练了一个答案抽取模型，该答案抽取模型接收“答案”作为提示词，该模型可以用来对潜在的答案信息进行挖掘抽取，我们同时提供了训练好的模型权重`uie-base-answer-extractor`。
 
 **问题生成**：我们基于中文预训练语言模型UNIMO-Text、模版策略和大规模多领域问题生成数据集训练了一个通用点问题生成预训练模型`unimo-text-1.0-question-generation`。
 
-**往返过滤**：我们采用过生成（overgenerate）的策略生成大量的潜在答案和问题，并通过往返过滤的方式针对生成的过量问答对进行过滤得到最终的问答对。我们的往返过滤模块需要训练一个有条件抽取式问答模型。
+**往返过滤**：我们采用过生成（overgenerate）的策略生成大量的潜在答案和问题，并通过往返过滤的方式针对生成的过量问答对进行过滤得到最终的问答对。我们的往返过滤模块需要训练一个有条件抽取式问答模型<sup>3</sup>。
 
 **语义索引**：针对给定问答对语料，我们基于RocketQA（即`rocketqa-zh-base-query-encoder`）对问答对进行语义向量化，并通过ElasticSearch的ANN服务构建索引库。
 
@@ -135,7 +135,7 @@ python run_pipelines_example.py --device cpu --source_file data/source_file.txt 
 ### 离线问答对语料构建
 这一部分介绍如何离线构建问答对语料，同时我们我们也在Pipeline中集成了在线问答对语料。
 #### 数据说明
-我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，系统将基于此构建索引库，该文件可直接下载放入`data`，开发者也可以使用自己的文件。
+我们以提供的纯文本文件[source_file.txt](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/source_file.txt)为例，系统将每一条都视为一个上下文并基于此生成多个问答对，随后系统将根据这些问答对构建索引库，该文件可直接下载放入`data`，开发者也可以使用自己的文件。
 
 #### 问答对生成
 对于标准场景的问答对可以直接使用提供的预训练模型实现零样本（zero-shot）问答对生成。对于细分场景开发者可以根据个人需求训练[自定义模型](#自定义模型)，加载自定义模型进行问答对生成，以进一步提升效果。
@@ -229,7 +229,7 @@ python -u run_corpus_preparation.py \
 #### 自定义数据
 在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
 
-这里我们提供预先标注好的文件样例[train.json]()和[dev.json]()，可直接下载放入`data`目录，开发者也可自行构建本地数据集，具体来说，本地数据集主要包含以下文件：
+这里我们提供预先标注好的文件样例[train.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/train.json)和[dev.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/test.json)，开发者可直接下载放入`data`目录，此外也可自行构建本地数据集，具体来说，本地数据集主要包含以下文件：
 ```text
 data
 ├── train.json # 训练数据集文件
@@ -264,6 +264,11 @@ python -u run_data_preprocess.py \
     --source_file_path data/train.json \
     --target_dir data/finetune \
     --do_answer_prompt
+
+python -u run_data_preprocess.py \
+  --source_file_path data/dev.json \
+  --target_dir data/finetune \
+  --do_answer_prompt
 ```
 关键参数释义如下：
 - `source_file_path` 指示了要转换的训练数据集文件或测试数据集文件，文件格式要求见[自定义数据](#自定义数据)部分。
@@ -277,15 +282,15 @@ python -u run_data_preprocess.py \
 
 ### 模型微调
 #### 答案抽取
-运行如下命令即可在样例训练集上微调答案抽取模型。
+运行如下命令即可在样例训练集上微调答案抽取模型，用户可以选择基于`uie-base-answer-extractor`进行微调，或者基于`uie-base`等从头开始微调。
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extraction finetune/answer_extraction_and_filtration/finetune.py \
-    --train_path=data/finetune/answer_extration/train.json \
-    --dev_path=data/finetune/answer_extration/dev.json \
-    --save_dir=log/answer_extration/checkpoints \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extraction finetune/answer_extraction_and_roundtrip_filtration/finetune.py \
+    --train_path=data/finetune/answer_extraction/train.json \
+    --dev_path=data/finetune/answer_extraction/dev.json \
+    --save_dir=log/answer_extraction/checkpoints \
     --learning_rate=1e-5 \
     --batch_size=16 \
     --max_seq_len=512 \
@@ -293,7 +298,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extract
     --model=uie-base \
     --seed=1000 \
     --logging_steps=100 \
-    --valid_steps=5000 \
+    --valid_steps=100 \
     --device=gpu
 ```
 关键参数释义如下：
@@ -304,8 +309,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extract
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为30。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base-answer-extractor`，`uie-base`,`uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `init_from_ckpt`: 用于初始化的模型参数的路径。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
@@ -316,11 +320,12 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/answer_extract
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python finetune/answer_generation/evaluate.py \
-    --model_path=log/answer_extration/checkpoints/model_best \
-    --test_path=data/finetune/answer_extration/dev.json  \
+python finetune/answer_extraction_and_roundtrip_filtration/evaluate.py \
+    --model_path=log/answer_extraction/checkpoints/model_best \
+    --test_path=data/finetune/answer_extraction/dev.json  \
     --batch_size=16 \
-    --max_seq_len=512
+    --max_seq_len=512 \
+    --limit=0.01
 ```
 
 关键参数释义如下：
@@ -330,6 +335,8 @@ python finetune/answer_generation/evaluate.py \
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
+- `limit`: SpanEvaluator测评指标的`limit`，当概率数组中的最后一个维度大于该值时将返回相应的文本片段；当limit设置为0.01时表示关注模型的召回率，也即答案的覆盖率。
+
 #### 问题生成
 运行如下命令即可在样例训练集上微调问题生成模型，并在样例验证集上进行验证。
 ```shell
@@ -399,12 +406,12 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/question_gener
 
 
 #### 过滤模型
-运行如下命令即可在样例训练集上微调过滤模型。
+运行如下命令即可在样例训练集上微调答案抽取模型，用户可以选择基于`uie-base-qa-filter`进行微调，或者基于`uie-base`等从头开始微调。
 ```shell
 # GPU启动，参数`--gpus`指定训练所用的GPU卡号，可以是单卡，也可以多卡
 # 例如使用1号和2号卡，则：`--gpu 1,2`
 unset CUDA_VISIBLE_DEVICES
-python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration answer_extraction_and_filtration/finetune.py \
+python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration finetune/answer_extraction_and_roundtrip_filtration/finetune.py \
     --train_path=data/finetune/filtration/train.json \
     --dev_path=data/finetune/filtration/dev.json \
     --save_dir=log/filtration/checkpoints \
@@ -426,7 +433,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration ans
 - `batch_size`: 批处理大小，请结合机器情况进行调整，默认为16。
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `num_epochs`: 训练轮数，默认为30。
-- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
+- `model`: 选择模型，程序会基于选择的模型进行模型微调，可选有`uie-base-qa-filter`，`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `init_from_ckpt`: 用于初始化的模型参数的路径。
 - `seed`: 随机种子，默认为1000.
 - `logging_steps`: 日志打印的间隔steps数，默认10。
@@ -437,11 +444,12 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration ans
 通过运行以下命令在样例验证集上进行模型评估：
 
 ```shell
-python filtration/evaluate.py \
+python finetune/answer_extraction_and_roundtrip_filtration/evaluate.py \
     --model_path=log/filtration/checkpoints/model_best \
     --test_path=data/finetune/filtration/dev.json  \
     --batch_size=16 \
-    --max_seq_len=512
+    --max_seq_len=512 \
+    --limit=0.5
 ```
 
 关键参数释义如下：
@@ -451,7 +459,7 @@ python filtration/evaluate.py \
 - `max_seq_len`: 文本最大切分长度，输入超过最大长度时会对输入文本进行自动切分，默认为512。
 - `model`: 选择所使用的模型，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`和`uie-nano`，默认为`uie-base`。
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
-
+- `limit`: SpanEvaluator测评指标的`limit`，当概率数组中的最后一个维度大于该值时将返回相应的文本片段。
 
 #### 语义索引和召回模型
 我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/faq_finance)。
@@ -461,5 +469,12 @@ python filtration/evaluate.py \
 我们的排序模型是基于RocketQA的CrossEncoder训练的单塔模型，该模型用于搜索的排序阶段，对召回的结果进行重新排序的作用。关于排序的定制训练，可以参考[CrossEncoder](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/ranking/cross_encoder)。
 
 ## References
-Zheng, Chujie, and Minlie Huang. "Exploring prompt-based few-shot learning for grounded dialog generation." arXiv preprint arXiv:2109.06513 (2021).
-Li, Wei, et al. "Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning." arXiv preprint arXiv:2012.15409 (2020).
+[1] Zheng, Chujie, and Minlie Huang. "Exploring prompt-based few-shot learning for grounded dialog generation." arXiv preprint arXiv:2109.06513 (2021).
+
+[2] Li, Wei, et al. "Unimo: Towards unified-modal understanding and generation via cross-modal contrastive learning." arXiv preprint arXiv:2012.15409 (2020).
+
+[3] Puri, Raul, et al. "Training question answering models from synthetic data." arXiv preprint arXiv:2002.09599 (2020).
+
+[4] Lewis, Patrick, et al. "Paq: 65 million probably-asked questions and what you can do with them." Transactions of the Association for Computational Linguistics 9 (2021): 1098-1115.
+
+[5] Alberti, Chris, et al. "Synthetic QA corpora generation with roundtrip consistency." arXiv preprint arXiv:1906.05416 (2019).
