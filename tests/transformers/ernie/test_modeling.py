@@ -439,7 +439,7 @@ class ErnieModelTest(ModelTesterMixin, unittest.TestCase):
 class ErnieModelIntegrationTest(unittest.TestCase, ModelTesterPretrainedMixin):
     base_model_class = ErniePretrainedModel
     hf_remote_test_model_path = "PaddleCI/tiny-random-ernie"
-    paddlehub_remote_test_model_path = "__internal_testing__/ernie"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-ernie"
 
     @slow
     def test_inference_no_attention(self):

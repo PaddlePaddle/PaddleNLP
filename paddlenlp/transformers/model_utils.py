@@ -166,6 +166,15 @@ def register_base_model(cls):
     return cls
 
 
+class BackboneMixin:
+    def forward_with_filtered_kwargs(self, *args, **kwargs):
+
+        signature = dict(inspect.signature(self.forward).parameters)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
+
+        return self(*args, **filtered_kwargs)
+
+
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedModel(Layer, GenerationMixin):
     """
@@ -269,6 +278,28 @@ class PretrainedModel(Layer, GenerationMixin):
         if not self.constructed_from_pretrained_config():
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
+
+    def __getattr__(self, name):
+        """
+        called when the attribute name is missed in the model
+
+        Args:
+            name: the name of attribute
+
+        Returns: the value of attribute
+
+        """
+        try:
+            return super(PretrainedModel, self).__getattr__(name)
+        except AttributeError:
+            result = getattr(self.config, name)
+
+            # FIXME(wj-Mcat): there are a lot of consistent errors, so temporary disable.
+            # logger.warning(
+            #     f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
+            #     f"Instead, do `model.config.{name}`"
+            # )
+            return result
 
     @property
     def base_model(self):

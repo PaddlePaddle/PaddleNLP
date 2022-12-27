@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import datetime
 import math
 import random
@@ -385,6 +386,13 @@ class GPTModelTester:
 
         return config, inputs_dict
 
+    def prepare_config_and_inputs_for_gpt(self):
+        config = self.get_config()
+        # excluding eos_token_id which is equal to vocab_size - 1
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size - 1, dtype="int64")
+        inputs_dict = {"input_ids": input_ids}
+        return config, inputs_dict
+
 
 @parameterized_class(
     ("return_dict", "use_labels"),
@@ -449,6 +457,41 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
     def test_gpt_weight_initialization(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_gpt_weight_initialization(*config_and_inputs)
+
+    def test_inputs_embeds(self):
+        # NOTE: rewrite test inputs embeds for gpt model since couldn't detect eos token id from inputs_embeds
+        # get config for model and inputs_dict for model forward
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_gpt()
+        # test all model classes
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            inputs = copy.deepcopy(self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids", encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids)
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids)
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
+
+            with paddle.no_grad():
+                embeds_output = model(**inputs)
+
+            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
 
     @slow
     def test_batch_generation(self):
