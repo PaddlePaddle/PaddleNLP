@@ -23,9 +23,9 @@ from typing import Optional
 import lr
 import numpy as np
 import paddle
+from args import parse_config_file
 from dataset import GPTDataset, get_train_valid_test_split_
 
-from paddlenlp.data import Stack, Tuple
 from paddlenlp.ops import Topology
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -195,12 +195,7 @@ def create_pretrained_dataset(
 
 class PretrainingTrainer(Trainer):
     def evaluate(self, eval_dataset=None, ignore_keys=None, metric_key_prefix: str = "eval"):
-        eval_dataloader = getattr(self, "eval_dataloader", None)
-        if eval_dataloader is None:
-            eval_dataset = self.eval_dataset if eval_dataset is None else eval_dataset
-            eval_dataloader = self.get_eval_dataloader(eval_dataset)
-            # must call data loader, otherwise, it will init many times, cause OOM error.
-            self.eval_dataloader = eval_dataloader()
+        eval_dataloader = self.get_eval_dataloader(eval_dataset)
 
         start_time = time.time()
         # Temporarily disable metric computation, we will do it in the loop here.
@@ -210,12 +205,8 @@ class PretrainingTrainer(Trainer):
         output = eval_loop(
             eval_dataloader,
             description="Evaluation",
-            # No point gathering the predictions if there are no metrics, otherwise we defer to
-            # self.args.prediction_loss_only
             prediction_loss_only=True if compute_metrics is None else None,
             ignore_keys=ignore_keys,
-            # Only evaluate max_eval_iters
-            max_eval_iters=self.args.eval_iters,
         )
 
         total_batch_size = self.args.eval_batch_size * self.args.world_size
@@ -232,6 +223,29 @@ class PretrainingTrainer(Trainer):
 
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
         return output.metrics
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        labels = inputs.pop("labels")
+        loss_mask = inputs.pop("loss_mask")
+
+        outputs = model(**inputs)
+
+        loss = self.criterion(outputs, labels, loss_mask=loss_mask)
+        outputs = (loss, outputs)
+
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+
+        return (loss, outputs) if return_outputs else loss
 
     def _get_eval_sampler(self, eval_dataset) -> Optional[paddle.io.Sampler]:
         return DistributedBatchSampler(
@@ -252,6 +266,26 @@ class PretrainingTrainer(Trainer):
             rank=self.args.process_index,
             drop_last=self.args.dataloader_drop_last,
         )
+
+
+def data_collator(*args, **kwargs):
+    tokens, loss_mask, attention_mask, position_ids, labels = [], [], [], [], []
+    batch = args[0]
+
+    for item in batch:
+        tokens.append(item[0])
+        loss_mask.append(item[1])
+        attention_mask.append(item[2])
+        position_ids.append(item[3])
+        labels.append(item[4])
+
+    return {
+        "input_ids": np.array(tokens),
+        "loss_mask": np.array(loss_mask),
+        "attention_mask": np.array(attention_mask),
+        "position_ids": np.array(position_ids),
+        "labels": np.array(labels),
+    }
 
 
 def get_train_data_file(args):
@@ -382,7 +416,7 @@ def do_train():
             model=model,
             criterion=criterion,
             args=model_args,
-            data_collator=Tuple(Stack(), Stack(), Stack(), Stack(), Stack()),
+            data_collator=data_collator,
             train_dataset=train_dataset if model_args.do_train else None,
             eval_dataset=valid_dataset if model_args.do_eval else None,
             optimizers=(None, lr_scheduler),
@@ -405,9 +439,16 @@ def do_train():
             trainer.save_state()
 
         if model_args.do_predict:
-            test_ret = trainer.predict(test_dataset)
-            trainer.log_metrics("test", test_ret.metrics)
+            metrics = trainer.evaluate(test_dataset)
+            trainer.log_metrics("test", metrics)
 
 
 if __name__ == "__main__":
+    # support: python run_pretrain.py --config=./configs/test.yaml
+    config_file = parse_config_file("./configs/default.yaml")
+    if config_file is not None:
+        from args import init_argv
+
+        init_argv("pretrain", config_file)
+
     do_train()
