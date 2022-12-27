@@ -142,6 +142,7 @@ def _dynabert(self, model, output_dir):
     ofa_model = _dynabert_training(
         self, ofa_model, model, teacher_model, train_dataloader, eval_dataloader, args.num_train_epochs
     )
+    self.reset_optimizer_and_scheduler()
 
     # Each width_mult best model would be exported.
     _dynabert_export(self)
@@ -539,6 +540,7 @@ def _get_dynabert_model(model, width_mult):
 def _load_parameters(dynabert_model, ori_state_dict):
     dynabert_state_dict = dynabert_model.state_dict()
     for key in ori_state_dict.keys():
+        # Removes '.fn' from ofa model parameters
         dynabert_key = key.replace(".fn", "")
         if dynabert_key not in dynabert_state_dict.keys():
             logger.warning("Failed to export parameter %s" % key)
@@ -546,8 +548,10 @@ def _load_parameters(dynabert_model, ori_state_dict):
             dynabert_shape = dynabert_state_dict[dynabert_key].shape
             if len(dynabert_shape) == 2:
                 dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0], : dynabert_shape[1]]
-            else:
+            elif len(dynabert_shape) == 1:
                 dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0]]
+            else:
+                raise ValueError("Please check input model. Length of shape should be 1 or 2 for any parameter.")
     dynabert_model.set_state_dict(dynabert_state_dict)
     return dynabert_model
 
@@ -769,7 +773,10 @@ def _quant_aware_training_dynamic(self, input_dir):
         os.remove(output_param_path)
 
     self.model = _recover_auto_model_forward(self.model)
-    logger.info("Quant aware training ends and quantized models are saved to %s.")
+    logger.info(
+        "Quant aware training ends and quantized models are saved to %s."
+        % os.path.join(input_dir, args.output_filename_prefix)
+    )
 
 
 def auto_model_dynabert_forward(
@@ -912,5 +919,10 @@ def soft_cross_entropy(inp, target):
     return -1.0 * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
 
 
+def reset_optimizer_and_scheduler(self):
+    self.optimizer, self.lr_scheduler = None, None
+
+
 Trainer.compress = compress
 Trainer.quant = quant
+Trainer.reset_optimizer_and_scheduler = reset_optimizer_and_scheduler
