@@ -18,8 +18,8 @@ pip install -U ppdiffusers visualdl
 **量化训练**
 
 ```bash
-export MODEL_NAME="CompVis/stable-diffusion-v1-4"
-export TEACHER_MODEL_NAME="./sd-pokemon-model-bs4"
+export MODEL_NAME="runwayml/stable-diffusion-v1-5"
+export TEACHER_MODEL_NAME="./sd-pokemon-model"
 export dataset_name="lambdalabs/pokemon-blip-captions"
 
 python -u train_text_to_image_qat.py \
