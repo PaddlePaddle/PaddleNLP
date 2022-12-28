@@ -376,7 +376,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/question_gener
 - `dataset_name` 数据集名称，用来指定数据集格式，默认为`dureader_qg`。
 - `train_file` 本地训练数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
 - `predict_file` 本地测试数据地址，数据格式必须与`dataset_name`所指数据集格式相同，默认为None。
-- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一。
+- `model_name_or_path` 指示了finetune使用的具体预训练模型，可以是PaddleNLP提供的预训练模型，或者是本地的预训练模型。如果使用本地的预训练模型，可以配置本地模型的目录地址，例如: ./checkpoints/model_xx/，目录中需包含paddle预训练模型model_state.pdparams。如果使用PaddleNLP提供的预训练模型，可以选择下面其中之一，默认为`unimo-text-1.0`。
    | 可选预训练模型        |
    |---------------------------------|
    | unimo-text-1.0      |
@@ -424,7 +424,7 @@ python -u -m paddle.distributed.launch --gpus "1,2" --log_dir log/filtration fin
     --model=uie-base \
     --seed=1000 \
     --logging_steps=100 \
-    --valid_steps=5000 \
+    --valid_steps=100 \
     --device=gpu
 ```
 关键参数释义如下：
