@@ -282,6 +282,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         "uie-senta-medium": {"do_lower_case": True},
         "uie-senta-mini": {"do_lower_case": True},
         "uie-senta-micro": {"do_lower_case": True},
+        "uie-senta-nano": {"do_lower_case": True},
         "uie-base-answer-extractor": {"do_lower_case": True},
         "uie-base-qa-filter": {"do_lower_case": True},
         "ernie-search-base-dual-encoder-marco-en": {"do_lower_case": True},
