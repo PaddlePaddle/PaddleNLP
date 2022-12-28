@@ -314,7 +314,7 @@ class Trainer:
         self.label_names = default_label_names if self.args.label_names is None else self.args.label_names
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
-        self.print_config()
+        # self.print_config()
 
         # very last
         self._memory_tracker.stop_and_update_metrics()

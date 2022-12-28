@@ -29,6 +29,7 @@ from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
 from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
+from .configuration_utils import PretrainedConfig
 
 # isort: split
 from .bert.modeling import *
