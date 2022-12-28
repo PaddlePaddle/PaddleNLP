@@ -442,7 +442,7 @@ class PretrainedConfig:
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
     # model-specific attribute map from hf attribute to paddle attribute
-    # { "standard_field": "paddle_field", ... }
+    # { "paddle_field": "standard_field", ... }
     standard_config_map: Dict[str, str] = {}
 
     _auto_class: Optional[str] = None
