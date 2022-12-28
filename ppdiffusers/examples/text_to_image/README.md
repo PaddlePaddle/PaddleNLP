@@ -28,21 +28,30 @@ python -u train_text_to_image_qat.py \
   --resolution=512 --center_crop --random_flip \
   --train_batch_size=4 \
   --gradient_accumulation_steps=1 \
-  --gradient_checkpointing \
   --max_train_steps=2 \
   --learning_rate=1e-05 \
   --max_grad_norm=1 \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
   --output_dir="sd-pokemon-model-int8-onnx" \
+  --gradient_checkpointing \
   --teacher_pretrained_model_name_or_path=$TEACHER_MODEL_NAME \
   --distill_coeff 0.2
 ```
 
-在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`目录下的是QAT导出的UNet预测模型。如设置大于0的`distill_coeff`则将使用`teacher_pretrained_model_name_or_path`提供的教师模型进行蒸馏训练。
+在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`目录下的是QAT导出的UNet预测模型。如设置大于0的`distill_coeff`则将使用`teacher_pretrained_model_name_or_path`提供的FP32教师模型进行蒸馏训练。`gradient_checkpointing ` 和 `gradient_accumulation_steps` 可以根据显存情况按需设置。
 
 **量化模型效果对比**
 
-修改 `qat_cmp_demo.py` 中 pipeline 使用的模型路径之后运行，将分别显示FP32模型和量化模型的结果。
+如下修改 `qat_cmp_demo.py` 中 pipeline 使用的模型路径之后运行，将分别显示FP32模型和量化模型的结果。
+
+```
+# FP32模型
+pipe1 = StableDiffusionPipeline.from_pretrained("examples/text_to_image/sd-pokemon-model-bs4/").to("cpu")
+# QAT模型，use_qat=1表示PACT，use_qat=2表示非PACT
+pipe2 = StableDiffusionPipeline.from_pretrained(
+    "examples/text_to_image/sd-pokemon-model-int8-onnx-nopact-distil02/final", use_qat=2
+)
+```
 
 ### 1.2 Pokemon训练教程
 
