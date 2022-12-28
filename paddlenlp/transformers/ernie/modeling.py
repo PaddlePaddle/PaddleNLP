@@ -35,6 +35,7 @@ from .configuration import (
     ERNIE_PRETRAINED_RESOURCE_FILES_MAP,
     ErnieConfig,
 )
+from ...utils.env import CONFIG_NAME
 
 __all__ = [
     "ErnieModel",
@@ -148,7 +149,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ernie"
@@ -161,13 +162,11 @@ class ErniePretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
-            if isinstance(layer.weight, paddle.Tensor):
+            if isinstance(layer.weight, paddle.Tensor):    
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )

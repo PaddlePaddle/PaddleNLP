@@ -94,7 +94,7 @@ class MBartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.mbart.config.init_std,
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )

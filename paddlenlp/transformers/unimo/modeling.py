@@ -13,6 +13,7 @@
 # limitations under the License.
 """Modeling classes for UNIMO model."""
 
+from ast import excepthandler
 from typing import Optional, Tuple
 
 import paddle
@@ -64,9 +65,7 @@ class UNIMOPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.unimo.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -540,12 +539,18 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def __getattr__(self, name):
         try:
-            return super().__getattr__(name)
+            base_model = getattr(self, self.base_model_prefix)
+            print(base_model)
+            return getattr(base_model, name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return super().__getattr__(name)
+        # try:
+        #     return super().__getattr__(name)
+        # except AttributeError:
+        #     try:
+        #         return getattr(getattr(self, self.base_model_prefix), name)
+        #     except AttributeError:
+        #         return getattr(getattr(self, self.base_model_prefix).config, name)
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel

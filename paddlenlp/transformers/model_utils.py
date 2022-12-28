@@ -289,17 +289,13 @@ class PretrainedModel(Layer, GenerationMixin):
         Returns: the value of attribute
 
         """
-        try:
-            return super(PretrainedModel, self).__getattr__(name)
-        except AttributeError:
-            result = getattr(self.config, name)
+        result = getattr(self.config, name)
 
-            # FIXME(wj-Mcat): there are a lot of consistent errors, so temporary disable.
-            # logger.warning(
-            #     f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
-            #     f"Instead, do `model.config.{name}`"
-            # )
-            return result
+        logger.warning(
+            f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
+            f"Instead, do `model.config.{name}`"
+        )
+        return result
 
     @property
     def base_model(self):
