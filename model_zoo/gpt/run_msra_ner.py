@@ -17,6 +17,7 @@ from dataclasses import dataclass, field
 from functools import partial
 
 import paddle
+from args import init_argv, parse_config_file
 
 from paddlenlp.data import DataCollatorForTokenClassification
 from paddlenlp.datasets import load_dataset
@@ -153,4 +154,7 @@ def do_train():
 
 
 if __name__ == "__main__":
+    config_file = parse_config_file()
+    if config_file is not None:
+        init_argv("msra_ner", config_file)
     do_train()

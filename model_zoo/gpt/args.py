@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import argparse
+import copy
 import os
 import sys
 
@@ -28,7 +29,7 @@ os.chdir(CURRENT_DIR)
 from paddlenlp.utils.log import logger  # noqa: E402
 
 
-def parse_config_file(default_file: str = "./configs/default.yaml") -> str | None:
+def parse_config_file() -> str | None:
     """parse config file from command line, so it will support:
 
         python run_pretrain.py --config=./configs/test.yaml
@@ -36,15 +37,9 @@ def parse_config_file(default_file: str = "./configs/default.yaml") -> str | Non
     Returns:
         str | None: the path of config file
     """
-    # 1. check whether start application from config file
-    # only contains --config args
-    if len(sys.argv) > 3:
-        return None
-
-    # 2. parse config file from command line
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default=default_file)
-    args = parser.parse_args()
+    parser.add_argument("--config", type=str, default=None)
+    args, _ = parser.parse_known_args()
     return args.config
 
 
@@ -55,18 +50,37 @@ def init_argv(config_name: str, config_file: str):
         config_file (str, optional): the path of config file. Defaults to None.
     """
     # add tag if it's slow test
-    if not os.getenv("slow_test", False):
+    if os.getenv("slow_test", None):
         config_file = "./configs/test.yaml"
+
+    logger.info(f"loading configuration file<{config_file}>")
 
     with open(config_file, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)[config_name]
 
-    # TODO(wj-Mcat): get the name of running application
-    argv = ["run.py"]
+    argv = get_model_argv()
+
     for key, value in config.items():
         argv.append(f"--{key}")
         argv.append(str(value))
     sys.argv = argv
+
+
+def get_model_argv():
+    """get model argv variables without --config parameter"""
+    argv = copy.deepcopy(sys.argv)
+    for index in range(len(argv)):
+        # [..., '--config', './configs/default.yaml', ...]
+        if argv[index] == "--config":
+            argv = argv[:index] + argv[index + 2 :]
+            break
+
+        # [..., '--config=./configs/default.yaml', ...]
+        if argv[index].startswith("--config"):
+            if "=" in argv[index]:
+                argv = argv[:index] + argv[index + 1 :]
+                break
+    return argv
 
 
 def get_device(device: str):

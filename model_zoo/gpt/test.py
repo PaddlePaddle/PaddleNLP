@@ -17,7 +17,7 @@ import os
 
 from args import init_argv
 
-DEFAULT_CONFIG_FILE = "./configs/test.yaml"
+DEFAULT_CONFIG_FILE = "./configs/default.yaml"
 
 
 def test_pretrain():
@@ -28,10 +28,15 @@ def test_pretrain():
 
 
 def test_run_eval():
-    init_argv("eval", DEFAULT_CONFIG_FILE)
-    from run_glue import do_train
+    # do not test under the slow_test
+    if os.getenv("slow_test", None):
+        return
 
-    do_train()
+    # TODO(wj-Mcat): add eval testing config
+    # init_argv("eval", DEFAULT_CONFIG_FILE)
+    # from run_eval import run
+
+    # run()
 
 
 def test_run_glue():
@@ -50,7 +55,7 @@ def test_msra_ner():
 
 def test_generation():
     # do not test under the slow_test
-    if not os.getenv("slow_test", False):
+    if os.getenv("slow_test", None):
         return
 
     init_argv("generation", DEFAULT_CONFIG_FILE)
@@ -58,6 +63,17 @@ def test_generation():
 
     run()
 
+
+# os.environ['slow_test'] = 'True'
+# test_pretrain()
+# sys.argv = []
+# test_generation()
+# sys.argv = []
+# test_msra_ner()
+# sys.argv = []
+# test_run_eval()
+# sys.argv = []
+# test_run_glue()
 
 # you can uncomment the following code to debug your application in local IDE
 # test_msra_ner()
