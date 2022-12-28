@@ -540,6 +540,9 @@ def do_train(args):
                 ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
             with ctx_manager:
+                # For NPU device, using fp16 data type to execute `dropout` NPU op
+                # can improve performance, which can change `Cast` CANN OP from
+                # AICPU operator to AICore operator.
                 with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=[
@@ -607,7 +610,12 @@ def do_train(args):
             else:
                 optimizer.step()
 
-            optimizer.clear_grad(set_to_zero=False)
+            if args.device == "npu":
+                # For NPU device, set set_to_zero to False can improve
+                # performance.
+                optimizer.clear_grad(set_to_zero=False)
+            else:
+                optimizer.clear_grad()
             train_run_cost += time.time() - train_start
             tr_loss.subtract_(tr_loss)
 
