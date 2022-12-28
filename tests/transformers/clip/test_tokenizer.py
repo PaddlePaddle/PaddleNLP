@@ -52,6 +52,7 @@ class CLIPTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_tokenizer(self, **kwargs):
         kwargs.update(self.special_tokens_map)
+        kwargs.update({"model_max_length": 512})
         return CLIPTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
@@ -60,7 +61,7 @@ class CLIPTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return input_text, output_text
 
     def test_full_tokenizer(self):
-        tokenizer = CLIPTokenizer(self.vocab_file, self.merges_file, **self.special_tokens_map)
+        tokenizer = self.get_tokenizer()
         text = "lower newer"
         bpe_tokens = ["lo", "w", "er</w>", "n", "e", "w", "er</w>"]
         tokens = tokenizer.tokenize(text)
