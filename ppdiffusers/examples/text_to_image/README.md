@@ -19,23 +19,26 @@ pip install -U ppdiffusers visualdl
 
 ```bash
 export MODEL_NAME="CompVis/stable-diffusion-v1-4"
+export TEACHER_MODEL_NAME="./sd-pokemon-model-bs4"
 export dataset_name="lambdalabs/pokemon-blip-captions"
 
 python -u train_text_to_image_qat.py \
   --pretrained_model_name_or_path=$MODEL_NAME \
   --dataset_name=$dataset_name \
   --resolution=512 --center_crop --random_flip \
-  --train_batch_size=1 \
-  --gradient_accumulation_steps=4 \
+  --train_batch_size=4 \
+  --gradient_accumulation_steps=1 \
   --gradient_checkpointing \
   --max_train_steps=2 \
   --learning_rate=1e-05 \
   --max_grad_norm=1 \
   --lr_scheduler="constant" --lr_warmup_steps=0 \
-  --output_dir="sd-pokemon-model-int8-onnx"
+  --output_dir="sd-pokemon-model-int8-onnx" \
+  --teacher_pretrained_model_name_or_path=$TEACHER_MODEL_NAME \
+  --distill_coeff 0.2
 ```
 
-在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`文件名的是QAT导出的UNet预测模型
+在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`目录下的是QAT导出的UNet预测模型。如设置大于0的`distill_coeff`则将使用`teacher_pretrained_model_name_or_path`提供的教师模型进行蒸馏训练。
 
 ### 1.2 Pokemon训练教程
 

@@ -290,6 +290,33 @@ class ModelMixin(nn.Layer):
 
         state_dict = load_dict(model_file, map_location="cpu")
 
+        #
+        use_qat = kwargs.pop("use_qat", False)
+        if use_qat and model.__class__.__name__ == "UNet2DConditionModel":
+            print("unet", "*" * 10)
+            quant_config = {
+                # It defauts to None, which means that no preprocessing is performed
+                # on the active value."
+                "activation_preprocess_type": "PACT" if use_qat == 1 else None,
+                # It defauts to None, which means that no preprocessing is performed
+                # on weights.
+                "weight_preprocess_type": "PACT" if use_qat == 1 else None,
+                "weight_quantize_type": "channel_wise_abs_max",
+                "activation_quantize_type": "moving_average_abs_max",
+                "weight_bits": 8,
+                "activation_bits": 8,
+                "dtype": "int8",
+                # window size for 'range_abs_max' quantization. defaulf is 10000
+                "window_size": 10000,
+                "quantizable_layer_type": ["Linear", "Conv2D"],
+                "moving_rate": 0.9,
+                "onnx_format": True,
+            }
+            from paddleslim import QAT
+
+            quanter = QAT(config=quant_config)
+            quanter.quantize(model)
+
         dtype = set(v.dtype for v in state_dict.values())
 
         if len(dtype) > 1 and paddle.float32 not in dtype:

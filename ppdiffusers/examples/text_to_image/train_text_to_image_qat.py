@@ -227,7 +227,7 @@ def parse_args():
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument("--distill_coeff", type=float, default=0, help="coeff for distillation loss")
-    parser.add_argument("--use_pact", action="store_true", default=False, help="QAT")
+    parser.add_argument("--use_pact", action="store_true", default=False, help="use PACT in QAT")
     parser.add_argument("--save_freq", type=int, default=0, help="frequency to save model")
 
     args = parser.parse_args()

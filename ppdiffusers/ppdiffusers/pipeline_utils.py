@@ -285,6 +285,8 @@ class DiffusionPipeline(ConfigMixin):
         # custom_pipeline = kwargs.pop("custom_pipeline", None)
         # for fastdeploy model
         runtime_options = kwargs.pop("runtime_options", None)
+        # for QAT test usage
+        use_qat = kwargs.pop("use_qat", False)
 
         # 1. Download the checkpoints and configs
         if not os.path.isdir(pretrained_model_name_or_path):
@@ -440,6 +442,12 @@ class DiffusionPipeline(ConfigMixin):
                         options = runtime_options
                     loading_kwargs["runtime_options"] = options
                     loading_kwargs["cache_dir"] = cache_dir
+
+                # for QAT test usage
+                from ppdiffusers.models import UNet2DConditionModel
+
+                if issubclass(class_obj, UNet2DConditionModel):
+                    loading_kwargs["use_qat"] = use_qat
 
                 if issubclass(class_obj, ModelMixin):
                     loading_kwargs["cache_dir"] = cache_dir
