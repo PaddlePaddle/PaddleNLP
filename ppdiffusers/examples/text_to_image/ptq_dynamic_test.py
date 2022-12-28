@@ -26,7 +26,6 @@ def parse_args():
         "--pretrained_model_name_or_path",
         type=str,
         default="runwayml/stable-diffusion-v1-5",
-        required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
     parser.add_argument(
@@ -35,7 +34,7 @@ def parse_args():
         default="int8_images",
         help="The output directory for images.",
     )
-    parser.add_argument("--seed", type=int, default=123, help="A seed for reproducible training.")
+    parser.add_argument("--seed", type=int, default=123, help="A seed for reproducible running.")
     args = parser.parse_args()
     return args
 

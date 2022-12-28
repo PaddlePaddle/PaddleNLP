@@ -53,6 +53,14 @@ pipe2 = StableDiffusionPipeline.from_pretrained(
 )
 ```
 
+**动态量化测试**
+
+```
+python ptq_dynamic_test.py --output_dir int_images
+```
+
+依赖 `diffusers`，生成图像将保存在`output_dir`中。
+
 ### 1.2 Pokemon训练教程
 
 为了下载`CompVis/stable-diffusion-v1-4`模型权重，我们需要阅读并签署相关的License。在这里我们默认用户已经阅读并签署了解了相关License，有关License及模型的详细介绍，请访问[CompVis/stable-diffusion-v1-4 card](https://huggingface.co/CompVis/stable-diffusion-v1-4)。
