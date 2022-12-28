@@ -198,7 +198,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
                 max_length = self._calculate_max_length(processed_train_dataset, processed_eval_dataset)
-                # https://www.paddlepaddle.org.cn/documentation/docs/en/api/paddle/device/cuda/get_device_properties_en.html
                 training_args = self._override_arguments(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
@@ -334,9 +333,5 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         else:
             exported_model_path = os.path.join(model_result.log_dir, self.export_path)
             return Taskflow(
-                "text_classification",
-                model=self.problem_type,
-                task_path=exported_model_path,
-                id2label=self.id2label,
-                # max_length=model_config.get("PreprocessArguments.max_length", 128),
+                "text_classification", model=self.problem_type, task_path=exported_model_path, id2label=self.id2label
             )

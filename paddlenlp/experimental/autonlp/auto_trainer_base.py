@@ -19,9 +19,7 @@ from abc import ABCMeta, abstractmethod
 from typing import Any, Callable, Dict, List, Optional, Union
 
 from hyperopt import hp
-import paddle
 from paddle.io import Dataset
-import numpy as np
 from ray import tune
 from ray.air import RunConfig
 from ray.tune.result_grid import ResultGrid
@@ -49,6 +47,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     def __init__(
         self,
+        train_dataset: Dataset,
+        eval_dataset: Dataset,
         metric_for_best_model: str,
         greater_is_better: bool,
         language: str,
@@ -59,6 +59,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             self.metric_for_best_model = f"eval_{metric_for_best_model}"
         else:
             self.metric_for_best_model = metric_for_best_model
+        self.train_dataset = train_dataset
+        self.eval_dataset = eval_dataset
         self.greater_is_better = greater_is_better
         self.language = language
         self.output_dir = output_dir
@@ -108,27 +110,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
-
-    @staticmethod
-    def _calculate_max_length(*datasets, quantile:float=1.0) -> int:
-        data_length = []
-        for dataset in datasets:
-            for example in dataset:
-                data_length.append(len(example["input_ids"]))
-        return np.quantile(data_length, quantile, method="nearest")
-    
-    @staticmethod
-    def _calculate_batch_size(model, input, train_dataset) -> int:
-
-#         (16000 - model_size) / (forward_back_ward_size)
-# (16000 - 4.3) / 18.25 = 1148.29
-# rounded to powers of 2 results in batch size 1024
-
-        data_length = []
-        for dataset in datasets:
-            for example in dataset:
-                data_length.append(len(example["input_ids"]))
-        return np.quantile(data_length, quantile, method="nearest")
 
     def export(self, export_path, trial_id=None):
         model_result = self._get_model_result(trial_id=trial_id)
@@ -195,10 +176,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
             )
 
+    def load(self, path: str):
+        logger.info(f"Restoring from {path}")
+        self.training_results = self.tuner.get_results()
+        self.tuner = tune.Tuner.restore(path)
+        logger.info("Found existing training results.")
+
     def train(
         self,
-        train_dataset: Dataset,
-        eval_dataset: Dataset,
         num_models: int = 1,
         preset: Optional[str] = None,
         num_gpus: Optional[int] = None,
@@ -206,13 +191,12 @@ class AutoTrainerBase(metaclass=ABCMeta):
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
         override: List[Dict[str, Any]] = None,
+        experiment_name: str = None,
     ) -> ResultGrid:
         """
         Main logic of training models
 
         Args:
-            train_dataset (Dataset, required): training dataset
-            eval_dataset (Dataset, required): evaluation dataset
             num_models (int, required): number of model trials to run
             preset (str, optional): preset configuration for the trained models, can significantly impact accuracy, size, and inference latency of trained models. If not set, this will be inferred from data.
             num_gpus (str, optional): number of GPUs to use for the job. By default, this is set based on detected GPUs.
@@ -222,12 +206,15 @@ class AutoTrainerBase(metaclass=ABCMeta):
             override: (dict[str, Any], optional): Advanced users only.
                 override the default configuration with the user-provided overrides. When overrides is provided, preset is ignored.
                 For example, {"max_steps": 5}.
+            experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>
 
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
-        self._data_checks_and_inference(train_dataset, eval_dataset)
-        trainable = self._construct_trainable(train_dataset, eval_dataset)
+        if hasattr(self, "tuner") and self.tuner is not None:
+            logger.info("Overwriting thhe existing Tuner and any previous training results")
+        self._data_checks_and_inference(self.train_dataset, self.eval_dataset)
+        trainable = self._construct_trainable(self.train_dataset, self.eval_dataset)
         model_search_space = self._filter_model_candidates(language=self.language, preset=preset, override=override)
         algo = HyperOptSearch(space=model_search_space, metric=self.metric_for_best_model, mode="max")
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
@@ -239,10 +226,19 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 hardware_resources["cpu"] = num_cpus
             trainable = tune.with_resources(trainable, hardware_resources)
         tune_config = tune.tune_config.TuneConfig(num_samples=num_models, time_budget_s=time_budget_s, search_alg=algo)
-        tuner = tune.Tuner(
+
+        if experiment_name is None:
+            experiment_name = datetime.datetime.now().strftime("%s")
+
+        self.tuner = tune.Tuner(
             trainable,
             tune_config=tune_config,
-            run_config=RunConfig(local_dir=self.output_dir) if self.output_dir else None,
+            run_config=RunConfig(
+                name=experiment_name, log_to_file=True, local_dir=self.output_dir if self.output_dir else None
+            ),
         )
-        self.training_results = tuner.fit()
+        self.training_results = self.tuner.fit()
+        self.show_training_results().to_csv(
+            path_or_buf=os.path.join(self.output_dir, experiment_name, "experiment_results.csv"), index=False
+        )
         return self.training_results
