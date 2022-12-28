@@ -1,35 +1,35 @@
-# UIE Taskflow使用指南
+# UIE Taskflow User Guide
 
-**目录**
-- [1. 功能简介](#1)
-- [2. 文档信息抽取](#2)
-  - [2.1 实体抽取](#21)
-  - [2.2 关系抽取](#22)
-  - [2.3 跨任务使用](#23)
-  - [2.4 输入说明](#24)
-  - [2.5 使用技巧](#25)
-  - [2.6 结果可视化](#26)
-  - [2.7 更多配置](#27)
+**Table of contents**
+- [1. Introduction](#1)
+- [2. Document Information Extraction](#2)
+   - [2.1 Entity Extraction](#21)
+   - [2.2 Relation Extraction](#22)
+   - [2.3 Multi-Task Extraction](#23)
+   - [2.4 Input Format](#24)
+   - [2.5 Tips](#25)
+   - [2.6 Visualization](#26)
+   - [2.7 More Configuration](#27)
 
 <a name="1"></a>
 
-## 1. 功能简介
+## 1. Introduction
 
-```paddlenlp.Taskflow```提供文本及文档的通用信息抽取、评价观点抽取等能力，可抽取多种类型的信息，包括但不限于命名实体识别（如人名、地名、机构名等）、关系（如电影的导演、歌曲的发行时间等）、事件（如某路口发生车祸、某地发生地震等）、以及评价维度、观点词、情感倾向等信息。用户可以使用自然语言自定义抽取目标，无需训练即可统一抽取输入文本或文档中的对应信息。**实现开箱即用，并满足各类信息抽取需求**
+```paddlenlp.Taskflow``` provides general information extraction of text and documents, evaluation opinion extraction and other capabilities, and can extract various types of information, including but not limited to named entities (such as person name, place name, organization name, etc.), relations (such as the director of the movie, the release time of the song, etc.), events (such as a car accident at a certain intersection, an earthquake in a certain place, etc.), and information such as product reviews, opinions, and sentiments. Users can use natural language to customize the extraction target, and can uniformly extract the corresponding information in the input text or document without training.
 
 <a name="2"></a>
 
-## 2. 文档信息抽取
+## 2. Document Information Extraction
 
-本章节主要介绍Taskflow的文档抽取功能，以下示例图片[下载链接](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/cases.zip)。
+This section introduces the document extraction capability of Taskflow with the following example picture [download link](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/cases.zip).
 
 <a name="21"></a>
 
-#### 2.1 实体抽取
+#### 2.1 Entity Extraction
 
-实体抽取，又称命名实体识别（Named Entity Recognition，简称NER），是指识别文本中具有特定意义的实体。在开放域信息抽取中，抽取的类别没有限制，用户可以自己定义。
+Entity extraction, also known as Named Entity Recognition (NER for short), refers to identifying entities with specific meanings in text. UIE adopts the open-domain approach where the entity category is not fixed and the users can define them by through natural language.
 
-- 报关单
+- Example: Customs Declaration Form
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206112148-82e26dad-4a77-40e3-bc11-f877047aeb87.png height=700 width=450 hspace='10'/>
@@ -98,8 +98,7 @@
             'text': '2017-02-24'}]}]
 ```
 
-- 证件
-
+- Example: Driver's License
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206114081-8c82e2a2-0c88-4ca3-9651-b12c94266be9.png height=400 width=700 hspace='10'/>
@@ -115,11 +114,11 @@
 
 <a name="22"></a>
 
-#### 2.2 关系抽取
+#### 2.2 Relation Extraction
 
-关系抽取（Relation Extraction，简称RE），是指从文本中识别实体并抽取实体之间的语义关系，进而获取三元组信息，即<主体，谓语，客体>。
+Relation Extraction refers to identifying entities from text and extracting the semantic relationship between entities, and then obtaining triple information, namely <subject, predicate, object>.
 
-- 表格
+- Example: Extracting relations from a table
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206115688-30de315a-8fd4-4125-a3c3-8cb05c6e39e5.png height=180 width=600 hspace='10'/>
@@ -135,11 +134,9 @@
 
 <a name="23"></a>
 
-#### 2.3 跨任务使用
+#### 2.3 Multi-Task Extraction
 
-- 实体、关系多任务抽取
-
-对文档进行实体+关系抽取，schema构造如下：
+To extract entities and relation from documents simultaneously, you may set the schema structure as following:
 
 ```text
 schema = [
@@ -172,11 +169,9 @@ schema = [
 
 <a name="24"></a>
 
-#### 2.4 输入说明
+#### 2.4 Input Format
 
-- 输入格式
-
-文档抽取UIE-X支持图片路径、http图片链接、base64的输入形式，支持图片和PDF两种文档格式。文本抽取可以通过`text`指定输入文本。
+For document information extraction, UIE-X supports image paths, http image links, base64 input form, and image and PDF document formats. In the input dict, `text` indicates text input and `doc` refer to the document input.
 
 ```python
 [
@@ -186,9 +181,9 @@ schema = [
 ]
 ```
 
-**NOTE**: 多页PDF输入目前只抽取第一页的结果，UIE-X比较适合单证文档（如票据、单据等）的信息提取，目前还不适合过长或多页的文档。
+**NOTE**: Multi-page PDF input currently only extracts the results of the first page. UIE-X is more suitable for information extraction of document documents (such as bills, receipts, etc.), but it is not suitable for documents that are too long or multi-page.
 
-- 使用自己的layout / OCR作为输入
+- Using custom OCR input
 
 ```python
 layout = [
@@ -202,11 +197,11 @@ ie({"doc": doc_path, 'layout': layout})
 
 <a name="25"></a>
 
-#### 2.5 使用技巧
+#### 2.5 Tips
 
-- 使用PP-Structure版面分析功能
+- Using PP-Structure layout analysis function
 
-OCR中识别出来的文字会按照左上到右下进行排序，对于分栏、表格内有多行文本等情况我们推荐使用版面分析功能``layout_analysis=True``以优化文字排序并增强抽取效果。以下例子仅举例版面分析功能的使用场景，实际场景一般需要标注微调。
+The text recognized in OCR will be sorted from top left to bottom right. For cases such as column division and multiple lines of text in the table, we recommend using the layout analysis function ``layout_analysis=True`` to optimize text sorting and enhance the extraction effect. The following example is only an example of the usage scenario of the layout analysis function, and the actual scenario generally needs to be marked and fine-tuned.
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206139057-aedec98f-683c-4648-999d-81ce5ea04a86.png height=250 width=500 hspace='10'/>
@@ -233,9 +228,9 @@ OCR中识别出来的文字会按照左上到右下进行排序，对于分栏�
 
 <a name="26"></a>
 
-#### 2.6 结果可视化
+#### 2.6 Visualization
 
-- OCR识别结果可视化：
+- Visualization of OCR recognition results:
 
 ```python
 >>> from paddlenlp.utils.doc_parser import DocParser
@@ -253,7 +248,7 @@ OCR中识别出来的文字会按照左上到右下进行排序，对于分栏�
     <img src=https://user-images.githubusercontent.com/40840292/206168103-0a37eab0-bb36-4eec-bd51-b3f85838b40c.png height=350 width=600 hspace='10'/>
 </div>
 
-- 抽取结果可视化：
+- Visualization of extraction results:
 
 ```python
 >>> from pprint import pprint
@@ -278,7 +273,7 @@ OCR中识别出来的文字会按照左上到右下进行排序，对于分栏�
 
 <a name="27"></a>
 
-#### 2.7 更多配置
+#### 2.7 More Configuration
 
 ```python
 >>> from paddlenlp import Taskflow
@@ -295,15 +290,15 @@ OCR中识别出来的文字会按照左上到右下进行排序，对于分栏�
                   use_fast=False)
 ```
 
-* `schema`：定义任务抽取目标，可参考开箱即用中不同任务的调用示例进行配置。
-* `schema_lang`：设置schema的语言，默认为`ch`, 可选有`ch`和`en`。因为中英schema的构造有所不同，因此需要指定schema的语言。
-* `ocr_lang`：选择PaddleOCR的语言，`ch`可在中英混合的图片中使用，`en`在英文图片上的效果更好，默认为`ch`。
-* `batch_size`：批处理大小，请结合机器情况进行调整，默认为16。
-* `model`：选择任务使用的模型，默认为`uie-base`，可选有`uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano`和`uie-medical-base`, `uie-base-en`，`uie-x-base`。
-* `layout_analysis`：是否使用PP-Structure对文档进行布局分析以优化布局信息的排序，默认为False。
-* `position_prob`：模型对于span的起始位置/终止位置的结果概率在0~1之间，返回结果去掉小于这个阈值的结果，默认为0.5，span的最终概率输出为起始位置概率和终止位置概率的乘积。
-* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
-* `use_fast`: 使用C++实现的高性能分词算子FastTokenizer进行文本预处理加速。需要通过`pip install fast-tokenizer-python`安装FastTokenizer库后方可使用。默认为`False`。更多使用说明可参考[FastTokenizer文档](../../fast_tokenizer)。
+* `schema`: Define the task extraction target, which can be configured by referring to the calling examples of different tasks in the out-of-the-box.
+* `schema_lang`: Set the language of the schema, the default is `ch`, optional `ch` and `en`. Because the structure of the Chinese and English schemas is different, the language of the schema needs to be specified.
+* `ocr_lang`: Select the language of PaddleOCR, `ch` can be used in mixed Chinese and English images, `en` works better on English images, the default is `ch`.
+* `batch_size`: batch size, please adjust according to the machine situation, the default is 16.
+* `model`: select the model used by the task, the default is `uie-base`, optional `uie-base`, `uie-medium`, `uie-mini`, `uie-micro`, `uie-nano` ` and `uie-medical-base`, `uie-base-en`, `uie-x-base`.
+* `layout_analysis`: Whether to use PP-Structure to analyze the layout of the document to optimize the sorting of layout information, the default is False.
+* `position_prob`: The result probability of the model for the start position/end position of the span is between 0 and 1, and the returned result removes the results less than this threshold, the default is 0.5, and the final probability output of the span is the start position probability and end position The product of the position probabilities.
+* `precision`: select the model precision, the default is `fp32`, optional `fp16` and `fp32`. `fp16` inference is faster. If you choose `fp16`, please ensure that the machine is correctly installed with NVIDIA-related drivers and basic software. **Ensure that CUDA>=11.2, cuDNN>=8.1.1**. For the first time use, you need to follow the prompts to install the relevant dependencies. Secondly, it is necessary to ensure that the CUDA Compute Capability of the GPU device is greater than 7.0. Typical devices include V100, T4, A10, A100, GTX 20 series and 30 series graphics cards, etc. For more information about CUDA Compute Capability and precision support, please refer to NVIDIA documentation: [GPU Hardware and Supported Precision Comparison Table](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix).
+* `use_fast`: Use the high-performance word segmentation operator FastTokenizer implemented in C++ to accelerate text preprocessing. The FastTokenizer library needs to be installed through `pip install fast-tokenizer-python` before it can be used. Defaults to `False`. For more usage instructions, please refer to [FastTokenizer Documentation](../../fast_tokenizer).
 
 ## References
 - **[PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)**

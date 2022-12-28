@@ -1,4 +1,4 @@
-# UIE Taskflow使用指南
+# 文本抽取任务UIE Taskflow使用指南
 
 **目录**
 - [1. 功能简介](#1)
@@ -353,7 +353,7 @@ UIE不限定行业领域和抽取目标，以下是一些通过Taskflow实现开
     英文模型schema构造如下：
 
     ```text
-    '情感倾向[正向，负向]'
+    'Sentiment classification [negative, positive]'
     ```
 
     英文模型调用示例：
