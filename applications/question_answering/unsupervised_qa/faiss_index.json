@@ -1,0 +1,1 @@
+{"sql_url": "sqlite:///faiss_document_store.db", "embedding_dim": 768, "faiss_index_factory_str": "Flat", "return_embedding": false, "duplicate_documents": "overwrite", "index": "document", "similarity": "dot_product", "embedding_field": "embedding", "progress_bar": true}
