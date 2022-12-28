@@ -1,29 +1,29 @@
 # document information extraction
 
 **Table of contents**
-- [1. Document Information Extraction Application](#1)
+- [1. Introduction](#1)
 - [2. Quick Start](#2)
    - [2.1 Code Structure](#21)
    - [2.2 Data Annotation](#22)
-   - [2.3 Model Fine-tuning](#23)
-   - [2.4 Model Evaluation](#24)
-   - [2.5 Model Prediction](#25)
+   - [2.3 Finetuning](#23)
+   - [2.4 Evaluation](#24)
+   - [2.5 Inference](#25)
    - [2.6 Experiments](#26)
 
 <a name="1"></a>
 
-## 1. Application of document information extraction
+## 1. Introduction
 
-This project provides an end-to-end application solution for document extraction based on UIE fine-tuning, and through the whole process of **data labeling-model training-model tuning-prediction deployment**, it can quickly realize the landing of document information extraction products.
+This Information Extraction (IE) guide introduces our open-source industry-grade solution that covers the most widely-used application scenarios of Information Extraction. It features **multi-domain, multi-task, and cross-modal capabilities** and goes through the full lifecycle of **data labeling, model training and model deployment**. We hope this guide can help you apply Information Extraction techniques in your own products or models.
 
-In layman's terms, information extraction is the process of extracting structured information from given input data such as text/pictures. In the process of implementing information extraction, it usually faces many challenges such as changing fields, diverse tasks, and scarce data. Aiming at the difficulties and pain points in the field of information extraction, PaddleNLP information extraction applies the idea of UIE unified modeling, provides an industrial-level application solution for document information extraction, and supports entities, relationships, events, and opinions in document/picture/table and plain text scenarios and other task information extraction**. The application **does not limit the industry field and extraction target**, and can realize the seamless connection from the product prototype development, business POC stage to business landing and iteration stages, helping developers to achieve rapid adaptation and landing of extraction scenarios in specific fields.
+Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction] (https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapated models specialized for different industry sectors.
 
-**Application highlights of document information extraction:**
+**Highlights:**
 
-- **Comprehensive coverage of scenarios🎓:** Covers various mainstream tasks of document information extraction, supports multiple languages, and meets the needs of developers for various information extraction.
-- **Leading effect🏃:** Using UIE-X, a model with outstanding effects in multimodal information extraction, as the training base, it has extensive and mature practical applicability.
-- **Easy to use⚡:** Implementing three lines of code through Taskflow can realize quick calls without labeled data, and one line of commands can start information extraction training, easily complete deployment and go online, and lower the threshold for information extraction technology.
-- **Efficient Tuning✊:** Developers can easily get started with the data labeling and model training process without any background knowledge of machine learning.
+- **Comprehensive Coverage🎓:** Covers various mainstream tasks of information extraction for plain text and document scenarios, supports multiple languages
+- **State-of-the-Art Performance🏃:** Strong performance from the UIE model series models in plain text and multimodal datasets. We also provide pretrained models of various sizes to meet different needs
+- **Easy to use⚡:** three lines of code to use our `Taskflow` for out-of-box Information Extraction capabilities. One line of command to model training and model deployment
+- **Efficient Tuning✊:** Developers can easily get started with the data labeling and model training process without a background in Machine Learning.
 
 <a name="2"></a>
 
@@ -47,9 +47,9 @@ For simple extraction targets, you can directly use ```paddlenlp.Taskflow``` to 
 
 ### 2.2 Data Annotation
 
-We recommend using [Label Studio](https://labelstud.io/) for document information extraction and data labeling. This project has opened up the channel from data labeling to training, that is, Label Studio can export data through [label_studio.py]( ../label_studio.py) script to easily convert the data into the form required for input into the model, achieving a seamless transition. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio.md).
+We recommend using [Label Studio](https://labelstud.io/) for data labeling. We provide an end-to-end pipeline for the labeling -> training process. You can export the labeled data in Label Studio through [label_studio.py]( ../label_studio.py) script to export and convert the data into the required input form for the model. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio.md).
 
-Here we provide the pre-labeled `VAT invoice dataset` file, you can run the following command line to download the dataset, we will show how to use the data conversion script to generate training/validation/test set files, and use the UIE-X model Make minor adjustments.
+Here we provide the pre-labeled example dataset `VAT invoice dataset`, which you can download by running the following command. We will demonstrate how to use the data conversion script to generate training/validation/test set files for finetuning.
 
 Download the VAT invoice dataset:
 ```shell
@@ -84,9 +84,7 @@ For more labeling rules and parameter descriptions for different types of tasks 
 
 <a name="23"></a>
 
-### 2.3 Model fine-tuning
-
-It is recommended to use [Trainer API](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/trainer.md) to fine-tune the model. Just input the model, data set, etc., and you can use the Trainer API to efficiently and quickly perform tasks such as pre-training, fine-tuning, and model compression. You can start multi-card training, mixed-precision training, gradient accumulation, breakpoint restart, log display, and other functions with one click. , the Trainer API also encapsulates the general training configuration of the training process, such as: optimizer, learning rate scheduling, etc.
+### 2.3 Finetuning
 
 Use the following command to fine-tune the model using `uie-x-base` as the pre-trained model, and save the fine-tuned model to `./checkpoint/model_best`:
 
@@ -179,7 +177,7 @@ Parameters:
 
 <a name="24"></a>
 
-### 2.4 Model Evaluation
+### 2.4 Evaluation
 
 ```shell
 python evaluate.py \
@@ -191,8 +189,7 @@ python evaluate.py \
     --max_seq_len 512 \
     --per_device_eval_batch_size 16
 ```
-Description of the evaluation method: The single-stage evaluation method is adopted, that is, tasks that require staged prediction such as relationship extraction and event extraction are evaluated separately for the prediction results of each stage. By default, the validation/test set uses all labels at the same level to construct all negative examples.
-
+We adopt the single-stage method for evaluation, which means tasks that require multiple stages (e.g. relation extraction, event extraction) are evaluated separately for each stage. By default, the validation/test set uses all labels at the same level to construct the negative examples.
 The `debug` mode can be turned on to evaluate each positive category separately. This mode is only used for model debugging:
 
 ```shell
@@ -252,9 +249,9 @@ Parameters:
 
 <a name="25"></a>
 
-### 2.5 Model Prediction
+### 2.5 Inference
 
-`paddlenlp.Taskflow` loads the custom model, and specifies the path of the model weight file through `task_path`, which must contain the trained model weight file `model_state.pdparams`.
+Same with the pretrained models, you can use `paddlenlp.Taskflow` to load your custom model by specifying the path of the model weight file through `task_path`
 
 ```python
 from pprint import pprint
@@ -265,7 +262,7 @@ schema = ['开票日期', '名称', '纳税人识别号', '开户行及账号', 
 my_ie = Taskflow("information_extraction", model="uie-x-base", schema=schema, task_path='./checkpoint/model_best', precison='fp16')
 ```
 
-According to the set `schema`, we can extract and visualize the information of the specified `doc_path` document:
+We specify the extraction targets by setting `schema` and visualize the information of the specified `doc_path` document:
 
 ```python
 doc_path = "./data/images/b199.jpg"

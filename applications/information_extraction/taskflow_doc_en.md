@@ -1,35 +1,35 @@
 # UIE Taskflow User Guide
 
 **Table of contents**
-- [1. Function Introduction](#1)
+- [1. Introduction](#1)
 - [2. Document Information Extraction](#2)
    - [2.1 Entity Extraction](#21)
    - [2.2 Relation Extraction](#22)
-   - [2.3 Use across tasks](#23)
-   - [2.4 Input Description](#24)
+   - [2.3 Multi-Task Extraction](#23)
+   - [2.4 Input Format](#24)
    - [2.5 Tips](#25)
-   - [2.6 Results Visualization](#26)
+   - [2.6 Visualization](#26)
    - [2.7 More Configuration](#27)
 
 <a name="1"></a>
 
-## 1. Function Introduction
+## 1. Introduction
 
-```paddlenlp.Taskflow``` provides general information extraction of text and documents, evaluation opinion extraction and other capabilities, and can extract various types of information, including but not limited to named entity recognition (such as person name, place name, organization name, etc.), Relationships (such as the director of the movie, the release time of the song, etc.), events (such as a car accident at a certain intersection, an earthquake in a certain place, etc.), and information such as evaluation dimensions, opinion words, and emotional tendencies. Users can use natural language to customize the extraction target, and can uniformly extract the corresponding information in the input text or document without training. ** Realize out-of-the-box use and meet various information extraction needs **
+```paddlenlp.Taskflow``` provides general information extraction of text and documents, evaluation opinion extraction and other capabilities, and can extract various types of information, including but not limited to named entities (such as person name, place name, organization name, etc.), relations (such as the director of the movie, the release time of the song, etc.), events (such as a car accident at a certain intersection, an earthquake in a certain place, etc.), and information such as product reviews, opinions, and sentiments. Users can use natural language to customize the extraction target, and can uniformly extract the corresponding information in the input text or document without training.
 
 <a name="2"></a>
 
 ## 2. Document Information Extraction
 
-This chapter mainly introduces the document extraction function of Taskflow, the following example picture [download link](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/cases.zip).
+This section introduces the document extraction capability of Taskflow with the following example picture [download link](https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/cases.zip).
 
 <a name="21"></a>
 
 #### 2.1 Entity Extraction
 
-Entity extraction, also known as Named Entity Recognition (NER for short), refers to identifying entities with specific meanings in text. In the open domain information extraction, the extracted categories are not limited, and users can define them by themselves.
+Entity extraction, also known as Named Entity Recognition (NER for short), refers to identifying entities with specific meanings in text. UIE adopts the open-domain approach where the entity category is not fixed and the users can define them by through natural language.
 
-- Customs declaration
+- Example: Customs Declaration Form
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206112148-82e26dad-4a77-40e3-bc11-f877047aeb87.png height=700 width=450 hspace='10'/>
@@ -98,7 +98,7 @@ Entity extraction, also known as Named Entity Recognition (NER for short), refer
             'text': '2017-02-24'}]}]
 ```
 
-- ID
+- Example: Driver's License
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206114081-8c82e2a2-0c88-4ca3-9651-b12c94266be9.png height=400 width=700 hspace='10'/>
@@ -118,7 +118,7 @@ Entity extraction, also known as Named Entity Recognition (NER for short), refer
 
 Relation Extraction refers to identifying entities from text and extracting the semantic relationship between entities, and then obtaining triple information, namely <subject, predicate, object>.
 
-- Sheet
+- Example: Extracting relations from a table
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/40840292/206115688-30de315a-8fd4-4125-a3c3-8cb05c6e39e5.png height=180 width=600 hspace='10'/>
@@ -134,11 +134,9 @@ Relation Extraction refers to identifying entities from text and extracting the 
 
 <a name="23"></a>
 
-#### 2.3 Use across tasks
+#### 2.3 Multi-Task Extraction
 
-- Multi-task extraction
-
-To extract entities and relation from documents, the schema structure is as follows:
+To extract entities and relation from documents simultaneously, you may set the schema structure as following:
 
 ```text
 schema = [
@@ -171,11 +169,9 @@ schema = [
 
 <a name="24"></a>
 
-#### 2.4 Input Description
+#### 2.4 Input Format
 
-- input format
-
-For document information extraction, UIE-X supports image paths, http image links, and base64 input forms, and supports image and PDF document formats. In a dict `text` indicates text input and `doc` refer to the document input.
+For document information extraction, UIE-X supports image paths, http image links, base64 input form, and image and PDF document formats. In the input dict, `text` indicates text input and `doc` refer to the document input.
 
 ```python
 [
@@ -232,7 +228,7 @@ The text recognized in OCR will be sorted from top left to bottom right. For cas
 
 <a name="26"></a>
 
-#### 2.6 Results Visualization
+#### 2.6 Visualization
 
 - Visualization of OCR recognition results:
 

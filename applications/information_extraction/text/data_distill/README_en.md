@@ -1,14 +1,14 @@
 # UIE Slim data distillation
 
-Behind the powerful extraction capability of UIE, it also requires a large computing power to support calculations. In some industrial application scenarios, the performance requirements are high, and it cannot be practically applied without effective compression. Therefore, we built the UIE Slim data distillation system based on the data distillation technology. The principle is to use the data as a bridge to transfer the knowledge of the UIE model to the small closed-domain information extraction model, so as to achieve the effect of greatly improving the prediction speed with a small loss of accuracy.
+While UIE has powerful zero-shot extraction capabilities, its prompting structure requires significant compute to serve in real time. Some industrial application scenarios have high inference performance requirements and the model cannot go into production without being effectively compressed. We built the UIE Slim Data Distillation with knowledge distillation techniques. The principle is to use the data as a bridge to transfer the knowledge of the UIE model to the smaller closed-domain information extraction model in order to achieve speedup inference significantly with minimal loss to accuracy.
 
 #### Three steps of UIE data distillation
 
-- **Step 1**: Use the UIE model to finetune the labeled data to get the Teacher Model.
+- **Step 1**: Finetune the UIE model on the labeled data to get the Teacher Model.
 
-- **Step 2**: The user provides large-scale unlabeled data, which needs to be from the same source as the labeled data. Prediction on unsupervised data using Taskflow UIE.
+- **Step 2**: Process the user-provided unlabeled data and run inference with Taskflow UIE.
 
-- **Step 3**: Use the labeled data and the synthetic data obtained in step 2 to train a closed-domain Student Model.
+- **Step 3**: Use the labeled data and the inference results obtained in step 2 to train a closed-domain Student Model.
 
 ## UIE Finetune
 
@@ -41,7 +41,7 @@ Description of configurable parameters:
 
 #### Teacher model evaluation
 
-In the UIE fine-tuning stage, the model effect is evaluated on UIE training format data (this evaluation method is not an end-to-end evaluation method, not a standard evaluation method for relation extraction or event extraction), and the end-to-end evaluation can be performed through the following evaluation script.
+In the UIE fine-tuning stage, the model performance is evaluated on UIE training format data, which is not a standard end-to-end evaluation method for relation extraction or event extraction. The end-to-end evaluation can be performed through the following evaluation script.
 
 ```shell
 python evaluate_teacher.py \

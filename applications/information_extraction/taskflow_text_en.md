@@ -1,27 +1,26 @@
 # UIE Taskflow User Guide - Text Information Extraction
 
 **Table of contents**
-- [1. Function Introduction](#1)
-- [2. Application Example](#2)
+- [1. Introduction](#1)
+- [2. Examples](#2)
 - [3. Text Information Extraction](#3)
    - [3.1 Entity Extraction](#31)
    - [3.2 Relation Extraction](#32)
    - [3.3 Event Extraction](#33)
    - [3.4 Opinion Extraction](#34)
    - [3.5 Sentiment Classification](#35)
-   - [3.6 Cross-task Extraction](#36)
-   - [3.7 Model Selection](#37)
+   - [3.6 Multi-task Extraction](#36)
+   - [3.7 Available Models](#37)
    - [3.8 More Configuration](#38)
 
 <a name="1"></a>
 
-## 1. Function introduction
-
-```paddlenlp.Taskflow``` provides plain text universal information extraction, opinion extraction and other capabilities, and can extract various types of information, including but not limited to named entity recognition (such as person name, place name, organization name, etc.), relationship (such as the director of the movie, the release time of the song, etc.), events (such as a car accident at a certain intersection, an earthquake in a certain place, etc.), and information such as evaluation dimensions, opinion words, and emotional tendencies. Users can use natural language to customize the extraction target, and can uniformly extract the corresponding information in the input text without training. ** Realize out-of-the-box use and meet various information extraction needs **
+## 1. Introduction
+```paddlenlp.Taskflow``` provides general information extraction of text and documents, evaluation opinion extraction and other capabilities, and can extract various types of information, including but not limited to named entities (such as person name, place name, organization name, etc.), relations (such as the director of the movie, the release time of the song, etc.), events (such as a car accident at a certain intersection, an earthquake in a certain place, etc.), and information such as product reviews, opinions, and sentiments. Users can use natural language to customize the extraction target, and can uniformly extract the corresponding information in the input text or document without training.
 
 <a name="2"></a>
 
-## 2. Application examples
+## 2. Examples
 
 UIE does not limit industry fields and extraction targets. The following are some industry examples implemented out of the box by Taskflow:
 
@@ -178,7 +177,7 @@ UIE does not limit industry fields and extraction targets. The following are som
      [{'Sentiment classification [negative, positive]': [{'text': 'negative', 'probability': 0.9998415771287057}]}]
      ```
 
-#### 3.6 Cross-task extraction
+#### 3.6 Multi-Task Extraction
 
    - For example, in the legal scene, entity extraction and relation extraction are performed on the text at the same time, and the schema can be constructed as follows:
 
@@ -224,9 +223,9 @@ UIE does not limit industry fields and extraction targets. The following are som
 
 <a name="37"></a>
 
-#### 3.7 Model Selection
+#### 3.7 Available Model
 
-- Multiple model options to meet accuracy and speed requirements
+- A variety of models to different accuracy and speed requirements
 
    | Model | Structure | Language |
    | :---: | :--------: | :--------: |
