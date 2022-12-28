@@ -62,18 +62,3 @@ def test_generation():
     from run_generation import run
 
     run()
-
-
-# os.environ['slow_test'] = 'True'
-# test_pretrain()
-# sys.argv = []
-# test_generation()
-# sys.argv = []
-# test_msra_ner()
-# sys.argv = []
-# test_run_eval()
-# sys.argv = []
-# test_run_glue()
-
-# you can uncomment the following code to debug your application in local IDE
-# test_msra_ner()
