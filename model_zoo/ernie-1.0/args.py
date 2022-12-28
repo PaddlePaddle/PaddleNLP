@@ -32,14 +32,9 @@ def parse_args(MODEL_CLASSES):
     parser = argparse.ArgumentParser()
     # yapf: disable
     parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
-        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
-    parser.add_argument("--tokenizer_name_or_path", default=None, type=str,
-        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
-        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
-    parser.add_argument("--continue_training", default=False, type=bool,
-        help="Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models.")
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])),)
+    parser.add_argument("--tokenizer_name_or_path", default=None, type=str, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])),)
+    parser.add_argument("--continue_training", default=False, type=bool, help="Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models.")
 
     # Train I/O config
     parser.add_argument("--input_dir", default=None, type=str, required=True, help="The input directory where the data will be read from.", )
