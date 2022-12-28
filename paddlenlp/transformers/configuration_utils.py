@@ -441,7 +441,7 @@ class PretrainedConfig:
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
-    # map hf attribute to paddle attribute
+    # model-specific attribute map from hf attribute to paddle attribute
     # { "standard_field": "paddle_field", ... }
     standard_config_map: Dict[str, str] = {}
 
@@ -450,12 +450,16 @@ class PretrainedConfig:
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         super().__setattr__(key, value)
         assert hasattr(self, key)
 
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key != "standard_config_map" and key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         return super().__getattribute__(key)
 
     def __getitem__(self, key):
