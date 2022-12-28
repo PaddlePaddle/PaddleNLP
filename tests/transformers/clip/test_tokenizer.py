@@ -52,7 +52,8 @@ class CLIPTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def get_tokenizer(self, **kwargs):
         kwargs.update(self.special_tokens_map)
-        kwargs.update({"model_max_length": 512})
+        if "model_max_length" not in kwargs:
+            kwargs.update({"model_max_length": 512})
         return CLIPTokenizer.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
