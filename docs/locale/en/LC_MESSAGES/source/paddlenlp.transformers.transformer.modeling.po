@@ -45,7 +45,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
 #: paddlenlp.transformers.transformer.modeling.position_encoding_init
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.transformer.modeling.position_encoding_init:5
 msgid ""
@@ -71,7 +71,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
 #: paddlenlp.transformers.transformer.modeling.position_encoding_init
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.transformer.modeling.position_encoding_init:13
 msgid ""
@@ -89,7 +89,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward
 #: paddlenlp.transformers.transformer.modeling.position_encoding_init
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion.forward:30
@@ -101,7 +101,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding.forward:14
 #: paddlenlp.transformers.transformer.modeling.position_encoding_init:18
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.transformer.modeling.CrossEntropyCriterion:1
 #: paddlenlp.transformers.transformer.modeling.PositionalEmbedding:1
@@ -109,7 +109,7 @@ msgstr ""
 #: paddlenlp.transformers.transformer.modeling.TransformerModel:1
 #: paddlenlp.transformers.transformer.modeling.WordEmbedding:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.transformer.modeling.WordEmbedding:1
 msgid "Word Embedding layer of Transformer."
@@ -423,7 +423,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
 msgid "基类：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.layers.rnn.BeamSearchDecoder`"
 
 #: of
 #: paddlenlp.transformers.transformer.modeling.TransformerBeamSearchDecoder:1
@@ -647,7 +647,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:1
 msgid "基类：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.transformer.modeling.TransformerModel`"
 
 #: of paddlenlp.transformers.transformer.modeling.InferTransformerModel:1
 msgid "The Transformer model for auto-regressive generation."

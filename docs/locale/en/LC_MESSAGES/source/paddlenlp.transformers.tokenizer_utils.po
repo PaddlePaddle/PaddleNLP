@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer:1
 msgid ""
@@ -110,7 +110,7 @@ msgstr ""
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.save_vocabulary
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.truncate_sequences
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.__call__:7
 msgid ""
@@ -306,7 +306,7 @@ msgstr ""
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.tokenizer_utils.convert_to_unicode
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.__call__:87
 msgid ""
@@ -429,7 +429,7 @@ msgstr ""
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.tokenizer_utils.convert_to_unicode
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.all_special_tokens:1
@@ -537,7 +537,7 @@ msgstr ""
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.from_pretrained:25
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.save_pretrained:14
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer.save_pretrained:1
@@ -1050,7 +1050,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.tokenizer_utils.BPETokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base Class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.tokenizer_utils.BPETokenizer:1
 msgid ""

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.dialogue.DialogueTask:1
 msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.task.Task`"
 
 #: of paddlenlp.taskflow.dialogue.DialogueTask:1
 msgid ""

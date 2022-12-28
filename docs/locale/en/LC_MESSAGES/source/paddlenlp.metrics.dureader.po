@@ -47,7 +47,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.dureader.normalize
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.dureader.normalize:4
 msgid "A list of normalized strings."

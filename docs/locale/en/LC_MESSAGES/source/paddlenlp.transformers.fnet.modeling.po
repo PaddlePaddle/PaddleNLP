@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.fnet.modeling.FNetPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.fnet.modeling.FNetPretrainedModel:1
 msgid ""
@@ -47,7 +47,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.modeling.FNetForTokenClassification:1
 #: paddlenlp.transformers.fnet.modeling.FNetModel:1
 msgid "基类：:class:`paddlenlp.transformers.fnet.modeling.FNetPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.fnet.modeling.FNetPretrainedModel`"
 
 #: of paddlenlp.transformers.fnet.modeling.FNetModel:1
 msgid ""
@@ -73,7 +73,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.modeling.FNetModel
 #: paddlenlp.transformers.fnet.modeling.FNetModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.fnet.modeling.FNetModel:5
 msgid ""
@@ -234,7 +234,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.modeling.FNetForSequenceClassification.forward
 #: paddlenlp.transformers.fnet.modeling.FNetModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.fnet.modeling.FNetModel.forward:32
 msgid ""
@@ -319,13 +319,13 @@ msgstr ""
 #: paddlenlp.transformers.fnet.modeling.FNetForSequenceClassification.forward
 #: paddlenlp.transformers.fnet.modeling.FNetModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.fnet.modeling.FNetForSequenceClassification.forward:46
 #: paddlenlp.transformers.fnet.modeling.FNetModel.forward:57
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.fnet.modeling.FNetForSequenceClassification:1
 msgid ""

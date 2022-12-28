@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
 
 #: of paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer:1
 msgid ""
@@ -38,7 +38,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.create_token_type_ids_from_sequences
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer:6
 msgid ""
@@ -113,7 +113,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.create_token_type_ids_from_sequences
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.build_inputs_with_special_tokens:13
@@ -124,7 +124,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.build_inputs_with_special_tokens
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.create_token_type_ids_from_sequences
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.reformer.tokenizer.ReformerTokenizer.create_token_type_ids_from_sequences:1

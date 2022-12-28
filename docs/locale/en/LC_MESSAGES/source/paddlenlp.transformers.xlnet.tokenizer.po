@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base Class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:1
 msgid ""
@@ -52,7 +52,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.save_resources
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer:7
 msgid ""
@@ -162,7 +162,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.convert_tokens_to_string:7
@@ -177,7 +177,7 @@ msgstr ""
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.xlnet.tokenizer.XLNetTokenizer.num_special_tokens_to_add:1

@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.data.data_collator.DataCollatorWithPadding:1
 #: paddlenlp.data.data_collator.DefaultDataCollator:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.data.data_collator.DataCollatorWithPadding:1
 msgid ""
@@ -38,7 +38,7 @@ msgstr ""
 #: paddlenlp.data.data_collator.DataCollatorForTokenClassification
 #: paddlenlp.data.data_collator.DataCollatorWithPadding
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.data.data_collator.DataCollatorForSeq2Seq:3
 #: paddlenlp.data.data_collator.DataCollatorForTokenClassification:3

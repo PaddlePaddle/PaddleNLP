@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:1
 msgid "基类：:class:`paddle.optimizer.lr.LambdaDecay`"
-msgstr ""
+msgstr "Base class：:class:`paddle.optimizer.lr.LambdaDecay`"
 
 #: of paddlenlp.transformers.optimization.LinearDecayWithWarmup:1
 msgid ""
@@ -40,7 +40,7 @@ msgstr ""
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:5
 #: paddlenlp.transformers.optimization.CosineDecayWithWarmup:7
@@ -82,7 +82,7 @@ msgstr ""
 #: paddlenlp.transformers.optimization.LinearDecayWithWarmup:21
 #: paddlenlp.transformers.optimization.PolyDecayWithWarmup:25
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.optimization.ConstScheduleWithWarmup:1
 msgid ""

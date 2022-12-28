@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -31,7 +31,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -39,7 +39,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.mbart.tokenizer.MBartTokenizer.tokenize:1
 msgid "Tokenize a string."

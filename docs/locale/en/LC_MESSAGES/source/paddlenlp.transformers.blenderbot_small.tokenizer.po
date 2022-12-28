@@ -24,7 +24,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer:1
@@ -56,7 +56,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer:28
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.bpe:1
@@ -71,7 +71,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.convert_ids_to_string
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.convert_tokens_to_string
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.bpe:6
@@ -83,7 +83,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.convert_ids_to_string
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.convert_tokens_to_string
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.blenderbot_small.tokenizer.BlenderbotSmallTokenizer.convert_tokens_to_string:1

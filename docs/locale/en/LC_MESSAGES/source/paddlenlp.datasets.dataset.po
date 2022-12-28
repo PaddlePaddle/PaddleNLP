@@ -38,7 +38,7 @@ msgstr ""
 #: paddlenlp.datasets.dataset.MapDataset.map
 #: paddlenlp.datasets.dataset.load_dataset
 msgid "参数"
-msgstr ""
+msgstr "Paremeters"
 
 #: of paddlenlp.datasets.dataset.MapDataset:5
 msgid ""
@@ -164,7 +164,7 @@ msgstr ""
 #: of paddlenlp.datasets.dataset.DatasetBuilder.read
 #: paddlenlp.datasets.dataset.load_dataset
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.datasets.dataset.DatasetBuilder.read:18
 msgid "A `MapDataset|IterDataset`."

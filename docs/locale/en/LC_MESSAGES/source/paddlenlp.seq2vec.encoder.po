@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.RNNEncoder:1
 #: paddlenlp.seq2vec.encoder.TCNEncoder:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.seq2vec.encoder.BoWEncoder:1
 msgid ""
@@ -52,7 +52,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.TCNEncoder
 #: paddlenlp.seq2vec.encoder.TCNEncoder.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.seq2vec.encoder.BoWEncoder:6
 #: paddlenlp.seq2vec.encoder.CNNEncoder:20
@@ -65,7 +65,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.LSTMEncoder:43
 #: paddlenlp.seq2vec.encoder.RNNEncoder:43
 msgid "示例"
-msgstr ""
+msgstr "Demo"
 
 #: of paddlenlp.seq2vec.encoder.BoWEncoder.get_input_dim:1
 msgid ""
@@ -105,7 +105,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.RNNEncoder.forward
 #: paddlenlp.seq2vec.encoder.TCNEncoder.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.seq2vec.encoder.BoWEncoder.forward:12
 msgid ""
@@ -120,7 +120,7 @@ msgstr ""
 #: paddlenlp.seq2vec.encoder.RNNEncoder.forward
 #: paddlenlp.seq2vec.encoder.TCNEncoder.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.seq2vec.encoder.CNNEncoder:1
 msgid ""

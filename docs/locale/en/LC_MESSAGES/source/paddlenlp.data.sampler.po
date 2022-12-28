@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.data.sampler.SamplerHelper:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.data.sampler.SamplerHelper:1
 msgid ""
@@ -55,7 +55,7 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 #: paddlenlp.data.sampler.SamplerHelper.sort
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.data.sampler.SamplerHelper:17
 msgid "Input dataset for :class:`SamplerHelper`."
@@ -88,7 +88,7 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 #: paddlenlp.data.sampler.SamplerHelper.sort
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.data.sampler.SamplerHelper.shuffle:10
 msgid "A new shuffled :class:`SamplerHelper` object."
@@ -99,14 +99,14 @@ msgstr ""
 #: paddlenlp.data.sampler.SamplerHelper.shuffle
 #: paddlenlp.data.sampler.SamplerHelper.sort
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.data.sampler.SamplerHelper.batch:25
 #: paddlenlp.data.sampler.SamplerHelper.shard:18
 #: paddlenlp.data.sampler.SamplerHelper.shuffle:14
 #: paddlenlp.data.sampler.SamplerHelper.sort:21
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.data.sampler.SamplerHelper.sort:1
 msgid "Sorts the dataset according to given callable :meth:`cmp` or :meth:`key`."

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.named_entity_recognition.NERWordTagTask:1
 msgid "基类：:class:`paddlenlp.taskflow.knowledge_mining.WordTagTask`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.knowledge_mining.WordTagTask`"
 
 #: of paddlenlp.taskflow.named_entity_recognition.NERWordTagTask:1
 msgid ""
@@ -37,7 +37,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.named_entity_recognition.NERLACTask:1
 msgid "基类：:class:`paddlenlp.taskflow.lexical_analysis.LacTask`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.lexical_analysis.LacTask`"
 
 #: of paddlenlp.taskflow.named_entity_recognition.NERLACTask:1
 msgid ""

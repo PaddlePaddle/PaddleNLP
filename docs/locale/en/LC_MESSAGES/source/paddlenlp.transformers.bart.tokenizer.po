@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
 
 #: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:1
 msgid "Construct a BART tokenizer based on byte-level Byte-Pair-Encoding."
@@ -38,7 +38,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bart.tokenizer.BartTokenizer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:6
 msgid ""
@@ -107,7 +107,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bart.tokenizer.BartTokenizer:46
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.bart.tokenizer.BartTokenizer.build_inputs_with_special_tokens:1

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer:1
 msgid ""
@@ -36,7 +36,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.tokenize
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer:3
 msgid "The file path of the vocabulary."
@@ -93,7 +93,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.tokenize
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -106,7 +106,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.tokenize
 #: paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.ernie_m.tokenizer.ErnieMTokenizer.clean_text:1
 msgid "Performs invalid character removal and whitespace cleanup on text."

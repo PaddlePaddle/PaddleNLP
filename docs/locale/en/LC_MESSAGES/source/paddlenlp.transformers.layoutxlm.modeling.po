@@ -30,7 +30,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.modeling.LayoutXLMForTokenClassification:1
 #: paddlenlp.transformers.layoutxlm.modeling.LayoutXLMModel:1
 msgid "基类：:class:`paddlenlp.transformers.layoutxlm.modeling.LayoutXLMPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutxlm.modeling.LayoutXLMPretrainedModel`"
 
 #: of paddlenlp.transformers.layoutxlm.modeling.LayoutXLMModel:1
 msgid "The bare LayoutXLM Model outputting raw hidden-states."
@@ -58,7 +58,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.modeling.LayoutXLMModel
 #: paddlenlp.transformers.layoutxlm.modeling.LayoutXLMModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.layoutxlm.modeling.LayoutXLMModel:10
 msgid ""
@@ -142,7 +142,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.modeling.LayoutXLMPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.layoutxlm.modeling.LayoutXLMPretrainedModel.init_weights:1

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer:1
 msgid ""
@@ -49,7 +49,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer:9
 msgid ""
@@ -103,7 +103,7 @@ msgstr ""
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer:38
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.convert_tokens_to_string:10
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -118,7 +118,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -133,7 +133,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.roformer.tokenizer.RoFormerTokenizer.convert_tokens_to_string:1
@@ -301,7 +301,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.roformer.tokenizer.JiebaBasicTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.bert.tokenizer.BasicTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.bert.tokenizer.BasicTokenizer`"
 
 #: of paddlenlp.transformers.roformer.tokenizer.JiebaBasicTokenizer:1
 msgid ""

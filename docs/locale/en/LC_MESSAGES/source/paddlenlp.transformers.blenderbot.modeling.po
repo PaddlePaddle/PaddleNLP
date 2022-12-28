@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForConditionalGeneration:1
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel:1
 msgid "基类：:class:`paddlenlp.transformers.blenderbot.modeling.BlenderbotPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.blenderbot.modeling.BlenderbotPretrainedModel`"
 
 #: of paddlenlp.transformers.blenderbot.modeling.BlenderbotModel:1
 msgid "Construct a bare Blenderbot Model."
@@ -54,7 +54,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.blenderbot.modeling.BlenderbotModel:10
 msgid "Vocabulary size of the Blenderbot model."
@@ -253,7 +253,7 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForCausalLM.forward
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.blenderbot.modeling.BlenderbotModel.forward:33
 msgid ""
@@ -270,14 +270,14 @@ msgstr ""
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForConditionalGeneration.forward
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForCausalLM.forward:32
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForConditionalGeneration.forward:11
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotModel.forward:40
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.blenderbot.modeling.BlenderbotForConditionalGeneration.get_encoder:1
@@ -287,7 +287,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.blenderbot.modeling.BlenderbotPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.blenderbot.modeling.BlenderbotPretrainedModel:1
 msgid ""

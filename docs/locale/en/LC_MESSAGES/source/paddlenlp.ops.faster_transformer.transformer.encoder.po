@@ -57,7 +57,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_forward
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_layer_forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_layer_forward:13
@@ -84,7 +84,7 @@ msgstr ""
 #: of paddlenlp.ops.faster_transformer.transformer.encoder.encoder_forward
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_layer_forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_layer_forward:28
@@ -101,7 +101,7 @@ msgstr ""
 #: of paddlenlp.ops.faster_transformer.transformer.encoder.encoder_forward
 #: paddlenlp.ops.faster_transformer.transformer.encoder.encoder_layer_forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.ops.faster_transformer.transformer.encoder.encoder_forward:1
 msgid ""
@@ -156,7 +156,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.encoder.disable_faster_encoder:5
 #: paddlenlp.ops.faster_transformer.transformer.encoder.enable_faster_encoder:7
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.encoder.disable_faster_encoder:1

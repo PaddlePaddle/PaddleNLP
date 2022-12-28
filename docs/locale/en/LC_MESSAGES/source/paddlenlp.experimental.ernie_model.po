@@ -47,7 +47,7 @@ msgstr ""
 #: paddlenlp.experimental.ernie_model.FasterErnieModel
 #: paddlenlp.experimental.ernie_model.FasterErnieModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.experimental.ernie_model.FasterErnieModel:10
 msgid ""

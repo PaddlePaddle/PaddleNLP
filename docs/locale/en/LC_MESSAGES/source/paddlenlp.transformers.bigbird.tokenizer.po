@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:1
 msgid ""
@@ -45,7 +45,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:7
 msgid ""
@@ -93,7 +93,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer
 msgid "引发"
-msgstr ""
+msgstr "Cause"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer:32
 msgid "If file sentencepiece_model_file doesn't exist."
@@ -110,7 +110,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -123,7 +123,7 @@ msgstr ""
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:1
@@ -146,7 +146,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.bigbird.tokenizer.BigBirdTokenizer.encode:1
 msgid "Returns a tuple containing the encoded sequence and mask information."

@@ -31,7 +31,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraModel:1
 #: paddlenlp.transformers.electra.modeling.ErnieHealthDiscriminator:1
 msgid "基类：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.electra.modeling.ElectraPretrainedModel`"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraModel:1
 msgid "The bare Electra Model transformer outputting raw hidden-states."
@@ -80,7 +80,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraModel:10
 msgid ""
@@ -253,7 +253,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "返回"
-msgstr ""
+msgstr "Retuen"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraModel.forward:32
 msgid ""
@@ -277,7 +277,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ErnieHealthForTotalPretraining.sample_negatives_from_softmax
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraDiscriminator.forward:16
 #: paddlenlp.transformers.electra.modeling.ElectraForMultipleChoice.forward:17
@@ -287,11 +287,11 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraGenerator.forward:15
 #: paddlenlp.transformers.electra.modeling.ElectraModel.forward:37
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraPretrainedModel:1
 msgid ""
@@ -512,7 +512,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.modeling.ElectraPretrainingCriterion:1
 #: paddlenlp.transformers.electra.modeling.ErnieHealthPretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.electra.modeling.ElectraClassificationHead:1
 msgid "Perform sentence-level classification tasks."

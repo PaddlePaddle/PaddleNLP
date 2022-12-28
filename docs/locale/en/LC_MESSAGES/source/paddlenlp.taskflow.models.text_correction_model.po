@@ -42,7 +42,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:1
 msgid ""
@@ -133,7 +133,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward:34
 msgid ""
@@ -163,5 +163,5 @@ msgstr ""
 
 #: of paddlenlp.taskflow.models.text_correction_model.ErnieForCSC.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

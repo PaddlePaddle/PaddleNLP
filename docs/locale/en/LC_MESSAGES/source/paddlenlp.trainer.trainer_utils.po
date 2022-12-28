@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.trainer.trainer_utils.ExplicitEnum:1
 msgid "基类：:class:`enum.Enum`"
-msgstr ""
+msgstr "Base class：:class:`enum.Enum`"
 
 #: of paddlenlp.trainer.trainer_utils.ExplicitEnum:1
 msgid "Enum with more explicit error message for missing values."
@@ -39,7 +39,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_utils.PredictionOutput:1
 #: paddlenlp.trainer.trainer_utils.TrainOutput:1
 msgid "基类：:class:`tuple`"
-msgstr ""
+msgstr "Base class：:class:`tuple`"
 
 #: of paddlenlp.trainer.trainer_utils.EvalPrediction:1
 msgid "Evaluation output (always contains labels), to be used to compute metrics."
@@ -49,7 +49,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_utils.EvalPrediction
 #: paddlenlp.trainer.trainer_utils.default_compute_objective
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.trainer.trainer_utils.EvalPrediction:3
 msgid "Predictions of the model."
@@ -91,7 +91,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_utils.OptimizerNames:1
 #: paddlenlp.trainer.trainer_utils.SchedulerType:1
 msgid "基类：:class:`paddlenlp.trainer.trainer_utils.ExplicitEnum`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.trainer.trainer_utils.ExplicitEnum`"
 
 #: of paddlenlp.trainer.trainer_utils.EvaluationStrategy:1
 #: paddlenlp.trainer.trainer_utils.IntervalStrategy:1
@@ -137,7 +137,7 @@ msgstr ""
 #: of paddlenlp.trainer.trainer_utils.default_compute_objective
 #: paddlenlp.trainer.trainer_utils.metrics_format
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.trainer.trainer_utils.default_compute_objective:7
 msgid "The objective to minimize or maximize"
@@ -146,7 +146,7 @@ msgstr ""
 #: of paddlenlp.trainer.trainer_utils.default_compute_objective
 #: paddlenlp.trainer.trainer_utils.metrics_format
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.trainer.trainer_utils.default_compute_objective:8
 msgid "`float`"

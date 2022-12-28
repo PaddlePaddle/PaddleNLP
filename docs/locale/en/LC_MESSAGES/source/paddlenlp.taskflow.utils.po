@@ -44,7 +44,7 @@ msgstr ""
 #: paddlenlp.taskflow.utils.download_file
 #: paddlenlp.taskflow.utils.levenstein_distance
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.utils.download_file:5
 msgid "The specified directory saving the file."
@@ -85,7 +85,7 @@ msgstr ""
 #: paddlenlp.taskflow.utils.Customization:1 paddlenlp.taskflow.utils.TermTree:1
 #: paddlenlp.taskflow.utils.TermTreeNode:1 paddlenlp.taskflow.utils.TriedTree:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.taskflow.utils.TermTreeNode:1
 msgid ""
@@ -154,7 +154,7 @@ msgstr ""
 #: paddlenlp.taskflow.utils.TriedTree.search
 #: paddlenlp.taskflow.utils.levenstein_distance
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.taskflow.utils.TermTreeNode.from_dict:6
 #: paddlenlp.taskflow.utils.TermTreeNode.from_json:6
@@ -169,7 +169,7 @@ msgstr ""
 #: paddlenlp.taskflow.utils.TriedTree.search
 #: paddlenlp.taskflow.utils.levenstein_distance
 msgid "返回类型"
-msgstr ""
+msgstr "Retuen type"
 
 #: of paddlenlp.taskflow.utils.TermTreeNode.from_json:1
 msgid "Build a node from JSON string."

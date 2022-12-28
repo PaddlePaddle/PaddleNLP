@@ -31,7 +31,7 @@ msgstr ""
 #: of paddlenlp.layers.tcn.TCN.forward paddlenlp.layers.tcn.TemporalBlock
 #: paddlenlp.layers.tcn.TemporalBlock.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.layers.tcn.TemporalBlock:4
 msgid "The number of channels in the input tensor."
@@ -79,7 +79,7 @@ msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.layers.tcn.TCN.forward:6
 msgid ""
@@ -89,5 +89,5 @@ msgstr ""
 
 #: of paddlenlp.layers.tcn.TCN.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:1
 msgid ""
@@ -50,7 +50,7 @@ msgstr ""
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.merge_subword
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:9
 msgid ""
@@ -97,7 +97,7 @@ msgstr ""
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer:34
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -114,7 +114,7 @@ msgstr ""
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -131,7 +131,7 @@ msgstr ""
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.load_vocabulary:1
 msgid ""
@@ -508,5 +508,5 @@ msgstr ""
 
 #: of paddlenlp.transformers.unimo.tokenizer.UNIMOTokenizer.gen_encode:87
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 

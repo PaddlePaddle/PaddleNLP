@@ -47,7 +47,7 @@ msgstr ""
 #: paddlenlp.taskflow.models.sentiment_analysis_model.LSTMModel.forward
 #: paddlenlp.taskflow.models.sentiment_analysis_model.SkepSequenceModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.models.sentiment_analysis_model.BoWModel:15
 msgid "The output size of linear that after the bow, default value is 128."

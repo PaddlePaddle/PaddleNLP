@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.dependency_parsing.DDParserTask:1
 msgid "基类：:class:`paddlenlp.taskflow.task.Task`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.task.Task`"
 
 #: of paddlenlp.taskflow.dependency_parsing.DDParserTask:1
 msgid ""
@@ -62,7 +62,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.dependency_parsing.eisner
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.taskflow.dependency_parsing.eisner:7
 msgid ""
@@ -86,7 +86,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.dependency_parsing.stripe
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.taskflow.dependency_parsing.stripe:3
 msgid "the input tensor with 2 or more dims."
@@ -123,7 +123,7 @@ msgstr ""
 #: of paddlenlp.taskflow.dependency_parsing.DepTree:1
 #: paddlenlp.taskflow.dependency_parsing.Node:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.taskflow.dependency_parsing.Node:1
 msgid "Node class"

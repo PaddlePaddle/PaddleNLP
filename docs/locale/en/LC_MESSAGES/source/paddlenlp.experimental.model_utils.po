@@ -33,7 +33,7 @@ msgstr ""
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.save_pretrained
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.save_resources
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.from_pretrained:5
@@ -86,7 +86,7 @@ msgstr ""
 
 #: of paddlenlp.experimental.model_utils.FasterPretrainedModel.from_pretrained
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.from_pretrained:23
@@ -95,13 +95,13 @@ msgstr ""
 
 #: of paddlenlp.experimental.model_utils.FasterPretrainedModel.from_pretrained
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.from_pretrained:27
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.save_pretrained:13
 msgid "示例"
-msgstr ""
+msgstr "example"
 
 #: of
 #: paddlenlp.experimental.model_utils.FasterPretrainedModel.save_pretrained:1

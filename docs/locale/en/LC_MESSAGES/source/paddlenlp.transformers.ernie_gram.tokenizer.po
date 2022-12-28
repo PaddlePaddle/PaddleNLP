@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`"
 
 #: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:1
 msgid ""
@@ -41,7 +41,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:7
 msgid ""
@@ -87,5 +87,5 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_gram.tokenizer.ErnieGramTokenizer:32
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 

@@ -29,7 +29,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_callback.TrainerControl:1
 #: paddlenlp.trainer.trainer_callback.TrainerState:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.trainer.trainer_callback.TrainerState:1
 msgid ""
@@ -59,7 +59,7 @@ msgstr ""
 #: paddlenlp.trainer.trainer_callback.TrainerControl
 #: paddlenlp.trainer.trainer_callback.TrainerState
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.trainer.trainer_callback.TrainerState:12
 msgid ""

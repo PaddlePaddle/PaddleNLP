@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.Conv2d:1
 msgid "基类：:class:`paddle.nn.layer.conv.Conv2D`"
-msgstr ""
+msgstr "Base class：:class:`paddle.nn.layer.conv.Conv2D`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.Backbone.forward:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.BasicStem.forward:1
@@ -48,7 +48,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.visual_backbone.VisualBackbone.forward
 #: paddlenlp.transformers.layoutxlm.visual_backbone.get_norm
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.Backbone.forward:4
 #: paddlenlp.transformers.layoutxlm.visual_backbone.BasicStem.forward:4
@@ -73,11 +73,11 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.visual_backbone.LastLevelMaxPool:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.VisualBackbone:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.ShapeSpec:1
 msgid "基类：:class:`paddlenlp.transformers.layoutxlm.visual_backbone._ShapeSpec`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutxlm.visual_backbone._ShapeSpec`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.get_norm:1
 msgid ""
@@ -96,7 +96,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.visual_backbone.build_resnet_backbone
 #: paddlenlp.transformers.layoutxlm.visual_backbone.get_norm
 msgid "返回"
-msgstr ""
+msgstr "Return "
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.get_norm:8
 msgid "the normalization layer"
@@ -109,18 +109,18 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.visual_backbone.build_resnet_backbone
 #: paddlenlp.transformers.layoutxlm.visual_backbone.get_norm
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.FrozenBatchNorm:1
 msgid "基类：:class:`paddle.fluid.dygraph.nn.BatchNorm`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.nn.BatchNorm`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.BasicBlock:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.BasicStem:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.BottleneckBlock:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.DeformBottleneckBlock:1
 msgid "基类：:class:`paddlenlp.transformers.layoutxlm.visual_backbone.CNNBlockBase`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutxlm.visual_backbone.CNNBlockBase`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.BasicBlock:1
 msgid ""
@@ -151,7 +151,7 @@ msgstr ""
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.FPN:1
 #: paddlenlp.transformers.layoutxlm.visual_backbone.ResNet:1
 msgid "基类：:class:`paddlenlp.transformers.layoutxlm.visual_backbone.Backbone`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutxlm.visual_backbone.Backbone`"
 
 #: of paddlenlp.transformers.layoutxlm.visual_backbone.ResNet.forward:1
 msgid ""

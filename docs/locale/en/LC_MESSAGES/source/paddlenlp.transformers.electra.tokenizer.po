@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:1
 msgid ""
@@ -48,7 +48,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:9
 msgid ""
@@ -95,7 +95,7 @@ msgstr ""
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer:34
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -110,7 +110,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -125,7 +125,7 @@ msgstr ""
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.electra.tokenizer.ElectraTokenizer.convert_tokens_to_string:1

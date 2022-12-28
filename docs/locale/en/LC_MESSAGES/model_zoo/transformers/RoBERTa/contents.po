@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../model_zoo/transformers/RoBERTa/contents.rst:5
 msgid "RoBERTa模型汇总"
-msgstr ""
+msgstr "Sumnary of RoBERTa Models"
 
 #: ../model_zoo/transformers/RoBERTa/contents.rst:8
 msgid "下表汇总介绍了目前PaddleNLP支持的RoBERTa模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
-msgstr ""
+msgstr "The following table summerizes all weights of the currently supported pre-trained RoBERTa models in PaddleNLP. For more details, please refer to the relevant links."
 
 #: ../model_zoo/transformers/RoBERTa/contents.rst:12
 msgid "Pretrained Weight"

@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.modeling.LukeForQuestionAnswering:1
 #: paddlenlp.transformers.luke.modeling.LukeModel:1
 msgid "基类：:class:`paddlenlp.transformers.luke.modeling.LukePretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.luke.modeling.LukePretrainedModel`"
 
 #: of paddlenlp.transformers.luke.modeling.LukeModel:1
 msgid "The bare Luke Model transformer outputting raw hidden-states."
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.modeling.LukeModel
 #: paddlenlp.transformers.luke.modeling.LukeModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.luke.modeling.LukeModel:10
 msgid ""
@@ -275,7 +275,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.modeling.LukeForQuestionAnswering.forward
 #: paddlenlp.transformers.luke.modeling.LukeModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.luke.modeling.LukeModel.forward:53
 msgid ""
@@ -341,7 +341,7 @@ msgstr ""
 #: paddlenlp.transformers.luke.modeling.LukeForQuestionAnswering.forward
 #: paddlenlp.transformers.luke.modeling.LukeModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.luke.modeling.LukeForEntityClassification.forward:25
@@ -351,11 +351,11 @@ msgstr ""
 #: paddlenlp.transformers.luke.modeling.LukeForQuestionAnswering.forward:31
 #: paddlenlp.transformers.luke.modeling.LukeModel.forward:72
 msgid "示例"
-msgstr ""
+msgstr "Example"
 
 #: of paddlenlp.transformers.luke.modeling.LukePretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class"
 
 #: of paddlenlp.transformers.luke.modeling.LukePretrainedModel:1
 msgid ""

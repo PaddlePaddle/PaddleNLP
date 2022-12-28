@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.transformers.semantic_search.modeling.ErnieCrossEncoder:1
 #: paddlenlp.transformers.semantic_search.modeling.ErnieDualEncoder:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.semantic_search.modeling.ErnieDualEncoder:1
 msgid ""
@@ -36,7 +36,7 @@ msgstr ""
 #: of paddlenlp.transformers.semantic_search.modeling.ErnieCrossEncoder:2
 #: paddlenlp.transformers.semantic_search.modeling.ErnieDualEncoder:6
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.semantic_search.modeling.ErnieCrossEncoder.forward:1
@@ -49,7 +49,7 @@ msgstr ""
 #: of paddlenlp.transformers.semantic_search.modeling.ErnieCrossEncoder.forward
 #: paddlenlp.transformers.semantic_search.modeling.ErnieDualEncoder.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.semantic_search.modeling.ErnieCrossEncoder.forward:4

@@ -30,7 +30,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMForTokenClassification:1
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMModel:1
 msgid "基类：:class:`paddlenlp.transformers.layoutlm.modeling.LayoutLMPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.layoutlm.modeling.LayoutLMPretrainedModel`"
 
 #: of paddlenlp.transformers.layoutlm.modeling.LayoutLMModel:1
 msgid "The bare LayoutLM Model outputting raw hidden-states."
@@ -61,7 +61,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMModel
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.layoutlm.modeling.LayoutLMModel:10
 msgid ""
@@ -218,7 +218,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMForTokenClassification.forward
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Returns"
 
 #: of paddlenlp.transformers.layoutlm.modeling.LayoutLMModel.forward:35
 msgid ""
@@ -267,11 +267,11 @@ msgstr ""
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMForTokenClassification.forward
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return types"
 
 #: of paddlenlp.transformers.layoutlm.modeling.LayoutLMPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMPretrainedModel.init_weights:1
@@ -317,7 +317,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMForSequenceClassification.forward:21
 #: paddlenlp.transformers.layoutlm.modeling.LayoutLMForTokenClassification.forward:21
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.layoutlm.modeling.LayoutLMForTokenClassification:1
 msgid ""

@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification:1
 #: paddlenlp.transformers.roformer.modeling.RoFormerModel:1
 msgid "基类：:class:`paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel`"
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerModel:1
 msgid "The bare RoFormer Model transformer outputting raw hidden-states."
@@ -64,7 +64,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters "
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerModel:10
 msgid ""
@@ -244,7 +244,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:35
 msgid ""
@@ -321,7 +321,7 @@ msgstr ""
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion.forward
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.roformer.modeling.RoFormerForQuestionAnswering.forward:22
@@ -329,11 +329,11 @@ msgstr ""
 #: paddlenlp.transformers.roformer.modeling.RoFormerForTokenClassification.forward:13
 #: paddlenlp.transformers.roformer.modeling.RoFormerModel.forward:55
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainedModel:1
 msgid ""
@@ -432,7 +432,7 @@ msgstr ""
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
 #: paddlenlp.transformers.roformer.modeling.RoFormerPretrainingHeads:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.roformer.modeling.RoFormerPretrainingCriterion:1
 msgid ""

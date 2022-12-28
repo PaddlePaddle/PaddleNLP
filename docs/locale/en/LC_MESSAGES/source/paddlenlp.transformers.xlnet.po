@@ -25,7 +25,7 @@ msgstr ""
 msgid ""
 "`XLNet: Generalized Autoregressive Pretraining for Language Understanding"
 " <https://arxiv.org/abs/1906.08237>`__ 是一款无监督的自回归预训练语言模型。"
-msgstr ""
+msgstr "`XLNet: Generalized Autoregressive Pretraining for Language Understanding <https://arxiv.org/abs/1906.08237>`__ is an unsupervised auto-regressive pre-trained language model."
 
 #: of paddlenlp.transformers.xlnet:7
 msgid ""
@@ -34,8 +34,10 @@ msgid ""
 "模型， Transformer-XL中的片段循环机制（Segment Recurrent Mechanism）和相对位置编码（Relative "
 "Positional Encoding）机制 能够支持XLNet接受更长的输入序列，这使得XLNet在长文本序列的语言任务上有着优秀的表现。"
 msgstr ""
+"Different from traditional one-way autoregressive models, XLNet performs language modeling by maximizing the expectation of all permutations of the input sequence, which enables it to simultaneously pay attention to contextual information."
+"In addition, XLNet integrates the `Transformer-XL <https://arxiv.org/abs/1901.02860>`__ model in the pre-training stage, the Segment Recurrent Mechanism"
+"and Relative Positional Encoding mechanism. It can support XLNet to accept longer input sequence, and makes XLNet have excellent performance on the language task of long text sequence."
 
 #: of paddlenlp.transformers.xlnet:12
 msgid "本项目是XLNet在 Paddle 2.0上的开源实现，由modeling和tokenizer两部分组成。"
-msgstr ""
-
+msgstr "This project is an open source implementation of XLNet on Paddle 2.0. It consists of two parts: modeling and tokenizer."

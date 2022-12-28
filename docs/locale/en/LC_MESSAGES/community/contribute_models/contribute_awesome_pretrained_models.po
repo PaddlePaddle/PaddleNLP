@@ -19,17 +19,19 @@ msgstr ""
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:3
 msgid "贡献预训练模型权重"
-msgstr ""
+msgstr "Contribute pre-trained model weights"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:6
 msgid "1. 模型网络结构类型"
-msgstr ""
+msgstr "1. Model network structure type"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:7
 msgid ""
 "PaddleNLP目前已支持绝大多数主流的预训练模型网络结构，既包括百度自研的预训练模型（如ERNIE系列）， "
 "也涵盖业界主流的预训练模型（如BERT，ALBERT，GPT，RoBERTa，XLNet等）。"
 msgstr ""
+"PaddleNLP is now supporing most mainstream pre-training model network structures, including Baidu's self-developed pre-training models (such as the ERNIE series),"
+"as well as the industry's mainstream pre-training models (such as BERT, ALBERT, GPT, RoBERTa, XLNet, etc. )."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:10
 msgid ""
@@ -39,14 +41,21 @@ msgid ""
 "<https://paddlenlp.readthedocs.io/zh/latest/community/contribute_models/contribute_new_models.html>`_"
 " ）。"
 msgstr ""
+"The summary of the pre-trained model structure types currently supported by PaddleNLP can be found in the `Transformer pre-trained model summary"
+"<https://paddlenlp.readthedocs.io/zh/latest/model_zoo/transformers.html>`_"
+"(continuously adding, new model contributions are also very welcome: `How to contribute new models"
+"<https://paddlenlp.readthedocs.io/zh/latest/community/contribute_models/contribute_new_models.html>`_"
+" ）。"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:15
 msgid "2. 模型参数权重类型"
-msgstr ""
+msgstr "2. "
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:16
 msgid "非常欢迎大家贡献优质模型参数权重。 参数权重类型包括但不限于（以BERT模型网络为例）："
 msgstr ""
+"Contributions of high quality model parameter weights are very welcome."
+"Parameter weight types include but are not limited to (take the BERT model network as an example):"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:19
 msgid ""
@@ -54,6 +63,9 @@ msgid ""
 "<https://huggingface.co/cl-tohoku/bert-base-japanese-char>`_ ，`danish-"
 "bert-botxo <https://huggingface.co/Maltehb/danish-bert-botxo>`_ 等）；"
 msgstr ""
+"The parameter weights of the BERT pre-training model not yet included in PaddleNLP"
+"(such as `bert-base-japanese-char <https://huggingface.co/cl-tohoku/bert-base-japanese-char>`_,"
+"`danish-bert- botxo <https://huggingface.co/Maltehb/danish-bert-botxo>`_ etc.);"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:21
 msgid ""
@@ -61,6 +73,9 @@ msgid ""
 "<https://huggingface.co/tbs17/MathBERT>`_ ，`finbert "
 "<https://huggingface.co/ProsusAI/finbert>`_ 等）；"
 msgstr ""
+"Pre-trained model parameter weights for BERT models in other vertical fields (such as mathematics, finance, law, medicine, etc.)"
+"(such as `MathBERT <https://huggingface.co/tbs17/MathBERT>`_ ，`finbert"
+"<https://huggingface.co/ProsusAI/finbert>`_ etc.）；"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:23
 msgid ""
@@ -69,14 +84,18 @@ msgid ""
 "sentiment>`_ ， `bert-base-NER <https://huggingface.co/dslim/bert-base-"
 "NER>`_ 等）；"
 msgstr ""
+"Model parameter weights after fine-tuning in downstream specific tasks based on BERT"
+"(such as `bert-base-multilingual-uncased-sentiment <https://huggingface.co/nlptown/bert-base-multilingual-uncased-"
+"sentiment>`_ ， `bert-base-NER <https://huggingface.co/dslim/bert-base-"
+"NER>`_ etc.）；"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:26
 msgid "其他模型参数权重（任何你觉得有价值的模型参数权重）；"
-msgstr ""
+msgstr "Other model parameter weights (any model parameter weights you find valuable);"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:29
 msgid "3. 参数权重格式转换"
-msgstr ""
+msgstr "3. Parameter weight format conversion"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:30
 msgid ""
@@ -84,14 +103,18 @@ msgid ""
 "这就需要我们进行不同深度学习框架间的模型格式转换，下面的链接给出了一份详细的关于Pytorch到Paddle模型格式转换的教程： "
 "`Pytorch到Paddle模型格式转换文档 <./convert_pytorch_to_paddle.rst>`_ 。"
 msgstr ""
+"When we want to contribute the weight of a model that is open source on github, but find that the weight is saved in the format of other deep learning frameworks (PyTorch, TensorFlow, etc.),"
+"we need to convert the model format between different deep learning frameworks."
+"The following The link gives a detailed tutorial on converting Pytorch to Paddle model format:"
+"Pytorch to Paddle Model Format Conversion Documentation<./convert_pytorch_to_paddle.rst>`_ ."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:35
 msgid "4. 进行贡献"
-msgstr ""
+msgstr "4. Make a contribution"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:37
 msgid "4.1 准备权重相关文件"
-msgstr ""
+msgstr "4.1 Prepare weight related documents"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:38
 msgid ""
@@ -99,32 +122,38 @@ msgid ""
 "，**vocab.txt**，**tokenizer_config.json** 以及 **model_config.json** "
 "这四个文件进行参数权重贡献。"
 msgstr ""
+"In general, we need to prepare  **model_state.pdparams**，**vocab.txt**，**tokenizer_config.json**, and **model_config.json** these four files to make parameter weights contribution."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:41
 msgid "model_state.pdparams 文件可以通过上述的参数权重格式转换过程得到；"
-msgstr ""
+msgstr "The model_state.pdparams file can be obtained through the above parameter weight format conversion process;"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:42
 msgid ""
 "vocab.txt "
 "文件可以直接使用原始模型对应的vocab文件（根据模型对应tokenizer类型的不同，该文件名可能为spiece.model等）；"
 msgstr ""
+"vocab.txt "
+"file can directly use the vocab file corresponding to the original model (depending on the type of tokenizer corresponding to the model, the file name may be spiece.model, etc.);"
+
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:43
 msgid ""
 "model_config.json 文件可以参考对应 model.save_pretrained() "
 "接口保存的model_config.json文件；"
 msgstr ""
+"The model_config.json file can refer to the model_config.json file saved by the corresponding model.save_pretrained() interface;"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:44
 msgid ""
 "tokenizer_config.json 文件可以参考对应 tokenizer.save_pretrained() "
 "接口保存的model_config.json文件；"
 msgstr ""
+"he tokenizer_config.json file can refer to the model_config.json file saved by the corresponding tokenizer.save_pretrained() interface;"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:47
 msgid "4.2 创建个人目录"
-msgstr ""
+msgstr "4.2 Create a personal directory"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:48
 msgid ""
@@ -132,10 +161,13 @@ msgid ""
 "目录名称使用你的github名称，比如新建目录 ``PaddleNLP/community/yingyibiao/`` 。 "
 "如果已有个人目录，则可以跳过此步骤。"
 msgstr ""
+"If you are making weighted contributions for the first time, then you need to create a new directory under ``PaddleNLP/community/``."
+"Use your github name for the directory name, for example, create a new directory ``PaddleNLP/community/yingyibiao/`` ."
+"You can skip this step if you already have a personal directory."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:53
 msgid "4.3 创建权重目录"
-msgstr ""
+msgstr "4.3 Create a weight directory"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:54
 msgid ""
@@ -143,36 +175,44 @@ msgid ""
 "sst-2-finetuned`` 这个模型， 则新建权重目录 ``PaddleNLP/community/yingyibiao/bert-"
 "base-uncased-sst-2-finetuned/`` 。"
 msgstr ""
+"Create a new weight directory under the personal directory in step 4.2, the weight directory name is the model weight name of this contribution."
+"For example, if I want to contribute the model ``bert-base-uncased-sst-2-finetuned``,"
+"then create a new weight directory ``PaddleNLP/community/yingyibiao/bert-base-uncased-sst-2-finetuned/`` ."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:59
 msgid "4.4 在权重目录下添加PR（pull request）相关文件"
-msgstr ""
+msgstr "4.4 Add PR (pull request) related files in the weight directory"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:60
 msgid "在步骤4.3的目录下加入两个文件，分别为 ``README.md`` 和 ``files.json`` 。"
-msgstr ""
+msgstr "Add two files to the directory in step 4.3, ``README.md`` and ``files.json``."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:62
 msgid "``README.md`` 是对你贡献的权重的详细介绍，使用示例，权重来源等。"
-msgstr ""
+msgstr "``README.md`` is a detailed introduction to the weights you contributed, examples of usage, sources of weights, etc."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:63
 msgid ""
 "``files.json`` 为步骤4.1所得的权重相关文件以及对应地址。files.json文件内容示例如下，只需将地址中的 "
 "*yingyibiao* 和 *bert-base-uncased-sst-2-finetuned* 分别更改为你的github用户名和权重名称。"
 msgstr ""
+"``files.json`` is the weight-related file and corresponding address obtained in step 4.1."
+"An example of the files.json file content is as follows, just change *yingyibiao* and *bert-base-uncased-sst-2-finetuned* in the address "
+"to your github username and weight name respectively."
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:76
 msgid "4.5 在github上提PR进行贡献"
-msgstr ""
+msgstr "4.5 Create PR on github to contribute"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:77
 msgid ""
 "第一次进行开源贡献的同学可以参考 `first-contributions "
 "<https://github.com/firstcontributions/first-contributions>`_ 。"
 msgstr ""
+"Users who make open source contributions for the first time can refer to `first-contributions"
+"<https://github.com/firstcontributions/first-contributions>`_ 。"
 
 #: ../community/contribute_models/contribute_awesome_pretrained_models.rst:78
 msgid "模型权重贡献PR示例请参考 `bert-base-uncased-sst-2-finetuned PR <.>`_ 。"
-msgstr ""
+msgstr "Please refer to `bert-base-uncased-sst-2-finetuned PR <.>`_ for the model weight contribution PR example."
 

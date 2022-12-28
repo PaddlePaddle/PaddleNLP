@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer:1
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer:1
 msgid "Constructs a GPT tokenizer based on byte-level Byte-Pair-Encoding."
@@ -47,7 +47,7 @@ msgstr ""
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_string
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.save_resources
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer:7
 msgid ""
@@ -73,7 +73,7 @@ msgstr ""
 #: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer:19
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer:22
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.vocab_size:1
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.vocab_size:1
@@ -87,7 +87,7 @@ msgstr ""
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_string
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.vocab_size:3
 msgid "The sum of size of vocabulary and the size of speical tokens."
@@ -100,7 +100,7 @@ msgstr ""
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_string
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.convert_ids_to_string:1
@@ -126,7 +126,7 @@ msgstr ""
 #: paddlenlp.transformers.gpt.tokenizer.GPTChineseTokenizer.vocab_size:7
 #: paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.convert_ids_to_string:10
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.gpt.tokenizer.GPTTokenizer.save_resources:1
 msgid ""

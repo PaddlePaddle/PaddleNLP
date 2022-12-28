@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.build_inputs_with_special_tokens:1
@@ -50,7 +50,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.build_inputs_with_special_tokens:6
@@ -69,7 +69,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.num_special_tokens_to_add
 msgid "返回"
-msgstr ""
+msgstr "Returns"
 
 #: of
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.build_inputs_with_special_tokens:11
@@ -82,7 +82,7 @@ msgstr ""
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.num_special_tokens_to_add
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.layoutxlm.tokenizer.LayoutXLMTokenizer.get_special_tokens_mask:1

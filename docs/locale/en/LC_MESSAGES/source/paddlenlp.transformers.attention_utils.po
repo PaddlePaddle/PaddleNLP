@@ -35,7 +35,7 @@ msgstr ""
 #: paddlenlp.transformers.attention_utils.Linear3D.forward
 #: paddlenlp.transformers.attention_utils.MultiHeadAttention.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.attention_utils.Attention.forward:4
 #: paddlenlp.transformers.attention_utils.DefaultAttention.forward:4

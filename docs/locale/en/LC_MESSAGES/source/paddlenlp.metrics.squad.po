@@ -32,7 +32,7 @@ msgstr ""
 #: of paddlenlp.metrics.squad.compute_prediction
 #: paddlenlp.metrics.squad.squad_evaluate
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.metrics.squad.compute_prediction:6
 msgid ""
@@ -76,7 +76,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.squad.compute_prediction
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.squad.compute_prediction:33
 msgid ""

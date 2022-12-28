@@ -19,5 +19,5 @@ msgstr ""
 
 #: ../community/contribute_datasets/index.rst:3
 msgid "如何贡献数据集"
-msgstr ""
+msgstr "How to contribute datasets"
 

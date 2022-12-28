@@ -25,7 +25,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.modeling.SkepForTokenClassification:1
 #: paddlenlp.transformers.skep.modeling.SkepModel:1
 msgid "基类：:class:`paddlenlp.transformers.skep.modeling.SkepPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.skep.modeling.SkepPretrainedModel`"
 
 #: of paddlenlp.transformers.skep.modeling.SkepModel:1
 msgid "The bare SKEP Model outputting raw hidden-states."
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.modeling.SkepModel
 #: paddlenlp.transformers.skep.modeling.SkepModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.skep.modeling.SkepModel:12
 msgid ""
@@ -226,7 +226,7 @@ msgstr ""
 #: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward
 #: paddlenlp.transformers.skep.modeling.SkepModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.skep.modeling.SkepModel.forward:34
 msgid ""
@@ -276,18 +276,18 @@ msgstr ""
 #: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward
 #: paddlenlp.transformers.skep.modeling.SkepModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.skep.modeling.SkepForSequenceClassification.forward:17
 #: paddlenlp.transformers.skep.modeling.SkepForTokenClassification.forward:17
 #: paddlenlp.transformers.skep.modeling.SkepModel.forward:49
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.skep.modeling.SkepPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.skep.modeling.SkepPretrainedModel:1
 msgid ""
@@ -380,7 +380,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.skep.modeling.SkepCrfForTokenClassification:1
 msgid ""

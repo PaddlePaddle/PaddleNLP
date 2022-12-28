@@ -19,231 +19,237 @@ msgstr ""
 
 #: ../FAQ.md:1
 msgid "PaddleNLP常见问题汇总（持续更新）"
-msgstr ""
+msgstr "Summary of PaddleNLP FAQs (continuously updated)"
 
 #: ../FAQ.md:3
 msgid "【精选】NLP精选5问"
-msgstr ""
+msgstr "【Featured】NLP Featured 5 Questions"
 
 #: ../FAQ.md:5 ../FAQ.md:59
 msgid "Q1.1 如何加载自己的本地数据集，以便使用PaddleNLP的功能？"
-msgstr ""
+msgstr "Q1.1 How do I load my own local dataset in order to use the features of PaddleNLP? "
 
 #: ../FAQ.md:6 ../FAQ.md:88
 msgid "Q1.2 PaddleNLP会将内置的数据集、模型下载到默认路径，如何修改路径？"
-msgstr ""
+msgstr "Q1.2 PaddleNLP will download the built-in dataset and model to the default path. How to modify the path?"
 
 #: ../FAQ.md:7 ../FAQ.md:98
 msgid "Q1.3 PaddleNLP中如何保存、加载训练好的模型？"
-msgstr ""
+msgstr "Q1.3 How to save and load the trained model in PaddleNLP?"
 
 #: ../FAQ.md:8 ../FAQ.md:134
 msgid "Q1.4 当训练样本较少时，有什么推荐的方法能提升模型效果吗？"
-msgstr ""
+msgstr "Q1.4 Is there any recommended method to improve the model performance when there are few training samples?"
 
 #: ../FAQ.md:9 ../FAQ.md:140
 msgid "Q1.5 如何提升模型的性能，提升QPS？"
-msgstr ""
+msgstr "Q1.5 How to improve the performance of the model and improve QPS?"
 
 #: ../FAQ.md:11
 msgid "【理论篇】NLP通用问题"
-msgstr ""
+msgstr "【Theory】NLP General Questions"
 
 #: ../FAQ.md:13 ../FAQ.md:152
 msgid "Q2.1 数据类别分布不均衡， 有哪些应对方法？"
-msgstr ""
+msgstr "Q2.1 What are the ways to deal with the uneven distribution of data categories?"
 
 #: ../FAQ.md:14 ../FAQ.md:166
 msgid "Q2.2 如果使用预训练模型，一般需要多少条样本？"
-msgstr ""
+msgstr "Q2.2 How many samples are generally required if using a pretrained model?"
 
 #: ../FAQ.md:16
 msgid "【实战篇】PaddleNLP实战问题"
-msgstr ""
+msgstr "【Practical】PaddleNLP Practical Questions"
 
 #: ../FAQ.md:18 ../FAQ.md:177
 msgid "数据集和数据处理"
-msgstr ""
+msgstr "Datasets and Data Processing"
 
 #: ../FAQ.md:20 ../FAQ.md:181
 msgid "Q3.1 使用自己的数据集训练预训练模型时，如何引入额外的词表？"
-msgstr ""
+msgstr "Q3.1 How do I introduce an extra vocabulary when training a pretrained model with my own dataset?"
 
 #: ../FAQ.md:22 ../FAQ.md:192
 msgid "模型训练调优"
-msgstr ""
+msgstr "Model training and tuning"
 
 #: ../FAQ.md:24 ../FAQ.md:196
 msgid "Q3.2 如何加载自己的预训练模型，进而使用PaddleNLP的功能？"
-msgstr ""
+msgstr "Q3.2 How to load your own pre-trained model and use PaddleNLP's features?"
 
 #: ../FAQ.md:25 ../FAQ.md:230
 msgid "Q3.3 如果训练中断，需要继续热启动训练，如何保证学习率和优化器能从中断地方继续迭代？"
-msgstr ""
+msgstr "Q3.3 If training is interrupted and hot-start training needs to be continued, how to ensure that the learning rate and optimizer can continue to iterate from where they were interrupted?"
 
 #: ../FAQ.md:26 ../FAQ.md:252
 msgid "Q3.4 如何冻结模型梯度？"
-msgstr ""
+msgstr "Q3.4 How to freeze model gradients?"
 
 #: ../FAQ.md:27 ../FAQ.md:313
 msgid "Q3.5 如何在eval阶段打印评价指标，在各epoch保存模型参数？"
-msgstr ""
+msgstr "Q3.5 How to print the evaluation indicators in the eval stage and save the model parameters in each epoch?"
 
 #: ../FAQ.md:28 ../FAQ.md:331
 msgid "Q3.6 训练过程中，训练程序意外退出或Hang住，应该如何排查？"
-msgstr ""
+msgstr "Q3.6 The training program quits or hangs unexpectedly during the training process. How to troubleshoot?"
 
 #: ../FAQ.md:30 ../FAQ.md:339
 msgid "Q3.7 在模型验证和测试过程中，如何保证每一次的结果是相同的？"
-msgstr ""
+msgstr "Q3.7 How to ensure that the results are the same every time during model validation and testing, ?"
 
 #: ../FAQ.md:31 ../FAQ.md:351
 msgid "Q3.8 ERNIE模型如何返回中间层的输出？"
-msgstr ""
+msgstr "Q3.8 How does the ERNIE model return the output of the middle layer?"
 
 #: ../FAQ.md:33 ../FAQ.md:358
 msgid "预测部署"
-msgstr ""
+msgstr "Predictive deployment"
 
 #: ../FAQ.md:35 ../FAQ.md:362
 msgid "Q3.9 PaddleNLP训练好的模型如何部署到服务器 ？"
-msgstr ""
+msgstr "Q3.9 How to deploy the model trained by PaddleNLP to the server?"
 
 #: ../FAQ.md:36 ../FAQ.md:380
 msgid "Q3.10 静态图模型如何转换成动态图模型？"
-msgstr ""
+msgstr "Q3.10 How to convert a static graph model into a dynamic graph model?"
 
 #: ../FAQ.md:38
 msgid "特定模型和应用场景咨询"
-msgstr ""
+msgstr "Consulting on specific models and application scenarios"
 
 #: ../FAQ.md:39 ../FAQ.md:390
 msgid "Q4.1 【词法分析】LAC模型，如何自定义标签label，并继续训练？"
-msgstr ""
+msgstr "Q4.1 【Lexical Analysis】LAC model, how to customize the label label and continue training?"
 
 #: ../FAQ.md:40 ../FAQ.md:398
 msgid "Q4.2 信息抽取任务中，是否推荐使用预训练模型+CRF，怎么实现呢？"
-msgstr ""
+msgstr "Q4.2 In the information extraction task, is it recommended to use the pre-training model + CRF, and how?"
 
 #: ../FAQ.md:41
 msgid ""
 "Q4.3 "
 "【阅读理解】MapDatasets的map()方法中对应的batched=True怎么理解，在阅读理解任务中为什么必须把参数batched设置为True？"
 msgstr ""
+"Q4.3 【Reading Comprehension】How to understand the corresponding batched=True in the map() method of MapDatasets, why the parameter batched must be set to True in the reading comprehension task?"
 
 #: ../FAQ.md:42 ../FAQ.md:410
 msgid "Q4.4 【语义匹配】语义索引和语义匹配有什么区别？"
-msgstr ""
+msgstr "Q4.4【semantic matching】What is the difference between semantic indexing and semantic matching?"
 
 #: ../FAQ.md:43 ../FAQ.md:416
 msgid "Q4.5 【解语】wordtag模型如何自定义添加命名实体及对应词类?"
-msgstr ""
+msgstr "Q4.5 【Decipher】How to customize the wordtag model to add named entities and corresponding parts of speech?"
 
 #: ../FAQ.md:45
 msgid "其他使用咨询"
-msgstr ""
+msgstr "Other usage consultation"
 
 #: ../FAQ.md:46 ../FAQ.md:433
 msgid "Q5.1 在CUDA11使用PaddlNLP报错?"
-msgstr ""
+msgstr "Q5.1 Using PaddlNLP in CUDA11 error?"
 
 #: ../FAQ.md:47 ../FAQ.md:439
 msgid "Q5.2 如何设置parameter？"
-msgstr ""
+msgstr "Q5.2 How to set parameters?"
 
 #: ../FAQ.md:48 ../FAQ.md:473
 msgid "Q5.3 GPU版的Paddle虽然能在CPU上运行，但是必须要有GPU设备吗？"
-msgstr ""
+msgstr "Q5.3 Although the GPU version of Paddle can run on the CPU, is it necessary to have a GPU device?"
 
 #: ../FAQ.md:49 ../FAQ.md:479
 msgid "Q5.4  如何指定用CPU还是GPU训练模型？"
-msgstr ""
+msgstr "Q5.4 How to specify whether to train a model with CPU or GPU?"
 
 #: ../FAQ.md:50 ../FAQ.md:487
 msgid "Q5.5 动态图模型和静态图模型的预测结果一致吗？"
-msgstr ""
+msgstr "Q5.5 Do the prediction results of the dynamic graphical model and the static graphical model match?"
 
 #: ../FAQ.md:51 ../FAQ.md:493
 msgid "Q5.6 如何可视化acc、loss曲线图、模型网络结构图等？"
-msgstr ""
+msgstr "Q5.6 How to visualize acc, loss curve graph, model network structure graph, etc.?"
 
 #: ../FAQ.md:53
 msgid "<a name=\"NLP精选\"></a>"
-msgstr ""
+msgstr "<a name=\"NLP精选\"></a>"
 
 #: ../FAQ.md:55
 msgid "⭐️【精选】NLP精选5问"
-msgstr ""
+msgstr "⭐️【Featured】Featured 5 Questions"
 
 #: ../FAQ.md:57
 msgid "<a name=\"1-1\"></a>"
-msgstr ""
+msgstr "<a name=\"1-1\"></a>"
 
 #: ../FAQ.md:61
 msgid ""
 "A: 通过使用PaddleNLP提供的 load_dataset，  MapDataset 和 IterDataset "
 "，可以方便的自定义属于自己的数据集哦，也欢迎您贡献数据集到PaddleNLP repo。"
 msgstr ""
+"A: By using the load_dataset, MapDataset and IterDataset provided by PaddleNLP, you can easily customize your own datasets. You are also welcome to contribute datasets to the PaddleNLP repo."
 
 #: ../FAQ.md:63
 msgid ""
 "从本地文件创建数据集时，我们 推荐 根据本地数据集的格式给出读取function并传入 load_dataset() 中创建数据集。 "
 "以waybill_ie快递单信息抽取任务中的数据为例："
 msgstr ""
+"When creating a dataset from a local file, we recommend giving the read function according to the format of the local dataset and passing it to load_dataset() to create the dataset."
+"Take the data in the waybill_ie express order information extraction task as an example:"
 
 #: ../FAQ.md:84
 msgid "如果您习惯使用paddle.io.Dataset/IterableDataset来创建数据集也是支持的，您也可以从其他python对象如List对象创建数据集，详细内容可参照官方文档-自定义数据集。"
-msgstr ""
+msgstr "If you are used to using paddle.io.Dataset/IterableDataset to create datasets, it is also supported. You can also create datasets from other python objects such as List objects. For details, please refer to the official documentation - Custom datasets."
 
 #: ../FAQ.md:86
 msgid "<a name=\"1-2\"></a>"
-msgstr ""
+msgstr "<a name=\"1-2\"></a>"
 
 #: ../FAQ.md:90
 msgid "A: 内置的数据集、模型默认会下载到$HOME/.paddlenlp/下，通过配置环境变量可下载到指定路径："
-msgstr ""
+msgstr "A: The built-in datasets and models will be downloaded to $HOME/.paddlenlp/ by default, and can be downloaded to the specified path by configuring environment variables:"
 
 #: ../FAQ.md:92
 msgid "（1）Linux下，设置 export PPNLP_HOME=\"xxxx\"，注意不要设置带有中文字符的路径。"
-msgstr ""
+msgstr "(1) Under Linux, set export PPNLP_HOME=\"xxxx\", be careful not to set a path with Chinese characters."
 
 #: ../FAQ.md:94
 msgid "（2）Windows下，同样配置环境变量 PPNLP_HOME 到其他非中文字符路径，重启即可。"
-msgstr ""
+msgstr "(2) Under Windows, also configure the environment variable PPNLP_HOME to other non-Chinese character paths, and restart."
 
 #: ../FAQ.md:96
 msgid "<a name=\"1-3\"></a>"
-msgstr ""
+msgstr "<a name=\"1-3\"></a>"
 
 #: ../FAQ.md:100
 msgid "A：（1）PaddleNLP预训练模型"
-msgstr ""
+msgstr "A: (1) PaddleNLP pre-training model"
 
 #: ../FAQ.md:102
 msgid "​    保存："
-msgstr ""
+msgstr "    Save："
 
 #: ../FAQ.md:109 ../FAQ.md:125
 msgid "​    加载："
-msgstr ""
+msgstr "    Load："
 
 #: ../FAQ.md:116
 msgid "（2）常规模型 保存："
-msgstr ""
+msgstr "(2) Conventional model save:"
 
 #: ../FAQ.md:132
 msgid "<a name=\"1-4\"></a>"
-msgstr ""
+msgstr "<a name=\"1-4\"></a>"
 
 #: ../FAQ.md:136
 msgid ""
 "A: 增加训练样本带来的效果是最直接的。此外，可以基于我们开源的预训练模型进行热启，再用少量数据集fine-"
 "tune模型。此外，针对分类、匹配等场景，小样本学习也能够带来不错的效果。"
 msgstr ""
+"A: The effect of adding training samples is the most straightforward. In addition, it is possible to perform a warm start based on our open source pre-trained model, and then fine-"
+"tune the model with a small dataset. In addition, for scenarios such as classification and matching, small sample learning can also bring good results."
 
 #: ../FAQ.md:138
 msgid "<a name=\"1-5\"></a>"
-msgstr ""
+msgstr "<a name=\"1-5\"></a>"
 
 #: ../FAQ.md:142
 msgid ""
@@ -251,108 +257,121 @@ msgid ""
 "Inference高性能预测引擎进行预测部署。对于Transformer类模型的GPU预测还可以使用PaddleNLP中提供的FasterTransformer功能来进行快速预测，其集成了NV"
 " FasterTransformer并进行了功能增强。"
 msgstr ""
+"A: From an engineering point of view, for server-side deployment you can use Paddle"
+"Inference high-performance forecasting engine for forecasting deployment. For GPU prediction of Transformer class models, the FasterTransformer function provided in PaddleNLP can also be used for fast prediction,"
+" which integrates NV FasterTransformer and enhances its functions."
 
 #: ../FAQ.md:144
 msgid ""
 "从模型策略角度，可以使用一些模型小型化技术来进行模型压缩，如模型蒸馏和裁剪，通过小模型来实现加速。PaddleNLP中集成了ERNIE-"
 "Tiny这样一些通用小模型供下游任务微调使用。另外PaddleNLP提供了模型压缩示例，实现了DynaBERT、TinyBERT、MiniLM等方法策略，可以参考对自己的模型进行蒸馏压缩。"
 msgstr ""
+"From the perspective of model strategy, some model miniaturization techniques can be used for model compression, such as model distillation and clipping, to achieve acceleration through small models. Some general small models such as ERNIE-Tiny are integrated in PaddleNLP for fine-tuning of downstream tasks."
+"In addition, PaddleNLP provides an example of model compression, which implements methods and strategies such as DynaBERT, TinyBERT, and MiniLM. You can refer to the distillation and compression of your own model."
 
 #: ../FAQ.md:146
 msgid "<a name=\"NLP通用问题\"></a>"
-msgstr ""
+msgstr "<a name=\"NLP通用问题\"></a>"
 
 #: ../FAQ.md:148
 msgid "⭐️【理论篇】NLP通用问题"
-msgstr ""
+msgstr "⭐️【Theory】NLP General Questions"
 
 #: ../FAQ.md:150
 msgid "<a name=\"2-2\"></a>"
-msgstr ""
+msgstr "<a name=\"2-2\"></a>"
 
 #: ../FAQ.md:154
 msgid "A: 可以采用以下几种方法优化类别分布不均衡问题："
-msgstr ""
+msgstr "A: The following methods can be used to optimize the class distribution imbalance problem:"
 
 #: ../FAQ.md:156
 msgid "（1）欠采样：对样本量较多的类别进行欠采样，去除一些样本，使得各类别数目接近。"
-msgstr ""
+msgstr "(1) Undersampling: Undersampling the categories with a large number of samples, removing some samples, so that the number of each category is close."
 
 #: ../FAQ.md:158
 msgid "（2）过采样：对样本量较少的类别进行过采样，选择样本进行复制，使得各类别数目接近。"
-msgstr ""
+msgstr "(2) Oversampling: Oversampling a category with a small sample size, and selecting samples to replicate, so that the number of categories is close."
 
 #: ../FAQ.md:160
 msgid "（3）修改分类阈值：直接使用类别分布不均衡的数据训练分类器，会使得模型在预测时更偏向于多数类，所以不再以0.5为分类阈值，而是针对少数类在模型仅有较小把握时就将样本归为少数类。"
-msgstr ""
+msgstr "(3) Modify the classification threshold: directly using data with uneven distribution of categories to train the classifier will make the model more biased towards the majority class in prediction. Therefore, 0.5 is no longer used as the classification threshold. Instead, for the minority class, the sample is classified as the minority class when the model has only small confidence."
 
 #: ../FAQ.md:162
 msgid "（4）代价敏感学习：比如LR算法中设置class_weight参数。"
-msgstr ""
+msgstr "(4) Cost-sensitive learning: For example, the class_weight parameter is set in the LR algorithm."
 
 #: ../FAQ.md:164
 msgid "<a name=\"2-3\"></a>"
-msgstr ""
+msgstr "<a name=\"2-3\"></a>"
 
 #: ../FAQ.md:168
 msgid ""
 "A: "
 "很难定义具体需要多少条样本，取决于具体的任务以及数据的质量。如果数据质量没问题的话，分类、文本匹配任务所需数据量级在百级别，翻译则需要百万级能够训练出一个比较鲁棒的模型。如果样本量较少，可以考虑数据增强，或小样本学习。"
 msgstr ""
+"A: "
+"It is difficult to define how many samples are needed, depending on the specific task and the quality of the data. If there is no problem with the data quality, the amount of data required for classification and text matching tasks is in the hundreds of levels, and the translation requires millions of levels to train a relatively robust model. If the sample size is small, data augmentation, or small sample learning can be considered."
+
 
 #: ../FAQ.md:171
 msgid "<a name=\"PaddleNLP实战问题\"></a>"
-msgstr ""
+msgstr "<a name=\"PaddleNLPPractical Questions\"></a>"
 
 #: ../FAQ.md:173
 msgid "⭐️【实战篇】PaddleNLP实战问题"
-msgstr ""
+msgstr "⭐️【Practical】PaddleNLP Practical Questions"
 
 #: ../FAQ.md:175
 msgid "<a name=\"数据问题\"></a>"
-msgstr ""
+msgstr "<a name=\"Date Questions\"></a>"
 
 #: ../FAQ.md:179
 msgid "<a name=\"3-1\"></a>"
-msgstr ""
+msgstr "<a name=\"3-1\"></a>"
 
 #: ../FAQ.md:183
 msgid ""
 "A: "
 "预训练模型通常会有配套的tokenzier和词典，对于大多数中文预训练模型，如ERNIE-3.0-Medium-zh，使用的都是字粒度的输入，tokenzier会将句子转换为字粒度的形式，模型无法收到词粒度的输入。如果希望引入额外的词典，需要修改预训练模型的tokenizer和词典，可以参考这里blog，另外注意embedding矩阵也要加上这些新增词的embedding表示。"
 msgstr ""
+"A: "
+"The pre-training model usually has a matching tokenzier and dictionary. For most Chinese pre-training models, such as ERNIE-1.0, the input of word granularity is used. The tokenzier will convert the sentence into the form of word granularity, and the model cannot receive words."
+"Granular input. If you want to introduce additional dictionaries, you need to modify the tokenizer and dictionary of the pre-training model, you can refer to this blog, and note that the embedding matrix should also add the embedding representation of these new words."
 
-#: ../FAQ.md:185
-msgid ""
-"另外还有一种方式可以使用这些字典信息，可以将数据中在词典信息中的词进行整体mask进行一个mask language "
-"model的二次预训练，这样经过二次训练的模型就包含了对额外字典的表征。可参考 Mask Language Model 数据构建。"
+#: ../../FAQ.md:185
+msgid "另外还有一种方式可以使用这些字典信息，可以将数据中在词典信息中的词进行整体mask进行一个mask language model的二次预训练，这样经过二次训练的模型就包含了对额外字典的表征。可参考 PaddleNLP 预训练数据流程。"
 msgstr ""
+"In addition, there is another way to use these dictionary information. The words in the dictionary information in the data can be masked as a whole, and a second pre-training of a mask language model can be performed,"
+"so that the second-trained model includes the additional dictionary information. characterization. Refer to Mask Language Model data construction."
 
 #: ../FAQ.md:188
 msgid "此外还有些词粒度及字词混合粒度的预训练模型，在这些词粒度的模型下引入额外的词表也会容易些，我们也将持续丰富PaddleNLP中的预训练模型。"
-msgstr ""
+msgstr "Moreover, there are some pre-training models with word granularity and word-mix granularity. It will be easier to introduce additional vocabulary under these word granularity models. We will also continue to enrich the pre-training models in PaddleNLP."
 
 #: ../FAQ.md:190
 msgid "<a name=\"训练调优问题\"></a>"
-msgstr ""
+msgstr "<a name=\"Training Tuning Questions\"></a>"
 
 #: ../FAQ.md:194
 msgid "<a name=\"4-1\"></a>"
-msgstr ""
+msgstr "<a name=\"4-1\"></a>"
 
 #: ../FAQ.md:198
 msgid ""
 "A: "
 "以bert为例，如果是使用PaddleNLP训练，通过save_pretrained()接口保存的模型，可通过from_pretrained()来加载："
 msgstr ""
+"A: "
+"Taking bert as an example, if PaddleNLP is used for training, the model saved through the save_pretrained() interface can be loaded through from_pretrained():"
 
 #: ../FAQ.md:205
 msgid "如果不是上述情况，可以使用如下方式加载模型，也欢迎您贡献模型到PaddleNLP repo中。"
-msgstr ""
+msgstr "If this is not the case, you can load the model as follows, and you are welcome to contribute the model to the PaddleNLP repo."
 
 #: ../FAQ.md:207
 msgid "（1）加载BertTokenizer和BertModel"
-msgstr ""
+msgstr "（1） Load BertTokenizer and BertModel"
 
 #: ../FAQ.md:214
 msgid ""
@@ -360,74 +379,87 @@ msgid ""
 "tokenizer_config.json、model_state.pdparams、  vocab.txt "
 "文件，保存到./checkpoint："
 msgstr ""
+"（2） Call save_pretrained() to generate model_config.json、"
+"tokenizer_config.json、model_state.pdparams、  vocab.txt "
+"file and save it to ./checkpoint："
 
 #: ../FAQ.md:221
 msgid ""
 "（3）修改model_config.json、 "
 "tokenizer_config.json这两个配置文件，指定为自己的模型，之后通过from_pretrained()加载模型。"
 msgstr ""
+"（3） Modify the two configuration files, model_config.json、"
+"tokenizer_config.json, and specify them as your own model, and then load the model through from_pretrained()."
 
 #: ../FAQ.md:228
 msgid "<a name=\"4-2\"></a>"
-msgstr ""
+msgstr "<a name=\"4-2\"></a>"
 
 #: ../FAQ.md:232
 msgid "A:"
-msgstr ""
+msgstr "A:"
 
 #: ../FAQ.md:234
 msgid "（1）完全恢复训练状态，可以先将lr、 optimizer、model的参数保存下来："
-msgstr ""
+msgstr "（1）To fully restore the training state, you can first save the parameters of lr、 optimizer、 and model："
 
 #: ../FAQ.md:242
 msgid "（2）加载lr、 optimizer、model参数即可恢复训练："
-msgstr ""
+msgstr "（2）Load the lr、 optimizer、model parameters to resume training："
 
 #: ../FAQ.md:250
 msgid "<a name=\"4-3\"></a>"
-msgstr ""
+msgstr "<a name=\"4-3\"></a>"
 
 #: ../FAQ.md:254
 msgid "A: 有多种方法可以尝试："
-msgstr ""
+msgstr "A: There are multiple ways to try:"
 
 #: ../FAQ.md:257
 msgid "（1）可以直接修改 PaddleNLP 内部代码实现，在需要冻结梯度的地方用 paddle.no_grad() 包裹一下"
-msgstr ""
+msgstr "（1）You can directly modify the internal code implementation of PaddleNLP, wrap it with paddle.no_grad() where you need to freeze the gradient"
 
 #: ../FAQ.md:259
 msgid "paddle.no_grad() 的使用方式，以对 forward() 进行冻结为例："
-msgstr ""
+msgstr "How to use paddle.no_grad(), take freezing forward() as an example:"
 
 #: ../FAQ.md:282
 msgid "paddle.no_grad() 的使用也不局限于模型内部实现里面，也可以包裹外部的方法，比如："
-msgstr ""
+msgstr "The use of paddle.no_grad() is not limited to the internal implementation of the model, and can also use wrap external methods, such as:"
 
 #: ../FAQ.md:296
 msgid ""
 "（2）第二种方法：以ERNIE为例，将模型输出的 tensor 设置 stop_gradient 为 True。可以使用 "
 "register_forward_post_hook 按照如下的方式尝试："
 msgstr ""
+"（2）The second method： Take ERNIE as an example, set stop_gradient to True for the tensor output by the model."
+"You can try using register_forward_post_hook as follows:"
 
 #: ../FAQ.md:305
 msgid ""
 "（3）第三种方法：在 optimizer 上进行处理，model.parameters 是一个 List，可以通过 name "
 "进行相应的过滤，更新/不更新某些参数，这种方法需要对网络结构的名字有整体了解，因为网络结构的实体名字决定了参数的名字，这个使用方法有一定的门槛："
 msgstr ""
+"（3）The third method： process on the optimizer, model.parameters is a List,"
+"Some parameters can be filtered accordingly by name, and some parameters can be updated/not updated. This method requires an overall understanding of the name of the network structure, because the entity name of the network structure determines the name of the parameter. This method has certain thresholds:"
+
 
 #: ../FAQ.md:311
 msgid "<a name=\"4-4\"></a>"
-msgstr ""
+msgstr "<a name=\"4-4\"></a>"
 
 #: ../FAQ.md:315
 msgid ""
 "A: 飞桨主框架提供了两种训练与预测的方法，一种是用 "
 "paddle.Model()对模型进行封装，通过高层API如Model.fit()、Model.evaluate()、Model.predict()等完成模型的训练与预测；另一种就是基于基础API常规的训练方式。"
 msgstr ""
+"A: The main frame of the Paddle provides two methods of training and prediction, one is to use"
+"paddle.Model() to encapsulate the model, and use high-level APIs such as Model.fit()、Model.evaluate() Model.predict( )、 and so on to complete the training and prediction of the model;"
+"The other is the conventional training method based on the basic API."
 
 #: ../FAQ.md:317
 msgid "（1）对于第一种方法："
-msgstr ""
+msgstr "（1）For the first method："
 
 #: ../FAQ.md:319
 msgid ""
@@ -436,86 +468,103 @@ msgid ""
 "给定后，eval_freq 的默认值为1，即每一个epoch进行一次评估。注意：在训练前，我们需要在 Model.prepare() "
 "接口传入metrics参数才能在eval时打印模型评价指标。"
 msgstr ""
+"We can set the eval_data and eval_freq parameters in the paddle.Model.fit() API to print model evaluation metrics during training:"
+"The eval_data parameter is an iterable validation set data source, and the eval_freq parameter is the frequency of evaluation;"
+"when eval_dat is given, the default value of eval_freq is 1, that is, an evaluation is performed every epoch."
+"Note: Before training, we need to pass the metrics parameter in the Model.prepare() interface to print the model evaluation metrics during eval."
 
 #: ../FAQ.md:321
 msgid ""
 "关于模型保存，我们可以设置 paddle.Model.fit() 中的 save_freq 参数控制模型保存的频率：save_freq "
 "的默认值为1，即每一个epoch保存一次模型。"
 msgstr ""
+"Regarding model saving, we can set the save_freq parameter in paddle.Model.fit() to control the frequency of model saving:"
+"the default value of save_freq is 1, that is, the model is saved once per epoch."
 
 #: ../FAQ.md:323
 msgid "（2）对于第二种方法："
-msgstr ""
+msgstr "（2）For the second method""
 
 #: ../FAQ.md:325
 msgid "我们在PaddleNLP的examples目录下提供了常见任务的训练与预测脚本：如GLUE 和 SQuAD等"
-msgstr ""
+msgstr "We provide training and prediction scripts for common tasks in PaddleNLP's examples directory: such as GLUE and SQuAD, etc."
 
 #: ../FAQ.md:327
 msgid "开发者可以参考上述脚本进行自定义训练与预测脚本的开发。"
-msgstr ""
+msgstr "Developers can refer to the above scripts to develop custom training and prediction scripts."
 
 #: ../FAQ.md:329
 msgid "<a name=\"4-5\"></a>"
-msgstr ""
+msgstr "<a name=\"4-5\"></a>"
 
 #: ../FAQ.md:333
 msgid "A:  一般先考虑内存、显存（使用GPU训练的话）是否不足，可将训练和评估的batch size调小一些。"
-msgstr ""
+msgstr "A: Generally, first consider whether the memory and video memory (if using GPU training) are insufficient, and the batch size of training and evaluation can be reduced."
+
 
 #: ../FAQ.md:335
 msgid "需要注意，batch size调小时，学习率learning rate也要调小，一般可按等比例调整。"
-msgstr ""
+msgstr "It should be noted that if the batch size is adjusted to a smaller value, the learning rate should also be adjusted smaller, which can generally be adjusted in equal proportions."
 
 #: ../FAQ.md:337
 msgid "<a name=\"4-6\"></a>"
-msgstr ""
+msgstr "<a name=\"4-6\"></a>"
 
 #: ../FAQ.md:341
 msgid "A: 在验证和测试过程中常常出现的结果不一致情况一般有以下几种解决方法："
-msgstr ""
+msgstr "A: There are generally the following solutions to the inconsistent results that often occur during verification and testing:"
 
 #: ../FAQ.md:343
 msgid "（1）确保设置了eval模式，并保证数据相关的seed设置保证数据一致性。"
-msgstr ""
+msgstr "（1）Make sure that the eval mode is set, and ensure that the data-related seed settings ensure data consistency."
 
 #: ../FAQ.md:345
 msgid ""
 "（2）如果是下游任务模型，查看是否所有模型参数都被导入了，直接使用bert-"
 "base这种预训练模型是不包含任务相关参数的，要确认导入的是微调后的模型，否则任务相关参数会随机初始化导致出现随机性。"
 msgstr ""
+"（2）If it is a downstream task model, check if all model parameters are imported,"
+"directly using the pre-training model of bert-base does not contain task-related parameters,"
+"make sure that the fine-tuned model is imported, otherwise the task-related parameters will be randomly initialized, resulting in randomness."
 
 #: ../FAQ.md:347
 msgid ""
 "（3）部分算子使用CUDNN后端产生的不一致性可以通过环境变量的设置来避免。如果模型中使用了CNN相关算子，可以设置FLAGS_cudnn_deterministic=True。如果模型中使用了RNN相关算子，可以设置CUBLAS_WORKSPACE_CONFIG=:16:8或CUBLAS_WORKSPACE_CONFIG=:4096:2（CUDNN"
 " 10.2以上版本可用，参考CUDNN 8 release note）。"
 msgstr ""
+"（3）The inconsistency caused by some operators using the CUDNN backend can be avoided by setting environment variables. If CNN related operators are used in the model, FLAGS_cudnn_deterministic=True can be set."
+"If RNN-related operators are used in the model, you can set CUBLAS_WORKSPACE_CONFIG=:16:8 or CUBLAS_WORKSPACE_CONFIG=:4096:2 (available in versions above CUDNN10.2, refer to CUDNN 8 release note)."
+
 
 #: ../FAQ.md:349
 msgid "<a name=\"4-7\"></a>"
-msgstr ""
+msgstr "<a name=\"4-7\"></a>"
 
 #: ../FAQ.md:353
 msgid ""
 "A: 目前的API设计不保留中间层输出，当然在PaddleNLP里可以很方便地修改源码。 "
 "此外，还可以在ErnieModel的__init__函数中通过register_forward_post_hook()为想要保留输出的Layer注册一个forward_post_hook函数，在forward_post_hook函数中把Layer的输出保存到一个全局的List里面。forward_post_hook函数将会在forward函数调用之后被调用，并保存Layer输出到全局的List。详情参考register_forward_post_hook()。"
 msgstr ""
+"A: The current API design does not retain the output of the middle layer, of course, the source code can be easily modified in PaddleNLP."
+"In addition, you can register a forward_post_hook function for the Layer that wants to retain the output through register_forward_post_hook() in the __init__ function of ErnieModel, "
+"and save the output of the Layer to a global List in the forward_post_hook function. The forward_post_hook function will be called after the forward function is called, and save the Layer output to the global List. See register_forward_post_hook() for details."
+
 
 #: ../FAQ.md:356
 msgid "<a name=\"部署问题\"></a>"
-msgstr ""
+msgstr "<a name=\"Deployment Questions\"></a>"
 
 #: ../FAQ.md:360
 msgid "<a name=\"5-1\"></a>"
-msgstr ""
+msgstr "<a name=\"5-1\"></a>"
 
 #: ../FAQ.md:364
 msgid "A: 我们推荐在动态图模式下开发，静态图模式部署。"
-msgstr ""
+msgstr "A: We recommend developing in dynamic graph mode and deploying in static graph mode."
 
 #: ../FAQ.md:366
 msgid "（1）动转静"
-msgstr ""
+msgstr "（1）Dynamic to static"
 
 #: ../FAQ.md:368
 msgid ""
@@ -524,10 +573,15 @@ msgid ""
 "可以参考官方文档 动态图转静态图文档，使用 paddle.jit.to_static 完成动转静。 另外，在 PaddleNLP "
 "我们也提供了导出静态图模型的例子，可以参考 waybill_ie 模型导出。"
 msgstr ""
+"Dynamic to static, that is, converting a dynamic graph model into a static graph model that can be used for deployment."
+"The dynamic graph interface is easier to use, and the python-style interactive programming experience is more friendly to model development, while static graphs have absolute advantages in performance compared to dynamic graphs."
+"Therefore, the dynamic and static provide such a bridge, taking into account the development cost and performance at the same time."
+"You can refer to the official document dynamic image to static image documentation, and use paddle.jit.to_static to complete dynamic to static."
+"In addition, we also provide an example of exporting static graph models in PaddleNLP, you can refer to waybill_ie model export."
 
-#: ../FAQ.md:373
+#: ../../FAQ.md:373
 msgid "（2）借助Paddle Inference部署"
-msgstr ""
+msgstr "(2) Using Paddle Inference to Deploy"
 
 #: ../FAQ.md:375
 msgid ""
@@ -536,60 +590,67 @@ msgid ""
 "Inference 简介。 为便于初次上手的用户更易理解 NLP 模型如何使用Paddle Inference，PaddleNLP "
 "也提供了对应的例子以供参考，可以参考 /PaddleNLP/examples 下的deploy目录，如基于ERNIE的命名实体识别模型部署。"
 msgstr ""
+"Models saved from dynamic to static can be deployed with the help of Paddle Inference for high-performance inference."
+"Paddle Inference has built-in high-performance CPU/GPU Kernel, combined with fine-grained OP horizontal and vertical integration strategies, and integrated TensorRT to improve the performance of model inference."
+"For details, please refer to the Paddle Inference Introduction document. To make it easier for first-time users to understand how NLP models use Paddle Inference,"
+"PaddleNLP also provides corresponding examples for reference, you can refer to the deploy directory under /PaddleNLP/examples, such as ERNIE-based named entity recognition model deployment."
 
 #: ../FAQ.md:378
 msgid "<a name=\"5-2\"></a>"
-msgstr ""
+msgstr "<a name=\"5-2\"></a>"
 
 #: ../FAQ.md:382
 msgid "A: 首先，需要将静态图参数保存成ndarray数据，然后将静态图参数名和对应动态图参数名对应，最后保存成动态图参数即可。详情可参考参数转换脚本。"
-msgstr ""
+msgstr "A: First, you need to save the static graph parameters as ndarray data, then map the static graph parameter names to the corresponding dynamic graph parameter names, and finally save them as dynamic graph parameters. For details, refer to the parameter conversion script."
 
 #: ../FAQ.md:384
 msgid "<a name=\"NLP应用场景\"></a>"
-msgstr ""
+msgstr "<a name=\"NLP应用场景\"></a>"
 
 #: ../FAQ.md:386
 msgid "⭐️特定模型和应用场景咨询"
-msgstr ""
+msgstr "⭐️Consulting on specific models and application scenarios"
 
 #: ../FAQ.md:388
 msgid "<a name=\"6-1\"></a>"
-msgstr ""
+msgstr "<a name=\"6-1\"></a>"
 
 #: ../FAQ.md:392
 msgid "A: 更新label文件tag.dict，添加 修改下CRF的标签数即可。"
-msgstr ""
+msgstr "A: Update the label file tag.dict, add and modify the number of labels of the CRF."
 
 #: ../FAQ.md:394
 msgid "可参考自定义标签示例，增量训练自定义LABLE示例。"
-msgstr ""
+msgstr "You can refer to the custom label example, the incremental training custom LABLE example."
 
 #: ../FAQ.md:396
 msgid "<a name=\"6-2\"></a>"
-msgstr ""
+msgstr "<a name=\"6-2\"></a>"
 
 #: ../FAQ.md:400
 msgid "A: 预训练模型+CRF是一个通用的序列标注的方法，目前预训练模型对序列信息的表达也是非常强的，也可以尝试直接使用预训练模型对序列标注任务建模。"
-msgstr ""
+msgstr "A: Pre-training model + CRF is a general sequence labeling method. At present, the pre-training model is also very strong in expressing sequence information. You can also try to use the pre-training model directly to model sequence labeling tasks."
 
 #: ../FAQ.md:402
 msgid "<a name=\"6-3\"></a>"
-msgstr ""
+msgstr "<a name=\"6-3\"></a>"
 
 #: ../FAQ.md:404
 msgid "Q4.3.【阅读理解】MapDatasets的map()方法中对应的batched=True怎么理解，在阅读理解任务中为什么必须把参数batched设置为True？"
-msgstr ""
+msgstr "Q4.3.【Reading Comprehension】How to understand the corresponding batched=True in the map() method of MapDatasets? Why the parameter batched must be set to True in the reading comprehension task?"
 
 #: ../FAQ.md:406
 msgid ""
 "A: "
 "batched=True就是对整个batch（这里不一定是训练中的batch，理解为一组数据就可以）的数据进行map，即map中的trans_func接受一组数据为输入，而非逐条进行map。在阅读理解任务中，根据使用的doc_stride不同，一条样本可能被转换成多条feature，对数据逐条map是行不通的，所以需要设置batched=True。"
 msgstr ""
+"A: "
+"batched=True is to map the data of the entire batch (not necessarily the batch in training, it can be understood as a set of data), that is, the trans_func in the map accepts a set of data as input, rather than map one by one."
+"In the reading comprehension task, depending on the doc_stride used, a sample may be converted into multiple features, and it is not feasible to map the data one by one, so you need to set batched=True."
 
 #: ../FAQ.md:408
 msgid "<a name=\"6-4\"></a>"
-msgstr ""
+msgstr "<a name=\"6-4\"></a>"
 
 #: ../FAQ.md:412
 msgid ""
@@ -597,10 +658,15 @@ msgid ""
 "相关的文档，语义匹配要解决的核心问题是对 query和文档更精细的语义匹配信息建模。换个角度理解， "
 "语义索引是要解决搜索、推荐场景下的召回问题，而语义匹配是要解决排序问题，两者要解决的问题不同，所采用的方案也会有很大不同，但两者间存在一些共通的技术点，可以互相借鉴。"
 msgstr ""
+"A: The core problem to be solved by semantic indexing is how to quickly and accurately find documents related to query from massive Docs through ANN indexing."
+"The core problem to be solved by semantic matching is to model the more refined semantic matching information of query and document."
+"From another perspective, semantic indexing is to solve the recall problem in search and recommendation scenarios, while semantic matching is to solve the sorting problem."
+"The problems to be solved by the two are different, and the solutions adopted will be very different, but there are some common technical points between the two, which can be learned from each other."
+
 
 #: ../FAQ.md:414
 msgid "<a name=\"6-5\"></a>"
-msgstr ""
+msgstr "<a name=\"6-5\"></a>"
 
 #: ../FAQ.md:418
 msgid ""
@@ -609,78 +675,87 @@ msgid ""
 "（1）分词正确，这里可能依赖于wordtag的finetune数据，来让分词正确； "
 "（2）wordtag里面也需要把分词正确后term打上相应的知识信息。wordtag自定义TermTree的方式将在后续版本提供出来。"
 msgstr ""
+"A: It mainly relies on the secondary structure data for finetune, and at the same time, the termtree information needs to be updated."
+"wordtag is divided into two steps:"
+"（1）Word segmentation through the BIOES system； （2）Match the segmented information with TermTree. Therefore we need:"
+"（1）The word segmentation is correct, here may rely on the wordtag's finetune data to make the word segmentation correct;"
+"（2）In the wordtag, it is also necessary to mark the term with the corresponding knowledge information after the word segmentation is correct. The way wordtag customizes TermTree will be provided in subsequent versions."
 
 #: ../FAQ.md:425
 msgid "可参考issue。"
-msgstr ""
+msgstr "Please refer to issue."
 
 #: ../FAQ.md:427
 msgid "<a name=\"使用咨询问题\"></a>"
-msgstr ""
+msgstr "<a name=\"Use Advisory Questions\"></a>"
 
 #: ../FAQ.md:429
 msgid "⭐️其他使用咨询"
-msgstr ""
+msgstr "⭐️Other Usage Consultation"
 
 #: ../FAQ.md:431
 msgid "<a name=\"7-1\"></a>"
-msgstr ""
+msgstr "<a name=\"7-1\"></a>"
 
 #: ../FAQ.md:435
 msgid "A: 在CUDA11安装，可参考issue，其他CUDA版本安装可参考 官方文档"
-msgstr ""
+msgstr "A: For installation in CUDA11, please refer to issue, other CUDA versions can refer to official documentation."
 
 #: ../FAQ.md:437
 msgid "<a name=\"7-2\"></a>"
-msgstr ""
+msgstr "<a name=\"7-2\"></a>"
 
 #: ../FAQ.md:441
 msgid "A: 有多种方法： （1）可以通过set_value()来设置parameter，set_value()的参数可以是numpy或者tensor。"
-msgstr ""
+msgstr "A: There are multiple ways: （1）The parameter can be set by set_value(), and the parameter of set_value() can be numpy or tensor."
 
 #: ../FAQ.md:453
 msgid "（2）通过create_parameter()设置参数。"
-msgstr ""
+msgstr "（2）Set parameters through create_parameter()."
 
 #: ../FAQ.md:471
 msgid "<a name=\"7-3\"></a>"
-msgstr ""
+msgstr "<a name=\"7-3\"></a>"
 
 #: ../FAQ.md:475
 msgid ""
 "A: 不支持 GPU 的设备只能安装 CPU 版本的 PaddlePaddle。 GPU 版本的 PaddlePaddle 如果想只在 CPU "
 "上运行，可以通过 export CUDA_VISIBLE_DEVICES=-1 来设置。"
-msgstr ""
+msgstr "" 
+"A: Devices without GPU support can only install the CPU version of PaddlePaddle."
+"If you want to run the GPU version of PaddlePaddle only on the CPU, you can set it by export CUDA_VISIBLE_DEVICES=-1 ."
 
 #: ../FAQ.md:477
 msgid "<a name=\"7-4\"></a>"
-msgstr ""
+msgstr "<a name=\"7-4\"></a>"
 
 #: ../FAQ.md:481
 msgid "A: 一般我们的训练脚本提供了 --device 选项，用户可以通过 --device 选择需要使用的设备。"
-msgstr ""
+msgstr "A: Generally, our training script provides the --device option, and the user can select the device to be used through --device."
 
 #: ../FAQ.md:483
 msgid ""
 "具体而言，在Python文件中，我们可以通过·paddle.device.set_device()·，设置为gpu或者cpu，可参考 "
 "set_device文档。"
-msgstr ""
+msgstr "Specifically, in the Python file, we can set it to gpu or cpu through paddle.device.set_device(), please refer to the set_device documentation."
 
 #: ../FAQ.md:485
 msgid "<a name=\"7-5\"></a>"
-msgstr ""
+msgstr "<a name=\"7-5\"></a>"
 
 #: ../FAQ.md:489
 msgid "A: 正常情况下，预测结果应当是一致的。如果遇到不一致的情况，可以及时反馈给 PaddleNLP 的开发人员，我们进行处理。"
-msgstr ""
+msgstr "A: Under normal circumstances, the predicted results should be consistent. If you encounter inconsistencies, you can timely feedback to the developers of PaddleNLP, and we will deal with them."
 
 #: ../FAQ.md:491
 msgid "<a name=\"7-6\"></a>"
-msgstr ""
+msgstr "<a name=\"7-6\"></a>"
 
 #: ../FAQ.md:495
 msgid ""
 "A: "
 "可使用VisualDL进行可视化。其中acc、loss曲线图的可视化可参考Scalar——折线图组件使用指南，模型网络结构的可视化可参考Graph——网络结构组件使用指南。"
 msgstr ""
+"A: "
+"VisualDL can be used for visualization. For the visualization of acc and loss graphs, please refer to Scalar - User Guide for Line Chart Components, and for the visualization of the model network structure, refer to Graph - User Guide for Network Structure Components."
 

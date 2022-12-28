@@ -19,119 +19,125 @@ msgstr ""
 
 #: ../trainer.md:1
 msgid "PaddleNLP Trainer API"
-msgstr ""
+msgstr "PaddleNLP Trainer API"
 
 #: ../trainer.md:3
 msgid "PaddleNLP提供了Trainer训练API，针对训练过程的通用训练配置做了封装，比如："
-msgstr ""
+msgstr "PaddleNLP provides the Trainer training API, which encapsulates the general training configuration of the training process, such as："
 
 #: ../trainer.md:5
 msgid "优化器、学习率调度等训练配置"
-msgstr ""
+msgstr "Training configuration such as optimizer, learning rate scheduling, etc."
 
 #: ../trainer.md:6
 msgid "多卡，混合精度，梯度累积等功能"
-msgstr ""
+msgstr "Multi-card, mixed precision, gradient accumulation and other functions"
 
 #: ../trainer.md:7
 msgid "checkpoint断点，断点重启（数据集，随机数恢复）"
-msgstr ""
+msgstr "checkpoint breakpoint, breakpoint restart (dataset, random number recovery)"
 
 #: ../trainer.md:8
 msgid "日志显示，loss可视化展示等"
-msgstr ""
+msgstr "Log display, loss visual display, etc."
 
 #: ../trainer.md:10
 msgid "用户输入模型，数据集，就可以使用Trainer API高效快速的实现预训练、微调等任务。"
-msgstr ""
+msgstr "Users can use the Trainer API to efficiently and quickly implement tasks such as pre-training and fine-tuning by entering models and datasets."
 
 #: ../trainer.md:13
 msgid "Trainer基本使用方法介绍"
-msgstr ""
+msgstr "Introduction to the basic usage of Trainer"
 
 #: ../trainer.md:15
 msgid ""
 "下面是用户使用 Trainer API进行finetune任务的简单示例，这里以中文情感分类数据集chnsenticorp为例。 "
 "更详细的使用可以参考CLUE Trainer版本。"
 msgstr ""
+"The following is a simple example of a user using the Trainer API to perform a finetune task, taking the Chinese sentiment classification dataset chnsenticorp as an example."
+"For more detailed usage, please refer to the CLUE Trainer version."
 
 #: ../trainer.md:18
 msgid "导入需要用到的头文件。"
-msgstr ""
+msgstr "Import the required header files."
 
 #: ../trainer.md:19
 msgid "主要是模型、Tokenizer"
-msgstr ""
+msgstr "Mainly models, Tokenizer"
 
 #: ../trainer.md:20
 msgid "还有Trainer组件"
-msgstr ""
+msgstr "and the Trainer component"
 
 #: ../trainer.md:21
 msgid "其中Trainer是训练主要入口，用户传入模型，数据集，即可进行训练"
-msgstr ""
+msgstr "Among them, Trainer is the main entrance for training. Users can input models and data sets to train."
 
 #: ../trainer.md:22
 msgid "TrainingArguments 包含了用户需要的大部分训练参数。"
-msgstr ""
+msgstr "TrainingArguments contains most of the training parameters required by the user"
 
 #: ../trainer.md:23
 msgid "PdArgumentParser 是用户输出参数的工具"
-msgstr ""
+msgstr "PdArgumentParser is a tool for user output parameters"
 
 #: ../trainer.md:31
 msgid "设置好用户参数"
-msgstr ""
+msgstr "Set user parameters"
 
 #: ../trainer.md:32
 msgid ""
 "PdArgumentParser 可以接受多个类似TrainingArguments的参数。用户可以自定义所需要的ModelArguments, "
 "DataArguments为为 tuple 传入 PdArgumentParser即可。"
 msgstr ""
+"PdArgumentParser can accept multiple parameters like TrainingArguments."
+"Users can customize the required ModelArguments, and DataArguments can be passed in PdArgumentParser for the tuple."
 
 #: ../trainer.md:33
 msgid ""
 "这些参数都是通过python xxx.py --dataset xx --max_seq_length "
 "xx的方式传入。TrainingArguments的所有可配置参数见后文。"
 msgstr ""
+"These parameters are passed in by python xxx.py --dataset xx --max_seq_length xx."
+"See below for all configurable parameters of TrainingArguments."
 
 #: ../trainer.md:50
 msgid "加载模型，tokenizer, 数据集"
-msgstr ""
+msgstr "Load model, tokenizer, dataset"
 
 #: ../trainer.md:51
 msgid "注意，这里的数据集，需要输出的是一个dict。dict中的key，需要和模型的输入名称对应。"
-msgstr ""
+msgstr "Note that the dataset here needs to output a dict. The key in the dict needs to correspond to the input name of the model."
 
 #: ../trainer.md:52
 msgid "这里的，labels如果模型没有使用到，我们还需要额外定义criterion，计算最后的loss损失。"
-msgstr ""
+msgstr "Here, if the labels are not used by the model, we also need to define an additional criterion to calculate the final loss."
 
 #: ../trainer.md:66
 msgid "构造Trainer实例，进行模型训练。"
-msgstr ""
+msgstr "Construct a Trainer instance for model training."
 
 #: ../trainer.md:67
 msgid "这里传入model,criterion,args,train_dataset,tokenizer这些训练需要的组件，构建了实例化的trainer"
-msgstr ""
+msgstr "Here, the components required for training such as model, criterion, args, train_dataset, and tokenizer are passed in, and the instantiated trainer is constructed."
 
 #: ../trainer.md:68
 msgid "使用trainer.train()接口开始训练过程。训练完成后，可以保存模型，保存一些日志。"
-msgstr ""
+msgstr "Use the trainer.train() interface to start the training process. After training, you can save the model, save some logs."
 
 #: ../trainer.md:84
 msgid "预训练的使用方式可以参考ERNIE-1.0 Trainer版本。"
-msgstr ""
+msgstr "For the usage of pre-training, please refer to the ERNIE-1.0 Trainer version."
 
 #: ../trainer.md:87
 msgid "Trainer 实例化参数介绍"
-msgstr ""
+msgstr "Introduction to Trainer instantiation parameters"
 
 #: ../trainer.md:88
 msgid "Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并针对 PaddleNLP 模型进行了优化。"
-msgstr ""
+msgstr "Trainer is a simple, yet full-featured Paddle training and evaluation module, optimized for PaddleNLP models."
 
 #: ../trainer.md:172
 msgid "TrainingArguments 参数介绍"
-msgstr ""
+msgstr "TrainingArguments parameter introduction"
 

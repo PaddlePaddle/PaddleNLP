@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.data.vocab.Vocab:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.data.vocab.Vocab:1
 msgid ""
@@ -37,7 +37,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
 #: paddlenlp.data.vocab.Vocab.to_tokens
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.data.vocab.Vocab:4
 msgid ""
@@ -111,7 +111,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
 #: paddlenlp.data.vocab.Vocab.to_tokens
 msgid "返回"
-msgstr ""
+msgstr "Returns"
 
 #: of paddlenlp.data.vocab.Vocab.to_tokens:7
 msgid ""
@@ -125,7 +125,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_indices paddlenlp.data.vocab.Vocab.to_json
 #: paddlenlp.data.vocab.Vocab.to_tokens
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.data.vocab.Vocab.build_vocab:41
 #: paddlenlp.data.vocab.Vocab.from_dict:28
@@ -135,7 +135,7 @@ msgstr ""
 #: paddlenlp.data.vocab.Vocab.to_json:14
 #: paddlenlp.data.vocab.Vocab.to_tokens:13
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.data.vocab.Vocab.to_indices:1
 msgid "Maps the input tokens into indices."

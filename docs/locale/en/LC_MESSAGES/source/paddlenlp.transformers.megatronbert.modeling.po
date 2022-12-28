@@ -31,7 +31,7 @@ msgstr ""
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertForTokenClassification:1
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.megatronbert.modeling.MegatronBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.megatronbert.modeling.MegatronBertPretrainedModel`"
 
 #: of paddlenlp.transformers.megatronbert.modeling.MegatronBertModel:1
 msgid "The bare MegatronBert Model transformer outputting raw hidden-states."
@@ -72,7 +72,7 @@ msgstr ""
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.megatronbert.modeling.MegatronBertModel:10
 msgid ""
@@ -262,7 +262,7 @@ msgstr ""
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertForTokenClassification.forward
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.megatronbert.modeling.MegatronBertModel.forward:34
 msgid ""
@@ -320,7 +320,7 @@ msgstr ""
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertForTokenClassification.forward
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertForCausalLM.forward:21
@@ -333,12 +333,12 @@ msgstr ""
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertForTokenClassification.forward:19
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertModel.forward:49
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of
 #: paddlenlp.transformers.megatronbert.modeling.MegatronBertPretrainedModel:1

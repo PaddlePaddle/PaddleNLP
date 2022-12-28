@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
 msgid "基类：:class:`paddle.nn.layer.common.Embedding`"
-msgstr ""
+msgstr "Base class：:class:`paddle.nn.layer.common.Embedding`"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding:1
 msgid ""
@@ -44,7 +44,7 @@ msgstr ""
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.set_trainable
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding:5
 msgid ""
@@ -103,7 +103,7 @@ msgstr ""
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:6
 msgid "The vectors of specifying words."
@@ -115,7 +115,7 @@ msgstr ""
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.search
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.search:7
 msgid "`numpy.array`"
@@ -126,7 +126,7 @@ msgstr ""
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_list_from_words:10
 #: paddlenlp.embeddings.token_embedding.TokenEmbedding.search:10
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.embeddings.token_embedding.TokenEmbedding.get_idx_from_word:1
 msgid "Gets the index of specifying word by searching word_to_idx dict."

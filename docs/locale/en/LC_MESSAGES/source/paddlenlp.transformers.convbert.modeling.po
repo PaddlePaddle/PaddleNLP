@@ -30,7 +30,7 @@ msgstr ""
 #: paddlenlp.transformers.convbert.modeling.ConvBertGenerator:1
 #: paddlenlp.transformers.convbert.modeling.ConvBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.convbert.modeling.ConvBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.convbert.modeling.ConvBertPretrainedModel`"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertModel:1
 msgid "The bare ConvBert Model transformer outputting raw hidden-states."
@@ -72,7 +72,7 @@ msgstr ""
 #: paddlenlp.transformers.convbert.modeling.ConvBertPretrainingCriterion
 #: paddlenlp.transformers.convbert.modeling.ConvBertPretrainingCriterion.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertModel:10
 msgid ""
@@ -298,7 +298,7 @@ msgstr ""
 #: paddlenlp.transformers.convbert.modeling.ConvBertGenerator.forward
 #: paddlenlp.transformers.convbert.modeling.ConvBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertModel.forward:34
 msgid ""
@@ -316,7 +316,7 @@ msgstr ""
 #: paddlenlp.transformers.convbert.modeling.ConvBertGenerator.forward
 #: paddlenlp.transformers.convbert.modeling.ConvBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertDiscriminator.forward:39
 #: paddlenlp.transformers.convbert.modeling.ConvBertForMultipleChoice.forward:17
@@ -326,11 +326,11 @@ msgstr ""
 #: paddlenlp.transformers.convbert.modeling.ConvBertGenerator.forward:39
 #: paddlenlp.transformers.convbert.modeling.ConvBertModel.forward:39
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertPretrainedModel:1
 msgid ""
@@ -511,7 +511,7 @@ msgstr ""
 #: of paddlenlp.transformers.convbert.modeling.ConvBertClassificationHead:1
 #: paddlenlp.transformers.convbert.modeling.ConvBertPretrainingCriterion:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.convbert.modeling.ConvBertClassificationHead:1
 msgid "ConvBert head for sentence-level classification tasks."

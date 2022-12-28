@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class：:class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.bleu.BLEU:1
 msgid ""
@@ -67,7 +67,7 @@ msgstr ""
 #: paddlenlp.metrics.bleu.BLEUForDuReader
 #: paddlenlp.metrics.bleu.BLEUForDuReader.add_inst
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.metrics.bleu.BLEU:28
 msgid "`trans_func` transforms the network output to string to calculate."
@@ -94,7 +94,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU:46
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.metrics.bleu.BLEU:47
 msgid "Using as a general evaluation object."
@@ -145,7 +145,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU.accumulate
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.bleu.BLEU.accumulate:3
 msgid "Returns the accumulated metric `bleu` and its data type is float64."
@@ -153,7 +153,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEU.accumulate
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.metrics.bleu.BLEU.name:1
 msgid "Returns metric name"
@@ -161,7 +161,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.bleu.BLEUForDuReader:1
 msgid "基类：:class:`paddlenlp.metrics.bleu.BLEU`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.metrics.bleu.BLEU`"
 
 #: of paddlenlp.metrics.bleu.BLEUForDuReader:1
 msgid "BLEU metric with bonus for DuReader contest."

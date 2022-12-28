@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.t5.tokenizer.T5Tokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
 
 #: of paddlenlp.transformers.t5.tokenizer.T5Tokenizer:1
 msgid ""
@@ -42,7 +42,7 @@ msgstr ""
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.decode
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.get_special_tokens_mask
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.t5.tokenizer.T5Tokenizer:6
 msgid ""
@@ -120,7 +120,7 @@ msgstr ""
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.decode
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.get_special_tokens_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.build_inputs_with_special_tokens:13
@@ -134,7 +134,7 @@ msgstr ""
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.decode
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.get_special_tokens_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.t5.tokenizer.T5Tokenizer.create_token_type_ids_from_sequences:1

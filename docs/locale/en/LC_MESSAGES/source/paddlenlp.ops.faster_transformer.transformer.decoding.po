@@ -41,7 +41,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.decoding.convert_params
 #: paddlenlp.ops.faster_transformer.transformer.decoding.enable_ft_para
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.ops.faster_transformer.transformer.decoding.convert_params:5
 msgid "The faster model object."
@@ -82,7 +82,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.decoding.convert_params
 #: paddlenlp.ops.faster_transformer.transformer.decoding.get_ft_para_conf
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.ops.faster_transformer.transformer.decoding.convert_params:25
 msgid ""
@@ -112,7 +112,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.decoding.convert_params
 #: paddlenlp.ops.faster_transformer.transformer.decoding.get_ft_para_conf
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.decoding.InferBartDecoding.forward:1

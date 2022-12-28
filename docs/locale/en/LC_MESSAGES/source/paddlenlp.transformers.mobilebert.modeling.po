@@ -26,7 +26,7 @@ msgstr ""
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertForSequenceClassification:1
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.mobilebert.modeling.MobileBertPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.mobilebert.modeling.MobileBertPretrainedModel`"
 
 #: of paddlenlp.transformers.mobilebert.modeling.MobileBertModel:1
 msgid ""
@@ -50,7 +50,7 @@ msgstr ""
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.forward
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.get_head_mask
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.mobilebert.modeling.MobileBertModel:8
 msgid ""
@@ -193,7 +193,7 @@ msgstr ""
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.forward
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.get_head_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.get_head_mask:10
@@ -324,18 +324,18 @@ msgstr ""
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertForSequenceClassification.forward
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertForQuestionAnswering.forward:39
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertForSequenceClassification.forward:25
 #: paddlenlp.transformers.mobilebert.modeling.MobileBertModel.forward:54
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.mobilebert.modeling.MobileBertPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.mobilebert.modeling.MobileBertPretrainedModel:1
 msgid ""

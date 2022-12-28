@@ -19,61 +19,64 @@ msgstr ""
 
 #: ../get_started/installation.rst:2
 msgid "安装PaddleNLP"
-msgstr ""
+msgstr "PaddleNLP Installation"
 
 #: ../get_started/installation.rst:3
 msgid ""
 "以下安装过程默认用户已安装好paddlepaddle-"
 "gpu或paddlepaddle(版本大于或等于2.0)，paddlepaddle安装方式参照 飞桨官网_。"
 msgstr ""
+"Presumption: User has installed paddlepaddle-gpu or paddlepaddle version is >= 2.0, for the installation guide of paddlepaddle, please refer to the official website_."
 
 #: ../get_started/installation.rst:8
 msgid "pip安装"
 msgstr ""
+"pip Installation"
 
 #: ../get_started/installation.rst:14
 msgid "Anaconda安装"
-msgstr ""
+msgstr "Anaconda Installation"
 
 #: ../get_started/installation.rst:15
 msgid "Anaconda是一个开源的Python发行版本，其包含了conda、Python等180多个科学包及其依赖项。使用Anaconda可以通过创建多个独立的Python环境，避免用户的Python环境安装太多不同版本依赖导致冲突。"
 msgstr ""
+"Anaconda is a distribution of the Python programming languages, it includes more than 180 data-science packages.By using Anaconda, users can create multiple Python virtual envirnoments, in this way it avoids conflicts between installed packages."
 
 #: ../get_started/installation.rst:18
 msgid "1、windows安装Anaconda"
-msgstr ""
+msgstr "1. Install Anaconda in Windows"
 
 #: ../get_started/installation.rst:21 ../get_started/installation.rst:56
 msgid "第一步 下载"
-msgstr ""
+msgstr "Step 1 Download"
 
 #: ../get_started/installation.rst:22
 msgid "在 Anaconda官网_ 选择下载Windows Python3.7 64-Bit版本。"
-msgstr ""
+msgstr "Please select Windows Python 3.7 64-Bit on the Anaconda official website_."
 
 #: ../get_started/installation.rst:26
 msgid "确保已经安装Visual C++ Build Tools(可以在开始菜单中找到)，如未安装，请点击 下载安装_。"
-msgstr ""
+msgstr "Make sure you have already installed Visual C++ Build Tools(it can be found under Start menu), if not installed, please click Download and Install_."
 
 #: ../get_started/installation.rst:31 ../get_started/installation.rst:62
 msgid "第二步 安装"
-msgstr ""
+msgstr "Step 2 Installation"
 
 #: ../get_started/installation.rst:32
 msgid "运行下载的安装包(以.exe为后辍)，根据引导完成安装, 用户可自行修改安装目录（如下图）。"
-msgstr ""
+msgstr "Run the downloaded installation package(.exe extension), follow the instructions, users can customize the installation(see the picture below)."
 
 #: ../get_started/installation.rst:37 ../get_started/installation.rst:73
 msgid "第三步 使用"
-msgstr ""
+msgstr "Step 3 How to use it"
 
 #: ../get_started/installation.rst:38
 msgid "点击Windows系统左下角的Windows图标，打开：所有程序->Anaconda3/2（64-bit）->Anaconda Prompt"
-msgstr ""
+msgstr "Click the Windows logo at the bottom left corner of Windows OS, All Programs -> Anaconda3/2 (64-bit) -> Anaconda Prompt"
 
 #: ../get_started/installation.rst:39
 msgid "在命令行中执行下述命令"
-msgstr ""
+msgstr "Run the following commands in terminal"
 
 #: ../get_started/installation.rst:50 ../get_started/installation.rst:84
 msgid ""
@@ -81,28 +84,54 @@ msgid ""
 "paddlenlp试试吧，之后再次使用都可以通过打开'所有程序->Anaconda3/2（64-bit）->Anaconda "
 "Prompt'，再执行conda activate my_paddlenlp进入环境后，即可再次使用PaddleNLP。"
 msgstr ""
+"You should be able to use PaddleNLP in virtual environment after followed the aforementioned configuration steps. Type python in terminal, then 'import paddlenlp' and have a try."
+"You can always find it by click 'All Programs' ->Anaconda3/2（64-bit）->Anaconda Prompt', then type 'conda activate my_paddlenlp` to enter the environment."
 
 #: ../get_started/installation.rst:53
 msgid "2、Linux/Mac安装安装Anaconda"
-msgstr ""
+msgstr "2. Install Anaconda on Linux/Mac"
 
 #: ../get_started/installation.rst:57
 msgid "在 Anaconda官网_ 选择下载对应系统 Python3.7版本下载（Mac下载Command Line Installer版本即可)。"
-msgstr ""
+msgstr "Please choose Python3.7(For Mac users, please choose Command Line Installer) on the Anaconda website_."
 
 #: ../get_started/installation.rst:63
 msgid "打开终端，在终端安装Anaconda"
-msgstr ""
+msgstr "Open a terminal and install Anaconda"
 
 #: ../get_started/installation.rst:70
 msgid "安装过程中一直回车即可，如提示设置安装路径，可根据需求修改，一般默认即可。"
-msgstr ""
+msgstr "Type enter all the time, unless you would like to change the installation path."
 
 #: ../get_started/installation.rst:87
 msgid "代码安装"
-msgstr ""
+msgstr "Code Installation"
 
 #: ../get_started/installation.rst:88
 msgid "github代码会跟随开发进度不断更新"
+msgstr "The code on Github will be updated accordingly."
+
+#: ../get_started/installation.rst:97
+msgid "使用Docker镜像体验PaddleNLP"
+msgstr "Use PaddleNLP by Docker Image"
+
+#: ../get_started/installation.rst:99
+msgid "如果您没有Docker运行环境，请参考 `Docker官网`_ 进行安装"
 msgstr ""
+"If you don't have the Docker installed, please refer to `Docker Official "
+"Website`_"
+
+#: ../get_started/installation.rst:103
+msgid "PaddleNLP提供了带有最新代码的docker镜像供您使用，您只需要*拉取docker镜像*，然后*运行docker镜像*，无需其他任何额外操作，即可开始使用PaddleNLP的所有功能。"
+
+msgstr ""
+"PaddleNLP provides the docker image with its latest code, all you need to do is to *pull the docker image*, then *run the docker image*, and that's it."
+
+#: ../get_started/installation.rst:105
+msgid "在 `Docker Hub`_ 中获取这些镜像及相应的使用指南，包括CPU、GPU、ROCm版本。"
+msgstr "Please refer to `Docker Hub`_ to get the instructions about how to use this docker image, including CPU, GPU, ROCm versions."
+
+#: ../get_started/installation.rst:109
+msgid "如果您对自动化制作docker镜像感兴趣，或有自定义需求，请访问 `PaddlePaddle/PaddleCloud`_ 做进一步了解。"
+msgstr "If you were interested in automating the docker image process, or would like to customize it, please refer to `PaddlePaddle/PaddleCloud`_ for more details."
 

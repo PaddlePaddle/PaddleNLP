@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.sighan.DetectionF1:1
 msgid "基类：:class:`paddle.metric.metrics.Metric`"
-msgstr ""
+msgstr "Base class：:class:`paddle.metric.metrics.Metric`"
 
 #: of paddlenlp.metrics.sighan.CorrectionF1.update:1
 #: paddlenlp.metrics.sighan.DetectionF1.update:1
@@ -58,7 +58,7 @@ msgstr ""
 
 #: of paddlenlp.metrics.sighan.DetectionF1.name
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.metrics.sighan.DetectionF1.name:3
 msgid "The name of the metric instance."
@@ -66,9 +66,9 @@ msgstr ""
 
 #: of paddlenlp.metrics.sighan.DetectionF1.name
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.metrics.sighan.CorrectionF1:1
 msgid "基类：:class:`paddlenlp.metrics.sighan.DetectionF1`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.metrics.sighan.DetectionF1`"
 

@@ -27,7 +27,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.modeling.ReformerModel:1
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead:1
 msgid "基类：:class:`paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel`"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerModel:1
 msgid ""
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerModel:10
 msgid "Whether to tie input and output embeddings. Defaults to `False`."
@@ -364,7 +364,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.modeling.ReformerModel.forward
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerModel.forward:43
 msgid ""
@@ -456,7 +456,7 @@ msgstr ""
 #: paddlenlp.transformers.reformer.modeling.ReformerModel.forward
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerForMaskedLM.forward:44
 #: paddlenlp.transformers.reformer.modeling.ReformerForQuestionAnswering.forward:55
@@ -464,11 +464,11 @@ msgstr ""
 #: paddlenlp.transformers.reformer.modeling.ReformerModel.forward:72
 #: paddlenlp.transformers.reformer.modeling.ReformerModelWithLMHead.forward:50
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.reformer.modeling.ReformerPretrainedModel:1
 msgid ""

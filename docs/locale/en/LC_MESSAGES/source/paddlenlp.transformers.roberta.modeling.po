@@ -29,7 +29,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification:1
 #: paddlenlp.transformers.roberta.modeling.RobertaModel:1
 msgid "基类：:class:`paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel`"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaModel:1
 msgid "The bare Roberta Model outputting raw hidden-states."
@@ -65,7 +65,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaModel
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaModel:10
 msgid ""
@@ -234,7 +234,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaModel.forward:34
 msgid ""
@@ -314,7 +314,7 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaForCausalLM.forward:28
 #: paddlenlp.transformers.roberta.modeling.RobertaForMaskedLM.forward:28
@@ -323,11 +323,11 @@ msgstr ""
 #: paddlenlp.transformers.roberta.modeling.RobertaForTokenClassification.forward:28
 #: paddlenlp.transformers.roberta.modeling.RobertaModel.forward:55
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.roberta.modeling.RobertaPretrainedModel:1
 msgid ""

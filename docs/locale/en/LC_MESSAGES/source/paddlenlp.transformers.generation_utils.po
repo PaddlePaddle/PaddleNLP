@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin:1
 msgid "This class implements the interface for generation task."
@@ -44,7 +44,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:5
 msgid ""
@@ -182,7 +182,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:91
 msgid ""
@@ -230,9 +230,9 @@ msgstr ""
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.generation_utils.GenerationMixin.generate:107
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 

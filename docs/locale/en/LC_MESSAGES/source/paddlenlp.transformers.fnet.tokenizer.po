@@ -27,7 +27,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.fnet.tokenizer.FNetTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.albert.tokenizer.AlbertEnglishTokenizer`"
 
 #: of paddlenlp.transformers.fnet.tokenizer.FNetTokenizer:1
 msgid ""
@@ -41,7 +41,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.save_resources
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.fnet.tokenizer.FNetTokenizer:4
 msgid ""
@@ -204,7 +204,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.get_special_tokens_mask
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.build_inputs_with_special_tokens:12
@@ -218,7 +218,7 @@ msgstr ""
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.create_token_type_ids_from_sequences
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.get_special_tokens_mask
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.fnet.tokenizer.FNetTokenizer.build_inputs_with_special_tokens:13

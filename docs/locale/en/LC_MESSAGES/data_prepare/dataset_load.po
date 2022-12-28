@@ -19,21 +19,23 @@ msgstr ""
 
 #: ../data_prepare/dataset_load.rst:3
 msgid "加载数据集"
-msgstr ""
+msgstr "Dataset Loading"
 
 #: ../data_prepare/dataset_load.rst:6
 msgid "快速加载内置数据集"
-msgstr ""
+msgstr "Loading Buit-in Datasets"
 
 #: ../data_prepare/dataset_load.rst:8
 msgid ""
 "目前PaddleNLP内置20余个NLP数据集，涵盖阅读理解，文本分类，序列标注，机器翻译等多项任务。目前提供的数据集可以在 "
 ":doc:`数据集列表 <./dataset_list>` 中找到。"
 msgstr ""
+"Currently PaddleNLP provides more than 20 NLP datasets, which conver reading comprehension, text classification, token classification and machine translation etc."
+"These datasets can be found in :doc:`Dataset List <./dataset_list>`."
 
 #: ../data_prepare/dataset_load.rst:10
 msgid "以 **msra_ner** 数据集为例:"
-msgstr ""
+msgstr "Let's take **msra_ner** as an example:"
 
 #: ../data_prepare/dataset_load.rst:17
 msgid ""
@@ -41,63 +43,69 @@ msgid ""
 "下找到msra_ner数据集对应的数据读取脚本（默认路径：paddlenlp/datasets/msra_ner.py），并调用脚本中 "
 ":class:`DatasetBuilder` 类的相关方法生成数据集。"
 msgstr ""
+":func:`load_dataset` will find the script(it can be found: paddlenlp/datasets/msra_ner.py) of dataset loading for msra_ner in :obj:`paddlenlp.datasets` and call the relevant methods in :class:`DatasetBuilder` to generate dataset."
 
 #: ../data_prepare/dataset_load.rst:19
 msgid ""
-"生成数据集可以以 :class:`MapDataset` 和 :class:`IterDataset` 两种类型返回，分别是对 "
-":class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展，只需在 "
-":func:`load_dataset` 时设置 :attr:`lazy` 参数即可获取相应类型。:obj:`Flase` 对应返回 "
-":class:`MapDataset` ，:obj:`True` 对应返回 :class:`IterDataset`，默认值为None，对应返回 "
-":class:`DatasetBuilder` 默认的数据集类型，大多数为 :class:`MapDataset` 。"
+"生成数据集可以以 :class:`MapDataset` 和 :class:`IterDataset` 两种类型返回，分别是对 :class:`paddle.io.Dataset` 和 :class:`paddle.io.IterableDataset` 的扩展，只需在 :func:`load_dataset` 时设置 :attr:`lazy` 参数即可获取相应类型。:obj:`False` 对应返回 :class:`MapDataset` ，:obj:`True` 对应返回 :class:`IterDataset`，默认值为None，对应返回 :class:`DatasetBuilder` 默认的数据集类型，大多数为 :class:`MapDataset` 。"
 msgstr ""
+"The generated dataset can be returned as type :class:`MapDataset` and :class:`IterDataset`, which are sub-classes for :class:`paddle.io.Dataset` and :class:`paddle.io.IterableDataset`, "
+"you need to set :attr:`lazy` in :func:`load_dataset` to get it. :obj:`False` means to return :class:`MapDataset` ，:obj:`True` means to return  :class:`IterDataset`, the default value is None, "
+"it means to return default dataset type of :class:`DatasetBuilder`, in most cases it means :class:`MapDataset`."
 
 #: ../data_prepare/dataset_load.rst:31
 msgid ""
 "关于 :class:`MapDataset` 和 :class:`IterDataset` 功能和异同可以参考API文档 "
 ":doc:`datasets <../source/paddlenlp.datasets.dataset>`。"
 msgstr ""
+"To compare :class:`MapDataset` and :class:`IterDataset` please refer to the API document :doc:`datasets <../source/paddlenlp.datasets.dataset>`."
 
 #: ../data_prepare/dataset_load.rst:34
 msgid "选择子数据集"
-msgstr ""
+msgstr "Select sub dataset"
 
 #: ../data_prepare/dataset_load.rst:36
 msgid ""
 "有些数据集是很多子数据集的集合，每个子数据集都是一个独立的数据集。例如 **GLUE** 数据集就包含COLA, SST2, MRPC, "
 "QQP等10个子数据集。"
 msgstr ""
+"Some datasets are collections of sub-datasets, each and every sub dataset is independent. For example **GLUE** dataset includs 10 sub datasets e.g. COLA, SST2, MRPC, QQP etc."
 
 #: ../data_prepare/dataset_load.rst:38
 msgid ":func:`load_dataset` 方法提供了一个 :attr:`name` 参数用来指定想要获取的子数据集。使用方法如下："
 msgstr ""
+":func:`load_dataset` has a :attr:`name` which can be used to specify a sub-dataset, please see the demo below:"
 
 #: ../data_prepare/dataset_load.rst:46
 msgid "以内置数据集格式读取本地数据集"
-msgstr ""
+msgstr "Load the local dataset in the format of a built-in dataset"
 
 #: ../data_prepare/dataset_load.rst:48
 msgid ""
 "有的时候，我们希望使用数据格式与内置数据集相同的本地数据替换某些内置数据集的数据（例如参加SQuAD竞赛，对训练数据进行了数据增强）。 "
 ":func:`load_dataset` 方法提供的 :attr:`data_files` 参数可以实现这个功能。以 **SQuAD** 为例。"
 msgstr ""
+"It is, sometimes, quite useful to load local datasets in the format of a built-in dataset(e.g. during the SQuAD event, it enchanced the dataset)."
+"This approach can be implemented by using  :attr:`data_files in :func:`load_dataset`. Take **SQuAD** as an example. "
 
 #: ../data_prepare/dataset_load.rst:58
 msgid ""
 "对于某些数据集，不同的split的读取方式不同。对于这种情况则需要在 :attr:`splits` 参数中以传入与 "
 ":attr:`data_files` **一一对应** 的split信息。"
 msgstr ""
+"Not all datasets have the same approach for reading the split data. In this case, we need to pass in the the relevant information of :attr:`data_files` to the split function."
 
 #: ../data_prepare/dataset_load.rst:60
 msgid "此时 :attr:`splits` 不再代表选取的内置数据集，而代表以何种格式读取本地数据集。"
-msgstr ""
+msgstr "In this situation :attr:`splits` does not represent the selected built-in dataset, instead it shows how to load local datasets."
 
 #: ../data_prepare/dataset_load.rst:62
 msgid "下面以 **COLA** 数据集为例："
-msgstr ""
+msgstr "Let's take **COLA** dataset as an example:"
 
 #: ../data_prepare/dataset_load.rst:69
 msgid ""
 "**另外需要注意数据集的是没有默认加载选项的，**:attr:`splits` **和**:attr:`data_files` "
 "**必须至少指定一个。**"
 msgstr ""
-
+"**For the datasets which do not have a default loading option, :attr:`splits` or :attr:`data_files` must be specified.**"

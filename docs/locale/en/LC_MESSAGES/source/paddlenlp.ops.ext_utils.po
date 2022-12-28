@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.ops.ext_utils.CMakeExtension:1
 msgid "基类：:class:`setuptools.extension.Extension`"
-msgstr ""
+msgstr "Base class：:class:`setuptools.extension.Extension`"
 
 #: of paddlenlp.ops.ext_utils.CMakeExtension.build_with_command:1
 #: paddlenlp.ops.ext_utils.FasterTransformerExtension.build_with_command:1
@@ -48,7 +48,7 @@ msgstr ""
 
 #: of paddlenlp.ops.ext_utils.FasterTransformerExtension:1
 msgid "基类：:class:`paddlenlp.ops.ext_utils.CMakeExtension`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.ops.ext_utils.CMakeExtension`"
 
 #: of paddlenlp.ops.ext_utils.BuildExtension:1
 msgid "基类：:class:`paddle.utils.cpp_extension.cpp_extension.BuildExtension`"

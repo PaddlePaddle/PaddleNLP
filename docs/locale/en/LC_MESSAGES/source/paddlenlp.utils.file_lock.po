@@ -23,11 +23,11 @@ msgstr ""
 
 #: of paddlenlp.utils.file_lock.FileLockException:1
 msgid "基类：:class:`Exception`"
-msgstr ""
+msgstr "Base class：:class:`Exception`"
 
 #: of paddlenlp.utils.file_lock.FileLock:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.utils.file_lock.FileLock:1
 msgid ""

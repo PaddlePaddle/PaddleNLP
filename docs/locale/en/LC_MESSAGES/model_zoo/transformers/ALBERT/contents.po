@@ -19,11 +19,11 @@ msgstr ""
 
 #: ../model_zoo/transformers/ALBERT/contents.rst:5
 msgid "ALBERT模型汇总"
-msgstr ""
+msgstr "ALBERT Models Summary"
 
 #: ../model_zoo/transformers/ALBERT/contents.rst:9
 msgid "下表汇总介绍了目前PaddleNLP支持的ALBERT模型对应预训练权重。 关于模型的具体细节可以参考对应链接。"
-msgstr ""
+msgstr "The following table summarizes the weights for all pre-trained ALBERT models supported by PaddleNLP. For more details, please refer to the relevant links."
 
 #: ../model_zoo/transformers/ALBERT/contents.rst:13
 msgid "Pretrained Weight"

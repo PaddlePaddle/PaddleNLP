@@ -31,7 +31,7 @@ msgstr ""
 #: paddlenlp.experimental.faster_tokenizer.to_tensor
 #: paddlenlp.experimental.faster_tokenizer.to_vocab_buffer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.experimental.faster_tokenizer.to_tensor:4
 msgid "The value will be setted to the tensor."

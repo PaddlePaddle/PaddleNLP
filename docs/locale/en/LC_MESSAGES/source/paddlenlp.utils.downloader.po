@@ -30,7 +30,7 @@ msgstr ""
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url:8
 msgid "a local path to save downloaded weights."
@@ -38,9 +38,9 @@ msgstr ""
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.utils.downloader.get_weights_path_from_url:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 

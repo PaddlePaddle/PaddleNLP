@@ -24,7 +24,7 @@ msgstr ""
 #: of paddlenlp.data.collate.Dict:1 paddlenlp.data.collate.Pad:1
 #: paddlenlp.data.collate.Stack:1 paddlenlp.data.collate.Tuple:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.data.collate.Stack:1
 msgid ""
@@ -38,7 +38,7 @@ msgstr ""
 #: paddlenlp.data.collate.Stack paddlenlp.data.collate.Stack.__call__
 #: paddlenlp.data.collate.Tuple paddlenlp.data.collate.Tuple.__call__
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.data.collate.Stack:4
 msgid ""
@@ -66,7 +66,7 @@ msgstr ""
 #: of paddlenlp.data.collate.Dict.__call__ paddlenlp.data.collate.Pad.__call__
 #: paddlenlp.data.collate.Stack.__call__ paddlenlp.data.collate.Tuple.__call__
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.data.collate.Stack.__call__:7
 msgid "Stacked batch data."
@@ -75,14 +75,14 @@ msgstr ""
 #: of paddlenlp.data.collate.Dict.__call__ paddlenlp.data.collate.Pad.__call__
 #: paddlenlp.data.collate.Stack.__call__ paddlenlp.data.collate.Tuple.__call__
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.data.collate.Dict.__call__:14
 #: paddlenlp.data.collate.Pad.__call__:18
 #: paddlenlp.data.collate.Stack.__call__:11
 #: paddlenlp.data.collate.Tuple.__call__:14
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.data.collate.Pad:1
 msgid "Pads the input data samples to the largest length at `axis`."

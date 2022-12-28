@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.convbert.tokenizer.ConvBertTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.electra.tokenizer.ElectraTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.electra.tokenizer.ElectraTokenizer`"
 
 #: of paddlenlp.transformers.convbert.tokenizer.ConvBertTokenizer:1
 msgid ""

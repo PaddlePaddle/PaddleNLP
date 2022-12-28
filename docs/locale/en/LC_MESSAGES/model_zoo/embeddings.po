@@ -23,55 +23,55 @@ msgstr ""
 
 #: ../model_zoo/embeddings.md:3 ../model_zoo/embeddings.md:24
 msgid "介绍"
-msgstr ""
+msgstr "Introduction"
 
 #: ../model_zoo/embeddings.md:4 ../model_zoo/embeddings.md:28
 msgid "用法"
-msgstr ""
+msgstr "How To Use"
 
 #: ../model_zoo/embeddings.md:5 ../model_zoo/embeddings.md:30
 msgid "TokenEmbedding参数"
-msgstr ""
+msgstr "TokenEmbedding Parameter"
 
 #: ../model_zoo/embeddings.md:6 ../model_zoo/embeddings.md:69
 msgid "初始化"
-msgstr ""
+msgstr "Initialization"
 
 #: ../model_zoo/embeddings.md:7 ../model_zoo/embeddings.md:101
 msgid "查询embedding结果"
-msgstr ""
+msgstr "Check Embedding Results"
 
 #: ../model_zoo/embeddings.md:8 ../model_zoo/embeddings.md:115
 msgid "可视化embedding结果"
-msgstr ""
+msgstr "Visualize Embedding Results"
 
 #: ../model_zoo/embeddings.md:9 ../model_zoo/embeddings.md:140
 msgid "计算词向量cosine相似度"
-msgstr ""
+msgstr "Calculate the similarity of cosine for vectors"
 
 #: ../model_zoo/embeddings.md:10 ../model_zoo/embeddings.md:147
 msgid "计算词向量内积"
-msgstr ""
+msgstr "Calculate the dot product of word vectors"
 
 #: ../model_zoo/embeddings.md:11 ../model_zoo/embeddings.md:155
 msgid "训练"
-msgstr ""
+msgstr "Training"
 
 #: ../model_zoo/embeddings.md:12 ../model_zoo/embeddings.md:171
 msgid "切词"
-msgstr ""
+msgstr "Word Segmentation"
 
 #: ../model_zoo/embeddings.md:13 ../model_zoo/embeddings.md:183
 msgid "预训练模型"
-msgstr ""
+msgstr "Pre-trained Model"
 
 #: ../model_zoo/embeddings.md:14 ../model_zoo/embeddings.md:189
 msgid "中文词向量"
-msgstr ""
+msgstr "Chinese Word Vector"
 
 #: ../model_zoo/embeddings.md:15 ../model_zoo/embeddings.md:343
 msgid "英文词向量"
-msgstr ""
+msgstr "English Word Vector"
 
 #: ../model_zoo/embeddings.md:16 ../model_zoo/embeddings.md:345
 msgid "Word2Vec"
@@ -87,109 +87,121 @@ msgstr ""
 
 #: ../model_zoo/embeddings.md:19 ../model_zoo/embeddings.md:416
 msgid "使用方式"
-msgstr ""
+msgstr "How To Use"
 
 #: ../model_zoo/embeddings.md:20 ../model_zoo/embeddings.md:427
 msgid "模型信息"
-msgstr ""
+msgstr "Model Information"
 
 #: ../model_zoo/embeddings.md:21 ../model_zoo/embeddings.md:751
 msgid "致谢"
-msgstr ""
+msgstr "Thanks"
 
 #: ../model_zoo/embeddings.md:22 ../model_zoo/embeddings.md:756
 msgid "参考论文"
-msgstr ""
+msgstr "References"
 
 #: ../model_zoo/embeddings.md:26
 msgid "PaddleNLP提供多个开源的预训练词向量模型，用户仅需在使用paddlenlp.embeddings.TokenEmbedding时，指定预训练模型的名称，即可加载相对应的预训练模型。以下将介绍TokenEmbeddign详细用法，并列出PaddleNLP所支持的预训练Embedding模型。"
 msgstr ""
+"PaddleNLP provides multiple open source pre-trained word vector models. Users only need to specify the name of the pre-trained model when using paddlenlp.embeddings.TokenEmbedding to load the corresponding pre-trained model."
+"The following will introduce the detailed use of TokenEmbeddign, and list the pre-trained Embedding models that supported by PaddleNLP."
 
 #: ../model_zoo/embeddings.md:116
 msgid "使用深度学习可视化工具VisualDL的High Dimensional组件可以对embedding结果进行可视化展示，便于对其直观分析，步骤如下："
-msgstr ""
+msgstr "Using the High Dimensional component from the deep learning visualization tool VisualDL can visualize the embedding results, which is easy for intuitive analysis. The steps are as follows:"
 
 #: ../model_zoo/embeddings.md:128
 msgid "执行完毕后会在当前路径下生成一个visualize目录，并将日志存放在其中，我们在命令行启动VisualDL即可进行查看，启动命令为："
-msgstr ""
+msgstr "When complete the execution, a visualize directory will be generated in the current path, and the log will be stored in it. We can view it by starting VisualDL on the command. The startup command is:"
 
 #: ../model_zoo/embeddings.md:132
 msgid "启动后打开浏览器即可看到可视化结果"
-msgstr ""
+msgstr "After startup, we can see the visualization results on borwser."
 
 #: ../model_zoo/embeddings.md:138
 msgid "使用VisualDL除可视化embedding结果外，还可以对标量、图片、音频等进行可视化，有效提升训练调参效率。关于VisualDL更多功能和详细介绍，可参考VisualDL使用文档。"
-msgstr ""
+msgstr "In addition to visualizing embedding results, VisualDL can also visualize scalars, pictures, audio, etc., effectively improving the efficiency of training parameters. For more functions and detailed introduction of VisualDL, please refer to the VisualDL documentation."
 
 #: ../model_zoo/embeddings.md:157
 msgid ""
 "以下为TokenEmbedding简单的组网使用方法。有关更多TokenEmbedding训练流程相关的使用方法，请参考Word "
 "Embedding with PaddleNLP。"
 msgstr ""
+"The following is a simple network use method of TokenEmbedding. For more use methods about the TokenEmbedding training process, please refer to Word"
+"Embedding with PaddleNLP。"
 
 #: ../model_zoo/embeddings.md:185
 msgid "以下将列举PaddleNLP支持的Embedding预训练模型。"
-msgstr ""
+msgstr "The following will list the Embedding pre-training models that supported by PaddleNLP."
 
 #: ../model_zoo/embeddings.md:186
 msgid "模型命名方式为：${训练模型}.${语料}.${词向量类型}.${co-occurrence type}.dim${维度}。"
-msgstr ""
+msgstr "The model is named as：${training model}.${corpus}.${word vector type}.${co-occurrence type}.dim${dimension}."
 
 #: ../model_zoo/embeddings.md:187
 msgid "模型有三种，分别是Word2Vec(w2v, skip-gram), GloVe(glove)和FastText(fasttext)。"
-msgstr ""
+msgstr "There are three types of model: Word2Vec(w2v, skip-gram), GloVe(glove)和FastText(fasttext)."
 
 #: ../model_zoo/embeddings.md:191
 msgid "以下预训练词向量由Chinese-Word-Vectors提供。"
-msgstr ""
+msgstr "The following pre-trained word vectors are provided by Chinese-Word-Vectors."
 
 #: ../model_zoo/embeddings.md:193
 msgid "根据不同类型的上下文为每个语料训练多个目标词向量，第二列开始表示不同类型的上下文。以下为上下文类别："
-msgstr ""
+msgstr "Multiple target word vectors are trained for each corpus according to different types of contexts, and the second column starts to represent different types of contexts. The following are context categories:"
 
 #: ../model_zoo/embeddings.md:195
 msgid "Word表示训练时目标词预测的上下文是一个Word。"
-msgstr ""
+msgstr "Word indicates that the context of the target word prediction during training is a Word."
 
 #: ../model_zoo/embeddings.md:196
 msgid ""
 "Word + "
 "N-gram表示训练时目标词预测的上下文是一个Word或者Ngram，其中bigram表示2-grams，ngram.1-2表示1-gram或者2-grams。"
 msgstr ""
+"Word + "
+"N-gram means that the context of target word prediction during training is a Word or Ngram, where bigram means 2-grams, and ngram.1-2 means 1-gram or 2-grams."
 
 #: ../model_zoo/embeddings.md:197
 msgid ""
 "Word + Character表示训练时目标词预测的上下文是一个Word或者Character，其中word-"
 "character.char1-2表示上下文是1个或2个Character。"
 msgstr ""
+"Word + Character indicates that the context of the target word prediction during training is a Word or Character,"
+"where word-character.char1-2 indicates that the context is 1 or 2 Characters."
 
 #: ../model_zoo/embeddings.md:198
 msgid ""
 "Word + Character + Ngram表示训练时目标词预测的上下文是一个Word、Character或者Ngram。bigram-"
 "char表示上下文是2-grams或者1个Character。"
 msgstr ""
+"Word + Character + Ngram indicates that the context of target word prediction during training is a Word, Character or Ngram."
+"bigram-char indicates that the context is 2-grams or 1 Chcter."
 
 #: ../model_zoo/embeddings.md:284
 msgid "特别地，对于百度百科语料，在不同的 Co-occurrence类型下分别提供了目标词与上下文向量："
-msgstr ""
+msgstr "Especially, for the Baidu Baike corpus, target words and context vectors are provided under different Co-occurrence types:"
 
 #: ../model_zoo/embeddings.md:418
 msgid ""
 "以上所述的模型名称可直接以参数形式传入padddlenlp.embeddings.TokenEmbedding，加载相对应的模型。比如要加载语料为Wiki2017，通过FastText训练的预训练模型（fasttext"
 ".wiki-news.target.word-word.dim300.en），只需执行以下代码："
 msgstr ""
+"The model names mentioned above can be directly passed to padddlenlp.embeddings.TokenEmbedding as a parameter to load the corresponding models."
+"For example, to load the pre-trained model (fasttext.wiki-news.target.word-word.dim300.en) trained by FastText with the corpus as Wiki2017, only need to execute the following code:"
 
 #: ../model_zoo/embeddings.md:752
 msgid "感谢 Chinese-Word-Vectors提供Word2Vec中文预训练词向量。"
-msgstr ""
+msgstr "Thanks to Chinese-Word-Vectors for the Word2Vec Chinese pre-trained word vectors."
 
 #: ../model_zoo/embeddings.md:753
 msgid "感谢 GloVe Project提供的GloVe英文预训练词向量。"
-msgstr ""
+msgstr "Thanks to the GloVe Project for the GloVe English pre-trained word vectors"
 
 #: ../model_zoo/embeddings.md:754
 msgid "感谢 FastText Project提供的英文预训练词向量。"
-msgstr ""
+msgstr "Thanks to the FastText Project for the English pre-trained word vectors"
 
 #: ../model_zoo/embeddings.md:757
 msgid ""

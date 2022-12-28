@@ -31,7 +31,7 @@ msgstr ""
 #: paddlenlp.ops.faster_transformer.transformer.decoder.InferTransformerDecoder
 #: paddlenlp.ops.faster_transformer.transformer.decoder.InferTransformerDecoder.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.ops.faster_transformer.transformer.decoder.InferTransformerDecoder:3

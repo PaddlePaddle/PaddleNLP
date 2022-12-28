@@ -28,7 +28,7 @@ msgstr ""
 #: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification:1
 #: paddlenlp.transformers.mbart.modeling.MBartModel:1
 msgid "基类：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.mbart.modeling.MBartPretrainedModel`"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartModel:1
 msgid "The bare MBart Model transformer outputting raw hidden-states."
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.transformers.mbart.modeling.MBartModel
 #: paddlenlp.transformers.mbart.modeling.MBartModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartModel:10
 msgid ""
@@ -249,7 +249,7 @@ msgstr ""
 #: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward
 #: paddlenlp.transformers.mbart.modeling.MBartModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartDecoder.forward:14
 #: paddlenlp.transformers.mbart.modeling.MBartModel.forward:42
@@ -266,7 +266,7 @@ msgstr ""
 #: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward
 #: paddlenlp.transformers.mbart.modeling.MBartModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.mbart.modeling.MBartForConditionalGeneration.forward:31
@@ -274,11 +274,11 @@ msgstr ""
 #: paddlenlp.transformers.mbart.modeling.MBartForSequenceClassification.forward:23
 #: paddlenlp.transformers.mbart.modeling.MBartModel.forward:47
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartPretrainedModel:1
 msgid "基类：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.model_utils.PretrainedModel`"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartPretrainedModel:1
 msgid ""
@@ -359,7 +359,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead:1
 msgid "基类：:class:`paddle.fluid.dygraph.layers.Layer`"
-msgstr ""
+msgstr "Base class：:class:`paddle.fluid.dygraph.layers.Layer`"
 
 #: of paddlenlp.transformers.mbart.modeling.MBartClassificationHead:1
 msgid "Head for sentence-level classification tasks."

@@ -34,7 +34,7 @@ msgstr ""
 #: paddlenlp.utils.tools.dygraph_params_to_static
 #: paddlenlp.utils.tools.static_params_to_dygraph
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.utils.tools.dygraph_params_to_static:5
 #: paddlenlp.utils.tools.static_params_to_dygraph:5
@@ -51,7 +51,7 @@ msgstr ""
 #: paddlenlp.utils.tools.dygraph_params_to_static
 #: paddlenlp.utils.tools.static_params_to_dygraph
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.utils.tools.dygraph_params_to_static:10
 #: paddlenlp.utils.tools.static_params_to_dygraph:11
@@ -62,7 +62,7 @@ msgstr ""
 #: paddlenlp.utils.tools.dygraph_params_to_static
 #: paddlenlp.utils.tools.static_params_to_dygraph
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.utils.tools.dygraph_params_to_static:1
 msgid "Simple tool for convert dygraph paramters to static paramters dict."
@@ -74,7 +74,7 @@ msgstr ""
 
 #: of paddlenlp.utils.tools.TimeCostAverage:1
 msgid "基类：:class:`object`"
-msgstr ""
+msgstr "Base class：:class:`object`"
 
 #: of paddlenlp.utils.tools.TimeCostAverage:1
 msgid ""
@@ -126,5 +126,5 @@ msgstr ""
 
 #: of paddlenlp.utils.tools.compare_version:15
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 

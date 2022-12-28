@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.gpt.tokenizer.GPTTokenizer`"
 
 #: of paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer:1
 msgid ""
@@ -66,7 +66,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer:36
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens:1
@@ -76,7 +76,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens:5
@@ -91,7 +91,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens:10
@@ -101,7 +101,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.blenderbot.tokenizer.BlenderbotTokenizer.build_inputs_with_special_tokens:11

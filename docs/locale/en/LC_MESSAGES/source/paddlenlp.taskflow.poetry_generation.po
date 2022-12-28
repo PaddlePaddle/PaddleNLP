@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.taskflow.poetry_generation.PoetryGenerationTask:1
 msgid "基类：:class:`paddlenlp.taskflow.text_generation.TextGenerationTask`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.taskflow.text_generation.TextGenerationTask`"
 
 #: of paddlenlp.taskflow.poetry_generation.PoetryGenerationTask:1
 msgid ""

@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer:1
 msgid "基类：:class:`paddlenlp.data.tokenizer.BaseTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.data.tokenizer.BaseTokenizer`"
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer:1
 msgid ""
@@ -37,7 +37,7 @@ msgstr ""
 #: paddlenlp.data.tokenizer.JiebaTokenizer.cut
 #: paddlenlp.data.tokenizer.JiebaTokenizer.encode
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer:5
 msgid "An instance of :class:`paddlenlp.data.Vocab`."
@@ -70,7 +70,7 @@ msgstr ""
 #: of paddlenlp.data.tokenizer.JiebaTokenizer.cut
 #: paddlenlp.data.tokenizer.JiebaTokenizer.encode
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer.cut:15
 msgid "A list of tokens."
@@ -79,12 +79,12 @@ msgstr ""
 #: of paddlenlp.data.tokenizer.JiebaTokenizer.cut
 #: paddlenlp.data.tokenizer.JiebaTokenizer.encode
 msgid "返回类型"
-msgstr ""
+msgstr "Return Type"
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer.cut:19
 #: paddlenlp.data.tokenizer.JiebaTokenizer.encode:21
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.data.tokenizer.JiebaTokenizer.encode:1
 msgid ""

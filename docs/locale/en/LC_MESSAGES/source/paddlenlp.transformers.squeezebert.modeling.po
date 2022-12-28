@@ -27,12 +27,12 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertForTokenClassification:1
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel:1
 msgid "基类：:class:`paddlenlp.transformers.squeezebert.modeling.SqueezeBertPreTrainedModel`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.squeezebert.modeling.SqueezeBertPreTrainedModel`"
 
 #: of paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel:1
 msgid ""
@@ -208,7 +208,7 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertForTokenClassification.forward
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel.forward
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel.forward:35
 msgid ""
@@ -271,7 +271,7 @@ msgstr ""
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertForTokenClassification.forward
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertModel.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.squeezebert.modeling.SqueezeBertForSequenceClassification:1

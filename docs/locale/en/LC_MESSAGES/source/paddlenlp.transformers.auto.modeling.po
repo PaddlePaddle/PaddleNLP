@@ -35,7 +35,7 @@ msgstr ""
 #: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification:1
 #: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification:1
 msgid "基类：:class:`paddlenlp.transformers.auto.modeling._BaseAutoModelClass`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.auto.modeling._BaseAutoModelClass`"
 
 #: of paddlenlp.transformers.auto.modeling.AutoModel:1
 msgid ""
@@ -66,7 +66,7 @@ msgstr ""
 #: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
 #: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:5
 msgid ""
@@ -134,7 +134,7 @@ msgstr ""
 #: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
 #: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.auto.modeling.AutoModel.from_pretrained:29
 msgid "An instance of `AutoModel`."
@@ -154,7 +154,7 @@ msgstr ""
 #: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained
 #: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of paddlenlp.transformers.auto.modeling.AutoDecoder.from_pretrained:16
 #: paddlenlp.transformers.auto.modeling.AutoDiscriminator.from_pretrained:16
@@ -170,7 +170,7 @@ msgstr ""
 #: paddlenlp.transformers.auto.modeling.AutoModelForSequenceClassification.from_pretrained:16
 #: paddlenlp.transformers.auto.modeling.AutoModelForTokenClassification.from_pretrained:16
 msgid "示例"
-msgstr ""
+msgstr "Examples"
 
 #: of paddlenlp.transformers.auto.modeling.AutoModelForPretraining:1
 msgid "AutoModelForPretraining."

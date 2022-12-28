@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.PretrainedTokenizer`"
 
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:1
 msgid "Construct an ERNIE-CTM tokenizer."
@@ -44,7 +44,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.get_special_tokens_mask
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:7
 msgid "File path of the vocabulary."
@@ -108,7 +108,7 @@ msgstr ""
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer:37
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:12
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size:1
 msgid "Return the size of vocabulary."
@@ -122,7 +122,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size:3
 msgid "The size of vocabulary."
@@ -136,7 +136,7 @@ msgstr ""
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.num_special_tokens_to_add
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
 #: of
 #: paddlenlp.transformers.ernie_ctm.tokenizer.ErnieCtmTokenizer.convert_tokens_to_string:1

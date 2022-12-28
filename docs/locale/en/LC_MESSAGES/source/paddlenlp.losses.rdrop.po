@@ -30,7 +30,7 @@ msgstr ""
 
 #: of paddlenlp.losses.rdrop.RDropLoss paddlenlp.losses.rdrop.RDropLoss.forward
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.losses.rdrop.RDropLoss:5
 msgid ""
@@ -59,7 +59,7 @@ msgstr ""
 
 #: of paddlenlp.losses.rdrop.RDropLoss.forward
 msgid "返回"
-msgstr ""
+msgstr "Return "
 
 #: of paddlenlp.losses.rdrop.RDropLoss.forward:8
 msgid "Returns tensor `loss`, the rdrop loss of p and q."
@@ -67,5 +67,5 @@ msgstr ""
 
 #: of paddlenlp.losses.rdrop.RDropLoss.forward
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 

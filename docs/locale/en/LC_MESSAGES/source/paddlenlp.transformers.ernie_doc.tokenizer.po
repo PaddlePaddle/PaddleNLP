@@ -23,7 +23,7 @@ msgstr ""
 
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocTokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.ernie.tokenizer.ErnieTokenizer`"
 
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocTokenizer:1
 msgid ""
@@ -42,7 +42,7 @@ msgstr ""
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer
 #: paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocTokenizer
 msgid "参数"
-msgstr ""
+msgstr "Parameters"
 
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocTokenizer:8
 msgid ""
@@ -94,11 +94,11 @@ msgstr ""
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer:32
 #: paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocTokenizer:33
 msgid "实际案例"
-msgstr ""
+msgstr "Case study"
 
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer:1
 msgid "基类：:class:`paddlenlp.transformers.tokenizer_utils.BPETokenizer`"
-msgstr ""
+msgstr "Base class：:class:`paddlenlp.transformers.tokenizer_utils.BPETokenizer`"
 
 #: of paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer:1
 msgid ""
@@ -134,7 +134,7 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer.vocab_size
 msgid "返回"
-msgstr ""
+msgstr "Return"
 
 #: of
 #: paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer.vocab_size:3
@@ -144,5 +144,5 @@ msgstr ""
 #: of
 #: paddlenlp.transformers.ernie_doc.tokenizer.ErnieDocBPETokenizer.vocab_size
 msgid "返回类型"
-msgstr ""
+msgstr "Return type"
 
