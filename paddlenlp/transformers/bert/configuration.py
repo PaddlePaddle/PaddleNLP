@@ -365,7 +365,7 @@ class BertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "bert"
-    standard_config: Dict[str, str] = {"dropout": "classifier_dropout"}
+    standard_config_map: Dict[str, str] = {"dropout": "classifier_dropout"}
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
