@@ -23,15 +23,14 @@ from paddle.nn import Layer
 
 from paddlenlp.utils.log import logger
 
-from .. import PretrainedModel, register_base_model
 from ...utils.env import CONFIG_NAME
+from .. import PretrainedModel, register_base_model
 from .configuration import (
     ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
     ERNIE_LAYOUT_PRETRAINED_RESOURCE_FILES_MAP,
     ErnieLayoutConfig,
 )
 from .visual_backbone import ResNet
-
 
 __all__ = [
     "ErnieLayoutModel",

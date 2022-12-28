@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
     MaskedLMOutput,
@@ -44,7 +45,6 @@ from .configuration import (
     BERT_PRETRAINED_RESOURCE_FILES_MAP,
     BertConfig,
 )
-from ...utils.env import CONFIG_NAME
 
 __all__ = [
     "BertModel",

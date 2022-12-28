@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -35,7 +36,6 @@ from .configuration import (
     ERNIE_PRETRAINED_RESOURCE_FILES_MAP,
     ErnieConfig,
 )
-from ...utils.env import CONFIG_NAME
 
 __all__ = [
     "ErnieModel",
@@ -162,7 +162,7 @@ class ErniePretrainedModel(PretrainedModel):
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # only support dygraph, use truncated_normal and make it inplace
             # and configurable later
-            if isinstance(layer.weight, paddle.Tensor):    
+            if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
