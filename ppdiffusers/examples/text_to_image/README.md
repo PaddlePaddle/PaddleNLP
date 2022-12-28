@@ -40,6 +40,10 @@ python -u train_text_to_image_qat.py \
 
 在运行 `max_train_steps` 后模型将保存在 `output_dir/final` 下面，`unet_qat`目录下的是QAT导出的UNet预测模型。如设置大于0的`distill_coeff`则将使用`teacher_pretrained_model_name_or_path`提供的教师模型进行蒸馏训练。
 
+**量化模型效果对比**
+
+修改 `qat_cmp_demo.py` 中 pipeline 使用的模型路径之后运行，将分别显示FP32模型和量化模型的结果。
+
 ### 1.2 Pokemon训练教程
 
 为了下载`CompVis/stable-diffusion-v1-4`模型权重，我们需要阅读并签署相关的License。在这里我们默认用户已经阅读并签署了解了相关License，有关License及模型的详细介绍，请访问[CompVis/stable-diffusion-v1-4 card](https://huggingface.co/CompVis/stable-diffusion-v1-4)。
