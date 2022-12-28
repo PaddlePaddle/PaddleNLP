@@ -139,6 +139,7 @@ from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
 from .ernie_vil.procesing import *
+from .ernie_vil.image_processing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .unimo.configuration import *
@@ -163,6 +164,7 @@ from .artist.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 from .clip.modeling import *
+from .clip.configuration import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
