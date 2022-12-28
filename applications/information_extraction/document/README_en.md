@@ -29,7 +29,7 @@ Information Extraction (IE) is the process of extracting structured information 
 
 ## 2. Quick Start
 
-For simple extraction targets, you can directly use ```paddlenlp.Taskflow``` to achieve zero-shot extraction. For subdivision scenarios, we recommend using custom functions (labeling a small amount of data for model fine-tuning) to further improve the effect.
+For quick start, you can directly use ```paddlenlp.Taskflow``` out-of-the-box, leveraging the zero-shot capability. For production use cases, we recommend labeling a small amount of data for model fine-tuning to further improve the performance.
 
 <a name="21"></a>
 
