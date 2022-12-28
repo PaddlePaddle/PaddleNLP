@@ -13,7 +13,6 @@
 # limitations under the License.
 """Modeling classes for UNIMO model."""
 
-from ast import excepthandler
 from typing import Optional, Tuple
 
 import paddle
@@ -21,8 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -539,18 +537,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
 
     def __getattr__(self, name):
         try:
-            base_model = getattr(self, self.base_model_prefix)
-            print(base_model)
-            return getattr(base_model, name)
-        except AttributeError:
             return super().__getattr__(name)
-        # try:
-        #     return super().__getattr__(name)
-        # except AttributeError:
-        #     try:
-        #         return getattr(getattr(self, self.base_model_prefix), name)
-        #     except AttributeError:
-        #         return getattr(getattr(self, self.base_model_prefix).config, name)
+        except AttributeError:
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel

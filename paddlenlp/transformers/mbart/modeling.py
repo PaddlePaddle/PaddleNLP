@@ -22,8 +22,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Embedding, Layer, MultiHeadAttention
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -1132,7 +1131,4 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)

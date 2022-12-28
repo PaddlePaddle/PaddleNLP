@@ -289,13 +289,16 @@ class PretrainedModel(Layer, GenerationMixin):
         Returns: the value of attribute
 
         """
-        result = getattr(self.config, name)
+        try:
+            return super(PretrainedModel, self).__getattr__(name)
+        except AttributeError:
+            result = getattr(self.config, name)
 
-        logger.warning(
-            f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-            f"Instead, do `model.config.{name}`"
-        )
-        return result
+            logger.warning(
+                f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
+                f"Instead, do `model.config.{name}`"
+            )
+            return result
 
     @property
     def base_model(self):
