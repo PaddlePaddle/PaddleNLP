@@ -550,7 +550,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         model. (default: None)
                         
   --skip_memory_metrics
-                       是否跳过内存指标检测。（可选，默认为True，跳过）
+                       是否跳过内存profiler检测。（可选，默认为True，跳过）
                        Whether or not to skip adding of memory profiler reports
                        to metrics.(default:True)
 
