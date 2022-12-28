@@ -46,11 +46,7 @@ def set_seed(seed=1000):
     paddle.seed(seed)
 
 
-def create_dataloader(dataset,
-                      trans_fn=None,
-                      mode='train',
-                      batch_size=1,
-                      batchify_fn=None):
+def create_dataloader(dataset, trans_fn=None, mode="train", batch_size=1, batchify_fn=None):
     """
     Creats dataloader.
 
@@ -69,18 +65,12 @@ def create_dataloader(dataset,
     if trans_fn:
         dataset = dataset.map(trans_fn)
 
-    shuffle = True if mode == 'train' else False
+    shuffle = True if mode == "train" else False
     if mode == "train":
-        sampler = paddle.io.DistributedBatchSampler(dataset=dataset,
-                                                    batch_size=batch_size,
-                                                    shuffle=shuffle)
+        sampler = paddle.io.DistributedBatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
     else:
-        sampler = paddle.io.BatchSampler(dataset=dataset,
-                                         batch_size=batch_size,
-                                         shuffle=shuffle)
-    dataloader = paddle.io.DataLoader(dataset,
-                                      batch_sampler=sampler,
-                                      collate_fn=batchify_fn)
+        sampler = paddle.io.BatchSampler(dataset=dataset, batch_size=batch_size, shuffle=shuffle)
+    dataloader = paddle.io.DataLoader(dataset, batch_sampler=sampler, collate_fn=batchify_fn)
     return dataloader
 
 
@@ -101,11 +91,7 @@ if __name__ == "__main__":
     # It should be updated according to the corpus.
     stopwords = set(["的", "吗", "吧", "呀", "呜", "呢", "呗"])
     # Builds vocab.
-    word2idx = build_vocab(texts,
-                           stopwords,
-                           min_freq=5,
-                           unk_token="[UNK]",
-                           pad_token="[PAD]")
+    word2idx = build_vocab(texts, stopwords, min_freq=5, unk_token="[UNK]", pad_token="[PAD]")
     vocab = Vocab.from_dict(word2idx, unk_token="[UNK]", pad_token="[PAD]")
     # Saves vocab.
     vocab.to_json(args.vocab_path)
@@ -114,79 +100,56 @@ if __name__ == "__main__":
     network = args.network.lower()
     vocab_size = len(vocab)
     num_classes = len(train_ds.label_list)
-    pad_token_id = vocab.to_indices('[PAD]')
-    if network == 'bow':
+    pad_token_id = vocab.to_indices("[PAD]")
+    if network == "bow":
         model = BoWModel(vocab_size, num_classes, padding_idx=pad_token_id)
-    elif network == 'bigru':
-        model = GRUModel(vocab_size,
-                         num_classes,
-                         direction='bidirect',
-                         padding_idx=pad_token_id)
-    elif network == 'bilstm':
-        model = LSTMModel(vocab_size,
-                          num_classes,
-                          direction='bidirect',
-                          padding_idx=pad_token_id)
-    elif network == 'bilstm_attn':
+    elif network == "bigru":
+        model = GRUModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "bilstm":
+        model = LSTMModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "bilstm_attn":
         lstm_hidden_size = 196
         attention = SelfInteractiveAttention(hidden_size=2 * lstm_hidden_size)
-        model = BiLSTMAttentionModel(attention_layer=attention,
-                                     vocab_size=vocab_size,
-                                     lstm_hidden_size=lstm_hidden_size,
-                                     num_classes=num_classes,
-                                     padding_idx=pad_token_id)
-    elif network == 'birnn':
-        model = RNNModel(vocab_size,
-                         num_classes,
-                         direction='bidirect',
-                         padding_idx=pad_token_id)
-    elif network == 'cnn':
+        model = BiLSTMAttentionModel(
+            attention_layer=attention,
+            vocab_size=vocab_size,
+            lstm_hidden_size=lstm_hidden_size,
+            num_classes=num_classes,
+            padding_idx=pad_token_id,
+        )
+    elif network == "birnn":
+        model = RNNModel(vocab_size, num_classes, direction="bidirect", padding_idx=pad_token_id)
+    elif network == "cnn":
         model = CNNModel(vocab_size, num_classes, padding_idx=pad_token_id)
-    elif network == 'gru':
-        model = GRUModel(vocab_size,
-                         num_classes,
-                         direction='forward',
-                         padding_idx=pad_token_id,
-                         pooling_type='max')
-    elif network == 'lstm':
-        model = LSTMModel(vocab_size,
-                          num_classes,
-                          direction='forward',
-                          padding_idx=pad_token_id,
-                          pooling_type='max')
-    elif network == 'rnn':
-        model = RNNModel(vocab_size,
-                         num_classes,
-                         direction='forward',
-                         padding_idx=pad_token_id,
-                         pooling_type='max')
+    elif network == "gru":
+        model = GRUModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
+    elif network == "lstm":
+        model = LSTMModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
+    elif network == "rnn":
+        model = RNNModel(vocab_size, num_classes, direction="forward", padding_idx=pad_token_id, pooling_type="max")
     else:
         raise ValueError(
             "Unknown network: %s, it must be one of bow, lstm, bilstm, cnn, gru, bigru, rnn, birnn and bilstm_attn."
-            % network)
+            % network
+        )
     model = paddle.Model(model)
 
     # Reads data and generates mini-batches.
     tokenizer = JiebaTokenizer(vocab)
     trans_fn = partial(convert_example, tokenizer=tokenizer, is_test=False)
     batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=vocab.token_to_idx.get('[PAD]', 0)),  # input_ids
+        Pad(axis=0, pad_val=vocab.token_to_idx.get("[PAD]", 0)),  # input_ids
         Stack(dtype="int64"),  # seq len
-        Stack(dtype="int64")  # label
+        Stack(dtype="int64"),  # label
     ): [data for data in fn(samples)]
-    train_loader = create_dataloader(train_ds,
-                                     trans_fn=trans_fn,
-                                     batch_size=args.batch_size,
-                                     mode='train',
-                                     batchify_fn=batchify_fn)
-    dev_loader = create_dataloader(dev_ds,
-                                   trans_fn=trans_fn,
-                                   batch_size=args.batch_size,
-                                   mode='validation',
-                                   batchify_fn=batchify_fn)
+    train_loader = create_dataloader(
+        train_ds, trans_fn=trans_fn, batch_size=args.batch_size, mode="train", batchify_fn=batchify_fn
+    )
+    dev_loader = create_dataloader(
+        dev_ds, trans_fn=trans_fn, batch_size=args.batch_size, mode="validation", batchify_fn=batchify_fn
+    )
 
-    optimizer = paddle.optimizer.Adam(parameters=model.parameters(),
-                                      learning_rate=args.lr)
+    optimizer = paddle.optimizer.Adam(parameters=model.parameters(), learning_rate=args.lr)
 
     # Defines loss and metric.
     criterion = paddle.nn.CrossEntropyLoss()
@@ -201,8 +164,4 @@ if __name__ == "__main__":
 
     # Starts training and evaluating.
     callback = paddle.callbacks.ProgBarLogger(log_freq=10, verbose=3)
-    model.fit(train_loader,
-              dev_loader,
-              epochs=args.epochs,
-              save_dir=args.save_dir,
-              callbacks=callback)
+    model.fit(train_loader, dev_loader, epochs=args.epochs, save_dir=args.save_dir, callbacks=callback)

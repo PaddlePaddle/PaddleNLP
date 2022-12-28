@@ -25,26 +25,18 @@ from paddlenlp.utils.log import logger
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config",
-                        default="./config/decoder.sample.yaml",
-                        type=str,
-                        help="Path of the config file. ")
-    parser.add_argument("--decoder_lib",
-                        default="../../build/lib/libdecoder_op.so",
-                        type=str,
-                        help="Path of libdecoder_op.so. ")
-    parser.add_argument("--use_fp16_decoder",
-                        action="store_true",
-                        help="Whether to use fp16 decoder to predict. ")
+    parser.add_argument("--config", default="./config/decoder.sample.yaml", type=str, help="Path of the config file. ")
+    parser.add_argument(
+        "--decoder_lib", default="../../build/lib/libdecoder_op.so", type=str, help="Path of libdecoder_op.so. "
+    )
+    parser.add_argument("--use_fp16_decoder", action="store_true", help="Whether to use fp16 decoder to predict. ")
     args = parser.parse_args()
     return args
 
 
 def get_op_cache_config(use_batch_major_op_cache, size_per_head, is_fp16):
     x = 8 if is_fp16 else 4
-    use_batch_major_op_cache = True if use_batch_major_op_cache == True and \
-                                       size_per_head % x == 0 \
-                                    else False
+    use_batch_major_op_cache = True if use_batch_major_op_cache == True and size_per_head % x == 0 else False
     x = x if use_batch_major_op_cache else 1
     return use_batch_major_op_cache, x
 
@@ -55,9 +47,7 @@ def do_predict(args):
 
     use_batch_major_op_cache = True
     size_per_head = args.d_model // args.n_head
-    use_batch_major_op_cache, x = get_op_cache_config(use_batch_major_op_cache,
-                                                      size_per_head,
-                                                      args.use_fp16_decoder)
+    use_batch_major_op_cache, x = get_op_cache_config(use_batch_major_op_cache, size_per_head, args.use_fp16_decoder)
 
     # Define model
     transformer = FasterDecoder(
@@ -76,19 +66,16 @@ def do_predict(args):
         max_out_len=args.max_out_len,
         decoder_lib=args.decoder_lib,
         use_fp16_decoder=args.use_fp16_decoder,
-        use_batch_major_op_cache=use_batch_major_op_cache)
+        use_batch_major_op_cache=use_batch_major_op_cache,
+    )
 
     # Load checkpoint.
-    transformer.load(os.path.join(args.init_from_params,
-                                  "transformer.pdparams"))
+    transformer.load(os.path.join(args.init_from_params, "transformer.pdparams"))
     # Set evaluate mode
     transformer.eval()
 
     # Generate src_word randomly
-    src_word = paddle.randint(0,
-                              args.src_vocab_size,
-                              shape=[args.infer_batch_size, args.max_length],
-                              dtype='int64')
+    src_word = paddle.randint(0, args.src_vocab_size, shape=[args.infer_batch_size, args.max_length], dtype="int64")
 
     with paddle.no_grad():
         for i in range(100):
@@ -98,14 +85,13 @@ def do_predict(args):
             paddle.device.cuda.synchronize()
             finished_seq, finished_scores = transformer(src_word=src_word)
         paddle.device.cuda.synchronize()
-        logger.info("Average test time for decoder is %f ms" %
-                    ((time.time() - start) / 50 * 1000))
+        logger.info("Average test time for decoder is %f ms" % ((time.time() - start) / 50 * 1000))
 
 
 if __name__ == "__main__":
     ARGS = parse_args()
     yaml_file = ARGS.config
-    with open(yaml_file, 'rt') as f:
+    with open(yaml_file, "rt") as f:
         args = AttrDict(yaml.safe_load(f))
     args.decoder_lib = ARGS.decoder_lib
     args.use_fp16_decoder = ARGS.use_fp16_decoder

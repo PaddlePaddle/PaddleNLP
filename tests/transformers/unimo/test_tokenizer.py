@@ -19,7 +19,7 @@ import unittest
 import tempfile
 from typing import TYPE_CHECKING, Any, Dict, List, Tuple, Union
 
-from paddlenlp.transformers import (UNIMOTokenizer, PretrainedTokenizer)
+from paddlenlp.transformers import UNIMOTokenizer, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
 from ..test_tokenizer_common import TokenizerTesterMixin
@@ -45,22 +45,21 @@ class UNIMOTokenizationTest(unittest.TestCase):
     def setUp(self):
         super().setUp()
 
-        tokenizers_list = [(
-            self.tokenizer_class,
-            pretrained_name,
-            self.from_pretrained_kwargs
-            if self.from_pretrained_kwargs is not None else {},
-        ) for pretrained_name in
-                           self.tokenizer_class.pretrained_resource_files_map[
-                               self.from_pretrained_vocab_key].keys()
-                           if self.from_pretrained_filter is None or (
-                               self.from_pretrained_filter is not None
-                               and self.from_pretrained_filter(pretrained_name))
-                           ]
+        tokenizers_list = [
+            (
+                self.tokenizer_class,
+                pretrained_name,
+                self.from_pretrained_kwargs if self.from_pretrained_kwargs is not None else {},
+            )
+            for pretrained_name in self.tokenizer_class.pretrained_resource_files_map[
+                self.from_pretrained_vocab_key
+            ].keys()
+            if self.from_pretrained_filter is None
+            or (self.from_pretrained_filter is not None and self.from_pretrained_filter(pretrained_name))
+        ]
         self.tokenizers_list = tokenizers_list[:1]
 
-        with open(f"{get_tests_dir()}/sample_text.txt",
-                  encoding="utf-8") as f_data:
+        with open(f"{get_tests_dir()}/sample_text.txt", encoding="utf-8") as f_data:
             self._data = f_data.read().replace("\n\n", "\n").strip()
 
         self.tmpdirname = tempfile.mkdtemp()
@@ -82,17 +81,11 @@ class UNIMOTokenizationTest(unittest.TestCase):
                 self.assertIsInstance(vocab_dict, dict)
                 self.assertGreaterEqual(len(tokenizer), len(vocab_dict))
 
-                vocab = [
-                    tokenizer.convert_ids_to_tokens(i)
-                    for i in range(len(tokenizer))
-                ]
+                vocab = [tokenizer.convert_ids_to_tokens(i) for i in range(len(tokenizer))]
                 self.assertEqual(len(vocab), len(tokenizer))
 
                 tokenizer.add_tokens(["asdfasdfasdfasdf"])
-                vocab = [
-                    tokenizer.convert_ids_to_tokens(i)
-                    for i in range(len(tokenizer))
-                ]
+                vocab = [tokenizer.convert_ids_to_tokens(i) for i in range(len(tokenizer))]
                 self.assertEqual(len(vocab), len(tokenizer))
 
     def test_right_and_left_padding(self):
@@ -109,60 +102,50 @@ class UNIMOTokenizationTest(unittest.TestCase):
 
                 # RIGHT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "right"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    padding="max_length")['input_ids']
+                    sequence, max_length=sequence_length + padding_size, padding="max_length"
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual(
-                    encoded_sequence + [padding_idx] * padding_size,
-                    padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual(encoded_sequence + [padding_idx] * padding_size, padded_sequence)
 
                 # LEFT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "left"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    padding="max_length")['input_ids']
+                    sequence, max_length=sequence_length + padding_size, padding="max_length"
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual([padding_idx] * padding_size +
-                                 encoded_sequence, padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual([padding_idx] * padding_size + encoded_sequence, padded_sequence)
 
                 # RIGHT & LEFT PADDING - Check that nothing is done for 'longest' and 'no_padding'
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(
-                    sequence, padding=True)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence, padding=True)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)
 
                 tokenizer.padding_side = "left"
-                padded_sequence_left = tokenizer.encode(
-                    sequence, padding="longest")['input_ids']
+                padded_sequence_left = tokenizer.encode(sequence, padding="longest")["input_ids"]
                 padded_sequence_left_length = len(padded_sequence_left)
                 self.assertEqual(sequence_length, padded_sequence_left_length)
                 self.assertEqual(encoded_sequence, padded_sequence_left)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(sequence)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)
 
                 tokenizer.padding_side = "left"
-                padded_sequence_left = tokenizer.encode(
-                    sequence, padding=False)['input_ids']
+                padded_sequence_left = tokenizer.encode(sequence, padding=False)["input_ids"]
                 padded_sequence_left_length = len(padded_sequence_left)
                 self.assertEqual(sequence_length, padded_sequence_left_length)
                 self.assertEqual(encoded_sequence, padded_sequence_left)
@@ -176,10 +159,9 @@ class UNIMOTokenizationTest(unittest.TestCase):
                 # RIGHT PADDING - Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 truncation_size = 3
                 tokenizer.truncation_side = "right"
-                encoded_sequence = tokenizer.encode(
-                    sequence,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence, return_token_type_ids=None, add_special_tokens=False)[
+                    "input_ids"
+                ]
                 sequence_length = len(encoded_sequence)
                 # Remove EOS/BOS tokens
                 truncated_sequence = tokenizer.encode(
@@ -187,12 +169,11 @@ class UNIMOTokenizationTest(unittest.TestCase):
                     max_length=sequence_length - truncation_size,
                     truncation=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
                 truncated_sequence_length = len(truncated_sequence)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_length + truncation_size)
-                self.assertEqual(encoded_sequence[:-truncation_size],
-                                 truncated_sequence)
+                self.assertEqual(sequence_length, truncated_sequence_length + truncation_size)
+                self.assertEqual(encoded_sequence[:-truncation_size], truncated_sequence)
 
                 # LEFT PADDING - Check that it correctly pads when a maximum length is specified along with the truncation flag set to True
                 tokenizer.truncation_side = "left"
@@ -202,57 +183,45 @@ class UNIMOTokenizationTest(unittest.TestCase):
                     max_length=sequence_length - truncation_size,
                     truncation=True,
                     return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    add_special_tokens=False,
+                )["input_ids"]
                 truncated_sequence_length = len(truncated_sequence)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_length + truncation_size)
-                self.assertEqual(encoded_sequence[truncation_size:],
-                                 truncated_sequence)
+                self.assertEqual(sequence_length, truncated_sequence_length + truncation_size)
+                self.assertEqual(encoded_sequence[truncation_size:], truncated_sequence)
 
                 # RIGHT & LEFT PADDING - Check that nothing is done for 'longest' and 'no_truncation'
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.truncation_side = "right"
                 truncated_sequence_right = tokenizer.encode(
-                    sequence,
-                    truncation=True,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation=True, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_right_length = len(truncated_sequence_right)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_right_length)
+                self.assertEqual(sequence_length, truncated_sequence_right_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_right)
 
                 tokenizer.truncation_side = "left"
                 truncated_sequence_left = tokenizer.encode(
-                    sequence,
-                    truncation="longest_first",
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation="longest_first", return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_left_length = len(truncated_sequence_left)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_left_length)
+                self.assertEqual(sequence_length, truncated_sequence_left_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_left)
 
                 tokenizer.truncation_side = "right"
                 truncated_sequence_right = tokenizer.encode(
-                    sequence,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_right_length = len(truncated_sequence_right)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_right_length)
+                self.assertEqual(sequence_length, truncated_sequence_right_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_right)
 
                 tokenizer.truncation_side = "left"
                 truncated_sequence_left = tokenizer.encode(
-                    sequence,
-                    truncation=False,
-                    return_token_type_ids=None,
-                    add_special_tokens=False)['input_ids']
+                    sequence, truncation=False, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
                 truncated_sequence_left_length = len(truncated_sequence_left)
-                self.assertEqual(sequence_length,
-                                 truncated_sequence_left_length)
+                self.assertEqual(sequence_length, truncated_sequence_left_length)
                 self.assertEqual(encoded_sequence, truncated_sequence_left)
 
     def test_padding_to_max_length(self):
@@ -270,27 +239,22 @@ class UNIMOTokenizationTest(unittest.TestCase):
 
                 # Check that it correctly pads when a maximum length is specified along with the padding flag set to True
                 tokenizer.padding_side = "right"
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
                 # FIXME: the next line should be padding(max_length) to avoid warning
                 padded_sequence = tokenizer.encode(
-                    sequence,
-                    max_length=sequence_length + padding_size,
-                    pad_to_max_seq_len=True)['input_ids']
+                    sequence, max_length=sequence_length + padding_size, pad_to_max_seq_len=True
+                )["input_ids"]
                 padded_sequence_length = len(padded_sequence)
-                self.assertEqual(sequence_length + padding_size,
-                                 padded_sequence_length)
-                self.assertEqual(
-                    encoded_sequence + [padding_idx] * padding_size,
-                    padded_sequence)
+                self.assertEqual(sequence_length + padding_size, padded_sequence_length)
+                self.assertEqual(encoded_sequence + [padding_idx] * padding_size, padded_sequence)
 
                 # Check that nothing is done when a maximum length is not specified
-                encoded_sequence = tokenizer.encode(sequence)['input_ids']
+                encoded_sequence = tokenizer.encode(sequence)["input_ids"]
                 sequence_length = len(encoded_sequence)
 
                 tokenizer.padding_side = "right"
-                padded_sequence_right = tokenizer.encode(
-                    sequence, pad_to_max_seq_len=True)['input_ids']
+                padded_sequence_right = tokenizer.encode(sequence, pad_to_max_seq_len=True)["input_ids"]
                 padded_sequence_right_length = len(padded_sequence_right)
                 self.assertEqual(sequence_length, padded_sequence_right_length)
                 self.assertEqual(encoded_sequence, padded_sequence_right)

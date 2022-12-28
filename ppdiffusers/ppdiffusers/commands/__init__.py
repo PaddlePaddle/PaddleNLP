@@ -18,7 +18,6 @@ from argparse import ArgumentParser
 
 
 class BasePPDiffusersCLICommand(ABC):
-
     @staticmethod
     @abstractmethod
     def register_subcommand(parser: ArgumentParser):

@@ -17,7 +17,7 @@ import numpy as np
 from paddle_serving_server.pipeline import PipelineClient
 
 client = PipelineClient()
-client.connect(['127.0.0.1:8080'])
+client.connect(["127.0.0.1:8080"])
 
 list_data = ["湖北省为什么鼓励缴费人通过线上缴费渠道缴费？", "佛山市救助站有多少个救助床位"]
 feed = {}

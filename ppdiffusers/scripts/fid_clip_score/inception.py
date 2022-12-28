@@ -20,9 +20,10 @@ from paddle.utils.download import get_weights_path_from_url
 # Inception weights ported to Pytorch from
 # http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz
 FID_WEIGHTS_URL = (
-    'https://paddlenlp.bj.bcebos.com/models/mseitzer/pp_inception-2015-12-05-6726825d.pdparams',
-    '8e2ae24c34c5c8b81d45167bb9361f4c')
-WEIGHTS_PATH = 'pp_inception-2015-12-05-6726825d.pdparams'
+    "https://paddlenlp.bj.bcebos.com/models/mseitzer/pp_inception-2015-12-05-6726825d.pdparams",
+    "8e2ae24c34c5c8b81d45167bb9361f4c",
+)
+WEIGHTS_PATH = "pp_inception-2015-12-05-6726825d.pdparams"
 
 
 class ConvNormActivation(nn.Sequential):
@@ -46,30 +47,34 @@ class ConvNormActivation(nn.Sequential):
         bias (bool, optional): Whether to use bias in the convolution layer. By default, biases are included if ``norm_layer is None``.
     """
 
-    def __init__(self,
-                 in_channels,
-                 out_channels,
-                 kernel_size=3,
-                 stride=1,
-                 padding=None,
-                 groups=1,
-                 norm_layer=nn.BatchNorm2D,
-                 activation_layer=nn.ReLU,
-                 dilation=1,
-                 bias=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=3,
+        stride=1,
+        padding=None,
+        groups=1,
+        norm_layer=nn.BatchNorm2D,
+        activation_layer=nn.ReLU,
+        dilation=1,
+        bias=None,
+    ):
         if padding is None:
             padding = (kernel_size - 1) // 2 * dilation
         if bias is None:
             bias = norm_layer is None
         layers = [
-            nn.Conv2D(in_channels,
-                      out_channels,
-                      kernel_size,
-                      stride,
-                      padding,
-                      dilation=dilation,
-                      groups=groups,
-                      bias_attr=bias)
+            nn.Conv2D(
+                in_channels,
+                out_channels,
+                kernel_size,
+                stride,
+                padding,
+                dilation=dilation,
+                groups=groups,
+                bias_attr=bias,
+            )
         ]
         if norm_layer is not None:
             # The hyperparameter of BatchNorm2D is different from PaddlePaddle.
@@ -91,15 +96,17 @@ class InceptionV3(nn.Layer):
         64: 0,  # First max pooling features
         192: 1,  # Second max pooling featurs
         768: 2,  # Pre-aux classifier features
-        2048: 3  # Final average pooling features
+        2048: 3,  # Final average pooling features
     }
 
-    def __init__(self,
-                 output_blocks=(DEFAULT_BLOCK_INDEX, ),
-                 resize_input=True,
-                 normalize_input=True,
-                 requires_grad=False,
-                 use_fid_inception=True):
+    def __init__(
+        self,
+        output_blocks=(DEFAULT_BLOCK_INDEX,),
+        resize_input=True,
+        normalize_input=True,
+        requires_grad=False,
+        use_fid_inception=True,
+    ):
         """Build pretrained InceptionV3
 
         Parameters
@@ -137,8 +144,7 @@ class InceptionV3(nn.Layer):
         self.output_blocks = sorted(output_blocks)
         self.last_needed_block = max(output_blocks)
 
-        assert self.last_needed_block <= 3, \
-            'Last possible output block index is 3'
+        assert self.last_needed_block <= 3, "Last possible output block index is 3"
 
         self.blocks = nn.LayerList()
 
@@ -152,7 +158,7 @@ class InceptionV3(nn.Layer):
             inception.inception_stem.conv_1a_3x3,
             inception.inception_stem.conv_2a_3x3,
             inception.inception_stem.conv_2b_3x3,
-            inception.inception_stem.max_pool
+            inception.inception_stem.max_pool,
         ]
         self.blocks.append(nn.Sequential(*block0))
 
@@ -161,7 +167,7 @@ class InceptionV3(nn.Layer):
             block1 = [
                 inception.inception_stem.conv_3b_1x1,
                 inception.inception_stem.conv_4a_3x3,
-                inception.inception_stem.max_pool
+                inception.inception_stem.max_pool,
             ]
             self.blocks.append(nn.Sequential(*block1))
 
@@ -184,7 +190,8 @@ class InceptionV3(nn.Layer):
             block3 = [
                 inception.inception_block_list[8],
                 inception.inception_block_list[9],
-                inception.inception_block_list[10], inception.avg_pool
+                inception.inception_block_list[10],
+                inception.avg_pool,
             ]
             self.blocks.append(nn.Sequential(*block3))
 
@@ -208,10 +215,7 @@ class InceptionV3(nn.Layer):
         outp = []
         x = inp
         if self.resize_input:
-            x = F.interpolate(x,
-                              size=(299, 299),
-                              mode='bilinear',
-                              align_corners=False)
+            x = F.interpolate(x, size=(299, 299), mode="bilinear", align_corners=False)
 
         if self.normalize_input:
             x = 2 * x - 1  # Scale from range (0, 1) to range (-1, 1)
@@ -233,10 +237,8 @@ def hack_bn_layer(layer):
 
 
 def _inception_v3(*args, **kwargs):
-    """Wraps `paddle.vision.models.inception_v3`
-    """
-    return paddle.vision.models.inception_v3(*args,
-                                             **kwargs).apply(hack_bn_layer)
+    """Wraps `paddle.vision.models.inception_v3`"""
+    return paddle.vision.models.inception_v3(*args, **kwargs).apply(hack_bn_layer)
 
 
 def fid_inception_v3():
@@ -248,9 +250,7 @@ def fid_inception_v3():
     This method first constructs paddle.vision's Inception and then patches the
     necessary parts that are different in the FID Inception model.
     """
-    inception = _inception_v3(num_classes=1008,
-                              with_pool=True,
-                              pretrained=False)
+    inception = _inception_v3(num_classes=1008, with_pool=True, pretrained=False)
     inception.inception_block_list[0] = InceptionA(192, pool_features=32)
     inception.inception_block_list[1] = InceptionA(256, pool_features=64)
     inception.inception_block_list[2] = InceptionA(288, pool_features=64)
@@ -261,60 +261,41 @@ def fid_inception_v3():
     inception.inception_block_list[9] = InceptionE_1(1280)
     inception.inception_block_list[10] = InceptionE_2(2048)
 
-    weight_path = get_weights_path_from_url(FID_WEIGHTS_URL[0],
-                                            FID_WEIGHTS_URL[1])
+    weight_path = get_weights_path_from_url(FID_WEIGHTS_URL[0], FID_WEIGHTS_URL[1])
     state_dict = paddle.load(weight_path)
     inception.set_state_dict(state_dict)
     return inception
 
 
 class InceptionA(nn.Layer):
-
     def __init__(self, num_channels, pool_features):
         super().__init__()
-        self.branch1x1 = ConvNormActivation(in_channels=num_channels,
-                                            out_channels=64,
-                                            kernel_size=1,
-                                            padding=0,
-                                            activation_layer=nn.ReLU)
+        self.branch1x1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=64, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
 
-        self.branch5x5_1 = ConvNormActivation(in_channels=num_channels,
-                                              out_channels=48,
-                                              kernel_size=1,
-                                              padding=0,
-                                              activation_layer=nn.ReLU)
-        self.branch5x5_2 = ConvNormActivation(in_channels=48,
-                                              out_channels=64,
-                                              kernel_size=5,
-                                              padding=2,
-                                              activation_layer=nn.ReLU)
+        self.branch5x5_1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=48, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch5x5_2 = ConvNormActivation(
+            in_channels=48, out_channels=64, kernel_size=5, padding=2, activation_layer=nn.ReLU
+        )
 
-        self.branch3x3dbl_1 = ConvNormActivation(in_channels=num_channels,
-                                                 out_channels=64,
-                                                 kernel_size=1,
-                                                 padding=0,
-                                                 activation_layer=nn.ReLU)
-        self.branch3x3dbl_2 = ConvNormActivation(in_channels=64,
-                                                 out_channels=96,
-                                                 kernel_size=3,
-                                                 padding=1,
-                                                 activation_layer=nn.ReLU)
-        self.branch3x3dbl_3 = ConvNormActivation(in_channels=96,
-                                                 out_channels=96,
-                                                 kernel_size=3,
-                                                 padding=1,
-                                                 activation_layer=nn.ReLU)
+        self.branch3x3dbl_1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=64, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch3x3dbl_2 = ConvNormActivation(
+            in_channels=64, out_channels=96, kernel_size=3, padding=1, activation_layer=nn.ReLU
+        )
+        self.branch3x3dbl_3 = ConvNormActivation(
+            in_channels=96, out_channels=96, kernel_size=3, padding=1, activation_layer=nn.ReLU
+        )
         # Patch: Tensorflow's average pool does not use the padded zero's in
         # its average calculation
-        self.branch_pool = nn.AvgPool2D(kernel_size=3,
-                                        stride=1,
-                                        padding=1,
-                                        exclusive=True)
-        self.branch_pool_conv = ConvNormActivation(in_channels=num_channels,
-                                                   out_channels=pool_features,
-                                                   kernel_size=1,
-                                                   padding=0,
-                                                   activation_layer=nn.ReLU)
+        self.branch_pool = nn.AvgPool2D(kernel_size=3, stride=1, padding=1, exclusive=True)
+        self.branch_pool_conv = ConvNormActivation(
+            in_channels=num_channels, out_channels=pool_features, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
 
     def forward(self, x):
         branch1x1 = self.branch1x1(x)
@@ -327,76 +308,75 @@ class InceptionA(nn.Layer):
 
         branch_pool = self.branch_pool(x)
         branch_pool = self.branch_pool_conv(branch_pool)
-        x = paddle.concat([branch1x1, branch5x5, branch3x3dbl, branch_pool],
-                          axis=1)
+        x = paddle.concat([branch1x1, branch5x5, branch3x3dbl, branch_pool], axis=1)
         return x
 
 
 class InceptionC(nn.Layer):
-
     def __init__(self, num_channels, channels_7x7):
         super().__init__()
-        self.branch1x1 = ConvNormActivation(in_channels=num_channels,
-                                            out_channels=192,
-                                            kernel_size=1,
-                                            padding=0,
-                                            activation_layer=nn.ReLU)
+        self.branch1x1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=192, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
 
-        self.branch7x7_1 = ConvNormActivation(in_channels=num_channels,
-                                              out_channels=channels_7x7,
-                                              kernel_size=1,
-                                              stride=1,
-                                              padding=0,
-                                              activation_layer=nn.ReLU)
-        self.branch7x7_2 = ConvNormActivation(in_channels=channels_7x7,
-                                              out_channels=channels_7x7,
-                                              kernel_size=(1, 7),
-                                              stride=1,
-                                              padding=(0, 3),
-                                              activation_layer=nn.ReLU)
-        self.branch7x7_3 = ConvNormActivation(in_channels=channels_7x7,
-                                              out_channels=192,
-                                              kernel_size=(7, 1),
-                                              stride=1,
-                                              padding=(3, 0),
-                                              activation_layer=nn.ReLU)
+        self.branch7x7_1 = ConvNormActivation(
+            in_channels=num_channels,
+            out_channels=channels_7x7,
+            kernel_size=1,
+            stride=1,
+            padding=0,
+            activation_layer=nn.ReLU,
+        )
+        self.branch7x7_2 = ConvNormActivation(
+            in_channels=channels_7x7,
+            out_channels=channels_7x7,
+            kernel_size=(1, 7),
+            stride=1,
+            padding=(0, 3),
+            activation_layer=nn.ReLU,
+        )
+        self.branch7x7_3 = ConvNormActivation(
+            in_channels=channels_7x7,
+            out_channels=192,
+            kernel_size=(7, 1),
+            stride=1,
+            padding=(3, 0),
+            activation_layer=nn.ReLU,
+        )
 
-        self.branch7x7dbl_1 = ConvNormActivation(in_channels=num_channels,
-                                                 out_channels=channels_7x7,
-                                                 kernel_size=1,
-                                                 padding=0,
-                                                 activation_layer=nn.ReLU)
-        self.branch7x7dbl_2 = ConvNormActivation(in_channels=channels_7x7,
-                                                 out_channels=channels_7x7,
-                                                 kernel_size=(7, 1),
-                                                 padding=(3, 0),
-                                                 activation_layer=nn.ReLU)
-        self.branch7x7dbl_3 = ConvNormActivation(in_channels=channels_7x7,
-                                                 out_channels=channels_7x7,
-                                                 kernel_size=(1, 7),
-                                                 padding=(0, 3),
-                                                 activation_layer=nn.ReLU)
-        self.branch7x7dbl_4 = ConvNormActivation(in_channels=channels_7x7,
-                                                 out_channels=channels_7x7,
-                                                 kernel_size=(7, 1),
-                                                 padding=(3, 0),
-                                                 activation_layer=nn.ReLU)
-        self.branch7x7dbl_5 = ConvNormActivation(in_channels=channels_7x7,
-                                                 out_channels=192,
-                                                 kernel_size=(1, 7),
-                                                 padding=(0, 3),
-                                                 activation_layer=nn.ReLU)
+        self.branch7x7dbl_1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=channels_7x7, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch7x7dbl_2 = ConvNormActivation(
+            in_channels=channels_7x7,
+            out_channels=channels_7x7,
+            kernel_size=(7, 1),
+            padding=(3, 0),
+            activation_layer=nn.ReLU,
+        )
+        self.branch7x7dbl_3 = ConvNormActivation(
+            in_channels=channels_7x7,
+            out_channels=channels_7x7,
+            kernel_size=(1, 7),
+            padding=(0, 3),
+            activation_layer=nn.ReLU,
+        )
+        self.branch7x7dbl_4 = ConvNormActivation(
+            in_channels=channels_7x7,
+            out_channels=channels_7x7,
+            kernel_size=(7, 1),
+            padding=(3, 0),
+            activation_layer=nn.ReLU,
+        )
+        self.branch7x7dbl_5 = ConvNormActivation(
+            in_channels=channels_7x7, out_channels=192, kernel_size=(1, 7), padding=(0, 3), activation_layer=nn.ReLU
+        )
         # Patch: Tensorflow's average pool does not use the padded zero's in
         # its average calculation
-        self.branch_pool = nn.AvgPool2D(kernel_size=3,
-                                        stride=1,
-                                        padding=1,
-                                        exclusive=True)
-        self.branch_pool_conv = ConvNormActivation(in_channels=num_channels,
-                                                   out_channels=192,
-                                                   kernel_size=1,
-                                                   padding=0,
-                                                   activation_layer=nn.ReLU)
+        self.branch_pool = nn.AvgPool2D(kernel_size=3, stride=1, padding=1, exclusive=True)
+        self.branch_pool_conv = ConvNormActivation(
+            in_channels=num_channels, out_channels=192, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
 
     def forward(self, x):
         branch1x1 = self.branch1x1(x)
@@ -414,69 +394,46 @@ class InceptionC(nn.Layer):
         branch_pool = self.branch_pool(x)
         branch_pool = self.branch_pool_conv(branch_pool)
 
-        x = paddle.concat([branch1x1, branch7x7, branch7x7dbl, branch_pool],
-                          axis=1)
+        x = paddle.concat([branch1x1, branch7x7, branch7x7dbl, branch_pool], axis=1)
 
         return x
 
 
 class InceptionE_1(nn.Layer):
-
     def __init__(self, num_channels):
         super().__init__()
-        self.branch1x1 = ConvNormActivation(in_channels=num_channels,
-                                            out_channels=320,
-                                            kernel_size=1,
-                                            padding=0,
-                                            activation_layer=nn.ReLU)
-        self.branch3x3_1 = ConvNormActivation(in_channels=num_channels,
-                                              out_channels=384,
-                                              kernel_size=1,
-                                              padding=0,
-                                              activation_layer=nn.ReLU)
-        self.branch3x3_2a = ConvNormActivation(in_channels=384,
-                                               out_channels=384,
-                                               kernel_size=(1, 3),
-                                               padding=(0, 1),
-                                               activation_layer=nn.ReLU)
-        self.branch3x3_2b = ConvNormActivation(in_channels=384,
-                                               out_channels=384,
-                                               kernel_size=(3, 1),
-                                               padding=(1, 0),
-                                               activation_layer=nn.ReLU)
+        self.branch1x1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=320, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch3x3_1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=384, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch3x3_2a = ConvNormActivation(
+            in_channels=384, out_channels=384, kernel_size=(1, 3), padding=(0, 1), activation_layer=nn.ReLU
+        )
+        self.branch3x3_2b = ConvNormActivation(
+            in_channels=384, out_channels=384, kernel_size=(3, 1), padding=(1, 0), activation_layer=nn.ReLU
+        )
 
-        self.branch3x3dbl_1 = ConvNormActivation(in_channels=num_channels,
-                                                 out_channels=448,
-                                                 kernel_size=1,
-                                                 padding=0,
-                                                 activation_layer=nn.ReLU)
-        self.branch3x3dbl_2 = ConvNormActivation(in_channels=448,
-                                                 out_channels=384,
-                                                 kernel_size=3,
-                                                 padding=1,
-                                                 activation_layer=nn.ReLU)
-        self.branch3x3dbl_3a = ConvNormActivation(in_channels=384,
-                                                  out_channels=384,
-                                                  kernel_size=(1, 3),
-                                                  padding=(0, 1),
-                                                  activation_layer=nn.ReLU)
-        self.branch3x3dbl_3b = ConvNormActivation(in_channels=384,
-                                                  out_channels=384,
-                                                  kernel_size=(3, 1),
-                                                  padding=(1, 0),
-                                                  activation_layer=nn.ReLU)
+        self.branch3x3dbl_1 = ConvNormActivation(
+            in_channels=num_channels, out_channels=448, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
+        self.branch3x3dbl_2 = ConvNormActivation(
+            in_channels=448, out_channels=384, kernel_size=3, padding=1, activation_layer=nn.ReLU
+        )
+        self.branch3x3dbl_3a = ConvNormActivation(
+            in_channels=384, out_channels=384, kernel_size=(1, 3), padding=(0, 1), activation_layer=nn.ReLU
+        )
+        self.branch3x3dbl_3b = ConvNormActivation(
+            in_channels=384, out_channels=384, kernel_size=(3, 1), padding=(1, 0), activation_layer=nn.ReLU
+        )
 
         # Patch: Tensorflow's average pool does not use the padded zero's in
         # its average calculation
-        self.branch_pool = nn.AvgPool2D(kernel_size=3,
-                                        stride=1,
-                                        padding=1,
-                                        exclusive=True)
-        self.branch_pool_conv = ConvNormActivation(in_channels=num_channels,
-                                                   out_channels=192,
-                                                   kernel_size=1,
-                                                   padding=0,
-                                                   activation_layer=nn.ReLU)
+        self.branch_pool = nn.AvgPool2D(kernel_size=3, stride=1, padding=1, exclusive=True)
+        self.branch_pool_conv = ConvNormActivation(
+            in_channels=num_channels, out_channels=192, kernel_size=1, padding=0, activation_layer=nn.ReLU
+        )
 
     def forward(self, x):
         branch1x1 = self.branch1x1(x)
@@ -499,13 +456,11 @@ class InceptionE_1(nn.Layer):
         branch_pool = self.branch_pool(x)
         branch_pool = self.branch_pool_conv(branch_pool)
 
-        x = paddle.concat([branch1x1, branch3x3, branch3x3dbl, branch_pool],
-                          axis=1)
+        x = paddle.concat([branch1x1, branch3x3, branch3x3dbl, branch_pool], axis=1)
         return x
 
 
 class InceptionE_2(InceptionE_1):
-
     def __init__(self, num_channels):
         super(InceptionE_2, self).__init__(num_channels)
 
@@ -534,6 +489,5 @@ class InceptionE_2(InceptionE_1):
         branch_pool = F.max_pool2d(x, kernel_size=3, stride=1, padding=1)
         branch_pool = self.branch_pool_conv(branch_pool)
 
-        x = paddle.concat([branch1x1, branch3x3, branch3x3dbl, branch_pool],
-                          axis=1)
+        x = paddle.concat([branch1x1, branch3x3, branch3x3dbl, branch_pool], axis=1)
         return x

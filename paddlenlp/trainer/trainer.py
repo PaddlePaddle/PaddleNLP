@@ -69,6 +69,7 @@ from .trainer_utils import (
     PredictionOutput,
     RemoveColumnsCollator,
     ShardingOption,
+    TrainerMemoryTracker,
     TrainOutput,
     find_batch_size,
     get_last_checkpoint,
@@ -153,6 +154,10 @@ class Trainer:
         optimizers (`Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler]`, *optional*): A tuple
             containing the optimizer and the scheduler to use. Will default to an instance of [`AdamW`] on your model
             and a scheduler given by [`get_linear_schedule_with_warmup`] controlled by `args`.
+        preprocess_logits_for_metrics (`Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor]`, *optional*):
+            A function that preprocess the logits right before caching them at each evaluation step. Must take two
+            tensors, the logits and the labels, and return the logits once processed as desired. The modifications made
+            by this function will be reflected in the predictions received by `compute_metrics`.
 
     Important attributes:
 
@@ -179,6 +184,7 @@ class Trainer:
         compute_metrics: Optional[Callable[[EvalPrediction], Dict]] = None,
         callbacks: Optional[List[TrainerCallback]] = None,
         optimizers: Tuple[paddle.optimizer.Optimizer, paddle.optimizer.lr.LRScheduler] = (None, None),
+        preprocess_logits_for_metrics: Callable[[paddle.Tensor, paddle.Tensor], paddle.Tensor] = None,
     ):
 
         if args is None:
@@ -189,6 +195,10 @@ class Trainer:
         self.args = args
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
+
+        # memory metrics - must set up as early as possible
+        self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+        self._memory_tracker.start()
 
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
@@ -223,6 +233,7 @@ class Trainer:
         self.criterion = criterion
 
         self.compute_metrics = compute_metrics
+        self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
         self.optimizer, self.lr_scheduler = optimizers
 
         self.state = TrainerState()
@@ -254,10 +265,13 @@ class Trainer:
             logger.info("Using half precision")
             self.do_grad_scaling = True
             self.amp_dtype = "float16" if args.fp16 else "bfloat16"
+            # fix for load saved fp16 or bf16 ckpt, decorate model first.
+            if self.args.fp16_opt_level == "O2":
+                paddle.amp.decorate(models=model, level=self.args.fp16_opt_level, dtype=self.amp_dtype)
 
             if self.sharding is not None:
                 self.scaler = paddle.amp.GradScaler(init_loss_scaling=self.args.scale_loss)
-                if self.amp_dtype == "float16":
+                if self.amp_dtype == "float16" or self.amp_dtype == "bfloat16":
                     if ShardingOption.SHARD_OP in self.args.sharding:
                         self.scaler = fleet.distributed_scaler(self.scaler)
                     else:
@@ -285,7 +299,9 @@ class Trainer:
         if args.recompute:
 
             def fn(layer):
-                if hasattr(layer, "enable_recompute") and layer.enable_recompute is False:
+                if hasattr(layer, "enable_recompute") and (
+                    layer.enable_recompute is False or layer.enable_recompute == 0
+                ):
                     layer.enable_recompute = True
 
             model.apply(fn)
@@ -299,6 +315,9 @@ class Trainer:
 
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
+
+        # very last
+        self._memory_tracker.stop_and_update_metrics()
 
     def add_callback(self, callback):
         """
@@ -386,6 +405,9 @@ class Trainer:
         self.is_in_train = True
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
 
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
             resume_from_checkpoint = get_last_checkpoint(args.output_dir)
@@ -447,9 +469,9 @@ class Trainer:
 
         # delay_optimizer_creation = (
         #     self.sharding is not None
-        #     and ShardingOption.SHARD_OP not in self.args.sharding
+        #     and ShardingOption.SHARD_OP in self.args.sharding
         # )
-        delay_optimizer_creation = self.sharding is None
+        delay_optimizer_creation = False
 
         if not delay_optimizer_creation:
             self.create_optimizer_and_scheduler(num_training_steps=max_steps)
@@ -708,6 +730,8 @@ class Trainer:
 
         self.is_in_train = False
 
+        self._memory_tracker.stop_and_update_metrics(metrics)
+
         self.log(metrics)
 
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
@@ -751,7 +775,7 @@ class Trainer:
             tr_loss.subtract_(tr_loss)
 
             logs["loss"] = round(tr_loss_scalar / (self.state.global_step - self._globalstep_last_logged), 8)
-            logs["learning_rate"] = self._get_learning_rate()
+            logs["learning_rate"] = float("{0:.3e}".format(self._get_learning_rate()))
             logs["global_step"] = int(self.state.global_step)
 
             total_train_batch_size = (
@@ -812,7 +836,7 @@ class Trainer:
 
             return DataLoader(
                 train_dataset,
-                batch_size=self.args.per_device_eval_batch_size,
+                batch_size=self.args.per_device_train_batch_size,
                 collate_fn=self.data_collator,
                 num_workers=self.args.dataloader_num_workers,
             )
@@ -961,6 +985,8 @@ class Trainer:
                     return x in decay_parameters
 
             optimizer_cls, optimizer_kwargs = Trainer.get_optimizer_cls_and_kwargs(self.args)
+            if hasattr(optimizer_cls, "_create_master_weight") and self.args.fp16_opt_level == "O2":
+                optimizer_kwargs["multi_precision"] = True
 
             if ShardingOption.SHARD_OP in self.args.sharding:
                 from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer import (
@@ -1282,6 +1308,7 @@ class Trainer:
         self.save_model(output_dir)
 
         if self.sharding is not None:
+            dist.barrier()
             if self.dp_group.rank == 0:
                 paddle.save(
                     self.optimizer.state_dict(),
@@ -1492,6 +1519,9 @@ class Trainer:
             A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
             dictionary also contains the epoch number which comes from the training state.
         """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
 
@@ -1518,6 +1548,8 @@ class Trainer:
         self.log(output.metrics)
 
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
 
         return output.metrics
 
@@ -1569,9 +1601,15 @@ class Trainer:
         logger.info(f"***** Running {description} *****")
         if has_length(dataloader):
             logger.info(f"  Num examples = {self.num_examples(dataloader)}")
-            logger.info(f"  Total prediction steps = {len(dataloader)}")
+            if max_eval_iters > 0:
+                logger.info(f"  Total prediction steps = {max_eval_iters}")
+            else:
+                logger.info(f"  Total prediction steps = {len(dataloader)}")
         else:
             logger.info("  Num examples: Unknown")
+            if max_eval_iters > 0:
+                logger.info(f"  Total prediction steps = {max_eval_iters}")
+
         logger.info(f"  Pre device batch size = {batch_size}")
         logger.info(f"  Total Batch size = {batch_size * self.args.world_size}")
 
@@ -1621,6 +1659,8 @@ class Trainer:
             if logits is not None:
                 logits = self._pad_across_processes(logits)
                 logits = self._nested_gather(logits)
+                if self.preprocess_logits_for_metrics is not None:
+                    logits = self.preprocess_logits_for_metrics(logits, labels)
                 preds_host = logits if preds_host is None else nested_concat(preds_host, logits, padding_index=-100)
             self.control = self.callback_handler.on_prediction_step(args, self.state, self.control)
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
@@ -1706,6 +1746,9 @@ class Trainer:
             - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
               labels).
         """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         test_dataloader = self.get_test_dataloader(test_dataset)
         start_time = time.time()
 
@@ -1722,6 +1765,8 @@ class Trainer:
                 num_steps=math.ceil(output.num_samples / total_batch_size),
             )
         )
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
 
         return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
 
@@ -1919,9 +1964,7 @@ class Trainer:
         return remove_columns_collator
 
     def _is_iterable_dataset(self, dataset):
-        return isinstance(dataset, paddle.io.IterableDataset) or (
-            isinstance(dataset, datasets.iterable_dataset.IterableDataset) if is_datasets_available() else False
-        )
+        return isinstance(dataset, paddle.io.IterableDataset)
 
     def print_config(self, args=None, key=""):
         """

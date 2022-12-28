@@ -4,10 +4,19 @@ on: [push, pull_request]
 
 jobs:
   Lint:
-    name: Install Environment
-    runs-on: ubuntu-latest
+    name: Lint
+    runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v3
+      - name: checkout develop
+        run: |
+          if ! git show-ref --quiet refs/heads/develop; then \
+              echo "local develop branch is missing, creating local develop branch that tracks remote develop branch"
+              git fetch origin develop
+              git branch develop --track origin/develop
+          else
+            echo "local develop branch exist, skipping"
+          fi
       - uses: actions/setup-python@v1
         with:
           python-version: 3.8

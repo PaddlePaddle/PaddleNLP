@@ -30,8 +30,9 @@ from paddlenlp.metrics.rouge import RougeL
 from nltk.translate.bleu_score import sentence_bleu, corpus_bleu
 
 
-def compute_predictions(all_examples, all_features, all_results, n_best_size,
-                        max_answer_length, do_lower_case, verbose, tokenizer):
+def compute_predictions(
+    all_examples, all_features, all_results, n_best_size, max_answer_length, do_lower_case, verbose, tokenizer
+):
     """Write final predictions to the json file and log-odds of null if needed."""
 
     example_index_to_features = collections.defaultdict(list)
@@ -43,10 +44,8 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
         unique_id_to_result[result.unique_id] = result
 
     _PrelimPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-        "PrelimPrediction", [
-            "feature_index", "start_index", "end_index", "start_logit",
-            "end_logit"
-        ])
+        "PrelimPrediction", ["feature_index", "start_index", "end_index", "start_logit", "end_logit"]
+    )
 
     preds_for_eval = collections.OrderedDict()
     preds_for_test = []
@@ -89,14 +88,15 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                             start_index=start_index,
                             end_index=end_index,
                             start_logit=result.start_logits[start_index],
-                            end_logit=result.end_logits[end_index]))
+                            end_logit=result.end_logits[end_index],
+                        )
+                    )
 
-        prelim_predictions = sorted(prelim_predictions,
-                                    key=lambda x: (x.start_logit + x.end_logit),
-                                    reverse=True)
+        prelim_predictions = sorted(prelim_predictions, key=lambda x: (x.start_logit + x.end_logit), reverse=True)
 
         _NbestPrediction = collections.namedtuple(  # pylint: disable=invalid-name
-            "NbestPrediction", ["text", "start_logit", "end_logit"])
+            "NbestPrediction", ["text", "start_logit", "end_logit"]
+        )
 
         seen_predictions = {}
         nbest = []
@@ -105,12 +105,10 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 break
             feature = features[pred.feature_index]
             if pred.start_index > 0:  # this is a non-null prediction
-                tok_tokens = feature.tokens[pred.start_index:(pred.end_index +
-                                                              1)]
+                tok_tokens = feature.tokens[pred.start_index : (pred.end_index + 1)]
                 orig_doc_start = feature.token_to_orig_map[pred.start_index]
                 orig_doc_end = feature.token_to_orig_map[pred.end_index]
-                orig_tokens = example.doc_tokens[orig_doc_start:(orig_doc_end +
-                                                                 1)]
+                orig_tokens = example.doc_tokens[orig_doc_start : (orig_doc_end + 1)]
                 tok_text = "".join(tok_tokens)
 
                 # De-tokenize WordPieces that have been split off.
@@ -122,8 +120,7 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
 
                 tok_text = "".join(tok_text.split())
                 orig_text = "".join(orig_tokens)
-                final_text = get_final_text(tok_text, orig_text, tokenizer,
-                                            verbose)
+                final_text = get_final_text(tok_text, orig_text, tokenizer, verbose)
                 if final_text in seen_predictions:
                     continue
 
@@ -132,18 +129,14 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 final_text = ""
                 seen_predictions[final_text] = True
 
-            nbest.append(
-                _NbestPrediction(text=final_text,
-                                 start_logit=pred.start_logit,
-                                 end_logit=pred.end_logit))
+            nbest.append(_NbestPrediction(text=final_text, start_logit=pred.start_logit, end_logit=pred.end_logit))
 
         # if we didn't inlude the empty option in the n-best, inlcude it
 
         # In very rare edge cases we could have no valid predictions. So we
         # just create a nonce prediction in this case to avoid failure.
         if not nbest:
-            nbest.append(
-                _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
+            nbest.append(_NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0))
 
         assert len(nbest) >= 1
 
@@ -155,19 +148,19 @@ def compute_predictions(all_examples, all_features, all_results, n_best_size,
                 if entry.text:
                     best_non_null_entry = entry
                 else:
-                    best_non_null_entry = _NbestPrediction(text="empty",
-                                                           start_logit=0.0,
-                                                           end_logit=0.0)
+                    best_non_null_entry = _NbestPrediction(text="empty", start_logit=0.0, end_logit=0.0)
 
         preds_for_eval[example.qas_id] = best_non_null_entry.text
 
-        preds_for_test.append({
-            'yesno_answers': [],
-            'question': example.question_text,
-            'question_type': example.question_type,
-            'answers': [best_non_null_entry.text],
-            'question_id': example.qas_id
-        })
+        preds_for_test.append(
+            {
+                "yesno_answers": [],
+                "question": example.question_text,
+                "question_type": example.question_type,
+                "answers": [best_non_null_entry.text],
+                "question_id": example.qas_id,
+            }
+        )
 
     return preds_for_eval, preds_for_test
 
@@ -220,7 +213,7 @@ def get_final_text(pred_text, orig_text, tokenizer, verbose):
     start_position = tok_text.find(pred_text)
     if start_position == -1:
         if verbose:
-            print(u"Unable to find text: '%s' in '%s'" % (pred_text, tok_text))
+            print("Unable to find text: '%s' in '%s'" % (pred_text, tok_text))
         return orig_text
     end_position = start_position + len(pred_text) - 1
 
@@ -229,8 +222,7 @@ def get_final_text(pred_text, orig_text, tokenizer, verbose):
 
     if len(orig_ns_text) != len(tok_ns_text):
         if verbose:
-            print(u"Length not equal after stripping spaces: '%s' vs '%s'" %
-                  (orig_ns_text, tok_ns_text))
+            print("Length not equal after stripping spaces: '%s' vs '%s'" % (orig_ns_text, tok_ns_text))
         return orig_text
 
     # We then project the characters in `pred_text` back to `orig_text` using
@@ -247,7 +239,7 @@ def get_final_text(pred_text, orig_text, tokenizer, verbose):
 
     if orig_start_position is None:
         if verbose:
-            print(u"Couldn't map start position")
+            print("Couldn't map start position")
         return orig_text
 
     orig_end_position = None
@@ -258,10 +250,10 @@ def get_final_text(pred_text, orig_text, tokenizer, verbose):
 
     if orig_end_position is None:
         if verbose:
-            print(u"Couldn't map end position")
+            print("Couldn't map end position")
         return orig_text
 
-    output_text = orig_text[orig_start_position:(orig_end_position + 1)]
+    output_text = orig_text[orig_start_position : (orig_end_position + 1)]
     return output_text
 
 
@@ -290,9 +282,7 @@ def _compute_softmax(scores):
 
 def _get_best_indexes(logits, n_best_size):
     """Get the n-best logits from a list."""
-    index_and_score = sorted(enumerate(logits),
-                             key=lambda x: x[1],
-                             reverse=True)
+    index_and_score = sorted(enumerate(logits), key=lambda x: x[1], reverse=True)
 
     best_indexes = []
     for i in range(len(index_and_score)):
@@ -315,15 +305,15 @@ def normalize(s):
     normalized = []
     for ss in s:
         tokens = [c for c in list(ss) if len(c.strip()) != 0]
-        norm_s = ''.join(tokens)
-        norm_s = norm_s.replace(u"，", u",")
-        norm_s = norm_s.replace(u"。", u".")
-        norm_s = norm_s.replace(u"！", u"!")
-        norm_s = norm_s.replace(u"？", u"?")
-        norm_s = norm_s.replace(u"；", u";")
-        norm_s = norm_s.replace(u"（", u"(").replace(u"）", u")")
-        norm_s = norm_s.replace(u"【", u"[").replace(u"】", u"]")
-        norm_s = norm_s.replace(u"“", u"\"").replace(u"“", u"\"")
+        norm_s = "".join(tokens)
+        norm_s = norm_s.replace("，", ",")
+        norm_s = norm_s.replace("。", ".")
+        norm_s = norm_s.replace("！", "!")
+        norm_s = norm_s.replace("？", "?")
+        norm_s = norm_s.replace("；", ";")
+        norm_s = norm_s.replace("（", "(").replace("）", ")")
+        norm_s = norm_s.replace("【", "[").replace("】", "]")
+        norm_s = norm_s.replace("“", '"').replace("“", '"')
         normalized.append(norm_s)
     return normalized
 
@@ -335,7 +325,7 @@ def dureader_evaluate(examples, preds):
     for example in examples:
         qid = example.qas_id
         if qid not in preds:
-            print('Missing prediction for %s' % qid)
+            print("Missing prediction for %s" % qid)
             continue
         pred_answers = preds[qid]
         pred_answers = normalize([pred_answers])[0]
@@ -349,9 +339,6 @@ def dureader_evaluate(examples, preds):
 
     bleu4 = bleu_eval.score()
     rouge_l = rouge_eval.score()
-    metrics = {
-        'ROUGE-L': round(rouge_l * 100, 2),
-        'BLEU-4': round(bleu4 * 100, 2)
-    }
+    metrics = {"ROUGE-L": round(rouge_l * 100, 2), "BLEU-4": round(bleu4 * 100, 2)}
 
-    print(json.dumps(metrics).encode('utf8'))
+    print(json.dumps(metrics).encode("utf8"))

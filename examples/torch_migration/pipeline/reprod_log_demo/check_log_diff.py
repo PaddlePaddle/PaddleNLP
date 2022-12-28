@@ -23,6 +23,4 @@ if __name__ == "__main__":
 
     diff_helper.compare_info(info1, info2)
 
-    diff_helper.report(diff_method="mean",
-                       diff_threshold=1e-6,
-                       path="./diff.txt")
+    diff_helper.report(diff_method="mean", diff_threshold=1e-6, path="./diff.txt")

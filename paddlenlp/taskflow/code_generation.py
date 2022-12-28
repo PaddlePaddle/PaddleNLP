@@ -32,11 +32,11 @@ usage = r"""
 
 class CodeGenerationTask(Task):
     """
-    The text generation model to predict the code. 
+    The text generation model to predict the code.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -44,10 +44,10 @@ class CodeGenerationTask(Task):
         self._batch_size = kwargs.get("batch_size", 1)
         self._max_length = kwargs.get("max_length", 128)
         self._min_length = kwargs.get("min_length", 0)
-        self._decode_strategy = kwargs.get("decode_strategy", 'sampling')
+        self._decode_strategy = kwargs.get("decode_strategy", "sampling")
         self._temperature = kwargs.get("temperature", 0.6)
         self._top_k = kwargs.get("top_k", 5)
-        self._top_p = kwargs.get("top_p", 1.)
+        self._top_p = kwargs.get("top_p", 1.0)
         self._num_beams = kwargs.get("num_beams", 4)
         self._length_penalty = kwargs.get("length_penalty", 1.0)
         self._repetition_penalty = kwargs.get("repetition_penalty", 1.1)
@@ -74,19 +74,16 @@ class CodeGenerationTask(Task):
         Generate input batches.
         """
         padding = False if batch_size == 1 else True
-        pad_func = Pad(pad_val=self._model.pad_token_id,
-                       pad_right=False,
-                       dtype=np.int64)
+        pad_func = Pad(pad_val=self._model.pad_token_id, pad_right=False, dtype=np.int64)
 
         def _parse_batch(batch_examples):
             if padding:
                 input_ids = pad_func([example for example in batch_examples])
             else:
-                input_ids = np.asarray([example for example in batch_examples],
-                                       dtype=np.int64)
+                input_ids = np.asarray([example for example in batch_examples], dtype=np.int64)
             return input_ids
 
-        examples = self._convert_text_to_input(data)['input_ids']
+        examples = self._convert_text_to_input(data)["input_ids"]
 
         # Seperates data into some batches.
         one_batch = []
@@ -113,8 +110,8 @@ class CodeGenerationTask(Task):
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
         outputs = {}
-        outputs['batches'] = batches
-        outputs['text'] = inputs
+        outputs["batches"] = batches
+        outputs["text"] = inputs
         return outputs
 
     def _run_model(self, inputs):
@@ -137,11 +134,12 @@ class CodeGenerationTask(Task):
                 num_beams=self._num_beams,
                 length_penalty=self._length_penalty,
                 repetition_penalty=self._repetition_penalty,
-                use_faster=self._use_faster)
+                use_faster=self._use_faster,
+            )
             all_ids.extend(ids.numpy().tolist())
             all_scores.extend(scores.numpy().tolist())
-        inputs['ids'] = all_ids
-        inputs['scores'] = all_scores
+        inputs["ids"] = all_ids
+        inputs["scores"] = all_scores
         return inputs
 
     def _postprocess(self, inputs):
@@ -149,16 +147,13 @@ class CodeGenerationTask(Task):
         The model output is tag ids, this function will convert the model output to raw text.
         """
         batch_out = []
-        generated_ids = inputs['ids']
+        generated_ids = inputs["ids"]
         for generated_id in generated_ids:
-            text = self._tokenizer.decode(generated_id,
-                                          skip_special_tokens=True,
-                                          spaces_between_special_tokens=False)
-            text = re.split("\nclass|\ndef|\n#|\n@|\nprint|\nif",
-                            text)[0].rstrip()
+            text = self._tokenizer.decode(generated_id, skip_special_tokens=True, spaces_between_special_tokens=False)
+            text = re.split("\nclass|\ndef|\n#|\n@|\nprint|\nif", text)[0].rstrip()
             batch_out.append(text)
         if self._output_scores:
-            return batch_out, inputs['scores']
+            return batch_out, inputs["scores"]
         return batch_out
 
     def _construct_input_spec(self):
@@ -166,7 +161,5 @@ class CodeGenerationTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
         ]

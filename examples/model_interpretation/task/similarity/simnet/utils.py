@@ -14,9 +14,9 @@
 import numpy as np
 
 
-def convert_example(example, tokenizer, is_test=False, language='en'):
+def convert_example(example, tokenizer, is_test=False, language="en"):
     """
-    Builds model inputs from a sequence for sequence classification tasks. 
+    Builds model inputs from a sequence for sequence classification tasks.
     It use `jieba.cut` to tokenize text.
 
     Args:
@@ -31,7 +31,7 @@ def convert_example(example, tokenizer, is_test=False, language='en'):
         title_seq_len(obj:`int`): The input sequence title length.
         label(obj:`numpy.array`, data type of int64, optional): The input label if not is_test.
     """
-    if language == 'ch':
+    if language == "ch":
         q_name = "query"
         t_name = "title"
         label = "label"
@@ -57,14 +57,14 @@ def preprocess_prediction_data(data, tokenizer):
     It process the prediction data as the format used as training.
 
     Args:
-        data (obj:`List[List[str, str]]`): 
-            The prediction data whose each element is a text pair. 
+        data (obj:`List[List[str, str]]`):
+            The prediction data whose each element is a text pair.
             Each text will be tokenized by jieba.lcut() function.
         tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
 
     Returns:
-        examples (obj:`list`): The processed data whose each element 
-            is a `list` object, which contains 
+        examples (obj:`list`): The processed data whose each element
+            is a `list` object, which contains
 
             - query_ids(obj:`list[int]`): The list of query ids.
             - title_ids(obj:`list[int]`): The list of title ids.
@@ -85,14 +85,14 @@ def preprocess_data(data, tokenizer, language):
     It process the prediction data as the format used as training.
 
     Args:
-        data (obj:`List[List[str, str]]`): 
-            The prediction data whose each element is a text pair. 
+        data (obj:`List[List[str, str]]`):
+            The prediction data whose each element is a text pair.
             Each text will be tokenized by jieba.lcut() function.
         tokenizer(obj: paddlenlp.data.JiebaTokenizer): It use jieba to cut the chinese string.
 
     Returns:
-        examples (obj:`list`): The processed data whose each element 
-            is a `list` object, which contains 
+        examples (obj:`list`): The processed data whose each element
+            is a `list` object, which contains
 
             - query_ids(obj:`list[int]`): The list of query ids.
             - title_ids(obj:`list[int]`): The list of title ids.
@@ -100,7 +100,7 @@ def preprocess_data(data, tokenizer, language):
             - title_seq_len(obj:`int`): The input sequence title length.
 
     """
-    if language == 'ch':
+    if language == "ch":
         q_name = "query"
         t_name = "title"
     else:
@@ -121,7 +121,6 @@ def get_idx_from_word(word, word_to_idx, unk_word):
 
 
 class CharTokenizer:
-
     def __init__(self, vocab, language, vocab_path):
         self.vocab = vocab
         self.language = language
@@ -129,90 +128,84 @@ class CharTokenizer:
         self.unk_token = []
 
     def encode(self, sentence):
-        if self.language == 'ch':
+        if self.language == "ch":
             words = tokenizer_punc(sentence, self.vocab_path)
         else:
             words = sentence.strip().split()
-        return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in words
-        ]
+        return [get_idx_from_word(word, self.vocab.token_to_idx, self.vocab.unk_token) for word in words]
 
     def tokenize(self, sentence, wo_unk=True):
-        if self.language == 'ch':
+        if self.language == "ch":
             return tokenizer_punc(sentence, self.vocab_path)
         else:
             return sentence.strip().split()
 
     def convert_tokens_to_string(self, tokens):
-        return ' '.join(tokens)
+        return " ".join(tokens)
 
     def convert_tokens_to_ids(self, tokens):
-        return [
-            get_idx_from_word(word, self.vocab.token_to_idx,
-                              self.vocab.unk_token) for word in tokens
-        ]
+        return [get_idx_from_word(word, self.vocab.token_to_idx, self.vocab.unk_token) for word in tokens]
 
 
 def tokenizer_lac(string, lac):
-    temp = ''
+    temp = ""
     res = []
     for c in string:
-        if '\u4e00' <= c <= '\u9fff':
-            if temp != '':
+        if "\u4e00" <= c <= "\u9fff":
+            if temp != "":
                 res.extend(lac.run(temp))
-                temp = ''
+                temp = ""
             res.append(c)
         else:
             temp += c
-    if temp != '':
+    if temp != "":
         res.extend(lac.run(temp))
     return res
 
 
 def tokenizer_punc(string, vocab_path):
     res = []
-    sub_string_list = string.strip().split('[MASK]')
+    sub_string_list = string.strip().split("[MASK]")
     for idx, sub_string in enumerate(sub_string_list):
-        temp = ''
+        temp = ""
         for c in sub_string:
-            if '\u4e00' <= c <= '\u9fff':
-                if temp != '':
+            if "\u4e00" <= c <= "\u9fff":
+                if temp != "":
                     temp_seg = punc_split(temp, vocab_path)
                     res.extend(temp_seg)
-                    temp = ''
+                    temp = ""
                 res.append(c)
             else:
                 temp += c
-        if temp != '':
+        if temp != "":
             temp_seg = punc_split(temp, vocab_path)
             res.extend(temp_seg)
         if idx < len(sub_string_list) - 1:
-            res.append('[MASK]')
+            res.append("[MASK]")
     return res
 
 
 def punc_split(string, vocab_path):
     punc_set = set()
-    with open(vocab_path, 'r') as f:
+    with open(vocab_path, "r") as f:
         for token in f:
             punc_set.add(token.strip())
-        punc_set.add(' ')
+        punc_set.add(" ")
         for ascii_num in range(65296, 65306):
             punc_set.add(chr(ascii_num))
         for ascii_num in range(48, 58):
             punc_set.add(chr(ascii_num))
 
     res = []
-    temp = ''
+    temp = ""
     for c in string:
         if c in punc_set:
-            if temp != '':
+            if temp != "":
                 res.append(temp)
-                temp = ''
+                temp = ""
             res.append(c)
         else:
             temp += c
-    if temp != '':
+    if temp != "":
         res.append(temp)
     return res

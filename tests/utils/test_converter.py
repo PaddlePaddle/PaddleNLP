@@ -13,11 +13,18 @@
 # limitations under the License.
 
 import unittest
-from unittest import TestCase
+
 from paddle import nn
-from tests.testing_utils import slow
+
+from paddlenlp.transformers import (
+    BertConfig,
+    BertForSequenceClassification,
+    BertForTokenClassification,
+    BertModel,
+    PretrainedModel,
+)
 from paddlenlp.utils.converter import Converter, StateDictKeysChecker
-from paddlenlp.transformers import PretrainedModel, BertModel, BertConfig, BertForTokenClassification, BertForSequenceClassification
+from tests.testing_utils import require_package, slow
 
 
 class TestPretrainedModel(PretrainedModel):
@@ -25,7 +32,6 @@ class TestPretrainedModel(PretrainedModel):
 
 
 class BaseModel(TestPretrainedModel):
-
     def __init__(self):
         super().__init__()
         self.norm = nn.LayerNorm([3])
@@ -33,7 +39,6 @@ class BaseModel(TestPretrainedModel):
 
 
 class DownstreamModel(TestPretrainedModel):
-
     def __init__(self):
         super().__init__()
         self.base = BaseModel()
@@ -42,7 +47,6 @@ class DownstreamModel(TestPretrainedModel):
 
 
 class SecondDownstreamModel(TestPretrainedModel):
-
     def __init__(self):
         super().__init__()
         self.base = BaseModel()
@@ -51,23 +55,20 @@ class SecondDownstreamModel(TestPretrainedModel):
 
 
 class TestConverter(unittest.TestCase):
-
     def setUp(self) -> None:
         self.base_model = BaseModel()
 
         self.downstream_model = DownstreamModel()
 
+    @require_package("torch")
     def test_base_base_checking(self):
-        checker = StateDictKeysChecker(
-            self.base_model,
-            Converter.get_model_state_dict(self.base_model, True))
+        checker = StateDictKeysChecker(self.base_model, Converter.get_model_state_dict(self.base_model, True))
         diff_keys = checker.get_diff_keys()
         self.assertEqual(len(diff_keys), 0)
 
+    @require_package("torch")
     def test_base_downstream_checking(self):
-        checker = StateDictKeysChecker(
-            self.base_model,
-            Converter.get_model_state_dict(self.downstream_model, True))
+        checker = StateDictKeysChecker(self.base_model, Converter.get_model_state_dict(self.downstream_model, True))
 
         unexpected_keys = checker.get_unexpected_keys()
         self.assertEqual(len(unexpected_keys), 4)
@@ -75,10 +76,9 @@ class TestConverter(unittest.TestCase):
         mismatched_keys = checker.get_mismatched_keys()
         self.assertEqual(len(mismatched_keys), 0)
 
+    @require_package("torch")
     def test_downstream_base_checking(self):
-        checker = StateDictKeysChecker(
-            self.downstream_model,
-            Converter.get_model_state_dict(self.base_model, True))
+        checker = StateDictKeysChecker(self.downstream_model, Converter.get_model_state_dict(self.base_model, True))
 
         unexpected_keys = checker.get_unexpected_keys()
         self.assertEqual(len(unexpected_keys), 0)
@@ -86,10 +86,11 @@ class TestConverter(unittest.TestCase):
         mismatched_keys = checker.get_mismatched_keys()
         self.assertEqual(len(mismatched_keys), 4)
 
+    @require_package("torch")
     def test_downstream_downstream_checking(self):
         checker = StateDictKeysChecker(
-            self.downstream_model,
-            Converter.get_model_state_dict(SecondDownstreamModel(), True))
+            self.downstream_model, Converter.get_model_state_dict(SecondDownstreamModel(), True)
+        )
 
         unexpected_keys = checker.get_unexpected_keys()
         self.assertEqual(len(unexpected_keys), 4)
@@ -98,14 +99,14 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(len(mismatched_keys), 4)
 
     @slow
+    @require_package("torch")
     def test_bert_case(self):
         config = BertConfig()
         bert_model = BertModel(config)
         bert_for_token_model = BertForTokenClassification(config)
 
         # base-downstream
-        checker = StateDictKeysChecker(
-            bert_model, Converter.get_model_state_dict(bert_for_token_model))
+        checker = StateDictKeysChecker(bert_model, Converter.get_model_state_dict(bert_for_token_model))
 
         unexpected_keys = checker.get_unexpected_keys()
         self.assertEqual(len(unexpected_keys), 2)
@@ -114,8 +115,7 @@ class TestConverter(unittest.TestCase):
         self.assertEqual(len(mismatched_keys), 0)
 
         # base-base
-        checker = StateDictKeysChecker(
-            bert_model, Converter.get_model_state_dict(bert_model))
+        checker = StateDictKeysChecker(bert_model, Converter.get_model_state_dict(bert_model))
 
         unexpected_keys = checker.get_unexpected_keys()
         self.assertEqual(len(unexpected_keys), 0)
@@ -138,8 +138,7 @@ class TestConverter(unittest.TestCase):
         # downstream-downstream
         checker = StateDictKeysChecker(
             bert_for_token_model,
-            Converter.get_model_state_dict(
-                BertForSequenceClassification(config)),
+            Converter.get_model_state_dict(BertForSequenceClassification(config)),
         )
 
         unexpected_keys = checker.get_unexpected_keys()
@@ -172,8 +171,8 @@ class TestConverter(unittest.TestCase):
     def test_remove_unused_fields(self):
         config = {"transformers_version": "1"}
         Converter.remove_transformer_unused_fields(config)
-        self.assertNotIn('transformers_version', config)
+        self.assertNotIn("transformers_version", config)
 
         # remove un-exist field
         Converter.remove_transformer_unused_fields(config)
-        self.assertNotIn('transformers_version', config)
+        self.assertNotIn("transformers_version", config)

@@ -14,18 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import copy
 import json
-import paddle
+import os
 from collections import UserDict
 from typing import Any, Dict, Optional, Tuple, Union
-from ..utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from ..utils.env import MODEL_HOME
 
 import numpy as np
-from .tokenizer_utils_base import TensorType
+import paddle
+
+from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ..utils.env import MODEL_HOME
 from ..utils.log import logger
+from .tokenizer_utils_base import TensorType
 
 FEATURE_EXTRACTOR_NAME = "preprocessor_config.json"
 
@@ -43,9 +44,7 @@ class BatchFeature(UserDict):
             initialization.
     """
 
-    def __init__(self,
-                 data: Optional[Dict[str, Any]] = None,
-                 tensor_type: Union[None, str, TensorType] = None):
+    def __init__(self, data: Optional[Dict[str, Any]] = None, tensor_type: Union[None, str, TensorType] = None):
         super().__init__(data)
         self.convert_to_tensors(tensor_type=tensor_type)
 
@@ -57,9 +56,7 @@ class BatchFeature(UserDict):
         if isinstance(item, str):
             return self.data[item]
         else:
-            raise KeyError(
-                "Indexing with integers is not available when using Python based feature extractors"
-            )
+            raise KeyError("Indexing with integers is not available when using Python based feature extractors")
 
     def __getattr__(self, item: str):
         try:
@@ -83,9 +80,7 @@ class BatchFeature(UserDict):
     def items(self):
         return self.data.items()
 
-    def convert_to_tensors(self,
-                           tensor_type: Optional[Union[str,
-                                                       TensorType]] = None):
+    def convert_to_tensors(self, tensor_type: Optional[Union[str, TensorType]] = None):
         """
         Convert the inner content to tensors.
         Args:
@@ -106,7 +101,9 @@ class BatchFeature(UserDict):
             is_tensor = paddle.is_tensor
         else:
             as_tensor = np.asarray
-            is_tensor = lambda x: isinstance(x, np.ndarray)
+
+            def is_tensor(x):
+                return isinstance(x, np.ndarray)
 
         # Do the tensor conversion in batch
         for key, value in self.items():
@@ -134,6 +131,7 @@ class FeatureExtractionMixin(object):
     This is a feature extraction mixin used to provide saving/loading functionality for sequential and image feature
     extractors.
     """
+
     pretrained_feature_extractor_file = []
     _auto_class = None
 
@@ -154,9 +152,7 @@ class FeatureExtractionMixin(object):
         self._processor_class = processor_class
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str,
-                                                                  os.PathLike],
-                        **kwargs):
+    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs):
         r"""
         Instantiate a type of [`~feature_extraction_utils.FeatureExtractionMixin`] from a feature extractor, *e.g.* a
         derived class of [`SequenceFeatureExtractor`].
@@ -202,13 +198,11 @@ class FeatureExtractionMixin(object):
             assert unused_kwargs == {"foo": False}
             ```
         """
-        feature_extractor_dict, kwargs = cls.get_feature_extractor_dict(
-            pretrained_model_name_or_path, **kwargs)
+        feature_extractor_dict, kwargs = cls.get_feature_extractor_dict(pretrained_model_name_or_path, **kwargs)
 
         return cls.from_dict(feature_extractor_dict, **kwargs)
 
-    def save_pretrained(self, save_directory: Union[str, os.PathLike],
-                        **kwargs):
+    def save_pretrained(self, save_directory: Union[str, os.PathLike], **kwargs):
         """
         Save a feature_extractor object to the directory `save_directory`, so that it can be re-loaded using the
         [`~feature_extraction_utils.FeatureExtractionMixin.from_pretrained`] class method.
@@ -220,26 +214,22 @@ class FeatureExtractionMixin(object):
                 Additional key word arguments.
         """
         if os.path.isfile(save_directory):
-            raise AssertionError(
-                f"Provided path ({save_directory}) should be a directory, not a file"
-            )
+            raise AssertionError(f"Provided path ({save_directory}) should be a directory, not a file")
 
         os.makedirs(save_directory, exist_ok=True)
 
         # If we save using the predefined names, we can load using `from_pretrained`
-        output_feature_extractor_file = os.path.join(save_directory,
-                                                     FEATURE_EXTRACTOR_NAME)
+        output_feature_extractor_file = os.path.join(save_directory, FEATURE_EXTRACTOR_NAME)
 
         self.to_json_file(output_feature_extractor_file)
-        logger.info(
-            f"Feature extractor saved in {output_feature_extractor_file}")
+        logger.info(f"Feature extractor saved in {output_feature_extractor_file}")
 
         return [output_feature_extractor_file]
 
     @classmethod
     def get_feature_extractor_dict(
-            cls, pretrained_model_name_or_path: Union[str, os.PathLike],
-            **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs
+    ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """
         From a `pretrained_model_name_or_path`, resolve to a dictionary of parameters, to be used for instantiating a
         feature extractor of type [`~feature_extraction_utils.FeatureExtractionMixin`] using `from_dict`.
@@ -254,37 +244,33 @@ class FeatureExtractionMixin(object):
         pretrained_model_name_or_path = str(pretrained_model_name_or_path)
         is_local = os.path.isdir(pretrained_model_name_or_path)
         if os.path.isdir(pretrained_model_name_or_path):
-            resolved_feature_extractor_file = os.path.join(
-                pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
+            resolved_feature_extractor_file = os.path.join(pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME)
         elif os.path.isfile(pretrained_model_name_or_path):
             resolved_feature_extractor_file = pretrained_model_name_or_path
             is_local = True
         else:
             # from pretrained_feature_extractor_file
             if pretrained_model_name_or_path in cls.pretrained_feature_extractor_file:
-                feature_extractor_file = cls.pretrained_feature_extractor_file[
-                    pretrained_model_name_or_path]
+                feature_extractor_file = cls.pretrained_feature_extractor_file[pretrained_model_name_or_path]
             else:
                 # Assuming from community-contributed pretrained models
                 feature_extractor_file = os.path.join(
-                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path,
-                    FEATURE_EXTRACTOR_NAME)
-            default_root = os.path.join(MODEL_HOME,
-                                        pretrained_model_name_or_path)
+                    COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, FEATURE_EXTRACTOR_NAME
+                )
+            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_feature_extractor_file = get_path_from_url(
-                    feature_extractor_file, default_root)
+                resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, default_root)
             except Exception:
                 # For any other exception, we throw a generic error.
                 raise EnvironmentError(
                     f"Can't load feature extractor for '{pretrained_model_name_or_path}'. If you were trying to load"
                     " it from 'BOS', make sure you don't have a local directory with the"
                     f" same name. Otherwise, make sure '{pretrained_model_name_or_path}' is the correct path to a"
-                    f" directory containing a {FEATURE_EXTRACTOR_NAME} file")
+                    f" directory containing a {FEATURE_EXTRACTOR_NAME} file"
+                )
         try:
             # Load feature_extractor dict
-            with open(resolved_feature_extractor_file, "r",
-                      encoding="utf-8") as reader:
+            with open(resolved_feature_extractor_file, "r", encoding="utf-8") as reader:
                 text = reader.read()
             feature_extractor_dict = json.loads(text)
 
@@ -294,12 +280,9 @@ class FeatureExtractionMixin(object):
             )
 
         if is_local:
-            logger.info(
-                f"loading configuration file {resolved_feature_extractor_file}")
+            logger.info(f"loading configuration file {resolved_feature_extractor_file}")
         else:
-            logger.info(
-                f"loading configuration file from cache at {resolved_feature_extractor_file}"
-            )
+            logger.info(f"loading configuration file from cache at {resolved_feature_extractor_file}")
 
         return feature_extractor_dict, kwargs
 
