@@ -1,12 +1,12 @@
 # Information Extraction Application
 
 **Table of contents**
-- [1. Introduction to Information Extraction Application](#1)
-- [2. Technical Features](#2)
-   - [2.1 Full Coverage of Information Extraction Scheme](#21)
-   - [2.2 Powerful Model Base](#22)
-   - [2.3 Industrial-level Full-process Solution](#23)
-   - [2.4 Case Display](#24)
+- [1. Introduction](#1)
+- [2. Features](#2)
+   - [2.1 Available Models](#21)
+   - [2.2 Performance](#22)
+   - [2.3 Full Development Lifecycle](#23)
+   - [2.4 Demo](#24)
 - [3. Quick Start](#3)
    - [3.1 Taskflow](#31)
    - [3.2 Text Information Extraction](#32)
@@ -14,26 +14,26 @@
 
 <a name="1"></a>
 
-## 1. Introduction to Information Extraction Application
+## 1. Introduction
 
-The information extraction application has open sourced industrial-level solutions for a series of high-frequency scenarios of information extraction. It has **multi-domain, multi-task, and cross-modal capabilities**. The whole process is perfect, which can quickly realize the landing of information extraction products.
+This Information Extraction (IE) guide introduces our open-source industry-grade solution that covers the most widely-used application scenarios of Information Extraction. It features **multi-domain, multi-task, and cross-modal capabilities** and goes through the full lifecycle of **data labeling, model training and model deployment**. We hope this guide can help you apply Information Extraction techniques in your own products or models.
 
-In layman's terms, information extraction is the process of extracting structured information from given input data such as text/pictures. In the process of implementing information extraction, it usually faces many challenges such as changing fields, diverse tasks, and scarce data. Aiming at the difficulties and pain points in the field of information extraction, the PaddleNLP information extraction application** is based on the idea of UIE unified modeling** and provides an industrial-level application solution for information extraction. **In addition to supporting plain text scene entities, relationships, events, opinions, etc. In addition to task extraction, it also supports end-to-end information extraction of documents/pictures/tables**. The application **does not limit the industry field and extraction target**, and can realize the seamless connection from the product prototype development, business POC stage to business landing and iteration stages, helping developers to achieve rapid adaptation and landing of extraction scenarios in specific fields.
+Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction] (https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapated models specialized for different industry sectors.
 
-**Information extraction application highlights:**
+**Highlights:**
 
-- **Comprehensive coverage of scenarios🎓:** Covers various mainstream tasks of information extraction, oriented to plain text and document scenarios, supports multiple languages, and meets developers' diverse information extraction needs.
-- **Leading effect🏃:** Using the UIE series models with outstanding effects in plain text and multi-modality as the training base, it provides pre-trained models of various sizes to meet different needs, and has extensive and mature practical applicability .
-- **Easy to use⚡:** Implementing three lines of code through Taskflow can realize quick calls without labeled data, and one line of commands can start information extraction training, easily complete deployment and go online, and lower the threshold for information extraction technology.
-- **Efficient Tuning✊:** Developers can easily get started with the data labeling and model training process without any background knowledge of machine learning.
+- **Comprehensive Coverage🎓:** Covers various mainstream tasks of information extraction for plain text and document scenarios, supports multiple languages
+- **State-of-the-Art Performance🏃:** Strong performance from the UIE model series models in plain text and multimodal datasets. We also provide pretrained models of various sizes to meet different needs
+- **Easy to use⚡:** three lines of code to use our `Taskflow` for out-of-box Information Extraction capabilities. One line of command to model training and model deployment
+- **Efficient Tuning✊:** Developers can easily get started with the data labeling and model training process without a background in Machine Learning.
 
 <a name="2"></a>
 
-## 2. Technical Features
+## 2. Features
 
 <a name="21"></a>
 
-### 2.1 Full Coverage of Information Extraction Scheme
+### 2.1 Available Models
 
 Multiple model selection, satisfying accuracy and speed, and adapting to different information extraction scenarios.
 
@@ -42,18 +42,18 @@ Multiple model selection, satisfying accuracy and speed, and adapting to differe
 | `uie-base`<br />`uie-medium`<br />`uie-mini`<br />`uie-micro`<br />`uie-nano` | For **plain text** The **extractive** model of the scene supports **Chinese**         | Supports entity, relation, event, opinion extraction |
 |                       `uie-base-en`                          | An **extractive** model for **plain text** scenarios, supports **English**         | Supports entity, relation, event, opinion extraction |
 |                     `uie-m-base`<br />`uie-m-large`          | An **extractive** model for **plain text** scenarios, supporting **Chinese and English**     | Supports entity, relation, event, opinion extraction |
-|                      <b>`uie-x-base`</b>                     | An **extractive** model for **plain text** and **document** scenarios, supports **Chinese and English** | supports plain text All the functions of the scene, and also support the end-to-end information extraction of documents/pictures/tables |
+|                      <b>`uie-x-base`</b>                     | An **extractive** model for **plain text** and **document** scenarios, supports **Chinese and English** | Supports entity, relation, event, opinion extraction on both plain text and documents/pictures/tables |
 
 
 <a name="22"></a>
 
-### 2.2 Powerful Model Base
+### 2.2 Performance
 
-The information extraction application uses the ERNIE 3.0 lightweight model as a pre-training model, and at the same time performs secondary pre-training on a large amount of information extraction data, so that the model can be adapted to a fixed prompt.
+The UIE model series uses the ERNIE 3.0 lightweight models as the pre-trained language models and was finetuned on a large amount of information extraction data so that the model can be adapted to a fixed prompt.
 
-- Experimental results of Chinese text dataset
+- Experimental results on Chinese dataset
 
-We conducted experiments on the self-built test sets of the three vertical texts of the Internet, medical care, and finance:
+We conducted experiments on the in-house test sets of the three different domains of Internet, medical care, and finance:
 
 <table>
 <tr><th row_span='2'><th colspan='2'>finance<th colspan='2'>healthcare<th colspan='2'>internet
@@ -68,11 +68,11 @@ We conducted experiments on the self-built test sets of the three vertical texts
 <tr><td>🧾🎓<b>uie-x-base (12L768H)</b><td>48.84<td>73.87<td>65.60<td>88.81<td><b>79.36</b> <td>81.65
 </table>
 
-0-shot means that no training data is directly used for prediction through ```paddlenlp.Taskflow```, and 5-shot means that each category contains 5 pieces of labeled data for model fine-tuning. **Experiments show that UIE can further improve the performance with a small amount of data (few-shot) in vertical scenes**.
+0-shot means that no training data is directly used for prediction through ```paddlenlp.Taskflow```, and 5-shot means that each category contains 5 pieces of labeled data for model fine-tuning. **Experiments show that UIE can further improve the performance with a small amount of data (few-shot)**.
 
-- Experimental results of multimodal datasets
+- Experimental results on multimodal datasets
 
-We experimented on the zero-sample effect of UIE-X on the self-built multi-modal test sets of three major scenarios: general, financial, and medical:
+We experimented on the zero-shot performance of UIE-X on the in-house multi-modal test sets in three different domains of general, financial, and medical:
 
 <table>
 <tr><th ><th>General <th>Financial<th colspan='2'>Medical
@@ -83,23 +83,23 @@ The general test set contains complex samples from different fields and is the m
 
 <a name="23"></a>
 
-### 2.3 Industrial-level Full-process Solution
+### 2.3 Full Development Lifecycle
 
 **Research stage**
 
-- At this stage, the target requirements are open and there is a lack of data accumulation. We provide a simple way of invoking Taskflow with three lines of code, which can quickly verify the effect in business scenarios without labeling data.
+- At this stage, the target requirements are open and there is no labeled data. We provide a simple way of using Taskflow out-of-the-box with three lines of code, which allows you to build POC without any labeled data.
    - [Text Extraction Taskflow User Guide](./taskflow_text_en.md)
    - [Document Extraction Taskflow User Guide](./taskflow_doc_en.md)
 
 **Data preparation stage**
 
-- We recommend customizing your own information extraction model in actual business scenarios. We provide Label Studio labeling solutions for different extraction scenarios. Based on this solution, the seamless connection from data labeling to training data construction can be realized, which greatly reduces the time cost of data labeling and model customization.
+- We recommend finetuning your own information extraction model for your use case. We provide Label Studio labeling solutions for different extraction scenarios. Based on this solution, the seamless connection from data labeling to training data construction can be realized, which greatly reduces the time cost of data labeling and model customization.
    - [Text Extraction Labeling Guide](./label_studio_text_en.md)
    - [Document Extraction and Labeling Guide](./label_studio_doc_en.md).
 
 **Model fine-tuning and closed domain distillation**
 
-- Based on UIE's excellent small-sample fine-tuning capabilities, it realizes low-cost model customization and adaptation. At the same time, it provides an acceleration solution for closed domain distillation to solve the problem of slow extraction speed.
+- Based on UIE's few-shot capabilities, it realizes low-cost model customization and adaptation. At the same time, it provides an acceleration solution for closed domain distillation to solve the problem of slow extraction speed.
    - [Example of the whole process of text information extraction](./text/README_en.md)
    - [Example of document information extraction process](./document/README_en.md)
 
@@ -111,9 +111,9 @@ The general test set contains complex samples from different fields and is the m
 
 <a name="24"></a>
 
-### 2.4 Case Display
+### 2.4 Demo
 
-- 🧾Experience the UIE-X function through the [Huggingface website](https://huggingface.co/spaces/PaddlePaddle/UIE-X):
+- 🧾Try our UIE-X demo on [🤗 HuggingFace Space](https://huggingface.co/spaces/PaddlePaddle/UIE-X):
 
 <div align="center">
      <img src=https://user-images.githubusercontent.com/40840292/207856955-a01cd5dd-fd5c-48ae-b8fd-c69512a88845.png height=500 width=900 hspace='10'/>
