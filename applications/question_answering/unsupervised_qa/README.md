@@ -463,7 +463,6 @@ python finetune/answer_extraction_and_roundtrip_filtration/evaluate.py \
 - `debug`: 是否开启debug模式对每个正例类别分别进行评估，该模式仅用于模型调试，默认关闭。
 - `limit`: SpanEvaluator测评指标的`limit`，当概率数组中的最后一个维度大于该值时将返回相应的文本片段。
 
-
 #### 语义索引和召回模型
 我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/supervised_qa/faq_finance)。
 
