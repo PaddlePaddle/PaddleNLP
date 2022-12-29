@@ -268,6 +268,13 @@ def main(args):
     reset_state_dict = reset_program_state_dict(state_dict)
     paddle.static.set_program_state(main_program, reset_state_dict)
 
+    amp_list = paddle.static.amp.CustomOpLists()
+    amp_list.unsupported_list = {}
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
+        main_program, amp_list, use_fp16_guard=False)
+    paddle.static.amp.cast_parameters_to_fp16(
+        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
+
     if args.enable_load_params:
         logging.info(f"loading weights from: {args.load_params_path}")
         if not args.load_params_path.endswith("pdparams"):
@@ -275,13 +282,6 @@ def main(args):
         with open(args.load_params_path, "rb") as file:
             params = pickle.load(file)
         paddle.static.set_program_state(main_program, params)
-
-    amp_list = paddle.static.amp.CustomOpLists()
-    amp_list.unsupported_list = {}
-    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
-        main_program, amp_list, use_fp16_guard=False)
-    paddle.static.amp.cast_parameters_to_fp16(
-        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     # Create ipu_strategy
     ipu_strategy = create_ipu_strategy(args)
