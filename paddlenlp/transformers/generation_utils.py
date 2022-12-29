@@ -722,6 +722,15 @@ class GenerationMixin(object):
             decode_strategy
         )
 
+        if getattr(self, "deprecated_warnings", None) is None:
+            self.deprecated_warnings = {}
+
+        if "use_faster" in model_kwargs:
+            use_fast = model_kwargs.pop("use_faster")
+            if not self.deprecated_warnings.get("use_faster", False):
+                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
+                self.deprecated_warnings["use_faster"] = True
+
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
         eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
