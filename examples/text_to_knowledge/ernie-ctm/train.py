@@ -20,9 +20,9 @@ from functools import partial
 
 import numpy as np
 import paddle
+from data_process import convert_example, create_dataloader, load_dict, read_custom_data
 from metric import SequenceAccuracy
 
-from data import convert_example, create_dataloader, load_dict, read_custom_data
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
@@ -38,7 +38,7 @@ def parse_args():
     parser = argparse.ArgumentParser()
 
     # yapf: disable
-    parser.add_argument("--data_dir", default="./data", type=str, help="The input data dir, should contain train.json.")
+    parser.add_argument("--data_dir", default="./input_dir", type=str, help="The input data dir, should contain train.json.")
     parser.add_argument("--init_from_ckpt", default=None, type=str, help="The path of checkpoint to be loaded.")
     parser.add_argument("--output_dir", default="./output", type=str, help="The output directory where the model predictions and checkpoints will be written.",)
     parser.add_argument("--max_seq_len", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.", )

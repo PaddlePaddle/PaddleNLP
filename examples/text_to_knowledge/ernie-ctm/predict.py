@@ -16,9 +16,9 @@ import argparse
 import os
 
 import paddle
+from data_process import convert_example, load_dict
 from utils import decode
 
-from data import convert_example, load_dict
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.transformers import ErnieCtmTokenizer, ErnieCtmWordtagModel
 
