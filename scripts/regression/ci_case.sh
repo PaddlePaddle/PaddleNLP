@@ -803,15 +803,15 @@ print_info $? transformer_deploy_C_FT
 # 23 pet
 pet (){
 path="examples/few_shot/pet"
-python tests/ci/ci_normal_case.py ${path}
+python scripts/regression/ci_normal_case.py ${path}
 }
 efl(){
 path="examples/few_shot/efl"
-python tests/ci/ci_normal_case.py ${path}
+python scripts/regression/ci_normal_case.py ${path}
 }
 p-tuning(){
 path="examples/few_shot/p-tuning"
-python tests/ci/ci_normal_case.py ${path}
+python scripts/regression/ci_normal_case.py ${path}
 }
 #24 simbert
 simbert(){
@@ -1046,7 +1046,7 @@ print_info $? textcnn_predict
 #33 taskflow
 taskflow (){
 cd ${nlp_dir}
-python tests/ci/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
+python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
 transformers(){
