@@ -12,23 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import time
+import os
 import random
+import time
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Stack, Pad, Tuple
+from metric import SequenceAccuracy
+
+from data import convert_example, create_dataloader, load_dict, read_custom_data
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
-
-from data import load_dict, convert_example, read_custom_data, create_dataloader
-from metric import SequenceAccuracy
+from paddlenlp.transformers import (
+    ErnieCtmTokenizer,
+    ErnieCtmWordtagModel,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -49,7 +52,7 @@ def parse_args():
     parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
     parser.add_argument("--seed", default=1000, type=int, help="random seed for initialization")
-    parser.add_argument("--device", default="gpu",type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--device", default="gpu", type=str, help="The device to select to train the model, is must be cpu/gpu/xpu.")
     # yapf: enable
 
     args = parser.parse_args()
@@ -104,7 +107,7 @@ def do_train(args):
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len, tags_to_idx=tags_to_idx)
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
         Stack(dtype="int64"),  # seq_len
@@ -129,8 +132,6 @@ def do_train(args):
     num_training_steps = len(train_data_loader) * args.num_train_epochs
     warmup = args.warmup_steps if args.warmup_steps > 0 else args.warmup_proportion
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, warmup)
-
-    num_train_optimization_steps = len(train_ds) / args.batch_size * args.num_train_epochs
 
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
@@ -157,7 +158,8 @@ def do_train(args):
             global_step += 1
             input_ids, token_type_ids, seq_len, tags = batch
 
-            loss, _ = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)
+            loss = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)[0]
+
             loss = loss.mean()
             total_loss += loss
             loss.backward()
