@@ -1247,7 +1247,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
-        config.save_pretrained(cache_dir)
+
+        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
+            config.save_pretrained(cache_dir)
 
         # 2. init the model
         init_args = config["init_args"] or ()
