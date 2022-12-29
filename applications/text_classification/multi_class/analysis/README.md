@@ -337,7 +337,7 @@ python dirty.py \
     --device "gpu:3" \
     --dataset_dir "../data" \
     --max_seq_length 128 \
-    --params_path "../checkpoint-m/" \
+    --params_path "../checkpoint/" \
     --batch_size 8 \
     --dirty_num 100 \
     --dirty_file "train_dirty.txt" \
