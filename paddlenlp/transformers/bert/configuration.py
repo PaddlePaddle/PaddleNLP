@@ -15,7 +15,8 @@
 from __future__ import annotations
 
 from typing import Dict
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
+
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["BERT_PRETRAINED_INIT_CONFIGURATION", "BertConfig", "BERT_PRETRAINED_RESOURCE_FILES_MAP"]
 
@@ -364,7 +365,7 @@ class BertConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "bert"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
+    standard_config_map: Dict[str, str] = {"dropout": "classifier_dropout"}
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
