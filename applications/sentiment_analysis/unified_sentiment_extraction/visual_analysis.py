@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 from collections import defaultdict
@@ -24,12 +23,11 @@ import wordcloud
 from utils import load_json_file
 
 from paddlenlp.taskflow.utils import download_file
+from paddlenlp.utils.log import logger
 
 # make sure that the font 'SimHei' is installed in system
 plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
-
-logger = logging.getLogger(__file__)
 
 URLS = {
     "SimHei": [
@@ -610,7 +608,7 @@ def default_visual_analysis(args):
         save_path = os.path.join(args.save_dir, "sentence_sentiment.png")
         vs.plot_sentence_sentiment(sr.sentence_sentiment, save_path)
 
-    print("Images has been saved to: {}".format(args.save_dir))
+    logger.info("Visual images for sentiment analysis has been saved to: {}".format(args.save_dir))
 
 
 if __name__ == "__main__":

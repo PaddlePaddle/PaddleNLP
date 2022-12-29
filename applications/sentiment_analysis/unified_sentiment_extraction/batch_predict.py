@@ -19,6 +19,7 @@ import time
 from utils import load_txt, write_json_file
 
 from paddlenlp import Taskflow
+from paddlenlp.utils.log import logger
 
 
 def main(args):
@@ -62,8 +63,8 @@ def main(args):
         save_dir = os.path.dirname(args.file_path)
         save_path = os.path.join(save_dir, "sentiment_results.json")
     write_json_file(results, save_path)
-    print("The results of sentiment analysis has been saved to: {}".format(save_path))
-    print("This run take {} seconds.".format(time.time() - start_time))
+    logger.info("The results of sentiment analysis has been saved to: {}".format(save_path))
+    logger.info("This run take {} seconds.".format(time.time() - start_time))
 
 
 if __name__ == "__main__":
