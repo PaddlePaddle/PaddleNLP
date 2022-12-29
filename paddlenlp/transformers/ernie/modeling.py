@@ -1351,7 +1351,11 @@ class UTC(ErniePretrainedModel):
             loss = paddle.nn.functional.binary_cross_entropy_with_logits(option_logits, labels)
 
         if not return_dict:
-            output = (option_logits,) + outputs[2:]
+            output = (option_logits,)
+            if output_hidden_states:
+                output = output + (outputs.hidden_states,)
+            if output_attentions:
+                output = output + (output.attentions,)
             return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
 
         return MultipleChoiceModelOutput(

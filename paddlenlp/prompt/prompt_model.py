@@ -70,6 +70,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         **kwargs: Dict[str, Any]
     ):
         return_dict = return_dict if return_dict is not None else False
+        return_hidden_states = kwargs.get("return_hidden_states", False)
         input_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -114,8 +115,15 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, model_outputs.logits)
-            return ((loss,) + output) if loss is not None else output
+            output = (logits,)
+            if return_hidden_states:
+                output = output + (model_outputs.logits,)
+            if loss is not None:
+                return (loss,) + output
+            if isinstance(output, (list, tuple)) and len(output) == 1:
+                output = output[0]
+            return output
+
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,

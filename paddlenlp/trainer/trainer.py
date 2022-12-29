@@ -1615,6 +1615,7 @@ class Trainer:
 
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
+
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))

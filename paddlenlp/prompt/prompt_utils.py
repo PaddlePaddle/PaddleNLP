@@ -83,7 +83,9 @@ class PromptDataCollatorWithPadding:
         max_length = batch["input_ids"].shape[1]
         for key in features[0]:
             if key not in self.default_model_input_names:
-                values = [b[key] for b in features]
+                values = [b[key] for b in features if key in b]
+                if len(values) < len(features):
+                    continue
                 if key == "masked_positions":
                     new_values = []
                     for index, value in enumerate(values):
