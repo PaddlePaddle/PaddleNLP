@@ -20,8 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -64,9 +63,7 @@ class UNIMOPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.unimo.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -542,10 +539,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel

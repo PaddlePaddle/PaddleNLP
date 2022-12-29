@@ -133,9 +133,7 @@ class ErnieMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie_m.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )

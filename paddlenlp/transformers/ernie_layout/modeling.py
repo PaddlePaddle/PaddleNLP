@@ -23,6 +23,7 @@ from paddle.nn import Layer
 
 from paddlenlp.utils.log import logger
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from .configuration import (
     ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION,
@@ -171,7 +172,7 @@ class ErnieLayoutEmbeddings(Layer):
 
 
 class ErnieLayoutPretrainedModel(PretrainedModel):
-    model_config_file = "config.json"
+    model_config_file = CONFIG_NAME
     pretrained_init_configuration = ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_LAYOUT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "ernie_layout"
@@ -184,9 +185,7 @@ class ErnieLayoutPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.pretrained_init_configuration["initializer_range"]
-                        if "initializer_range" in self.pretrained_init_configuration
-                        else 0.02,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
