@@ -69,6 +69,7 @@ from .trainer_utils import (
     PredictionOutput,
     RemoveColumnsCollator,
     ShardingOption,
+    TrainerMemoryTracker,
     TrainOutput,
     find_batch_size,
     get_last_checkpoint,
@@ -195,6 +196,10 @@ class Trainer:
         self.is_in_train = False
         # self.do_grad_scaling = args.fp16
 
+        # memory metrics - must set up as early as possible
+        self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+        self._memory_tracker.start()
+
         # Seed must be set before instantiating the model when using model
         set_seed(self.args.seed)
         if model is None:
@@ -311,6 +316,9 @@ class Trainer:
         self.control = self.callback_handler.on_init_end(self.args, self.state, self.control)
         self.print_config()
 
+        # very last
+        self._memory_tracker.stop_and_update_metrics()
+
     def add_callback(self, callback):
         """
         Add a callback to the current list of [`~TrainerCallback`].
@@ -396,6 +404,9 @@ class Trainer:
         args = self.args
         self.is_in_train = True
         resume_from_checkpoint = None if not resume_from_checkpoint else resume_from_checkpoint
+
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
 
         # Load potential model checkpoint
         if isinstance(resume_from_checkpoint, bool) and resume_from_checkpoint:
@@ -718,6 +729,8 @@ class Trainer:
         metrics["train_loss"] = train_loss
 
         self.is_in_train = False
+
+        self._memory_tracker.stop_and_update_metrics(metrics)
 
         self.log(metrics)
 
@@ -1506,6 +1519,9 @@ class Trainer:
             A dictionary containing the evaluation loss and the potential metrics computed from the predictions. The
             dictionary also contains the epoch number which comes from the training state.
         """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         eval_dataloader = self.get_eval_dataloader(eval_dataset)
         start_time = time.time()
 
@@ -1532,6 +1548,8 @@ class Trainer:
         self.log(output.metrics)
 
         self.control = self.callback_handler.on_evaluate(self.args, self.state, self.control, output.metrics)
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
 
         return output.metrics
 
@@ -1728,6 +1746,9 @@ class Trainer:
             - metrics (`Dict[str, float]`, *optional*): The potential dictionary of metrics (if the dataset contained
               labels).
         """
+        # memory metrics - must set up as early as possible
+        self._memory_tracker.start()
+
         test_dataloader = self.get_test_dataloader(test_dataset)
         start_time = time.time()
 
@@ -1744,6 +1765,8 @@ class Trainer:
                 num_steps=math.ceil(output.num_samples / total_batch_size),
             )
         )
+
+        self._memory_tracker.stop_and_update_metrics(output.metrics)
 
         return PredictionOutput(predictions=output.predictions, label_ids=output.label_ids, metrics=output.metrics)
 
