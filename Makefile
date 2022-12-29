@@ -66,10 +66,11 @@ deploy-paddlenlp:
 	twine upload --skip-existing dist/*
 
 .PHONY: release
-test_all_examples=all
-cudaid1=0
-cudaid2=0,1
+.PHONY: release
 release: 
+	test_all_examples=all
+	cudaid1=0
+	cudaid2=0,1
 	bash ./tests/ci/run_release.sh ${cudaid1} ${cudaid2} ${test_all_examples}
 
 .PHONY: key
