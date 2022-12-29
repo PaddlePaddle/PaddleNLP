@@ -61,6 +61,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         self,
         text_column: str,
         label_column: str,
+        train_dataset: Dataset,
+        eval_dataset: Dataset,
         metric_for_best_model: str = "eval_accuracy",
         greater_is_better: bool = True,
         problem_type: str = "multi_class",
@@ -68,7 +70,11 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     ):
 
         super(AutoTrainerForTextClassification, self).__init__(
-            metric_for_best_model=metric_for_best_model, greater_is_better=greater_is_better, **kwargs
+            train_dataset=train_dataset,
+            eval_dataset=eval_dataset,
+            metric_for_best_model=metric_for_best_model,
+            greater_is_better=greater_is_better,
+            **kwargs,
         )
         self.text_column = text_column
         self.label_column = label_column
@@ -83,10 +89,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _default_training_argument(self) -> TrainingArguments:
         return TrainingArguments(
             output_dir=self.training_path,
-            num_train_epochs=1,
-            learning_rate=1e-5,
-            per_device_train_batch_size=2,
-            per_device_eval_batch_size=2,
             disable_tqdm=True,
             metric_for_best_model="accuracy",
             greater_is_better=True,
@@ -100,10 +102,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _default_prompt_tuning_arguments(self) -> PromptTuningArguments:
         return PromptTuningArguments(
             output_dir=self.training_path,
-            num_train_epochs=1,
-            learning_rate=1e-5,
-            per_device_train_batch_size=2,
-            per_device_eval_batch_size=2,
             disable_tqdm=True,
             metric_for_best_model="accuracy",
             greater_is_better=True,
@@ -128,7 +126,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             ],
         )
         return [
-            # fast learning: high LR, small epoch
+            # fast learning: high LR, small early stop patience
             {
                 "preset": "finetune",
                 "language": "Chinese",
@@ -136,11 +134,11 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "EarlyStoppingCallback.early_stopping_patience": 2,
                 "TrainingArguments.per_device_train_batch_size": train_batch_size,
                 "TrainingArguments.per_device_eval_batch_size": train_batch_size * 2,
-                "TrainingArguments.num_train_epochs": 10,
+                "TrainingArguments.num_train_epochs": 100,
                 "TrainingArguments.model_name_or_path": chinese_models,
                 "TrainingArguments.learning_rate": 3e-5,
             },
-            # slow learning: small LR, rely on early stopping to end training
+            # slow learning: small LR, large early stop patience
             {
                 "preset": "finetune",
                 "language": "Chinese",
@@ -177,7 +175,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
         def trainable(config):
             config = config["candidates"]
-            max_length = config.get("PreprocessArguments.max_length", 128)
             if "EarlyStoppingCallback.early_stopping_patience" in config:
                 callbacks = [
                     EarlyStoppingCallback(
@@ -197,7 +194,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 )
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
-                training_args = self._override_arguments(config, self._default_training_argument)
+                training_args = self._override_hp(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
                     tokenizer=tokenizer,
@@ -217,6 +214,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 return eval_metrics
             elif config["trainer_type"] == "PromptTrainer":
                 model_path = config["PromptTuningArguments.model_name_or_path"]
+                max_length = config.get("PreprocessArguments.max_length", 128)
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
                 processed_train_dataset = train_dataset.map(self._preprocess_labels, lazy=False)
                 processed_eval_dataset = eval_dataset.map(self._preprocess_labels, lazy=False)
@@ -227,7 +225,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     max_length=max_length,
                     model=model,
                 )
-                training_args = self._override_arguments(config, self._default_prompt_tuning_arguments)
+                training_args = self._override_hp(config, self._default_prompt_tuning_arguments)
                 verbalizer = SoftVerbalizer(label_words=self.id2label, tokenizer=tokenizer, model=model)
                 prompt_model = PromptModelForSequenceClassification(
                     model,

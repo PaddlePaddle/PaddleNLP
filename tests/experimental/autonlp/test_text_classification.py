@@ -25,6 +25,24 @@ from paddlenlp.experimental.autonlp import AutoTrainerForTextClassification
 from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from tests.testing_utils import get_tests_dir
 
+finetune_model_candidate = {
+    "trainer_type": "Trainer",
+    "TrainingArguments.max_steps": 5,
+    "TrainingArguments.per_device_train_batch_size": 2,
+    "TrainingArguments.per_device_eval_batch_size": 2,
+    "TrainingArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
+}
+multiclass_prompt_model_candidate = {
+    "trainer_type": "PromptTrainer",
+    "template.prompt": "“{'text': 'label_desc'}”这句话是关于{'mask'}的",
+    "PromptTuningArguments.max_steps": 5,
+    "PromptTuningArguments.per_device_train_batch_size": 2,
+    "PromptTuningArguments.per_device_eval_batch_size": 2,
+    "PromptTuningArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
+}
+multilabel_prompt_model_candidate = copy.deepcopy(multiclass_prompt_model_candidate)
+multilabel_prompt_model_candidate["template.prompt"] = "“{'text': 'sentence'}”这句话是关于{'mask'}的"
+
 
 def read_multi_label_dataset(path):
     with open(path, "r", encoding="utf-8") as f:
@@ -65,47 +83,32 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (
-                {
-                    "trainer_type": "Trainer",
-                    "TrainingArguments.max_steps": 5,
-                    "TrainingArguments.per_device_train_batch_size": 2,
-                    "TrainingArguments.per_device_eval_batch_size": 2,
-                    "TrainingArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
-                },
-            ),
-            (
-                {
-                    "trainer_type": "PromptTrainer",
-                    "template.prompt": "“{'text': 'label_desc'}”这句话是关于{'mask'}的",
-                    "PromptTuningArguments.max_steps": 5,
-                    "PromptTuningArguments.per_device_train_batch_size": 2,
-                    "PromptTuningArguments.per_device_eval_batch_size": 2,
-                    "PromptTuningArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
-                },
-            ),
+            (finetune_model_candidate, {"TrainingArguments.max_steps": 2}),
+            (finetune_model_candidate, None),
+            (multiclass_prompt_model_candidate, None),
         ]
     )
-    def test_multiclass(self, override):
+    def test_multiclass(self, custom_model_candidate, hp_overrides):
         with TemporaryDirectory() as temp_dir_path:
             train_ds = copy.deepcopy(self.multi_class_train_ds)
             dev_ds = copy.deepcopy(self.multi_class_dev_ds)
             num_models = 1
             # create auto trainer and train
             auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
                 label_column="label_desc",
                 text_column="sentence",
                 language="Chinese",
                 output_dir=temp_dir_path,
             )
             auto_trainer.train(
-                train_ds,
-                dev_ds,
                 num_cpus=1,
                 num_gpus=0,
                 max_concurrent_trials=1,
                 num_models=num_models,
-                override=override,
+                custom_model_candidates=[custom_model_candidate],
+                hp_overrides=hp_overrides,
             )
 
             # check is training is valid
@@ -117,10 +120,16 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertIsInstance(results_df, DataFrame)
             self.assertEqual(len(results_df), num_models)
 
+            # test hp override
+            if hp_overrides is not None:
+                for hp_key, hp_value in hp_overrides.items():
+                    result_hp_key = f"config/candidates/{hp_key}"
+                    self.assertEqual(results_df[result_hp_key][0], hp_value)
+
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            if override["trainer_type"] == "PromptTrainer":
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
                 self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
                 self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
             else:  # finetune_test
@@ -136,7 +145,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
-            if override["trainer_type"] == "PromptTrainer":
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
                 with self.assertRaises(NotImplementedError):
                     auto_trainer.to_taskflow()
             else:
@@ -150,36 +159,20 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
 
     @parameterized.expand(
         [
-            (
-                {
-                    "trainer_type": "Trainer",
-                    "TrainingArguments.max_steps": 5,
-                    "TrainingArguments.per_device_train_batch_size": 2,
-                    "TrainingArguments.per_device_eval_batch_size": 2,
-                    # "TrainingArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                    "TrainingArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
-                },
-            ),
-            (
-                {
-                    "trainer_type": "PromptTrainer",
-                    "template.prompt": "“{'text': 'sentence'}”这句话是关于{'mask'}的",
-                    "PromptTuningArguments.max_steps": 5,
-                    "PromptTuningArguments.per_device_train_batch_size": 2,
-                    "PromptTuningArguments.per_device_eval_batch_size": 2,
-                    "PromptTuningArguments.model_name_or_path": "__internal_testing__/tiny-random-bert",
-                    # "PromptTuningArguments.model_name_or_path": "ernie-3.0-nano-zh",
-                },
-            ),
+            (finetune_model_candidate, {"TrainingArguments.max_steps": 2}),
+            (finetune_model_candidate, None),
+            (multilabel_prompt_model_candidate, None),
         ]
     )
-    def test_multilabel_finetune(self, override):
+    def test_multilabel_finetune(self, custom_model_candidate, hp_overrides):
         with TemporaryDirectory() as temp_dir_path:
             train_ds = copy.deepcopy(self.multi_label_train_ds)
             dev_ds = copy.deepcopy(self.multi_label_dev_ds)
             num_models = 1
             # create auto trainer and train
             auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
                 label_column="labels",
                 text_column="sentence",
                 language="Chinese",
@@ -187,13 +180,12 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 problem_type="multi_label",
             )
             auto_trainer.train(
-                train_ds,
-                dev_ds,
                 num_cpus=1,
                 num_gpus=0,
                 max_concurrent_trials=1,
                 num_models=num_models,
-                override=override,
+                custom_model_candidates=[custom_model_candidate],
+                hp_overrides=hp_overrides,
             )
 
             # check is training is valid
@@ -205,10 +197,16 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
             self.assertIsInstance(results_df, DataFrame)
             self.assertEqual(len(results_df), num_models)
 
+            # test hp override
+            if hp_overrides is not None:
+                for hp_key, hp_value in hp_overrides.items():
+                    result_hp_key = f"config/candidates/{hp_key}"
+                    self.assertEqual(results_df[result_hp_key][0], hp_value)
+
             # test export
             temp_export_path = os.path.join(temp_dir_path, "test_export")
             auto_trainer.export(export_path=temp_export_path)
-            if override["trainer_type"] == "PromptTrainer":
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
                 self.assertTrue(os.path.exists(os.path.join(temp_export_path, "model.pdmodel")))
                 self.assertTrue(os.path.exists(os.path.join(temp_export_path, "template_config.json")))
             else:  # finetune_test
@@ -224,7 +222,7 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 auto_trainer.export(export_path=temp_export_path, trial_id="invalid_trial_id")
 
             # test taskflow
-            if override["trainer_type"] == "PromptTrainer":
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
                 with self.assertRaises(NotImplementedError):
                     auto_trainer.to_taskflow()
             else:
@@ -239,7 +237,11 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
 
     def test_untrained_auto_trainer(self):
         with TemporaryDirectory() as temp_dir:
+            train_ds = copy.deepcopy(self.multi_class_train_ds)
+            dev_ds = copy.deepcopy(self.multi_class_dev_ds)
             auto_trainer = AutoTrainerForTextClassification(
+                train_dataset=train_ds,
+                eval_dataset=dev_ds,
                 label_column="label_desc",
                 text_column="sentence",
                 language="Chinese",

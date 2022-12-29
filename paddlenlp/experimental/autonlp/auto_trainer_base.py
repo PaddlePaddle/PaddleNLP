@@ -44,6 +44,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     training_path = "training"
     export_path = "exported_model"
+    results_filename = "experiment_results.csv"
 
     def __init__(
         self,
@@ -121,32 +122,32 @@ class AutoTrainerBase(metaclass=ABCMeta):
     def to_taskflow(self, trial_id=None):
         pass
 
-    def _override_arguments(self, config: Dict[str, Any], default_arguments: Any) -> Any:
+    def _override_hp(self, config: Dict[str, Any], default_hp: Any) -> Any:
         """
         Overrides the arguments with the provided hyperparameter config
         """
-        new_arguments = copy.deepcopy(default_arguments)
+        new_hp = copy.deepcopy(default_hp)
         for key, value in config.items():
-            if key.startswith(default_arguments.__class__.__name__):
+            if key.startswith(default_hp.__class__.__name__):
                 _, hp_key = key.split(".")
-                setattr(new_arguments, hp_key, value)
-        return new_arguments
+                setattr(new_hp, hp_key, value)
+        return new_hp
 
-    def _filter_model_candidates(self, language=None, preset=None, override=None) -> List[Dict[str, Any]]:
+    def _filter_model_candidates(
+        self, language=None, preset=None, custom_model_candidates=None
+    ) -> List[Dict[str, Any]]:
         """
         Model Candidates stored as Ray hyperparameter search space, organized by
         override, language and preset
         """
-        if override is not None:
-            model_candidates = [override]
-        else:
-            model_candidates = self._model_candidates
-            if language is not None:
-                model_candidates = filter(lambda x: x["language"] == language, model_candidates)
-            if preset is not None:
-                model_candidates = filter(lambda x: x["preset"] == preset, model_candidates)
-        hyperopt_search_space = {"candidates": hp.choice("candidates", list(model_candidates))}
-        return hyperopt_search_space
+        model_candidates = custom_model_candidates if custom_model_candidates is not None else self._model_candidates
+        if language is not None:
+            model_candidates = filter(
+                lambda x: x["language"] == language if "language" in x else True, model_candidates
+            )
+        if preset is not None:
+            model_candidates = filter(lambda x: x["preset"] == preset if "preset" in x else True, model_candidates)
+        return list(model_candidates)
 
     def _get_model_result(self, trial_id=None):
         if hasattr(self, "training_results"):
@@ -190,7 +191,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         num_cpus: Optional[int] = None,
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
-        override: List[Dict[str, Any]] = None,
+        hp_overrides: Dict[str, Any] = None,
+        custom_model_candidates: List[Dict[str, Any]] = None,
         experiment_name: str = None,
     ) -> ResultGrid:
         """
@@ -198,15 +200,18 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
         Args:
             num_models (int, required): number of model trials to run
-            preset (str, optional): preset configuration for the trained models, can significantly impact accuracy, size, and inference latency of trained models. If not set, this will be inferred from data.
+            preset (str, optional): preset configuration for the trained models, can significantly impact accuracy, size, and inference latency of trained models.
+                If not set, this will be inferred from data.
             num_gpus (str, optional): number of GPUs to use for the job. By default, this is set based on detected GPUs.
             num_cpus (str, optional): number of CPUs to use for the job. By default, this is set based on virtual cores.
             max_concurrent_trials (int, optional): maximum number of trials to run concurrently. Must be non-negative. If None or 0, no limit will be applied.
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
-            override: (dict[str, Any], optional): Advanced users only.
-                override the default configuration with the user-provided overrides. When overrides is provided, preset is ignored.
-                For example, {"max_steps": 5}.
-            experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>
+            experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
+                Defaults to UNIX timestamp.
+            hp_overrides: (dict[str, Any], optional): Advanced users only.
+                override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
+            custom_model_candiates: (dict[str, Any], optional): Advanced users only.
+                Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
 
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
@@ -215,8 +220,14 @@ class AutoTrainerBase(metaclass=ABCMeta):
             logger.info("Overwriting thhe existing Tuner and any previous training results")
         self._data_checks_and_inference(self.train_dataset, self.eval_dataset)
         trainable = self._construct_trainable(self.train_dataset, self.eval_dataset)
-        model_search_space = self._filter_model_candidates(language=self.language, preset=preset, override=override)
-        algo = HyperOptSearch(space=model_search_space, metric=self.metric_for_best_model, mode="max")
+        model_candidates = self._filter_model_candidates(
+            language=self.language, preset=preset, custom_model_candidates=custom_model_candidates
+        )
+        if hp_overrides is not None:
+            for model_candidate in model_candidates:
+                model_candidate.update(hp_overrides)
+        search_space = {"candidates": hp.choice("candidates", model_candidates)}
+        algo = HyperOptSearch(space=search_space, metric=self.metric_for_best_model, mode="max")
         algo = ConcurrencyLimiter(algo, max_concurrent=max_concurrent_trials)
         if num_gpus or num_cpus:
             hardware_resources = {}
@@ -239,6 +250,6 @@ class AutoTrainerBase(metaclass=ABCMeta):
         )
         self.training_results = self.tuner.fit()
         self.show_training_results().to_csv(
-            path_or_buf=os.path.join(self.output_dir, experiment_name, "experiment_results.csv"), index=False
+            path_or_buf=os.path.join(self.output_dir, experiment_name, self.results_filename), index=False
         )
         return self.training_results
