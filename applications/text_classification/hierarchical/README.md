@@ -65,7 +65,7 @@ rm baidu_extract_2020.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.4
+- paddlenlp >= 2.4.8
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -183,23 +183,11 @@ data/
 
 #### 2.4.1 预训练模型微调
 
-使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
+使用CPU/GPU训练，默认为GPU训练。使用CPU训练只需将设备参数配置改为`--device cpu`，可以使用`--device gpu:0`指定GPU卡号：
 ```shell
 python train.py \
     --dataset_dir "data" \
     --device "gpu" \
-    --max_seq_length 128 \
-    --model_name "ernie-3.0-medium-zh" \
-    --batch_size 32 \
-    --early_stop \
-    --epochs 100
-```
-
-如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
-```shell
-python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
-    --dataset_dir "data" \
-    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
@@ -248,12 +236,12 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 
 ```text
 checkpoint/
-├── model_config.json
-├── model_state.pdparams
-├── tokenizer_config.json
-└── vocab.txt
+├── config.json # 模型配置文件，paddlenlp 2.4.5以前为model_config.json
+├── model_state.pdparams # 模型参数文件
+├── tokenizer_config.json # 分词器配置文件
+├── vocab.txt
+└── ...
 ```
-
 **NOTE:**
 * 如需恢复模型训练，则可以设置 `--init_from_ckpt checkpoint/model_state.pdparams` 。
 * 如需训练英文文本分类任务，只需更换预训练模型参数 `model_name` 。英文训练任务推荐使用"ernie-2.0-base-en"、"ernie-2.0-large-en"。
@@ -276,7 +264,6 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 
 ```text
 [2022-08-11 03:10:14,058] [    INFO] - -----Evaluate model-------
-[2022-08-11 03:10:14,059] [    INFO] - Train dataset size: 11958
 [2022-08-11 03:10:14,059] [    INFO] - Dev dataset size: 1498
 [2022-08-11 03:10:14,059] [    INFO] - Accuracy in dev dataset: 89.19%
 [2022-08-11 03:10:14,059] [    INFO] - Macro avg in dev dataset: precision: 93.48 | recall: 93.26 | F1 score 93.22
@@ -284,11 +271,9 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 [2022-08-11 03:10:14,095] [    INFO] - Level 1 Label Performance: Macro F1 score: 96.39 | Micro F1 score: 96.81 | Accuracy: 94.93
 [2022-08-11 03:10:14,255] [    INFO] - Level 2 Label Performance: Macro F1 score: 92.79 | Micro F1 score: 93.90 | Accuracy: 89.72
 [2022-08-11 03:10:14,256] [    INFO] - Class name: 交往
-[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 471(3.9%) | precision: 99.57 | recall: 98.94 | F1 score 99.25
 [2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 60(4.0%) | precision: 91.94 | recall: 95.00 | F1 score 93.44
 [2022-08-11 03:10:14,256] [    INFO] - ----------------------------
 [2022-08-11 03:10:14,256] [    INFO] - Class name: 交往##会见
-[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 98(0.8%) | precision: 100.00 | recall: 100.00 | F1 score 100.00
 [2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 12(0.8%) | precision: 92.31 | recall: 100.00 | F1 score 96.00
 ...
 ```
@@ -444,7 +429,7 @@ prune/
 
 - 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
-- 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
+- 在线服务化部署搭建请参考 [PaddleNLP SimpleServing部署指南](deploy/simple_serving/README.md) 或 [Triton部署指南](deploy/triton_serving/README.md)。
 
 <a name="模型效果"></a>
 
