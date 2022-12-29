@@ -31,27 +31,13 @@
 
 ## News 📢
 
-* 🔥 **2022.12.9 发布 [PaddleNLP v2.4.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.5)**
-  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型**UIE-X**，小样本迁移能力强；新增[信息抽取全流程应用方案](./applications/information_extraction)。
-
-*  [PaddleNLP v2.4.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.4)
-    * 支持在[Huggingface Hub](https://huggingface.co/PaddlePaddle)快速体验。
-    * Pipelines 新增交互式学习语义检索模型[Ernie-Search](./pipelines/API.md)；发布[SimpleServing](./docs/server.md)，支持Taskflow、预训练模型快速部署。
-
-* [PaddleNLP v2.4.3](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.3)
-  * [Trainer API](./docs/trainer.md) 升级，新增sharding、bf16训练，新增Seq2seqTrainer、IterableDataset支持；[小样本 Prompt API](./docs/advanced_guide/prompt.md)升级。
-  * [通用信息抽取 UIE 能力升级](./model_zoo/uie)，支持量化训练及 INT8 精度推理，进一步提升 UIE 推理速度。
-
-* [PaddleNLP v2.4.2](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.2)
-  * 新增[中文文本摘要方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/text_summarization/pegasus)，效果领先；新增[问题生成方案](./examples/question_generation)。
-  * 发布[PPDiffusers](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers)：支持跨模态（如图像与语音）训练和推理的扩散模型（Diffusion Model）工具箱。
-
-* [PaddleNLP v2.4.1](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.1)
-  * 新增多语言跨模态布局增强文档智能大模型 [ERNIE-Layout](./model_zoo/ernie-layout/)以及文档抽取问答模型DocPrompt，精准理解文档图片布局与语义信息。
-
+* 🔥 **近期新增**
+  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型 UIE-X，小样本迁移能力强；新增[信息抽取全流程应用方案](./applications/information_extraction)。
+  * ❣️发布[基于 UIE 的观点抽取与情感分析应用方案](./applications/sentiment_analysis/unified_sentiment_extraction)，小样本能力强悍。支持句子级与属性级情感极性分类、属性抽取、观点抽取，解决属性聚合和隐性观点抽取难题。
 * **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
   * 💎 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 🔨 🍭产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持 小样本学习 和 TrustAI 可信计算模型训练与调优。
+  * 🔨 产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持小样本学习和 TrustAI 可信计算模型训练与调优。
+  * 🍭 AIGC ：新增代码生成 SOTA 模型[CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#文图生成) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；
   * 💪 框架升级：[模型自动压缩 API](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[小样本 Prompt](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
 
