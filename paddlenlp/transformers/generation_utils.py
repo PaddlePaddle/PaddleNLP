@@ -731,6 +731,7 @@ class GenerationMixin(object):
                 logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
                 self.deprecated_warnings["use_faster"] = True
 
+        # TODO: change from model.attribute to model.config.attribute when all models are integrated with PretrainedConfig
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
         eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
