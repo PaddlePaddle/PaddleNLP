@@ -322,7 +322,7 @@ class DiscoDiffusionMixin:
                 t_int = int(t.item()) + 1  # errors on last step without +1, need to find source
                 # when using SLIP Base model the dimensions need to be hard coded to avoid AttributeError: 'VisionTransformer' object has no attribute 'input_resolution'
                 try:
-                    input_resolution = self.clip.vision_model.input_resolution
+                    input_resolution = getattr(self, self.base_model_prefix).vision_model.input_resolution
                 except Exception:
                     input_resolution = 224
 
@@ -334,7 +334,7 @@ class DiscoDiffusionMixin:
                     IC_Grey_P=cut_icgray_p[1000 - t_int],
                 )
                 clip_in = normalize(cuts(x_in.add(paddle.to_tensor(1.0)).divide(paddle.to_tensor(2.0))))
-                image_embeds = self.clip.get_image_features(clip_in)
+                image_embeds = getattr(self, self.base_model_prefix).get_image_features(clip_in)
 
                 dists = spherical_dist_loss(
                     image_embeds.unsqueeze(1),

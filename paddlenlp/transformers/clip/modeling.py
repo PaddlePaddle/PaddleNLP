@@ -61,8 +61,6 @@ __all__ = [
     "ModifiedResNet",
     "CLIPVisionTransformer",
     "CLIPTextTransformer",
-    "VisionTransformer",
-    "TextTransformer",
     "CLIPTextModel",
     "CLIPVisionModel",
     "CLIPPretrainedModel",
@@ -1206,11 +1204,11 @@ class CLIPModel(CLIPPretrainedModel):
                 Pixel values. Padding will be ignored by default should you provide it.
                 Its data type should be `float32` and it has a shape of [image_batch_size, num_channels, height, width].
             position_ids(Tensor, optional):
-                Indices of positions of each input sequence tokens in the position embeddings (TextTransformer). Selected in
+                Indices of positions of each input sequence tokens in the position embeddings (CLIPTextTransformer). Selected in
                 the range ``[0, max_text_length - 1]``.
                 Shape as `(batch_size, num_tokens)` and dtype as int64. Defaults to `None`.
             attention_mask (Tensor, optional):
-                Mask used in multi-head attention (TextTransformer) to avoid performing attention on to some unwanted positions,
+                Mask used in multi-head attention (CLIPTextTransformer) to avoid performing attention on to some unwanted positions,
                 usually the paddings or the subsequent positions.
                 Its data type can be int, float and bool.
                 When the data type is bool, the `masked` tokens have `False` values and the others have `True` values.
@@ -1241,6 +1239,7 @@ class CLIPModel(CLIPPretrainedModel):
         >>> from paddlenlp.transformers import CLIPProcessor, CLIPModel
 
         >>> model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+        >>> model.eval()
         >>> processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
         >>> url = "http://images.cocodataset.org/val2017/000000039769.jpg"
@@ -2102,7 +2101,3 @@ class CLIPForImageGeneration(CLIPPretrainedModel, DiscoDiffusionMixin, StableDif
         if artist is not None:
             text_prompt += ",{},trending on artstation".format(artist)
         return text_prompt
-
-
-TextTransformer = CLIPTextTransformer
-VisionTransformer = CLIPVisionTransformer

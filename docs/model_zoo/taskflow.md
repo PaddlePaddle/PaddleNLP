@@ -1470,7 +1470,7 @@ from paddlenlp import Taskflow
 ##### Disco Diffusion模型
 ```python
 # 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
->>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh")
+>>> text_to_image = Taskflow("text_to_image", model="PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh")
 >>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
 >>> for batch_index, batch_image in enumerate(image_list):
 >>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
@@ -1540,7 +1540,7 @@ from paddlenlp import Taskflow
 <p align="center">
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh"]`。
 * `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
 
 </div></details>

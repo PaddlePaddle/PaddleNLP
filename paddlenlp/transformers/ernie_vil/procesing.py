@@ -31,13 +31,13 @@ class ErnieViLProcessor(ProcessorMixin):
     [`~ErnieViLProcessor.__call__`] and [`~ErnieViLProcessor.decode`] for more information.
 
     Args:
-        image_processor ([`ErnieViLProcessor`]):
+        image_processor ([`ErnieViLImageProcessor`]):
             The image processor is a required input.
         tokenizer ([`ErnieViLTokenizer`]):
             The tokenizer is a required input.
     """
     attributes = ["image_processor", "tokenizer"]
-    image_processor_class = "ErnieViLProcessor"
+    image_processor_class = "ErnieViLImageProcessor"
     tokenizer_class = "ErnieViLTokenizer"
 
     def __init__(self, image_processor=None, tokenizer=None, **kwargs):
@@ -62,7 +62,7 @@ class ErnieViLProcessor(ProcessorMixin):
         Main method to prepare for the model one or several sequences(s) and image(s). This method forwards the `text`
         and `kwargs` arguments to ErnieViLTokenizer's [`~ErnieViLTokenizer.__call__`] if `text` is not `None` to encode
         the text. To prepare the image(s), this method forwards the `images` and `kwrags` arguments to
-        ErnieViLProcessor's [`~ErnieViLProcessor.__call__`] if `images` is not `None`. Please refer to the doctsring
+        ErnieViLImageProcessor's [`~ErnieViLImageProcessor.__call__`] if `images` is not `None`. Please refer to the doctsring
         of the above two methods for more information.
 
         Args:
