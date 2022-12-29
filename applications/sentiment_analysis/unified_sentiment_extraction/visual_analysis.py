@@ -531,7 +531,9 @@ class SentimentResult(object):
                 self._parse_sentiment_polarity(sentiment)
             else:
                 raise ValueError(
-                    "Unknown key [{}] for sentiment analysis, you could try to map it with corresponding aspect_prompt, opinion_prompt or sentiment prompt."
+                    "Unknown key {} for sentiment analysis, you could try to map it with corresponding aspect_prompt, opinion_prompt or sentiment prompt.".format(
+                        key
+                    )
                 )
 
     def parse_sentiment_result(self, results):
