@@ -293,11 +293,16 @@ class PretrainedModel(Layer, GenerationMixin):
             return super(PretrainedModel, self).__getattr__(name)
         except AttributeError:
             result = getattr(self.config, name)
+            if getattr(self, "deprecated_warnings", None) is None:
+                self.deprecated_warnings = {}
 
-            logger.warning(
-                f"Do not access config from `model.{name}` which will be deprecated after v2.6.0, "
-                f"Instead, do `model.config.{name}`"
-            )
+            if not self.deprecated_warnings.get(name, False):
+                logger.warning(
+                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
+                    f"Instead, do `model.config.{name}`"
+                )
+                self.deprecated_warnings[name] = True
+
             return result
 
     @property
@@ -1247,7 +1252,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
-        config.save_pretrained(cache_dir)
+
+        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
+            config.save_pretrained(cache_dir)
 
         # 2. init the model
         init_args = config["init_args"] or ()

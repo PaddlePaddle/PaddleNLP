@@ -69,40 +69,54 @@ def compress(self, custom_evaluate=None):
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         _dynabert(self, self.model, args.output_dir)
         if "ptq" in args.strategy or "qat" in args.strategy:
+            output_dir_list = []
             for width_mult in args.width_mult_list:
                 output_dir_width = os.path.join(args.output_dir, "width_mult_" + str(round(width_mult, 2)))
                 if "ptq" in args.strategy:
-                    self.quant(output_dir_width, "ptq")
+                    output_dir_list += self.quant(output_dir_width, "ptq")
                 elif "qat" in args.strategy:
                     self.quant(output_dir_width, "qat")
-
-    elif args.strategy == "ptq":
-        # Input model is an inference model
+                    output_dir_list += output_dir_width
+            if "embeddings" in args.strategy:
+                for output_dir in output_dir_list:
+                    self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+    elif "ptq" in args.strategy:
+        # When input model is an inference model
         if args.input_infer_model_path is not None:
             model_dir = os.path.dirname(args.input_infer_model_path)
             self.args.input_filename_prefix = os.path.basename(args.input_infer_model_path)
-            self.quant(model_dir, args.strategy)
+            output_dir_list = self.quant(model_dir, "ptq")
         # Input model is load from Trainer API in dygraph.
         else:
+            # When input model is a dygraph.
+            # exports model and then do 'ptq'
             # Prefix of `export_model` is 'model'
             self.args.input_filename_prefix = "model"
             input_spec = generate_input_spec(self.model, self.train_dataset)
             input_dir = args.output_dir
             export_model(model=self.model, input_spec=input_spec, path=input_dir)
-            self.quant(input_dir, args.strategy)
-    elif args.strategy == "qat":
+            output_dir_list = self.quant(input_dir, "ptq")
+        if "embeddings" in args.strategy:
+            for output_dir in output_dir_list:
+                self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+    elif "qat" in args.strategy:
         global_try_import_slim()
-        self.quant(args.output_dir, args.strategy)
+        self.quant(args.output_dir, "qat")
+        if "embeddings" in args.strategy:
+            self.quant(os.path.join(args.output_dir, args.output_filename_prefix), "embeddings")
 
 
 def quant(self, model_dir, strategy):
     """
-    Supports Post-Training Quantization now.
+    Supports Post-Training Quantization, Quantization Aware Training and
+    Embedding Quantization.
     """
     if strategy == "ptq":
-        _post_training_quantization_grid_search(self, model_dir)
+        return _post_training_quantization_grid_search(self, model_dir)
     elif strategy == "qat":
         _quant_aware_training_dynamic(self, model_dir)
+    elif strategy == "embeddings":
+        _quant_embeddings(self, model_dir)
 
 
 def generate_input_spec(model, dataset):
@@ -589,6 +603,7 @@ def _post_training_quantization_grid_search(self, model_dir):
     exe = paddle.static.Executor(place)
 
     args.output_filename_prefix = "int8"
+    output_dir_list = []
 
     def _post_training_quantization(algo, batch_size, batch_nums):
         try:
@@ -636,11 +651,13 @@ def _post_training_quantization_grid_search(self, model_dir):
             optimize_model=False,
         )
         post_training_quantization.quantize()
+        save_model_path = os.path.join(model_dir, algo + "_".join([str(batch_size), str(batch_nums)]))
         post_training_quantization.save_quantized_model(
-            save_model_path=os.path.join(model_dir, algo + "_".join([str(batch_size), str(batch_nums)])),
+            save_model_path=save_model_path,
             model_filename=args.output_filename_prefix + ".pdmodel",
             params_filename=args.output_filename_prefix + ".pdiparams",
         )
+        output_dir_list.append(save_model_path)
 
     logger.info("Post training quantization starts.")
     for algo in args.algo_list:
@@ -650,6 +667,7 @@ def _post_training_quantization_grid_search(self, model_dir):
 
     paddle.disable_static()
     logger.info("Post training quantization ends and quantized models are saved.")
+    return output_dir_list
 
 
 def _quant_aware_training_dynamic(self, input_dir):
@@ -680,10 +698,10 @@ def _quant_aware_training_dynamic(self, input_dir):
         "onnx_format": args.onnx_format,
     }
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
 
-    output_param_path = os.path.join(args.output_dir, "best_quant.pdparams")
+    output_param_path = os.path.join(input_dir, "best_quant.pdparams")
 
     train_dataloader = self.get_train_dataloader()
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
@@ -768,13 +786,40 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter.save_quantized_model(
         self.model, os.path.join(input_dir, args.output_filename_prefix), input_spec=input_spec
     )
-    if os.path.exists(output_param_path):
-        os.remove(output_param_path)
 
     self.model = _recover_auto_model_forward(self.model)
     logger.info(
         "Quant aware training ends and quantized models are saved to %s."
         % os.path.join(input_dir, args.output_filename_prefix)
+    )
+
+
+def _quant_embeddings(self, input_prefix):
+    import paddleslim.quant as quant
+
+    self.args.output_filename_prefix = "quant_emb"
+
+    paddle.enable_static()
+    place = paddle.set_device(self.args.device)
+    exe = paddle.static.Executor(place)
+    main_program, feed_target_names, fetch_targets = paddle.static.load_inference_model(input_prefix, exe)
+
+    config = {"quantize_op_types": ["lookup_table_v2"], "lookup_table_v2": {"quantize_type": "log"}}
+
+    quant_emb_program = quant.quant_embedding(main_program, place, config)
+
+    input_dir = os.path.dirname(input_prefix)
+
+    paddle.fluid.io.save_inference_model(
+        input_dir,
+        feed_target_names,
+        fetch_targets,
+        exe,
+        quant_emb_program,
+        model_filename=self.args.output_filename_prefix + ".pdmodel",
+        params_filename=self.args.output_filename_prefix + ".pdiparams",
+        export_for_deployment=True,
+        program_only=False,
     )
 
 

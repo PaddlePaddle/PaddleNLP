@@ -67,7 +67,7 @@ class ModelTesterMixin:
     test_resize_position_embeddings = False
     test_mismatched_shapes = True
     test_missing_keys = True
-    test_model_compatibility_keys = False
+    test_model_compatibility_keys = True
     use_test_inputs_embeds = False
     use_test_model_name_list = True
     is_encoder_decoder = False

@@ -1,3 +1,5 @@
+简体中文 | [English](README_en.md)
+
 # 信息抽取应用
 
 **目录**
