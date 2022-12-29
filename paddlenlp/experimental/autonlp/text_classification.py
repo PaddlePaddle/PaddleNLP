@@ -197,7 +197,6 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 )
                 processed_train_dataset = train_dataset.map(trans_func, lazy=False)
                 processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
-                max_length = self._calculate_max_length(processed_train_dataset, processed_eval_dataset)
                 training_args = self._override_arguments(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
