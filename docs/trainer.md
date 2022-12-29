@@ -548,5 +548,10 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                         是否从断点重启恢复训练，(可选，默认为 None)
                         The path to a folder with a valid checkpoint for your
                         model. (default: None)
+                        
+  --skip_memory_metrics
+                       是否跳过内存profiler检测。（可选，默认为True，跳过）
+                       Whether or not to skip adding of memory profiler reports
+                       to metrics.(default:True)
 
 ```

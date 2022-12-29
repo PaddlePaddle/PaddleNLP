@@ -1,3 +1,5 @@
+简体中文 | [English](README_en.md)
+
 # 文档信息抽取
 
 **目录**

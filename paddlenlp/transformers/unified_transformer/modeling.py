@@ -20,8 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -66,9 +65,7 @@ class UnifiedTransformerPretrainedModel(PretrainedModel):
                     # big models.
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.unified_transformer.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
