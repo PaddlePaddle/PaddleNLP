@@ -73,7 +73,7 @@ def evaluate(model, metric, data_loader, tags, tags_to_idx):
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, seq_len, tags = batch
-        loss, seq_logits = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)
+        loss, seq_logits = model(input_ids, token_type_ids, lengths=seq_len, tag_labels=tags)[:2]
         loss = loss.mean()
         losses.append(loss.numpy())
 
