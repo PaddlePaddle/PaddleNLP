@@ -22,7 +22,7 @@ def get_model_list():
     <https://github.com/PaddlePaddle/PaddleNLP/model_zoo/>
     <https://github.com/PaddlePaddle/PaddleNLP/examples/>
     """
-    path = os.getcwd()
+
     CI_MODEL_LIST = [
         "waybill_ie",
         "msra_ner",
@@ -109,9 +109,9 @@ def get_model_list():
     ]
     examples_second_list = ["model_interpretation", "semantic_indexing", "lexical_analysis", "word_embedding"]
 
-    model_list = os.listdir(path + "/model_zoo")
-    examples_list = os.listdir(path + "/examples/")
-    app_list = os.listdir(path + "/applications/")
+    model_list = os.listdir("model_zoo")
+    examples_list = os.listdir("examples/")
+    app_list = os.listdir("applications/")
 
     # remove model_list README
     model_list.remove("README.md")
@@ -120,7 +120,7 @@ def get_model_list():
     model_list.extend(examples_second_list)
     for examples_model_list in examples_list:
         if examples_model_list not in examples_second_list:
-            examples_model = os.listdir(path + "/examples/" + examples_model_list)
+            examples_model = os.listdir("examples/" + examples_model_list)
             if "README.md" in examples_model:
                 examples_model.remove("README.md")
             model_list.extend(examples_model)
@@ -133,11 +133,10 @@ def get_model_list():
         if full_model not in CI_MODEL_LIST:
             no_test_models.append(full_model)
 
-    # save model list for CI pr_env.sh
-    with io.open("./model_list.txt", "w", encoding="utf-8") as list:
+    # save model list for CI run_ci.sh
+    with io.open("./scripts/regression/model_list.txt", "w", encoding="utf-8") as list:
         for all_model in all_examples_dict:
             list.write("{}\n".format(all_model))
-            # list.write("{}".format(all_model) + "\r\n")
         list.close()
     return all_examples_dict
 

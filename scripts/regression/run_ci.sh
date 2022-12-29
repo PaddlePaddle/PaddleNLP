@@ -233,10 +233,10 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     for p0case in ${P0case_list[*]};do
         echo -e "\033[35m ---- running P0case $case_num/${#P0case_list[*]}: ${p0case} \033[0m"
         if [[ ${!Normal_dic[*]} =~ ${p0case} ]];then
-            python ${nlp_dir}/tests/ci/ci_normal_case.py ${Normal_dic[${p0case}]}
+            python ${nlp_dir}/scripts/regression/ci_normal_case.py ${Normal_dic[${p0case}]}
             let case_num++
         else
-            bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
+            bash ${nlp_dir}/scripts/regression/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
             let case_num++
         fi
     done

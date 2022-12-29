@@ -71,7 +71,7 @@ get_diff_TO_P0case
     case_num=1
     for p0case in ${P0case_list[*]};do
         echo -e "\033[35m ---- running P0case $case_num/${#P0case_list[*]}: ${p0case} \033[0m"
-        bash ${nlp_dir}/tests/ci/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
+        bash ${nlp_dir}/scripts/regression/ci_case.sh ${p0case} ${cudaid1} ${cudaid2}
         let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"
