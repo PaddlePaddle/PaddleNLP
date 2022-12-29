@@ -293,11 +293,16 @@ class PretrainedModel(Layer, GenerationMixin):
             return super(PretrainedModel, self).__getattr__(name)
         except AttributeError:
             result = getattr(self.config, name)
+            if getattr(self, "deprecated_warnings", None) is None:
+                self.deprecated_warnings = {}
 
-            logger.warning(
-                f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
-                f"Instead, do `model.config.{name}`"
-            )
+            if not self.deprecated_warnings.get(name, False):
+                logger.warning(
+                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
+                    f"Instead, do `model.config.{name}`"
+                )
+                self.deprecated_warnings[name] = True
+
             return result
 
     @property
