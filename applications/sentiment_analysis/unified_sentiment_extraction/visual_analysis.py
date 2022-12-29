@@ -608,12 +608,6 @@ def default_visual_analysis(args):
         save_path = os.path.join(args.save_dir, "sentence_sentiment.png")
         vs.plot_sentence_sentiment(sr.sentence_sentiment, save_path)
 
-    # visual opinion for specified aspect
-    # aspect = "房间"
-    # save_path = os.path.join(args.save_dir, "opinions_for_aspect_wc.png")
-    # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="wordcloud")
-    # save_path = os.path.join(args.save_dir, "opinions_for_aspect_hist.png")
-    # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="histogram")
     print("Images has been saved to: {}".format(args.save_dir))
 
 
