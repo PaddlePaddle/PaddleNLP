@@ -41,6 +41,7 @@ from paddlenlp.transformers import (
     GPTTokenizer,
 )
 from paddlenlp.utils.batch_sampler import DistributedBatchSampler
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
@@ -82,6 +83,21 @@ def set_seed(args):
     random.seed(args.seed + idx)
     np.random.seed(args.seed + idx)
     paddle.seed(args.seed + idx)
+
+
+def download_corpus(args: ModelArguments):
+    os.makedirs(args.input_dir, exist_ok=True)
+    files = [
+        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy",
+        "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz",
+    ]
+
+    for file in files:
+        file_name = file.split("/")[-1]
+        file_path = os.path.join(args.input_dir, file_name)
+        if os.path.exists(file_path):
+            logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
+            get_path_from_url_with_filelock(file_name, root_dir=args.input_dir)
 
 
 def create_pretrained_dataset(
@@ -396,6 +412,9 @@ def do_train():
             optimizer.set_state_dict(opt_dict)
         else:
             logger.warning("No optimizer checkpoint file found in %s." % opt_path)
+
+    # check and download corpus
+    download_corpus(model_args)
 
     files = get_train_data_file(model_args)
     files.sort()
