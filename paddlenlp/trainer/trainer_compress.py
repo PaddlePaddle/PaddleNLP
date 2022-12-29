@@ -76,10 +76,19 @@ def compress(self, custom_evaluate=None):
                     output_dir_list += self.quant(output_dir_width, "ptq")
                 elif "qat" in args.strategy:
                     self.quant(output_dir_width, "qat")
-                    output_dir_list += output_dir_width
-            if "embeddings" in args.strategy:
+                    output_dir_list.append(output_dir_width)
+        if "embeddings" in args.strategy:
+            if "ptq" not in args.strategy and "qat" not in args.strategy:
+                output_dir_list = []
+                for width_mult in args.width_mult_list:
+                    output_dir_width = os.path.join(
+                        args.output_dir, "width_mult_" + str(round(width_mult, 2)), args.input_filename_prefix
+                    )
+                    self.quant(output_dir_width, "embeddings")
+            else:
                 for output_dir in output_dir_list:
                     self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+
     elif "ptq" in args.strategy:
         # When input model is an inference model
         if args.input_infer_model_path is not None:
@@ -583,7 +592,7 @@ def _dynabert_export(self):
         self.model = dynabert_model
         if "qat" not in self.args.strategy:
             input_spec = generate_input_spec(self.model, self.train_dataset)
-            pruned_infer_model_dir = os.path.join(self.args.output_dir, width_mult)
+            pruned_infer_model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
             export_model(model=dynabert_model, input_spec=input_spec, path=pruned_infer_model_dir)
             self.args.input_filename_prefix = "model"
             logger.info("Pruned models have been exported.")
