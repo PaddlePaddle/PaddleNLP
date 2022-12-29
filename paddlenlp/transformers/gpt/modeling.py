@@ -24,6 +24,7 @@ from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
+from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPastAndCrossAttentions,
@@ -425,7 +426,7 @@ class GPTEmbeddings(nn.Layer):
     def forward(self, input_ids, position_ids=None, inputs_embeddings=None):
         if input_ids is not None:
             input_shape = paddle.shape(input_ids)
-            input_embeddings = self.word_embeddings(input_ids)
+            inputs_embeddings = self.word_embeddings(input_ids)
         else:
             input_shape = paddle.shape(inputs_embeddings)[:-1]
 
@@ -435,7 +436,7 @@ class GPTEmbeddings(nn.Layer):
             position_ids = seq_length - ones
 
         position_embeddings = self.position_embeddings(position_ids)
-        embeddings = input_embeddings + position_embeddings
+        embeddings = inputs_embeddings + position_embeddings
         embeddings = self.dropout(embeddings)
         return embeddings
 
@@ -851,7 +852,7 @@ class GPTModel(GPTPretrainedModel):
             past_length = 0
             if cache is not None:
                 past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype=input_ids.dtype)
+            position_ids = paddle.arange(past_length, input_shape[-1] + past_length, dtype="int64")
             position_ids = position_ids.unsqueeze(0)
             # .expand_as(input_ids)
             position_ids = paddle.expand(position_ids, input_shape)
@@ -860,7 +861,7 @@ class GPTModel(GPTPretrainedModel):
         )
 
         # TODO, use registered buffer
-        length = paddle.shape(input_ids)[-1]
+        length = input_shape[-1]
         if cache is not None:
             cache_length = paddle.shape(cache[0].k)[2]
             length = length + cache_length
@@ -1177,6 +1178,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
             Especialy, when `return_dict=use_cache=output_attentions=output_hidden_states=False`,
             returns a tensor `logits` which is the output of the gpt model.
         """
+        input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
         outputs = self.gpt(
             input_ids,
             position_ids=position_ids,
@@ -1188,7 +1190,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        if isinstance(outputs, type(input_ids)):
+        if isinstance(outputs, input_type):
             hidden_states = outputs
         else:
             hidden_states = outputs[0]
@@ -1206,7 +1208,7 @@ class GPTLMHeadModel(GPTPretrainedModel):
 
         # outputs = [output, all_hidden_states, new_caches, all_self_attentions]
         if not return_dict:
-            if isinstance(outputs, type(input_ids)):
+            if isinstance(outputs, input_type):
                 return (loss, logits) if loss is not None else logits
 
             outputs = (logits,) + outputs[1:]
@@ -1370,6 +1372,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
                 logits = model(**inputs)
 
         """
+        input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
         sequence_output = self.gpt(
             input_ids,
             position_ids=position_ids,
@@ -1379,7 +1382,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        if isinstance(sequence_output, type(input_ids)):
+        if isinstance(sequence_output, input_type):
             hidden_states = sequence_output
         else:
             hidden_states = sequence_output[0]
@@ -1392,7 +1395,7 @@ class GPTForTokenClassification(GPTPretrainedModel):
             loss = loss_fct(logits.reshape((-1, self.num_classes)), labels.reshape((-1,)))
 
         if not return_dict:
-            if isinstance(sequence_output, type(input_ids)):
+            if isinstance(sequence_output, input_type):
                 return (loss, logits) if loss is not None else logits
 
             outputs = (logits,) + sequence_output[1:]
@@ -1488,7 +1491,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 logits = model(**inputs)
 
         """
-
+        input_type = type(input_ids) if input_ids is not None else type(inputs_embeds)
         # sequence_output shape [bs, seq_len, hidden_size]
         sequence_output = self.gpt(
             input_ids,
@@ -1500,7 +1503,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
             output_hidden_states=output_hidden_states,
             return_dict=return_dict,
         )
-        if isinstance(sequence_output, type(input_ids)):
+        if isinstance(sequence_output, input_type):
             hidden_states = sequence_output
         else:
             hidden_states = sequence_output[0]
@@ -1509,7 +1512,15 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         # padding index maybe 0
         eos_token_id = self.gpt.config.get("eos_token_id", 0)
         # sequence_lengths shape [bs,]
-        sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
+        if input_ids is not None:
+            sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1
+        else:
+            inputs_shape = paddle.shape(inputs_embeds)[:-1]
+            sequence_lengths = paddle.ones(inputs_shape[:-1], dtype="int64") * (inputs_shape[1] - 1)
+            logger.warning(
+                f"{self.__class__.__name__} will not detect padding tokens in `inputs_embeds`. Results may be "
+                "unexpected if using padding tokens in conjunction with `inputs_embeds.`"
+            )
 
         pooled_logits = logits.gather_nd(paddle.stack([paddle.arange(logits.shape[0]), sequence_lengths], axis=-1))
 
@@ -1526,7 +1537,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
                 loss = loss_fct(pooled_logits, labels)
 
         if not return_dict:
-            if isinstance(sequence_output, type(input_ids)):
+            if isinstance(sequence_output, input_type):
                 return (loss, pooled_logits) if loss is not None else pooled_logits
 
             outputs = (pooled_logits,) + sequence_output[1:]

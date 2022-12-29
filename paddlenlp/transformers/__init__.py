@@ -26,6 +26,7 @@ from .tokenizer_utils import (
 )
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
+from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
@@ -47,6 +48,9 @@ from .electra.tokenizer import *
 from .electra.converter import *
 from .albert.modeling import *
 from .albert.tokenizer import *
+from .bit.modeling import *
+from .bit.configuration import *
+from .bit.image_processing import *
 from .bart.modeling import *
 from .bart.tokenizer import *
 from .bart.configuration import *
@@ -63,6 +67,9 @@ from .convbert.modeling import *
 from .convbert.tokenizer import *
 from .ctrl.modeling import *
 from .ctrl.tokenizer import *
+from .dpt.modeling import *
+from .dpt.configuration import *
+from .dpt.image_processing import *
 from .distilbert.modeling import *
 from .distilbert.tokenizer import *
 from .ernie.configuration import *
@@ -160,6 +167,7 @@ from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
 from .clip.converter import *
+from .clip.image_processing import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *

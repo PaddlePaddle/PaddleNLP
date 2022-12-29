@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
 import time
@@ -21,19 +20,21 @@ from functools import partial
 
 import numpy as np
 import paddle
+from paddle.incubate import asp
 from paddle.io import DataLoader
-from paddlenlp.datasets import load_dataset
-
 from paddle.metric import Accuracy
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.metrics import Mcc, PearsonAndSpearman
-from paddlenlp.utils.log import logger
 
-from paddle.static import sparsity
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.metrics import Mcc, PearsonAndSpearman
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -253,15 +254,17 @@ def do_train(args):
 
     train_ds = train_ds.map(trans_func, lazy=True)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type
-        Stack(dtype="int64" if train_ds.label_list else "float32"),  # label
-    ): fn(samples)
+    def batchify_fn(
+        samples,
+        fn=Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id),  # input
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # token_type
+            Stack(dtype="int64" if train_ds.label_list else "float32"),  # label
+        ),
+    ):
+        return fn(samples)
 
     train_batch_sampler = paddle.io.BatchSampler(train_ds, batch_size=args.batch_size, shuffle=True)
-
-    feed_list_name = []
 
     # Define the input data and create the train/dev data_loader
     with paddle.static.program_guard(main_program, startup_program):
@@ -343,10 +346,10 @@ def do_train(args):
 
         # Keep Pooler and task-specific layer dense.
         # Please note, excluded_layers must be set before calling `optimizer.minimize()`.
-        sparsity.set_excluded_layers(main_program, [model.bert.pooler.dense.full_name(), model.classifier.full_name()])
-        # Calling sparsity.decorate() to wrap minimize() in optimizer, which
+        asp.set_excluded_layers(main_program, [model.bert.pooler.dense.full_name(), model.classifier.full_name()])
+        # Calling asp.decorate() to wrap minimize() in optimizer, which
         # will insert necessary masking operations for ASP workflow.
-        optimizer = sparsity.decorate(optimizer)
+        optimizer = asp.decorate(optimizer)
         optimizer.minimize(loss)
 
     # Create the metric pass for the validation
@@ -364,8 +367,8 @@ def do_train(args):
     paddle.static.set_program_state(main_program, reset_state_dict)
 
     # Pruning model to be 2:4 sparse pattern
-    # Must call `exe.run(startup_program)` first before calling `sparsity.prune_model`
-    sparsity.prune_model(place, main_program)
+    # Must call `exe.run(startup_program)` first before calling `asp.prune_model`
+    asp.prune_model(place, main_program)
 
     global_step = 0
     tic_train = time.time()

@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -148,7 +149,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ernie"
@@ -165,9 +166,7 @@ class ErniePretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )

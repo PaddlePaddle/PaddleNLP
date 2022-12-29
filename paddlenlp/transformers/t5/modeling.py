@@ -593,13 +593,12 @@ class T5PretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialize the weights"""
-        factor = (
-            self.initializer_factor if hasattr(self, "initializer_factor") else self.t5.config["initializer_factor"]
-        )  # Used for testing weights initialization
-        d_model = self.d_model if hasattr(self, "d_model") else self.t5.config["d_model"]
-        d_ff = self.d_ff if hasattr(self, "d_ff") else self.t5.config["d_ff"]
-        n_heads = self.num_heads if hasattr(self, "num_heads") else self.t5.config["num_heads"]
-        key_value_proj_dim = self.d_kv if hasattr(self, "d_kv") else self.t5.config["d_kv"]
+        # Used for testing weights initialization
+        factor = self.config.initializer_factor
+        d_model = self.config.d_model
+        d_ff = self.config.d_ff
+        n_heads = self.config.num_heads
+        key_value_proj_dim = self.config.d_kv
 
         if isinstance(layer, T5LayerNorm):
             layer.weight.set_value(paddle.ones_like(layer.weight) * factor)
@@ -681,8 +680,8 @@ class T5PretrainedModel(PretrainedModel):
                 )
 
     def _shift_right(self, input_ids):
-        bos_token_id = self.bos_token_id if hasattr(self, "bos_token_id") else self.t5.config["bos_token_id"]
-        pad_token_id = self.pad_token_id if hasattr(self, "pad_token_id") else self.t5.config["pad_token_id"]
+        bos_token_id = self.config.bos_token_id
+        pad_token_id = self.config.pad_token_id
 
         assert (
             bos_token_id is not None
