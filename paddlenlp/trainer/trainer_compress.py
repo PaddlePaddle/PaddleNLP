@@ -69,7 +69,6 @@ def compress(self, custom_evaluate=None):
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         _dynabert(self, self.model, args.output_dir)
         if "ptq" in args.strategy or "qat" in args.strategy:
-            self.args.input_filename_prefix = "model"
             for width_mult in args.width_mult_list:
                 output_dir_width = os.path.join(args.output_dir, "width_mult_" + str(round(width_mult, 2)))
                 if "ptq" in args.strategy:
@@ -572,6 +571,7 @@ def _dynabert_export(self):
             input_spec = generate_input_spec(self.model, self.train_dataset)
             pruned_infer_model_dir = os.path.join(self.args.output_dir, width_mult)
             export_model(model=dynabert_model, input_spec=input_spec, path=pruned_infer_model_dir)
+            self.args.input_filename_prefix = "model"
             logger.info("Pruned models have been exported.")
 
 
