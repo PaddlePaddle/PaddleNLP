@@ -403,7 +403,7 @@ class UIETask(Task):
             with open(config_file_path) as f:
                 self._init_class = json.load(f)["architectures"].pop()
         else:
-            # TODO: compatible with the model fine-tuned without PretrainedConfig
+            # Compatible with the model fine-tuned without PretrainedConfig
             if os.path.exists(os.path.join(self._task_path, LEGACY_CONFIG_NAME)):
                 if "config" in self.resource_files_names.keys():
                     del self.resource_files_names["config"]
