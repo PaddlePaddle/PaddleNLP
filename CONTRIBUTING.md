@@ -6,7 +6,7 @@ This document explains our workflow and work style:
 
 ## Workflow
 
-PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
+PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
 
 #### 1. Fork
 
