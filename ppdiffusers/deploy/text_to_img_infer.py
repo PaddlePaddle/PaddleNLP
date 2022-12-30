@@ -255,11 +255,8 @@ if __name__ == "__main__":
     elif args.backend == "paddle" or args.backend == "paddle_tensorrt":
         use_trt = True if args.backend == "paddle_tensorrt" else False
         # Note(zhoushunjie): Will change to paddle-trt runtime later
-        text_encoder_runtime = create_paddle_inference_runtime(
-            args.model_dir,
-            args.text_encoder_model_prefix,
-            False,
-            device_id=args.device_id,
+        text_encoder_runtime = create_ort_runtime(
+            args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
         )
         vae_decoder_runtime = create_paddle_inference_runtime(
             args.model_dir,
