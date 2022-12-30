@@ -73,11 +73,10 @@ python evaluate.py \
 可支持配置的参数：
 
 * `device`: 选用什么设备进行训练，可选择cpu、gpu、xpu、npu；默认为"gpu"。
-* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含train.txt、dev.txt和label.txt文件;默认为None。
+* `dataset_dir`：必须，本地数据集路径，数据集路径中应包含dev.txt和label.txt文件;默认为None。
 * `params_path`：保存训练模型的目录；默认为"../checkpoint/"。
 * `max_seq_length`：分词器tokenizer使用的最大序列长度，ERNIE模型最大不能超过2048。请根据文本长度选择，通常推荐128、256或512，若出现显存不足，请适当调低这一参数；默认为128。
 * `batch_size`：批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `train_file`：本地数据集中开发集文件名；默认为"train.txt"。
 * `dev_file`：本地数据集中开发集文件名；默认为"dev.txt"。
 * `label_file`：本地数据集中标签集文件名；默认为"label.txt"。
 * `bad_case_path`：开发集中预测错误样本保存路径；默认为"/bad_case.txt"。
@@ -87,7 +86,7 @@ python evaluate.py \
 
 ```text
 [2022-08-11 03:10:14,058] [    INFO] - -----Evaluate model-------
-[2022-08-11 03:10:14,059] [    INFO] - Train dataset size: 11958
+
 [2022-08-11 03:10:14,059] [    INFO] - Dev dataset size: 1498
 [2022-08-11 03:10:14,059] [    INFO] - Accuracy in dev dataset: 89.19%
 [2022-08-11 03:10:14,059] [    INFO] - Macro avg in dev dataset: precision: 93.48 | recall: 93.26 | F1 score 93.22
@@ -95,11 +94,9 @@ python evaluate.py \
 [2022-08-11 03:10:14,095] [    INFO] - Level 1 Label Performance: Macro F1 score: 96.39 | Micro F1 score: 96.81 | Accuracy: 94.93
 [2022-08-11 03:10:14,255] [    INFO] - Level 2 Label Performance: Macro F1 score: 92.79 | Micro F1 score: 93.90 | Accuracy: 89.72
 [2022-08-11 03:10:14,256] [    INFO] - Class name: 交往
-[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 471(3.9%) | precision: 99.57 | recall: 98.94 | F1 score 99.25
 [2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 60(4.0%) | precision: 91.94 | recall: 95.00 | F1 score 93.44
 [2022-08-11 03:10:14,256] [    INFO] - ----------------------------
 [2022-08-11 03:10:14,256] [    INFO] - Class name: 交往##会见
-[2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in train dataset: 98(0.8%) | precision: 100.00 | recall: 100.00 | F1 score 100.00
 [2022-08-11 03:10:14,256] [    INFO] - Evaluation examples in dev dataset: 12(0.8%) | precision: 92.31 | recall: 100.00 | F1 score 96.00
 ...
 ```
