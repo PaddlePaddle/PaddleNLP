@@ -703,7 +703,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
     Args:
         ernie (`ErnieModel`):
             An instance of `ErnieModel`.
-        num_classes (int, optional):
+        num_tag (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of ERNIE.
@@ -713,7 +713,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
     def __init__(self, config: ErnieCtmConfig):
         super(ErnieCtmForTokenClassification, self).__init__(config)
-        self.num_classes = config.num_labels
+        self.num_tag = config.num_labels
         self.ernie_ctm = ErnieCtmModel(config)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
@@ -735,7 +735,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[sequence_length, num_tag]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -752,10 +752,11 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         """
 
-        sequence_output, _, _, _ = self.ernie_ctm(
+        output = self.ernie_ctm(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
 
+        sequence_output = output[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits

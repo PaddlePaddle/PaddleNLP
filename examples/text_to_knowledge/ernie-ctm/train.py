@@ -107,12 +107,14 @@ def do_train(args):
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len, tags_to_idx=tags_to_idx)
 
-    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
-        Stack(dtype="int64"),  # seq_len
-        Pad(axis=0, pad_val=tags_to_idx["O"], dtype="int64"),  # tags
-    ): fn(samples)
+    def batchify_fn(samples):
+        fn = Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
+            Stack(dtype="int64"),  # seq_len
+            Pad(axis=0, pad_val=tags_to_idx["O"], dtype="int64"),  # tags
+        )
+        return fn(samples)
 
     train_data_loader = create_dataloader(
         train_ds, mode="train", batch_size=args.batch_size, batchify_fn=batchify_fn, trans_fn=trans_func

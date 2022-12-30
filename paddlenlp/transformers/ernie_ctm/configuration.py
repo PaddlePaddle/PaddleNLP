@@ -98,7 +98,7 @@ class ErnieCtmConfig(PretrainedConfig):
     """
     model_type = "ernie-ctm"
     pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
-    attribute_map = {"num_tag": "num_labels"}
+    attribute_map = {"num_tag": "num_labels", "dropout": "classifier_dropout"}
 
     def __init__(
         self,
