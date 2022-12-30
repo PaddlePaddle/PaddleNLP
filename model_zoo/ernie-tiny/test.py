@@ -17,11 +17,11 @@ from typing import Optional
 
 import numpy as np
 import paddle
-from model import JointErnie
 from utils import (
     get_label_name,
     input_preprocess,
     intent_cls_postprocess,
+    read_example,
     read_test_file,
     slot_cls_postprocess,
 )
@@ -59,9 +59,14 @@ class ModelArguments:
     """
 
     model_name_or_path: Optional[str] = field(
-        default="ernie-3.0-tiny-nano-v2",
+        default="ernie-3.0-tiny-nano-v2-zh",
         metadata={"help": "Path to pretrained model. Defaults to 'ernie-3.0-tiny-nano-v2'"},
     )
+    infer_prefix: Optional[str] = field(
+        default=None,
+        metadata={"help": ""},
+    )
+
     dropout: float = field(default=0.1, metadata={"help": "Dropout rate for JointErnie. Defaults to 0.1."})
 
 
@@ -71,37 +76,71 @@ def main():
 
     paddle.set_device(compression_args.device)
 
-    intent_label_names, slot_label_names, _, _ = get_label_name(data_args.intent_label_path, data_args.slot_label_path)
-
-    test_dataset = load_dataset(
-        read_test_file,
-        filename=data_args.test_path,
-        lazy=False,
-    )
-    tokenizer = AutoTokenizer.from_pretrained("ernie-3.0-tiny-medium-v2")
-
-    model = JointErnie.from_pretrained(
-        model_args.model_name_or_path,
-        intent_dim=len(intent_label_names),
-        slot_dim=len(slot_label_names),
-        dropout=model_args.dropout,
+    intent_label_names, slot_label_names, intent2id, slot2id = get_label_name(
+        data_args.intent_label_path, data_args.slot_label_path
     )
 
-    model.eval()
+    tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
-    for data in test_dataset:
-        query_list = [data["query"]]
-        query_input_dict = input_preprocess(query_list, tokenizer, max_seq_length=16)
-        input_ids = paddle.to_tensor(query_input_dict["input_ids"])
-        intent_logits_tensor, slot_logits_tensor, _ = model(input_ids)
+    paddle.enable_static()
+    place = paddle.set_device(compression_args.device)
+    exe = paddle.static.Executor(place)
 
-        intent_logits = np.array(intent_logits_tensor)
-        slot_logits = np.array(slot_logits_tensor)
+    program, feed_target_names, fetch_targets = paddle.static.load_inference_model(model_args.infer_prefix, exe)
 
-        intent_out = intent_cls_postprocess(intent_logits, intent_label_names)
-        slots_out = slot_cls_postprocess(slot_logits, query_list, slot_label_names)
+    if compression_args.do_eval:
+        test_dataset = load_dataset(
+            read_example,
+            filename=data_args.test_path,
+            intent2id=intent2id,
+            slot2id=slot2id,
+            tokenizer=tokenizer,
+            max_seq_length=data_args.max_seq_length,
+            no_entity_id=data_args.ignore_index,
+            lazy=False,
+        )
+        intent_right, slot_right, intent_right_no_slot = 0, 0, 0
+        for data in test_dataset:
+            input_ids = np.array(data["input_ids"])
+            intent_logits, slot_logits = exe.run(
+                program, feed={"input_ids": input_ids.reshape(1, -1).astype("int32")}, fetch_list=fetch_targets
+            )
 
-        print(intent_out, "\n", slots_out)
+            slot_pred = slot_logits.argmax(axis=-1)
+            intent_pred = intent_logits.argmax(axis=-1)
+
+            intent_label = np.array(data["intent_label"])
+            slot_label = np.array(data["slot_label"])
+
+            padding_mask = input_ids == 0
+            padding_mask |= (input_ids == 2) | (input_ids == 1)
+
+            if intent_label == intent_pred:
+                intent_right += 1
+                if intent_label in (0, 2, 3, 4, 6, 7, 8, 10):
+                    intent_right_no_slot += 1
+            elif ((slot_pred == slot_label) | padding_mask).all():
+                slot_right += 1
+        accuracy = (slot_right + intent_right_no_slot) / len(test_dataset) * 100
+        intent_accuracy = intent_right / len(test_dataset) * 100
+
+        print({"intent_accuracy": intent_accuracy, "accuracy": accuracy})
+    else:
+        test_dataset = load_dataset(
+            read_test_file,
+            filename=data_args.test_path,
+            lazy=False,
+        )
+        for data in test_dataset:
+            query_list = [data["query"]]
+            query_input_dict = input_preprocess(query_list, tokenizer, max_seq_length=16)
+            input_ids = query_input_dict["input_ids"]
+            intent_logits, slot_logits = exe.run(program, feed={"input_ids": input_ids}, fetch_list=fetch_targets)
+
+            # Shows result
+            intent_out = intent_cls_postprocess(intent_logits, intent_label_names)
+            slots_out = slot_cls_postprocess(slot_logits, query_list, slot_label_names)
+            print(query_list, "\n", intent_out, "\n", slots_out)
 
 
 if __name__ == "__main__":

@@ -40,19 +40,12 @@ class JointErnie(ErniePretrainedModel):
             weight_attr=nn.initializer.KaimingNormal(),
             bias_attr=nn.initializer.KaimingNormal(),
         )
-
-        # self.intent_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
-        # self.slot_hidden = nn.Linear(self.ernie.config["hidden_size"], self.ernie.config["hidden_size"])
-
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
         sequence_output, pooled_output = self.ernie(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
-        # sequence_output = nn.functional.relu(self.slot_hidden(self.dropout(sequence_output)))
-        # pooled_output = nn.functional.relu(self.intent_hidden(self.dropout(pooled_output)))
-
         sequence_output = self.dropout(sequence_output)
         slot_logits = self.slot_classifier(sequence_output)
 

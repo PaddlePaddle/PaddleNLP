@@ -121,10 +121,6 @@ def compute_metrics(p):
             intent_right_no_slot += 1
         elif ((slot_pred == slot_label[i]) | padding_mask[i]).all() == 1:
             slot_right += 1
-        # else:
-        # print(tokenizer.convert_ids_to_tokens(input_ids[i]))
-        # print("pred", slot_pred, "\n", "slot", slot_label[i], "\n", padding_mask[i])
-        # import pdb; pdb.set_trace()
 
     intent_right += sum(intent_preds == intent_label)
     accuracy = (slot_right + intent_right_no_slot) / slot_label.shape[0] * 100
@@ -154,7 +150,6 @@ def intent_cls_postprocess(logits, intent_label_names):
     max_value = np.max(logits, axis=1, keepdims=True)
     exp_data = np.exp(logits - max_value)
     probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
-    # print(intent_label_names[int(probs.argmax(axis=-1))])
     out_dict = {"intent": intent_label_names[int(probs.argmax(axis=-1))], "confidence": probs.max(axis=-1)}
     return out_dict
 
@@ -183,15 +178,7 @@ def slot_cls_postprocess(logits, input_data, label_names):
             if "B-" in label_names[pred]:
                 start = i - 1
                 label_name = label_names[pred][2:]
-        # if start >= 0:
-        #     items.append(
-        #         {
-        #             "slot": "",
-        #             "entity": input_data[batch][start : len(preds) - 1],
-        #             "pos": [start, len(preds) - 1],
-        #         }
-        #     )
         value.append(items)
 
-    out_dict = {"value": value}  # , "tokens_label": batch_preds}
+    out_dict = {"value": value}
     return out_dict

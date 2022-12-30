@@ -12,30 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import time
-import os
 import copy
-import math
-import numpy as np
 import inspect
+import math
+import os
+import time
 
 import paddle
-from paddle.utils import try_import
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.metric import Accuracy
-from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+from paddle.utils import try_import
 
-from ..utils.log import logger
 from ..data import Pad
-from ..transformers import AutoModelForSequenceClassification
-from ..transformers import AutoModelForQuestionAnswering
-from ..transformers import AutoModelForTokenClassification
-from ..transformers import export_model
-from ..transformers.ofa_utils import *
-from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
 from ..metrics import ChunkEvaluator
-from ..metrics.squad import squad_evaluate, compute_prediction
+from ..metrics.squad import compute_prediction, squad_evaluate
+from ..transformers import export_model
+from ..transformers.model_outputs import BaseModelOutputWithPoolingAndCrossAttentions
+from ..transformers.ofa_utils import (
+    compute_neuron_head_importance,
+    encoder_layer_ofa_forward,
+    encoder_ofa_forward,
+    mha_ofa_forward,
+    prepare_qkv_ofa,
+    reorder_neuron_head,
+)
+from ..utils.log import logger
 from .trainer import Trainer
 
 
@@ -66,38 +68,64 @@ def compress(self, custom_evaluate=None):
                 self.custom_evaluate is not None
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         _dynabert(self, self.model, args.output_dir)
-        if "ptq" in args.strategy:
-            self.args.input_filename_prefix = "pruned_model"
+        if "ptq" in args.strategy or "qat" in args.strategy:
+            output_dir_list = []
             for width_mult in args.width_mult_list:
                 output_dir_width = os.path.join(args.output_dir, "width_mult_" + str(round(width_mult, 2)))
-                self.quant(output_dir_width, "ptq")
-    elif args.strategy == "ptq":
-        # Input model is an inference model
+                if "ptq" in args.strategy:
+                    output_dir_list += self.quant(output_dir_width, "ptq")
+                elif "qat" in args.strategy:
+                    self.quant(output_dir_width, "qat")
+                    output_dir_list.append(output_dir_width)
+        if "embeddings" in args.strategy:
+            if "ptq" not in args.strategy and "qat" not in args.strategy:
+                output_dir_list = []
+                for width_mult in args.width_mult_list:
+                    output_dir_width = os.path.join(
+                        args.output_dir, "width_mult_" + str(round(width_mult, 2)), args.input_filename_prefix
+                    )
+                    self.quant(output_dir_width, "embeddings")
+            else:
+                for output_dir in output_dir_list:
+                    self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+
+    elif "ptq" in args.strategy:
+        # When input model is an inference model
         if args.input_infer_model_path is not None:
             model_dir = os.path.dirname(args.input_infer_model_path)
             self.args.input_filename_prefix = os.path.basename(args.input_infer_model_path)
-            self.quant(model_dir, args.strategy)
+            output_dir_list = self.quant(model_dir, "ptq")
         # Input model is load from Trainer API in dygraph.
         else:
+            # When input model is a dygraph.
+            # exports model and then do 'ptq'
             # Prefix of `export_model` is 'model'
             self.args.input_filename_prefix = "model"
             input_spec = generate_input_spec(self.model, self.train_dataset)
             input_dir = args.output_dir
             export_model(model=self.model, input_spec=input_spec, path=input_dir)
-            self.quant(input_dir, args.strategy)
-    elif args.strategy == "qat":
+            output_dir_list = self.quant(input_dir, "ptq")
+        if "embeddings" in args.strategy:
+            for output_dir in output_dir_list:
+                self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+    elif "qat" in args.strategy:
         global_try_import_slim()
-        self.quant(args.output_dir, args.strategy)
+        self.quant(args.output_dir, "qat")
+        if "embeddings" in args.strategy:
+            self.quant(os.path.join(args.output_dir, args.output_filename_prefix), "embeddings")
 
 
 def quant(self, model_dir, strategy):
     """
-    Supports Post-Training Quantization now.
+    Supports Post-Training Quantization, Quantization Aware Training and
+    Embedding Quantization.
     """
     if strategy == "ptq":
-        _post_training_quantization_grid_search(self, model_dir)
+        return _post_training_quantization_grid_search(self, model_dir)
     elif strategy == "qat":
         _quant_aware_training_dynamic(self, model_dir)
+    elif strategy == "embeddings":
+        _quant_embeddings(self, model_dir)
 
 
 def generate_input_spec(model, dataset):
@@ -127,7 +155,7 @@ def _dynabert(self, model, output_dir):
     # TODO: args.gradient_accumulation_steps
     if args.max_steps > 0:
         args.num_training_steps = args.max_steps
-        args.num_train_epochs = math.ceil(num_training_steps / len(train_dataloader))
+        args.num_train_epochs = math.ceil(args.num_training_steps / len(train_dataloader))
     else:
         args.num_training_steps = len(train_dataloader) * args.num_train_epochs
         args.num_train_epochs = math.ceil(args.num_train_epochs)
@@ -136,9 +164,10 @@ def _dynabert(self, model, output_dir):
     ofa_model = _dynabert_training(
         self, ofa_model, model, teacher_model, train_dataloader, eval_dataloader, args.num_train_epochs
     )
+    self.reset_optimizer_and_scheduler()
 
     # Each width_mult best model would be exported.
-    _dynabert_export(self, ofa_model)
+    _dynabert_export(self)
 
     ofa_model, ofa_model.model = _recover_transformer_func(ofa_model, True), _recover_transformer_func(
         ofa_model.model, True
@@ -228,8 +257,8 @@ def _recover_auto_model_forward(self):
 
 
 def _dynabert_init(self, model, eval_dataloader):
-    from paddleslim.nas.ofa.convert_super import Convert, supernet
     from paddleslim.nas.ofa import OFA, DistillConfig, utils
+    from paddleslim.nas.ofa.convert_super import Convert, supernet
 
     # Step1: Initialize a dictionary to save the weights from the origin model.
     origin_weights = model.state_dict()
@@ -269,6 +298,7 @@ def _dynabert_init(self, model, eval_dataloader):
         loss_fct=self.criterion,
         num_layers=model.base_model.config["num_hidden_layers"],
         num_heads=model.base_model.config["num_attention_heads"],
+        label_names=self.args.label_names,
     )
 
     reorder_neuron_head(ofa_model.model, head_importance, neuron_importance)
@@ -381,9 +411,8 @@ def evaluate_token_cls(self, model, data_loader):
         if isinstance(model, paddleslim.nas.ofa.OFA):
             logits = logits[0]
         preds = logits.argmax(axis=2)
-        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(
-            batch["seq_len"], preds, batch["labels"]
-        )
+        seq_len = paddle.sum(batch["labels"] != self.train_dataset.ignore_label, axis=-1)
+        num_infer_chunks, num_label_chunks, num_correct_chunks = metric.compute(seq_len, preds, batch["labels"])
         metric.update(num_infer_chunks.numpy(), num_label_chunks.numpy(), num_correct_chunks.numpy())
     res = metric.accumulate()
     logger.info("precision: %f, recall: %f, f1_score: %f" % (res[0], res[1], res[2]))
@@ -393,7 +422,7 @@ def evaluate_token_cls(self, model, data_loader):
 
 
 def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, eval_dataloader, num_train_epochs):
-    from paddleslim.nas.ofa import OFA, DistillConfig, utils
+    from paddleslim.nas.ofa import utils
 
     global_step = 0
     lambda_logit = 1.0
@@ -431,7 +460,10 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
                 if isinstance(logits, tuple):
                     logit_loss = 0
                     for i in range(len(logits)):
-                        logit_loss += soft_cross_entropy(logits[i], teacher_logits[i].detach())
+                        try:
+                            logit_loss += soft_cross_entropy(logits[i], teacher_logits[i].detach())
+                        except RuntimeError:
+                            pass
                     logit_loss /= len(logits)
                 else:
                     logit_loss = soft_cross_entropy(logits, teacher_logits.detach())
@@ -485,48 +517,92 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
     return ofa_model
 
 
-def _dynabert_export(self, ofa_model):
-    from paddleslim.nas.ofa import OFA, DistillConfig, utils
-
-    ofa_model._add_teacher = False
-    ofa_model, ofa_model.model = _recover_transformer_func(ofa_model), _recover_transformer_func(ofa_model.model)
-    if isinstance(ofa_model.model, paddle.DataParallel):
-        ori_num_heads = ofa_model.model._layers.base_model.encoder.layers[0].self_attn.num_heads
-    else:
-        ori_num_heads = ofa_model.model.base_model.encoder.layers[0].self_attn.num_heads
-    for width_mult in self.args.width_mult_list:
-        model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
-        state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
-        origin_model = self.model.__class__.from_pretrained(model_dir)
-        ofa_model.model.set_state_dict(state_dict)
-        best_config = utils.dynabert_config(ofa_model, width_mult)
-        best_config = check_dynabert_config(best_config, width_mult)
-        input_spec = generate_input_spec(self.model, self.train_dataset)
-        origin_model_new = ofa_model.export(
-            best_config,
-            input_shapes=[[1, 1]] * len(input_spec),
-            input_dtypes=["int64"] * len(input_spec),
-            origin_model=origin_model,
+def _get_dynabert_model(model, width_mult):
+    for layer in model.base_model.encoder.layers:
+        # Multi-Head Attention
+        layer.self_attn.num_heads = int(layer.self_attn.num_heads * width_mult)
+        layer.self_attn.q_proj = nn.Linear(
+            layer.self_attn.q_proj.weight.shape[0],
+            int(layer.self_attn.q_proj.weight.shape[1] * width_mult),
+            layer.self_attn.q_proj._weight_attr,
+            layer.self_attn.q_proj._bias_attr,
         )
-        for name, sublayer in origin_model_new.named_sublayers():
-            if isinstance(sublayer, paddle.nn.MultiHeadAttention):
-                sublayer.num_heads = int(width_mult * sublayer.num_heads)
+        layer.self_attn.k_proj = nn.Linear(
+            layer.self_attn.k_proj.weight.shape[0],
+            int(layer.self_attn.k_proj.weight.shape[1] * width_mult),
+            layer.self_attn.k_proj._weight_attr,
+            layer.self_attn.k_proj._bias_attr,
+        )
+        layer.self_attn.v_proj = nn.Linear(
+            layer.self_attn.v_proj.weight.shape[0],
+            int(layer.self_attn.v_proj.weight.shape[1] * width_mult),
+            layer.self_attn.v_proj._weight_attr,
+            layer.self_attn.v_proj._bias_attr,
+        )
+        layer.self_attn.out_proj = nn.Linear(
+            int(layer.self_attn.out_proj.weight.shape[0] * width_mult),
+            layer.self_attn.out_proj.weight.shape[1],
+            layer.self_attn.out_proj._weight_attr,
+            layer.self_attn.out_proj._bias_attr,
+        )
 
-        pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
-        net = paddle.jit.to_static(origin_model_new, input_spec=input_spec)
-        paddle.jit.save(net, pruned_infer_model_dir)
-        # Recover num_heads of ofa_model.model
-        if isinstance(ofa_model.model, paddle.DataParallel):
-            for layer in ofa_model.model._layers.base_model.encoder.layers:
-                layer.self_attn.num_heads = ori_num_heads
+        # Feed Forward
+        layer.linear1 = nn.Linear(
+            layer.linear1.weight.shape[0],
+            int(layer.linear1.weight.shape[1] * width_mult),
+            layer.linear1._weight_attr,
+            layer.linear1._bias_attr,
+        )
+        layer.linear2 = nn.Linear(
+            int(layer.linear2.weight.shape[0] * width_mult),
+            layer.linear2.weight.shape[1],
+            layer.linear2._weight_attr,
+            layer.linear2._bias_attr,
+        )
+    return model
+
+
+def _load_parameters(dynabert_model, ori_state_dict):
+    dynabert_state_dict = dynabert_model.state_dict()
+    for key in ori_state_dict.keys():
+        # Removes '.fn' from ofa model parameters
+        dynabert_key = key.replace(".fn", "")
+        if dynabert_key not in dynabert_state_dict.keys():
+            logger.warning("Failed to export parameter %s" % key)
         else:
-            for layer in ofa_model.model.base_model.encoder.layers:
-                layer.self_attn.num_heads = ori_num_heads
-    logger.info("Pruned models have been exported.")
+            dynabert_shape = dynabert_state_dict[dynabert_key].shape
+            if len(dynabert_shape) == 2:
+                dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0], : dynabert_shape[1]]
+            elif len(dynabert_shape) == 1:
+                dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0]]
+            else:
+                raise ValueError("Please check input model. Length of shape should be 1 or 2 for any parameter.")
+    dynabert_model.set_state_dict(dynabert_state_dict)
+    return dynabert_model
+
+
+def _export_dynamic_dynabert_model(self, width_mult):
+    model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
+    state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
+    origin_model = self.model.__class__.from_pretrained(model_dir)
+    dynabert_model = _get_dynabert_model(origin_model, width_mult)
+    dynabert_model = _load_parameters(dynabert_model, state_dict)
+    return dynabert_model
+
+
+def _dynabert_export(self):
+    for width_mult in self.args.width_mult_list:
+        dynabert_model = _export_dynamic_dynabert_model(self, width_mult)
+        self.model = dynabert_model
+        if "qat" not in self.args.strategy:
+            input_spec = generate_input_spec(self.model, self.train_dataset)
+            pruned_infer_model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
+            export_model(model=dynabert_model, input_spec=input_spec, path=pruned_infer_model_dir)
+            self.args.input_filename_prefix = "model"
+            logger.info("Pruned models have been exported.")
 
 
 def _post_training_quantization_grid_search(self, model_dir):
-    eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
     args = self.args
     if args.batch_num_list is None:
         args.batch_num_list = [1]
@@ -540,8 +616,14 @@ def _post_training_quantization_grid_search(self, model_dir):
     exe = paddle.static.Executor(place)
 
     args.output_filename_prefix = "int8"
+    output_dir_list = []
 
     def _post_training_quantization(algo, batch_size, batch_nums):
+        try:
+            from paddle.fluid.contrib.slim.quantization import PostTrainingQuantization
+        except ImportError:
+            from paddle.static.quantization import PostTrainingQuantization
+
         def _batch_generator_func():
             param_name_list = []
             for key in self.eval_dataset[0]:
@@ -582,11 +664,13 @@ def _post_training_quantization_grid_search(self, model_dir):
             optimize_model=False,
         )
         post_training_quantization.quantize()
+        save_model_path = os.path.join(model_dir, algo + "_".join([str(batch_size), str(batch_nums)]))
         post_training_quantization.save_quantized_model(
-            save_model_path=os.path.join(model_dir, algo + "_".join([str(batch_size), str(batch_nums)])),
+            save_model_path=save_model_path,
             model_filename=args.output_filename_prefix + ".pdmodel",
             params_filename=args.output_filename_prefix + ".pdiparams",
         )
+        output_dir_list.append(save_model_path)
 
     logger.info("Post training quantization starts.")
     for algo in args.algo_list:
@@ -596,6 +680,7 @@ def _post_training_quantization_grid_search(self, model_dir):
 
     paddle.disable_static()
     logger.info("Post training quantization ends and quantized models are saved.")
+    return output_dir_list
 
 
 def _quant_aware_training_dynamic(self, input_dir):
@@ -626,10 +711,10 @@ def _quant_aware_training_dynamic(self, input_dir):
         "onnx_format": args.onnx_format,
     }
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
 
-    output_param_path = os.path.join(args.output_dir, "best_quant.pdparams")
+    output_param_path = os.path.join(input_dir, "best_quant.pdparams")
 
     train_dataloader = self.get_train_dataloader()
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
@@ -644,9 +729,10 @@ def _quant_aware_training_dynamic(self, input_dir):
 
     self.create_optimizer_and_scheduler(num_training_steps=args.num_training_steps)
 
-    logger.info("FP32 model's evaluation starts.")
+    logger.info("Evaluating FP32 model before quantization aware training.")
 
     tic_eval = time.time()
+
     acc = evaluate(self, self.model, eval_dataloader)
     logger.info("eval done total: %s s" % (time.time() - tic_eval))
 
@@ -657,6 +743,7 @@ def _quant_aware_training_dynamic(self, input_dir):
     global_step = 0
     tic_train = time.time()
     best_acc, acc = 0.0, 0.0
+
     logger.info("Quant aware training starts.")
     # Train self.model
     for epoch in range(args.num_train_epochs):
@@ -678,7 +765,6 @@ def _quant_aware_training_dynamic(self, input_dir):
             for key in batch:
                 if key in model_para_keys:
                     inputs[key] = batch[key]
-
             logits = self.model(**inputs)
             loss = self.criterion(logits, labels)
             loss.backward()
@@ -713,11 +799,41 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter.save_quantized_model(
         self.model, os.path.join(input_dir, args.output_filename_prefix), input_spec=input_spec
     )
-    if os.path.exists(output_param_path):
-        os.remove(output_param_path)
 
     self.model = _recover_auto_model_forward(self.model)
-    logger.info("Quant aware training ends and quantized models are saved.")
+    logger.info(
+        "Quant aware training ends and quantized models are saved to %s."
+        % os.path.join(input_dir, args.output_filename_prefix)
+    )
+
+
+def _quant_embeddings(self, input_prefix):
+    import paddleslim.quant as quant
+
+    self.args.output_filename_prefix = "quant_emb"
+
+    paddle.enable_static()
+    place = paddle.set_device(self.args.device)
+    exe = paddle.static.Executor(place)
+    main_program, feed_target_names, fetch_targets = paddle.static.load_inference_model(input_prefix, exe)
+
+    config = {"quantize_op_types": ["lookup_table_v2"], "lookup_table_v2": {"quantize_type": "log"}}
+
+    quant_emb_program = quant.quant_embedding(main_program, place, config)
+
+    input_dir = os.path.dirname(input_prefix)
+
+    paddle.fluid.io.save_inference_model(
+        input_dir,
+        feed_target_names,
+        fetch_targets,
+        exe,
+        quant_emb_program,
+        model_filename=self.args.output_filename_prefix + ".pdmodel",
+        params_filename=self.args.output_filename_prefix + ".pdiparams",
+        export_for_deployment=True,
+        program_only=False,
+    )
 
 
 def auto_model_dynabert_forward(
@@ -860,5 +976,10 @@ def soft_cross_entropy(inp, target):
     return -1.0 * paddle.mean(paddle.sum(inp_likelihood * target_prob, axis=-1))
 
 
+def reset_optimizer_and_scheduler(self):
+    self.optimizer, self.lr_scheduler = None, None
+
+
 Trainer.compress = compress
 Trainer.quant = quant
+Trainer.reset_optimizer_and_scheduler = reset_optimizer_and_scheduler

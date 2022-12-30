@@ -133,6 +133,7 @@ def main():
         train_dataset=train_dataset if compression_args.do_train or compression_args.do_compress else None,
         eval_dataset=eval_dataset if compression_args.do_eval or compression_args.do_compress else None,
         criterion=criterion,
+        tokenizer=tokenizer,
         compute_metrics=compute_metrics,
     )
 
@@ -165,31 +166,35 @@ def main():
 
     if compression_args.do_train:
         trainer.train(resume_from_checkpoint=checkpoint)
-    if compression_args:
+    if compression_args.do_compress:
 
         @paddle.no_grad()
         def custom_evaluate(self, model, data_loader):
             model.eval()
-            slot_right = 0
-
-            intent_right_no_slot = 0
-            sample_num = 0
+            slot_right, intent_right_no_slot, sample_num = 0, 0, 0
             for batch in data_loader:
-                intent_logits, slot_logits, padding_mask = model(
-                    input_ids=batch["input_ids"],
-                )
+                logits = model(input_ids=batch["input_ids"])
+                if len(logits) == 2:
+                    intent_logits, slot_logits, padding_mask = logits[0]
+                elif len(logits) == 3:
+                    intent_logits, slot_logits, padding_mask = logits
                 slot_pred = slot_logits.argmax(axis=-1)
                 intent_pred = intent_logits.argmax(axis=-1)
 
                 intent_label = batch["intent_label"]
                 slot_label = batch["slot_label"]
-                if (intent_label == intent_pred) and (intent_label in (0, 2, 3, 4, 6, 7, 8, 10)):
-                    intent_right_no_slot += 1
-                elif ((slot_pred == slot_label) | padding_mask).all() == 1:
-                    slot_right += 1
-                sample_num += 1
+                # intent_right_no_slot += paddle.sum((intent_label == intent_pred) & (intent_label==0)|( intent_label==2)|(intent_label==3)|(intent_label==4)|(intent_label==6)|(intent_label==7)|(intent_label==8)|(intent_label==10))
+                # slot_right += paddle.all((slot_pred == slot_label) | padding_mask.astype(paddle.bool), axis=-1)
+
+                for i in range(len(intent_pred)):
+                    if (intent_label[i] == intent_pred[i]) and (intent_label[i] in (0, 2, 3, 4, 6, 7, 8, 10)):
+                        intent_right_no_slot += 1
+                    elif paddle.all((slot_pred[i] == slot_label[i]) | padding_mask[i].astype(paddle.bool)):
+                        slot_right += 1
+                    sample_num += 1
 
             accuracy = (slot_right + intent_right_no_slot) / sample_num * 100
+            logger.info("accurcy: %.2f" % accuracy)
 
             return accuracy
 
@@ -202,7 +207,6 @@ def main():
             model,
             input_spec=[
                 paddle.static.InputSpec(shape=[None, None], dtype="int32"),  # input_ids
-                paddle.static.InputSpec(shape=[None, None], dtype="int32"),  # segment_ids
             ],
         )
         # save converted static graph model
