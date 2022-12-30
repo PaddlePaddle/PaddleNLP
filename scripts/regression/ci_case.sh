@@ -39,7 +39,7 @@ fi
 pytest_slow_test() {
 cd ${nlp_dir}/
 export CUDA_VISIBLE_DEVICES=${cudaid2}
-time (slow_test=true pytest -n auto >${log_path}/pytest) >>${log_path}/pytest 2>&1
+time (RUN_SLOW_TEST=true pytest -n auto >${log_path}/pytest) >>${log_path}/pytest 2>&1
 }
 
 # case list
@@ -1056,20 +1056,6 @@ taskflow (){
 cd ${nlp_dir}
 python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
-}
-
-transformers(){
-echo ' RUN all transformers unittest'
-cd ${nlp_dir}/tests/transformers/
-for apicase in `ls`;do
-    if [[ ${apicase##*.} == "py" ]];then
-            continue
-    else
-        cd ${nlp_dir}
-        pytest tests/transformers/${apicase}/test_*.py  >${nlp_dir}/unittest_logs/${apicase}_unittest.log 2>&1
-        print_info $? tests ${apicase}_unittest
-    fi
-done
 }
 
 faster_generation(){
