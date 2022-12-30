@@ -65,16 +65,10 @@ deploy-paddlenlp:
 	# upload
 	twine upload --skip-existing dist/*
 
-.PHONY: release
-test_all_examples=all
-cudaid1=0
-cudaid2=0,1
+.PHONY: regression-all
 release: 
-	bash ./scripts/regression/run_release.sh ${cudaid1} ${cudaid2} ${test_all_examples}
+	bash ./scripts/regression/run_release.sh 0 0,1 all
 
-.PHONY: key
-test_key_examples=p0
-cudaid1=0
-cudaid2=0,1
+.PHONY: regression-key
 key: 
-	bash ./scripts/regression/run_release.sh ${cudaid1} ${cudaid2} ${test_key_examples}
+	bash ./scripts/regression/run_release.sh 0 0,1 p0
