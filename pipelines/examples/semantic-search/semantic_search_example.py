@@ -164,7 +164,7 @@ def semantic_search_tutorial():
         retriever = get_faiss_retriever(use_gpu)
 
     # Ranker
-    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-base-query-encoder", use_gpu=use_gpu)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
     # Pipeline
     from pipelines import SemanticSearchPipeline
