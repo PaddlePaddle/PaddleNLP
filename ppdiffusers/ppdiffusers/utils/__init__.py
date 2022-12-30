@@ -16,14 +16,20 @@
 
 import os
 
+from packaging import version
+
+from ..version import VERSION as __version__
 from .deprecation_utils import deprecate
 from .import_utils import (
     ENV_VARS_TRUE_AND_AUTO_VALUES,
     ENV_VARS_TRUE_VALUES,
     USE_PADDLE,
     DummyObject,
+    OptionalDependencyNotAvailable,
     is_fastdeploy_available,
     is_inflect_available,
+    is_k_diffusion_available,
+    is_librosa_available,
     is_modelcards_available,
     is_onnx_available,
     is_paddle_available,
@@ -45,6 +51,7 @@ if is_paddle_available():
         load_image,
         load_numpy,
         load_ppnlp_numpy,
+        nightly,
         paddle_all_close,
         parse_flag_from_env,
         slow,
@@ -65,6 +72,7 @@ DOWNLOAD_SERVER = "https://bj.bcebos.com/paddlenlp/models/community"
 PPDIFFUSERS_CACHE = default_cache_path
 PPDIFFUSERS_DYNAMIC_MODULE_NAME = "ppdiffusers_modules"
 PPNLP_MODULES_CACHE = os.getenv("PPNLP_MODULES_CACHE", _get_sub_home("modules"))
+TEST_DOWNLOAD_SERVER = "https://paddlenlp.bj.bcebos.com/models/community/ppdiffusers/tests"
 
 _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
     "DDIMScheduler",
@@ -75,4 +83,15 @@ _COMPATIBLE_STABLE_DIFFUSION_SCHEDULERS = [
     "HeunDiscreteScheduler",
     "EulerAncestralDiscreteScheduler",
     "DPMSolverMultistepScheduler",
+    "DPMSolverSinglestepScheduler",
 ]
+
+
+def check_min_version(min_version):
+    if version.parse(__version__) < version.parse(min_version):
+        if "dev" in min_version:
+            error_message = "This example requires a source install from ppdiffusers"
+        else:
+            error_message = f"This example requires a minimum version of {min_version},"
+        error_message += f" but the version found is {__version__}.\n"
+        raise ImportError(error_message)
