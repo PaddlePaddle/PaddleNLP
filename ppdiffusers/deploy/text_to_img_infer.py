@@ -228,14 +228,6 @@ if __name__ == "__main__":
         },
     }
 
-    text_encoder_shape = {
-        "input_ids": {
-            "min_shape": [1, 77],
-            "max_shape": [2, 77],
-            "opt_shape": [2, 77],
-        }
-    }
-
     # 4. Init runtime
     device_id = args.device_id
     if args.device == "cpu":
