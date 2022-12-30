@@ -161,7 +161,6 @@ def query_qa_pairs(request: QueryQAPairRequest):
 
 def _process_request(pipeline, request) -> Dict[str, Any]:
     start_time = time.time()
-    # breakpoint()
     params = request.params or {}
 
     # format global, top-level filters (e.g. "params": {"filters": {"name": ["some"]}})
