@@ -68,15 +68,27 @@ def compress(self, custom_evaluate=None):
                 self.custom_evaluate is not None
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         _dynabert(self, self.model, args.output_dir)
-        if "ptq" in args.strategy:
-            self.args.input_filename_prefix = "pruned_model"
+        if "ptq" in args.strategy or "qat" in args.strategy:
             output_dir_list = []
             for width_mult in args.width_mult_list:
                 output_dir_width = os.path.join(args.output_dir, "width_mult_" + str(round(width_mult, 2)))
-                output_dir_list += self.quant(output_dir_width, "ptq")
-                if "embeddings" in args.strategy:
-                    for output_dir in output_dir_list:
-                        self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+                if "ptq" in args.strategy:
+                    output_dir_list += self.quant(output_dir_width, "ptq")
+                elif "qat" in args.strategy:
+                    self.quant(output_dir_width, "qat")
+                    output_dir_list.append(output_dir_width)
+        if "embeddings" in args.strategy:
+            if "ptq" not in args.strategy and "qat" not in args.strategy:
+                output_dir_list = []
+                for width_mult in args.width_mult_list:
+                    output_dir_width = os.path.join(
+                        args.output_dir, "width_mult_" + str(round(width_mult, 2)), args.input_filename_prefix
+                    )
+                    self.quant(output_dir_width, "embeddings")
+            else:
+                for output_dir in output_dir_list:
+                    self.quant(os.path.join(output_dir, args.output_filename_prefix), "embeddings")
+
     elif "ptq" in args.strategy:
         # When input model is an inference model
         if args.input_infer_model_path is not None:
@@ -153,8 +165,9 @@ def _dynabert(self, model, output_dir):
         self, ofa_model, model, teacher_model, train_dataloader, eval_dataloader, args.num_train_epochs
     )
     self.reset_optimizer_and_scheduler()
+
     # Each width_mult best model would be exported.
-    _dynabert_export(self, ofa_model)
+    _dynabert_export(self)
 
     ofa_model, ofa_model.model = _recover_transformer_func(ofa_model, True), _recover_transformer_func(
         ofa_model.model, True
@@ -500,44 +513,89 @@ def _dynabert_training(self, ofa_model, model, teacher_model, train_dataloader, 
     return ofa_model
 
 
-def _dynabert_export(self, ofa_model):
-    from paddleslim.nas.ofa import utils
-
-    ofa_model._add_teacher = False
-    ofa_model, ofa_model.model = _recover_transformer_func(ofa_model), _recover_transformer_func(ofa_model.model)
-    if isinstance(ofa_model.model, paddle.DataParallel):
-        ori_num_heads = ofa_model.model._layers.base_model.encoder.layers[0].self_attn.num_heads
-    else:
-        ori_num_heads = ofa_model.model.base_model.encoder.layers[0].self_attn.num_heads
-    for width_mult in self.args.width_mult_list:
-        model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
-        state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
-        origin_model = self.model.__class__.from_pretrained(model_dir)
-        ofa_model.model.set_state_dict(state_dict)
-        best_config = utils.dynabert_config(ofa_model, width_mult)
-        best_config = check_dynabert_config(best_config, width_mult)
-        input_spec = generate_input_spec(self.model, self.train_dataset)
-        origin_model_new = ofa_model.export(
-            best_config,
-            input_shapes=[[1, 1]] * len(input_spec),
-            input_dtypes=["int64"] * len(input_spec),
-            origin_model=origin_model,
+def _get_dynabert_model(model, width_mult):
+    for layer in model.base_model.encoder.layers:
+        # Multi-Head Attention
+        layer.self_attn.num_heads = int(layer.self_attn.num_heads * width_mult)
+        layer.self_attn.q_proj = nn.Linear(
+            layer.self_attn.q_proj.weight.shape[0],
+            int(layer.self_attn.q_proj.weight.shape[1] * width_mult),
+            layer.self_attn.q_proj._weight_attr,
+            layer.self_attn.q_proj._bias_attr,
         )
-        for name, sublayer in origin_model_new.named_sublayers():
-            if isinstance(sublayer, paddle.nn.MultiHeadAttention):
-                sublayer.num_heads = int(width_mult * sublayer.num_heads)
+        layer.self_attn.k_proj = nn.Linear(
+            layer.self_attn.k_proj.weight.shape[0],
+            int(layer.self_attn.k_proj.weight.shape[1] * width_mult),
+            layer.self_attn.k_proj._weight_attr,
+            layer.self_attn.k_proj._bias_attr,
+        )
+        layer.self_attn.v_proj = nn.Linear(
+            layer.self_attn.v_proj.weight.shape[0],
+            int(layer.self_attn.v_proj.weight.shape[1] * width_mult),
+            layer.self_attn.v_proj._weight_attr,
+            layer.self_attn.v_proj._bias_attr,
+        )
+        layer.self_attn.out_proj = nn.Linear(
+            int(layer.self_attn.out_proj.weight.shape[0] * width_mult),
+            layer.self_attn.out_proj.weight.shape[1],
+            layer.self_attn.out_proj._weight_attr,
+            layer.self_attn.out_proj._bias_attr,
+        )
 
-        pruned_infer_model_dir = os.path.join(model_dir, "pruned_model")
-        net = paddle.jit.to_static(origin_model_new, input_spec=input_spec)
-        paddle.jit.save(net, pruned_infer_model_dir)
-        # Recover num_heads of ofa_model.model
-        if isinstance(ofa_model.model, paddle.DataParallel):
-            for layer in ofa_model.model._layers.base_model.encoder.layers:
-                layer.self_attn.num_heads = ori_num_heads
+        # Feed Forward
+        layer.linear1 = nn.Linear(
+            layer.linear1.weight.shape[0],
+            int(layer.linear1.weight.shape[1] * width_mult),
+            layer.linear1._weight_attr,
+            layer.linear1._bias_attr,
+        )
+        layer.linear2 = nn.Linear(
+            int(layer.linear2.weight.shape[0] * width_mult),
+            layer.linear2.weight.shape[1],
+            layer.linear2._weight_attr,
+            layer.linear2._bias_attr,
+        )
+    return model
+
+
+def _load_parameters(dynabert_model, ori_state_dict):
+    dynabert_state_dict = dynabert_model.state_dict()
+    for key in ori_state_dict.keys():
+        # Removes '.fn' from ofa model parameters
+        dynabert_key = key.replace(".fn", "")
+        if dynabert_key not in dynabert_state_dict.keys():
+            logger.warning("Failed to export parameter %s" % key)
         else:
-            for layer in ofa_model.model.base_model.encoder.layers:
-                layer.self_attn.num_heads = ori_num_heads
-    logger.info("Pruned models have been exported.")
+            dynabert_shape = dynabert_state_dict[dynabert_key].shape
+            if len(dynabert_shape) == 2:
+                dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0], : dynabert_shape[1]]
+            elif len(dynabert_shape) == 1:
+                dynabert_state_dict[dynabert_key] = ori_state_dict[key][: dynabert_shape[0]]
+            else:
+                raise ValueError("Please check input model. Length of shape should be 1 or 2 for any parameter.")
+    dynabert_model.set_state_dict(dynabert_state_dict)
+    return dynabert_model
+
+
+def _export_dynamic_dynabert_model(self, width_mult):
+    model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
+    state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
+    origin_model = self.model.__class__.from_pretrained(model_dir)
+    dynabert_model = _get_dynabert_model(origin_model, width_mult)
+    dynabert_model = _load_parameters(dynabert_model, state_dict)
+    return dynabert_model
+
+
+def _dynabert_export(self):
+    for width_mult in self.args.width_mult_list:
+        dynabert_model = _export_dynamic_dynabert_model(self, width_mult)
+        self.model = dynabert_model
+        if "qat" not in self.args.strategy:
+            input_spec = generate_input_spec(self.model, self.train_dataset)
+            pruned_infer_model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
+            export_model(model=dynabert_model, input_spec=input_spec, path=pruned_infer_model_dir)
+            self.args.input_filename_prefix = "model"
+            logger.info("Pruned models have been exported.")
 
 
 def _post_training_quantization_grid_search(self, model_dir):
@@ -649,10 +707,10 @@ def _quant_aware_training_dynamic(self, input_dir):
         "onnx_format": args.onnx_format,
     }
 
-    if not os.path.exists(args.output_dir):
-        os.makedirs(args.output_dir)
+    if not os.path.exists(input_dir):
+        os.makedirs(input_dir)
 
-    output_param_path = os.path.join(args.output_dir, "best_quant.pdparams")
+    output_param_path = os.path.join(input_dir, "best_quant.pdparams")
 
     train_dataloader = self.get_train_dataloader()
     eval_dataloader = self.get_eval_dataloader(self.eval_dataset)
@@ -667,9 +725,10 @@ def _quant_aware_training_dynamic(self, input_dir):
 
     self.create_optimizer_and_scheduler(num_training_steps=args.num_training_steps)
 
-    logger.info("FP32 model's evaluation starts.")
+    logger.info("Evaluating FP32 model before quantization aware training.")
 
     tic_eval = time.time()
+
     acc = evaluate(self, self.model, eval_dataloader)
     logger.info("eval done total: %s s" % (time.time() - tic_eval))
 
@@ -680,6 +739,7 @@ def _quant_aware_training_dynamic(self, input_dir):
     global_step = 0
     tic_train = time.time()
     best_acc, acc = 0.0, 0.0
+
     logger.info("Quant aware training starts.")
     # Train self.model
     for epoch in range(args.num_train_epochs):
@@ -701,7 +761,6 @@ def _quant_aware_training_dynamic(self, input_dir):
             for key in batch:
                 if key in model_para_keys:
                     inputs[key] = batch[key]
-
             logits = self.model(**inputs)
             loss = self.criterion(logits, labels)
             loss.backward()
@@ -736,11 +795,12 @@ def _quant_aware_training_dynamic(self, input_dir):
     quanter.save_quantized_model(
         self.model, os.path.join(input_dir, args.output_filename_prefix), input_spec=input_spec
     )
-    if os.path.exists(output_param_path):
-        os.remove(output_param_path)
 
     self.model = _recover_auto_model_forward(self.model)
-    logger.info("Quant aware training ends and quantized models are saved.")
+    logger.info(
+        "Quant aware training ends and quantized models are saved to %s."
+        % os.path.join(input_dir, args.output_filename_prefix)
+    )
 
 
 def _quant_embeddings(self, input_prefix):

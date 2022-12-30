@@ -64,7 +64,7 @@ rm divorce.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.4
+- paddlenlp >= 2.4.8
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -181,24 +181,11 @@ data/
 
 #### 2.4.1 预训练模型微调
 
-使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
+使用CPU/GPU训练，默认为GPU训练。使用CPU训练只需将设备参数配置改为`--device cpu`，可以使用`--device gpu:0`指定GPU卡号：
 ```shell
 python train.py \
     --dataset_dir "data" \
     --device "gpu" \
-    --max_seq_length 128 \
-    --model_name "ernie-3.0-medium-zh" \
-    --batch_size 32 \
-    --early_stop \
-    --epochs 100
-```
-
-
-如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
-```shell
-python -m paddle.distributed.launch --nproc_per_node 8 --backend "gloo" train.py \
-    --dataset_dir "data" \
-    --device "cpu" \
     --max_seq_length 128 \
     --model_name "ernie-3.0-medium-zh" \
     --batch_size 32 \
@@ -245,10 +232,11 @@ python -m paddle.distributed.launch --gpus "0" train.py \
 
 ```text
 checkpoint/
-├── model_config.json
-├── model_state.pdparams
-├── tokenizer_config.json
-└── vocab.txt
+├── config.json # 模型配置文件，paddlenlp 2.4.5以前为model_config.json
+├── model_state.pdparams # 模型参数文件
+├── tokenizer_config.json # 分词器配置文件
+├── vocab.txt
+└── ...
 ```
 
 **NOTE:**
@@ -274,17 +262,14 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 
 ```text
 [2022-08-12 02:24:48,193] [    INFO] - -----Evaluate model-------
-[2022-08-12 02:24:48,194] [    INFO] - Train dataset size: 14377
 [2022-08-12 02:24:48,194] [    INFO] - Dev dataset size: 1611
 [2022-08-12 02:24:48,194] [    INFO] - Accuracy in dev dataset: 74.24%
 [2022-08-12 02:24:48,194] [    INFO] - Macro avg in dev dataset: precision: 82.96 | recall: 77.59 | F1 score 79.36
 [2022-08-12 02:24:48,194] [    INFO] - Micro avg in dev dataset: precision: 91.50 | recall: 89.66 | F1 score 90.57
 [2022-08-12 02:24:48,195] [    INFO] - Class name: 婚后有子女
-[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 6759(47.0%) | precision: 99.78 | recall: 99.59 | F1 score 99.68
 [2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 784(48.7%) | precision: 97.07 | recall: 97.32 | F1 score 97.20
 [2022-08-12 02:24:48,195] [    INFO] - ----------------------------
 [2022-08-12 02:24:48,195] [    INFO] - Class name: 限制行为能力子女抚养
-[2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in train dataset: 4358(30.3%) | precision: 99.36 | recall: 99.56 | F1 score 99.46
 [2022-08-12 02:24:48,195] [    INFO] - Evaluation examples in dev dataset: 492(30.5%) | precision: 88.57 | recall: 88.21 | F1 score 88.39
 ...
 ```
@@ -442,7 +427,7 @@ prune/
 
 - 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
-- 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
+- 在线服务化部署搭建请参考 [PaddleNLP SimpleServing部署指南](deploy/simple_serving/README.md) 或 [Triton部署指南](deploy/triton_serving/README.md)。
 
 <a name="模型效果"></a>
 
