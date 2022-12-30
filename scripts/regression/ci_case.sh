@@ -34,6 +34,14 @@ else
     echo -e "\033[32m ${log_path}/$2_SUCCESS \033[0m"
 fi
 }
+
+# Enable ``slow_test`` with pytest tools
+pytest_slow_test() {
+cd ${nlp_dir}/
+export CUDA_VISIBLE_DEVICES=${cudaid2}
+time (slow_test=true pytest -n auto >${log_path}/pytest) >>${log_path}/pytest 2>&1
+}
+
 # case list
 # 1 waybill_ie (无可控参数，数据集外置)
 waybill_ie(){
@@ -1049,6 +1057,7 @@ cd ${nlp_dir}
 python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }
+
 transformers(){
 echo ' RUN all transformers unittest'
 cd ${nlp_dir}/tests/transformers/
@@ -1062,6 +1071,7 @@ for apicase in `ls`;do
     fi
 done
 }
+
 faster_generation(){
 cd ${nlp_dir}/faster_generation/samples
 python codegen_sample.py >${log_path}/fast_generation_codegen >>${log_path}/fast_generation_codegen 2>&1
