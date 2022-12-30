@@ -25,6 +25,27 @@ import pip
 from paddlenlp.utils.log import logger
 
 
+def is_paddle_cuda_available() -> bool:
+    if is_paddle_available():
+        import paddle
+
+        return paddle.device.cuda.device_count() > 0
+    else:
+        return False
+
+
+def is_paddle_available() -> bool:
+    """check if `torch` package is installed
+    Returns:
+        bool: if `torch` is available
+    """
+    return is_package_available("paddle")
+
+
+def is_psutil_available():
+    return importlib.util.find_spec("psutil") is not None
+
+
 def is_torch_available() -> bool:
     """check if `torch` package is installed
     Returns:
