@@ -150,7 +150,7 @@ class ErnieLayoutConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "ernie_layout"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
+    standard_config_map: Dict[str, str] = {"dropout": "classifier_dropout"}
     pretrained_init_configuration = ERNIE_LAYOUT_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

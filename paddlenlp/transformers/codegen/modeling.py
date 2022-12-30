@@ -21,8 +21,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Layer
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -295,16 +294,14 @@ class CodeGenPreTrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.transformer.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = getattr(self, "layer_norm_epsilon", 1e-05)
+            layer._epsilon = self.config.layer_norm_epsilon
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
@@ -696,7 +693,4 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)

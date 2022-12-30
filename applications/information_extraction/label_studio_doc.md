@@ -1,4 +1,4 @@
-# 信息抽取任务Label Studio使用指南
+# 文档抽取任务Label Studio使用指南
 
  **目录**
 
@@ -205,7 +205,7 @@ Relation XML模板：
     <img src=https://user-images.githubusercontent.com/40840292/199890897-b33ede99-97d8-4d44-877a-2518a87f8b67.png height=200 width=1200 />
 </div>
 
-<a name="36"></a>
+<a name="26"></a>
 
 #### 2.6 数据转换
 

@@ -87,10 +87,10 @@ Recent years have witnessed the rise and success of pre-training techniques in v
     <img src=https://user-images.githubusercontent.com/40840292/195615523-05d05aba-3bc3-415d-a836-ad1a5d3db56e.png height=400 width=1000 hspace='15'/>
 </div>
 
-- Chinese invoice VQA by multilingual(CHS, CHT, EN, JP, FR) prompt
+- Chinese invoice VQA by multilingual(CHS, CHT, EN, JP, DE) prompt
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/40840292/195615648-de053dcc-312b-4c7a-a8c9-299bba3dcfd5.png height=350 width=1000 hspace='15'/>
+    <img src=https://user-images.githubusercontent.com/40840292/209898193-c09a87fe-29cd-4e22-8e67-a5f281a99871.jpg height=350 width=1000 hspace='15'/>
 </div>
 
 - Demo images are available [here](https://bj.bcebos.com/paddlenlp/taskflow/document_intelligence/demo.zip)
