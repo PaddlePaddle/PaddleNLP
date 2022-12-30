@@ -374,19 +374,10 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
             unet = self.unet.model
             unet_output_name = unet.get_output_info(0).name
             for i, t in enumerate(timesteps):
-                # tensor_t = paddle.to_tensor(t)
                 # expand the latents if we are doing classifier free guidance
-                # latent_model_input = np.concatenate([latents] * 2) if do_classifier_free_guidance else latents
-                # latent_model_input = self.scheduler.scale_model_input(paddle.to_tensor(latent_model_input), tensor_t)
-                # latent_model_input = latent_model_input.numpy()
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
                 # predict the noise residual
-                # noise_pred = self.unet(
-                #     sample=latent_model_input.astype(np.float32),
-                #     timestep=np.array([t], dtype=np.int64),
-                #     encoder_hidden_states=text_embeddings.astype(np.float32),
-                # )[0]
                 input1 = fd.C.FDTensor()
                 input2 = fd.C.FDTensor()
                 input3 = fd.C.FDTensor()
@@ -402,8 +393,6 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                 noise_pred = paddle.utils.dlpack.from_dlpack(dlpack)
                 # perform guidance
                 if do_classifier_free_guidance:
-                    # noise_pred_uncond, noise_pred_text = np.split(noise_pred, 2)
-                    # noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
                     noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 

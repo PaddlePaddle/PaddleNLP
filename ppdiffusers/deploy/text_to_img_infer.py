@@ -18,6 +18,7 @@ import time
 
 import fastdeploy as fd
 import numpy as np
+import paddle
 from fastdeploy import ModelFormat
 
 from paddlenlp.transformers import CLIPTokenizer
@@ -232,6 +233,9 @@ if __name__ == "__main__":
     device_id = args.device_id
     if args.device == "cpu":
         device_id = -1
+        paddle.set_device("cpu")
+    else:
+        paddle.set_device(f"gpu:{device_id}")
     if args.backend == "onnx_runtime":
         text_encoder_runtime = create_ort_runtime(
             args.model_dir, args.text_encoder_model_prefix, args.model_format, device_id=device_id
