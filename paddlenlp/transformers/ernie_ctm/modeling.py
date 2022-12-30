@@ -711,12 +711,14 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
             of `ErnieCtmModel` instance `ernie`. Defaults to `None`.
     """
 
-    def __init__(self, ernie_ctm, num_classes=2, dropout=None):
-        super(ErnieCtmForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.ernie_ctm = ernie_ctm  # allow ernie_ctm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_ctm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_ctm.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieCtmConfig):
+        super(ErnieCtmForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+        self.ernie_ctm = ErnieCtmModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -750,7 +752,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         """
 
-        sequence_output, _, _ = self.ernie_ctm(
+        sequence_output, _, _, _ = self.ernie_ctm(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
 
