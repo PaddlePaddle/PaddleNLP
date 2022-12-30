@@ -17,10 +17,14 @@
 
 import copy
 import os
-from typing import Union
+from typing import Optional, Union
 
 from ...utils.log import logger
-from ..configuration_utils import PretrainedConfig, convert_to_legacy_config
+from ..configuration_utils import (
+    PretrainedConfig,
+    convert_to_legacy_config,
+    flatten_model_config,
+)
 
 __all__ = [
     "CLIPTextConfig",
@@ -92,7 +96,9 @@ class Old2NewPretrainedConfig(PretrainedConfig):
         # Those arguments may be passed along for our internal telemetry.
         # We remove them so they don't appear in `return_unused_kwargs`.
         # convert local config to legacy config
+        # do standard config map: there are some old-school pretrained-config not refactored.
         config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
+        config_dict = flatten_model_config(config_dict)
 
         # check old_config?
         is_old_config = "vision_layers" in config_dict or "text_layers" in config_dict
@@ -267,8 +273,14 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
         self.attention_dropout = attention_dropout
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
-
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> PretrainedConfig:
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the text config dict if we are loading from CLIPConfig
@@ -377,8 +389,14 @@ class CLIPVisionConfig(Old2NewPretrainedConfig):
         self.hidden_act = hidden_act
 
     @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path: Union[str, os.PathLike], **kwargs) -> "PretrainedConfig":
-
+    def from_pretrained(
+        cls,
+        pretrained_model_name_or_path: Union[str, os.PathLike],
+        from_hf_hub: bool = False,
+        cache_dir: Optional[str] = None,
+        **kwargs
+    ) -> PretrainedConfig:
+        kwargs.update({"from_hf_hub": from_hf_hub, "cache_dir": cache_dir})
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
         # get the vision config dict if we are loading from CLIPConfig
