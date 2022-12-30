@@ -1149,3 +1149,134 @@ class SequenceClassifierOutputWithPast(ModelOutput):
     past_key_values: Optional[Tuple[Tuple[paddle.Tensor]]] = None
     hidden_states: Optional[Tuple[paddle.Tensor]] = None
     attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class BackboneOutput(ModelOutput):
+    """
+    Base class for outputs of backbones.
+
+    Args:
+        feature_maps (`tuple(paddle.Tensor)` of shape `(batch_size, num_channels, height, width)`):
+            Feature maps of the stages.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings + one for the output of each layer) of
+            shape `(batch_size, sequence_length, hidden_size)` or `(batch_size, num_channels, height, width)`,
+            depending on the backbone.
+
+            Hidden-states of the model at the output of each stage plus the initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, sequence_length,
+            sequence_length)`. Only applicable if the backbone uses attention.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    feature_maps: Tuple[paddle.Tensor] = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class BaseModelOutputWithPoolingAndNoAttention(ModelOutput):
+    """
+    Base class for model's outputs that also contains a pooling of the last hidden states.
+
+    Args:
+        last_hidden_state (`paddle.Tensor` of shape `(batch_size, num_channels, height, width)`):
+            Sequence of hidden-states at the output of the last layer of the model.
+        pooler_output (`paddle.Tensor` of shape `(batch_size, hidden_size)`):
+            Last layer hidden-state after a pooling operation on the spatial dimensions.
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, num_channels, height, width)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+    """
+
+    last_hidden_state: paddle.Tensor = None
+    pooler_output: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class ImageClassifierOutputWithNoAttention(ModelOutput):
+    """
+    Base class for outputs of image classification models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, config.num_labels)`):
+            Classification (or regression if config.num_labels==1) scores (before SoftMax).
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each stage) of shape `(batch_size, num_channels, height, width)`. Hidden-states (also
+            called feature maps) of the model at the output of each stage.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class DepthEstimatorOutput(ModelOutput):
+    """
+    Base class for outputs of depth estimation models.
+
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        predicted_depth (`paddle.Tensor` of shape `(batch_size, height, width)`):
+            Predicted depth for each pixel.
+
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, num_channels, height, width)`.
+
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, patch_size,
+            sequence_length)`.
+
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    predicted_depth: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None
+
+
+@dataclass
+class SemanticSegmenterOutput(ModelOutput):
+    """
+    Base class for outputs of semantic segmentation models.
+    Args:
+        loss (`paddle.Tensor` of shape `(1,)`, *optional*, returned when `labels` is provided):
+            Classification (or regression if config.num_labels==1) loss.
+        logits (`paddle.Tensor` of shape `(batch_size, config.num_labels, logits_height, logits_width)`):
+            Classification scores for each pixel.
+            <Tip warning={true}>
+            The logits returned do not necessarily have the same size as the `pixel_values` passed as inputs. This is
+            to avoid doing two interpolations and lose some quality when a user needs to resize the logits to the
+            original image size as post-processing. You should always check your logits shape and resize as needed.
+            </Tip>
+        hidden_states (`tuple(paddle.Tensor)`, *optional*, returned when `output_hidden_states=True` is passed or when `config.output_hidden_states=True`):
+            Tuple of `paddle.Tensor` (one for the output of the embeddings, if the model has an embedding layer, +
+            one for the output of each layer) of shape `(batch_size, patch_size, hidden_size)`.
+            Hidden-states of the model at the output of each layer plus the optional initial embedding outputs.
+        attentions (`tuple(paddle.Tensor)`, *optional*, returned when `output_attentions=True` is passed or when `config.output_attentions=True`):
+            Tuple of `paddle.Tensor` (one for each layer) of shape `(batch_size, num_heads, patch_size,
+            sequence_length)`.
+            Attentions weights after the attention softmax, used to compute the weighted average in the self-attention
+            heads.
+    """
+
+    loss: Optional[paddle.Tensor] = None
+    logits: paddle.Tensor = None
+    hidden_states: Optional[Tuple[paddle.Tensor]] = None
+    attentions: Optional[Tuple[paddle.Tensor]] = None

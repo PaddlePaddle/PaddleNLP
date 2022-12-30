@@ -854,7 +854,7 @@ template<
     // The number of threads in a threadblock.
     int THREADS_PER_BLOCK
     >
-__global__ void gptj_masked_multihead_attention_kernel(Masked_multihead_attention_params<T> params, int pad_active_groups)
+__global__ void masked_multihead_attention_kernel_v2(Masked_multihead_attention_params<T> params, int pad_active_groups)
 {
 
     // Make sure the hidden dimension per head is a multiple of the number of threads per key.
@@ -1417,27 +1417,27 @@ __global__ void gptj_masked_multihead_attention_kernel(Masked_multihead_attentio
     <<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params, pad_active_groups)
 
 
-#define GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK, stream) \
+#define MMHA_LAUNCH_KERNEL_V2(T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK, stream) \
   int pad_active_groups = 1 << static_cast<int>(ceil(std::log2(THDS_PER_BLOCK / THDS_PER_VALUE))); \
   size_t smem_sz = mmha::smem_size_in_bytes<T>(params, THDS_PER_VALUE, THDS_PER_BLOCK, pad_active_groups); \
   dim3 grid(params.num_heads, params.batch_size);  \
-    mmha::gptj_masked_multihead_attention_kernel<T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK> \
+    mmha::masked_multihead_attention_kernel_v2<T, Dh, Dh_MAX, THDS_PER_KEY, THDS_PER_VALUE, THDS_PER_BLOCK> \
   <<<grid, THDS_PER_BLOCK, smem_sz, stream>>>(params, pad_active_groups)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template < typename T, int Dh, int Dh_MAX>
 void  mmha_launch_kernel(const Masked_multihead_attention_params<T> &params, const cudaStream_t &stream) {
-  if(params.rotary_embedding_dim>0){
+  if (params.rotary_embedding_dim > 0 || params.relative_attention_bias_float || params.relative_attention_bias_half) {
     constexpr int THREADS_PER_VALUE = Dh_MAX * sizeof(T) / 16;
     if( params.timestep < 32 ) {
-      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);
+      MMHA_LAUNCH_KERNEL_V2(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);
     } else if( params.timestep < 2048 ) {
-      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 2, THREADS_PER_VALUE, 128, stream);
+      MMHA_LAUNCH_KERNEL_V2(T, Dh, Dh_MAX, 2, THREADS_PER_VALUE, 128, stream);
     } else {
-      GPTJ_MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 1, THREADS_PER_VALUE, 256, stream);
+      MMHA_LAUNCH_KERNEL_V2(T, Dh, Dh_MAX, 1, THREADS_PER_VALUE, 256, stream);
     }
-  }else{
+  } else {
     constexpr int THREADS_PER_VALUE = Dh * sizeof(T) / 16;
     if( params.timestep < 32 ) {
       MMHA_LAUNCH_KERNEL(T, Dh, Dh_MAX, 4, THREADS_PER_VALUE, 64, stream);

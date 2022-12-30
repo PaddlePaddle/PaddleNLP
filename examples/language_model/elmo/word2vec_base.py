@@ -12,18 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from paddle.io import Dataset, DataLoader
-import paddle.distributed as dist
-
+import argparse
 import os
 import re
-import argparse
+
 import numpy as np
-from sklearn.model_selection import train_test_split
+import paddle
+import paddle.distributed as dist
+import paddle.nn as nn
 from gensim.models.keyedvectors import KeyedVectors
+from paddle.io import DataLoader, Dataset
+from sklearn.model_selection import train_test_split
 
 
 # yapf: disable
@@ -227,7 +226,7 @@ def train(args):
             adam.clear_grad()
 
             if step % args.logging_step == 0:
-                print("step %d, loss %.4f" % (step, loss.numpy()[0]))
+                print("step %d, loss %.4f" % (step, float(loss)))
 
     acc = test(model, test_loader)
     print("\ntest acc %.4f\n" % acc)
@@ -246,7 +245,7 @@ def test(model, test_loader):
         num += label.shape[0]
         predict = paddle.argmax(output, axis=1)
         label = paddle.cast(label, dtype=predict.dtype)
-        correct += paddle.sum(paddle.cast(predict == label, dtype="int64")).numpy()[0]
+        correct += int(paddle.sum(paddle.cast(predict == label, dtype="int64")))
     model.train()
     return correct * 1.0 / num
 

@@ -63,8 +63,7 @@ def mha_ofa_forward(self, query, key, value, attn_mask=None, cache=None):
         q, k, v, cache = self._prepare_qkv(query, key, value, cache)
 
     # scale dot product attention
-    # TODO: use paddle.matmul, however it doesn't support `alpha`
-    product = paddle.fluid.layers.matmul(x=q, y=k, transpose_y=True, alpha=self.head_dim**-0.5)
+    product = paddle.matmul(x=q * (self.head_dim**-0.5), y=k, transpose_y=True)
     if attn_mask[0] is not None:
         # TODO(guosheng): support bool mask
         product = product + attn_mask[0]

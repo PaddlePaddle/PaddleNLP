@@ -38,7 +38,7 @@ from paddlenlp.utils.log import logger
 from ..utils import CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
-    get_path_from_url,
+    get_path_from_url_with_filelock,
     is_url,
     url_file_exists,
 )
@@ -148,7 +148,7 @@ def cached_path(
             shutil.rmtree(file_path, ignore_errors=True)
 
         # URL, so get it from the cache (downloading if necessary)
-        output_path = get_path_from_url(
+        output_path = get_path_from_url_with_filelock(
             url_or_filename,
             root_dir=cache_dir,
         )
@@ -441,8 +441,8 @@ class PretrainedConfig:
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
-    # map hf attribute to paddle attribute
-    # { "standard_field": "paddle_field", ... }
+    # model-specific attribute map from hf attribute to paddle attribute
+    # { "paddle_field": "standard_field", ... }
     standard_config_map: Dict[str, str] = {}
 
     _auto_class: Optional[str] = None
@@ -450,12 +450,16 @@ class PretrainedConfig:
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         super().__setattr__(key, value)
         assert hasattr(self, key)
 
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key != "standard_config_map" and key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         return super().__getattribute__(key)
 
     def __getitem__(self, key):
@@ -784,7 +788,7 @@ class PretrainedConfig:
 
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url(
+            resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
         # 4. get the configuration file from local dir with default name, eg: /local/path
@@ -842,6 +846,9 @@ class PretrainedConfig:
         return_unused_kwargs = kwargs.pop("return_unused_kwargs", False)
         # Those arguments may be passed along for our internal telemetry.
         # We remove them so they don't appear in `return_unused_kwargs`.
+
+        # convert local config to legacy config
+        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
 
         config = cls(**config_dict)
 

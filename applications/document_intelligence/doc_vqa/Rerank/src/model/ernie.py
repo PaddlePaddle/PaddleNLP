@@ -13,19 +13,15 @@
 # limitations under the License.
 """Ernie model."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function, unicode_literals
 
 import json
-import six
 import logging
 from io import open
 
+import paddle
 import paddle.fluid as fluid
-
+import six
 from model.transformer_encoder import encoder, pre_process_layer
 
 log = logging.getLogger(__name__)
@@ -140,7 +136,7 @@ class ErnieModel(object):
 
         emb_out = pre_process_layer(emb_out, "nd", self._prepostprocess_dropout, name=model_name + "pre_encoder")
 
-        self_attn_mask = fluid.layers.matmul(x=input_mask, y=input_mask, transpose_y=True)
+        self_attn_mask = paddle.matmul(x=input_mask, y=input_mask, transpose_y=True)
 
         self_attn_mask = fluid.layers.scale(x=self_attn_mask, scale=10000.0, bias=-1.0, bias_after_scale=False)
         n_head_self_attn_mask = fluid.layers.stack(x=[self_attn_mask] * self._n_head, axis=1)
@@ -226,7 +222,7 @@ class ErnieModel(object):
             name="mask_lm_out_fc.b_0", initializer=fluid.initializer.Constant(value=0.0)
         )
         if self._weight_sharing:
-            fc_out = fluid.layers.matmul(
+            fc_out = paddle.matmul(
                 x=mask_trans_feat,
                 y=fluid.default_main_program().global_block().var(self._word_emb_name),
                 transpose_y=True,
