@@ -34,7 +34,7 @@
   * 📃 Release **[UIE-X](./applications/information_extraction)**, an universal information extraction model which supports both document and text inputs.
   * ❣️Release  **[View Extraction and Sentiment Analysis Models](./applications/sentiment_analysis/unified_sentiment_extraction)** based on UIE,  including abilities of sentence and attribute level emotional polarity classification, attribute extraction,  opinion extraction,  attribute aggregation and implicit opinion extraction.
 * **2022.9.6 [PaddleNLPv2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0) Released!**
-  * 💎 NLP Tool: **[Pipelines](./pipelines)** released. Supports for fast construction of search engine and question answering systems, and it is expandable to all kinds of NLP systems. Building end-to-end pipelines for NLP tasks like playing Lego!
+  * 💎 NLP Tools: Released **[Pipelines](./pipelines)** which supports turn-key construction of search engine and question answering systems. It features a flexible design that is applicable for all kinds of NLP systems so you can build end-to-end NLP pipelines like Legos!
 
   * 🔨 Industrial application: Release **[Complete Solution of Text Classification](./applications/text_classification)** covering various scenarios of text classification: multi-class, multi-label and hierarchical, it also supports for **few-shot learning** and the training and optimization of **TrustAI**. Upgrade for [**UIE**](./model_zoo/uie) and release **UIE-M**, support both Chinese and English information extraction in a single model; release the data distillation solution for UIE to break the bottleneck of time-consuming of inference.
 
