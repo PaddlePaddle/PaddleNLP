@@ -33,7 +33,7 @@ from modeling import (
     IpuBertPretrainingNSPHeads,
 )
 from scipy.stats import truncnorm
-from utils import ProgressBar, ProgressFunc, load_custom_ops, parse_args
+from utils import ProgressFunc, load_custom_ops, parse_args
 
 from paddlenlp.transformers import LinearDecayWithWarmup
 
@@ -297,7 +297,7 @@ def main(args):
 
     # Compile program for IPU
     ipu_compiler = paddle.static.IpuCompiledProgram(main_program, ipu_strategy=ipu_strategy)
-    logging.info(f"start compiling, please wait some minutes")
+    logging.info("start compiling, please wait some minutes")
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time

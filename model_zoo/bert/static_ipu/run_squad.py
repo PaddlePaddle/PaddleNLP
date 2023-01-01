@@ -360,7 +360,7 @@ def main(args):
         fetch_list = [start_logits.name, end_logits.name]
 
     ipu_compiler = paddle.static.IpuCompiledProgram(main_program, ipu_strategy=ipu_strategy)
-    logging.info(f"start compiling, please wait some minutes")
+    logging.info("start compiling, please wait some minutes")
     cur_time = time.time()
     main_program = ipu_compiler.compile(feed_list, fetch_list)
     time_cost = time.time() - cur_time
