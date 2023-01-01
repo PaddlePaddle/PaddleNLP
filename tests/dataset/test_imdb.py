@@ -1,4 +1,4 @@
-# Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,37 +11,35 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-import os
 import unittest
-from paddlenlp.datasets import load_dataset
 
-from common_test import CpuCommonTest
-import util
-import unittest
+from paddlenlp.datasets import load_dataset
+from tests.common_test import CpuCommonTest
+from tests.testing_utils import assert_raises, slow
 
 
 def get_examples(mode="train"):
     examples = {
         "train": (
-            "I loved this movie since I was 7 and I saw it on the opening day "
-            "It was so touching and beautiful I strongly recommend seeing for "
-            "all Its a movie to watch with your family by farbr br My MPAA rating "
-            "PG13 for thematic elements prolonged scenes of disastor nuditysexuality "
-            "and some language",
+            "I loved this movie since I was 7 and I saw it on the opening day. "
+            "It was so touching and beautiful. I strongly recommend seeing for all. "
+            "It's a movie to watch with your family by far.<br /><br />"
+            "My MPAA rating: PG-13 for thematic elements, prolonged scenes of disastor, "
+            "nudity/sexuality and some language.",
             1,
         ),
         "test": (
-            "Felix in Hollywood is a great film The version I viewed was very well "
-            "restored which is sometimes a problem with these silent era animated films "
-            "It has some of Hollywoods most famous stars making cameo animated "
-            "appearances A must for any silent film or animation enthusiast",
+            "Felix in Hollywood is a great film. The version I viewed was very well restored, "
+            "which is sometimes a problem with these silent era animated films. It has some of "
+            "Hollywood's most famous stars making cameo animated appearances. A must for any "
+            "silent film or animation enthusiast.",
             1,
         ),
     }
     return examples[mode]
 
 
+@slow
 class TestImdbTrainSet(CpuCommonTest):
     def setUp(self):
         self.config["path_or_read_func"] = "imdb"
@@ -56,6 +54,7 @@ class TestImdbTrainSet(CpuCommonTest):
         self.check_output_equal(expected_label, train_ds[36]["label"])
 
 
+@slow
 class TestImdbTestSet(CpuCommonTest):
     def setUp(self):
         self.config["path_or_read_func"] = "imdb"
@@ -70,6 +69,7 @@ class TestImdbTestSet(CpuCommonTest):
         self.check_output_equal(expected_label, test_ds[23]["label"])
 
 
+@slow
 class TestImdbTrainTestSet(CpuCommonTest):
     def setUp(self):
         self.config["path_or_read_func"] = "imdb"
@@ -96,7 +96,7 @@ class TestImdbNoSplitDataFiles(CpuCommonTest):
     def setUp(self):
         self.config["path_or_read_func"] = "imdb"
 
-    @util.assert_raises
+    @assert_raises
     def test_no_split_datafiles(self):
         load_dataset(**self.config)
 

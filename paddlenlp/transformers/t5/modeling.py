@@ -593,13 +593,12 @@ class T5PretrainedModel(PretrainedModel):
 
     def _init_weights(self, layer):
         """Initialize the weights"""
-        factor = (
-            self.initializer_factor if hasattr(self, "initializer_factor") else self.t5.config["initializer_factor"]
-        )  # Used for testing weights initialization
-        d_model = self.d_model if hasattr(self, "d_model") else self.t5.config["d_model"]
-        d_ff = self.d_ff if hasattr(self, "d_ff") else self.t5.config["d_ff"]
-        n_heads = self.num_heads if hasattr(self, "num_heads") else self.t5.config["num_heads"]
-        key_value_proj_dim = self.d_kv if hasattr(self, "d_kv") else self.t5.config["d_kv"]
+        # Used for testing weights initialization
+        factor = self.config.initializer_factor
+        d_model = self.config.d_model
+        d_ff = self.config.d_ff
+        n_heads = self.config.num_heads
+        key_value_proj_dim = self.config.d_kv
 
         if isinstance(layer, T5LayerNorm):
             layer.weight.set_value(paddle.ones_like(layer.weight) * factor)
@@ -681,8 +680,8 @@ class T5PretrainedModel(PretrainedModel):
                 )
 
     def _shift_right(self, input_ids):
-        bos_token_id = self.bos_token_id if hasattr(self, "bos_token_id") else self.t5.config["bos_token_id"]
-        pad_token_id = self.pad_token_id if hasattr(self, "pad_token_id") else self.t5.config["pad_token_id"]
+        bos_token_id = self.config.bos_token_id
+        pad_token_id = self.config.pad_token_id
 
         assert (
             bos_token_id is not None
@@ -697,7 +696,7 @@ class T5PretrainedModel(PretrainedModel):
         # replace possible -100 values in labels by `pad_token_id`
         shifted_input_ids = paddle.where(
             shifted_input_ids == -100,
-            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids))),
+            paddle.assign(np.asarray(pad_token_id, dtype=data_type_converter(shifted_input_ids)).reshape([1])),
             shifted_input_ids,
         )
 
@@ -1509,7 +1508,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_attentions=encoder_output.attentions,
         )
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterT5
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
@@ -1517,16 +1516,16 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
-        self._faster_entry = FasterT5(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        self._fast_entry = FasterT5(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):

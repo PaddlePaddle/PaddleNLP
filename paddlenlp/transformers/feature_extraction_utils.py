@@ -14,18 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import copy
 import json
-import paddle
+import os
 from collections import UserDict
 from typing import Any, Dict, Optional, Tuple, Union
-from ..utils.downloader import get_path_from_url, COMMUNITY_MODEL_PREFIX
-from ..utils.env import MODEL_HOME
 
 import numpy as np
-from .tokenizer_utils_base import TensorType
+import paddle
+
+from ..utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url_with_filelock
+from ..utils.env import MODEL_HOME
 from ..utils.log import logger
+from .tokenizer_utils_base import TensorType
 
 FEATURE_EXTRACTOR_NAME = "preprocessor_config.json"
 
@@ -100,7 +101,9 @@ class BatchFeature(UserDict):
             is_tensor = paddle.is_tensor
         else:
             as_tensor = np.asarray
-            is_tensor = lambda x: isinstance(x, np.ndarray)
+
+            def is_tensor(x):
+                return isinstance(x, np.ndarray)
 
         # Do the tensor conversion in batch
         for key, value in self.items():
@@ -256,7 +259,7 @@ class FeatureExtractionMixin(object):
                 )
             default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
             try:
-                resolved_feature_extractor_file = get_path_from_url(feature_extractor_file, default_root)
+                resolved_feature_extractor_file = get_path_from_url_with_filelock(feature_extractor_file, default_root)
             except Exception:
                 # For any other exception, we throw a generic error.
                 raise EnvironmentError(

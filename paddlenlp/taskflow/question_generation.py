@@ -13,34 +13,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
-import json
-import math
-import os
-import copy
-import itertools
 import math
 
 import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-from ..transformers import UNIMOLMHeadModel
-from ..transformers import UNIMOTokenizer
 
-from ..datasets import load_dataset
-from ..data import Stack, Pad, Tuple
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
+from ..data import Pad
+from ..transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+            from paddlenlp import Taskflow
 
-           question_generation = Taskflow("question_generation")
-           question_generation([{"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"}]])
-           '''
-              ['黄山最高峰是什么']
-           '''
+            question_generation = Taskflow("question_generation")
+            question_generation([{"context": "奇峰黄山千米以上的山峰有77座，整座黄山就是一座花岗岩的峰林，自古有36大峰，36小峰，最高峰莲花峰、最险峰天都峰和观日出的最佳点光明顶构成黄山的三大主峰。", "answer": "莲花峰"}]])
+            '''
+                ['黄山最高峰是什么']
+            '''
          """
 
 
@@ -127,11 +116,7 @@ class QuestionGenerationTask(Task):
         inputs = inputs[0]
         if isinstance(inputs, str):
             if len(inputs) == 0:
-                raise ValueError(
-                    "Invalid inputs, input text should not be empty text, please check your input.".format(
-                        type(inputs)
-                    )
-                )
+                raise ValueError("Invalid inputs, input text should not be empty text, please check your input. ")
             inputs = [inputs]
         elif isinstance(inputs, dict):
             if not ("source" in inputs and "title" in inputs) and not ("context" in inputs and "answer" in inputs):
@@ -140,7 +125,11 @@ class QuestionGenerationTask(Task):
                 )
         elif isinstance(inputs, list):
             if not (isinstance(inputs[0], dict)):
-                raise TypeError("Invalid inputs, input text should be list of dict.".format(type(inputs[0])))
+                raise TypeError(
+                    "Invalid inputs, input text should be list of dict, but type of List({}) found! ".format(
+                        type(inputs[0])
+                    )
+                )
         else:
             raise TypeError(
                 "Invalid inputs, input text should be str or list of str, but type of {} found!".format(type(inputs))
@@ -172,19 +161,19 @@ class QuestionGenerationTask(Task):
             title = example[1]
 
         if self._template == 1:
-            ### use template 1
+            # use template 1
             source = "答案：" + title + self._tokenizer.sep_token + "上下文：" + source
             title = None
             if target:
                 target = "问题：" + target
         elif self._template == 2:
-            ### use template 2
+            # use template 2
             source = "答案：" + title + self._tokenizer.sep_token + "上下文：" + source
             title = None
             if target:
                 target = "在已知答案的前提下，问题：" + target
         elif self._template == 3:
-            ### use template 3
+            # use template 3
             source = "这是一个问题生成任务，根据提供的答案和上下文，来生成问题。" + title + self._tokenizer.sep_token + "上下文：" + source
             title = None
             if target:
@@ -272,7 +261,7 @@ class QuestionGenerationTask(Task):
                 repetition_penalty=self._repetition_penalty,
                 bos_token_id=self._tokenizer.cls_token_id,
                 eos_token_id=self._tokenizer.mask_token_id,
-                use_faster=self._use_faster,
+                use_fast=self._use_faster,
                 use_fp16_decoding=self._use_fp16_decoding,
             )
             all_ids.extend(ids)

@@ -235,7 +235,7 @@ class PromptTrainer(Trainer):
             loss = self.criterion(logits, labels)
 
             if self.args.use_rdrop:
-                loss = self._compute_rdrop_loss(model, input_dict, logits, loss)
+                loss = self._compute_rdrop_loss(model, input_dict, labels, logits, loss)
 
             if self.args.use_rgl:
                 loss += self._compute_rgl_loss(hidden_states, labels)
@@ -246,9 +246,8 @@ class PromptTrainer(Trainer):
 
         return (loss, outputs) if return_outputs else loss
 
-    def _compute_rdrop_loss(self, model, input_dict, outputs, loss):
+    def _compute_rdrop_loss(self, model, input_dict, labels, outputs, loss):
         re_outputs, _ = model(**input_dict)
-        labels = input_dict["labels"]
         ce_loss = (self.criterion(re_outputs, labels) + loss) * 0.5
         kl_loss = self.rdrop_criterion(outputs, re_outputs)
         loss = ce_loss + self.args.alpha_rdrop * kl_loss

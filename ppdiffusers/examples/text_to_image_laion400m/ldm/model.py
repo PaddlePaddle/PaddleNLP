@@ -168,15 +168,16 @@ class LatentDiffusionModel(nn.Layer):
 
     def forward(self, input_ids=None, pixel_values=None, **kwargs):
         self.train()
-        with paddle.no_grad():
-            self.vae.eval()
-            latents = self.vae.encode(pixel_values).latent_dist.sample()
-            latents = latents * 0.18215
-            noise = paddle.randn(latents.shape)
-            timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).astype(
-                "int64"
-            )
-            noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
+        with paddle.amp.auto_cast(enable=False):
+            with paddle.no_grad():
+                self.vae.eval()
+                latents = self.vae.encode(pixel_values).latent_dist.sample()
+                latents = latents * 0.18215
+                noise = paddle.randn(latents.shape)
+                timesteps = paddle.randint(0, self.noise_scheduler.num_train_timesteps, (latents.shape[0],)).astype(
+                    "int64"
+                )
+                noisy_latents = self.noise_scheduler.add_noise(latents, noise, timesteps)
 
         encoder_hidden_states = self.text_encoder(input_ids)[0]
         noise_pred = self.unet(noisy_latents, timesteps, encoder_hidden_states).sample

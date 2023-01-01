@@ -55,7 +55,7 @@ def senta_pipeline(args):
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file_path", default="", type=str, help="The file that you want to perform sentiment analysis on.")
+    parser.add_argument("--file_path", required=True, type=str, help="The file that you want to perform sentiment analysis on.")
     parser.add_argument("--max_examples", default=-1, type=int, help="The maxinum number of examples processed by pipline.")
     parser.add_argument("--model", choices=['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano'], default="uie-senta-base", help="The model name that you wanna use for sentiment analysis.")
     parser.add_argument("--aspects", default=None, type=str, nargs="+", help="A list of pre-given aspects, that is to say, Pipeline only perform sentiment analysis on these pre-given aspects if you input it.")
