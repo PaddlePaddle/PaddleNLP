@@ -13,28 +13,34 @@
 # limitations under the License.
 
 from __future__ import annotations
-from abc import ABC, abstractmethod
+
+import inspect
 import json
 import os
 import re
+from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import Callable, Dict, Optional, List, Tuple, Type, Union, TypeVar
 from dataclasses import dataclass
+from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+import numpy as np
 import paddle
+from numpy import allclose, ndarray, transpose
 from paddle import Tensor
 from paddle.nn import Layer
-import numpy as np
-from numpy import ndarray, transpose, allclose
+
 from paddlenlp.transformers import PretrainedModel
 from paddlenlp.transformers.configuration_utils import PretrainedConfig
-from paddlenlp.utils.log import logger
 from paddlenlp.utils.import_utils import (
     import_module,
     is_package_available,
     is_torch_available,
     is_transformers_available,
 )
+from paddlenlp.utils.log import logger
+
+# from paddlenlp.utils.serialization import load_torch
+
 
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
@@ -66,13 +72,15 @@ def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarra
             infos.append(tensor_summary(item))
         return "\n".join(infos)
 
-    # it must be Paddle Tensor or Pytorch Tensor
-    if not isinstance(tensor, ndarray):
+    # check whether contains `.numpy` method
+    # numpy is wrapped from C++, so it will be the `builtin` method
+    if hasattr(tensor, "numpy") and inspect.isbuiltin(getattr(tensor, "numpy")):
         tensor = tensor.detach().cpu().numpy()
+        tensor = np.reshape(tensor, [-1])
+        top_3_tensor = str(tensor[1:4])
+        return top_3_tensor
 
-    tensor = np.reshape(tensor, [-1])
-    top_3_tensor = str(tensor[1:4])
-    return top_3_tensor
+    return str(tensor)
 
 
 def compare_model_weights(first_state_dict: Dict[str, ndarray], second_state_dict: Dict[str, ndarray]) -> List[str]:
@@ -107,7 +115,7 @@ def load_all_converters() -> List[Type[Converter]]:
             continue
 
         obj = getattr(transformer_module, obj_name, None)
-        if obj and issubclass(obj, Converter):
+        if obj is not None and issubclass(obj, Converter):
             converter_classes.append(obj)
 
     return converter_classes
@@ -193,7 +201,7 @@ class StateDictKeysChecker:
 
             # the base-static must be same
             if not state_dict_contains_prefix(self.loaded_state_dict, self.base_model_prefix):
-                error_msg = [f"also the base model, but contains the diff keys: \n"]
+                error_msg = ["also the base model, but contains the diff keys: \n"]
                 if not_in_model_keys:
                     error_msg.append(f"in loaded state-dict, not in model keys: <{not_in_model_keys}>\n")
                 if not_in_loaded_keys:
@@ -245,6 +253,11 @@ class StateDictNameMapping:
     action: Optional[str] = None  # the value can be: transpose, merge_last_two_dim
     index: Optional[int] = None
 
+    slots: list[str] = None
+
+    def __post_init__(self):
+        self.slots = self.parse_slots(self.source_name)
+
     def should_transpose(self) -> bool:
         return self.action == "transpose"
 
@@ -268,6 +281,34 @@ class StateDictNameMapping:
             assert len(shape) == 3
             return np.reshape(tensor, [shape[0], -1])
         return tensor
+
+    @staticmethod
+    def parse_slots(text: str):
+        left_char, right_char = "{", "}"
+
+        slots = []
+        while left_char in text:
+            left_index = text.index(left_char)
+            right_index = text.index(right_char)
+            slots.append(text[left_index : right_index + len(right_char)])
+            text = text[right_index + len(right_char) :]
+
+        return slots
+
+    def matched(self, text: str) -> bool:
+        """check whether the layer_name match the current pattern
+
+        Args:
+            text (str): the name of layer
+
+        Returns:
+            bool: whether the
+        """
+        if text == self.source_name:
+            return True
+
+        if not self.slots:
+            return False
 
 
 class TensorInfoSaver:
@@ -454,7 +495,7 @@ class LogitHooker:
         self.tensor_info_saver.summary()
 
 
-class Converter(ABC):
+class ConverterLogitMixin(ABC):
     """Model Weight Converter for developer to convert pytorch/tensorflow/jax pretrained model weight to paddle.
 
     * you can convert model weight in online/offline mode.
@@ -463,7 +504,7 @@ class Converter(ABC):
     """
 
     _ignore_state_dict_keys = []
-    num_layer_regex = "\.\d+\."
+    num_layer_regex = r"\.\d+\."
 
     num_layer_key: str = "num_hidden_layers"
 
@@ -875,3 +916,17 @@ class Converter(ABC):
             logger.warning(
                 "you don't install `torch` and `transformers` package, so we can't compare the logits between paddle & pytorch model"
             )
+
+
+class Converter(ABC):
+    def convert(self, input_dir: str, output_dir: str):
+        """the entry of converting config and converting model file
+
+        Args:
+            input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
+            output_dir (str): the output dir
+        """
+        os.makedirs(output_dir, exist_ok=True)
+
+    def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
+        raise
