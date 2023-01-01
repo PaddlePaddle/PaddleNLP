@@ -224,20 +224,35 @@ def load_squad_dataset(args):
         train_batch_sampler = BatchSampler(dataset, batch_size=bs, shuffle=args.shuffle, drop_last=False)
 
     if args.is_training:
-        collate_fn = lambda samples, fn=Dict(
-            {
-                "input_ids": Stack(),
-                "token_type_ids": Stack(),
-                "position_ids": Stack(),
-                "input_mask": Stack(),
-                "start_positions": Stack(),
-                "end_positions": Stack(),
-            }
-        ): fn(samples)
+
+        def _collate_fn(samples):
+            fn = Dict(
+                {
+                    "input_ids": Stack(),
+                    "token_type_ids": Stack(),
+                    "position_ids": Stack(),
+                    "input_mask": Stack(),
+                    "start_positions": Stack(),
+                    "end_positions": Stack(),
+                }
+            )
+            return fn(samples)
+
+        collate_fn = _collate_fn
     else:
-        collate_fn = lambda samples, fn=Dict(
-            {"input_ids": Stack(), "token_type_ids": Stack(), "position_ids": Stack(), "input_mask": Stack()}
-        ): fn(samples)
+
+        def _collate_fn(samples):
+            fn = Dict(
+                {
+                    "input_ids": Stack(),
+                    "token_type_ids": Stack(),
+                    "position_ids": Stack(),
+                    "input_mask": Stack(),
+                }
+            )
+            return fn(samples)
+
+        collate_fn = _collate_fn
 
     data_loader = DataLoader(
         dataset=dataset, batch_sampler=train_batch_sampler, collate_fn=collate_fn, return_list=True
