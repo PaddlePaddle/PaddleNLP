@@ -244,7 +244,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 为了实现更极致的模型部署性能，安装FastTokenizers后只需在`AutoTokenizer` API上打开 `use_fast=True`选项，即可调用C++实现的高性能分词算子，轻松获得超Python百余倍的文本处理加速，更多使用说明可参考[FastTokenizer文档](./fast_tokenizer)。
 
-#### ⚡️ FasterGeneration：高性能生成加速库
+#### ⚡️ FastGeneration：高性能生成加速库
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -255,10 +255,10 @@ model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
 ...
 outputs, _ = model.generate(
     input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_faster=True)
+    use_fast=True)
 ```
 
-简单地在`generate()`API上打开`use_faster=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FasterGeneration文档](./faster_generation)。
+简单地在`generate()`API上打开`use_fast=True`选项，轻松在Transformer、GPT、BART、PLATO、UniLM等生成式预训练模型上获得5倍以上GPU加速，更多使用说明可参考[FastGeneration文档](./fast_generation)。
 
 #### 🚀 Fleet：飞桨4D混合并行分布式训练技术
 

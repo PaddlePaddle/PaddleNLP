@@ -71,7 +71,7 @@
    :caption: 进阶指南
 
    模型压缩 <advanced_guide/model_compression/index>
-   文本生成高性能加速 <advanced_guide/fastergeneration/index>
+   文本生成高性能加速 <advanced_guide/fastgeneration/index>
    大规模分布式训练 <advanced_guide/distributed_training>
 
 .. toctree::

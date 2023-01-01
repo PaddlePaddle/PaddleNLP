@@ -17,7 +17,7 @@
     - [模型训练](#模型训练)
     - [模型预测](#模型预测)
     - [模型推理部署](#模型推理部署)
-      - [FasterGeneration加速及模型静态图导出](#fastergeneration加速及模型静态图导出)
+      - [FastGeneration加速及模型静态图导出](#fastgeneration加速及模型静态图导出)
       - [模型部署](#模型部署)
   - [References](#references)
 
@@ -30,7 +30,7 @@
 
 - 效果领先。在LCSTS上效果达到SOTA。
 - 开箱即用。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
-- 高性能推理。本项目基于[FasterGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/faster_generation)
+- 高性能推理。本项目基于[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/fast_generation)
   进行推理加速，能够提供更高性能的推理体验。
 - 训练推理全流程打通。本项目提供了全面的定制训练流程，从数据准备、模型训练预测，到模型推理部署，一应俱全。
 
@@ -90,7 +90,7 @@ IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese"模型，还支持large模型: "I
 
 - 模型部署需要将保存的最佳模型参数（动态图）导出成静态图参数，用于后续的推理部署。
 
-- 文本摘要应用提供了基于Paddle Inference的本地部署predictor，并且支持在GPU设备使用FasterGeneration进行加速。
+- 文本摘要应用提供了基于Paddle Inference的本地部署predictor，并且支持在GPU设备使用FastGeneration进行加速。
 
 - 文本摘要应用提供了基于Paddle Serving的服务端部署方案。
 
@@ -259,10 +259,10 @@ Finetuned baseline的模型在[LCSTS](https://aclanthology.org/D15-1229/)测试�
 
 ### 模型推理部署
 
-#### FasterGeneration加速及模型静态图导出
+#### FastGeneration加速及模型静态图导出
 
 使用动态图训练结束之后，可以通过[静态图导出脚本](export_model.py)
-实现基于FasterGeneration的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
+实现基于FastGeneration的高性能预测加速，并将动态图参数导出成静态图参数，静态图参数保存在`output_path`指定路径中。运行方式：
 
 ```shell
 python export_model.py \

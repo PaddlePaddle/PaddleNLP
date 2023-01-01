@@ -1508,7 +1508,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             encoder_attentions=encoder_output.attentions,
         )
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterT5
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
@@ -1516,16 +1516,16 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
-        self._faster_entry = FasterT5(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        self._fast_entry = FasterT5(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     @staticmethod
     def prepare_input_ids_for_generation(bos_token_id, encoder_output=None):
