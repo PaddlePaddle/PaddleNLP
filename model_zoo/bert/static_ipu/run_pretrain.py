@@ -22,9 +22,6 @@ import numpy as np
 import paddle
 import paddle.optimizer
 import paddle.static
-from paddlenlp.transformers import LinearDecayWithWarmup
-from scipy.stats import truncnorm
-
 from dataset_ipu import PretrainingHDF5DataLoader
 from modeling import (
     BertModel,
@@ -35,7 +32,10 @@ from modeling import (
     IpuBertPretrainingNSPAccAndLoss,
     IpuBertPretrainingNSPHeads,
 )
-from utils import load_custom_ops, parse_args, ProgressBar, ProgressFunc
+from scipy.stats import truncnorm
+from utils import ProgressBar, ProgressFunc, load_custom_ops, parse_args
+
+from paddlenlp.transformers import LinearDecayWithWarmup
 
 
 def set_seed(seed):
@@ -270,10 +270,8 @@ def main(args):
 
     amp_list = paddle.static.amp.CustomOpLists()
     amp_list.unsupported_list = {}
-    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
-        main_program, amp_list, use_fp16_guard=False)
-    paddle.static.amp.cast_parameters_to_fp16(
-        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(main_program, amp_list, use_fp16_guard=False)
+    paddle.static.amp.cast_parameters_to_fp16(paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
     if args.enable_load_params:
         logging.info(f"loading weights from: {args.load_params_path}")

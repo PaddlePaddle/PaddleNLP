@@ -24,14 +24,20 @@ import paddle
 import paddle.optimizer
 import paddle.static
 from datasets import load_dataset
+from modeling import (
+    BertModel,
+    DeviceScope,
+    IpuBertConfig,
+    IpuBertForQuestionAnswering,
+    IpuBertQAAccAndLoss,
+)
 from paddle.io import BatchSampler, DataLoader
+from run_pretrain import create_ipu_strategy, reset_program_state_dict, set_seed
+from utils import load_custom_ops, parse_args
+
 from paddlenlp.data import Dict, Stack
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.transformers import BertTokenizer, LinearDecayWithWarmup
-
-from modeling import BertModel, DeviceScope, IpuBertConfig, IpuBertForQuestionAnswering, IpuBertQAAccAndLoss
-from run_pretrain import create_ipu_strategy, reset_program_state_dict, set_seed
-from utils import load_custom_ops, parse_args
 
 
 def create_data_holder(args):
@@ -238,13 +244,12 @@ def load_squad_dataset(args):
     )
     return raw_dataset, data_loader
 
+
 def cast_model_to_fp16(main_program):
     amp_list = paddle.static.amp.CustomOpLists()
     amp_list.unsupported_list = {}
-    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(
-        main_program, amp_list, use_fp16_guard=False)
-    paddle.static.amp.cast_parameters_to_fp16(
-        paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
+    to_fp16_var_names = paddle.static.amp.cast_model_to_fp16(main_program, amp_list, use_fp16_guard=False)
+    paddle.static.amp.cast_parameters_to_fp16(paddle.CPUPlace(), main_program, to_fp16_var_names=to_fp16_var_names)
 
 
 def main(args):
