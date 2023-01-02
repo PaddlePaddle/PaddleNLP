@@ -373,20 +373,27 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             unet = self.unet.model
             unet_output_name = unet.get_output_info(0).name
+            text_embeddings = paddle.to_tensor(text_embeddings, dtype="float32")
             for i, t in enumerate(timesteps):
                 # expand the latents if we are doing classifier free guidance
                 latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
                 # predict the noise residual
-                input1 = fd.C.FDTensor()
-                input2 = fd.C.FDTensor()
-                input3 = fd.C.FDTensor()
-                input1.from_numpy(latent_model_input.numpy().astype(np.float32), False)
-                input2.from_numpy(np.array(t, dtype=np.int64), False)
-                input3.from_numpy(text_embeddings.astype(np.float32), False)
-                unet.bind_input_tensor("sample", input1)
-                unet.bind_input_tensor("timestep", input2)
-                unet.bind_input_tensor("encoder_hidden_states", input3)
+                # input1 = fd.C.FDTensor()
+                # input2 = fd.C.FDTensor()
+                # input3 = fd.C.FDTensor()
+                # input1.from_numpy(latent_model_input.numpy().astype(np.float32), False)
+                # input2.from_numpy(np.array(t, dtype=np.int64), False)
+                # input3.from_numpy(text_embeddings.astype(np.float32), False)
+                dlpack1 = paddle.utils.dlpack.to_dlpack(latent_model_input)
+                dlpack2 = paddle.utils.dlpack.to_dlpack(t)
+                dlpack3 = paddle.utils.dlpack.to_dlpack(text_embeddings)
+                sample = fd.C.FDTensor.from_dlpack("sample", dlpack1)
+                timestep = fd.C.FDTensor.from_dlpack("timestep", dlpack2)
+                encoder_hidden_states = fd.C.FDTensor.from_dlpack("encoder_hidden_states", dlpack3)
+                unet.bind_input_tensor("sample", sample)
+                unet.bind_input_tensor("timestep", timestep)
+                unet.bind_input_tensor("encoder_hidden_states", encoder_hidden_states)
                 unet.zero_copy_infer()
                 noise_pred = unet.get_output_tensor(unet_output_name)
                 dlpack = noise_pred.to_dlpack()
@@ -397,9 +404,7 @@ class FastDeployStableDiffusionPipeline(DiffusionPipeline):
                     noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
 
                 # compute the previous noisy sample x_t -> x_t-1
-                scheduler_output = self.scheduler.step(
-                    paddle.to_tensor(noise_pred), t, paddle.to_tensor(latents), **extra_step_kwargs
-                )
+                scheduler_output = self.scheduler.step(noise_pred, t, latents, **extra_step_kwargs)
                 latents = scheduler_output.prev_sample  # .numpy()
 
                 # call the callback, if provided
