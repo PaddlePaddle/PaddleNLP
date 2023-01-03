@@ -212,10 +212,18 @@ def do_eval(args):
     dev_ds = dev_ds.map(trans_func, lazy=True)
     dev_batch_sampler = paddle.io.BatchSampler(dev_ds, batch_size=args.batch_size, shuffle=False)
 
-    batchify_fn = DataCollatorWithPadding(tokenizer)
+    if args.device == "npu":
+        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+        batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+    else:
+        batchify_fn = DataCollatorWithPadding(tokenizer)
 
     dev_data_loader = DataLoader(
-        dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+        dataset=dev_ds,
+        batch_sampler=dev_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=args.num_workers,
+        return_list=True,
     )
 
     num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
@@ -387,12 +395,20 @@ def do_predict(args):
         is_test=True,
     )
 
-    batchify_fn = DataCollatorWithPadding(tokenizer)
+    if args.device == "npu":
+        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+        batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+    else:
+        batchify_fn = DataCollatorWithPadding(tokenizer)
 
     test_ds = test_ds.map(trans_func, lazy=True)
     test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=args.batch_size, shuffle=False)
     test_data_loader = DataLoader(
-        dataset=test_ds, batch_sampler=test_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
+        dataset=test_ds,
+        batch_sampler=test_batch_sampler,
+        collate_fn=batchify_fn,
+        num_workers=args.num_workers,
+        return_list=True,
     )
 
     num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
