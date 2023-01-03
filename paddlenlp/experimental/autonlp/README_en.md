@@ -2,6 +2,8 @@
 
 [简体中文🀄](./README_cn.md) |  **English**🌎
 
+# Introduction
+
 **The AutoNLP APIs are subjective to significant changes until formal release**
 
 **AutoNLP** is an experimental project by PaddleNLP to democratize NLP for everyone. Delivering a successful NLP project is not easy, as it requires deep domain knowledge. Time after time, we have seen people struggle to make NLP work on their dataset, for their projects, which is why we are building **AutoNLP**. Compared with the traditional AutoML approach of massive paid compute for State-of-the-Art model performance, we have a different philosphy:
