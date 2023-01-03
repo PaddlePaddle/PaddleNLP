@@ -867,10 +867,10 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
     """
 
-    def __init__(self, config: GPTConfig):
+    def __init__(self, config: GPTConfig, max_predict_len: int = 32):
         super(GPTForGreedyGeneration, self).__init__(config)
         self.gpt = GPTModel(config)
-        self.max_predict_len = paddle.to_tensor(config.max_predict_len, dtype="int32")
+        self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
         self.eol_token_id = config.eol_token_id
         self.apply(self.init_weights)
 

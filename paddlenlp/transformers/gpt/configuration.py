@@ -261,7 +261,6 @@ class GPTConfig(PretrainedConfig):
         bos_token_id: int = 0,
         eol_token_id: int = 3,
         topo: int = None,
-        max_predict_len: int = 32,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, **kwargs)
@@ -282,4 +281,3 @@ class GPTConfig(PretrainedConfig):
         self.bos_token_id = bos_token_id
         self.eol_token_id = eol_token_id
         self.topo = topo
-        self.max_predict_len = max_predict_len
