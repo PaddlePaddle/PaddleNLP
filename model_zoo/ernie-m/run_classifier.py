@@ -16,7 +16,6 @@
 import random
 from dataclasses import dataclass, field
 from functools import partial
-from pprint import pprint
 
 import numpy as np
 import paddle
@@ -229,7 +228,7 @@ def do_train():
             trainer.log_metrics("eval", metrics)
 
         combined.update({"eval_accuracy_average": np.mean(list(combined.values()))})
-        pprint(combined)
+        trainer.log_metrics("eval", combined)
         trainer.save_metrics("eval", combined)
 
 
