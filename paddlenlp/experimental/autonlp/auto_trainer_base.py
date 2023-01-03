@@ -38,8 +38,12 @@ class AutoTrainerBase(metaclass=ABCMeta):
     Task-specific AutoTrainers need to inherit from the meta class.
 
     Args:
-        language (string, optional): language of the text
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
+        train_dataset (Dataset, required): Training dataset, must contains the 'text_column' and 'label_column' specified below
+        eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
+        language (string, required): language of the text
+        metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
+        greater_is_better (bool, required): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
+        output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
     """
 
     training_path = "training"
@@ -113,6 +117,13 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
 
     def export(self, export_path, trial_id=None):
+        """
+        Export the model from a certain `trial_id` to the given file path.
+
+        Args:
+            export_path (str, required): the filepath to export to
+            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+        """
         model_result = self._get_model_result(trial_id=trial_id)
         exported_model_path = os.path.join(model_result.log_dir, self.export_path)
         shutil.copytree(exported_model_path, export_path, dirs_exist_ok=True)
@@ -120,10 +131,24 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
+        """
+        Convert the model from a certain `trial_id` to a Taskflow for model inference
+
+        Args:
+            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+        """
         raise NotImplementedError
 
     @abstractmethod
-    def evaluate(self, trial_id=None, eval_dataset=None):
+    def evaluate(self, trial_id=None, eval_dataset=None) -> Dict[str, float]:
+        """
+        Evaluate the models from a certain `trial_id` on the given dataset
+
+        Args:
+            trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
+            eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
+                If not provided, defaults to the evaluation dataset used at construction
+        """
         raise NotImplementedError
 
     def _override_hp(self, config: Dict[str, Any], default_hp: Any) -> Any:
@@ -182,6 +207,12 @@ class AutoTrainerBase(metaclass=ABCMeta):
             )
 
     def load(self, path: str):
+        """
+        Restores the AutoTrainer from a given experiment directory produced by a previous run
+
+        Args:
+            path (str, required): The filepath to load the previous experiments
+        """
         logger.info(f"Restoring from {path}")
         self.training_results = self.tuner.get_results()
         self.tuner = tune.Tuner.restore(path)

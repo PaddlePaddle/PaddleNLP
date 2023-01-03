@@ -51,11 +51,15 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
     AutoTrainer for Text Classification problems
 
     Args:
+        train_dataset (Dataset, required): Training dataset, must contains the 'text_column' and 'label_column' specified below
+        eval_dataset (Dataset, required): Evaluation dataset, must contains the 'text_column' and 'label_column' specified below
         text_column (string, required): Name of the column that contains the input text.
         label_column (string, required): Name of the column that contains the target variable to predict.
+        language (string, required): language of the text
         metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
         greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
-        kwargs (dict, optional): Additional keyword arguments passed along to underlying meta class.
+        problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
+        output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
     """
 
     def __init__(
@@ -262,6 +266,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return trainable
 
     def evaluate(self, trial_id=None, eval_dataset=None):
+        """
+        Evaluate the models from a certain `trial_id` on the given dataset
+
+        Args:
+            trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model selected by `metric_for_best_model`
+            eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields.
+                If not provided, defaults to the evaluation dataset used at construction
+        """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         if model_config["trainer_type"] == "PromptTrainer":
@@ -343,6 +355,12 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         return result
 
     def to_taskflow(self, trial_id=None):
+        """
+        Convert the model from a certain `trial_id` to a Taskflow for model inference
+
+        Args:
+            trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+        """
         model_result = self._get_model_result(trial_id=trial_id)
         model_config = model_result.metrics["config"]["candidates"]
         if model_config["trainer_type"] == "PromptTrainer":
