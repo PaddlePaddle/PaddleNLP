@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import functools
+import os
+from dataclasses import dataclass, field
 
 import paddle
 import paddle.nn.functional as F
+from metric import MetricReport
 from paddleslim.nas.ofa import OFA
-from paddlenlp.utils.log import logger
+from utils import preprocess_function, read_local_dataset
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
-from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from dataclasses import dataclass, field
-
-from utils import preprocess_function, read_local_dataset
-from metric import MetricReport
+from paddlenlp.trainer import CompressionArguments, PdArgumentParser, Trainer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -41,7 +40,7 @@ class DataArguments:
     """
 
     dataset_dir: str = field(default=None, metadata={"help": "Local dataset directory should include train.txt, dev.txt and label.txt."})
-    max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
+    max_seq_length: int = field(default=128, metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
 @dataclass
@@ -49,7 +48,7 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-    params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
+    params_dir: str = field(default='./checkpoint/', metadata={"help": "The output directory where the model checkpoints are written."})
 # yapf: enable
 
 
@@ -59,57 +58,46 @@ def dynabert_evaluate(self, model, data_loader):
     model.eval()
     metric.reset()
     for batch in data_loader:
-        logits = model(batch['input_ids'], batch['token_type_ids'])
+        logits = model(batch["input_ids"], batch["token_type_ids"])
         # Supports paddleslim.nas.ofa.OFA model and nn.layer model.
         if isinstance(model, OFA):
             logits = logits[0]
         probs = F.sigmoid(logits)
-        metric.update(probs, batch['labels'])
+        metric.update(probs, batch["labels"])
 
     micro_f1_score, macro_f1_score = metric.accumulate()
-    logger.info("micro f1 score: %.5f, macro f1 score: %.5f" %
-                (micro_f1_score, macro_f1_score))
+    logger.info("micro f1 score: %.5f, macro f1 score: %.5f" % (micro_f1_score, macro_f1_score))
     model.train()
     return macro_f1_score
 
 
 def main():
-    parser = PdArgumentParser(
-        (ModelArguments, DataArguments, CompressionArguments))
-    model_args, data_args, compression_args = parser.parse_args_into_dataclasses(
-    )
+    parser = PdArgumentParser((ModelArguments, DataArguments, CompressionArguments))
+    model_args, data_args, compression_args = parser.parse_args_into_dataclasses()
     paddle.set_device(compression_args.device)
-    compression_args.strategy = 'dynabert'
+    compression_args.strategy = "dynabert"
     # Log model and data config
     compression_args.print_config(model_args, "Model")
     compression_args.print_config(data_args, "Data")
 
     label_list = {}
-    label_path = os.path.join(data_args.dataset_dir, 'label.txt')
-    train_path = os.path.join(data_args.dataset_dir, 'train.txt')
-    dev_path = os.path.join(data_args.dataset_dir, 'dev.txt')
-    with open(label_path, 'r', encoding='utf-8') as f:
+    label_path = os.path.join(data_args.dataset_dir, "label.txt")
+    train_path = os.path.join(data_args.dataset_dir, "train.txt")
+    dev_path = os.path.join(data_args.dataset_dir, "dev.txt")
+    with open(label_path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f):
             l = line.strip()
             label_list[l] = i
 
-    train_ds = load_dataset(read_local_dataset,
-                            path=train_path,
-                            label_list=label_list,
-                            lazy=False)
-    dev_ds = load_dataset(read_local_dataset,
-                          path=dev_path,
-                          label_list=label_list,
-                          lazy=False)
+    train_ds = load_dataset(read_local_dataset, path=train_path, label_list=label_list, lazy=False)
+    dev_ds = load_dataset(read_local_dataset, path=dev_path, label_list=label_list, lazy=False)
 
-    model = AutoModelForSequenceClassification.from_pretrained(
-        model_args.params_dir)
+    model = AutoModelForSequenceClassification.from_pretrained(model_args.params_dir)
     tokenizer = AutoTokenizer.from_pretrained(model_args.params_dir)
 
-    trans_func = functools.partial(preprocess_function,
-                                   tokenizer=tokenizer,
-                                   max_seq_length=data_args.max_seq_length,
-                                   label_nums=len(label_list))
+    trans_func = functools.partial(
+        preprocess_function, tokenizer=tokenizer, max_seq_length=data_args.max_seq_length, label_nums=len(label_list)
+    )
     train_dataset = train_ds.map(trans_func)
     dev_dataset = dev_ds.map(trans_func)
 
@@ -123,7 +111,8 @@ def main():
         data_collator=data_collator,
         train_dataset=train_dataset,
         eval_dataset=dev_dataset,
-        criterion=criterion)  # Strategy`dynabert` needs arguments `criterion`
+        criterion=criterion,
+    )  # Strategy`dynabert` needs arguments `criterion`
 
     compression_args.print_config()
 

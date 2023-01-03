@@ -15,26 +15,31 @@
 
 # This file is modified from
 #  https://github.com/huggingface/transformers/blob/main/src/transformers/trainer_utils.py
+
 """
-Utilities for the Trainer class. 
+Utilities for the Trainer class.
 """
 import datetime
+import gc
+import inspect
 import json
+import math
 import os
 import random
 import re
+import threading
 import time
-import math
 from enum import Enum
-from typing import Dict, NamedTuple, Optional, Tuple, Union, List
+from typing import Dict, List, NamedTuple, Optional, Tuple, Union
 
 import numpy as np
 import paddle
 from paddle.io import IterableDataset
 from paddle.optimizer.lr import LambdaDecay
 
-from ..utils.log import logger
 from ..transformers.tokenizer_utils_base import BatchEncoding
+from ..utils.import_utils import is_paddle_cuda_available, is_psutil_available
+from ..utils.log import logger
 
 __all__ = [
     "TrainOutput",
@@ -51,6 +56,7 @@ __all__ = [
 
 def set_seed(seed: int):
     import paddle
+
     random.seed(seed)
     np.random.seed(seed)
     paddle.seed(seed)
@@ -107,15 +113,13 @@ _re_checkpoint = re.compile(r"^" + PREFIX_CHECKPOINT_DIR + r"\-(\d+)$")
 def get_last_checkpoint(folder):
     content = os.listdir(folder)
     checkpoints = [
-        path for path in content if _re_checkpoint.search(path) is not None
-        and os.path.isdir(os.path.join(folder, path))
+        path
+        for path in content
+        if _re_checkpoint.search(path) is not None and os.path.isdir(os.path.join(folder, path))
     ]
     if len(checkpoints) == 0:
         return
-    return os.path.join(
-        folder,
-        max(checkpoints,
-            key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+    return os.path.join(folder, max(checkpoints, key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
 
 
 class IntervalStrategy(ExplicitEnum):
@@ -147,6 +151,7 @@ class ShardingOption(ExplicitEnum):
     FULL_SHARD for sharding optimizer gradient and parameter
     OFFLOAD means offload to cpu.
     """
+
     SHARD_OP = "stage1"
     SHARD_GRAD_OP = "stage2"
     FULL_SHARD = "stage3"
@@ -219,9 +224,7 @@ def get_constant_schedule(learning_rate: float, last_epoch: int = -1):
     return LambdaDecay(learning_rate, lambda _: 1, last_epoch=last_epoch)
 
 
-def get_constant_schedule_with_warmup(learning_rate: float,
-                                      num_warmup_steps: int,
-                                      last_epoch: int = -1):
+def get_constant_schedule_with_warmup(learning_rate: float, num_warmup_steps: int, last_epoch: int = -1):
     """
     Create a schedule with a constant learning rate preceded by a warmup period during which the learning rate
     increases linearly between 0 and the initial lr set in the optimizer.
@@ -244,10 +247,7 @@ def get_constant_schedule_with_warmup(learning_rate: float,
     return LambdaDecay(learning_rate, lr_lambda, last_epoch=last_epoch)
 
 
-def get_linear_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps,
-                                    num_training_steps,
-                                    last_epoch=-1):
+def get_linear_schedule_with_warmup(learning_rate: float, num_warmup_steps, num_training_steps, last_epoch=-1):
     """
     Create a schedule with a learning rate that decreases linearly from the initial lr set in the optimizer to 0, after
     a warmup period during which it increases linearly from 0 to the initial lr set in the optimizer.
@@ -268,18 +268,15 @@ def get_linear_schedule_with_warmup(learning_rate: float,
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
         return max(
-            0.0,
-            float(num_training_steps - current_step) /
-            float(max(1, num_training_steps - num_warmup_steps)))
+            0.0, float(num_training_steps - current_step) / float(max(1, num_training_steps - num_warmup_steps))
+        )
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
 
-def get_cosine_schedule_with_warmup(learning_rate: float,
-                                    num_warmup_steps: int,
-                                    num_training_steps: int,
-                                    num_cycles: float = 0.5,
-                                    last_epoch: int = -1):
+def get_cosine_schedule_with_warmup(
+    learning_rate: float, num_warmup_steps: int, num_training_steps: int, num_cycles: float = 0.5, last_epoch: int = -1
+):
     """
     Create a schedule with a learning rate that decreases following the values of the cosine function between the
     initial lr set in the optimizer to 0, after a warmup period during which it increases linearly between 0 and the
@@ -303,11 +300,8 @@ def get_cosine_schedule_with_warmup(learning_rate: float,
     def lr_lambda(current_step):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
-        progress = float(current_step - num_warmup_steps) / float(
-            max(1, num_training_steps - num_warmup_steps))
-        return max(
-            0.0, 0.5 *
-            (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
+        progress = float(current_step - num_warmup_steps) / float(max(1, num_training_steps - num_warmup_steps))
+        return max(0.0, 0.5 * (1.0 + math.cos(math.pi * float(num_cycles) * 2.0 * progress)))
 
     return LambdaDecay(learning_rate, lr_lambda, last_epoch)
 
@@ -347,22 +341,16 @@ def get_scheduler(
 
     # All other schedulers require `num_warmup_steps`
     if num_warmup_steps is None:
-        raise ValueError(
-            f"{name} requires `num_warmup_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_warmup_steps`, please provide that argument.")
 
     if name == SchedulerType.CONSTANT_WITH_WARMUP:
         return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps)
 
     # All other schedulers require `num_training_steps`
     if num_training_steps is None:
-        raise ValueError(
-            f"{name} requires `num_training_steps`, please provide that argument."
-        )
+        raise ValueError(f"{name} requires `num_training_steps`, please provide that argument.")
 
-    return schedule_func(learning_rate,
-                         num_warmup_steps=num_warmup_steps,
-                         num_training_steps=num_training_steps)
+    return schedule_func(learning_rate, num_warmup_steps=num_warmup_steps, num_training_steps=num_training_steps)
 
 
 def _secs2timedelta(secs):
@@ -416,8 +404,7 @@ def log_metrics(self, split, metrics):
     k_width = max(len(str(x)) for x in metrics_formatted.keys())
     v_width = max(len(str(x)) for x in metrics_formatted.values())
     for key in sorted(metrics_formatted.keys()):
-        logger.info(
-            f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
+        logger.info(f"  {key: <{k_width}} = {metrics_formatted[key]:>{v_width}}")
 
 
 def save_metrics(self, split, metrics, combined=True):
@@ -477,18 +464,217 @@ def has_length(dataset):
         return False
 
 
-def get_last_checkpoint(folder):
-    content = os.listdir(folder)
-    checkpoints = [
-        path for path in content if _re_checkpoint.search(path) is not None
-        and os.path.isdir(os.path.join(folder, path))
-    ]
-    if len(checkpoints) == 0:
-        return
-    return os.path.join(
-        folder,
-        max(checkpoints,
-            key=lambda x: int(_re_checkpoint.search(x).groups()[0])))
+class TrainerMemoryTracker:
+    """
+    A helper class that tracks cpu and gpu memory.
+
+    This class will silently skip unless `psutil` is available. Install with `pip install psutil`.
+
+    When a stage completes, it can pass metrics dict to update with the memory metrics gathered during this stage.
+
+    Example :
+
+    ```python
+    self._memory_tracker = TrainerMemoryTracker(self.args.skip_memory_metrics)
+    self._memory_tracker.start()
+    # code ...
+    metrics = {"train_runtime": 10.5}
+    self._memory_tracker.stop_and_update_metrics(metrics)
+    ```
+
+    At the moment GPU tracking is only for `paddle`.
+
+    # To understand this class' intricacies please read the documentation of [`~Trainer.log_metrics`].
+    """
+
+    # map trainer methods to metrics prefix
+    stages = {
+        "__init__": "init",
+        "train": "train",
+        "_inner_training_loop": "train",
+        "evaluate": "eval",
+        "predict": "test",
+    }
+
+    def __init__(self, skip_memory_metrics=False):
+
+        self.skip_memory_metrics = skip_memory_metrics
+
+        if not is_psutil_available():
+            # soft dependency on psutil
+            self.skip_memory_metrics = True
+
+        if self.skip_memory_metrics:
+            return
+
+        import psutil  # noqa
+
+        if is_paddle_cuda_available():
+            import paddle
+
+            self.paddle = paddle
+            self.gpu = {}
+        else:
+            self.paddle = None
+
+        self.process = psutil.Process()
+
+        self.cur_stage = None
+        self.cpu = {}
+        self.init_reported = False
+
+    def derive_stage(self):
+        """derives the stage/caller name automatically"""
+        caller = inspect.currentframe().f_back.f_back.f_code.co_name
+        if caller in self.stages:
+            return self.stages[caller]
+        else:
+            raise ValueError(
+                f"was called from {caller}, but only expect to be called from one of {self.stages.keys()}"
+            )
+
+    def cpu_mem_used(self):
+        """get resident set size memory for the current process"""
+        return self.process.memory_info().rss
+
+    def peak_monitor_func(self):
+        self.cpu_mem_used_peak = -1
+
+        while True:
+            self.cpu_mem_used_peak = max(self.cpu_mem_used(), self.cpu_mem_used_peak)
+
+            # can't sleep or will not catch the peak right (this comment is here on purpose)
+            # time.sleep(0.001) # 1msec
+
+            if not self.peak_monitoring:
+                break
+
+    def start(self):
+        """start tracking for the caller's stage"""
+        if self.skip_memory_metrics:
+            return
+
+        stage = self.derive_stage()
+        # deal with nested calls of eval during train - simply ignore those
+        if self.cur_stage is not None and self.cur_stage != stage:
+            return
+
+        self.cur_stage = stage
+
+        gc.collect()
+
+        if self.paddle is not None:
+            # self.torch.cuda.reset_peak_memory_stats()?
+            self.paddle.device.cuda.empty_cache()
+
+        # gpu
+        if self.paddle is not None:
+            self.gpu_mem_used_at_start = self.paddle.device.cuda.memory_allocated()
+
+        # cpu
+        self.cpu_mem_used_at_start = self.cpu_mem_used()
+
+        self.peak_monitoring = True
+        peak_monitor_thread = threading.Thread(target=self.peak_monitor_func)
+        peak_monitor_thread.daemon = True
+        peak_monitor_thread.start()
+
+    def stop(self, stage):
+        """stop tracking for the passed stage"""
+
+        # deal with nested calls of eval during train - simply ignore those
+        if self.cur_stage is not None and self.cur_stage != stage:
+            return
+
+        # this sends a signal to peak_monitor_func to complete its loop
+        self.peak_monitoring = False
+
+        # first ensure all objects get collected and their memory is freed
+        gc.collect()
+
+        if self.paddle is not None:
+            self.paddle.device.cuda.empty_cache()
+
+        # concepts:
+        # - alloc_delta:  the difference of allocated memory between the end and the start
+        # - peaked_delta: the difference between the peak memory and the current memory
+        # in order to know how much memory the measured code consumed one needs to sum these two
+
+        # gpu
+        if self.paddle is not None:
+            self.gpu_mem_used_now = self.paddle.device.cuda.memory_allocated()
+            self.gpu_mem_used_peak = self.paddle.device.cuda.max_memory_allocated()
+            self.gpu[self.cur_stage] = dict(
+                begin=self.gpu_mem_used_at_start,
+                end=self.gpu_mem_used_now,
+                alloc=(self.gpu_mem_used_now - self.gpu_mem_used_at_start),
+                peaked=max(0, self.gpu_mem_used_peak - self.gpu_mem_used_now),
+            )
+
+        # cpu
+        self.cpu_mem_used_now = self.cpu_mem_used()
+        self.cpu[self.cur_stage] = dict(
+            begin=self.cpu_mem_used_at_start,
+            end=self.cpu_mem_used_now,
+            alloc=(self.cpu_mem_used_now - self.cpu_mem_used_at_start),
+            peaked=max(0, self.cpu_mem_used_peak - self.cpu_mem_used_now),
+        )
+
+        # reset - cycle finished
+        self.cur_stage = None
+
+    def update_metrics(self, stage, metrics):
+        """updates the metrics"""
+        if self.skip_memory_metrics:
+            return
+
+        # deal with nested calls of eval during train - simply ignore those
+        if self.cur_stage is not None and self.cur_stage != stage:
+            return
+
+        # since we don't have a way to return init metrics, we push them into the first of train/val/predict
+        stages = [stage]
+        if not self.init_reported:
+            stages.insert(0, "init")
+            self.init_reported = True
+
+        for stage in stages:
+            for t in ["alloc", "peaked"]:
+                if stage in self.cpu and t in self.cpu[stage]:
+                    metrics[f"{stage}_mem_cpu_{t}_delta"] = self.cpu[stage][t]
+                if self.paddle is not None and stage in self.gpu and t in self.gpu[stage]:
+                    metrics[f"{stage}_mem_gpu_{t}_delta"] = self.gpu[stage][t]
+            # if we need additional debug info, enable the following
+            # for t in ["begin", "end"]:
+            #     if stage in self.cpu and t in self.cpu[stage]:
+            #         metrics[f"{stage}_mem_cpu_{t}"] = self.cpu[stage][t]
+            #     if self.torch is not None and stage in self.gpu and t in self.gpu[stage]:
+            #         metrics[f"{stage}_mem_gpu_{t}"] = self.gpu[stage][t]
+
+        # since memory can be allocated before init, and it might be difficult to track overall
+        # memory usage, in particular for GPU, let's report memory usage at the point init was called
+        if stages[0] == "init":
+            metrics["before_init_mem_cpu"] = self.cpu["init"]["begin"]
+            if self.paddle is not None:
+                metrics["before_init_mem_gpu"] = self.gpu["init"]["begin"]
+            # if we also wanted to report any additional memory allocations in between init and
+            # whatever the next stage was we could also report this:
+            # if self.cpu["init"]["end"] != self.cpu[stage]["begin"]:
+            #     metrics[f"after_init_mem_cpu_delta"] = self.cpu[stage]["begin"] - self.cpu["init"]["end"]
+            # if self.torch is not None and self.gpu["init"]["end"] != self.gpu[stage]["begin"]:
+            #     metrics[f"after_init_mem_gpu_delta"] = self.gpu[stage]["begin"] - self.gpu["init"]["end"]
+
+    def stop_and_update_metrics(self, metrics=None):
+        """combine stop and metrics update in one call for simpler code"""
+        if self.skip_memory_metrics:
+            return
+
+        stage = self.derive_stage()
+        self.stop(stage)
+
+        # init doesn't have metrics to update so we just save that data for later stages to retrieve
+        if metrics is not None:
+            self.update_metrics(stage, metrics)
 
 
 class IterableDatasetShard(IterableDataset):
@@ -552,8 +738,7 @@ class IterableDatasetShard(IterableDataset):
         # ):
         #     self.dataset.generator.manual_seed(self.seed + self.epoch)
         real_batch_size = self.batch_size * self.num_processes
-        process_slice = range(self.process_index * self.batch_size,
-                              (self.process_index + 1) * self.batch_size)
+        process_slice = range(self.process_index * self.batch_size, (self.process_index + 1) * self.batch_size)
 
         first_batch = None
         current_batch = []
@@ -580,12 +765,9 @@ class IterableDatasetShard(IterableDataset):
     def __len__(self):
         # Will raise an error if the underlying dataset is not sized.
         if self.drop_last:
-            return (len(self.dataset) //
-                    (self.batch_size * self.num_processes)) * self.batch_size
+            return (len(self.dataset) // (self.batch_size * self.num_processes)) * self.batch_size
         else:
-            return math.ceil(
-                len(self.dataset) /
-                (self.batch_size * self.num_processes)) * self.batch_size
+            return math.ceil(len(self.dataset) / (self.batch_size * self.num_processes)) * self.batch_size
 
 
 def find_batch_size(tensors):
@@ -630,15 +812,15 @@ class RemoveColumnsCollator:
         if not isinstance(feature, dict):
             return feature
         if not self.message_logged and self.logger and self.model_name:
-            ignored_columns = list(
-                set(feature.keys()) - set(self.signature_columns))
+            ignored_columns = list(set(feature.keys()) - set(self.signature_columns))
             if len(ignored_columns) > 0:
                 dset_description = "" if self.description is None else f"in the {self.description} set"
                 self.logger.info(
                     f"The following columns {dset_description} don't have a corresponding argument in "
                     f"`{self.model_name}.forward` and have been ignored: {', '.join(ignored_columns)}."
                     f" If {', '.join(ignored_columns)} are not expected by `{self.model_name}.forward`, "
-                    " you can safely ignore this message.")
+                    " you can safely ignore this message."
+                )
                 self.message_logged = True
         return {k: v for k, v in feature.items() if k in self.signature_columns}
 

@@ -14,8 +14,7 @@
 """Albert model configuration"""
 from __future__ import annotations
 
-from typing import Dict
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["PRETRAINED_INIT_CONFIGURATION", "RobertaConfig"]
 
@@ -32,7 +31,7 @@ PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 12,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "hfl/roberta-wwm-ext-large": {
         "attention_probs_dropout_prob": 0.1,
@@ -46,7 +45,7 @@ PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 24,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
+        "pad_token_id": 0,
     },
     "hfl/rbt6": {
         "attention_probs_dropout_prob": 0.1,
@@ -102,8 +101,8 @@ PRETRAINED_INIT_CONFIGURATION = {
         "num_hidden_layers": 3,
         "type_vocab_size": 2,
         "vocab_size": 21128,
-        "pad_token_id": 0
-    }
+        "pad_token_id": 0,
+    },
 }
 
 
@@ -178,28 +177,28 @@ class RobertaConfig(PretrainedConfig):
     >>> # Accessing the model configuration
     >>> configuration = model.config
     ```"""
-    model_type = "albert"
+    model_type = "roberta"
     pretrained_init_configuration = PRETRAINED_INIT_CONFIGURATION
 
-    def __init__(self,
-                 vocab_size: int = 21128,
-                 hidden_size: int = 768,
-                 num_hidden_layers: int = 12,
-                 num_attention_heads: int = 12,
-                 intermediate_size: int = 3072,
-                 hidden_act: str = "gelu",
-                 hidden_dropout_prob: float = 0.1,
-                 attention_probs_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: int = 16,
-                 initializer_range: float = 0.02,
-                 pad_token_id: int = 0,
-                 layer_norm_eps: float = 1e-12,
-                 cls_token_id: int = 101,
-                 **kwargs):
-        super().__init__(pad_token_id=pad_token_id,
-                         cls_token_id=cls_token_id,
-                         **kwargs)
+    def __init__(
+        self,
+        vocab_size: int = 21128,
+        hidden_size: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "gelu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 16,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+        layer_norm_eps: float = 1e-12,
+        cls_token_id: int = 101,
+        **kwargs
+    ):
+        super().__init__(pad_token_id=pad_token_id, cls_token_id=cls_token_id, **kwargs)
 
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size

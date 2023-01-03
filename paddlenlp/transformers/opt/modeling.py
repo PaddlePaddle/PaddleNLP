@@ -14,23 +14,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import collections
-from typing import Optional, List, Dict, Any
+from typing import Any, Dict, List, Optional
 
 import paddle
 import paddle.nn as nn
-from paddle.nn import LayerNorm, Layer
-import paddle.nn.functional as F
-import paddle.tensor as tensor
-from paddle.fluid import layers
-from paddle.nn.layer.transformer import _convert_param_attr_to_list
-from paddlenlp.transformers.gpt.modeling import MultiHeadAttention, TransformerDecoderLayer
+from paddle.nn import Layer
+
+from paddlenlp.transformers.gpt.modeling import TransformerDecoderLayer
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
 __all__ = [
-    'OPTModel',
-    'OPTPretrainedModel',
-    'OPTForCausalLM',
+    "OPTModel",
+    "OPTPretrainedModel",
+    "OPTForCausalLM",
 ]
 
 
@@ -39,19 +35,19 @@ class TransformerDecoder(Layer):
     TransformerDecoder is a stack of N decoder layers.
     """
 
-    def __init__(self,
-                 decoder_layers: List[Layer],
-                 num_layers: int,
-                 hidden_size: int,
-                 word_embed_proj_dim: int,
-                 norm: Optional[Layer] = None,
-                 normalize_before: bool = False):
+    def __init__(
+        self,
+        decoder_layers: List[Layer],
+        num_layers: int,
+        hidden_size: int,
+        word_embed_proj_dim: int,
+        norm: Optional[Layer] = None,
+        normalize_before: bool = False,
+    ):
         super(TransformerDecoder, self).__init__()
 
         if word_embed_proj_dim != hidden_size:
-            self.project_out = nn.Linear(hidden_size,
-                                         word_embed_proj_dim,
-                                         bias_attr=False)
+            self.project_out = nn.Linear(hidden_size, word_embed_proj_dim, bias_attr=False)
         else:
             self.project_out = None
 
@@ -65,13 +61,7 @@ class TransformerDecoder(Layer):
 
         self.checkpoints = []
 
-    def forward(self,
-                tgt,
-                memory,
-                tgt_mask=None,
-                memory_mask=None,
-                use_cache: bool = False,
-                cache=None):
+    def forward(self, tgt, memory, tgt_mask=None, memory_mask=None, use_cache: bool = False, cache=None):
         r"""
         Applies a stack of N Transformer decoder layers on inputs. If `norm` is
         provided, also applies layer normalization on the output of last decoder
@@ -84,25 +74,13 @@ class TransformerDecoder(Layer):
         for i, mod in enumerate(self.layers):
             if cache is None:
                 if use_cache:
-                    output, new_cache = mod(output,
-                                            memory,
-                                            tgt_mask=tgt_mask,
-                                            use_cache=use_cache,
-                                            cache=cache)
+                    output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
                     new_caches.append(new_cache)
                 else:
-                    output = mod(output,
-                                 memory,
-                                 tgt_mask=tgt_mask,
-                                 use_cache=use_cache,
-                                 cache=cache)
+                    output = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache)
 
             else:
-                output, new_cache = mod(output,
-                                        memory,
-                                        tgt_mask=tgt_mask,
-                                        use_cache=use_cache,
-                                        cache=cache[i])
+                output, new_cache = mod(output, memory, tgt_mask=tgt_mask, use_cache=use_cache, cache=cache[i])
                 new_caches.append(new_cache)
             self.checkpoints.append(output.name)
 
@@ -121,7 +99,7 @@ class TransformerDecoder(Layer):
         produced by `TransformerDecoderLayer.gen_cache`. See `TransformerDecoderLayer.gen_cache`
         for more details. If `do_zip` is True, apply `zip` on these tuples to get
         a list with two elements.
-       """
+        """
         cache = [layer.gen_cache(memory) for layer in self.layers]
         if do_zip:
             cache = list(zip(*cache))
@@ -129,11 +107,9 @@ class TransformerDecoder(Layer):
 
 
 class OPTLearnedPositionEmbedding(nn.Embedding):
-    """this module learns postional embeddings up to a fixed maximum size
-    """
+    """this module learns postional embeddings up to a fixed maximum size"""
 
-    def __init__(self, num_embeddings: int, embedding_dim: int,
-                 initializer_range: float):
+    def __init__(self, num_embeddings: int, embedding_dim: int, initializer_range: float):
         """OPT is set up so taht if padding_idx is specified then offset the embedding ids by 2
         and adjust num_embeddings appropriately. Other models don't have this hack
 
@@ -152,7 +128,7 @@ class OPTLearnedPositionEmbedding(nn.Embedding):
             past_key_values_length (int, optional): the past key value which will . Defaults to 0.
 
         Returns:
-            paddle.Tensor: the position embedding 
+            paddle.Tensor: the position embedding
         """
         # cut positions if `past_key_values_length` is > 0
         position_ids = position_ids[:, past_key_values_length:]
@@ -164,34 +140,33 @@ class OPTEmbeddings(Layer):
     Include embeddings from word and position embeddings.
     """
 
-    def __init__(self,
-                 vocab_size: int,
-                 hidden_size: int = 768,
-                 word_embed_proj_dim: int = 768,
-                 padding_idx: int = 1,
-                 hidden_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: Optional[int] = None,
-                 initializer_range=0.02):
+    def __init__(
+        self,
+        vocab_size: int,
+        hidden_size: int = 768,
+        word_embed_proj_dim: int = 768,
+        padding_idx: int = 1,
+        hidden_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: Optional[int] = None,
+        initializer_range=0.02,
+    ):
         super(OPTEmbeddings, self).__init__()
         self.word_embeddings = nn.Embedding(
             vocab_size,
             word_embed_proj_dim,
             # padding_idx=padding_idx,
-            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(
-                mean=0.0, std=initializer_range)))
+            weight_attr=paddle.ParamAttr(initializer=nn.initializer.Normal(mean=0.0, std=initializer_range)),
+        )
 
         if word_embed_proj_dim != hidden_size:
-            self.project_in = nn.Linear(word_embed_proj_dim,
-                                        hidden_size,
-                                        bias_attr=False)
+            self.project_in = nn.Linear(word_embed_proj_dim, hidden_size, bias_attr=False)
         else:
             self.project_in = None
 
         self.position_embeddings = OPTLearnedPositionEmbedding(
-            num_embeddings=max_position_embeddings,
-            embedding_dim=hidden_size,
-            initializer_range=initializer_range)
+            num_embeddings=max_position_embeddings, embedding_dim=hidden_size, initializer_range=initializer_range
+        )
 
         self.dropout = nn.Dropout(hidden_dropout_prob)
 
@@ -227,17 +202,20 @@ class OPTPretrainedModel(PretrainedModel):
     base_model_prefix = "opt"
 
     def init_weights(self, layer):
-        """ Initialization hook """
+        """Initialization hook"""
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
             if isinstance(layer.weight, paddle.Tensor):
                 layer.weight.set_value(
-                    paddle.tensor.normal(mean=0.0,
-                                         std=self.initializer_range if hasattr(
-                                             self, "initializer_range") else
-                                         self.opt.config["initializer_range"],
-                                         shape=layer.weight.shape))
+                    paddle.tensor.normal(
+                        mean=0.0,
+                        std=self.initializer_range
+                        if hasattr(self, "initializer_range")
+                        else self.opt.config["initializer_range"],
+                        shape=layer.weight.shape,
+                    )
+                )
 
 
 @register_base_model
@@ -300,25 +278,27 @@ class OPTModel(OPTPretrainedModel):
 
     """
 
-    def __init__(self,
-                 vocab_size: int,
-                 hidden_size: int = 768,
-                 word_embed_proj_dim: int = 768,
-                 num_hidden_layers: int = 12,
-                 num_attention_heads: int = 12,
-                 intermediate_size: int = 3072,
-                 hidden_act: str = "relu",
-                 hidden_dropout_prob: float = 0.1,
-                 attention_probs_dropout_prob: float = 0.1,
-                 max_position_embeddings: int = 512,
-                 type_vocab_size: int = 16,
-                 initializer_range: float = 0.02,
-                 pad_token_id: int = 0,
-                 eos_token_id: int = 7,
-                 bos_token_id: int = 0,
-                 eol_token_id: int = 3,
-                 normalize_before: bool = True,
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_size: int,
+        hidden_size: int = 768,
+        word_embed_proj_dim: int = 768,
+        num_hidden_layers: int = 12,
+        num_attention_heads: int = 12,
+        intermediate_size: int = 3072,
+        hidden_act: str = "relu",
+        hidden_dropout_prob: float = 0.1,
+        attention_probs_dropout_prob: float = 0.1,
+        max_position_embeddings: int = 512,
+        type_vocab_size: int = 16,
+        initializer_range: float = 0.02,
+        pad_token_id: int = 0,
+        eos_token_id: int = 7,
+        bos_token_id: int = 0,
+        eol_token_id: int = 3,
+        normalize_before: bool = True,
+        **kwargs
+    ):
         super(OPTModel, self).__init__()
 
         self.pad_token_id = pad_token_id
@@ -348,10 +328,12 @@ class OPTModel(OPTPretrainedModel):
                     attn_dropout=attention_probs_dropout_prob,
                     act_dropout=hidden_dropout_prob,
                     weight_attr=paddle.ParamAttr(
-                        initializer=nn.initializer.Normal(
-                            mean=0.0, std=self.initializer_range)),
+                        initializer=nn.initializer.Normal(mean=0.0, std=self.initializer_range)
+                    ),
                     bias_attr=None,
-                    normalize_before=normalize_before))
+                    normalize_before=normalize_before,
+                )
+            )
 
         self.decoder = TransformerDecoder(
             decoder_layers,
@@ -359,18 +341,14 @@ class OPTModel(OPTPretrainedModel):
             norm="LayerNorm",
             hidden_size=hidden_size,
             normalize_before=normalize_before,
-            word_embed_proj_dim=word_embed_proj_dim)
+            word_embed_proj_dim=word_embed_proj_dim,
+        )
 
         self.apply(self.init_weights)
         self.checkpoints = []
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                use_cache=False,
-                cache=None):
-        r'''
+    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
+        r"""
         The OPTModel forward method, overrides the `__call__()` special method.
 
         Args:
@@ -418,27 +396,23 @@ class OPTModel(OPTPretrainedModel):
                 inputs = tokenizer("Welcome to use PaddlePaddle and PaddleNLimage.pngP!", return_token_type_ids=False)
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 output = model(**inputs)
-        '''
+        """
 
         self.checkpoints = []
         if position_ids is None:
             past_length = 0
             if cache is not None:
                 past_length = paddle.shape(cache[0].k)[-2]
-            position_ids = paddle.arange(past_length,
-                                         paddle.shape(input_ids)[-1] +
-                                         past_length,
-                                         dtype=input_ids.dtype)
+            position_ids = paddle.arange(past_length, paddle.shape(input_ids)[-1] + past_length, dtype=input_ids.dtype)
             position_ids = position_ids.unsqueeze(0)
 
             position_ids = paddle.expand_as(position_ids, input_ids)
-        embedding_output = self.embeddings(input_ids=input_ids,
-                                           position_ids=position_ids)
+        embedding_output = self.embeddings(input_ids=input_ids, position_ids=position_ids)
 
         # TODO, use registered buffer
-        causal_mask = paddle.tensor.triu(paddle.ones(
-            (paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4,
-                                         diagonal=1)
+        causal_mask = paddle.tensor.triu(
+            paddle.ones((paddle.shape(input_ids)[-1], paddle.shape(input_ids)[-1])) * -1e4, diagonal=1
+        )
 
         if attention_mask is not None:
             if len(attention_mask.shape) == 2:
@@ -449,32 +423,25 @@ class OPTModel(OPTPretrainedModel):
         # The tensor returned by triu not in static graph.
         attention_mask.stop_gradient = True
 
-        decoder_outputs = self.decoder(embedding_output,
-                                       memory=None,
-                                       tgt_mask=attention_mask,
-                                       use_cache=use_cache,
-                                       cache=cache)
+        decoder_outputs = self.decoder(
+            embedding_output, memory=None, tgt_mask=attention_mask, use_cache=use_cache, cache=cache
+        )
 
         self.checkpoints.extend(self.decoder.checkpoints)
         return decoder_outputs
 
 
 class OPTLMHead(Layer):
-
-    def __init__(self,
-                 hidden_size: int,
-                 vocab_size: int,
-                 embedding_weights=None):
+    def __init__(self, hidden_size: int, vocab_size: int, embedding_weights=None):
         super(OPTLMHead, self).__init__()
-        self.decoder_weight = self.create_parameter(
-            shape=[vocab_size, hidden_size],
-            dtype=paddle.get_default_dtype(),
-            is_bias=True) if embedding_weights is None else embedding_weights
+        self.decoder_weight = (
+            self.create_parameter(shape=[vocab_size, hidden_size], dtype=paddle.get_default_dtype(), is_bias=True)
+            if embedding_weights is None
+            else embedding_weights
+        )
 
     def forward(self, hidden_states):
-        logits = paddle.tensor.matmul(hidden_states,
-                                      self.decoder_weight,
-                                      transpose_y=True)
+        logits = paddle.tensor.matmul(hidden_states, self.decoder_weight, transpose_y=True)
         return logits
 
 
@@ -494,14 +461,10 @@ class OPTForCausalLM(OPTPretrainedModel):
         self.lm_head = OPTLMHead(
             hidden_size=self.opt.config["hidden_size"],
             vocab_size=self.opt.config["vocab_size"],
-            embedding_weights=self.opt.embeddings.word_embeddings.weight)
+            embedding_weights=self.opt.embeddings.word_embeddings.weight,
+        )
 
-    def forward(self,
-                input_ids,
-                position_ids=None,
-                attention_mask=None,
-                use_cache=False,
-                cache=None):
+    def forward(self, input_ids, position_ids=None, attention_mask=None, use_cache=False, cache=None):
         r"""
 
         Args:
@@ -537,11 +500,9 @@ class OPTForCausalLM(OPTPretrainedModel):
                 print(tokenizer.batch_decode(output_ids[0]))
         """
 
-        outputs = self.opt(input_ids,
-                           position_ids=position_ids,
-                           attention_mask=attention_mask,
-                           use_cache=use_cache,
-                           cache=cache)
+        outputs = self.opt(
+            input_ids, position_ids=position_ids, attention_mask=attention_mask, use_cache=use_cache, cache=cache
+        )
 
         if use_cache:
             encoder_outputs, cached_kvs = outputs[:2]
@@ -555,53 +516,40 @@ class OPTForCausalLM(OPTPretrainedModel):
         else:
             return logits
 
-    def prepare_faster_entry(self, kwargs: Dict[str, Any]):
+    def prepare_fast_entry(self, kwargs: Dict[str, Any]):
         # import FasterOPT at here to avoid cycling import
         from paddlenlp.ops import FasterOPT
 
-        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        decode_strategy = kwargs.get('decode_strategy')
+        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
+        decode_strategy = kwargs.get("decode_strategy")
         # decoding_lib can be passed into FasterOPT
-        decoding_lib = kwargs.get('decoding_lib', None)
+        decoding_lib = kwargs.get("decoding_lib", None)
 
         if decode_strategy == "beam_search":
-            raise AttributeError(
-                "'beam_search' is not supported yet in the faster version of OPT"
-            )
+            raise AttributeError("'beam_search' is not supported yet in the fast version of OPT")
         # Currently, FasterTransformer only support restricted size_per_head.
-        size_per_head = self.opt.config["hidden_size"] // self.opt.config[
-            "num_attention_heads"]
+        size_per_head = self.opt.config["hidden_size"] // self.opt.config["num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of OPT"
-                % size_per_head)
-        if kwargs['forced_bos_token_id'] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'forced_bos_token_id != None' is not supported yet in the faster version"
+                "'size_per_head = %d' is not supported yet in the fast version of OPT" % size_per_head
             )
-        if kwargs['min_length'] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError(
-                "'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterOPT(self,
-                                       use_fp16_decoding=use_fp16_decoding,
-                                       decoding_lib=decoding_lib).forward
-        return self._faster_entry
+        if kwargs["forced_bos_token_id"] is not None:
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        if kwargs["min_length"] != 0:
+            # not support for min_length yet in the fast version
+            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
+        self._fast_entry = FasterOPT(self, use_fp16_decoding=use_fp16_decoding, decoding_lib=decoding_lib).forward
+        return self._fast_entry
 
-    def prepare_inputs_for_generation(self,
-                                      input_ids,
-                                      use_cache=False,
-                                      cache=None,
-                                      **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
         position_ids = kwargs.get("position_ids", None)
         attention_mask = kwargs.get("attention_mask", None)
         if attention_mask is not None:
             if len(attention_mask.shape) == 4:
                 attention_mask = attention_mask[:, -1, -1, :]
-            if "int" in paddle.common_ops_import.convert_dtype(
-                    attention_mask.dtype):
+            if "int" in paddle.common_ops_import.convert_dtype(attention_mask.dtype):
                 attention_mask = (1.0 - attention_mask) * -1e4
         if cache is not None:
             input_ids = input_ids[:, -1].unsqueeze(-1)
@@ -613,7 +561,7 @@ class OPTForCausalLM(OPTPretrainedModel):
             "position_ids": position_ids,
             "attention_mask": attention_mask,
             "use_cache": use_cache,
-            "cache": cache
+            "cache": cache,
         }
 
     def __getattr__(self, name):

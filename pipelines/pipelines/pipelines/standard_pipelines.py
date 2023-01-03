@@ -14,21 +14,19 @@
 
 import logging
 from abc import ABC
-from copy import deepcopy
 from pathlib import Path
-from typing import List, Optional, Dict, Any
-from functools import wraps
+from typing import Any, Dict, List, Optional
 
-from pipelines.schema import Document
-from pipelines.nodes.reader import BaseReader
-from pipelines.nodes.ranker import BaseRanker
-from pipelines.nodes.retriever import BaseRetriever
 from pipelines.document_stores import BaseDocumentStore
-from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
 from pipelines.nodes.answer_extractor import AnswerExtractor, QAFilter
-from pipelines.nodes.question_generator import QuestionGenerator
-from pipelines.pipelines import Pipeline
 from pipelines.nodes.base import BaseComponent
+from pipelines.nodes.question_generator import QuestionGenerator
+from pipelines.nodes.ranker import BaseRanker
+from pipelines.nodes.reader import BaseReader
+from pipelines.nodes.retriever import BaseRetriever
+from pipelines.nodes.text_to_image_generator import ErnieTextToImageGenerator
+from pipelines.pipelines import Pipeline
+from pipelines.schema import Document
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +93,9 @@ class BaseStandardPipeline(ABC):
         return self.pipeline.save_to_yaml(path, return_defaults)
 
     @classmethod
-    def load_from_yaml(cls,
-                       path: Path,
-                       pipeline_name: Optional[str] = None,
-                       overwrite_with_env_variables: bool = True):
+    def load_from_yaml(
+        cls, path: Path, pipeline_name: Optional[str] = None, overwrite_with_env_variables: bool = True
+    ):
         """
         Load Pipeline from a YAML file defining the individual components and how they're tied together to form
         a Pipeline. A single YAML can declare multiple Pipelines, in which case an explicit `pipeline_name` must
@@ -144,8 +141,7 @@ class BaseStandardPipeline(ABC):
         standard_pipeline_object = cls.__new__(
             cls
         )  # necessary because we can't call __init__ as we can't provide parameters
-        standard_pipeline_object.pipeline = Pipeline.load_from_yaml(
-            path, pipeline_name, overwrite_with_env_variables)
+        standard_pipeline_object.pipeline = Pipeline.load_from_yaml(path, pipeline_name, overwrite_with_env_variables)
         return standard_pipeline_object
 
     def get_nodes_by_class(self, class_type) -> List[Any]:
@@ -170,10 +166,7 @@ class BaseStandardPipeline(ABC):
         """
         return self.pipeline.get_document_store()
 
-    def run_batch(self,
-                  queries: List[str],
-                  params: Optional[dict] = None,
-                  debug: Optional[bool] = None):
+    def run_batch(self, queries: List[str], params: Optional[dict] = None, debug: Optional[bool] = None):
         """
         Run a batch of queries through the pipeline.
         :param queries: List of query strings.
@@ -185,9 +178,7 @@ class BaseStandardPipeline(ABC):
                       All debug information can then be found in the dict returned
                       by this method under the key "_debug"
         """
-        output = self.pipeline.run_batch(queries=queries,
-                                         params=params,
-                                         debug=debug)
+        output = self.pipeline.run_batch(queries=queries, params=params, debug=debug)
         return output
 
 
@@ -196,28 +187,18 @@ class ExtractiveQAPipeline(BaseStandardPipeline):
     Pipeline for Extractive Question Answering.
     """
 
-    def __init__(self, reader: BaseReader, ranker: BaseRanker,
-                 retriever: BaseRetriever):
+    def __init__(self, reader: BaseReader, ranker: BaseRanker, retriever: BaseRetriever):
         """
         :param reader: Reader instance
         :param retriever: Retriever instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=retriever,
-                               name="Retriever",
-                               inputs=["Query"])
-        self.pipeline.add_node(component=ranker,
-                               name="Ranker",
-                               inputs=["Retriever"])
-        self.pipeline.add_node(component=reader,
-                               name="Reader",
-                               inputs=["Ranker"])
+        self.pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
+        self.pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
+        self.pipeline.add_node(component=reader, name="Reader", inputs=["Ranker"])
         self.metrics_filter = {"Retriever": ["recall_single_hit"]}
 
-    def run(self,
-            query: str,
-            params: Optional[dict] = None,
-            debug: Optional[bool] = None):
+    def run(self, query: str, params: Optional[dict] = None, debug: Optional[bool] = None):
         """
         :param query: The search query string.
         :param params: Params for the `retriever` and `reader`. For instance,
@@ -237,25 +218,16 @@ class SemanticSearchPipeline(BaseStandardPipeline):
     Pipeline for semantic search.
     """
 
-    def __init__(self,
-                 retriever: BaseRetriever,
-                 ranker: Optional[BaseRanker] = None):
+    def __init__(self, retriever: BaseRetriever, ranker: Optional[BaseRanker] = None):
         """
         :param retriever: Retriever instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=retriever,
-                               name="Retriever",
-                               inputs=["Query"])
+        self.pipeline.add_node(component=retriever, name="Retriever", inputs=["Query"])
         if ranker:
-            self.pipeline.add_node(component=ranker,
-                                   name="Ranker",
-                                   inputs=["Retriever"])
+            self.pipeline.add_node(component=ranker, name="Ranker", inputs=["Retriever"])
 
-    def run(self,
-            query: str,
-            params: Optional[dict] = None,
-            debug: Optional[bool] = None):
+    def run(self, query: str, params: Optional[dict] = None, debug: Optional[bool] = None):
         """
         :param query: the query string.
         :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
@@ -280,17 +252,10 @@ class DocPipeline(BaseStandardPipeline):
         :param docreader: document model runner instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=preprocessor,
-                               name="PreProcessor",
-                               inputs=["Query"])
-        self.pipeline.add_node(component=docreader,
-                               name="Reader",
-                               inputs=["PreProcessor"])
+        self.pipeline.add_node(component=preprocessor, name="PreProcessor", inputs=["Query"])
+        self.pipeline.add_node(component=docreader, name="Reader", inputs=["PreProcessor"])
 
-    def run(self,
-            meta: dict,
-            params: Optional[dict] = None,
-            debug: Optional[bool] = None):
+    def run(self, meta: dict, params: Optional[dict] = None, debug: Optional[bool] = None):
         """
         :param query: the query string.
         :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
@@ -312,14 +277,9 @@ class TextToImagePipeline(BaseStandardPipeline):
 
     def __init__(self, text_to_image_generator: ErnieTextToImageGenerator):
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=text_to_image_generator,
-                               name="TextToImageGenerator",
-                               inputs=["Query"])
+        self.pipeline.add_node(component=text_to_image_generator, name="TextToImageGenerator", inputs=["Query"])
 
-    def run(self,
-            query: str,
-            params: Optional[dict] = None,
-            debug: Optional[bool] = None):
+    def run(self, query: str, params: Optional[dict] = None, debug: Optional[bool] = None):
         output = self.pipeline.run(query=query, params=params, debug=debug)
         return output
 
@@ -329,9 +289,7 @@ class TextToImagePipeline(BaseStandardPipeline):
         params: Optional[dict] = None,
         debug: Optional[bool] = None,
     ):
-        output = self.pipeline.run_batch(documents=documents,
-                                         params=params,
-                                         debug=debug)
+        output = self.pipeline.run_batch(documents=documents, params=params, debug=debug)
         return output
 
 
@@ -340,26 +298,16 @@ class QAGenerationPipeline(BaseStandardPipeline):
     Pipeline for semantic search.
     """
 
-    def __init__(self, answer_extractor: AnswerExtractor,
-                 question_generator: QuestionGenerator, qa_filter: QAFilter):
+    def __init__(self, answer_extractor: AnswerExtractor, question_generator: QuestionGenerator, qa_filter: QAFilter):
         """
         :param retriever: Retriever instance
         """
         self.pipeline = Pipeline()
-        self.pipeline.add_node(component=answer_extractor,
-                               name="AnswerExtractor",
-                               inputs=["Query"])
-        self.pipeline.add_node(component=question_generator,
-                               name="QuestionGenerator",
-                               inputs=["AnswerExtractor"])
-        self.pipeline.add_node(component=qa_filter,
-                               name="QAFilter",
-                               inputs=["QuestionGenerator"])
+        self.pipeline.add_node(component=answer_extractor, name="AnswerExtractor", inputs=["Query"])
+        self.pipeline.add_node(component=question_generator, name="QuestionGenerator", inputs=["AnswerExtractor"])
+        self.pipeline.add_node(component=qa_filter, name="QAFilter", inputs=["QuestionGenerator"])
 
-    def run(self,
-            meta: List[str],
-            params: Optional[dict] = None,
-            debug: Optional[bool] = None):
+    def run(self, meta: List[str], params: Optional[dict] = None, debug: Optional[bool] = None):
         """
         :param query: the query string.
         :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
@@ -370,4 +318,35 @@ class QAGenerationPipeline(BaseStandardPipeline):
               by this method under the key "_debug"
         """
         output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        return output
+
+
+class SentaPipeline(BaseStandardPipeline):
+    """
+    Pipeline for document intelligence.
+    """
+
+    def __init__(self, preprocessor: BaseComponent, senta: BaseComponent, visualization: BaseComponent):
+        """
+        :param preprocessor: file preprocessor instance
+        :param senta: senta model instance
+        """
+        self.pipeline = Pipeline()
+        self.pipeline.add_node(component=preprocessor, name="PreProcessor", inputs=["File"])
+        self.pipeline.add_node(component=senta, name="Senta", inputs=["PreProcessor"])
+        self.pipeline.add_node(component=visualization, name="Visualization", inputs=["Senta"])
+
+    def run(self, meta: dict, params: Optional[dict] = None, debug: Optional[bool] = None):
+        """
+        :param query: the query string.
+        :param params: params for the `retriever` and `reader`. For instance, params={"Retriever": {"top_k": 10}}
+        :param debug: Whether the pipeline should instruct nodes to collect debug information
+              about their execution. By default these include the input parameters
+              they received and the output they generated.
+              All debug information can then be found in the dict returned
+              by this method under the key "_debug"
+        """
+        output = self.pipeline.run(meta=meta, params=params, debug=debug)
+        if "examples" in output:
+            output.pop("examples")
         return output

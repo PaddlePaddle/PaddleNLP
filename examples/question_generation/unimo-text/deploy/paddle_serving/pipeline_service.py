@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle_serving_server.web_service import WebService, Op
-from numpy import array
 import logging
-import numpy as np
-from paddlenlp.transformers import AutoTokenizer
+
+from infer_utils import batchify_fn, convert_example, postprocess_response
+from paddle_serving_server.web_service import Op, WebService
+
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.transformers import UNIMOTokenizer
-from paddlenlp.data import Pad
-
-from infer_utils import convert_example, batchify_fn, select_sum, postprocess_response
-
-import paddle_serving_server.pipeline.operator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -32,11 +27,11 @@ class UnimoTextOp(Op):
     """Op for unimo_text."""
 
     def init_op(self):
-        self.tokenizer = UNIMOTokenizer.from_pretrained('unimo-text-1.0')
+        self.tokenizer = UNIMOTokenizer.from_pretrained("unimo-text-1.0")
 
     def preprocess(self, input_dicts, data_id, log_id):
         # Convert input format
-        (_, input_dict), = input_dicts.items()
+        ((_, input_dict),) = input_dicts.items()
         data = input_dict["inputs"]
         if isinstance(data, str) and "array(" in data:
             data = eval(data)
@@ -44,24 +39,22 @@ class UnimoTextOp(Op):
             _LOGGER.error("input value  {}is not supported.".format(data))
         examples = [convert_example(i, self.tokenizer) for i in data]
         input_ids, token_type_ids, position_ids, attention_mask, seq_len = batchify_fn(
-            examples, self.tokenizer.pad_token_id)
+            examples, self.tokenizer.pad_token_id
+        )
         new_dict = {}
-        new_dict['input_ids'] = input_ids
-        new_dict['token_type_ids'] = token_type_ids
-        new_dict['attention_mask'] = attention_mask
-        new_dict['seq_len'] = seq_len
+        new_dict["input_ids"] = input_ids
+        new_dict["token_type_ids"] = token_type_ids
+        new_dict["attention_mask"] = attention_mask
+        new_dict["seq_len"] = seq_len
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model input
         return new_dict, False, None, ""
 
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         # keyname refer to export_checkpoint_client/serving_client_conf.prototxt
-        ids = fetch_dict['transpose_0.tmp_0'][:, 0, :].tolist()
-        scores = fetch_dict['_generated_var_3'][:, 0].tolist()
+        ids = fetch_dict["transpose_0.tmp_0"][:, 0, :].tolist()
+        # scores = fetch_dict["_generated_var_3"][:, 0].tolist()
 
-        results = [
-            "".join(postprocess_response(sample, self.tokenizer))
-            for sample in ids
-        ]
+        results = ["".join(postprocess_response(sample, self.tokenizer)) for sample in ids]
         new_dict = {}
         new_dict["outputs"] = str(results)
         # the first return must be a dict or a list of dict, the dict corresponding to a batch of model output
@@ -69,14 +62,13 @@ class UnimoTextOp(Op):
 
 
 class UnimoTextService(WebService):
-
     def get_pipeline_response(self, read_op):
         return UnimoTextOp(name="question_generation", input_ops=[read_op])
 
 
 if __name__ == "__main__":
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     service = UnimoTextService(name="question_generation")
     service.prepare_pipeline_config("config.yml")
     service.run_service()

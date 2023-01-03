@@ -5,16 +5,14 @@ from paddlenlp.data import Pad, Vocab
 
 
 class TransformerReader(object):
-
     def __init__(self, args={}):
         super(TransformerReader, self).__init__()
 
-        dataset = load_dataset('wmt14ende', splits=('test'))
+        dataset = load_dataset("wmt14ende", splits=("test"))
         if not args.benchmark:
             self.vocab = Vocab.load_vocabulary(**dataset.vocab_info["bpe"])
         else:
-            self.vocab = Vocab.load_vocabulary(
-                **dataset.vocab_info["benchmark"])
+            self.vocab = Vocab.load_vocabulary(**dataset.vocab_info["benchmark"])
         self.src_vocab = self.trg_vocab = self.vocab
 
         def convert_samples(samples):
@@ -46,11 +44,9 @@ class TransformerReader(object):
         """
         insts = self.tokenize(insts)
 
-        src_max_len = (max([len(inst) for inst in insts]) +
-                       self.pad_seq) // self.pad_seq * self.pad_seq
-        src_word = self.word_pad([
-            inst + [self.eos_idx] + [self.pad_idx] *
-            (src_max_len - 1 - len(inst)) for inst in insts
-        ])
+        src_max_len = (max([len(inst) for inst in insts]) + self.pad_seq) // self.pad_seq * self.pad_seq
+        src_word = self.word_pad(
+            [inst + [self.eos_idx] + [self.pad_idx] * (src_max_len - 1 - len(inst)) for inst in insts]
+        )
 
         return np.asarray(src_word)

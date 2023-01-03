@@ -33,26 +33,20 @@ MODEL_CLASSES = {
 
 
 class Demo:
-
-    def __init__(self,
-                 model_type="gpt-cn",
-                 model_name_or_path="gpt-cpm-large-cn",
-                 max_predict_len=32):
+    def __init__(self, model_type="gpt-cn", model_name_or_path="gpt-cpm-large-cn", max_predict_len=32):
         model_class, tokenizer_class = MODEL_CLASSES[model_type]
         self.tokenizer = tokenizer_class.from_pretrained(model_name_or_path)
-        logger.info('Loading the model parameters, please wait...')
+        logger.info("Loading the model parameters, please wait...")
         self.model = model_class.from_pretrained(
-            model_name_or_path,
-            max_predict_len=max_predict_len,
-            eol_token_id=self.tokenizer.eol_token_id)
+            model_name_or_path, max_predict_len=max_predict_len, eol_token_id=self.tokenizer.eol_token_id
+        )
         self.model.eval()
-        logger.info('Model loaded.')
+        logger.info("Model loaded.")
 
     # prediction function
     def predict(self, text):
         ids = self.tokenizer(text)["input_ids"]
-        input_ids = paddle.to_tensor(
-            np.array(ids).reshape(1, -1).astype('int64'))
+        input_ids = paddle.to_tensor(np.array(ids).reshape(1, -1).astype("int64"))
         out = self.model(input_ids)
         out = [int(x) for x in out.numpy().reshape([-1])]
         logger.info(self.tokenizer.convert_ids_to_string(out))
@@ -62,13 +56,11 @@ class Demo:
         self.predict("问题：中国的首都是哪里？答案：北京。\n问题：%s 答案：" % question)
 
     def ask_question_en(self, question):
-        self.predict(
-            "Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer:"
-            % question)
+        self.predict("Question: Where is the capital of China? Answer: Beijing. \n Question:%s Answer:" % question)
 
     # dictation poetry
     def dictation_poetry_cn(self, front):
-        self.predict('''默写古诗: 大漠孤烟直，长河落日圆。\n%s''' % front)
+        self.predict("""默写古诗: 大漠孤烟直，长河落日圆。\n%s""" % front)
 
 
 if __name__ == "__main__":

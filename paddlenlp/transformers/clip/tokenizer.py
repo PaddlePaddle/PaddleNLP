@@ -21,7 +21,7 @@ from ...utils.log import logger
 from functools import lru_cache
 import json
 
-__all__ = ['CLIPTokenizer']
+__all__ = ["CLIPTokenizer"]
 
 
 @lru_cache()
@@ -34,11 +34,9 @@ def bytes_to_unicode():
     decent coverage. This is a significant percentage of your normal, say, 32K bpe vocab. To avoid that, we want lookup
     tables between utf-8 bytes and unicode strings.
     """
-    bs = (list(range(ord("!"),
-                     ord("~") + 1)) + list(range(ord("¡"),
-                                                 ord("¬") + 1)) +
-          list(range(ord("®"),
-                     ord("ÿ") + 1)))
+    bs = (
+        list(range(ord("!"), ord("~") + 1)) + list(range(ord("¡"), ord("¬") + 1)) + list(range(ord("®"), ord("ÿ") + 1))
+    )
     cs = bs[:]
     n = 0
     for b in range(2**8):
@@ -119,83 +117,56 @@ class CLIPTokenizer(PretrainedTokenizer):
 
     """
     # merges and vocab same as GPT2
-    resource_files_names = {
-        "vocab_file": "vocab.json",
-        "merges_file": "merges.txt"
-    }
+    resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
     pretrained_resource_files_map = {
         "vocab_file": {
-            "openai/clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
-            "openai/clip-rn50":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/vocab.json",
-            "openai/clip-rn101":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
-            "openai/clip-vit-large-patch14":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/vocab.json",
+            "openai/clip-vit-base-patch32": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
+            "openai/clip-rn50": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/vocab.json",
+            "openai/clip-rn101": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
+            "openai/clip-vit-large-patch14": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/vocab.json",
         },
         "merges_file": {
-            "openai/clip-vit-base-patch32":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
-            "openai/clip-rn50":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/merges.txt",
-            "openai/clip-rn101":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
-            "openai/clip-vit-large-patch14":
-            "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/merges.txt",
-        }
+            "openai/clip-vit-base-patch32": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
+            "openai/clip-rn50": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/merges.txt",
+            "openai/clip-rn101": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
+            "openai/clip-vit-large-patch14": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/merges.txt",
+        },
     }
     pretrained_init_configuration = {
-        "openai/clip-vit-base-patch32": {
-            "max_len": 77
-        },
-        "openai/clip-rn50": {
-            "max_len": 77
-        },
-        "openai/clip-rn101": {
-            "max_len": 77
-        },
-        "openai/clip-vit-large-patch14": {
-            "max_len": 77
-        },
+        "openai/clip-vit-base-patch32": {"max_len": 77},
+        "openai/clip-rn50": {"max_len": 77},
+        "openai/clip-rn101": {"max_len": 77},
+        "openai/clip-vit-large-patch14": {"max_len": 77},
     }
 
-    def __init__(self,
-                 vocab_file,
-                 merges_file,
-                 errors='replace',
-                 max_len=77,
-                 bos_token="<|startoftext|>",
-                 eos_token="<|endoftext|>",
-                 unk_token="<|endoftext|>",
-                 pad_token="<|endoftext|>",
-                 **kwargs):
+    def __init__(
+        self,
+        vocab_file,
+        merges_file,
+        errors="replace",
+        max_len=77,
+        bos_token="<|startoftext|>",
+        eos_token="<|endoftext|>",
+        unk_token="<|endoftext|>",
+        pad_token="<|endoftext|>",
+        **kwargs
+    ):
 
-        bos_token = AddedToken(bos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   bos_token, str) else bos_token
-        eos_token = AddedToken(eos_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   eos_token, str) else eos_token
-        unk_token = AddedToken(unk_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   pad_token, str) else pad_token
+        bos_token = AddedToken(bos_token, lstrip=False, rstrip=False) if isinstance(bos_token, str) else bos_token
+        eos_token = AddedToken(eos_token, lstrip=False, rstrip=False) if isinstance(eos_token, str) else eos_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
 
-        self._build_special_tokens_map_extended(bos_token=bos_token,
-                                                eos_token=eos_token,
-                                                unk_token=unk_token,
-                                                pad_token=pad_token)
+        self._build_special_tokens_map_extended(
+            bos_token=bos_token, eos_token=eos_token, unk_token=unk_token, pad_token=pad_token
+        )
 
         try:
             import ftfy
+
             self.fix_text = ftfy.fix_text
         except ImportError:
-            logger.warning(
-                "ftfy or spacy is not installed using BERT BasicTokenizer instead of ftfy."
-            )
+            logger.warning("ftfy or spacy is not installed using BERT BasicTokenizer instead of ftfy.")
             self.nlp = BasicTokenizer(do_lower_case=True)
             self.fix_text = None
         self.re = try_import("regex")
@@ -204,7 +175,7 @@ class CLIPTokenizer(PretrainedTokenizer):
         self._merges_file = merges_file
         self.max_len = max_len if max_len is not None else int(1e12)
 
-        with open(vocab_file, 'r', encoding='utf-8') as f:
+        with open(vocab_file, "r", encoding="utf-8") as f:
             self.encoder = json.load(f)
 
         self.decoder = {v: k for k, v in self.encoder.items()}
@@ -213,14 +184,10 @@ class CLIPTokenizer(PretrainedTokenizer):
         self.byte_decoder = {v: k for k, v in self.byte_encoder.items()}
 
         with open(merges_file, encoding="utf-8") as merges_handle:
-            bpe_merges = merges_handle.read().strip().split("\n")[1:49152 -
-                                                                  256 - 2 + 1]
+            bpe_merges = merges_handle.read().strip().split("\n")[1 : 49152 - 256 - 2 + 1]
         bpe_merges = [tuple(merge.split()) for merge in bpe_merges]
         self.bpe_ranks = dict(zip(bpe_merges, range(len(bpe_merges))))
-        self.cache = {
-            "<|startoftext|>": "<|startoftext|>",
-            "<|endoftext|>": "<|endoftext|>"
-        }
+        self.cache = {"<|startoftext|>": "<|startoftext|>", "<|endoftext|>": "<|endoftext|>"}
 
         self.pat = self.re.compile(
             r"""<\|startoftext\|>|<\|endoftext\|>|'s|'t|'re|'ve|'m|'ll|'d|[\p{L}]+|[\p{N}]|[^\s\p{L}\p{N}]+""",
@@ -243,11 +210,11 @@ class CLIPTokenizer(PretrainedTokenizer):
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
-        Build model inputs from a sequence or a pair of sequence for sequence classification tasks 
+        Build model inputs from a sequence or a pair of sequence for sequence classification tasks
         by concatenating and adding special tokens. A CLIP sequence has the following format:
-        
+
         - single sequence: `<|startoftext|> X <|endoftext|>`
-        
+
         Pairs of sequences are not the expected use case, but they will be handled without a separator.
 
         Args:
@@ -265,27 +232,20 @@ class CLIPTokenizer(PretrainedTokenizer):
             return _bos + token_ids_0 + _eos
         return _bos + token_ids_0 + _eos + _eos + token_ids_1 + _eos
 
-    def get_special_tokens_mask(self,
-                                token_ids_0,
-                                token_ids_1=None,
-                                already_has_special_tokens=False):
+    def get_special_tokens_mask(self, token_ids_0, token_ids_1=None, already_has_special_tokens=False):
         """
         Retrieves sequence ids from a token list that has no special tokens added. This method is
         called when adding special tokens using the tokenizer ``encode`` methods.
         """
         if already_has_special_tokens:
             return super().get_special_tokens_mask(
-                token_ids_0=token_ids_0,
-                token_ids_1=token_ids_1,
-                already_has_special_tokens=True)
+                token_ids_0=token_ids_0, token_ids_1=token_ids_1, already_has_special_tokens=True
+            )
         if token_ids_1 is None:
             return [1] + ([0] * len(token_ids_0)) + [1]
-        return [1] + ([0] * len(token_ids_0)) + [1, 1] + (
-            [0] * len(token_ids_1)) + [1]
+        return [1] + ([0] * len(token_ids_0)) + [1, 1] + ([0] * len(token_ids_1)) + [1]
 
-    def create_token_type_ids_from_sequences(self,
-                                             token_ids_0,
-                                             token_ids_1=None):
+    def create_token_type_ids_from_sequences(self, token_ids_0, token_ids_1=None):
         """
         Create a mask from the two sequences passed to be used in a sequence-pair classification task.
         """
@@ -299,15 +259,14 @@ class CLIPTokenizer(PretrainedTokenizer):
     def bpe(self, token):
         if token in self.cache:
             return self.cache[token]
-        word = tuple(token[:-1]) + (token[-1] + "</w>", )
+        word = tuple(token[:-1]) + (token[-1] + "</w>",)
         pairs = get_pairs(word)
 
         if not pairs:
             return token + "</w>"
 
         while True:
-            bigram = min(
-                pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
+            bigram = min(pairs, key=lambda pair: self.bpe_ranks.get(pair, float("inf")))
             if bigram not in self.bpe_ranks:
                 break
             first, second = bigram
@@ -323,8 +282,7 @@ class CLIPTokenizer(PretrainedTokenizer):
                     new_word.extend(word[i:j])
                     i = j
 
-                if word[i] == first and i < len(word) - 1 and word[i +
-                                                                   1] == second:
+                if word[i] == first and i < len(word) - 1 and word[i + 1] == second:
                     new_word.append(first + second)
                     i += 2
                 else:
@@ -352,8 +310,7 @@ class CLIPTokenizer(PretrainedTokenizer):
             token = "".join(
                 self.byte_encoder[b] for b in token.encode("utf-8")
             )  # Maps all our bytes to unicode strings, avoiding control tokens of the BPE (spaces in our case)
-            bpe_tokens.extend(bpe_token
-                              for bpe_token in self.bpe(token).split(" "))
+            bpe_tokens.extend(bpe_token for bpe_token in self.bpe(token).split(" "))
         return bpe_tokens
 
     def _convert_token_to_id(self, token):
@@ -367,10 +324,12 @@ class CLIPTokenizer(PretrainedTokenizer):
         Converts a sequence of tokens (string) in a single string.
         """
         text = "".join(tokens)
-        text = bytearray([self.byte_decoder[c] for c in text
-                          ]).decode('utf-8',
-                                    errors=self.errors).replace("</w>",
-                                                                " ").strip()
+        text = (
+            bytearray([self.byte_decoder[c] for c in text])
+            .decode("utf-8", errors=self.errors)
+            .replace("</w>", " ")
+            .strip()
+        )
         return text
 
     def save_resources(self, save_directory):
@@ -389,31 +348,47 @@ class CLIPTokenizer(PretrainedTokenizer):
                 shutil.copyfile(source_path, save_path)
 
     def __call__(
-            self,
-            text,
-            text_pair=None,
-            max_length=None,
-            stride=0,
-            is_split_into_words=False,
-            padding=False,
-            truncation=False,
-            return_position_ids=False,
-            return_token_type_ids=False,  # don't return token_type_ids 
-            return_attention_mask=False,
-            return_length=False,
-            return_overflowing_tokens=False,
-            return_special_tokens_mask=False,
-            return_dict=True,
-            return_offsets_mapping=False,
-            add_special_tokens=True,
-            pad_to_multiple_of=None,
-            return_tensors=None,
-            verbose: bool = True,
-            **kwargs):
+        self,
+        text,
+        text_pair=None,
+        max_length=None,
+        stride=0,
+        is_split_into_words=False,
+        padding=False,
+        truncation=False,
+        return_position_ids=False,
+        return_token_type_ids=False,  # don't return token_type_ids
+        return_attention_mask=False,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+        return_dict=True,
+        return_offsets_mapping=False,
+        add_special_tokens=True,
+        pad_to_multiple_of=None,
+        return_tensors=None,
+        verbose: bool = True,
+        **kwargs
+    ):
         return super().__call__(
-            text, text_pair, max_length, stride, is_split_into_words, padding,
-            truncation, return_position_ids, return_token_type_ids,
-            return_attention_mask, return_length, return_overflowing_tokens,
-            return_special_tokens_mask, return_dict, return_offsets_mapping,
-            add_special_tokens, pad_to_multiple_of, return_tensors, verbose,
-            **kwargs)
+            text,
+            text_pair,
+            max_length,
+            stride,
+            is_split_into_words,
+            padding,
+            truncation,
+            return_position_ids,
+            return_token_type_ids,
+            return_attention_mask,
+            return_length,
+            return_overflowing_tokens,
+            return_special_tokens_mask,
+            return_dict,
+            return_offsets_mapping,
+            add_special_tokens,
+            pad_to_multiple_of,
+            return_tensors,
+            verbose,
+            **kwargs,
+        )

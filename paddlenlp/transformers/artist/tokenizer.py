@@ -16,7 +16,7 @@
 from ..bert.tokenizer import BertTokenizer
 
 __all__ = [
-    'ArtistTokenizer',
+    "ArtistTokenizer",
 ]
 
 
@@ -33,7 +33,7 @@ class ArtistTokenizer(BertTokenizer):
             Defaults to `True`.
         image_vocab_size (int, optional):
             The vocabulary size of image.
-            Defaults to `16384`. 
+            Defaults to `16384`.
         do_basic_tokenize (bool, optional):
             Whether to use a basic tokenizer before a WordPiece tokenizer.
             Defaults to `True`.
@@ -75,24 +75,20 @@ class ArtistTokenizer(BertTokenizer):
             print(inputs)
 
             '''
-            {'input_ids': [23983, 23707, 20101, 18750, 17175, 18146, 21090, 24408, 17068, 
+            {'input_ids': [23983, 23707, 20101, 18750, 17175, 18146, 21090, 24408, 17068,
                            19725, 17428, 21076, 19577, 19833, 21657]}
             '''
-            
+
     """
+
     resource_files_names = {"vocab_file": "vocab.txt"}  # for save_pretrained
     pretrained_resource_files_map = {
         "vocab_file": {
-            "pai-painter-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/vocab.txt",
-            "pai-painter-painting-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/vocab.txt",
-            "pai-painter-scenery-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/vocab.txt",
-            "pai-painter-commercial-base-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/vocab.txt",
-            "pai-painter-large-zh":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/vocab.txt",
+            "pai-painter-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-base-zh/vocab.txt",
+            "pai-painter-painting-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-painting-base-zh/vocab.txt",
+            "pai-painter-scenery-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-scenery-base-zh/vocab.txt",
+            "pai-painter-commercial-base-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-commercial-base-zh/vocab.txt",
+            "pai-painter-large-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/artist/pai-painter-large-zh/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -125,24 +121,36 @@ class ArtistTokenizer(BertTokenizer):
         "pai-painter-large-zh": 32,
     }
 
-    def __init__(self,
-                 vocab_file,
-                 do_lower_case=True,
-                 image_vocab_size=16384,
-                 do_basic_tokenize=True,
-                 never_split=None,
-                 unk_token="[UNK]",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 tokenize_chinese_chars=True,
-                 strip_accents=None,
-                 **kwargs):
-        super().__init__(vocab_file, do_lower_case, do_basic_tokenize,
-                         never_split, unk_token, sep_token, pad_token,
-                         cls_token, mask_token, tokenize_chinese_chars,
-                         strip_accents, **kwargs)
+    def __init__(
+        self,
+        vocab_file,
+        do_lower_case=True,
+        image_vocab_size=16384,
+        do_basic_tokenize=True,
+        never_split=None,
+        unk_token="[UNK]",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        tokenize_chinese_chars=True,
+        strip_accents=None,
+        **kwargs
+    ):
+        super().__init__(
+            vocab_file,
+            do_lower_case,
+            do_basic_tokenize,
+            never_split,
+            unk_token,
+            sep_token,
+            pad_token,
+            cls_token,
+            mask_token,
+            tokenize_chinese_chars,
+            strip_accents,
+            **kwargs,
+        )
         # we need add image_vocab_size offset
         # for example [523, 102, 0, 0]
         # => [523 + image_vocab_size, 102 + image_vocab_size, 0 + image_vocab_size, 0 + image_vocab_size]
@@ -174,14 +182,13 @@ class ArtistTokenizer(BertTokenizer):
                 tokens.append(self.added_tokens_decoder[index])
             else:
                 # note: process image_vocab_size offset
-                tokens.append(
-                    self._convert_id_to_token(index - self.image_vocab_size))
+                tokens.append(self._convert_id_to_token(index - self.image_vocab_size))
         return tokens
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """
-        Build model inputs from a sequence (we don't add special tokens). 
-        
+        Build model inputs from a sequence (we don't add special tokens).
+
         An Artist sequence has the following format:
 
         - single sequence:      ``X``
@@ -190,7 +197,7 @@ class ArtistTokenizer(BertTokenizer):
             token_ids_0 (List[int]):
                 List of IDs to which the special tokens will be added.
             token_ids_1 (List[int], optional):
-                Optional second list of IDs for sequence pairs. 
+                Optional second list of IDs for sequence pairs.
                 We do'nt use sequence pairs.
                 Defaults to None.
 
@@ -200,31 +207,47 @@ class ArtistTokenizer(BertTokenizer):
         return token_ids_0
 
     def __call__(
-            self,
-            text,
-            text_pair=None,
-            max_length=32,  # default
-            stride=0,
-            is_split_into_words=False,
-            padding="max_length",  # default
-            truncation=True,  # default
-            return_position_ids=False,
-            return_token_type_ids=False,  # don't return token_type_ids 
-            return_attention_mask=False,
-            return_length=False,
-            return_overflowing_tokens=False,
-            return_special_tokens_mask=False,
-            return_dict=True,
-            return_offsets_mapping=False,
-            add_special_tokens=True,
-            pad_to_multiple_of=None,
-            return_tensors=None,
-            verbose: bool = True,
-            **kwargs):
+        self,
+        text,
+        text_pair=None,
+        max_length=32,  # default
+        stride=0,
+        is_split_into_words=False,
+        padding="max_length",  # default
+        truncation=True,  # default
+        return_position_ids=False,
+        return_token_type_ids=False,  # don't return token_type_ids
+        return_attention_mask=False,
+        return_length=False,
+        return_overflowing_tokens=False,
+        return_special_tokens_mask=False,
+        return_dict=True,
+        return_offsets_mapping=False,
+        add_special_tokens=True,
+        pad_to_multiple_of=None,
+        return_tensors=None,
+        verbose: bool = True,
+        **kwargs
+    ):
         return super().__call__(
-            text, text_pair, max_length, stride, is_split_into_words, padding,
-            truncation, return_position_ids, return_token_type_ids,
-            return_attention_mask, return_length, return_overflowing_tokens,
-            return_special_tokens_mask, return_dict, return_offsets_mapping,
-            add_special_tokens, pad_to_multiple_of, return_tensors, verbose,
-            **kwargs)
+            text,
+            text_pair,
+            max_length,
+            stride,
+            is_split_into_words,
+            padding,
+            truncation,
+            return_position_ids,
+            return_token_type_ids,
+            return_attention_mask,
+            return_length,
+            return_overflowing_tokens,
+            return_special_tokens_mask,
+            return_dict,
+            return_offsets_mapping,
+            add_special_tokens,
+            pad_to_multiple_of,
+            return_tensors,
+            verbose,
+            **kwargs,
+        )

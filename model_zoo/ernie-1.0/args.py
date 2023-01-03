@@ -15,30 +15,26 @@
 import argparse
 
 import paddle
+
 from paddlenlp.utils.log import logger
 
 
 def str2bool(v):
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+    if v.lower() in ("yes", "true", "t", "y", "1"):
         return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+    elif v.lower() in ("no", "false", "f", "n", "0"):
         return False
     else:
-        raise argparse.ArgumentTypeError('Unsupported value encountered.')
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def parse_args(MODEL_CLASSES):
     parser = argparse.ArgumentParser()
     # yapf: disable
     parser.add_argument("--model_type", default=None, type=str, required=True, help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()), )
-    parser.add_argument("--model_name_or_path", default=None, type=str, required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
-        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
-    parser.add_argument("--tokenizer_name_or_path", default=None, type=str,
-        help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(
-        sum([ list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values() ], [])),)
-    parser.add_argument("--continue_training", default=False, type=bool,
-        help="Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models.")
+    parser.add_argument("--model_name_or_path", default=None, type=str, required=True, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])),)
+    parser.add_argument("--tokenizer_name_or_path", default=None, type=str, help="Path to pre-trained model or shortcut name selected in the list: " + ", ".join(sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])),)
+    parser.add_argument("--continue_training", default=False, type=bool, help="Pre-training from existing paddlenlp model weights. Default Fasle and model will train from scratch. If set True, the model_name_or_path argument must exist in the paddlenlp models.")
 
     # Train I/O config
     parser.add_argument("--input_dir", default=None, type=str, required=True, help="The input directory where the data will be read from.", )
@@ -92,7 +88,7 @@ def parse_args(MODEL_CLASSES):
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization.")
     parser.add_argument("--num_workers", type=int, default=2, help="Num of workers for DataLoader.")
     parser.add_argument("--check_accuracy", type=str2bool, nargs='?', const=False, help="Check accuracy for training process.")
-    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "mlu"], help="select cpu, gpu, xpu devices.")
+    parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "mlu", "npu"], help="select cpu, gpu, xpu, npu devices.")
     parser.add_argument("--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style.")
     parser.add_argument("--share_folder", type=str2bool, nargs='?', const=False, help="Use share folder for data dir and output dir on multi machine.")
 
@@ -112,15 +108,11 @@ def parse_args(MODEL_CLASSES):
 
     if args.check_accuracy:
         if args.hidden_dropout_prob != 0:
-            args.hidden_dropout_prob = .0
-            logger.warning(
-                "The hidden_dropout_prob should set to 0 for accuracy checking."
-            )
+            args.hidden_dropout_prob = 0.0
+            logger.warning("The hidden_dropout_prob should set to 0 for accuracy checking.")
         if args.attention_probs_dropout_prob != 0:
-            args.attention_probs_dropout_prob = .0
-            logger.warning(
-                "The attention_probs_dropout_prob should set to 0 for accuracy checking."
-            )
+            args.attention_probs_dropout_prob = 0.0
+            logger.warning("The attention_probs_dropout_prob should set to 0 for accuracy checking.")
     if args.dp_degree * args.mp_degree * args.pp_degree * args.sharding_degree == 1:
         if paddle.distributed.get_world_size() > 1:
             args.dp_degree = paddle.distributed.get_world_size()

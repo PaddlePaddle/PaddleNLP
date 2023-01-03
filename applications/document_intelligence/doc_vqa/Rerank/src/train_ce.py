@@ -28,11 +28,12 @@ import multiprocessing
 # NOTE(paddle-dev): All of these flags should be
 # set before `import paddle`. Otherwise, it would
 # not take any effect.
-os.environ['FLAGS_eager_delete_tensor_gb'] = '0'  # enable gc
+os.environ["FLAGS_eager_delete_tensor_gb"] = "0"  # enable gc
 
 import paddle
 import paddle.fluid as fluid
-if hasattr(paddle, 'enable_static'):
+
+if hasattr(paddle, "enable_static"):
     paddle.enable_static()
 from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
 import paddle.fluid.incubate.fleet.base.role_maker as role_maker
@@ -60,23 +61,24 @@ def main(args):
         dev_count = len(dev_list)
     else:
         place = fluid.CPUPlace()
-        dev_count = int(os.environ.get('CPU_NUM', multiprocessing.cpu_count()))
+        dev_count = int(os.environ.get("CPU_NUM", multiprocessing.cpu_count()))
     exe = fluid.Executor(place)
 
-    reader = reader_ce.ClassifyReader(vocab_path=args.vocab_path,
-                                      label_map_config=args.label_map_config,
-                                      max_seq_len=args.max_seq_len,
-                                      total_num=args.train_data_size,
-                                      do_lower_case=args.do_lower_case,
-                                      in_tokens=args.in_tokens,
-                                      random_seed=args.random_seed,
-                                      tokenizer=args.tokenizer,
-                                      for_cn=args.for_cn,
-                                      task_id=args.task_id)
+    reader = reader_ce.ClassifyReader(
+        vocab_path=args.vocab_path,
+        label_map_config=args.label_map_config,
+        max_seq_len=args.max_seq_len,
+        total_num=args.train_data_size,
+        do_lower_case=args.do_lower_case,
+        in_tokens=args.in_tokens,
+        random_seed=args.random_seed,
+        tokenizer=args.tokenizer,
+        for_cn=args.for_cn,
+        task_id=args.task_id,
+    )
 
     if not (args.do_train or args.do_val or args.do_test):
-        raise ValueError("For args `do_train`, `do_val` and `do_test`, at "
-                         "least one of them must be True.")
+        raise ValueError("For args `do_train`, `do_val` and `do_test`, at " "least one of them must be True.")
 
     if args.do_test:
         assert args.test_save is not None
@@ -100,13 +102,13 @@ def main(args):
             trainer_id=fleet.worker_index(),
             trainer_num=fleet.worker_num(),
             shuffle=True,
-            phase="train")
+            phase="train",
+        )
 
         num_train_examples = reader.get_num_examples(args.train_set)
 
         if args.in_tokens:
-            max_train_steps = args.epoch * num_train_examples // (
-                args.batch_size // args.max_seq_len) // dev_count
+            max_train_steps = args.epoch * num_train_examples // (args.batch_size // args.max_seq_len) // dev_count
         else:
             max_train_steps = args.epoch * num_train_examples // args.batch_size // dev_count
 
@@ -141,9 +143,8 @@ def main(args):
         with fluid.program_guard(train_program, startup_prog):
             with fluid.unique_name.guard():
                 train_pyreader, graph_vars = create_model(
-                    args,
-                    pyreader_name='train_reader',
-                    ernie_config=ernie_config)
+                    args, pyreader_name="train_reader", ernie_config=ernie_config
+                )
                 scheduled_lr = optimization(
                     loss=graph_vars["loss"],
                     warmup_steps=warmup_steps,
@@ -158,28 +159,27 @@ def main(args):
                     decr_every_n_nan_or_inf=args.decr_every_n_nan_or_inf,
                     incr_ratio=args.incr_ratio,
                     decr_ratio=args.decr_ratio,
-                    dist_strategy=dist_strategy)
+                    dist_strategy=dist_strategy,
+                )
 
         if args.verbose:
             if args.in_tokens:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
-                    program=train_program,
-                    batch_size=args.batch_size // args.max_seq_len)
+                    program=train_program, batch_size=args.batch_size // args.max_seq_len
+                )
             else:
                 lower_mem, upper_mem, unit = fluid.contrib.memory_usage(
-                    program=train_program, batch_size=args.batch_size)
-            log.info("Theoretical memory usage in training: %.3f - %.3f %s" %
-                     (lower_mem, upper_mem, unit))
+                    program=train_program, batch_size=args.batch_size
+                )
+            log.info("Theoretical memory usage in training: %.3f - %.3f %s" % (lower_mem, upper_mem, unit))
 
     if args.do_val or args.do_test:
         test_prog = fluid.Program()
         with fluid.program_guard(test_prog, startup_prog):
             with fluid.unique_name.guard():
                 test_pyreader, graph_vars = create_model(
-                    args,
-                    pyreader_name='test_reader',
-                    ernie_config=ernie_config,
-                    is_prediction=True)
+                    args, pyreader_name="test_reader", ernie_config=ernie_config, is_prediction=True
+                )
 
         test_prog = test_prog.clone(for_test=True)
 
@@ -192,19 +192,15 @@ def main(args):
         if args.init_checkpoint and args.init_pretraining_params:
             log.warning(
                 "WARNING: args 'init_checkpoint' and 'init_pretraining_params' "
-                "both are set! Only arg 'init_checkpoint' is made valid.")
+                "both are set! Only arg 'init_checkpoint' is made valid."
+            )
         if args.init_checkpoint:
-            init_checkpoint(exe,
-                            args.init_checkpoint,
-                            main_program=startup_prog)
+            init_checkpoint(exe, args.init_checkpoint, main_program=startup_prog)
         elif args.init_pretraining_params:
-            init_pretraining_params(exe,
-                                    args.init_pretraining_params,
-                                    main_program=startup_prog)
+            init_pretraining_params(exe, args.init_pretraining_params, main_program=startup_prog)
     elif args.do_val or args.do_test:
         if not args.init_checkpoint:
-            raise ValueError("args 'init_checkpoint' should be set if"
-                             "only doing validation or testing!")
+            raise ValueError("args 'init_checkpoint' should be set if" "only doing validation or testing!")
         init_checkpoint(exe, args.init_checkpoint, main_program=startup_prog)
 
     if args.do_train:
@@ -237,19 +233,15 @@ def main(args):
                     train_exe.run(fetch_list=[], program=train_program)
 
                 else:
-                    outputs = evaluate(train_exe,
-                                       train_program,
-                                       train_pyreader,
-                                       graph_vars,
-                                       "train",
-                                       metric=args.metric)
+                    outputs = evaluate(
+                        train_exe, train_program, train_pyreader, graph_vars, "train", metric=args.metric
+                    )
 
                     if args.verbose:
-                        verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size(
-                        )
+                        verbose = "train pyreader queue size: %d, " % train_pyreader.queue.size()
                         verbose += "learning rate: %f" % (
-                            outputs["learning_rate"]
-                            if warmup_steps > 0 else args.learning_rate)
+                            outputs["learning_rate"] if warmup_steps > 0 else args.learning_rate
+                        )
                         log.info(verbose)
 
                     current_example, current_epoch = reader.get_train_progress()
@@ -258,47 +250,45 @@ def main(args):
 
                     log.info(
                         "epoch: %d, progress: %d/%d, step: %d, ave loss: %f, "
-                        "ave acc: %f, speed: %f steps/s" %
-                        (current_epoch, current_example * dev_count,
-                         num_train_examples, steps, outputs["loss"],
-                         outputs["accuracy"], args.skip_steps / used_time))
-                    ce_info.append(
-                        [outputs["loss"], outputs["accuracy"], used_time])
+                        "ave acc: %f, speed: %f steps/s"
+                        % (
+                            current_epoch,
+                            current_example * dev_count,
+                            num_train_examples,
+                            steps,
+                            outputs["loss"],
+                            outputs["accuracy"],
+                            args.skip_steps / used_time,
+                        )
+                    )
+                    ce_info.append([outputs["loss"], outputs["accuracy"], used_time])
 
                     time_begin = time.time()
 
                 if steps % args.save_steps == 0:
-                    save_path = os.path.join(args.checkpoints,
-                                             "step_" + str(steps))
-                    fluid.io.save_persistables(exe, save_path,
-                                               fleet._origin_program)
+                    save_path = os.path.join(args.checkpoints, "step_" + str(steps))
+                    fluid.io.save_persistables(exe, save_path, fleet._origin_program)
 
                 if steps % args.validation_steps == 0:
                     # evaluate dev set
                     if args.do_val:
-                        evaluate_wrapper(args, reader, exe, test_prog,
-                                         test_pyreader, graph_vars,
-                                         current_epoch, steps)
+                        evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, current_epoch, steps)
 
                     if args.do_test:
-                        predict_wrapper(args, reader, exe, test_prog,
-                                        test_pyreader, graph_vars,
-                                        current_epoch, steps)
+                        predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, current_epoch, steps)
 
                 if last_epoch != current_epoch:
                     last_epoch = current_epoch
 
             except fluid.core.EOFException:
                 save_path = os.path.join(args.checkpoints, "step_" + str(steps))
-                fluid.io.save_persistables(exe, save_path,
-                                           fleet._origin_program)
+                fluid.io.save_persistables(exe, save_path, fleet._origin_program)
                 train_pyreader.reset()
                 break
 
     # final eval on dev set
     if args.do_val:
-        evaluate_wrapper(args, reader, exe, test_prog, test_pyreader,
-                         graph_vars, current_epoch, steps)
+        evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, current_epoch, steps)
 
     # final eval on test set
     if args.do_test:
@@ -307,68 +297,42 @@ def main(args):
     # final eval on dianostic, hack for glue-ax
     if args.diagnostic:
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(args.diagnostic,
-                                  batch_size=args.batch_size,
-                                  epoch=1,
-                                  dev_count=1,
-                                  shuffle=False))
+            reader.data_generator(args.diagnostic, batch_size=args.batch_size, epoch=1, dev_count=1, shuffle=False)
+        )
 
         log.info("Final diagnostic")
-        qids, preds, probs = predict(test_exe, test_prog, test_pyreader,
-                                     graph_vars)
-        assert len(qids) == len(preds), '{} v.s. {}'.format(
-            len(qids), len(preds))
-        with open(args.diagnostic_save, 'w') as f:
+        qids, preds, probs = predict(test_exe, test_prog, test_pyreader, graph_vars)
+        assert len(qids) == len(preds), "{} v.s. {}".format(len(qids), len(preds))
+        with open(args.diagnostic_save, "w") as f:
             for id, s, p in zip(qids, preds, probs):
-                f.write('{}\t{}\t{}\n'.format(id, s, p))
+                f.write("{}\t{}\t{}\n".format(id, s, p))
 
-        log.info("Done final diagnostic, saving to {}".format(
-            args.diagnostic_save))
+        log.info("Done final diagnostic, saving to {}".format(args.diagnostic_save))
 
 
-def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars,
-                     epoch, steps):
+def evaluate_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, epoch, steps):
     # evaluate dev set
-    for ds in args.dev_set.split(','):
+    for ds in args.dev_set.split(","):
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(ds,
-                                  batch_size=args.predict_batch_size,
-                                  epoch=1,
-                                  dev_count=1,
-                                  shuffle=False))
+            reader.data_generator(ds, batch_size=args.predict_batch_size, epoch=1, dev_count=1, shuffle=False)
+        )
         log.info("validation result of dataset {}:".format(ds))
-        evaluate_info = evaluate(exe,
-                                 test_prog,
-                                 test_pyreader,
-                                 graph_vars,
-                                 "dev",
-                                 metric=args.metric)
-        log.info(evaluate_info +
-                 ', file: {}, epoch: {}, steps: {}'.format(ds, epoch, steps))
+        evaluate_info = evaluate(exe, test_prog, test_pyreader, graph_vars, "dev", metric=args.metric)
+        log.info(evaluate_info + ", file: {}, epoch: {}, steps: {}".format(ds, epoch, steps))
 
 
-def predict_wrapper(args,
-                    reader,
-                    exe,
-                    test_prog,
-                    test_pyreader,
-                    graph_vars,
-                    epoch=None,
-                    steps=None):
-    test_sets = args.test_set.split(',')
-    save_dirs = args.test_save.split(',')
+def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, epoch=None, steps=None):
+    test_sets = args.test_set.split(",")
+    save_dirs = args.test_save.split(",")
     assert len(test_sets) == len(save_dirs)
 
     for test_f, save_f in zip(test_sets, save_dirs):
         test_pyreader.decorate_tensor_provider(
-            reader.data_generator(test_f,
-                                  batch_size=args.predict_batch_size,
-                                  epoch=1,
-                                  dev_count=1,
-                                  shuffle=False))
+            reader.data_generator(test_f, batch_size=args.predict_batch_size, epoch=1, dev_count=1, shuffle=False)
+        )
 
         if epoch is not None or steps is not None:
-            save_path = save_f + '.' + str(epoch) + '.' + str(steps)
+            save_path = save_f + "." + str(epoch) + "." + str(steps)
         else:
             save_path = save_f
         log.info("testing {}, save to {}".format(test_f, save_path))
@@ -378,14 +342,14 @@ def predict_wrapper(args,
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         else:
-            log.warning('save dir exsits: %s, will skip saving' % save_dir)
+            log.warning("save dir exsits: %s, will skip saving" % save_dir)
 
-        with open(save_path, 'w') as f:
+        with open(save_path, "w") as f:
             for p in probs:
-                f.write('{}\n'.format(p[1]))
+                f.write("{}\n".format(p[1]))
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     prepare_logger(log)
     print_arguments(args)
     check_cuda(args.use_cuda)

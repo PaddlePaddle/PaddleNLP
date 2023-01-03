@@ -39,7 +39,7 @@ args = parser.parse_args()
 
 
 def dense_faq_pipeline():
-    use_gpu = True if args.device == 'gpu' else False
+    use_gpu = True if args.device == "gpu" else False
     faiss_document_store = "faiss_document_store.db"
     if os.path.exists(args.index_name) and os.path.exists(faiss_document_store):
         # connect to existed FAISS Index
@@ -55,18 +55,16 @@ def dense_faq_pipeline():
             embed_title=False,
         )
     else:
-        dicts = convert_files_to_dicts(dir_path=args.doc_dir,
-                                       split_paragraphs=True,
-                                       split_answers=True,
-                                       encoding='utf-8')
+        dicts = convert_files_to_dicts(
+            dir_path=args.doc_dir, split_paragraphs=True, split_answers=True, encoding="utf-8"
+        )
 
         if os.path.exists(args.index_name):
             os.remove(args.index_name)
         if os.path.exists(faiss_document_store):
             os.remove(faiss_document_store)
 
-        document_store = FAISSDocumentStore(embedding_dim=768,
-                                            faiss_index_factory_str="Flat")
+        document_store = FAISSDocumentStore(embedding_dim=768, faiss_index_factory_str="Flat")
         document_store.write_documents(dicts)
 
         retriever = DensePassageRetriever(
@@ -87,9 +85,7 @@ def dense_faq_pipeline():
         document_store.save(args.index_name)
 
     ### Ranker
-    ranker = ErnieRanker(
-        model_name_or_path="rocketqa-zh-dureader-cross-encoder",
-        use_gpu=use_gpu)
+    ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
     pipe = SemanticSearchPipeline(retriever, ranker)
 
@@ -101,56 +97,53 @@ def dense_faq_pipeline():
 
 def qa_generation_pipeline():
     answer_extractor = AnswerExtractor(
-        model='uie-base-answer-extractor',
+        model="uie-base-answer-extractor",
         device=args.device,
-        schema=['答案'],
+        schema=["答案"],
         max_answer_candidates=3,
         position_prob=0.01,
     )
 
     question_generator = QuestionGenerator(
-        model='unimo-text-1.0-question-generation',
+        model="unimo-text-1.0-question-generation",
         device=args.device,
         num_return_sequences=2,
     )
 
     qa_filter = QAFilter(
-        model='uie-base-qa-filter',
+        model="uie-base-qa-filter",
         device=args.device,
-        schema=['答案'],
+        schema=["答案"],
         position_prob=0.1,
     )
 
-    pipe = QAGenerationPipeline(answer_extractor=answer_extractor,
-                                question_generator=question_generator,
-                                qa_filter=qa_filter)
+    pipe = QAGenerationPipeline(
+        answer_extractor=answer_extractor, question_generator=question_generator, qa_filter=qa_filter
+    )
     pipeline_params = {"QAFilter": {"is_filter": True}}
 
     # list example
     meta = [
         "世界上最早的电影院是美国洛杉矶的“电气剧场”，建于1902年。",
-        "以脸书为例，2020年时，54%的成年人表示，他们从该平台获取新闻。而现在，这个数字下降到了44%。与此同时，YouTube在过去几年里一直保持平稳，约有三分之一的用户在该平台上获取新闻。"
+        "以脸书为例，2020年时，54%的成年人表示，他们从该平台获取新闻。而现在，这个数字下降到了44%。与此同时，YouTube在过去几年里一直保持平稳，约有三分之一的用户在该平台上获取新闻。",
     ]
     prediction = pipe.run(meta=meta, params=pipeline_params)
-    prediction = prediction['filtered_cqa_triples']
+    prediction = prediction["filtered_cqa_triples"]
     pprint(prediction)
 
     # file example
     if args.source_file:
         meta = []
-        with open(args.source_file, 'r', encoding='utf-8') as rf:
+        with open(args.source_file, "r", encoding="utf-8") as rf:
             for line in rf:
                 meta.append(line.strip())
         prediction = pipe.run(meta=meta, params=pipeline_params)
-        prediction = prediction['filtered_cqa_triples']
+        prediction = prediction["filtered_cqa_triples"]
         if not os.path.exists(args.doc_dir):
             os.makedirs(args.doc_dir)
-        with open(os.path.join(args.doc_dir, 'generated_qa_pairs.txt'),
-                  'w',
-                  encoding='utf-8') as wf:
+        with open(os.path.join(args.doc_dir, "generated_qa_pairs.txt"), "w", encoding="utf-8") as wf:
             for pair in prediction:
-                wf.write(pair['synthetic_question'].strip() + '\t' +
-                         pair['synthetic_answer'].strip() + '\n')
+                wf.write(pair["synthetic_question"].strip() + "\t" + pair["synthetic_answer"].strip() + "\n")
 
 
 if __name__ == "__main__":

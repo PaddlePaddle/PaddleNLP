@@ -24,7 +24,7 @@ from paddlenlp.data.vocab import Vocab
 
 from .. import PretrainedTokenizer, AddedToken
 
-__all__ = ['BigBirdTokenizer']
+__all__ = ["BigBirdTokenizer"]
 
 PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {"bigbird-base-uncased": 4096}
 
@@ -66,40 +66,42 @@ class BigBirdTokenizer(PretrainedTokenizer):
         ValueError: If file sentencepiece_model_file doesn't exist.
 
     """
+
     resource_files_names = {
         "sentencepiece_model_file": "sentencepiece_gpt2.model",
     }  # for save_pretrained
     pretrained_resource_files_map = {
         "sentencepiece_model_file": {
-            "bigbird-base-uncased":
-            "https://bj.bcebos.com/paddlenlp/models/transformers/bigbird/sentencepiece_gpt2.model",
+            "bigbird-base-uncased": "https://bj.bcebos.com/paddlenlp/models/transformers/bigbird/sentencepiece_gpt2.model",
         },
     }
     pretrained_init_configuration = {
-        "bigbird-base-uncased": {
-            "do_lower_case": True
-        },
+        "bigbird-base-uncased": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
 
-    def __init__(self,
-                 sentencepiece_model_file,
-                 do_lower_case=True,
-                 encoding="utf8",
-                 unk_token="<unk>",
-                 sep_token="[SEP]",
-                 pad_token="[PAD]",
-                 cls_token="[CLS]",
-                 mask_token="[MASK]",
-                 **kwargs):
+    def __init__(
+        self,
+        sentencepiece_model_file,
+        do_lower_case=True,
+        encoding="utf8",
+        unk_token="<unk>",
+        sep_token="[SEP]",
+        pad_token="[PAD]",
+        cls_token="[CLS]",
+        mask_token="[MASK]",
+        **kwargs
+    ):
 
         if not os.path.isfile(sentencepiece_model_file):
             raise ValueError(
                 "Can't find a vocabulary file at path '{}'. To load the "
                 "vocabulary from a pretrained model please use "
-                "`tokenizer = BigBirdTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`"
-                .format(sentencepiece_model_file))
+                "`tokenizer = BigBirdTokenizer.from_pretrained(PRETRAINED_MODEL_NAME)`".format(
+                    sentencepiece_model_file
+                )
+            )
         self.encoding = encoding
         self.sp_model = spm.SentencePieceProcessor()
         if os.path.isfile(sentencepiece_model_file):
@@ -108,10 +110,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         for id in range(self.sp_model.get_piece_size()):
             vocab_dict[self.sp_model.id_to_piece(id)] = id
         self.vocab = Vocab.from_dict(vocab_dict, unk_token=unk_token)
-        self.start_word_tokens = np.array([
-            self.vocab._idx_to_token[i][0] == "▁"
-            for i in range(0, len(self.vocab))
-        ])
+        self.start_word_tokens = np.array([self.vocab._idx_to_token[i][0] == "▁" for i in range(0, len(self.vocab))])
         self.unk_token = unk_token
         self.mask_id = vocab_dict[mask_token]
         self.unk_id = vocab_dict[unk_token]
@@ -119,29 +118,17 @@ class BigBirdTokenizer(PretrainedTokenizer):
         self.sep_id = vocab_dict[sep_token]
         self.pad_id = vocab_dict[pad_token] if pad_token in vocab_dict else 0
 
-        unk_token = AddedToken(unk_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   unk_token, str) else unk_token
-        pad_token = AddedToken(pad_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   pad_token, str) else pad_token
-        cls_token = AddedToken(cls_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   cls_token, str) else cls_token
-        sep_token = AddedToken(sep_token,
-                               lstrip=False, rstrip=False) if isinstance(
-                                   sep_token, str) else sep_token
+        unk_token = AddedToken(unk_token, lstrip=False, rstrip=False) if isinstance(unk_token, str) else unk_token
+        pad_token = AddedToken(pad_token, lstrip=False, rstrip=False) if isinstance(pad_token, str) else pad_token
+        cls_token = AddedToken(cls_token, lstrip=False, rstrip=False) if isinstance(cls_token, str) else cls_token
+        sep_token = AddedToken(sep_token, lstrip=False, rstrip=False) if isinstance(sep_token, str) else sep_token
 
         # Mask token behave like a normal word, i.e. include the space before it
-        mask_token = AddedToken(mask_token,
-                                lstrip=True, rstrip=False) if isinstance(
-                                    mask_token, str) else mask_token
+        mask_token = AddedToken(mask_token, lstrip=True, rstrip=False) if isinstance(mask_token, str) else mask_token
 
-        self._build_special_tokens_map_extended(sep_token=sep_token,
-                                                cls_token=cls_token,
-                                                unk_token=unk_token,
-                                                pad_token=pad_token,
-                                                mask_token=mask_token)
+        self._build_special_tokens_map_extended(
+            sep_token=sep_token, cls_token=cls_token, unk_token=unk_token, pad_token=pad_token, mask_token=mask_token
+        )
 
     @property
     def vocab_size(self):
@@ -228,11 +215,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         out_string = " ".join(tokens).replace(" ##", "").strip()
         return out_string
 
-    def encode(self,
-               text,
-               max_seq_len=None,
-               max_pred_len=None,
-               masked_lm_prob=0.15):
+    def encode(self, text, max_seq_len=None, max_pred_len=None, masked_lm_prob=0.15):
         """
         Returns a tuple containing the encoded sequence and mask information.
 
@@ -258,16 +241,12 @@ class BigBirdTokenizer(PretrainedTokenizer):
 
         def get_input_ids(text):
             if isinstance(text, str):
-                text = re.sub('[\n]+', '', text)
+                text = re.sub("[\n]+", "", text)
                 tokens = self._tokenize(text)
                 return self.convert_tokens_to_ids(tokens)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], str):
+            elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], str):
                 return self.convert_tokens_to_ids(text)
-            elif isinstance(text,
-                            (list, tuple)) and len(text) > 0 and isinstance(
-                                text[0], int):
+            elif isinstance(text, (list, tuple)) and len(text) > 0 and isinstance(text[0], int):
                 return text
             else:
                 raise ValueError(
@@ -279,9 +258,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         max_seq_len = len(ids) if max_seq_len is None else max_seq_len
         max_pred_len = len(ids) if max_pred_len is None else max_pred_len
 
-        end_pos = max_seq_len - 2 + np.random.randint(
-            max(1,
-                len(ids) - max_seq_len - 2))
+        end_pos = max_seq_len - 2 + np.random.randint(max(1, len(ids) - max_seq_len - 2))
         start_pos = max(0, end_pos - max_seq_len + 2)
         span_ids = ids[start_pos:end_pos]
 
@@ -295,21 +272,16 @@ class BigBirdTokenizer(PretrainedTokenizer):
         span_ids = span_ids[first_start_pos:]
         num_tokens = len(span_ids)
         word_begin_pos = word_begin_pos - first_start_pos
-        words = np.split(np.arange(len(span_ids), dtype="int32"),
-                         word_begin_pos)[1:]
+        words = np.split(np.arange(len(span_ids), dtype="int32"), word_begin_pos)[1:]
         assert len(words) == len(word_begin_pos)
-        num_to_predict = min(
-            max_pred_len,
-            max(1, int(round(len(word_begin_pos) * masked_lm_prob))))
+        num_to_predict = min(max_pred_len, max(1, int(round(len(word_begin_pos) * masked_lm_prob))))
 
         masked_lm_positions = np.concatenate(
-            np.random.choice(np.array([[]] + words, dtype=np.object)[1:],
-                             num_to_predict,
-                             replace=False), 0)
+            np.random.choice(np.array([[]] + words, dtype=np.object)[1:], num_to_predict, replace=False), 0
+        )
         if len(masked_lm_positions) > max_pred_len:
-            masked_lm_positions = masked_lm_positions[:max_pred_len + 1]
-            truncate_masking_flag = np.flatnonzero(
-                word_begin_flag[masked_lm_positions])
+            masked_lm_positions = masked_lm_positions[: max_pred_len + 1]
+            truncate_masking_flag = np.flatnonzero(word_begin_flag[masked_lm_positions])
             if len(truncate_masking_flag) == 0:
                 truncate_masking_index = max_pred_len
             else:
@@ -323,22 +295,17 @@ class BigBirdTokenizer(PretrainedTokenizer):
         mask_pos = masked_lm_positions[random_prob < 0.8]
         random_pos = masked_lm_positions[random_prob > 0.9]
         span_ids[mask_pos] = self.mask_id
-        span_ids[random_pos] = np.random.randint(self.unk_id + 1,
-                                                 self.vocab_size,
-                                                 len(random_pos),
-                                                 dtype=np.int32)
-        span_ids = np.concatenate([
-            np.array([self.cls_id], dtype=np.int32), span_ids,
-            np.array([self.sep_id], dtype=np.int32)
-        ])
+        span_ids[random_pos] = np.random.randint(self.unk_id + 1, self.vocab_size, len(random_pos), dtype=np.int32)
+        span_ids = np.concatenate(
+            [np.array([self.cls_id], dtype=np.int32), span_ids, np.array([self.sep_id], dtype=np.int32)]
+        )
         padding_len = max_seq_len - num_tokens - 2
         span_ids = np.pad(span_ids, [0, padding_len], "constant")
         pred_padding_len = max_pred_len - len(masked_lm_positions)
         masked_lm_weights = np.pad(
-            np.ones_like(masked_lm_positions, dtype=np.float32),
-            [0, pred_padding_len], "constant")
-        masked_lm_positions = np.pad(masked_lm_positions + 1,
-                                     [0, pred_padding_len], "constant")
+            np.ones_like(masked_lm_positions, dtype=np.float32), [0, pred_padding_len], "constant"
+        )
+        masked_lm_positions = np.pad(masked_lm_positions + 1, [0, pred_padding_len], "constant")
         masked_lm_ids = np.pad(masked_lm_ids, [0, pred_padding_len], "constant")
         return span_ids, masked_lm_positions, masked_lm_ids, masked_lm_weights
 
@@ -356,9 +323,7 @@ class BigBirdTokenizer(PretrainedTokenizer):
         """
         token_ids_0 = []
         token_ids_1 = []
-        return len(
-            self.build_inputs_with_special_tokens(
-                token_ids_0, token_ids_1 if pair else None))
+        return len(self.build_inputs_with_special_tokens(token_ids_0, token_ids_1 if pair else None))
 
     def build_inputs_with_special_tokens(self, token_ids_0, token_ids_1=None):
         """

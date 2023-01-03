@@ -1,0 +1,29 @@
+[tool.isort]
+profile = 'black'
+known_third_party = ["paddle"]
+skip = ['paddlenlp/transformers/__init__.py']
+
+[tool.black]
+line-length = 119
+target_version = ['py35', 'py36', 'py37', 'py38', 'py39', 'py310']
+exclude = ['.flake8']
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests/data",
+    "tests/datasets",
+    "tests/embeddings",
+    "tests/metrics",
+    "tests/ops",
+    "tests/transformers",
+    "tests/prompt",
+    "tests/taskflow",
+    "tests/utils",
+    "model_zoo",
+]
+python_files = [
+    "test.py",
+    "test_*.py"
+]

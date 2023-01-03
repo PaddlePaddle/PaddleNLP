@@ -16,10 +16,9 @@
 import sys
 import logging
 
-sys.path.append('.')
+sys.path.append(".")
 
-logging.basicConfig(format="%(asctime)s %(message)s",
-                    datefmt="%m/%d/%Y %I:%M:%S %p")
+logging.basicConfig(format="%(asctime)s %(message)s", datefmt="%m/%d/%Y %I:%M:%S %p")
 logger = logging.getLogger(__name__)
 logging.getLogger("elasticsearch").setLevel(logging.WARNING)
 logging.getLogger("pipelines").setLevel(logging.INFO)
@@ -42,10 +41,7 @@ except:
 
 
 def get_application() -> FastAPI:
-    application = FastAPI(title="pipelines REST API",
-                          debug=True,
-                          version=pipelines_version,
-                          root_path=ROOT_PATH)
+    application = FastAPI(title="pipelines REST API", debug=True, version=pipelines_version, root_path=ROOT_PATH)
 
     # This middleware enables allow all cross-domain requests to the API from a browser. For production
     # deployments, it could be made more restrictive.
@@ -94,9 +90,11 @@ app = get_application()
 use_route_names_as_operation_ids(app)
 
 logger.info("Open http://127.0.0.1:8000/docs to see Swagger API Documentation.")
-logger.info("""
+logger.info(
+    """
     Or just try it out directly: curl --request POST --url 'http://127.0.0.1:8000/query' -H "Content-Type: application/json"  --data '{"query": "Who is the father of Arya Stark?"}'
-    """)
+    """
+)
 
 if __name__ == "__main__":
     port = int(sys.argv[1])

@@ -11,7 +11,7 @@ paddlenlp.ops
    :maxdepth: 4
 
    paddlenlp.ops.distributed
-   paddlenlp.ops.faster_transformer
+   paddlenlp.ops.fast_transformer
    paddlenlp.ops.optimizer
 
 

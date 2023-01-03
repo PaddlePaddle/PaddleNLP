@@ -57,8 +57,9 @@ def convert_features_to_dataset(features):
                     f"'{base}' will be converted to a Paddle tensor of dtype long."
                 )
         except:
-            logger.debug(f"Could not determine type for feature '{t_name}'. "
-                         "Converting now to a tensor of default type long.")
+            logger.debug(
+                f"Could not determine type for feature '{t_name}'. " "Converting now to a tensor of default type long."
+            )
 
         # Convert all remaining python objects to Paddle long tensors
         cur_tensor = [sample[t_name] for sample in features]

@@ -17,7 +17,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.10.1\n"
 
-#: ../source/paddlenlp.transformers.bert.faster_tokenizer.rst:2
-msgid "faster\\_tokenizer"
+#: ../source/paddlenlp.transformers.bert.fast_tokenizer.rst:2
+msgid "fast\\_tokenizer"
 msgstr ""
 

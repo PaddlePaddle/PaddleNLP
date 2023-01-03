@@ -19,7 +19,6 @@ from .. import C
 
 
 class Model(ABC):
-
     def tokenize(self, tokens: List[str]):
         return self._model.tokenize(tokens)
 
@@ -40,23 +39,23 @@ class Model(ABC):
 
 
 class WordPiece(Model):
-
-    def __init__(self,
-                 vocab: Dict[str, int],
-                 unk_token: str = "[UNK]",
-                 max_input_chars_per_word: int = 100,
-                 continuing_subword_prefix: str = "##",
-                 handle_chinese_chars: bool = True):
+    def __init__(
+        self,
+        vocab: Dict[str, int],
+        unk_token: str = "[UNK]",
+        max_input_chars_per_word: int = 100,
+        continuing_subword_prefix: str = "##",
+        handle_chinese_chars: bool = True,
+    ):
         self._model = None
         if vocab is not None:
-            self._model = C.models.WordPiece(vocab, unk_token,
-                                             max_input_chars_per_word,
-                                             continuing_subword_prefix,
-                                             handle_chinese_chars)
+            self._model = C.models.WordPiece(
+                vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix, handle_chinese_chars
+            )
 
     @staticmethod
     def read_file(vocab: str):
-        """ Read a vocab.txt file
+        """Read a vocab.txt file
 
         :params vocab: (str) The path to a vocab.txt file
         :return: Dict[str, int], The vocabulary as a dict
@@ -64,11 +63,13 @@ class WordPiece(Model):
         return C.models.WordPiece.read_file(vocab)
 
     @staticmethod
-    def from_file(vocab: str,
-                  unk_token: str = "[UNK]",
-                  max_input_chars_per_word: int = 100,
-                  continuing_subword_prefix: str = "continuing_subword_prefix"):
-        """ Load a WordPiece instance from vocab file.
+    def from_file(
+        vocab: str,
+        unk_token: str = "[UNK]",
+        max_input_chars_per_word: int = 100,
+        continuing_subword_prefix: str = "continuing_subword_prefix",
+    ):
+        """Load a WordPiece instance from vocab file.
 
         :param vocab: (str) The path to a vocab.txt file
         :param unk_token: (str) The unknown token
@@ -77,30 +78,28 @@ class WordPiece(Model):
         :return: An instance of WordPiece.
         """
         wp = WordPiece(None)
-        wp._model = C.models.WordPiece.from_file(vocab, unk_token,
-                                                 max_input_chars_per_word,
-                                                 continuing_subword_prefix)
+        wp._model = C.models.WordPiece.from_file(vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix)
         return wp
 
 
 class FastWordPiece(Model):
-
-    def __init__(self,
-                 vocab: Dict[str, int],
-                 unk_token: str = "[UNK]",
-                 max_input_chars_per_word: int = 100,
-                 continuing_subword_prefix: str = "##",
-                 with_pretokenization: bool = False):
+    def __init__(
+        self,
+        vocab: Dict[str, int],
+        unk_token: str = "[UNK]",
+        max_input_chars_per_word: int = 100,
+        continuing_subword_prefix: str = "##",
+        with_pretokenization: bool = False,
+    ):
         self._model = None
         if vocab is not None:
-            self._model = C.models.FastWordPiece(vocab, unk_token,
-                                                 max_input_chars_per_word,
-                                                 continuing_subword_prefix,
-                                                 with_pretokenization)
+            self._model = C.models.FastWordPiece(
+                vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix, with_pretokenization
+            )
 
     @staticmethod
     def read_file(vocab: str):
-        """ Read a vocab.txt file
+        """Read a vocab.txt file
 
         :params vocab: (str) The path to a vocab.txt file
         :return: Dict[str, int], The vocabulary as a dict
@@ -108,11 +107,13 @@ class FastWordPiece(Model):
         return C.models.FastWordPiece.read_file(vocab)
 
     @staticmethod
-    def from_file(vocab: str,
-                  unk_token: str = "[UNK]",
-                  max_input_chars_per_word: int = 100,
-                  continuing_subword_prefix: str = "continuing_subword_prefix"):
-        """ Load a FastWordPiece instance from vocab file.
+    def from_file(
+        vocab: str,
+        unk_token: str = "[UNK]",
+        max_input_chars_per_word: int = 100,
+        continuing_subword_prefix: str = "continuing_subword_prefix",
+    ):
+        """Load a FastWordPiece instance from vocab file.
 
         :param vocab: (str) The path to a vocab.txt file
         :param unk_token: (str) The unknown token
@@ -121,26 +122,27 @@ class FastWordPiece(Model):
         :return: An instance of FastWordPiece.
         """
         wp = FastWordPiece(None)
-        wp._model = C.models.FastWordPiece.from_file(vocab, unk_token,
-                                                     max_input_chars_per_word,
-                                                     continuing_subword_prefix)
+        wp._model = C.models.FastWordPiece.from_file(
+            vocab, unk_token, max_input_chars_per_word, continuing_subword_prefix
+        )
         return wp
 
 
 class BPE(Model):
-
-    def __init__(self,
-                 vocab: Dict[str, int] = None,
-                 merges: List[Tuple[str, str]] = None,
-                 cache_capacity: int = None,
-                 dropout: float = None,
-                 unk_token: str = None,
-                 continuing_subword_prefix: str = None,
-                 end_of_word_suffix: str = None,
-                 fuse_unk: bool = None):
-        self._model = C.models.BPE(vocab, merges, cache_capacity, dropout,
-                                   unk_token, continuing_subword_prefix,
-                                   end_of_word_suffix, fuse_unk)
+    def __init__(
+        self,
+        vocab: Dict[str, int] = None,
+        merges: List[Tuple[str, str]] = None,
+        cache_capacity: int = None,
+        dropout: float = None,
+        unk_token: str = None,
+        continuing_subword_prefix: str = None,
+        end_of_word_suffix: str = None,
+        fuse_unk: bool = None,
+    ):
+        self._model = C.models.BPE(
+            vocab, merges, cache_capacity, dropout, unk_token, continuing_subword_prefix, end_of_word_suffix, fuse_unk
+        )
 
     @staticmethod
     def read_file(vocab: str, merges: str):
@@ -154,10 +156,7 @@ class BPE(Model):
 
 
 class Unigram(Model):
-
-    def __init__(self,
-                 vocab: List[Tuple[str, float]] = None,
-                 unk_id: int = None):
+    def __init__(self, vocab: List[Tuple[str, float]] = None, unk_id: int = None):
         self._model = C.models.Unigram(vocab, unk_id)
 
     def set_filter_token(self, filter_token: str = ""):

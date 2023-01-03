@@ -11,34 +11,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import random
-import paddle
+
 import numpy as np
+import paddle
 from PIL import Image
+
 from ..transformers import AutoModelForImageGeneration, AutoTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+            from paddlenlp import Taskflow
 
-           text_to_image = Taskflow("text_to_image")
-           image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
-           
-           for batch_index, batch_image in enumerate(image_list):
-               # len(batch_image) == 2 (num_return_images)
-               for image_index_in_returned_images, each_image in enumerate(batch_image):
+            text_to_image = Taskflow("text_to_image")
+            image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
+
+            for batch_index, batch_image in enumerate(image_list):
+                # len(batch_image) == 2 (num_return_images)
+                for image_index_in_returned_images, each_image in enumerate(batch_image):
                     each_image.save(f"figure_{batch_index}_{image_index_in_returned_images}.png")
-           
+
          """
 
 
 class TextToImageGenerationTask(Task):
     """
-    The text_to_image generation model to generate the image. 
+    The text_to_image generation model to generate the image.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -46,10 +49,10 @@ class TextToImageGenerationTask(Task):
         self._seed = None
         # we do not use batch
         self._batch_size = 1
-        self._temperature = kwargs.get("temperature", 1.)
+        self._temperature = kwargs.get("temperature", 1.0)
         self._top_k = kwargs.get("top_k", 32)
-        self._top_p = kwargs.get("top_p", 1.)
-        self._condition_scale = kwargs.get("condition_scale", 10.)
+        self._top_p = kwargs.get("top_p", 1.0)
+        self._condition_scale = kwargs.get("condition_scale", 10.0)
         self._num_return_images = kwargs.get("num_return_images", 2)
         self._use_faster = kwargs.get("use_faster", False)
         self._use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
@@ -75,10 +78,9 @@ class TextToImageGenerationTask(Task):
         """
 
         def _parse_batch(batch_examples):
-            tokenizerd_inputs = self._tokenizer(batch_examples,
-                                                return_tensors="pd",
-                                                padding="max_length",
-                                                truncation=True)
+            tokenizerd_inputs = self._tokenizer(
+                batch_examples, return_tensors="pd", padding="max_length", truncation=True
+            )
             if self._model.base_model_prefix == "dallebart":
                 tokenizerd_inputs["condition_scale"] = self._condition_scale
             return tokenizerd_inputs
@@ -101,7 +103,7 @@ class TextToImageGenerationTask(Task):
         """
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
-        outputs = {'batches': batches, 'text': inputs}
+        outputs = {"batches": batches, "text": inputs}
         return outputs
 
     def _run_model(self, inputs):
@@ -120,11 +122,12 @@ class TextToImageGenerationTask(Task):
                 top_k=self._top_k,
                 top_p=self._top_p,
                 num_return_sequences=self._num_return_images,
-                use_faster=self._use_faster,
-                use_fp16_decoding=self._use_fp16_decoding)
+                use_fast=self._use_faster,
+                use_fp16_decoding=self._use_fp16_decoding,
+            )
             all_images.append(images.numpy())
 
-        inputs['images'] = np.concatenate(all_images, axis=0)
+        inputs["images"] = np.concatenate(all_images, axis=0)
         return inputs
 
     def _postprocess(self, inputs):
@@ -132,7 +135,7 @@ class TextToImageGenerationTask(Task):
         The model output is images, this function will convert the model output to PIL Image with argument.
         """
         batch_out = []
-        for generated_image, prompt in zip(inputs['images'], inputs['text']):
+        for generated_image, prompt in zip(inputs["images"], inputs["text"]):
             image_list = []
             for image_index, image in enumerate(generated_image):
                 pil_image = Image.fromarray(image)
@@ -160,24 +163,23 @@ class TextToImageGenerationTask(Task):
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
         ]
 
     def set_argument(self, argument: dict):
         for k, v in argument.items():
-            if k == "input" or k == "image_index_in_returned_images": continue
+            if k == "input" or k == "image_index_in_returned_images":
+                continue
             setattr(self, f"_{k}", v)
 
 
 class TextToImageDiscoDiffusionTask(Task):
     """
-    The text_to_image disco diffusion model to generate the image. 
+    The text_to_image disco diffusion model to generate the image.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -216,7 +218,8 @@ class TextToImageDiscoDiffusionTask(Task):
                 return_tensors="pd",
                 padding="max_length",
                 max_length=self._tokenizer.model_max_length,
-                truncation=True)
+                truncation=True,
+            )
             return tokenizerd_inputs
 
         # Seperates data into some batches.
@@ -237,7 +240,7 @@ class TextToImageDiscoDiffusionTask(Task):
         """
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
-        outputs = {'batches': batches, 'text': inputs}
+        outputs = {"batches": batches, "text": inputs}
         return outputs
 
     def _run_model(self, inputs):
@@ -253,12 +256,12 @@ class TextToImageDiscoDiffusionTask(Task):
                     seed = random.randint(0, 2**32)
                 else:
                     seed = self._seed
-                image = self._model.generate(**batch_inputs,
-                                             seed=seed,
-                                             steps=self._num_inference_steps,
-                                             width_height=[
-                                                 self._width, self._height
-                                             ])[0]
+                image = self._model.generate(
+                    **batch_inputs,
+                    seed=seed,
+                    steps=self._num_inference_steps,
+                    width_height=[self._width, self._height],
+                )[0]
                 argument = dict(
                     seed=seed,
                     height=self._height,
@@ -270,35 +273,34 @@ class TextToImageDiscoDiffusionTask(Task):
                 image.argument = argument
                 image_per_prompt.append(image)
             all_images.append(image_per_prompt)
-        inputs['images'] = all_images
+        inputs["images"] = all_images
         return inputs
 
     def _postprocess(self, inputs):
-        return inputs['images']
+        return inputs["images"]
 
     def _construct_input_spec(self):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
         ]
 
     def set_argument(self, argument: dict):
         for k, v in argument.items():
-            if k == "input": continue
+            if k == "input":
+                continue
             setattr(self, f"_{k}", v)
 
 
 class TextToImageStableDiffusionTask(Task):
     """
-    The text_to_image diffusion model to generate the image. 
+    The text_to_image diffusion model to generate the image.
     Args:
         task(string): The name of task.
         model(string): The model name in the task.
-        kwargs (dict, optional): Additional keyword arguments passed along to the specific task. 
+        kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
     def __init__(self, task, model, **kwargs):
@@ -337,14 +339,14 @@ class TextToImageStableDiffusionTask(Task):
 
         def _parse_batch(batch_examples):
             batch_examples = batch_examples[0]
-            prompt = batch_examples if isinstance(batch_examples,
-                                                  str) else batch_examples[0]
+            prompt = batch_examples if isinstance(batch_examples, str) else batch_examples[0]
             tokenizerd_inputs = self._tokenizer(
                 prompt,
                 return_tensors="pd",
                 padding="max_length",
                 max_length=self._tokenizer.model_max_length,
-                truncation=True)
+                truncation=True,
+            )
 
             if self._mode in ["image2image", "inpaint"]:
                 tokenizerd_inputs["init_image"] = batch_examples[1]
@@ -368,20 +370,17 @@ class TextToImageStableDiffusionTask(Task):
         if self._mode == "text2image":
             if isinstance(inputs, str):
                 if len(inputs) == 0:
-                    raise ValueError(
-                        "Invalid inputs, input text should not be empty text, please check your input."
-                        .format(type(inputs)))
+                    raise ValueError("Invalid inputs, input text should not be empty text, please check your input. ")
                 inputs = [inputs]
             elif isinstance(inputs, list):
-                if not (isinstance(inputs[0], str)
-                        and len(inputs[0].strip()) > 0):
+                if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
                     raise TypeError(
-                        "Invalid inputs, input text should be List[str], and first element of list should not be empty text."
-                        .format(type(inputs[0])))
+                        "Invalid inputs, input text should be List[str], and first element of list should not be empty text. "
+                    )
             else:
                 raise TypeError(
-                    "Invalid inputs, input text should be str or List[str], but type of {} found!"
-                    .format(type(inputs)))
+                    "Invalid inputs, input text should be str or List[str], but type of {} found!".format(type(inputs))
+                )
         elif self._mode == "image2image":
             if isinstance(inputs, list):
                 if isinstance(inputs[0], str):
@@ -397,8 +396,10 @@ class TextToImageStableDiffusionTask(Task):
                         )
             else:
                 raise TypeError(
-                    "Invalid inputs, input text should be `List[str, str]` or `List[List[str, str]]`, but type of {} found!"
-                    .format(type(inputs)))
+                    "Invalid inputs, input text should be `List[str, str]` or `List[List[str, str]]`, but type of {} found!".format(
+                        type(inputs)
+                    )
+                )
         else:
             if isinstance(inputs, list):
                 if isinstance(inputs[0], str):
@@ -414,8 +415,10 @@ class TextToImageStableDiffusionTask(Task):
                         )
             else:
                 raise TypeError(
-                    "Invalid inputs, input text should be `List[str, str, str]` or `List[List[str, str, str]]`, but type of {} found!"
-                    .format(type(inputs)))
+                    "Invalid inputs, input text should be `List[str, str, str]` or `List[List[str, str, str]]`, but type of {} found!".format(
+                        type(inputs)
+                    )
+                )
         return inputs
 
     def _preprocess(self, inputs):
@@ -426,7 +429,7 @@ class TextToImageStableDiffusionTask(Task):
         """
         inputs = self._check_input_text(inputs)
         batches = self._batchify(inputs, self._batch_size)
-        outputs = {'batches': batches, 'text': inputs}
+        outputs = {"batches": batches, "text": inputs}
         return outputs
 
     def _run_model(self, inputs):
@@ -480,23 +483,22 @@ class TextToImageStableDiffusionTask(Task):
 
                 image_per_prompt.append(image)
             all_images.append(image_per_prompt)
-        inputs['images'] = all_images
+        inputs["images"] = all_images
         return inputs
 
     def _postprocess(self, inputs):
-        return inputs['images']
+        return inputs["images"]
 
     def _construct_input_spec(self):
         """
         Construct the input spec for the convert dygraph model to static model.
         """
         self._input_spec = [
-            paddle.static.InputSpec(shape=[None, None],
-                                    dtype="int64",
-                                    name='input_ids'),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
         ]
 
     def set_argument(self, argument: dict):
         for k, v in argument.items():
-            if k == "input": continue
+            if k == "input":
+                continue
             setattr(self, f"_{k}", v)
