@@ -13,16 +13,37 @@
 # limitations under the License.
 from __future__ import annotations
 
-import sys
+import importlib.util
 import os
-import site
 import shutil
+import site
+import sys
 from typing import Optional, Type
+
 import pip
-import importlib.util
+
 from paddlenlp.utils.log import logger
-import importlib.util
-import importlib_metadata
+
+
+def is_paddle_cuda_available() -> bool:
+    if is_paddle_available():
+        import paddle
+
+        return paddle.device.cuda.device_count() > 0
+    else:
+        return False
+
+
+def is_paddle_available() -> bool:
+    """check if `torch` package is installed
+    Returns:
+        bool: if `torch` is available
+    """
+    return is_package_available("paddle")
+
+
+def is_psutil_available():
+    return importlib.util.find_spec("psutil") is not None
 
 
 def is_torch_available() -> bool:
@@ -44,12 +65,12 @@ def is_package_available(package_name: str) -> bool:
     return package_spec is not None and package_spec.has_location
 
 
-def is_faster_tokenizer_available() -> bool:
-    """check if `faster_tokenizer` ia avaliable
+def is_fast_tokenizer_available() -> bool:
+    """check if `fast_tokenizer` ia avaliable
     Returns:
-        bool: if `faster_tokenizer` is avaliable
+        bool: if `fast_tokenizer` is avaliable
     """
-    return is_package_available("faster_tokenizer")
+    return is_package_available("fast_tokenizer")
 
 
 def is_transformers_available() -> bool:
@@ -58,11 +79,6 @@ def is_transformers_available() -> bool:
         bool: if `transformers` is available
     """
     return is_package_available("transformers")
-
-
-def is_fast_tokenizer_available():
-    package_spec = importlib.util.find_spec("fast_tokenizer")
-    return package_spec is not None and package_spec.has_location
 
 
 def install_package(

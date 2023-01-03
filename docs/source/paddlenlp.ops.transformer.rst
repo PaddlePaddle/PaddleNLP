@@ -11,4 +11,4 @@ transformer
    :maxdepth: 4
 
    paddlenlp.ops.transformer.decoding
-   paddlenlp.ops.transformer.faster_transformer
+   paddlenlp.ops.transformer.fast_transformer

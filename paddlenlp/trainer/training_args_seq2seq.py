@@ -12,14 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
 from .training_args import TrainingArguments
 from .utils import add_start_docstrings
-
-from ..utils.log import logger
 
 __all__ = [
     "Seq2SeqTrainingArguments",

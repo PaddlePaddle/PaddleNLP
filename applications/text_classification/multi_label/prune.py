@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
 import functools
+import os
+from dataclasses import dataclass, field
 
 import paddle
 import paddle.nn.functional as F
+from metric import MetricReport
 from paddleslim.nas.ofa import OFA
-from paddlenlp.utils.log import logger
+from utils import preprocess_function, read_local_dataset
+
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
-from paddlenlp.trainer import PdArgumentParser, Trainer, CompressionArguments
-from paddlenlp.transformers import AutoTokenizer, AutoModelForSequenceClassification
-from dataclasses import dataclass, field
-
-from utils import preprocess_function, read_local_dataset
-from metric import MetricReport
+from paddlenlp.trainer import CompressionArguments, PdArgumentParser, Trainer
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -41,7 +40,7 @@ class DataArguments:
     """
 
     dataset_dir: str = field(default=None, metadata={"help": "Local dataset directory should include train.txt, dev.txt and label.txt."})
-    max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
+    max_seq_length: int = field(default=128, metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
 @dataclass
@@ -49,7 +48,7 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-    params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
+    params_dir: str = field(default='./checkpoint/', metadata={"help": "The output directory where the model checkpoints are written."})
 # yapf: enable
 
 

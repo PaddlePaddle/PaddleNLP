@@ -15,5 +15,5 @@
 python export_model.py \
     --model_name_or_path IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese \
     --decoding_strategy beam_search \
-    --inference_model_dir ./inference_model \
+    --export_output_dir ./inference_model \
     --max_out_len 30 \

@@ -12,32 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
-import warnings
 
+import warnings
 from typing import Optional, Tuple
+
 import paddle
-from paddle import Tensor
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle import Tensor
 from paddle.nn import Layer
 
 try:
     from paddle.incubate.nn import FusedTransformerEncoderLayer
 except ImportError:
     FusedTransformerEncoderLayer = None
-from dataclasses import dataclass, fields
-from typing import List, Optional, Tuple, Union
+from dataclasses import dataclass
+
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
+
+from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
-    SequenceClassifierOutput,
-    TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
     MaskedLMOutput,
     ModelOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
+    SequenceClassifierOutput,
+    TokenClassifierOutput,
 )
-from .configuration import BERT_PRETRAINED_RESOURCE_FILES_MAP, BertConfig, BERT_PRETRAINED_INIT_CONFIGURATION
+from .configuration import (
+    BERT_PRETRAINED_INIT_CONFIGURATION,
+    BERT_PRETRAINED_RESOURCE_FILES_MAP,
+    BertConfig,
+)
 
 __all__ = [
     "BertModel",
@@ -132,7 +139,7 @@ class BertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
@@ -149,9 +156,7 @@ class BertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -173,54 +178,8 @@ class BertModel(BertPretrainedModel):
     and refer to the Paddle documentation for all matter related to general usage and behavior.
 
     Args:
-        vocab_size (int, optional):
-            Vocabulary size of `inputs_ids` in `BertModel`. Also is the vocab size of token embedding matrix.
-            Defines the number of different tokens that can be represented by the `inputs_ids` passed when calling `BertModel`.
-            Defaults to `30522`.
-        hidden_size (int, optional):
-            Dimensionality of the embedding layer, encoder layer and pooler layer. Defaults to `768`.
-        num_hidden_layers (int, optional):
-            Number of hidden layers in the Transformer encoder. Defaults to `12`.
-        num_attention_heads (int, optional):
-            Number of attention heads for each attention layer in the Transformer encoder.
-            Defaults to `12`.
-        intermediate_size (int, optional):
-            Dimensionality of the feed-forward (ff) layer in the encoder. Input tensors
-            to ff layers are firstly projected from `hidden_size` to `intermediate_size`,
-            and then projected back to `hidden_size`. Typically `intermediate_size` is larger than `hidden_size`.
-            Defaults to `3072`.
-        hidden_act (str, optional):
-            The non-linear activation function in the feed-forward layer.
-            ``"gelu"``, ``"relu"`` and any other paddle supported activation functions
-            are supported. Defaults to `"gelu"`.
-        hidden_dropout_prob (float, optional):
-            The dropout probability for all fully connected layers in the embeddings and encoder.
-            Defaults to `0.1`.
-        attention_probs_dropout_prob (float, optional):
-            The dropout probability used in MultiHeadAttention in all encoder layers to drop some attention target.
-            Defaults to `0.1`.
-        max_position_embeddings (int, optional):
-            The maximum value of the dimensionality of position encoding, which dictates the maximum supported length of an input
-            sequence. Defaults to `512`.
-        type_vocab_size (int, optional):
-            The vocabulary size of `token_type_ids`.
-            Defaults to `16`.
-        initializer_range (float, optional):
-            The standard deviation of the normal initializer.
-            Defaults to 0.02.
-
-            .. note::
-                A normal_initializer initializes weight matrices as normal distributions.
-                See :meth:`BertPretrainedModel.init_weights()` for how weights are initialized in `BertModel`.
-
-        pad_token_id (int, optional):
-            The index of padding token in the token vocabulary.
-            Defaults to `0`.
-
-        pooled_act (str, optional):
-            The non-linear activation function in the pooling layer.
-            Defaults to `"tanh"`.
-
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertModel.
     """
 
     def __init__(self, config: BertConfig):
