@@ -171,6 +171,13 @@ from .clip.tokenizer import *
 from .clip.procesing import *
 from .clip.converter import *
 from .clip.image_processing import *
+from .chineseclip.modeling import *
+from .chineseclip.configuration import *
+from .chineseclip.feature_extraction import *
+from .chineseclip.procesing import *
+from .chineseclip.converter import *
+from .chineseclip.image_processing import *
+from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *

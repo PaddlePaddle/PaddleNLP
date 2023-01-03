@@ -483,6 +483,8 @@ class CLIPConfig(Old2NewPretrainedConfig):
             vision_config = {}
             logger.info("vision_config is None. initializing the CLIPVisionConfig with default values.")
 
+        text_config.update({"projection_dim": projection_dim})
+        vision_config.update({"projection_dim": projection_dim})
         self.text_config = CLIPTextConfig(**text_config)
         self.vision_config = CLIPVisionConfig(**vision_config)
 

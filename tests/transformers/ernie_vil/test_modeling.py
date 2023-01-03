@@ -272,7 +272,6 @@ class ErnieViLTextModelTester:
         model.eval()
         with paddle.no_grad():
             result = model(input_ids, attention_mask=input_mask)
-            result = model(input_ids)
         self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
         self.parent.assertEqual(result.pooler_output.shape, [self.batch_size, self.hidden_size])
 

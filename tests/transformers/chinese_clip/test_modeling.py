@@ -1,6 +1,6 @@
 # coding=utf-8
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
+# Copyright 2022 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-""" Testing suite for the Paddle CLIP model. """
-
-
+""" Testing suite for the Paddle Chinese-CLIP model. """
 import copy
 import inspect
 import tempfile
@@ -23,24 +21,27 @@ import unittest
 
 import numpy as np
 import paddle
-from paddle import nn
+import paddle.nn as nn
+import requests
 from PIL import Image
 
 from paddlenlp.transformers import (
-    CLIPConfig,
-    CLIPModel,
-    CLIPProcessor,
-    CLIPTextConfig,
-    CLIPTextModel,
-    CLIPTextModelWithProjection,
-    CLIPVisionConfig,
-    CLIPVisionModel,
-    CLIPVisionModelWithProjection,
-    CLIPVisionTransformer,
+    ChineseCLIPConfig,
+    ChineseCLIPModel,
+    ChineseCLIPProcessor,
+    ChineseCLIPTextConfig,
+    ChineseCLIPTextModel,
+    ChineseCLIPTextModelWithProjection,
+    ChineseCLIPVisionConfig,
+    ChineseCLIPVisionModel,
+    ChineseCLIPVisionModelWithProjection,
 )
-from paddlenlp.transformers.clip.modeling import CLIP_PRETRAINED_MODEL_ARCHIVE_LIST
+from paddlenlp.transformers.chineseclip.modeling import (
+    CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST,
+    ChineseCLIPVisionTransformer,
+)
 
-from ...testing_utils import get_tests_dir, slow
+from ...testing_utils import slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
@@ -58,7 +59,157 @@ def _config_zero_init(config):
     return configs_no_init
 
 
-class CLIPVisionModelTester:
+class ChineseCLIPTextModelTester:
+    def __init__(
+        self,
+        parent,
+        batch_size=12,
+        seq_length=7,
+        is_training=True,
+        use_input_mask=True,
+        use_labels=True,
+        vocab_size=99,
+        hidden_size=32,
+        type_vocab_size=2,
+        projection_dim=32,
+        num_hidden_layers=5,
+        num_attention_heads=4,
+        intermediate_size=37,
+        dropout=0.1,
+        attention_dropout=0.1,
+        max_position_embeddings=512,
+        initializer_range=0.02,
+        scope=None,
+    ):
+        self.parent = parent
+        self.batch_size = batch_size
+        self.seq_length = seq_length
+        self.is_training = is_training
+        self.use_input_mask = use_input_mask
+        self.use_labels = use_labels
+        self.vocab_size = vocab_size
+        self.hidden_size = hidden_size
+        self.projection_dim = projection_dim
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.intermediate_size = intermediate_size
+        self.dropout = dropout
+        self.attention_dropout = attention_dropout
+        self.max_position_embeddings = max_position_embeddings
+        self.initializer_range = initializer_range
+        self.type_vocab_size = type_vocab_size
+        self.scope = scope
+
+    def prepare_config_and_inputs(self):
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
+
+        input_mask = None
+        if self.use_input_mask:
+            input_mask = random_attention_mask([self.batch_size, self.seq_length])
+
+        if input_mask is not None:
+            batch_size, seq_length = input_mask.shape
+            rnd_start_indices = np.random.randint(1, seq_length - 1, size=(batch_size,))
+            for batch_idx, start_index in enumerate(rnd_start_indices):
+                input_mask[batch_idx, :start_index] = 1
+                input_mask[batch_idx, start_index:] = 0
+
+        token_type_ids = ids_tensor([self.batch_size, self.seq_length], self.type_vocab_size)
+
+        config = self.get_config()
+
+        return config, input_ids, token_type_ids, input_mask
+
+    def get_config(self):
+        return ChineseCLIPTextConfig(
+            vocab_size=self.vocab_size,
+            hidden_size=self.hidden_size,
+            projection_dim=self.projection_dim,
+            num_hidden_layers=self.num_hidden_layers,
+            num_attention_heads=self.num_attention_heads,
+            intermediate_size=self.intermediate_size,
+            dropout=self.dropout,
+            attention_dropout=self.attention_dropout,
+            max_position_embeddings=self.max_position_embeddings,
+            initializer_range=self.initializer_range,
+        )
+
+    def create_and_check_model(self, config, input_ids, token_type_ids, input_mask):
+        model = ChineseCLIPTextModel(config=config)
+        model.eval()
+        with paddle.no_grad():
+            result = model(input_ids, token_type_ids=token_type_ids, attention_mask=input_mask)
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.pooler_output.shape, [self.batch_size, self.hidden_size])
+
+    def create_and_check_model_with_projection(self, config, input_ids, token_type_ids, input_mask):
+        model = ChineseCLIPTextModelWithProjection(config=config)
+        model.eval()
+        with paddle.no_grad():
+            result = model(input_ids, token_type_ids=token_type_ids, attention_mask=input_mask)
+        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
+        self.parent.assertEqual(result.text_embeds.shape, [self.batch_size, self.projection_dim])
+
+    def prepare_config_and_inputs_for_common(self):
+        config_and_inputs = self.prepare_config_and_inputs()
+        config, input_ids, token_type_ids, input_mask = config_and_inputs
+        inputs_dict = {"input_ids": input_ids, "token_type_ids": token_type_ids, "attention_mask": input_mask}
+        return config, inputs_dict
+
+
+class ChineseCLIPTextModelTest(ModelTesterMixin, unittest.TestCase):
+
+    all_model_classes = (ChineseCLIPTextModel, ChineseCLIPTextModelWithProjection)
+    use_test_model_name_list = False
+
+    def setUp(self):
+        self.model_tester = ChineseCLIPTextModelTester(self)
+        self.config_tester = ConfigTester(self, config_class=ChineseCLIPTextConfig, hidden_size=37)
+
+    def test_config(self):
+        self.config_tester.run_common_tests()
+
+    def test_model(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model(*config_and_inputs)
+
+    def test_model_with_projection(self):
+        config_and_inputs = self.model_tester.prepare_config_and_inputs()
+        self.model_tester.create_and_check_model_with_projection(*config_and_inputs)
+
+    def test_training(self):
+        pass
+
+    def test_training_gradient_checkpointing(self):
+        pass
+
+    @unittest.skip(reason="ChineseCLIPTextModel does not use inputs_embeds")
+    def test_inputs_embeds(self):
+        pass
+
+    @unittest.skip(reason="ChineseCLIPTextModel has no base class and is not available in MODEL_MAPPING")
+    def test_save_load_fast_init_from_base(self):
+        pass
+
+    @unittest.skip(reason="ChineseCLIPTextModel has no base class and is not available in MODEL_MAPPING")
+    def test_save_load_fast_init_to_base(self):
+        pass
+
+    @slow
+    def test_model_from_pretrained(self):
+        for model_name in CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+            model = ChineseCLIPTextModel.from_pretrained(model_name)
+            self.assertIsNotNone(model)
+
+    @slow
+    def test_model_with_projection_from_pretrained(self):
+        for model_name in CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+            model = ChineseCLIPTextModelWithProjection.from_pretrained(model_name)
+            self.assertIsNotNone(model)
+            self.assertTrue(hasattr(model, "text_projection"))
+
+
+class ChineseCLIPVisionModelTester:
     def __init__(
         self,
         parent,
@@ -104,7 +255,7 @@ class CLIPVisionModelTester:
         return config, pixel_values
 
     def get_config(self):
-        return CLIPVisionConfig(
+        return ChineseCLIPVisionConfig(
             image_size=self.image_size,
             patch_size=self.patch_size,
             num_channels=self.num_channels,
@@ -119,7 +270,7 @@ class CLIPVisionModelTester:
         )
 
     def create_and_check_model(self, config, pixel_values):
-        model = CLIPVisionModel(config=config)
+        model = ChineseCLIPVisionModel(config=config)
         model.eval()
         with paddle.no_grad():
             result = model(pixel_values)
@@ -131,7 +282,7 @@ class CLIPVisionModelTester:
         self.parent.assertEqual(result.pooler_output.shape, [self.batch_size, self.hidden_size])
 
     def create_and_check_model_with_projection(self, config, pixel_values):
-        model = CLIPVisionModelWithProjection(config=config)
+        model = ChineseCLIPVisionModelWithProjection(config=config)
         model.eval()
         with paddle.no_grad():
             result = model(pixel_values)
@@ -149,24 +300,26 @@ class CLIPVisionModelTester:
         return config, inputs_dict
 
 
-class CLIPVisionModelTest(ModelTesterMixin, unittest.TestCase):
+class ChineseCLIPVisionModelTest(ModelTesterMixin, unittest.TestCase):
     """
-    Here we also overwrite some of the tests of test_modeling_common.py, as CLIP does not use input_ids, inputs_embeds,
+    Here we also overwrite some of the tests of test_modeling_common.py, as CHINESE_CLIP does not use input_ids, inputs_embeds,
     attention_mask and seq_length.
     """
 
-    all_model_classes = (CLIPVisionModel, CLIPVisionModelWithProjection)
+    all_model_classes = (ChineseCLIPVisionModel, ChineseCLIPVisionModelWithProjection)
     test_resize_embeddings = False
     use_test_model_name_list = False
 
     def setUp(self):
-        self.model_tester = CLIPVisionModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=CLIPVisionConfig, has_text_modality=False, hidden_size=37)
+        self.model_tester = ChineseCLIPVisionModelTester(self)
+        self.config_tester = ConfigTester(
+            self, config_class=ChineseCLIPVisionConfig, has_text_modality=False, hidden_size=37
+        )
 
     def test_config(self):
         self.config_tester.run_common_tests()
 
-    @unittest.skip(reason="CLIP does not use inputs_embeds")
+    @unittest.skip(reason="CHINESE_CLIP does not use inputs_embeds")
     def test_inputs_embeds(self):
         pass
 
@@ -205,176 +358,30 @@ class CLIPVisionModelTest(ModelTesterMixin, unittest.TestCase):
     def test_training_gradient_checkpointing(self):
         pass
 
-    @unittest.skip(reason="CLIPVisionModel has no base class and is not available in MODEL_MAPPING")
+    @unittest.skip(reason="ChineseCLIPVisionModel has no base class and is not available in MODEL_MAPPING")
     def test_save_load_fast_init_from_base(self):
         pass
 
-    @unittest.skip(reason="CLIPVisionModel has no base class and is not available in MODEL_MAPPING")
+    @unittest.skip(reason="ChineseCLIPVisionModel has no base class and is not available in MODEL_MAPPING")
     def test_save_load_fast_init_to_base(self):
         pass
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CLIPVisionModel.from_pretrained(model_name)
+        for model_name in CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+            model = ChineseCLIPVisionModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
     @slow
     def test_model_with_projection_from_pretrained(self):
-        for model_name in CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CLIPVisionModelWithProjection.from_pretrained(model_name)
+        for model_name in CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+            model = ChineseCLIPVisionModelWithProjection.from_pretrained(model_name)
             self.assertIsNotNone(model)
-            if isinstance(model.vision_model, CLIPVisionTransformer):
+            if isinstance(model.vision_model, ChineseCLIPVisionTransformer):
                 self.assertTrue(hasattr(model, "vision_projection"))
 
 
-class CLIPTextModelTester:
-    def __init__(
-        self,
-        parent,
-        batch_size=12,
-        seq_length=7,
-        is_training=True,
-        use_input_mask=True,
-        use_labels=True,
-        vocab_size=99,
-        hidden_size=32,
-        projection_dim=32,
-        num_hidden_layers=5,
-        num_attention_heads=4,
-        intermediate_size=37,
-        dropout=0.1,
-        attention_dropout=0.1,
-        max_position_embeddings=512,
-        initializer_range=0.02,
-        scope=None,
-    ):
-        self.parent = parent
-        self.batch_size = batch_size
-        self.seq_length = seq_length
-        self.is_training = is_training
-        self.use_input_mask = use_input_mask
-        self.use_labels = use_labels
-        self.vocab_size = vocab_size
-        self.hidden_size = hidden_size
-        self.projection_dim = projection_dim
-        self.num_hidden_layers = num_hidden_layers
-        self.num_attention_heads = num_attention_heads
-        self.intermediate_size = intermediate_size
-        self.dropout = dropout
-        self.attention_dropout = attention_dropout
-        self.max_position_embeddings = max_position_embeddings
-        self.initializer_range = initializer_range
-        self.scope = scope
-
-    def prepare_config_and_inputs(self):
-        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size)
-
-        input_mask = None
-        if self.use_input_mask:
-            input_mask = random_attention_mask([self.batch_size, self.seq_length])
-
-        if input_mask is not None:
-            batch_size, seq_length = input_mask.shape
-            rnd_start_indices = np.random.randint(1, seq_length - 1, size=(batch_size,))
-            for batch_idx, start_index in enumerate(rnd_start_indices):
-                input_mask[batch_idx, :start_index] = 1
-                input_mask[batch_idx, start_index:] = 0
-
-        config = self.get_config()
-
-        return config, input_ids, input_mask
-
-    def get_config(self):
-        return CLIPTextConfig(
-            vocab_size=self.vocab_size,
-            hidden_size=self.hidden_size,
-            projection_dim=self.projection_dim,
-            num_hidden_layers=self.num_hidden_layers,
-            num_attention_heads=self.num_attention_heads,
-            intermediate_size=self.intermediate_size,
-            dropout=self.dropout,
-            attention_dropout=self.attention_dropout,
-            max_position_embeddings=self.max_position_embeddings,
-            initializer_range=self.initializer_range,
-        )
-
-    def create_and_check_model(self, config, input_ids, input_mask):
-        model = CLIPTextModel(config=config)
-        model.eval()
-        with paddle.no_grad():
-            result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(result.pooler_output.shape, [self.batch_size, self.hidden_size])
-
-    def create_and_check_model_with_projection(self, config, input_ids, input_mask):
-        model = CLIPTextModelWithProjection(config=config)
-        model.eval()
-        with paddle.no_grad():
-            result = model(input_ids, attention_mask=input_mask)
-        self.parent.assertEqual(result.last_hidden_state.shape, [self.batch_size, self.seq_length, self.hidden_size])
-        self.parent.assertEqual(result.text_embeds.shape, [self.batch_size, self.projection_dim])
-
-    def prepare_config_and_inputs_for_common(self):
-        config_and_inputs = self.prepare_config_and_inputs()
-        config, input_ids, input_mask = config_and_inputs
-        inputs_dict = {"input_ids": input_ids, "attention_mask": input_mask}
-        return config, inputs_dict
-
-
-class CLIPTextModelTest(ModelTesterMixin, unittest.TestCase):
-
-    all_model_classes = (CLIPTextModel, CLIPTextModelWithProjection)
-    use_test_model_name_list = False
-
-    def setUp(self):
-        self.model_tester = CLIPTextModelTester(self)
-        self.config_tester = ConfigTester(self, config_class=CLIPTextConfig, hidden_size=37)
-
-    def test_config(self):
-        self.config_tester.run_common_tests()
-
-    def test_model(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_model(*config_and_inputs)
-
-    def test_model_with_projection(self):
-        config_and_inputs = self.model_tester.prepare_config_and_inputs()
-        self.model_tester.create_and_check_model_with_projection(*config_and_inputs)
-
-    def test_training(self):
-        pass
-
-    def test_training_gradient_checkpointing(self):
-        pass
-
-    @unittest.skip(reason="CLIP does not use inputs_embeds")
-    def test_inputs_embeds(self):
-        pass
-
-    @unittest.skip(reason="CLIPTextModel has no base class and is not available in MODEL_MAPPING")
-    def test_save_load_fast_init_from_base(self):
-        pass
-
-    @unittest.skip(reason="CLIPTextModel has no base class and is not available in MODEL_MAPPING")
-    def test_save_load_fast_init_to_base(self):
-        pass
-
-    @slow
-    def test_model_from_pretrained(self):
-        for model_name in CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CLIPTextModel.from_pretrained(model_name)
-            self.assertIsNotNone(model)
-
-    @slow
-    def test_model_with_projection_from_pretrained(self):
-        for model_name in CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CLIPTextModelWithProjection.from_pretrained(model_name)
-            self.assertIsNotNone(model)
-            self.assertTrue(hasattr(model, "text_projection"))
-
-
-class CLIPModelTester:
+class ChineseCLIPModelTester:
     def __init__(self, parent, text_kwargs=None, vision_kwargs=None, is_training=True):
 
         if text_kwargs is None:
@@ -383,25 +390,25 @@ class CLIPModelTester:
             vision_kwargs = {}
 
         self.parent = parent
-        self.text_model_tester = CLIPTextModelTester(parent, **text_kwargs)
-        self.vision_model_tester = CLIPVisionModelTester(parent, **vision_kwargs)
+        self.text_model_tester = ChineseCLIPTextModelTester(parent, **text_kwargs)
+        self.vision_model_tester = ChineseCLIPVisionModelTester(parent, **vision_kwargs)
         self.is_training = is_training
 
     def prepare_config_and_inputs(self):
-        text_config, input_ids, attention_mask = self.text_model_tester.prepare_config_and_inputs()
+        text_config, input_ids, token_type_ids, attention_mask = self.text_model_tester.prepare_config_and_inputs()
         vision_config, pixel_values = self.vision_model_tester.prepare_config_and_inputs()
 
         config = self.get_config()
 
-        return config, input_ids, attention_mask, pixel_values
+        return config, input_ids, token_type_ids, attention_mask, pixel_values
 
     def get_config(self):
-        return CLIPConfig.from_text_vision_configs(
+        return ChineseCLIPConfig.from_text_vision_configs(
             self.text_model_tester.get_config(), self.vision_model_tester.get_config(), projection_dim=64
         )
 
-    def create_and_check_model(self, config, input_ids, attention_mask, pixel_values):
-        model = CLIPModel(config)
+    def create_and_check_model(self, config, input_ids, token_type_ids, attention_mask, pixel_values):
+        model = ChineseCLIPModel(config)
         model.eval()
         with paddle.no_grad():
             result = model(input_ids, pixel_values, attention_mask=attention_mask)
@@ -414,9 +421,10 @@ class CLIPModelTester:
 
     def prepare_config_and_inputs_for_common(self):
         config_and_inputs = self.prepare_config_and_inputs()
-        config, input_ids, attention_mask, pixel_values = config_and_inputs
+        config, input_ids, token_type_ids, attention_mask, pixel_values = config_and_inputs
         inputs_dict = {
             "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
             "pixel_values": pixel_values,
             "return_loss": True,
@@ -424,14 +432,16 @@ class CLIPModelTester:
         return config, inputs_dict
 
 
-class CLIPModelTest(ModelTesterMixin, unittest.TestCase):
-    all_model_classes = (CLIPModel,)
+class ChineseCLIPModelTest(ModelTesterMixin, unittest.TestCase):
+    all_model_classes = (ChineseCLIPModel,)
     test_resize_embeddings = False
     test_attention_outputs = False
     use_test_model_name_list = False
 
     def setUp(self):
-        self.model_tester = CLIPModelTester(self)
+        text_kwargs = {"batch_size": 12}
+        vision_kwargs = {"batch_size": 12}
+        self.model_tester = ChineseCLIPModelTester(self, text_kwargs, vision_kwargs)
 
     def test_model(self):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
@@ -449,15 +459,18 @@ class CLIPModelTest(ModelTesterMixin, unittest.TestCase):
     def test_retain_grad_hidden_states_attentions(self):
         pass
 
-    @unittest.skip(reason="CLIPModel does not have input/output embeddings")
+    @unittest.skip(reason="ChineseCLIPModel does not have input/output embeddings")
     def test_model_common_attributes(self):
         pass
 
-    # override as the `logit_scale` parameter initilization is different for CLIP
+    # override as the `logit_scale` parameter initilization is different for CHINESE_CLIP
     def test_initialization(self):
         config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_common()
 
         configs_no_init = _config_zero_init(config)
+        for sub_config_key in ("vision_config", "text_config"):
+            sub_config = getattr(configs_no_init, sub_config_key, {})
+            setattr(configs_no_init, sub_config_key, _config_zero_init(sub_config))
         for model_class in self.all_model_classes:
             model = model_class(config=configs_no_init)
             for name, param in model.named_parameters():
@@ -483,41 +496,39 @@ class CLIPModelTest(ModelTesterMixin, unittest.TestCase):
         # Save CLIPConfig and check if we can load CLIPVisionConfig from it
         with tempfile.TemporaryDirectory() as tmp_dir_name:
             config.save_pretrained(tmp_dir_name)
-            vision_config = CLIPVisionConfig.from_pretrained(tmp_dir_name)
+            vision_config = ChineseCLIPVisionConfig.from_pretrained(tmp_dir_name)
             self.assertDictEqual(config.vision_config.to_dict(), vision_config.to_dict())
 
         # Save CLIPConfig and check if we can load CLIPTextConfig from it
         with tempfile.TemporaryDirectory() as tmp_dir_name:
             config.save_pretrained(tmp_dir_name)
-            text_config = CLIPTextConfig.from_pretrained(tmp_dir_name)
+            text_config = ChineseCLIPTextConfig.from_pretrained(tmp_dir_name)
             self.assertDictEqual(config.text_config.to_dict(), text_config.to_dict())
 
     @slow
     def test_model_from_pretrained(self):
-        for model_name in CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
-            model = CLIPModel.from_pretrained(model_name)
+        for model_name in CHINESE_CLIP_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
+            model = ChineseCLIPModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
 
 
-# We will verify our results on an image of cute cats
+# We will verify our results on an image of Pikachu
 def prepare_img():
-    CUTE_CATS = get_tests_dir("fixtures/tests_samples/COCO/000000039769.png")
-    image = Image.open(CUTE_CATS)
-    return image
+    url = "https://clip-cn-beijing.oss-cn-beijing.aliyuncs.com/pokemon.jpeg"
+    im = Image.open(requests.get(url, stream=True).raw)
+    return im
 
 
-class CLIPModelIntegrationTest(unittest.TestCase):
+class ChineseCLIPModelIntegrationTest(unittest.TestCase):
     @slow
     def test_inference(self):
-        model_name = "openai/clip-vit-base-patch32"
-        model = CLIPModel.from_pretrained(model_name)
+        model_name = "OFA-Sys/chinese-clip-vit-base-patch16"
+        model = ChineseCLIPModel.from_pretrained(model_name)
         model.eval()
-        processor = CLIPProcessor.from_pretrained(model_name)
+        processor = ChineseCLIPProcessor.from_pretrained(model_name)
 
         image = prepare_img()
-        inputs = processor(
-            text=["a photo of a cat", "a photo of a dog"], images=image, padding=True, return_tensors="pd"
-        )
+        inputs = processor(text=["杰尼龟", "妙蛙种子", "小火龙", "皮卡丘"], images=image, padding=True, return_tensors="pd")
 
         # forward pass
         with paddle.no_grad():
@@ -533,6 +544,7 @@ class CLIPModelIntegrationTest(unittest.TestCase):
             [inputs.input_ids.shape[0], inputs.pixel_values.shape[0]],
         )
 
-        expected_logits = paddle.to_tensor([[24.5701, 19.3049]])
+        probs = paddle.nn.functional.softmax(outputs.logits_per_image, axis=1)
+        expected_probs = paddle.to_tensor([[1.2686e-03, 5.4499e-02, 6.7968e-04, 9.4355e-01]])
 
-        self.assertTrue(paddle.allclose(outputs.logits_per_image, expected_logits, atol=1e-3))
+        self.assertTrue(paddle.allclose(probs, expected_probs, atol=5e-3))
