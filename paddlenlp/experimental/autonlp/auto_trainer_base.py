@@ -226,9 +226,10 @@ class AutoTrainerBase(metaclass=ABCMeta):
         num_cpus: Optional[int] = None,
         max_concurrent_trials: Optional[int] = None,
         time_budget_s: Optional[Union[int, float, datetime.timedelta]] = None,
+        experiment_name: str = None,
+        verbosity: int = 0,
         hp_overrides: Dict[str, Any] = None,
         custom_model_candidates: List[Dict[str, Any]] = None,
-        experiment_name: str = None,
     ) -> ResultGrid:
         """
         Main logic of training models
@@ -243,6 +244,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
             time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
             experiment_name: (str, optional): name of the experiment. Experiment log will be stored under <output_dir>/<experiment_name>.
                 Defaults to UNIX timestamp.
+            verbosity: (int, optional): controls the verbosity of the logger. Defaults to 0, which set the logger level at INFO. To reduce the amount of logs,
+                use verbosity > 0 to set the logger level to WARNINGS
             hp_overrides: (dict[str, Any], optional): Advanced users only.
                 override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
             custom_model_candiates: (dict[str, Any], optional): Advanced users only.
@@ -251,6 +254,11 @@ class AutoTrainerBase(metaclass=ABCMeta):
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
+        if verbosity > 0:
+            logger.set_level("WARNINGS")
+        else:
+            logger.set_level("INFO")
+
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting thhe existing Tuner and any previous training results")
         self._data_checks_and_inference()
