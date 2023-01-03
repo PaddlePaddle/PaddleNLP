@@ -255,12 +255,13 @@ class AutoTrainerBase(metaclass=ABCMeta):
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
         if verbosity > 0:
-            logger.set_level("WARNINGS")
+            logger.set_level("WARNING")
         else:
             logger.set_level("INFO")
 
         if hasattr(self, "tuner") and self.tuner is not None:
-            logger.info("Overwriting thhe existing Tuner and any previous training results")
+            logger.info("Overwriting the existing Tuner and any previous training results")
+
         self._data_checks_and_inference()
         trainable = self._construct_trainable()
         model_candidates = self._filter_model_candidates(
