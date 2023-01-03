@@ -11,11 +11,11 @@
 
 | 模型 |  结构  | 语言 |
 | :---: | :--------: | :--------: |
-| `ERNIE 3.0-Base`| 12-layers, 768-hidden, 12-heads | 中文 |
-| `ERNIE 3.0-Medium`| 6-layers, 768-hidden, 12-heads | 中文 |
-| `ERNIE 3.0-Mini`| 6-layers, 384-hidden, 12-heads | 中文 |
-| `ERNIE 3.0-Micro`| 4-layers, 384-hidden, 12-heads | 中文 |
-| `ERNIE 3.0-Nano `| 4-layers, 312-hidden, 12-heads | 中文 |
+| **ERNIE 3.0-_Base_** | 12-layers, 768-hidden, 12-heads | 中文 |
+| **ERNIE 3.0-_Medium_** | 6-layers, 768-hidden, 12-heads | 中文 |
+| **ERNIE 3.0-_Mini_** | 6-layers, 384-hidden, 12-heads | 中文 |
+| **ERNIE 3.0-_Micro_** | 4-layers, 384-hidden, 12-heads | 中文 |
+| **ERNIE 3.0-_Nano_** | 4-layers, 312-hidden, 12-heads | 中文 |
 
 ## 支持的NLP任务列表
 
@@ -26,14 +26,8 @@
 
 ## 导出部署模型
 
-在部署前，需要先将训练好的ERNIE模型导出成部署模型，导出步骤可参考文档[导出模型](../README.md#模型导出).
+在部署前，需要在`AFQMC数据集`上微调ERNIE模型，并导出成部署模型，详细请查看[ERNIE 3.0模型训练流程](../README.md#模型训练)。
 
-## 下载微调模型
-
-为了方便开发者的测试，下面分别提供了在文本分类[TNEWS数据集](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)以及序列标注任务[MSRA_NER](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上微调的ERNIE 3.0-Medium模型，开发者可直接下载体验。
-
-- [ERNIE 3.0 Medium TNEWS](https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-tnews.tgz)
-- [ERNIE 3.0 Medium MSRA_NER](https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-msra.tgz)
 
 ## 详细部署文档
 
