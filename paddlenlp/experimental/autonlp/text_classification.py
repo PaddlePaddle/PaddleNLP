@@ -152,11 +152,11 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
             },
         ]
 
-    def _data_checks_and_inference(self, train_dataset: Dataset, eval_dataset: Dataset):
+    def _data_checks_and_inference(self):
         self.id2label, self.label2id = {}, {}
         # TODO: support label ids that is already encoded
         if self.problem_type == "multi_class":
-            for dataset in [train_dataset, eval_dataset]:
+            for dataset in [self.train_dataset, self.eval_dataset]:
                 for example in dataset:
                     label = example[self.label_column]
                     if label not in self.label2id:
@@ -164,7 +164,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                         self.id2label[len(self.id2label)] = label
         # multi_label
         else:
-            for dataset in [train_dataset, eval_dataset]:
+            for dataset in [self.train_dataset, self.eval_dataset]:
                 for example in dataset:
                     labels = example[self.label_column]
                     for label in labels:
@@ -172,7 +172,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                             self.label2id[label] = len(self.label2id)
                             self.id2label[len(self.id2label)] = label
 
-    def _construct_trainable(self, train_dataset: Dataset, eval_dataset: Dataset) -> Callable:
+    def _construct_trainable(self) -> Callable:
         def trainable(config):
             config = config["candidates"]
             if "EarlyStoppingCallback.early_stopping_patience" in config:
@@ -192,8 +192,8 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     tokenizer=tokenizer,
                     max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
                 )
-                processed_train_dataset = train_dataset.map(trans_func, lazy=False)
-                processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
+                processed_train_dataset = self.train_dataset.map(trans_func, lazy=False)
+                processed_eval_dataset = self.eval_dataset.map(trans_func, lazy=False)
                 training_args = self._override_hp(config, self._default_training_argument)
                 trainer = Trainer(
                     model=model,
@@ -210,14 +210,14 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 if os.path.exists(self.training_path):
                     logger.info("Removing training checkpoints to conserve disk space")
                     shutil.rmtree(self.training_path)
-                eval_metrics = trainer.evaluate(eval_dataset)
+                eval_metrics = trainer.evaluate(processed_eval_dataset)
                 return eval_metrics
             elif config["trainer_type"] == "PromptTrainer":
                 model_path = config["PromptTuningArguments.model_name_or_path"]
                 max_length = config.get("PreprocessArguments.max_length", 128)
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
-                processed_train_dataset = train_dataset.map(self._preprocess_labels, lazy=False)
-                processed_eval_dataset = eval_dataset.map(self._preprocess_labels, lazy=False)
+                processed_train_dataset = self.train_dataset.map(self._preprocess_labels, lazy=False)
+                processed_eval_dataset = self.eval_dataset.map(self._preprocess_labels, lazy=False)
                 model = AutoModelForMaskedLM.from_pretrained(model_path)
                 template = AutoTemplate.create_from(
                     prompt=config["template.prompt"],
@@ -249,7 +249,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                     compute_metrics=self._compute_metrics,
                 )
                 trainer.train()
-                eval_metrics = trainer.evaluate(eval_dataset)
+                eval_metrics = trainer.evaluate(processed_eval_dataset)
                 # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
                 # We directly export a static model instead of a dynamic model
                 trainer.export_model(self.export_path)
