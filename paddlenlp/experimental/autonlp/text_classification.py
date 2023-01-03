@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import copy
 import functools
 import os
 import shutil
@@ -172,95 +173,114 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                             self.label2id[label] = len(self.label2id)
                             self.id2label[len(self.id2label)] = label
 
+    def _construct_trainer(self, config) -> Trainer:
+        if "EarlyStoppingCallback.early_stopping_patience" in config:
+            callbacks = [
+                EarlyStoppingCallback(early_stopping_patience=config["EarlyStoppingCallback.early_stopping_patience"])
+            ]
+        else:
+            callbacks = None
+        if config["trainer_type"] == "Trainer":
+            model_path = config["TrainingArguments.model_name_or_path"]
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
+            trans_func = functools.partial(
+                self._preprocess_fn,
+                tokenizer=tokenizer,
+                max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
+            )
+            processed_train_dataset = copy.deepcopy(self.train_dataset).map(trans_func, lazy=False)
+            processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(trans_func, lazy=False)
+            training_args = self._override_hp(config, self._default_training_argument)
+            trainer = Trainer(
+                model=model,
+                tokenizer=tokenizer,
+                args=training_args,
+                train_dataset=processed_train_dataset,
+                eval_dataset=processed_eval_dataset,
+                data_collator=DataCollatorWithPadding(tokenizer),
+                compute_metrics=self._compute_metrics,
+                callbacks=callbacks,
+            )
+        elif config["trainer_type"] == "PromptTrainer":
+            model_path = config["PromptTuningArguments.model_name_or_path"]
+            max_length = config.get("PreprocessArguments.max_length", 128)
+            tokenizer = AutoTokenizer.from_pretrained(model_path)
+            processed_train_dataset = copy.deepcopy(self.train_dataset).map(self._preprocess_labels, lazy=False)
+            processed_eval_dataset = copy.deepcopy(self.eval_dataset).map(self._preprocess_labels, lazy=False)
+            model = AutoModelForMaskedLM.from_pretrained(model_path)
+            template = AutoTemplate.create_from(
+                prompt=config["template.prompt"],
+                tokenizer=tokenizer,
+                max_length=max_length,
+                model=model,
+            )
+            training_args = self._override_hp(config, self._default_prompt_tuning_arguments)
+            verbalizer = SoftVerbalizer(label_words=self.id2label, tokenizer=tokenizer, model=model)
+            prompt_model = PromptModelForSequenceClassification(
+                model,
+                template,
+                verbalizer,
+                freeze_plm=training_args.freeze_plm,
+                freeze_dropout=training_args.freeze_dropout,
+            )
+            if self.problem_type == "multi_class":
+                criterion = paddle.nn.CrossEntropyLoss()
+            else:  # multi_label
+                criterion = paddle.nn.BCEWithLogitsLoss()
+            trainer = PromptTrainer(
+                model=prompt_model,
+                tokenizer=tokenizer,
+                args=training_args,
+                criterion=criterion,
+                train_dataset=processed_train_dataset,
+                eval_dataset=processed_eval_dataset,
+                callbacks=callbacks,
+                compute_metrics=self._compute_metrics,
+            )
+        else:
+            raise ValueError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
+        return trainer
+
     def _construct_trainable(self) -> Callable:
         def trainable(config):
             config = config["candidates"]
-            if "EarlyStoppingCallback.early_stopping_patience" in config:
-                callbacks = [
-                    EarlyStoppingCallback(
-                        early_stopping_patience=config["EarlyStoppingCallback.early_stopping_patience"]
-                    )
-                ]
-            else:
-                callbacks = None
-            if config["trainer_type"] == "Trainer":
-                model_path = config["TrainingArguments.model_name_or_path"]
-                tokenizer = AutoTokenizer.from_pretrained(model_path)
-                model = AutoModelForSequenceClassification.from_pretrained(model_path, num_classes=len(self.id2label))
-                trans_func = functools.partial(
-                    self._preprocess_fn,
-                    tokenizer=tokenizer,
-                    max_length=model.config.max_position_embeddings,  # truncate to the max length allowed by the model
-                )
-                processed_train_dataset = self.train_dataset.map(trans_func, lazy=False)
-                processed_eval_dataset = self.eval_dataset.map(trans_func, lazy=False)
-                training_args = self._override_hp(config, self._default_training_argument)
-                trainer = Trainer(
-                    model=model,
-                    tokenizer=tokenizer,
-                    args=training_args,
-                    train_dataset=processed_train_dataset,
-                    eval_dataset=processed_eval_dataset,
-                    data_collator=DataCollatorWithPadding(tokenizer),
-                    compute_metrics=self._compute_metrics,
-                    callbacks=callbacks,
-                )
-                trainer.train()
-                trainer.save_model(self.export_path)
-                if os.path.exists(self.training_path):
-                    logger.info("Removing training checkpoints to conserve disk space")
-                    shutil.rmtree(self.training_path)
-                eval_metrics = trainer.evaluate(processed_eval_dataset)
-                return eval_metrics
-            elif config["trainer_type"] == "PromptTrainer":
-                model_path = config["PromptTuningArguments.model_name_or_path"]
-                max_length = config.get("PreprocessArguments.max_length", 128)
-                tokenizer = AutoTokenizer.from_pretrained(model_path)
-                processed_train_dataset = self.train_dataset.map(self._preprocess_labels, lazy=False)
-                processed_eval_dataset = self.eval_dataset.map(self._preprocess_labels, lazy=False)
-                model = AutoModelForMaskedLM.from_pretrained(model_path)
-                template = AutoTemplate.create_from(
-                    prompt=config["template.prompt"],
-                    tokenizer=tokenizer,
-                    max_length=max_length,
-                    model=model,
-                )
-                training_args = self._override_hp(config, self._default_prompt_tuning_arguments)
-                verbalizer = SoftVerbalizer(label_words=self.id2label, tokenizer=tokenizer, model=model)
-                prompt_model = PromptModelForSequenceClassification(
-                    model,
-                    template,
-                    verbalizer,
-                    freeze_plm=training_args.freeze_plm,
-                    freeze_dropout=training_args.freeze_dropout,
-                )
-                if self.problem_type == "multi_class":
-                    criterion = paddle.nn.CrossEntropyLoss()
-                else:  # multi_label
-                    criterion = paddle.nn.BCEWithLogitsLoss()
-                trainer = PromptTrainer(
-                    model=prompt_model,
-                    tokenizer=tokenizer,
-                    args=training_args,
-                    criterion=criterion,
-                    train_dataset=processed_train_dataset,
-                    eval_dataset=processed_eval_dataset,
-                    callbacks=callbacks,
-                    compute_metrics=self._compute_metrics,
-                )
-                trainer.train()
-                eval_metrics = trainer.evaluate(processed_eval_dataset)
+            trainer = self._construct_trainer(config)
+            trainer.train()
+            eval_metrics = trainer.evaluate()
+            if config["trainer_type"] == "PromptTrainer":
                 # It's difficult to load back the prompt model as a dynamic model due to lack of AutoModel support now
                 # We directly export a static model instead of a dynamic model
                 trainer.export_model(self.export_path)
-                if os.path.exists(self.training_path):
-                    logger.info("Removing training checkpoints to conserve disk space")
-                    shutil.rmtree(self.training_path)
-                return eval_metrics
             else:
-                raise ValueError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
+                trainer.save_model(self.export_path)
+            if os.path.exists(self.training_path):
+                logger.info("Removing training checkpoints to conserve disk space")
+                shutil.rmtree(self.training_path)
+            return eval_metrics
 
         return trainable
+
+    def evaluate(self, trial_id=None, eval_dataset=None):
+        model_result = self._get_model_result(trial_id=trial_id)
+        model_config = model_result.metrics["config"]["candidates"]
+        if model_config["trainer_type"] == "PromptTrainer":
+            raise NotImplementedError(
+                "'PromptTrainer' models do not support 'evaluate' yet because dygraph save model has not been implemented."
+            )
+        model_config["TrainingArguments.model_name_or_path"] = os.path.join(model_result.log_dir, self.export_path)
+        trainer = self._construct_trainer(model_config)
+        if eval_dataset is not None:
+            trans_func = functools.partial(
+                self._preprocess_fn,
+                tokenizer=trainer.tokenizer,
+                max_length=trainer.model.config.max_position_embeddings,  # truncate to the max length allowed by the model
+            )
+            processed_eval_dataset = eval_dataset.map(trans_func, lazy=False)
+            eval_metrics = trainer.evaluate(processed_eval_dataset)
+        else:
+            eval_metrics = trainer.evaluate()
+        return eval_metrics
 
     def _compute_metrics(self, eval_preds: EvalPrediction) -> Dict[str, float]:
         if self.problem_type == "multi_class":
@@ -316,7 +336,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         """
         preprocess an example from raw features to input features that Transformers models expect (e.g. input_ids, attention_mask, labels, etc)
         """
-        result = tokenizer(text=example[self.text_column], max_length=max_length)
+        result = tokenizer(text=example[self.text_column], max_length=max_length, truncation=True)
         if not is_test:
             example_with_labels = self._preprocess_labels(example)
             result["labels"] = example_with_labels["labels"]

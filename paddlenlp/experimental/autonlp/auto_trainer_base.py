@@ -120,7 +120,11 @@ class AutoTrainerBase(metaclass=ABCMeta):
 
     @abstractmethod
     def to_taskflow(self, trial_id=None):
-        pass
+        raise NotImplementedError
+
+    @abstractmethod
+    def evaluate(self, trial_id=None, eval_dataset=None):
+        raise NotImplementedError
 
     def _override_hp(self, config: Dict[str, Any], default_hp: Any) -> Any:
         """

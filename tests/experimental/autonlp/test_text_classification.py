@@ -139,6 +139,19 @@ class TestAutoTrainerForTextClassification(unittest.TestCase):
                 model_outputs = reloaded_model(**input_features)
                 self.assertEqual(model_outputs.shape, [1, len(auto_trainer.id2label)])
 
+            # test evaluate
+            if custom_model_candidate["trainer_type"] == "PromptTrainer":
+                with self.assertRaises(NotImplementedError):
+                    auto_trainer.evaluate()
+            else:
+                copy_dev_ds = copy.deepcopy(self.multi_class_dev_ds)
+                eval_metrics1 = auto_trainer.evaluate()
+                eval_metrics2 = auto_trainer.evaluate(eval_dataset=copy_dev_ds)
+                self.assertEqual(
+                    eval_metrics1[auto_trainer.metric_for_best_model],
+                    eval_metrics2[auto_trainer.metric_for_best_model],
+                )
+
             # test invalid export
             temp_export_path = os.path.join(temp_dir_path, "invalid_export")
             with self.assertRaises(LookupError):
