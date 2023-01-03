@@ -13,40 +13,25 @@
 # limitations under the License.
 
 import os
-import sys
-import yaml
 from functools import partial
-import distutils.util
-import os.path as osp
-from typing import Optional
 
-import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 from paddle.metric import Accuracy
+from sequence_classification import clue_trans_fn, seq_trans_fn
+from utils import ALL_DATASETS, DataArguments, ModelArguments
+
 import paddlenlp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
-    TrainingArguments,
     Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
 )
-from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForSequenceClassification,
-)
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 from paddlenlp.utils.log import logger
-
-sys.path.insert(0, os.path.abspath("."))
-from sequence_classification import seq_trans_fn, clue_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
 
 
 def main():
@@ -101,7 +86,7 @@ def main():
     )
 
     data_args.label_list = getattr(raw_datasets["train"], "label_list", None)
-    num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
+    num_classes = 1 if raw_datasets["train"].label_list is None else len(raw_datasets["train"].label_list)
 
     # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
@@ -132,7 +117,6 @@ def main():
         preds = paddle.to_tensor(preds)
         label = paddle.to_tensor(p.label_ids)
 
-        probs = F.softmax(preds, axis=1)
         metric = Accuracy()
         metric.reset()
         result = metric.compute(preds, label)

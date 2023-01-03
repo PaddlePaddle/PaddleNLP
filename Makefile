@@ -64,3 +64,11 @@ deploy-paddlenlp:
 	python3 setup.py sdist bdist_wheel
 	# upload
 	twine upload --skip-existing dist/*
+
+.PHONY: regression-all
+release: 
+	bash ./scripts/regression/run_release.sh 0 0,1 all
+
+.PHONY: regression-key
+key: 
+	bash ./scripts/regression/run_release.sh 0 0,1 p0

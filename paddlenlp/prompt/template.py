@@ -778,6 +778,7 @@ class AutoTemplate(object):
         max_length: int = 512,
         model: PretrainedModel = None,
         soft_embeddings: Tensor = None,
+        prefix_dropout: float = 0.1,
     ):
         # Default template if not defined.
         if prompt is None:
@@ -795,11 +796,17 @@ class AutoTemplate(object):
 
         # Choose Template according to template keywords.
         if "prefix" in template_keywords:
-            return PrefixTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model)
+            return PrefixTemplate(
+                prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model, prefix_dropout=prefix_dropout
+            )
         elif "soft" in template_keywords or "soft_id" in template_keywords:
             word_embeddings = model.get_input_embeddings()
             return SoftTemplate(
-                prompt=prompt, tokenizer=tokenizer, max_length=max_length, word_embeddings=word_embeddings
+                prompt=prompt,
+                tokenizer=tokenizer,
+                max_length=max_length,
+                word_embeddings=word_embeddings,
+                soft_embeddings=soft_embeddings,
             )
         else:
             return ManualTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length)

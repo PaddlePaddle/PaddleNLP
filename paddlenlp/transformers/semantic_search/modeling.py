@@ -16,24 +16,25 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from ..ernie.modeling import ErniePretrainedModel
+from ..ernie.configuration import ErnieConfig
+from ..ernie.modeling import ErnieModel, ErniePretrainedModel
 
 __all__ = ["ErnieDualEncoder", "ErnieCrossEncoder"]
 
 
 class ErnieEncoder(ErniePretrainedModel):
-    def __init__(self, ernie, dropout=None, output_emb_size=None, num_classes=2):
-        super(ErnieEncoder, self).__init__()
-        self.ernie = ernie  # allow ernie to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else 0.1)
-        self.classifier = nn.Linear(self.ernie.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieConfig, output_emb_size: int):
+        super(ErnieEncoder, self).__init__(config)
+
+        self.ernie = ErnieModel(config)
+        dropout = config.classifier_dropout if config.classifier_dropout is not None else 0.1
+
+        self.dropout = nn.Dropout(dropout)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         # Compatible to ERNIE-Search for adding extra linear layer
-        self.output_emb_size = output_emb_size
         if output_emb_size is not None and output_emb_size > 0:
             weight_attr = paddle.ParamAttr(initializer=paddle.nn.initializer.TruncatedNormal(std=0.02))
-            self.emb_reduce_linear = paddle.nn.Linear(
-                self.ernie.config["hidden_size"], output_emb_size, weight_attr=weight_attr
-            )
+            self.emb_reduce_linear = paddle.nn.Linear(config.hidden_size, output_emb_size, weight_attr=weight_attr)
         self.apply(self.init_weights)
 
     def init_weights(self, layer):
