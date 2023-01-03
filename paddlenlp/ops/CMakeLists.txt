@@ -478,4 +478,4 @@ if(ON_INFER AND WITH_GPT AND WITH_SP)
   add_definitions(-DGPT_ON_SENTENCEPIECE)
 endif()
 
-add_subdirectory(faster_transformer)
+add_subdirectory(fast_transformer)

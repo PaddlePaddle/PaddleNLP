@@ -11,20 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from dataclasses import dataclass
 from typing import Optional, Tuple
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import paddle.tensor as tensor
-from dataclasses import dataclass
-from paddle.nn import TransformerEncoder, Linear, Layer, Embedding, LayerNorm, Tanh
+from paddle.nn import Layer
+
 from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.transformers.model_outputs import ModelOutput, TokenClassifierOutput
 from paddlenlp.utils.tools import compare_version
 
 from .configuration import (
-    ErnieCtmConfig, ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION, ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP
+    ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION,
+    ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP,
+    ErnieCtmConfig,
 )
 
 if compare_version(paddle.version.full_version, "2.2.0") >= 0:
@@ -85,21 +87,15 @@ class ErnieCtmEmbeddings(Layer):
 
     def __init__(self, config: ErnieCtmConfig):
         super().__init__()
-        self.word_embeddings = nn.Embedding(config.vocab_size,
-                                            config.embedding_size,
-                                            padding_idx=config.pad_token_id)
-        self.position_embeddings = nn.Embedding(config.max_position_embeddings,
-                                                config.embedding_size)
-        self.token_type_embeddings = nn.Embedding(config.type_vocab_size,
-                                                  config.embedding_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.embedding_size, padding_idx=config.pad_token_id)
+        self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.embedding_size)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.embedding_size)
         self.layer_norm = nn.LayerNorm(config.embedding_size, epsilon=config.layer_norm_eps)
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.cls_num = config.cls_num
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None):
         if position_ids is None:
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
 
             content_len = paddle.shape(input_ids)[1] - self.cls_num
             position_ids = paddle.concat(
@@ -155,7 +151,7 @@ class ErnieCtmPretrainedModel(PretrainedModel):
     resource_files_names = {"model_state": "model_state.pdparams"}
 
     base_model_prefix = "ernie_ctm"
-    
+
     pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP
 
@@ -248,9 +244,8 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
         self.content_summary_index = config.content_summary_index
         self.initializer_range = config.initializer_range
         self.embeddings = ErnieCtmEmbeddings(config)
-        self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size,
-                                                     config.hidden_size)
-        
+        self.embedding_hidden_mapping_in = nn.Linear(config.embedding_size, config.hidden_size)
+
         def construct_encoder_layer():
             encoder_layer = nn.TransformerEncoderLayer(
                 config.hidden_size,
@@ -259,13 +254,12 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
                 dropout=config.hidden_dropout_prob,
                 activation="gelu",
                 attn_dropout=config.attention_probs_dropout_prob,
-                act_dropout=0)
+                act_dropout=0,
+            )
             encoder_layer.activation = nn.GELU(approximate=True)
             return encoder_layer
 
-        self.encoder = nn.LayerList(
-            construct_encoder_layer() for _ in range(config.num_hidden_layers)
-        )
+        self.encoder = nn.LayerList(construct_encoder_layer() for _ in range(config.num_hidden_layers))
         self.pooler = ErnieCtmPooler(config.hidden_size)
 
         self.use_content_summary = config.use_content_summary
@@ -282,15 +276,17 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
     def set_input_embeddings(self, value):
         self.embeddings.word_embeddings = value
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                position_ids=None,
-                attention_mask=None,
-                content_clone=False,
-                output_hidden_states=None,
-                output_attentions=None,
-                return_dict=None):
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        position_ids=None,
+        attention_mask=None,
+        content_clone=False,
+        output_hidden_states=None,
+        output_attentions=None,
+        return_dict=None,
+    ):
         r"""
         The ErnieCtmModel forward method, overrides the __call__() special method.
 
@@ -436,14 +432,19 @@ class ErnieCtmModel(ErnieCtmPretrainedModel):
             sequence_output = self.feature_output(sequence_output)
 
         if not return_dict:
-            return (sequence_output, pooled_output, content_output, all_hidden_states,)
+            return (
+                sequence_output,
+                pooled_output,
+                content_output,
+                all_hidden_states,
+            )
 
         return ErnieCtmModelOutput(
             last_hidden_state=sequence_output,
             pooler_output=pooled_output,
             content_output=content_output,
             hidden_states=all_hidden_states,
-            attentions=None
+            attentions=None,
         )
 
 
@@ -466,23 +467,24 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         self.num_tag = config.num_labels
         self.ernie_ctm = ErnieCtmModel(config)
         self.tag_classifier = nn.Linear(config.hidden_size, self.num_tag)
-        self.crf = LinearChainCrf(self.num_tag,
-                                  with_start_stop_tag=False)
+        self.crf = LinearChainCrf(self.num_tag, with_start_stop_tag=False)
         self.crf_loss = LinearChainCrfLoss(self.crf)
         self.viterbi_decoder = ViterbiDecoder(self.crf.transitions, False)
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                lengths=None,
-                position_ids=None,
-                attention_mask=None,
-                tag_labels=None,
-                output_hidden_states=None,
-                output_attentions=None,
-                return_dict=None):
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        lengths=None,
+        position_ids=None,
+        attention_mask=None,
+        tag_labels=None,
+        output_hidden_states=None,
+        output_attentions=None,
+        return_dict=None,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -540,13 +542,15 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
         )
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
-        outputs = self.ernie_ctm(input_ids=input_ids,
-                                 attention_mask=attention_mask,
-                                 token_type_ids=token_type_ids,
-                                 position_ids=position_ids,
-                                 output_hidden_states=output_hidden_states,
-                                 output_attentions=output_attentions,
-                                 return_dict=True)
+        outputs = self.ernie_ctm(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=True,
+        )
         sequence_output = outputs.last_hidden_state
         seq_logits = self.tag_classifier(sequence_output)
         loss = None
@@ -554,17 +558,19 @@ class ErnieCtmWordtagModel(ErnieCtmPretrainedModel):
             crf_loss = self.crf_loss(seq_logits, lengths, tag_labels)
             seq_loss = F.cross_entropy(seq_logits.reshape((-1, self.num_tag)), tag_labels.reshape((-1,)))
             loss = crf_loss + seq_loss
+            output = (loss, seq_logits)
         else:
             _, seq_logits = self.viterbi_decoder(seq_logits, lengths)
+            output = (seq_logits,)
 
         if not return_dict:
-            return (loss, seq_logits, outputs.hidden_states, outputs.attentions,)
+            return output + (
+                outputs.hidden_states,
+                outputs.attentions,
+            )
 
         return TokenClassifierOutput(
-            loss=loss,
-            logits=seq_logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.hidden_states
+            loss=loss, logits=seq_logits, hidden_states=outputs.hidden_states, attentions=outputs.hidden_states
         )
 
 
@@ -574,9 +580,8 @@ class ErnieCtmMLMHead(Layer):
         self.layer_norm = nn.LayerNorm(config.embedding_size)
 
         self.bias = self.create_parameter(
-            [config.vocab_size],
-            is_bias=True,
-            default_initializer=nn.initializer.Constant(value=0.0))
+            [config.vocab_size], is_bias=True, default_initializer=nn.initializer.Constant(value=0.0)
+        )
         self.dense = nn.Linear(config.hidden_size, config.embedding_size)
         self.decoder = nn.Linear(config.embedding_size, config.vocab_size)
         self.activation = nn.GELU(approximate=True)
@@ -609,15 +614,17 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
 
         self.apply(self.init_weights)
 
-    def forward(self,
-                input_ids=None,
-                token_type_ids=None,
-                attention_mask=None,
-                position_ids=None,
-                labels=None,
-                output_hidden_states: Optional[bool] = None,
-                output_attentions: Optional[bool] = None,
-                return_dict: Optional[bool] = None):
+    def forward(
+        self,
+        input_ids=None,
+        token_type_ids=None,
+        attention_mask=None,
+        position_ids=None,
+        labels=None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
         r"""
         Args:
             input_ids (Tensor):
@@ -662,13 +669,15 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
         )
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
 
-        outputs = self.ernie_ctm(input_ids=input_ids,
-                                 token_type_ids=token_type_ids,
-                                 attention_mask=attention_mask,
-                                 position_ids=position_ids,
-                                 output_hidden_states=output_hidden_states,
-                                 output_attentions=output_attentions,
-                                 return_dict=return_dict)
+        outputs = self.ernie_ctm(
+            input_ids=input_ids,
+            token_type_ids=token_type_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            output_hidden_states=output_hidden_states,
+            output_attentions=output_attentions,
+            return_dict=return_dict,
+        )
 
         sequence_output = outputs[0]
         logits = self.predictions(sequence_output)
@@ -678,14 +687,11 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
             loss = F.cross_entropy(logits.reshape([-1, self.config.vocab_size]), labels.reshape([-1]))
 
         if not return_dict:
-            outputs = (logits, ) + outputs[2:]
+            outputs = (logits,) + outputs[2:]
             return (loss,) + outputs
 
         return TokenClassifierOutput(
-            loss=loss,
-            logits=logits,
-            hidden_states=outputs.hidden_states,
-            attentions=outputs.attentions
+            loss=loss, logits=logits, hidden_states=outputs.hidden_states, attentions=outputs.attentions
         )
 
 
@@ -697,7 +703,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
     Args:
         ernie (`ErnieModel`):
             An instance of `ErnieModel`.
-        num_classes (int, optional):
+        num_tag (int, optional):
             The number of classes. Defaults to `2`.
         dropout (float, optional):
             The dropout probability for output of ERNIE.
@@ -705,12 +711,14 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
             of `ErnieCtmModel` instance `ernie`. Defaults to `None`.
     """
 
-    def __init__(self, ernie_ctm, num_classes=2, dropout=None):
-        super(ErnieCtmForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.ernie_ctm = ernie_ctm  # allow ernie_ctm to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie_ctm.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.ernie_ctm.config["hidden_size"], num_classes)
+    def __init__(self, config: ErnieCtmConfig):
+        super(ErnieCtmForTokenClassification, self).__init__(config)
+        self.num_tag = config.num_labels
+        self.ernie_ctm = ErnieCtmModel(config)
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, position_ids=None, attention_mask=None):
@@ -727,7 +735,7 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         Returns:
             Tensor: Returns tensor `logits`, a tensor of the input token classification logits.
-            Shape as `[sequence_length, num_classes]` and dtype as `float32`.
+            Shape as `[sequence_length, num_tag]` and dtype as `float32`.
 
         Example:
             .. code-block::
@@ -744,10 +752,11 @@ class ErnieCtmForTokenClassification(ErnieCtmPretrainedModel):
 
         """
 
-        sequence_output, _, _ = self.ernie_ctm(
+        output = self.ernie_ctm(
             input_ids, token_type_ids=token_type_ids, position_ids=position_ids, attention_mask=attention_mask
         )
 
+        sequence_output = output[0]
         sequence_output = self.dropout(sequence_output)
         logits = self.classifier(sequence_output)
         return logits

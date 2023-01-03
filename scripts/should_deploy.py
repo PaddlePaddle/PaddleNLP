@@ -69,12 +69,8 @@ if __name__ == "__main__":
     }
     remote_version = read_version_of_remote_package(args.name)
 
-    # tmp fix
     if args.name == "paddlenlp":
-        sys.path.append(".")
-        from paddlenlp import __version__
-
-        local_version = __version__
+        local_version = str(subprocess.check_output(["python", "setup.py", "--version"], text=True))
     elif args.name in version_file_map:
         PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         local_version_file = os.path.join(PROJECT_ROOT, version_file_map[args.name])
