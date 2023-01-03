@@ -1,32 +1,31 @@
 # AutoNLP
 
-**The AutoNLP APIs are subjective to significant changes until formal release**
+**AutoNLP目前在实验阶段。在正式发布之前，AutoNLP API有可能会变动**
 
-**AutoNLP** is an experimental project by PaddleNLP to democratize NLP for everyone. Delivering a successful NLP project is not easy, as it requires deep domain knowledge. Time after time, we have seen people struggle to make NLP work on their dataset, for their projects, which is why we are building **AutoNLP**. Compared with the traditional AutoML approach of massive paid compute for State-of-the-Art model performance, we have a different philosphy:
+**AutoNLP** 是 PaddleNLP 的一个早期的实验性质的项目，旨在让NLP技术赋能百业。交付一个成功的 NLP 项目并不容易，因为它需要深入的NLP领域知识，而我们经常看到开发者应用NLP技术的过程中遇到困难。这就是我们开发 **AutoNLP** 项目的原因。与为获得最先进的模型精度而使用大规模计算资源的传统 AutoML 方法相比，我们有不同的理念：
 
+1. 我们的目标不是在大型集群，大型数据集上训练最先进的模型，而是**在有限计算资源下的训练出不错模型**。我们假设我们的用户最多只有几个 GPU，并且希望在8小时内训练出不错的模型。您可以在 [Baidu AiStudio](https://aistudio.baidu.com/aistudio) 免费获得此级别的计算资源。
+2. AutoNLP的目标是提供**低代码**的解决方案，使您能够用几行代码训练出不错的模型，但它不是无代码的模型训练服务。
+3. 我们将尽可能地**自动化和抽象化** PaddleNLP已有的**全流程能力**（例如 预处理，分词，微调，提示学习，模型压缩，一键部署等等），助力开发者对于自己的使用场景进行快速适配与落地。
+4. 我们的工作是**免费和开源**的。
 
-1. Instead of training State-of-the-Art models on huge datasets running on huge clusters, our goal is to deliver **decent models under limited compute**. We assume our users have a few GPUs at most and want to get decent models under 8 hours on their own in-house datasets. Note that you can get this level of compute for FREE on [Baidu AiStudio](https://aistudio.baidu.com/aistudio).
-2. Our solution is **low-code** and enables you to train good models with a few lines of code but it won't be no code / drag and drop.
-3. Leverage the **full-cycle capability** of PaddleNLP, We intent to **automate and abstract away** as much of NLP as possible, ranging from preprocessing to tokenizing, from finetuning to prompt tuning, from model compression to deloyment, etc.
-4. Our work is and always will be **free and open-sourced**.
+## 安装
 
-## Installation
-
-Installing **AutoNLP** is very similar to installing PaddleNLP, with the only difference being the `[autonlp]` tag.
+安装 **AutoNLP** 与安装 PaddleNLP 非常相似，唯一的区别是 需要添加`[autonlp]`的标签。
 
 ```
 pip install -U paddlenlp[autonlp]
 ```
 
-You can also get our latest work in the develop branch by cloning from our [GitHub](https://github.com/PaddlePaddle/PaddleNLP) and install from source via `pip install .[autonlp]`.
+您还可以从我们的 [GitHub](https://github.com/PaddlePaddle/PaddleNLP) clone并通过“pip install .[autonlp]”从源代码安装来获取develop分支中的最新成果。
 
-## Basic Usage
+## 基础使用
 
-Since the only supported task is Text Classification for now, the following documentation are on the usage of **AutoTrainerForTextClassification**. You can also follow our AiStudio notebook for example.
+由于目前AutoNLP唯一支持的任务是文本分类，因此以下文档是关于 **AutoTrainerForTextClassification** 的使用用法。您也可以参考我们的 AiStudio notebook (To be added)
 
-### Constructor
+### 创建AutoTrainerForTextClassification对象
 
-`AutoTrainerForTextClassification` is the main class which you use to run model experiments and interact with the trained models You can construct it like the following:
+`AutoTrainerForTextClassification` 是您用来运行模型实验并与经过训练的模型交互的主要类，您可以像下面这样构造它：
 
 ```python
 auto_trainer = AutoTrainerForTextClassification(
@@ -41,19 +40,19 @@ auto_trainer = AutoTrainerForTextClassification(
 
 Args:
 
-- train_dataset (Dataset, required): Training dataset in the format of `paddle.io.Dataset`, must contains the 'text_column' and 'label_column' specified below
-- eval_dataset (Dataset, required): Evaluation dataset in the format of `paddle.io.Dataset`, must contains the 'text_column' and 'label_column' specified below
-- text_column (string, required): Name of the column that contains the input text.
-- label_column (string, required): Name of the column that contains the target variable to predict.
-- language (string, required): language of the text
-- metric_for_best_model (string, optional): the name of the metrc for selecting the best model.
-- greater_is_better (bool, optional): Whether better models should have a greater metric or not. Use in conjuction with `metric_for_best_model`.
-- problem_type (str, optional): Select among ["multi_class", "multi_label"] based on the nature of your problem
-- output_dir (str, optional): Output directory for the experiments, defaults to "autpnlp_results"
+- train_dataset (Dataset, required): `paddle.io.Dataset` 格式的训练数据集，必须包含下面指定的 `text_column` 和 `label_column`
+- eval_dataset (Dataset, required): `paddle.io.Dataset`格式的评估数据集，必须包含下面指定的`text_column`和`label_column`
+- text_column (string, required): 数据集中的文本字段，为模型的主要输入。
+- label_column (string, required): 数据集中的标签字段
+- language (string, required): 文本语言
+- metric_for_best_model (string, optional): 用来选择最优模型的评估指标
+- greater_is_better (bool, optional): 更好的模型是否应该有更大的指标。与`metric_for_best_model`结合使用
+- problem_type (str, optional): 根据问题的性质在 [`multi_class`, `multi_label`] 中选择
+- output_dir (str, optional): 输出目录，默认为`autpnlp_results`
 
-### Train
+### 训练
 
-You can start training with the following command:
+您可以使用以下命令开始训练模型：
 
 ```python
 auto_trainer.train(
@@ -67,41 +66,42 @@ auto_trainer.train(
 ```
 Args:
 
-- num_models (int, required): number of model trials to run
-- num_gpus (str, optional): number of GPUs to use for the job. By default, this is set based on detected GPUs.
-- num_cpus (str, optional): number of CPUs to use for the job. By default, this is set based on virtual cores.
-- max_concurrent_trials (int, optional): maximum number of trials to run concurrently. Must be non-negative. If None or 0, no limit will be applied. Defaults to None.
-- time_budget_s: (int|float|datetime.timedelta, optional) global time budget in seconds after which all model trials are stopped.
-- experiment_name: (str, optional): name of the experiment. Experiment log will be stored under `<output_dir>/<experiment_name>`. Defaults to UNIX timestamp.
-- hp_overrides: (dict[str, Any], optional): Advanced users only. override the hyperparameters of every model candidate.  For example, {"TrainingArguments.max_steps": 5}.
-- custom_model_candiates: (dict[str, Any], optional): Advanced users only. Run the user-provided model candidates instead of the default model candidated from PaddleNLP. See `._model_candidates` property as an example
-- verbosity: (int, optional): controls the verbosity of the logger. Defaults to `0`, which set the logger level at INFO. To reduce the amount of logs, use `verbosity > 0` to set the logger level to WARNINGS
+- num_models (int, required): 模型试验数量
+- num_gpus (str, optional): 实验使用的 GPU 数量。默认情况下，这是根据检测到的 GPU 设置的。
+- num_cpus (str, optional): 实验使用的 CPU 数量。默认情况下，这是根据检测到的 vCPU 设置的。
+- max_concurrent_trials (int, optional): 同时运行的最大试验数。必须是非负数。如果为 None 或 0，则不应用任何限制。默认为None。
+- time_budget_s: (int|float|datetime.timedelta, optional) 以秒为单位的全局时间预算，超过时间后停止所有模型试验。
+- experiment_name: (str, optional): 实验的名称。实验日志将存储在"<output_dir>/<experiment_name>"下。默认为 UNIX 时间戳。
+- verbosity: (int, optional): 控制日志的详细程度。默认为“0”，将日志级别设置为 INFO。如果需要减少日志量，请使用 `verbosity > 0` 将日志级别设置为 WARNINGS
+- hp_overrides: (dict[str, Any], optional): （仅限高级用户）。覆盖每个候选模型的超参数。例如，`{"TrainingArguments.max_steps"：5}`。
+- custom_model_candiates: (dict[str, Any], optional): （仅限高级用户）。运行用户提供的候选模型而不 PaddleNLP 的默认候选模型。可以参考 `._model_candidates` 属性
 
-### Evaluations and Examine Results
 
-#### Examine Results
+### 评估和检查实验结果
 
-Once the experimenets conclude, you can examine the experiment results like the following, which prints a pandas DataFrame:
+#### 检查实验结果
+
+实验结束后，您可以像下面这样检查实验结果，它会打印一个 pandas DataFrame：
 
 ```
 auto_trainer.show_training_results()
 ```
 
-You can also find the experiment results under `<output_dir>/experiment_results.csv`. The identifier for the models produced by different experiments is `trial_id`, which you can find in the `DataFrame` or the csv file.
+您还可以在`<output_dir>/experiment_results.csv`下找到实验结果。不同实验产生的模型的标识符是`trial_id`，您可以在 DataFrame 或 csv 文件中找到这个字段。
 
-#### Load Previous Results
+#### 加载以前的实验结果
 
-You can recover the experiment results from a previous run (including unfinished runs) like the following:
+您可以从之前的运行（包括未完成的运行）中恢复实验结果，如下所示：
 
 ```python
 auto_trainer.load("path/to/previous/results")
 ```
 
-This enables you to use the `show_training_results` API to examine the results. Call `train()` again will override the previous results.
+这使您能够使用 `show_training_results` API 来检查结果。再次调用 train() 将覆盖之前的结果。
 
-#### Custom Evaluations
+#### 使用不同的评估数据集
 
-To evaluate on datasets other than the evaluation dataset provided to `AutoTrainerForTextClassification` at construction, you can use the
+除了使用构建 AutoTrainerForTextClassification 的时候提供的评估数据集以外，您也可以使用其他的数据集进行评估：
 
 ```
 auto_trainer.evaluate(
@@ -111,14 +111,14 @@ auto_trainer.evaluate(
 ```
 
 Args:
-- trial_id (str, optional): specify the model to be evaluated through the `trial_id`. Defaults to the best model, ranked by `metric_for_best_model`
-- eval_dataset (Dataset, optional): custom evaluation dataset and must contains the 'text_column' and 'label_column' fields. If not provided, defaults to the evaluation dataset used at construction
+- trial_id (str, optional): 通过 `trial_id` 指定要评估的模型。默认为由`metric_for_best_model`决定的最佳模型
+- eval_dataset (Dataset, optional): 自定义评估数据集，并且必须包含`text_column`和`label_column`字段。如果未提供，则默认为构建时使用的评估数据集
 
 
 
-### Export and Inference
+### 模型输出与部署
 
-To export a model for later use, do:
+如果需要导出模型供以后使用，可以使用以下的API：
 
 ```
 auto_trainer.export(
@@ -128,10 +128,10 @@ auto_trainer.export(
 ```
 
 Args:
-- export_path (str, required): the filepath for export
-- trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+- export_path (str, required): 输出路径
+- trial_id (int, required): 通过 `trial_id` 指定要评估的模型。默认为由`metric_for_best_model`决定的最佳模型
 
-We also provide a convenience method to directly convert a model to a Taskflow for inference:
+同时我们还提供了`to_taskflow()`的API，可以直接将模型转换为 `Taskflow` 进行推理：
 
 ```
 taskflow = auto_trainer.to_taskflow()
@@ -139,4 +139,4 @@ taskflow("this is a test input")
 ```
 
 Args:
-- trial_id (int, required): use the `trial_id` to select the model to export. Defaults to the best model selected by `metric_for_best_model`
+- trial_id (int, required): 通过 `trial_id` 指定要评估的模型。默认为由`metric_for_best_model`决定的最佳模型

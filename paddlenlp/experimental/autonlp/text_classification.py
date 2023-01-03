@@ -155,6 +155,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 "TrainingArguments.model_name_or_path": chinese_models,
                 "TrainingArguments.learning_rate": 5e-6,
             },
+            # Note: prompt tuning candidates not included for now due to lack of inference capability
         ]
 
     def _data_checks_and_inference(self):
