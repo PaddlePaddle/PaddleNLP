@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Union
 from paddle.static import InputSpec
 from scipy.special import expit as np_sigmoid
 
-from paddlenlp.prompt import AutoTemplate, PromptDataCollatorWithPadding
+from paddlenlp.prompt import PromptDataCollatorWithPadding, UTCTemplate
 from paddlenlp.transformers import UTC, AutoTokenizer
 
 from .task import Task
@@ -55,33 +55,40 @@ class ZeroTextClassificationTask(Task):
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json",
-        "template_config": "template_config.json",
     }
-    resouce_files_urls = {
+    resource_files_urls = {
         "utc-large": {
             "model_state": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/model_state.pdparams",
+                "a4b4693f0021ec94cdd32ecf3c5e168c",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/model_config.json",
+                "21f3fa9aa4465d4d07afb0f24f57fae4",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/vocab.txt",
+                "afc01b5680a53525df5afd7518b42b48",
             ],
             "special_tokens_map": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/special_tokens_map.json",
+                "2458e2131219fc1f84a6e4843ae07008",
             ],
             "tokenizer_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/tokenizer_config.json",
+                "dcb0f3257830c0eb1f2de47f2d86f89a",
             ],
-            "template_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/template_config.json",
+            "added_tokens.json": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/added_tokens.json",
+                "ac8532655ddc0a1ce3b8a87dda81de5b",
             ],
         },
     }
 
-    def __init__(self, task: str, model: str, question: str = None, choices: list = None, **kwargs):
+    def __init__(self, task: str, model: str = "utc-large", question: str = None, choices: list = None, **kwargs):
         super(ZeroTextClassificationTask, self).__init__(task=task, model=model, **kwargs)
+
+        print("model", self._model)
 
         self._question = "" if question is None else question
         self._choices = choices
@@ -90,9 +97,9 @@ class ZeroTextClassificationTask(Task):
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
         self._num_workers = kwargs.get("num_workers", 0)
 
+        self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
-        self._construct_model(self._task_path)
 
     def set_argument(self, argument: dict):
         for k, v in argument.items():
@@ -112,11 +119,11 @@ class ZeroTextClassificationTask(Task):
             InputSpec(shape=[None], dtype="int64", name="cls_positions"),
         ]
 
-    def _construct_model(self):
+    def _construct_model(self, model):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UTC.from_pretrained(self._task_path)
+        model_instance = UTC.from_pretrained(model)
         self._model = model_instance
         self._model.eval()
 
@@ -124,8 +131,13 @@ class ZeroTextClassificationTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._task_path)
-        self._template = AutoTemplate.load_from(self._task_path, self._tokenizer, max_length=self._max_seq_len)
+        self._tokenizer = AutoTokenizer.from_pretrained(self._model)
+        self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
+        prompt = (
+            "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True, 'position': 0}"
+            "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+        )
+        self._template = UTCTemplate(prompt, self._tokenizer, self._max_seq_len, max_position_id=511)
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]
@@ -173,14 +185,13 @@ class ZeroTextClassificationTask(Task):
         """
         inputs = self._check_input_text(inputs)
         # Get the config from the kwargs
-        collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
         tokenized_inputs = [self._template(i) for i in inputs]
         batches = [
             tokenized_inputs[idx : idx + self._batch_size] for idx in range(0, len(tokenized_inputs), self._batch_size)
         ]
         outputs = {}
         outputs["text"] = inputs
-        outputs["batches"] = [collator(batch) for batch in batches]
+        outputs["batches"] = [self._collator(batch) for batch in batches]
 
         return outputs
 

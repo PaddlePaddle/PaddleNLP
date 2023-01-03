@@ -1017,7 +1017,7 @@ ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
         "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
         "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
         "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
-        "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie/ernie_1.0_large_zh_cw.pdparams",
+        "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/utc/utc_large.pdparams",
     }
 }
 
