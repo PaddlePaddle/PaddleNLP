@@ -232,7 +232,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 Set `use_fast=True` to use C++ Tokenizer kernel to achieve 100x faster on text pre-processing. For more usage please refer to [FastTokenizer](./fast_tokenizer).
 
-#### ⚡ FasterGeneration: High Perforance Generation Library
+#### ⚡ FastGeneration: High Perforance Generation Library
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/168407831-914dced0-3a5a-40b8-8a65-ec82bf13e53c.gif" width="400">
@@ -243,10 +243,10 @@ model = GPTLMHeadModel.from_pretrained('gpt-cpm-large-cn')
 ...
 outputs, _ = model.generate(
     input_ids=inputs_ids, max_length=10, decode_strategy='greedy_search',
-    use_faster=True)
+    use_fast=True)
 ```
 
-Set `use_faster=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FasterGeneration](./faster_generation).
+Set `use_fast=True` to achieve 5x speedup for Transformer, GPT, BART, PLATO, UniLM text generation. For more usage please refer to [FastGeneration](./fast_generation).
 
 #### 🚀 Fleet: 4D Hybrid Distributed Training
 

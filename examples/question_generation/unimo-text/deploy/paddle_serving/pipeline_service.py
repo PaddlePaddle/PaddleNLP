@@ -12,18 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle_serving_server.web_service import WebService, Op
-from numpy import array
 import logging
-import numpy as np
-from paddlenlp.transformers import AutoTokenizer
+
+from infer_utils import batchify_fn, convert_example, postprocess_response
+from paddle_serving_server.web_service import Op, WebService
+
 from paddlenlp.ops.ext_utils import load
 from paddlenlp.transformers import UNIMOTokenizer
-from paddlenlp.data import Pad
-
-from infer_utils import convert_example, batchify_fn, select_sum, postprocess_response
-
-import paddle_serving_server.pipeline.operator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,7 +52,7 @@ class UnimoTextOp(Op):
     def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
         # keyname refer to export_checkpoint_client/serving_client_conf.prototxt
         ids = fetch_dict["transpose_0.tmp_0"][:, 0, :].tolist()
-        scores = fetch_dict["_generated_var_3"][:, 0].tolist()
+        # scores = fetch_dict["_generated_var_3"][:, 0].tolist()
 
         results = ["".join(postprocess_response(sample, self.tokenizer)) for sample in ids]
         new_dict = {}
@@ -72,8 +67,8 @@ class UnimoTextService(WebService):
 
 
 if __name__ == "__main__":
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
+    # Load FastGeneration lib.
+    load("FastGeneration", verbose=True)
     service = UnimoTextService(name="question_generation")
     service.prepare_pipeline_config("config.yml")
     service.run_service()
