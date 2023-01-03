@@ -37,7 +37,8 @@ declare -A Build_list
 all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
  ["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
   ["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
-  ["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 ["transformers"]=20)
+  ["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 ["transformers"]=20 \
+  ["fast_generation"]=10)
 ####################################
 # set python env
 case ${python} in
@@ -69,7 +70,7 @@ echo "python="${python}
 install_paddle(){
     echo -e "\033[35m ---- Install paddlepaddle-gpu  \033[0m"
     python -m pip install --ignore-installed --upgrade pip
-    python -m pip install -r requirements_ci.txt
+    python -m pip install -r scripts/regression/requirements_ci.txt
     python -m pip install ${paddle};
     python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
     python -c 'from visualdl import LogWriter'
@@ -121,7 +122,7 @@ upload (){
 }
 ####################################
 # get diff case
-for line in `cat model_list.txt`;do
+for line in `cat scripts/regression/model_list.txt`;do
     all_example_dict[${#all_example_dict[*]}]=$line
 done
 cd ${nlp_dir}
@@ -179,8 +180,9 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
         fi
-    elif [[ ${dir1} =~ "fast_tokenizer" ]] || [[ ${dir1} =~ "faster_generation" ]] ;then #影响编包
+    elif [[ ${dir1} =~ "fast_tokenizer" ]] || [[ ${dir1} =~ "fast_generation" ]] ;then #影响编包
         Build_list[${dir1}]="paddlenlp" # 影响编包
+        P0case_list[${#P0case_list[*]}]=fast_generation
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
     elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包

@@ -32,24 +32,21 @@ ERNIE_CTM_CONFIG = {
     "content_summary_index": 1,
     "cls_num": 2,
     "num_prompt_placeholders": 5,
-    "prompt_vocab_ids": None
+    "prompt_vocab_ids": None,
 }
 
 
 ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION = {
     "ernie-ctm": ERNIE_CTM_CONFIG,
     "wordtag": ERNIE_CTM_CONFIG,
-    "nptag": ERNIE_CTM_CONFIG
+    "nptag": ERNIE_CTM_CONFIG,
 }
 
 ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "ernie-ctm":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
-        "wordtag":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/wordtag_pos.pdparams",
-        "nptag":
-        "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/nptag.pdparams",
+        "ernie-ctm": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
+        "wordtag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/wordtag_pos.pdparams",
+        "nptag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/nptag.pdparams",
     }
 }
 
@@ -101,6 +98,7 @@ class ErnieCtmConfig(PretrainedConfig):
     """
     model_type = "ernie-ctm"
     pretrained_init_configuration = ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION
+    attribute_map = {"num_tag": "num_labels", "dropout": "classifier_dropout"}
 
     def __init__(
         self,

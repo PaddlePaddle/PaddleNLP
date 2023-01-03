@@ -12,31 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 
-import numpy as np
 import paddle
-from paddlenlp.layers.crf import LinearChainCrf
-from paddlenlp.utils.tools import compare_version
+from data_process import convert_example, load_dict
+from utils import decode
 
-if compare_version(paddle.version.full_version, "2.2.0") >= 0:
-    # paddle.text.ViterbiDecoder is supported by paddle after version 2.2.0
-    from paddle.text import ViterbiDecoder
-else:
-    from paddlenlp.layers.crf import ViterbiDecoder
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.transformers import ErnieCtmWordtagModel, ErnieCtmTokenizer
-
-from data import transfer_str_to_example, convert_example, load_dict
-from utils import decode, reset_offset
+from paddlenlp.data import Pad, Stack, Tuple
+from paddlenlp.transformers import ErnieCtmTokenizer, ErnieCtmWordtagModel
 
 # yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--params_path", type=str, default="./output/model_300/model_state.pdparams", required=True, help="The path to model parameters to be loaded.")
 parser.add_argument("--data_dir", type=str, default="./data", help="The input data dir, should contain name_category_map.json.")
-parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_len", type=int, default=64, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", type=int, default=32, help="Batch size per GPU/CPU for training.")
 parser.add_argument('--device', type=str, choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
 args = parser.parse_args()
@@ -54,7 +44,7 @@ def do_predict(data, model, tokenizer, viterbi_decoder, tags_to_idx, idx_to_tags
 
     batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
         Stack(dtype="int64"),  # seq_len
@@ -68,7 +58,7 @@ def do_predict(data, model, tokenizer, viterbi_decoder, tags_to_idx, idx_to_tags
         input_ids = paddle.to_tensor(input_ids)
         token_type_ids = paddle.to_tensor(token_type_ids)
         seq_len = paddle.to_tensor(seq_len)
-        pred_tags = model(input_ids, token_type_ids, lengths=seq_len)
+        pred_tags = model(input_ids, token_type_ids, lengths=seq_len)[0]
         all_pred_tags.extend(pred_tags.numpy().tolist())
     results = decode(data, all_pred_tags, summary_num, idx_to_tags)
     return results

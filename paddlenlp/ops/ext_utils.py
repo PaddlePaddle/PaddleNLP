@@ -12,23 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-import subprocess
-import textwrap
 import hashlib
-import inspect
-from pathlib import Path
-from setuptools import setup, Extension
-from setuptools.command.build_ext import build_ext
+import os
+import subprocess
+import sys
+import textwrap
 from distutils.dep_util import newer_group
+from pathlib import Path
 
 from paddle.utils.cpp_extension import load_op_meta_info_and_register_op
-from paddle.utils.cpp_extension.extension_utils import _jit_compile, _import_module_from_library
-from paddle.utils.cpp_extension.cpp_extension import CUDA_HOME, CppExtension, BuildExtension as PaddleBuildExtension
+from paddle.utils.cpp_extension.cpp_extension import CUDA_HOME
+from paddle.utils.cpp_extension.cpp_extension import (
+    BuildExtension as PaddleBuildExtension,
+)
+from paddle.utils.cpp_extension.cpp_extension import CppExtension
+from paddle.utils.cpp_extension.extension_utils import (
+    _import_module_from_library,
+    _jit_compile,
+)
+from setuptools import Extension
+
 from paddlenlp.utils.env import PPNLP_HOME
-from paddlenlp.utils.log import logger
 from paddlenlp.utils.file_lock import decorate as file_lock
+from paddlenlp.utils.log import logger
 
 if CUDA_HOME and not os.path.exists(CUDA_HOME):
     # CUDA_HOME is only None for Windows CPU version in paddle `find_cuda_home`.
@@ -115,7 +121,7 @@ class CMakeExtension(Extension):
 class FasterTransformerExtension(CMakeExtension):
     def __init__(self, name, source_dir=None, need_parallel=False):
         super(FasterTransformerExtension, self).__init__(name, source_dir)
-        self.sources = _get_files(os.path.join(self.source_dir, "faster_transformer", "src")) + _get_files(
+        self.sources = _get_files(os.path.join(self.source_dir, "fast_transformer", "src")) + _get_files(
             os.path.join(self.source_dir, "patches", "FasterTransformer")
         )
         self._std_out_handle = None
@@ -131,20 +137,20 @@ class FasterTransformerExtension(CMakeExtension):
         if CUDA_HOME is None:  # GPU only
             # TODO(guosheng): should we touch a dummy file or add a quick exit
             # method to avoid meaningless process in `load`
-            logger.warning("FasterTransformer is not available because CUDA can not be found.")
+            logger.warning("FastGeneration is not available because CUDA can not be found.")
             raise NotImplementedError
-        # TODO(guosheng): Multiple -std seems be passed in FasterTransformer,
+        # TODO(guosheng): Multiple -std seems be passed in FastGeneration,
         # which is not allowed by NVCC. Fix it later.
         self.cmake_args = [f"-DPY_CMD={sys.executable}"]
         # `GetCUDAComputeCapability` is not exposed yet, and detect CUDA/GPU
         # version in cmake file.
         # self.cmake_args += [f"-DSM={self.sm}"] if self.sm is not None else []
-        self.cmake_args += [f"-DWITH_GPT=ON"]
+        self.cmake_args += ["-DWITH_GPT=ON"]
         if self.need_parallel:
-            self.cmake_args += [f"-DWITH_PARALLEL=ON"]
+            self.cmake_args += ["-DWITH_PARALLEL=ON"]
         try:
             super(FasterTransformerExtension, self).build_with_command(ext_builder)
-            # FasterTransformer cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
+            # FastGeneration cmake file resets `CMAKE_LIBRARY_OUTPUT_DIRECTORY`
             # to `CMAKE_BINARY_DIR/lib`, thus copy the lib back to `build_ext.build_lib`.
             # Maybe move this copy to CMakeList.
             # `copy_tree` or `copy_file`, boost lib might be included
@@ -153,7 +159,7 @@ class FasterTransformerExtension(CMakeExtension):
             # when it is in the dir of paddlenlp package.
             # os.remove(ext_builder.build_temp)
         except Exception as e:
-            logger.warning("FasterTransformer is not available due to build errors.")
+            logger.warning("FastGeneration is not available due to build errors.")
             raise e
 
     def get_target_filename(self):
@@ -188,7 +194,7 @@ class BuildExtension(PaddleBuildExtension):
 
 
 EXTENSIONS = {
-    "FasterTransformer": FasterTransformerExtension,
+    "FastGeneration": FasterTransformerExtension,
     # NOTE: Since model parallel code is supported by definitions, to avoid
     # performance degrading on non-parallel mode, we use a separated lib for
     # model parallel.
