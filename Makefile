@@ -35,7 +35,7 @@ lint:
 test: unit-test
 
 unit-test:
-	PYTHONPATH=$(shell pwd) pytest \
+	PYTHONPATH=$(shell pwd) pytest -x \
 		-n auto --cov paddlenlp \
 		--cov-report xml:coverage.xml
 
