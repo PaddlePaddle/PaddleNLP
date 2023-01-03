@@ -9,7 +9,7 @@
 
 ### 快速开始
 
-以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark 的[TNEWS数据集](https://github.com/aceimnorstuvwxz/toutiao-text-classfication-dataset)上进行文本分类任务的C++预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。
+以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark 的[AFQMC数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务的C++预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。示例中的模型是ERNIE 3.0在`AFQMC数据集`微调后导出得到的部署模型。
 
 ```bash
 mkdir build
@@ -20,15 +20,11 @@ tar xvf fastdeploy-linux-x64-x.x.x.tgz
 cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
-# 下载TNEWS数据集的微调后的ERNIE 3.0模型以及词表
-wget https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-tnews.tgz
-tar xvfz ernie-3.0-medium-zh-tnews.tgz
-
 # CPU 推理
-./seq_cls_infer_demo --model_dir ernie-3.0-medium-zh-tnews --device cpu --backend paddle
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --vocab_path ../../../best_models/afqmc/vocab.txt --device cpu --backend paddle
 
 # GPU 推理
-./seq_cls_infer_demo --model_dir ernie-3.0-medium-zh-tnews --device gpu --backend paddle
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --vocab_path ../../../best_models/afqmc/vocab.txt --device gpu --backend paddle
 
 ```
 
@@ -52,10 +48,11 @@ label: news_entertainment confidence:0.9522
 
 | 参数 |参数说明 |
 |----------|--------------|
-|--model_dir | 指定部署模型的目录， |
+|--model_dir | 指定部署模型的目录 |
+|--vocab_path| 指定的模型词表路径 |
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
-|--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--device | 运行的设备，可选范围: ['cpu', 'kunlunxin', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 

@@ -11,16 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <array>
+#include <iostream>
+#include <sstream>
+#include <vector>
+
 #include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
 #include "fastdeploy/function/reduce.h"
 #include "fastdeploy/function/softmax.h"
 #include "fastdeploy/runtime.h"
 #include "fastdeploy/utils/path.h"
 #include "gflags/gflags.h"
-#include <array>
-#include <iostream>
-#include <sstream>
-#include <vector>
 
 using namespace paddlenlp;
 using namespace fast_tokenizer::tokenizers_impl;
@@ -32,9 +33,11 @@ const char sep = '/';
 
 DEFINE_string(model_dir, "", "Directory of the inference model.");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
-DEFINE_string(device, "cpu",
-              "Type of inference device, support 'cpu' or 'gpu'.");
-DEFINE_string(backend, "paddle",
+DEFINE_string(device,
+              "cpu",
+              "Type of inference device, support 'cpu', 'kunlunxin' or 'gpu'.");
+DEFINE_string(backend,
+              "paddle",
               "The inference runtime backend, support: ['onnx_runtime', "
               "'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']");
 DEFINE_int32(batch_size, 1, "The batch size of data.");
@@ -56,7 +59,15 @@ void PrintUsage() {
 }
 
 bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
-  if (FLAGS_device == "gpu") {
+  std::string model_path = FLAGS_model_dir + sep + "model.pdmodel";
+  std::string param_path = FLAGS_model_dir + sep + "model.pdiparams";
+  fastdeploy::FDINFO << "model_path = " << model_path
+                     << ", param_path = " << param_path << std::endl;
+  option->SetModelPath(model_path, param_path);
+  if (FLAGS_device == "kunlunxin") {
+    option->UseKunlunXin();
+    return true;
+  } else if (FLAGS_device == "gpu") {
     option->UseGpu();
   } else if (FLAGS_device == "cpu") {
     option->UseCpu();
@@ -81,10 +92,12 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, 1},
+    option->SetTrtInputShape("input_ids",
+                             {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
-    option->SetTrtInputShape("token_type_ids", {1, 1},
+    option->SetTrtInputShape("token_type_ids",
+                             {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
@@ -98,15 +111,11 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
                         << FLAGS_backend << "'" << std::endl;
     return false;
   }
-  std::string model_path = FLAGS_model_dir + sep + "infer.pdmodel";
-  std::string param_path = FLAGS_model_dir + sep + "infer.pdiparams";
-  fastdeploy::FDINFO << "model_path = " << model_path
-                     << ", param_path = " << param_path << std::endl;
-  option->SetModelPath(model_path, param_path);
   return true;
 }
 
-bool BatchFyTexts(const std::vector<std::string>& texts, int batch_size,
+bool BatchFyTexts(const std::vector<std::string>& texts,
+                  int batch_size,
                   std::vector<std::vector<std::string>>* batch_texts) {
   for (int idx = 0; idx < texts.size(); idx += batch_size) {
     int rest = texts.size() - idx;
@@ -175,10 +184,10 @@ struct ErnieForSequenceClassificationPredictor {
     for (int i = 0; i < encodings.size(); ++i) {
       auto&& curr_input_ids = encodings[i].GetIds();
       auto&& curr_type_ids = encodings[i].GetTypeIds();
-      std::copy(curr_input_ids.begin(), curr_input_ids.end(),
-                input_ids_ptr + start);
-      std::copy(curr_type_ids.begin(), curr_type_ids.end(),
-                type_ids_ptr + start);
+      std::copy(
+          curr_input_ids.begin(), curr_input_ids.end(), input_ids_ptr + start);
+      std::copy(
+          curr_type_ids.begin(), curr_type_ids.end(), type_ids_ptr + start);
       start += seq_len;
     }
     return true;
@@ -226,17 +235,14 @@ struct ErnieForSequenceClassificationPredictor {
 };
 
 void PrintResult(const std::vector<SeqClsResult>& seq_cls_results,
-                 const std::vector<std::string>& data) {
-  static std::vector<std::string> label_list{
-      "news_story",   "news_culture",     "news_entertainment", "news_sports",
-      "news_finance", "news_house",       "news_car",           "news_edu",
-      "news_tech",    "news_military",    "news_travel",        "news_world",
-      "news_stock",   "news_agriculture", "news_game"};
+                 const std::vector<std::string>& data,
+                 const std::vector<std::string>& data_pair) {
+  static std::vector<std::string> label_list{"Similar", "Not similar"};
   for (int i = 0; i < data.size(); ++i) {
-    std::cout << "input data: " << data[i] << std::endl;
+    std::cout << "input data: " << data[i] << ", " << data_pair[i] << std::endl;
     std::cout << "seq cls result: " << std::endl;
     std::cout << "label: " << label_list[seq_cls_results[i].label]
-              << " confidence:" << seq_cls_results[i].confidence << std::endl;
+              << " confidence: " << seq_cls_results[i].confidence << std::endl;
     std::cout << "-----------------------------" << std::endl;
   }
 }
@@ -261,20 +267,24 @@ int main(int argc, char* argv[]) {
   }
   ErnieFastTokenizer tokenizer(vocab_path);
   tokenizer.EnableTruncMethod(
-      FLAGS_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      FLAGS_max_length,
+      0,
+      fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
 
   ErnieForSequenceClassificationPredictor predictor(option, tokenizer);
 
   std::vector<SeqClsResult> seq_cls_results;
-  std::vector<std::string> texts_ds = {
-      "未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？",
-      "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"};
-  std::vector<std::vector<std::string>> batch_texts;
+  std::vector<std::string> texts_ds = {"花呗收款额度限制",
+                                       "花呗支持高铁票支付吗"};
+  std::vector<std::string> texts_pair_ds = {"收钱码，对花呗支付的金额有限制吗",
+                                            "为什么友付宝不支持花呗付款"};
+  std::vector<std::vector<std::string>> batch_texts, batch_texts_pair;
   BatchFyTexts(texts_ds, FLAGS_batch_size, &batch_texts);
+  BatchFyTexts(texts_pair_ds, FLAGS_batch_size, &batch_texts_pair);
   for (int bs = 0; bs < batch_texts.size(); ++bs) {
-    predictor.Predict(batch_texts[bs], /* text_pair = */ {}, &seq_cls_results);
-    PrintResult(seq_cls_results, batch_texts[bs]);
+    predictor.Predict(batch_texts[bs], batch_texts_pair[bs], &seq_cls_results);
+    PrintResult(seq_cls_results, batch_texts[bs], batch_texts_pair[bs]);
   }
   return 0;
 }
