@@ -60,22 +60,31 @@ XNLI 是 MNLI 的子集，并且已被翻译成14种不同的语言（包含一�
 
 ```shell
 python run_classifier.py \
+    --output_dir output \
+    --do_train True \
+    --do_eval True \
     --task_type cross-lingual-transfer \
-    --batch_size 16 \
+    --per_device_train_batch_size 16 \
     --model_name_or_path ernie-m-base \
     --save_steps 12272 \
-    --output_dir output
+    --num_train_epochs 5 \
+    --warmup_ratio 0.1
 ```
 
 #### 多卡训练
 
 ```shell
-python -m paddle.distributed.launch --gpus 0,1 --log_dir output run_classifier.py \
+python -m paddle.distributed.launch --gpus 0,1 run_classifier.py \
+    --output_dir output \
+    --do_train True \
+    --do_eval True \
     --task_type cross-lingual-transfer \
-    --batch_size 16 \
+    --per_device_train_batch_size 16 \
     --model_name_or_path ernie-m-base \
     --save_steps 12272 \
-    --output_dir output
+    --num_train_epochs 5 \
+    --warmup_ratio 0.1 \
+    --remove_unused_columns False
 ```
 
 在XNLI数据集上微调 cross-lingual-transfer 类型的自然语言推断任务后，在测试集上有如下结果
@@ -100,6 +109,7 @@ python -m paddle.distributed.launch --gpus 0,1 --log_dir output run_classifier.p
 | XLM-R Large | 89.1 | 85.1 | 86.6 | 85.7 | 85.3 | 85.9 | 83.5 | 83.2 | 83.1 | 83.7 | 81.5 | **83.7** | **81.6** | 78.0 | 78.1 | 83.6 |
 | VECO Large | 88.9 | 82.4 | 86.0 | 84.7 | 85.3 | 86.2 | **85.8** | 80.1 | 83.0 | 77.2 | 80.9 | 82.8 | 75.3 | **83.1** | **83.0** | 83.0 |
 | **ERNIE-M Large** | **89.5** | **86.5** | **86.9** | **86.1** | **86.0** | **86.8** | 84.1 | **83.8** | **84.1** | **84.5** | **82.1** | 83.5 | 81.1 | 79.4 | 77.9 | **84.2** |
+
 ## 参考论文
 
  [Ouyang X ,  Wang S ,  Pang C , et al. ERNIE-M: Enhanced Multilingual Representation by Aligning Cross-lingual Semantics with Monolingual Corpora[J].  2020.](https://arxiv.org/abs/2012.15674)
