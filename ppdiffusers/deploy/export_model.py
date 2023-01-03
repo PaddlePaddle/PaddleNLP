@@ -28,7 +28,6 @@ from ppdiffusers.fastdeploy_utils import FastDeployRuntimeModel
 
 
 def convert_ppdiffusers_pipeline_to_fastdeploy_pipeline(model_path: str, output_path: str, sample: bool = False):
-    paddle.set_device("cpu")
     pipeline = StableDiffusionPipeline.from_pretrained(model_path, safety_checker=None, feature_extractor=None)
     output_path = Path(output_path)
 

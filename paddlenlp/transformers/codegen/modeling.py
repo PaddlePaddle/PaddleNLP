@@ -21,8 +21,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Layer
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -295,16 +294,14 @@ class CodeGenPreTrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.transformer.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
         elif isinstance(layer, nn.LayerNorm):
             layer.bias.set_value(paddle.zeros_like(layer.bias))
             layer.weight.set_value(paddle.full_like(layer.weight, 1.0))
-            layer._epsilon = getattr(self, "layer_norm_epsilon", 1e-05)
+            layer._epsilon = self.config.layer_norm_epsilon
         if isinstance(layer, nn.Linear) and layer.bias is not None:
             layer.bias.set_value(paddle.zeros_like(layer.bias))
 
@@ -551,27 +548,25 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterCodeGen
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the faster version of GPTJ")
+            raise AttributeError("'beam_search' is not supported yet in the fast version of GPTJ")
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.transformer.config.n_embd // self.transformer.config.n_head
         if size_per_head not in [32, 64, 80, 96, 128, 160, 192, 224, 256]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPTJ" % size_per_head
+                "'size_per_head = %d' is not supported yet in the fast version of GPTJ" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
-        self._faster_entry = FasterCodeGen(
-            self, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding
-        ).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        self._fast_entry = FasterCodeGen(self, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def prepare_inputs_for_generation(self, input_ids, cache=None, **kwargs):
         # only last token for inputs_ids if past is defined in kwargs
@@ -696,7 +691,4 @@ class CodeGenForCausalLM(CodeGenPreTrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)

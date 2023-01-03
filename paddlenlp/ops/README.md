@@ -2,12 +2,12 @@
 
 ## 子目录结构
 
-以下是 FasterTransformer 的高性能加速自定义 op 相关文件的目录结构。
+以下是 FastGeneration 的高性能加速自定义 op 相关文件的目录结构。
 
 ```text
 .
-├── faster_transformer/       # 基于自定义 op FasterTransformer 子路径
-  ├── sample/                 # 基于 FasterTransformer 使用样例
+├── fast_transformer/         # 基于自定义 op FastGeneration 子路径
+  ├── sample/                 # 基于 FastGeneration 使用样例
   ├── src/                    # 自定义 OP C++ CUDA 代码
   └── transformer/            # Python API 封装脚本
 └── patches                   # 自定义 op 第三方库自定义补丁代码
@@ -30,24 +30,24 @@
 
 ## 快速开始
 
-我们实现了基于 FasterTransformer 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FasterTransformer 自定义 op 的方式，包括 op 的编译与使用。
+我们实现了基于 FastGeneration 的自定义 op 的接入，用于加速文本生成模型在 GPU 上的预测性能。接下来，我们将分别介绍基于 Python 动态图和预测库使用 FastGeneration 自定义 op 的方式，包括 op 的编译与使用。
 
 ## Python 动态图使用自定义 op
 
 ### JIT 自动编译
 
-目前当基于动态图使用 FasterTransformer 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
+目前当基于动态图使用 FastGeneration 预测加速自定义 op 时，PaddleNLP 提供了 Just In Time 的自动编译，在一些 API 上，用户无需关注编译流程，可以直接执行对应的 API，程序会自动编译需要的第三方库。
 
 以 Transformer 为例，可以直接调用 `TransformerGenerator()` 这个 API，程序会自动编译。
 
 目前支持 JIT 的预测加速 API 有：
-* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./faster_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/faster_transformer/)。
-* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../model_zoo/gpt/faster_gpt/)。
+* `FasterTransformer()/TransformerGenerator()`: 支持 Transformer 模型的预测加速功能。使用示例可以参考 [Transformer 预测加速使用示例-sample](./fast_transformer/sample/decoding_sample.py)，[Transformer 预测加速使用示例-机器翻译](../../examples/machine_translation/transformer/fast_transformer/)。
+* `FasterGPT()`: 支持 GPT 模型的预测加速功能。使用示例可以参考 [GPT 预测加速使用示例](../../model_zoo/gpt/fast_gpt/)。
 * `FasterUnifiedTransformer()`: 支持 UnifiedTransformer 模型的预测加速功能。使用示例可以参考 [UnifiedTransformer 预测加速使用示例](../../examples/dialogue/unified_transformer/) 以及 PLATO-XL 的使用示例可以参考 [PLATO-XL 11B 使用示例](../../examples/dialogue/plato-xl/)。
 * `FasterUNIMOText()`: 支持 UNIMOText 模型预测加速功能。
   * 使用示例可以参考 [UNIMOText 预测加速使用示例](../../faster_generation/samples/unimo_text_sample.py)。
-  * 同样，我们提供了动转静以及 Paddle Inference 使用的示例，详细可以参考 [动转静导出](./faster_transformer/sample/unimo_text_export_model_sample.py) 和 [Paddle Inference 使用示例](./faster_transformer/sample/unimo_text_inference.py)。
-* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./faster_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
+  * 同样，我们提供了动转静以及 Paddle Inference 使用的示例，详细可以参考 [动转静导出](./fast_transformer/sample/unimo_text_export_model_sample.py) 和 [Paddle Inference 使用示例](./fast_transformer/sample/unimo_text_inference.py)。
+* `FasterBART()`: 支持 BART 模型预测加速功能。使用示例可以参考 [BART 预测加速使用示例-sample](./fast_transformer/sample/bart_decoding_sample.py)，[BART 预测加速使用示例-文本摘要](../../examples/text_summarization/bart)。
 
 具体使用方法可以参考 API 文档或是使用示例。
 
@@ -94,7 +94,7 @@ cd ../
 * `-DWITH_BART`: 是否编译带有 BART 支持的相关 lib。若使用，需要加上 `-DWITH_BART=ON`。默认为 ON。
 * `-DWITH_DECODER`: 是否编译带有 decoder 优化的 lib。默认为 ON。
 
-最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FasterTransformer decoding 执行的库。
+最终，编译会在 `./build/lib/` 路径下，产出 `libdecoding_op.so`，即需要的 FastGeneration decoding 执行的库。
 
 ### 使用 Transformer decoding 高性能推理
 
@@ -128,7 +128,7 @@ transformer = FasterTransformer(
     use_fp16_decoding=args.use_fp16_decoding)
 ```
 
-更详细的例子可以参考 `./faster_transformer/sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./fast_transformer/sample/decoding_sample.py` 以及 `./sample/encoder_decoding_sample.py`，我们提供了更详细用例。
 
 #### Transformer decoding 示例代码
 
@@ -139,7 +139,7 @@ export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 ./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 0
-python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
+python ./fast_transformer/sample/decoding_sample.py --config ./fast_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so
 ```
 
 使用 PaddlePaddle 仅执行 decoding 测试（float16）：
@@ -150,14 +150,14 @@ export CUDA_VISIBLE_DEVICES=0
 export FLAGS_fraction_of_gpu_memory_to_use=0.1
 # 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
 ./build/third-party/build/fastertransformer/bin/decoding_gemm 32 4 8 64 30000 32 512 1
-python ./faster_transformer/sample/decoding_sample.py --config ./faster_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
+python ./fast_transformer/sample/decoding_sample.py --config ./fast_transformer/sample/config/decoding.sample.yaml --decoding_lib ./build/lib/libdecoding_op.so --use_fp16_decoding
 ```
 
 其中，`decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 
 ### 使用 GPT-2 decoding 高性能推理
 
-与 `FasterTransformer` 类似，可以通过一下方式调用 GPT-2 相关优化：
+与 `FasterTransformer` API 类似，可以通过一下方式调用 GPT-2 相关优化：
 
 ``` python
 from paddlenlp.ops import FasterGPT
@@ -182,7 +182,7 @@ gpt = FasterGPT(
 
 若当前环境下没有需要的自定义 op 的动态库，将会使用 JIT 自动编译需要的动态库。如果需要自行编译自定义 op 所需的动态库，可以参考前文所述完成编译。编译好后，使用 `FasterGPT(decoding_lib="/path/to/lib", ...)` 可以完成导入。
 
-更详细的例子可以参考 `./faster_transformer/sample/gpt_sample.py`，我们提供了更详细用例。
+更详细的例子可以参考 `./fast_transformer/sample/gpt_sample.py`，我们提供了更详细用例。
 
 #### GPT-2 decoding 示例代码
 
@@ -190,7 +190,7 @@ gpt = FasterGPT(
 
 ``` sh
 export CUDA_VISIBLE_DEVICES=0
-python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_length 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
+python ./fast_transformer/sample/gpt_sample.py --model_name_or_path gpt2-medium-en --batch_size 1 --topk 4 --topp 0.0 --max_length 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0
 ```
 
 其中，各个选项的意义如下：
@@ -215,7 +215,7 @@ python ./faster_transformer/sample/gpt_sample.py --model_name_or_path gpt2-mediu
 
 #### PaddleNLP 准备
 
-首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FasterTransformer 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
+首先，因为需要基于当前环境重新编译，当前的 paddlenlp 的 python 包里面并不包含 FastGeneration 相关 lib，需要从源码自行编译，可以直接使用 Python 的 package 下的 paddlenlp，或是可从 github 克隆一个 PaddleNLP，并重新编译:
 
 以下以从 github 上 clone 一个新版 PaddleNLP 为例:
 
@@ -257,7 +257,7 @@ cd ../
     └── threadpool/
   └── version.txt
   ```
-* `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/faster_transformer/src/` 的相对路径。
+* `-DDEMO`: 说明预测库使用 demo 的位置。比如指定 -DDEMO=./demo/transformer_e2e.cc 或是 -DDEMO=./demo/gpt.cc。最好使用绝对路径，若使用相对路径，需要是相对于 `PaddleNLP/paddlenlp/ops/fast_transformer/src/` 的相对路径。
 * `-DSM`: 是指的所用 GPU 的 compute capability，建议不使用该选项设置，未设置时将自动检测。如要设置，需根据 [compute capability](https://developer.nvidia.com/zh-cn/cuda-gpus#compute) 进行设置，如 V100 时设置 `-DSM=70` 或 T4 时设置 `-DSM=75`。
 * `-DWITH_GPT`: 是否编译带有 GPT 相关的 lib。若使用 GPT-2 高性能推理，需要加上 `-DWITH_GPT=ON`。默认为 OFF。
 * `-DWITH_UNIFIED`: 是否编译带有 Unified Transformer 或是 UNIMOText 相关的 lib。若使用，需要加上 `-DWITH_UNIFIED=ON`。默认为 ON。
@@ -290,14 +290,14 @@ cd bin/
 * `decoding_gemm` 不同参数的意义可以参考 [FasterTransformer 文档](https://github.com/NVIDIA/FasterTransformer/tree/v3.1#execute-the-decoderdecoding-demos)。这里提前执行 `decoding_gemm`，可以在当前路径下生成一个 config 文件，里面会包含针对当前 decoding 部分提供的配置下，性能最佳的矩阵乘的算法，并在执行的时候读入这个数据。
 * `DATA_HOME` 则是 `paddlenlp.utils.env.DATA_HOME` 返回的路径。
 
-预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/faster_transformer/README.md` 文档中所记述的方式导出。
+预测所需要的模型文件，可以通过 `PaddleNLP/examples/machine_translation/transformer/fast_transformer/README.md` 文档中所记述的方式导出。
 
 #### 执行 GPT decoding on PaddlePaddle
 
-如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./faster_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
+如果需要使用 Paddle Inference 预测库针对 GPT 进行预测，首先，需要导出预测模型，可以通过 `./fast_transformer/sample/gpt_export_model_sample.py` 脚本获取预测库用模型，执行方式如下所示：
 
 ``` sh
-python ./faster_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en  --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
+python ./fast_transformer/sample/gpt_export_model_sample.py --model_name_or_path gpt2-medium-en  --topk 4 --topp 0.0 --max_out_len 32 --start_token "<|endoftext|>" --end_token "<|endoftext|>" --temperature 1.0 --inference_model_dir ./infer_model/
 ```
 
 各个选项的意义与上文的 `gpt_sample.py` 的选项相同。额外新增一个 `--inference_model_dir` 选项用于指定保存的模型文件、词表等文件。
