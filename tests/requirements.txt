@@ -1,3 +1,5 @@
 parameterized
 sentencepiece
 regex
+torch
+transformers
