@@ -252,9 +252,6 @@ class StateDictNameMapping:
 
     slots: list[str] = None
 
-    def __post_init__(self):
-        self.slots = self.parse_slots(self.source_name)
-
     def should_transpose(self) -> bool:
         return self.action == "transpose"
 
@@ -278,19 +275,6 @@ class StateDictNameMapping:
             assert len(shape) == 3
             return np.reshape(tensor, [shape[0], -1])
         return tensor
-
-    @staticmethod
-    def parse_slots(text: str):
-        left_char, right_char = "{", "}"
-
-        slots = []
-        while left_char in text:
-            left_index = text.index(left_char)
-            right_index = text.index(right_char)
-            slots.append(text[left_index : right_index + len(right_char)])
-            text = text[right_index + len(right_char) :]
-
-        return slots
 
     def matched(self, text: str) -> bool:
         """check whether the layer_name match the current pattern
@@ -495,9 +479,8 @@ class LogitHooker:
 class Converter(ABC):
     num_layer_regex = r"\.\d+\."
 
-    def __init__(self, input_dir: str, output_dir: str | None = None):
+    def __init__(self, input_dir: str):
         self.input_dir = input_dir
-        self.output_dir = output_dir or input_dir
 
     @classmethod
     def get_num_layer(cls, state_dict: Union[List[str], Dict[str, ndarray]]) -> Optional[int]:
@@ -532,7 +515,7 @@ class Converter(ABC):
             input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
             output_dir (str): the output dir
         """
-        os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.input_dir, exist_ok=True)
 
         # 1. get pytorch weight file
         weight_file = os.path.join(self.input_dir, "pytorch_model.bin")
@@ -549,8 +532,8 @@ class Converter(ABC):
 
         architectures = config.get("architectures", [])
         state_dict = load_torch(weight_file)
-        num_layer = self.get_num_layer(state_dict)
-        name_mappings = self.get_name_mapping(num_layer, architectures)
+        num_layers = self.get_num_layer(state_dict)
+        name_mappings = self.get_name_mapping(num_layers, architectures)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())
@@ -603,10 +586,6 @@ class LogitComparer(Converter):
     # change this attribute to map the configuration
     config_fields_to_be_removed: List[str] = ["transformers_version"]
     architectures: Dict[str, Type[PretrainedModel]] = {}
-    try_compare_logits: bool = True
-
-    # try to compare weights between two paddle model
-    try_compare_weight: bool = True
 
     def get_paddle_pytorch_model_classes(self) -> Tuple[object, object]:
         """return the [PaddleModelClass, PytorchModelClass] to
@@ -702,21 +681,18 @@ class LogitComparer(Converter):
 
         model_state_saver.summary()
 
-    def compare_logits(self, paddle_pretrained_dir: str, pytorch_pretrained_dir: str) -> bool:
+    def compare_logits(self) -> bool:
         """compare the logit of pytorch & paddle model
 
-        Args:
-            paddle_pretrained_dir (str): the pretrained_dir of paddle model which should contains pytorch_model.bin & config.json file
-            pytorch_pretrained_dir (str): the pretrained_dir of pytorch model which should contains pytorch_model.bin & config.json file
         Returns:
             bool: if the logits is absolutly same
         """
         PaddleModel, PytorchModel = self.get_paddle_pytorch_model_classes()
-        paddle_model = PaddleModel.from_pretrained(paddle_pretrained_dir)
+        paddle_model = PaddleModel.from_pretrained(self.input_dir)
 
         # 0. init the name_mapping & tensor_info_saver & logit_hooker
-        num_layer = self.get_num_layer(list(paddle_model.state_dict().keys()))
-        name_mappings = self.get_name_mapping(num_layer, paddle_model.config["architectures"])
+        num_layers = self.get_num_layer(list(paddle_model.state_dict().keys()))
+        name_mappings = self.get_name_mapping(num_layers, paddle_model.config["architectures"])
         tensor_info_saver = TensorInfoSaver()
 
         logit_hooker = LogitHooker(name_mappings, tensor_info_saver)
@@ -739,7 +715,7 @@ class LogitComparer(Converter):
         # 2. get the logits of pytorch model
         import torch
 
-        pytorch_model = PytorchModel.from_pretrained(pytorch_pretrained_dir)
+        pytorch_model = PytorchModel.from_pretrained(self.input_dir)
         logit_hooker.register_pytorch_model_hooks(pytorch_model)
 
         pytorch_model.eval()
@@ -757,7 +733,7 @@ class LogitComparer(Converter):
         # 3. compare the logits
         result = allclose(paddle_logits[1:4], pytorch_logits[1:4], atol=1e-4)
 
-        if not result and self.try_compare_logits:
+        if not result:
             print("============================== compare model state dict ==============================")
 
             self.compare_model_state_dicts(paddle_model_state_dict, pytorch_model_state_dict, name_mappings)
@@ -783,7 +759,7 @@ class LogitComparer(Converter):
 
         # 2. try to compare logits between paddle & pytorch model
         if is_torch_available() and is_transformers_available():
-            result = self.compare_logits(paddle_pretrained_dir=self.input_dir, pytorch_pretrained_dir=self.input_dir)
+            result = self.compare_logits()
             if result is True:
                 logger.info("the logits between pytorch model and paddle model is absolutly same")
             else:

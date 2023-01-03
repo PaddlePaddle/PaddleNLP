@@ -113,7 +113,7 @@ class BertConverter(Converter):
 
         # downstream mappings
         if "BertForQuestionAnswering" in architectures:
-            bert_model_mappings.append(
+            bert_model_mappings.extend(
                 [["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]]
             )
 
