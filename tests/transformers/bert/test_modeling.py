@@ -39,7 +39,7 @@ from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils import install_package, uninstall_package
 
-from ...testing_utils import slow
+from ...testing_utils import require_package, slow
 from ..test_configuration_common import ConfigTester
 from ..test_modeling_common import (
     ModelTesterMixin,
@@ -585,6 +585,19 @@ class BertCompatibilityTest(unittest.TestCase):
 
         model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased", dropout=0.3)
         self.assertEqual(model.dropout.p, 0.3)
+
+    @require_package("transformers", "torch")
+    def test_bert_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            model: BertModel = BertModel.from_pretrained(
+                "hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir, from_hf_hub=True
+            )
+
+            word_embedding = model.get_input_embeddings().weight
+            expected_slice = paddle.to_tensor(
+                [[-0.03694217, 0.04529607, 0.00205900], [0.01189871, 0.03520557, 0.01278174]]
+            )
+            self.assertTrue(paddle.allclose(word_embedding[1:3, 1:4], expected_slice, atol=1e-4))
 
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):

@@ -18,7 +18,6 @@ import inspect
 import json
 import os
 import re
-from abc import ABC
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
@@ -30,8 +29,8 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.transformers import PretrainedModel
+from paddlenlp.utils.env import PYTORCH_WEIGHT_FILE_NAME
 from paddlenlp.utils.import_utils import (
-    import_module,
     is_package_available,
     is_torch_available,
     is_transformers_available,
@@ -96,26 +95,6 @@ def compare_model_weights(first_state_dict: Dict[str, ndarray], second_state_dic
         if not is_close:
             mismatched_keys.append(key)
     return mismatched_keys
-
-
-def load_all_converters() -> List[Type[Converter]]:
-    """load all sub-converter class
-
-    Returns:
-        List[Type[Converter]]: the classes of Converter
-    """
-    transformer_module = import_module("paddlenlp.transformers")
-
-    converter_classes: List[Type[Converter]] = []
-    for obj_name in dir(transformer_module):
-        if not obj_name.endswith("Converter"):
-            continue
-
-        obj = getattr(transformer_module, obj_name, None)
-        if obj is not None and issubclass(obj, Converter):
-            converter_classes.append(obj)
-
-    return converter_classes
 
 
 def state_dict_contains_prefix(state_dict: Dict[str, ndarray], prefix: str) -> bool:
@@ -476,14 +455,12 @@ class LogitHooker:
         self.tensor_info_saver.summary()
 
 
-class Converter(ABC):
+class Convertible:
     num_layer_regex = r"\.\d+\."
-
-    def __init__(self, input_dir: str):
-        self.input_dir = input_dir
+    name_mappings: Callable[[dict], List[StateDictNameMapping]] | None = None
 
     @classmethod
-    def get_num_layer(cls, state_dict: Union[List[str], Dict[str, ndarray]]) -> Optional[int]:
+    def _get_num_layer(cls, state_dict: Union[List[str], Dict[str, ndarray]]) -> Optional[int]:
         """get num layer size from state_dict
 
         Args:
@@ -504,25 +481,22 @@ class Converter(ABC):
             return None
         return max(numbers) + 1
 
-    def on_converted(self):
-        """hook method for logit-comparer"""
-        pass
-
-    def convert(self) -> None:
+    @classmethod
+    def convert(cls, input_dir: str) -> None:
         """the entry of converting config and converting model file
 
         Args:
             input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
             output_dir (str): the output dir
         """
-        os.makedirs(self.input_dir, exist_ok=True)
+        os.makedirs(input_dir, exist_ok=True)
 
         # 1. get pytorch weight file
-        weight_file = os.path.join(self.input_dir, "pytorch_model.bin")
+        weight_file = os.path.join(input_dir, PYTORCH_WEIGHT_FILE_NAME)
         if not os.path.exists(weight_file):
             raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
 
-        config_file = os.path.join(self.input_dir, "config.json")
+        config_file = os.path.join(input_dir, "config.json")
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"config file<{weight_file}> not found")
 
@@ -530,10 +504,8 @@ class Converter(ABC):
         with open(config_file, "r", encoding="utf-8") as f:
             config = json.load(f)
 
-        architectures = config.get("architectures", [])
         state_dict = load_torch(weight_file)
-        num_layers = self.get_num_layer(state_dict)
-        name_mappings = self.get_name_mapping(num_layers, architectures)
+        name_mappings = cls._get_name_mappings(config)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())
@@ -550,15 +522,16 @@ class Converter(ABC):
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        paddle.save(state_dict, os.path.join(self.input_dir, "model_state.pdparams"))
-        self.on_converted()
+        model_weight_file = os.path.join(input_dir, "model_state.pdparams")
+        paddle.save(state_dict, model_weight_file)
+        return state_dict
 
-    def get_name_mapping(self, num_layers: int, architectures: list[str]) -> List[StateDictNameMapping]:
+    @classmethod
+    def _get_name_mappings(cls, config: dict) -> List[StateDictNameMapping]:
         """get name mapping of PretrainedModel
 
         Args:
-            num_layers (int): the config or number of transformer layers. Defaults to None.
-            architectures (): the architectures or pretrained model. Defaults to None.
+            config (dict): the configuration of name-mapping
 
         Raises:
             NotImplementedError:
@@ -569,7 +542,7 @@ class Converter(ABC):
         raise NotImplementedError
 
 
-class LogitComparer(Converter):
+class LogitComparer:
     """Model Weight Converter for developer to convert pytorch/tensorflow/jax pretrained model weight to paddle.
 
     * you can convert model weight in online/offline mode.

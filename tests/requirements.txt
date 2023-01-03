@@ -1,5 +1,5 @@
 parameterized
 sentencepiece
 regex
-torch
+torch>=1.5
 transformers
