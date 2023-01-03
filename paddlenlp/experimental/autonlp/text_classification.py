@@ -86,7 +86,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
         if problem_type in ["multi_label", "multi_class"]:
             self.problem_type = problem_type
         else:
-            raise ValueError(
+            raise NotImplementedError(
                 f"'{problem_type}' is not a supported problem_type. Please select among ['multi_label', 'multi_class']"
             )
 
@@ -244,7 +244,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
                 compute_metrics=self._compute_metrics,
             )
         else:
-            raise ValueError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
+            raise NotImplementedError("'trainer_type' can only be one of ['Trainer', 'PromptTrainer']")
         return trainer
 
     def _construct_trainable(self) -> Callable:
