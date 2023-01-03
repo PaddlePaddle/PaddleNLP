@@ -25,10 +25,7 @@ class BertConverterTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
             from transformers import BertConfig, BertForTokenClassification
 
-            config: BertConfig = BertConfig.from_pretrained("bert-base-uncased")
-            config.hidden_sizee = 32
-            config.num_hidden_layers = 4
-            config.num_attention_heads = 4
+            config: BertConfig = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel")
 
             pytorch_model = BertForTokenClassification(config)
             pytorch_model.save_pretrained(tempdir)
