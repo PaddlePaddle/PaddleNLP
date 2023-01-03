@@ -54,7 +54,7 @@ python setup.py install
 ```bash
 # 建议在 GPU 环境下运行本示例，运行速度较快
 export CUDA_VISIBLE_DEVICES=0
-python examples/document-intelligence/docprompt_example.py \
+python examples/sentiment_analysis/senta_example.py \
     --file_path "your file path"
 ```
 

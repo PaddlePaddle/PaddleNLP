@@ -1,15 +1,39 @@
-import sys
-import os
-import random
-import copy
-import logging
+# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 
 import argparse
-import paddle
+import copy
+import logging
+import os
+import random
+import sys
+
 import numpy as np
-from seqeval.metrics import classification_report, f1_score, precision_score, recall_score
-from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer, LayoutXLMForTokenClassification
+import paddle
+from seqeval.metrics import (
+    classification_report,
+    f1_score,
+    precision_score,
+    recall_score,
+)
 from xfun import XFUN
+
+from paddlenlp.transformers import (
+    LayoutXLMForTokenClassification,
+    LayoutXLMModel,
+    LayoutXLMTokenizer,
+)
 
 # Todo: delete the following line after the release of v2.2
 sys.path.insert(0, "../../../")
@@ -164,7 +188,7 @@ def train(args):
                     step,
                     len(train_dataloader),
                     lr_scheduler.get_lr(),
-                    loss.numpy()[0],
+                    float(loss),
                 )
             )
 
@@ -261,7 +285,7 @@ def evaluate(args, model, tokenizer, label2id_map, id2label_map, pad_token_label
 
             if paddle.distributed.get_rank() == 0:
                 logger.info(
-                    "[Eval]process: {}/{}, loss: {:.5f}".format(idx, len(eval_dataloader), tmp_eval_loss.numpy()[0])
+                    "[Eval]process: {}/{}, loss: {:.5f}".format(idx, len(eval_dataloader), float(tmp_eval_loss))
                 )
 
             eval_loss += tmp_eval_loss.item()

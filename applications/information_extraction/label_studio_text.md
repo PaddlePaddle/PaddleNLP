@@ -1,4 +1,4 @@
-# 信息抽取任务Label Studio使用指南
+# 文本抽取任务Label Studio使用指南
 
  **目录**
 

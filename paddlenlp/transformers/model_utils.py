@@ -166,6 +166,15 @@ def register_base_model(cls):
     return cls
 
 
+class BackboneMixin:
+    def forward_with_filtered_kwargs(self, *args, **kwargs):
+
+        signature = dict(inspect.signature(self.forward).parameters)
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k in signature}
+
+        return self(*args, **filtered_kwargs)
+
+
 @six.add_metaclass(InitTrackerMeta)
 class PretrainedModel(Layer, GenerationMixin):
     """
@@ -269,6 +278,32 @@ class PretrainedModel(Layer, GenerationMixin):
         if not self.constructed_from_pretrained_config():
             init_dict = fn_args_to_dict(original_init, *((self,) + args), **kwargs)
             self.config = init_dict
+
+    def __getattr__(self, name):
+        """
+        called when the attribute name is missed in the model
+
+        Args:
+            name: the name of attribute
+
+        Returns: the value of attribute
+
+        """
+        try:
+            return super(PretrainedModel, self).__getattr__(name)
+        except AttributeError:
+            result = getattr(self.config, name)
+            if getattr(self, "deprecated_warnings", None) is None:
+                self.deprecated_warnings = {}
+
+            if not self.deprecated_warnings.get(name, False):
+                logger.warning(
+                    f"Accessing `{name}` through `model.{name}` will be deprecated after v2.6.0. "
+                    f"Instead, do `model.config.{name}`"
+                )
+                self.deprecated_warnings[name] = True
+
+            return result
 
     @property
     def base_model(self):
@@ -628,9 +663,9 @@ class PretrainedModel(Layer, GenerationMixin):
                     state_to_load[k] = np.array(state_to_load[k])
                     state_to_load[k] = state_to_load[k].astype(dtype)
 
-        # For model parallel if FasterGeneration
+        # For model parallel if FastGeneration
         # To avoid recursive import temporarily.
-        import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
+        import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_to_load)
         if paddle.in_dynamic_mode():
@@ -1133,9 +1168,9 @@ class PretrainedModel(Layer, GenerationMixin):
                         state_dict[k] = np.array(state_dict[k])
                         state_dict[k] = state_dict[k].astype(dtype)
 
-        # For model parallel if FasterGeneration
+        # For model parallel if FastGeneration
         # To avoid recursive import temporarily.
-        import paddlenlp.ops.faster_transformer.transformer.decoding as ft_decoding
+        import paddlenlp.ops.fast_transformer.transformer.decoding as ft_decoding
 
         state_to_load = ft_decoding.get_ft_para_conf().fit_partial_model(model_to_load, state_dict)
         if paddle.in_dynamic_mode():
@@ -1217,7 +1252,9 @@ class PretrainedModel(Layer, GenerationMixin):
                 from_hf_hub=from_hf_hub,
                 **kwargs,
             )
-        config.save_pretrained(cache_dir)
+
+        if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
+            config.save_pretrained(cache_dir)
 
         # 2. init the model
         init_args = config["init_args"] or ()

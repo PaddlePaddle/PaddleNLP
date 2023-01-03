@@ -23,6 +23,7 @@ from parameterized import parameterized_class
 from paddlenlp.transformers import (
     CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST,
     AutoTokenizer,
+    CodeGenConfig,
     CodeGenForCausalLM,
     CodeGenModel,
 )
@@ -126,22 +127,22 @@ class CodeGenModelTester:
         )
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "n_embd": self.hidden_size,
-            "n_layer": self.num_hidden_layers,
-            "n_head": self.num_attention_heads,
-            "activation_function": self.hidden_act,
-            "resid_pdrop": self.hidden_dropout_prob,
-            "attn_pdrop": self.attention_probs_dropout_prob,
-            "n_positions": self.max_position_embeddings,
-            "n_ctx": self.max_position_embeddings,
-            "initializer_range": self.initializer_range,
-            "bos_token_id": self.bos_token_id,
-            "eos_token_id": self.eos_token_id,
-            "pad_token_id": self.pad_token_id,
-            "rotary_dim": self.rotary_dim,
-        }
+        return CodeGenConfig(
+            vocab_size=self.vocab_size,
+            n_embd=self.hidden_size,
+            n_layer=self.num_hidden_layers,
+            n_head=self.num_attention_heads,
+            activation_function=self.hidden_act,
+            resid_pdrop=self.hidden_dropout_prob,
+            attn_pdrop=self.attention_probs_dropout_prob,
+            n_positions=self.max_position_embeddings,
+            n_ctx=self.max_position_embeddings,
+            initializer_range=self.initializer_range,
+            bos_token_id=self.bos_token_id,
+            eos_token_id=self.eos_token_id,
+            pad_token_id=self.pad_token_id,
+            rotary_dim=self.rotary_dim,
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -169,7 +170,7 @@ class CodeGenModelTester:
         )
 
     def create_and_check_codegen_model(self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
@@ -178,7 +179,7 @@ class CodeGenModelTester:
         self.parent.assertEqual(len(result[1]), config["n_layer"])
 
     def create_and_check_codegen_model_past(self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # first forward pass
@@ -207,7 +208,7 @@ class CodeGenModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_codegen_model_attention_mask_past(self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # create attention mask
@@ -250,7 +251,7 @@ class CodeGenModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_codegen_model_past_large_inputs(self, config, input_ids, input_mask, *args):
-        model = CodeGenModel(**config)
+        model = CodeGenModel(config)
         model.eval()
 
         # first forward pass
@@ -283,8 +284,7 @@ class CodeGenModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
-        base_model = CodeGenModel(**config)
-        model = CodeGenForCausalLM(base_model)
+        model = CodeGenForCausalLM(config)
 
         outputs = model(
             input_ids, labels=input_ids if self.parent.use_labels else None, return_dict=self.parent.return_dict
@@ -297,8 +297,7 @@ class CodeGenModelTester:
         self.parent.assertEqual(logits.shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
-        base_model = CodeGenModel(**config)
-        model = CodeGenForCausalLM(base_model)
+        model = CodeGenForCausalLM(config)
 
         loss, logits = model(input_ids, return_dict=self.parent.return_dict, labels=input_ids)[:2]
         self.parent.assertEqual(loss.shape, [1])
@@ -451,7 +450,7 @@ class CodeGenModelTest(ModelTesterMixin, GenerationTesterMixin, unittest.TestCas
     @slow
     def test_auto_tokenizer(self):
         for model_name in CODEGEN_PRETRAINED_MODEL_ARCHIVE_LIST:
-            AutoTokenizer.from_pretrained(model_name)
+            AutoTokenizer.from_pretrained(model_name)  # assign a tokenizer but never use
 
 
 class CodeGenModelLanguageGenerationTest(unittest.TestCase):

@@ -13,15 +13,13 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import time
 
 from utils import load_txt, write_json_file
 
 from paddlenlp import Taskflow
-
-logger = logging.getLogger(__file__)
+from paddlenlp.utils.log import logger
 
 
 def main(args):
