@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-
 import paddle
-from paddlenlp.datasets import MapDataset
 
 
 def load_dict(dict_path):
