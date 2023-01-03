@@ -159,15 +159,16 @@ class UNIMOModel(UNIMOPretrainedModel):
             activation=config.hidden_act,
             attn_dropout=config.attention_probs_dropout_prob,
             act_dropout=0,
-            normalize_before=normalize_before)
+            normalize_before=config.normalize_before,
+        )
 
-        self.encoder_norm = nn.LayerNorm(hidden_size)
-        # post_encoder_norm = nn.LayerNorm(hidden_size)
+        self.encoder_norm = nn.LayerNorm(config.hidden_size)
+        # post_encoder_norm = nn.LayerNorm(config.hidden_size)
 
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
         self.encoder = nn.TransformerEncoder(
             encoder_layer,
-            num_hidden_layers,
+            config.num_hidden_layers,
             # post_encoder_norm,
         )
 
@@ -462,21 +463,19 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         )
 
     def prepare_fast_entry(self, kwargs):
-        from paddlenlp.ops import FasterUNIMOText, FasterMIRO
+        from paddlenlp.ops import FasterMIRO, FasterUNIMOText
 
-        use_fp16_decoding = kwargs.get('use_fp16_decoding', False)
-        decode_strategy = kwargs.get('decode_strategy')
-        if decode_strategy == 'sampling' and kwargs.get(
-                'top_k') != 0 and kwargs.get('top_p') != 1:
+        use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
+        decode_strategy = kwargs.get("decode_strategy")
+        if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
-                    "Only topk sampling or topp sampling are supported. " \
-                    "Topk sampling and topp sampling cannot be both applied in the fast version.")
-        if kwargs['repetition_penalty'] != 1.0:
-            # not support for repetition_penalty yet in the fast version
-            raise AttributeError(
-                "'repetition_penalty != 1' is not supported yet in the fast version"
+                "Only topk sampling or topp sampling are supported. "
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
-        if kwargs['forced_bos_token_id'] is not None:
+        if kwargs["repetition_penalty"] != 1.0:
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
+        if kwargs["forced_bos_token_id"] is not None:
             # not support for min_length yet in the fast version
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
@@ -484,11 +483,9 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             )
 
         if getattr(self.encoder, "norm", None) is None:
-            self._fast_entry = FasterUNIMOText(
-                self, use_fp16_decoding=use_fp16_decoding).forward
+            self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
         else:
-            self._fast_entry = FasterMIRO(
-                self, use_fp16_decoding=use_fp16_decoding).forward
+            self._fast_entry = FasterMIRO(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._fast_entry
 
     def adjust_logits_during_generation(self, logits):

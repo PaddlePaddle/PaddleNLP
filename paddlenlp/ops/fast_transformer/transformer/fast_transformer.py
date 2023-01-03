@@ -19,18 +19,17 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-
 from paddlenlp.ops import (
     InferBartDecoding,
     InferGptDecoding,
     InferGptJDecoding,
     InferMBartDecoding,
+    InferMIRODecoding,
     InferOptDecoding,
     InferPegasusDecoding,
     InferT5Decoding,
     InferTransformerDecoding,
     InferUnifiedDecoding,
-    InferMIRODecoding,
 )
 from paddlenlp.transformers import (
     BartPretrainedModel,
@@ -1276,12 +1275,7 @@ class FasterUNIMOText(UNIMOPretrainedModel):
 
 
 class FasterMIRO(UNIMOPretrainedModel):
-
-    def __init__(self,
-                 model,
-                 decoding_lib=None,
-                 use_fp16_decoding=False,
-                 **kwargs):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, **kwargs):
         super(FasterMIRO, self).__init__(model.config)
         self._model = model
         self._use_fp16_decoding = use_fp16_decoding
@@ -1312,10 +1306,10 @@ class FasterMIRO(UNIMOPretrainedModel):
             unk_id=self.unk_token_id,
             mask_id=self.mask_token_id,
             normalize_before=self._normalize_before,
-            hidden_act=self._hidden_act)
+            hidden_act=self._hidden_act,
+        )
 
-    def prepare_inputs_for_generation(self, input_ids, token_type_ids,
-                                      attention_mask, **kwargs):
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids, attention_mask, **kwargs):
         input_ids = input_ids[:, :-1]
         if input_ids.dtype == paddle.int64:
             input_ids = paddle.cast(input_ids, dtype="int32")
@@ -1326,9 +1320,7 @@ class FasterMIRO(UNIMOPretrainedModel):
         token_type_ids = token_type_ids[:, :-1]
 
         attention_mask = attention_mask[:, :, :-1, :-1]
-        attention_mask = paddle.cast(
-            attention_mask == 0,
-            dtype="float16" if self._use_fp16_decoding else "float32")
+        attention_mask = paddle.cast(attention_mask == 0, dtype="float16" if self._use_fp16_decoding else "float32")
 
         seq_len = kwargs.get("seq_len") - 1
         if seq_len.dtype == paddle.int64:
@@ -1339,7 +1331,7 @@ class FasterMIRO(UNIMOPretrainedModel):
             "token_type_ids": token_type_ids,
             "attention_mask": attention_mask,
             "seq_len": seq_len,
-            "decoder_type_ids": decoder_type_ids
+            "decoder_type_ids": decoder_type_ids,
         }
 
     def generate_logits_mask(self, use_fp16_decoding):
@@ -1361,35 +1353,34 @@ class FasterMIRO(UNIMOPretrainedModel):
         else:
             return logits_mask_t
 
-    def forward(self,
-                input_ids,
-                token_type_ids,
-                attention_mask,
-                seq_len=None,
-                max_length=128,
-                min_length=0,
-                top_k=4,
-                top_p=0.0,
-                num_beams=4,
-                decode_strategy="sampling",
-                bos_token_id=None,
-                eos_token_id=None,
-                pad_token_id=None,
-                diversity_rate=0.0,
-                temperature=1.0,
-                num_return_sequences=1,
-                length_penalty=0.6,
-                early_stopping=False,
-                forced_eos_token_id=None,
-                position_ids=None,
-                **model_kwargs):
+    def forward(
+        self,
+        input_ids,
+        token_type_ids,
+        attention_mask,
+        seq_len=None,
+        max_length=128,
+        min_length=0,
+        top_k=4,
+        top_p=0.0,
+        num_beams=4,
+        decode_strategy="sampling",
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        diversity_rate=0.0,
+        temperature=1.0,
+        num_return_sequences=1,
+        length_penalty=0.6,
+        early_stopping=False,
+        forced_eos_token_id=None,
+        position_ids=None,
+        **model_kwargs
+    ):
 
         if seq_len is None:
             assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
-            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id,
-                                             dtype="int32"),
-                                 axis=-1,
-                                 dtype="int32")
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id, dtype="int32"), axis=-1, dtype="int32")
         if decode_strategy.startswith("beam_search"):
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
@@ -1397,7 +1388,8 @@ class FasterMIRO(UNIMOPretrainedModel):
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                seq_len=seq_len)
+                seq_len=seq_len,
+            )
         elif decode_strategy == "sampling":
             input_ids, model_kwargs = self.expand_inputs_for_generation(
                 input_ids,
@@ -1405,22 +1397,21 @@ class FasterMIRO(UNIMOPretrainedModel):
                 token_type_ids=token_type_ids,
                 position_ids=position_ids,
                 attention_mask=attention_mask,
-                seq_len=seq_len)
+                seq_len=seq_len,
+            )
         elif decode_strategy == "greedy_search":
             model_kwargs = {
                 "token_type_ids": token_type_ids,
                 "position_ids": position_ids,
                 "attention_mask": attention_mask,
-                "seq_len": seq_len
+                "seq_len": seq_len,
             }
         else:
-            raise ValueError(
-                "Only greedy search, beam search and sampling are supported. ")
+            raise ValueError("Only greedy search, beam search and sampling are supported. ")
 
-        model_inputs = self.prepare_inputs_for_generation(
-            input_ids, **model_kwargs)
-        seq_len = model_inputs.pop('seq_len')
-        decoder_type_ids = model_inputs.pop('decoder_type_ids')
+        model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+        seq_len = model_inputs.pop("seq_len")
+        decoder_type_ids = model_inputs.pop("decoder_type_ids")
 
         ids, output_scores = self.decoding(
             input_ids=model_inputs["input_ids"],
@@ -1442,7 +1433,8 @@ class FasterMIRO(UNIMOPretrainedModel):
             forced_eos_token_id=forced_eos_token_id,
             pos_bias=False,
             early_stopping=early_stopping,
-            min_length=min_length)
+            min_length=min_length,
+        )
         if self.trans_out:
             if decode_strategy.startswith("beam_search"):
                 ids = ids.transpose([1, 2, 0])
