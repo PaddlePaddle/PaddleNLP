@@ -220,7 +220,7 @@ python -u run_corpus_preparation.py \
 关于如何对语义检索模型进行无监督训练，以及针对给定问答语料库进行模型部署，请参考[faq_system](../README.md)。 -->
 
 ### 基于Pipelines构建问答系统
-本项目提供了基于Pipelines的低成本构建问答对自动生成智能检索问答系统的能力。开发者只需要提供非结构化的纯文本，就可以使用本项目预制的问答对生成模块生成大量的问答对，并基于此快速搭建一个针对自己业务的检索问答系统，并可以提供Web可视化产品服务。Web可视化产品服务支持问答检索、在线问答对生成，在线文件上传和解析，在线索引库更新等功能，用户也可根据需要自行调整。具体的构建流程请参考[Pipelines-无监督智能检索问答系统](../../../pipelines/examples/unsupervised_question_answering/README.md)。
+本项目提供了基于Pipelines的低成本构建问答对自动生成智能检索问答系统的能力。开发者只需要提供非结构化的纯文本，就可以使用本项目预制的问答对生成模块生成大量的问答对，并基于此快速搭建一个针对自己业务的检索问答系统，并可以提供Web可视化产品服务。Web可视化产品服务支持问答检索、在线问答对生成，在线文件上传和解析，在线索引库更新等功能，用户也可根据需要自行调整。具体的构建流程请参考[Pipelines-无监督智能检索问答系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/unsupervised-question-answering)。
 
 
 
@@ -464,8 +464,7 @@ python finetune/answer_extraction_and_roundtrip_filtration/evaluate.py \
 - `limit`: SpanEvaluator测评指标的`limit`，当概率数组中的最后一个维度大于该值时将返回相应的文本片段。
 
 #### 语义索引和召回模型
-我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/faq_finance)。
-
+我们的语义索引和召回模型是基于RocketQA的QueryEncoder训练的双塔模型，该模型用于语义索引和召回阶段，分别进行语义向量抽取和相似度召回。除使用预置模型外，如果用户想训练并接入自己的模型，模型训练可以参考[FAQ Finance](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/question_answering/supervised_qa/faq_finance)。
 
 #### 排序模型
 我们的排序模型是基于RocketQA的CrossEncoder训练的单塔模型，该模型用于搜索的排序阶段，对召回的结果进行重新排序的作用。关于排序的定制训练，可以参考[CrossEncoder](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/neural_search/ranking/cross_encoder)。
