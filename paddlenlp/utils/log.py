@@ -75,6 +75,10 @@ class Logger(object):
 
     def enable(self):
         self._is_enable = True
+    
+    def set_level(self, log_level: str):
+        assert log_level in log_config,f"Invalid log level. Choose among {log_config.keys()}"
+        self.logger.setLevel(log_level)
 
     @property
     def is_enable(self) -> bool:
