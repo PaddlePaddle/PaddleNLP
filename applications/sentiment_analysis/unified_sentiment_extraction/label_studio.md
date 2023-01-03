@@ -36,7 +36,7 @@ label-studio start
 
 ## **2. label-studio 项目创建**
 
-创建项目之前，需要先确定好你需要标注的任务类型以及需要标注哪些内容，然后点击创建（Create）开始创建一个新的项目，填写项目名称、描述。
+创建项目之前，需要先确定标注的任务类型以及需要标注哪些内容，然后点击创建（Create）开始创建一个新的项目，填写项目名称、描述。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/202995157-9caa0b26-202d-46d2-832a-f1cdf3f9a9b6.png />
@@ -49,15 +49,15 @@ label-studio start
 </div>
 
 
-接下来，根据你需要标注的任务类型，选择适合的任务。在本项目中，默认会包含两种类型的任务：语句级情感分类任务和属性级情感分析任务。由于这两者都属于自然语言处理（NLP）任务，因此可以点击 `Natural Language Processing` 选项，在该选项下面进行选择相应的子项任务。
+接下来，根据需要标注的任务类型，选择适合的任务。在本项目中，默认会包含两种类型的任务：语句级情感分类任务和属性级情感分析任务。由于这两者都属于自然语言处理（NLP）任务，因此可以点击 `Natural Language Processing` 选项，在该选项下面进行选择相应的子项任务。
 
-如果你需要标注语句级情感分类任务，可以选择`Text Classification`。
+- 如果标注语句级情感分类任务，请选择`Text Classification`。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/202996231-a4cf809d-000e-4693-b7c8-70ff2fae22ae.png />
 </div>
 
-- 如果你需要标注属性级情感分析任务，比如属性-观点词-情感极性三元组的信息抽取，请选择`Relation Extraction`。
+- 如果标注属性级情感分析任务，比如属性-观点词-情感极性三元组的信息抽取，请选择`Relation Extraction`。
 
 <div align="center">
     <img src=https://user-images.githubusercontent.com/35913314/202997005-e8b0e865-584e-460e-8e68-a41532b6ef1b.png />
@@ -86,6 +86,7 @@ label-studio start
 <a name="3.2"></a>
 
 ### **3.2 属性级情感分析任务**
+
 
 以经典的属性-情感极性-观点词(A-S-O)三元组抽取为例，这里需要配置任务类型为`Relation Extraction`。
 
