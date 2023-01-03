@@ -16,10 +16,10 @@
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-from paddle.nn import Layer, Embedding
+from paddle.nn import Layer
 
-from ..nezha.modeling import ACT2FN
 from .. import PretrainedModel, register_base_model
+from ..nezha.modeling import ACT2FN
 
 __all__ = [
     "GPTJModel",
@@ -457,15 +457,11 @@ class GPTJModel(GPTJPretrainedModel):
         if input_ids is not None:
             input_shape = input_ids.shape
             input_ids = input_ids.reshape(shape=(-1, input_shape[-1]))
-            batch_size = input_ids.shape[0]
         else:
             raise ValueError("You have to specify input_ids")
 
         if cache is None:
-            past_length = 0
             cache = tuple([None] * len(self.h))
-        else:
-            past_length = cache[0][0].shape[-2]
 
         # Attention mask.
         if attention_mask is None:
@@ -523,25 +519,25 @@ class GPTJForCausalLM(GPTJPretrainedModel):
     def set_output_embeddings(self, new_embeddings):
         self.lm_head = new_embeddings
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterGPTJ
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the faster version of GPTJ")
+            raise AttributeError("'beam_search' is not supported yet in the fast version of GPTJ")
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.transformer.config["n_embd"] // self.transformer.config["n_head"]
         if size_per_head not in [32, 64, 80, 96, 128, 160, 192, 224, 256]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPTJ" % size_per_head
+                "'size_per_head = %d' is not supported yet in the fast version of GPTJ" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
-        self._faster_entry = FasterGPTJ(self, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
+        self._fast_entry = FasterGPTJ(self, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def prepare_inputs_for_generation(self, input_ids, cache=None, **kwargs):
         # only last token for inputs_ids if past is defined in kwargs

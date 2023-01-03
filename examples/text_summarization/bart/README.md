@@ -193,7 +193,7 @@ python generate.py \
 
 ### 模型高性能预测
 
-在模型预测阶段，我们提供了基于 FasterTransformer 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。只需在上述模型预测上添加两个参数即可：分别是`faster`，`use_fp16_decoding`。
+在模型预测阶段，我们提供了基于 FastGeneration 的高性能预测的选项，可以选择性开启是否需要采用高性能预测。只需在上述模型预测上添加两个参数即可：分别是`faster`，`use_fp16_decoding`。
 
 ```shell
 # GPU启动，预测仅支持单卡

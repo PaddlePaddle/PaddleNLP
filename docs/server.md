@@ -23,7 +23,7 @@ app.register_taskflow('taskflow/uie', uie)
 
 ```text
 def register_taskflow(
-        task_name,
+    task_name,
     task,
     taskflow_handler=None)
 
