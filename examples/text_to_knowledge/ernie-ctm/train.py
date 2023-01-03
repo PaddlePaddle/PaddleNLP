@@ -25,7 +25,6 @@ from metric import SequenceAccuracy
 
 from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.layers.crf import LinearChainCrf, LinearChainCrfLoss
 from paddlenlp.transformers import (
     ErnieCtmTokenizer,
     ErnieCtmWordtagModel,
@@ -102,13 +101,12 @@ def do_train(args):
     tags_to_idx = load_dict(os.path.join(args.data_dir, "tags.txt"))
 
     tokenizer = ErnieCtmTokenizer.from_pretrained("wordtag")
-    model = ErnieCtmWordtagModel.from_pretrained("wordtag", num_tag=len(tags_to_idx))
-    model.crf_loss = LinearChainCrfLoss(LinearChainCrf(len(tags_to_idx), 0.1, with_start_stop_tag=False))
+    model = ErnieCtmWordtagModel.from_pretrained("wordtag", num_labels=len(tags_to_idx))
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len, tags_to_idx=tags_to_idx)
 
     def batchify_fn(samples):
-        fn = Tuple(
+        fn = Tuple(  # noqa: E731
             Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
             Stack(dtype="int64"),  # seq_len
