@@ -14,8 +14,8 @@
 
 <a name="1"></a>
 
-## 1. label-studio 安装
-**本内容在以下环境进行测试安装：**
+## **1. label-studio 安装**
+本内容在以下环境进行测试安装：
 - python == 3.9.12
 - label-studio == 1.6.0
 
@@ -34,7 +34,7 @@ label-studio start
 
 <a name="2"></a>
 
-## 2. label-studio 项目创建
+## **2. label-studio 项目创建**
 
 创建项目之前，需要先确定好你需要标注的任务类型以及需要标注哪些内容，然后点击创建（Create）开始创建一个新的项目，填写项目名称、描述。
 
@@ -67,11 +67,11 @@ label-studio start
 
 <a name="3"></a>
 
-## 3. 情感分析任务标注
+## **3. 情感分析任务标注**
 
 <a name="3.1"></a>
 
-### 3.1 语句级情感分类任务
+### **3.1 语句级情感分类任务**
 这里对应的任务类型为`Text Classification`，在标注之前，需要设定`正向`和`负向`的标签，然后保存即可。
 
 <div align="center">
@@ -85,7 +85,7 @@ label-studio start
 
 <a name="3.2"></a>
 
-### 3.2 属性级情感分析任务
+### **3.2 属性级情感分析任务**
 
 以经典的属性-情感极性-观点词(A-S-O)三元组抽取为例，这里需要配置任务类型为`Relation Extraction`。
 
@@ -93,7 +93,7 @@ label-studio start
 
 <a name="3.2.1"></a>
 
-#### 3.2.1 Span类型标签
+#### **3.2.1 Span类型标签**
 这里为方便标注和后续处理，可以设定`评价维度##正向`用于定位情感倾向为正向的属性，`评价维度##负向`用于定位情感倾向为负向的属性，利用`观点词`标签定位语句中的观点词。
 
 <div align="center">
@@ -102,7 +102,7 @@ label-studio start
 
 <a name="3.2.2"></a>
 
-#### 3.2.2 Relation类型标签
+#### **3.2.2 Relation类型标签**
 点击Code，然后配置关系名称，最后点击保存即可
 
 <div align="center">
@@ -118,7 +118,7 @@ label-studio start
 
 <a name="4"></a>
 
-## 4. 导出标注数据
+## **4. 导出标注数据**
 
 勾选已标注文本ID，选择导出的文件类型为`JSON`，导出数据：
 
@@ -128,5 +128,5 @@ label-studio start
 
 <a name="5"></a>
 
-## 5. References
+## **5. References**
 - **[Label Studio 官网](https://labelstud.io/)**
