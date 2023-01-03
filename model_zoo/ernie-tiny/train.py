@@ -118,7 +118,7 @@ def main():
     )
 
     model = JointErnie.from_pretrained(
-        model_args.model_name_or_path,
+        pretrained_model_name_or_path=model_args.model_name_or_path,
         intent_dim=len(intent2id),
         slot_dim=len(slot2id),
         dropout=model_args.dropout,
@@ -171,7 +171,7 @@ def main():
         @paddle.no_grad()
         def custom_evaluate(self, model, data_loader):
             model.eval()
-            slot_right, intent_right_no_slot, sample_num = 0, 0, 0
+            intent_right, slot_right, sample_num = 0, 0, 0
             for batch in data_loader:
                 logits = model(input_ids=batch["input_ids"])
                 if len(logits) == 2:
@@ -183,18 +183,19 @@ def main():
 
                 intent_label = batch["intent_label"]
                 slot_label = batch["slot_label"]
-                # intent_right_no_slot += paddle.sum((intent_label == intent_pred) & (intent_label==0)|( intent_label==2)|(intent_label==3)|(intent_label==4)|(intent_label==6)|(intent_label==7)|(intent_label==8)|(intent_label==10))
-                # slot_right += paddle.all((slot_pred == slot_label) | padding_mask.astype(paddle.bool), axis=-1)
 
-                for i in range(len(intent_pred)):
-                    if (intent_label[i] == intent_pred[i]) and (intent_label[i] in (0, 2, 3, 4, 6, 7, 8, 10)):
-                        intent_right_no_slot += 1
-                    elif paddle.all((slot_pred[i] == slot_label[i]) | padding_mask[i].astype(paddle.bool)):
-                        slot_right += 1
-                    sample_num += 1
-
-            accuracy = (slot_right + intent_right_no_slot) / sample_num * 100
-            logger.info("accurcy: %.2f" % accuracy)
+                batch_num = intent_label.shape[0]
+                for i in range(batch_num):
+                    if intent_label[i] == intent_pred[i]:
+                        intent_right += 1
+                        if intent_label[i] in (0, 2, 3, 4, 6, 7, 8, 10):
+                            slot_right += 1
+                        elif paddle.all((slot_pred[i] == slot_label[i]) | padding_mask[i].astype(paddle.bool)):
+                            slot_right += 1
+                sample_num += batch_num
+            intent_accuracy = intent_right / sample_num * 100
+            accuracy = slot_right / sample_num * 100
+            logger.info("accuray: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
 
             return accuracy
 

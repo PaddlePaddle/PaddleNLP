@@ -16,26 +16,26 @@ import paddle
 from paddle import nn
 from paddle.nn import Layer
 
-from paddlenlp.transformers import ErniePretrainedModel
+from paddlenlp.transformers import ErnieModel, ErniePretrainedModel
 
 
 class JointErnie(ErniePretrainedModel):
-    def __init__(self, ernie, intent_dim, slot_dim, dropout=None):
-        super(JointErnie, self).__init__()
+    def __init__(self, config, intent_dim, slot_dim, dropout=None):
+        super(JointErnie, self).__init__(config)
         self.intent_num_labels = intent_dim
         self.slot_num_labels = slot_dim
 
-        self.ernie = ernie  # allow ernie to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.ernie.config["hidden_dropout_prob"])
+        self.ernie = ErnieModel(config)
+        self.dropout = nn.Dropout(dropout if dropout is not None else config["hidden_dropout_prob"])
 
         self.intent_classifier = nn.Linear(
-            self.ernie.config["hidden_size"],
+            config["hidden_size"],
             self.intent_num_labels,
             weight_attr=nn.initializer.KaimingNormal(),
             bias_attr=nn.initializer.KaimingNormal(),
         )
         self.slot_classifier = nn.Linear(
-            self.ernie.config["hidden_size"],
+            config["hidden_size"],
             self.slot_num_labels,
             weight_attr=nn.initializer.KaimingNormal(),
             bias_attr=nn.initializer.KaimingNormal(),

@@ -119,12 +119,11 @@ def main():
                 intent_right += 1
                 if intent_label in (0, 2, 3, 4, 6, 7, 8, 10):
                     intent_right_no_slot += 1
-            elif ((slot_pred == slot_label) | padding_mask).all():
-                slot_right += 1
+                elif ((slot_pred == slot_label) | padding_mask).all():
+                    slot_right += 1
         accuracy = (slot_right + intent_right_no_slot) / len(test_dataset) * 100
         intent_accuracy = intent_right / len(test_dataset) * 100
-
-        print({"intent_accuracy": intent_accuracy, "accuracy": accuracy})
+        print("accuray: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
     else:
         test_dataset = load_dataset(
             read_test_file,

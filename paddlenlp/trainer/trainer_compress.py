@@ -67,7 +67,9 @@ def compress(self, custom_evaluate=None):
             assert (
                 self.custom_evaluate is not None
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
-        _dynabert(self, self.model, args.output_dir)
+        model = copy.deepcopy(self.model)
+        _dynabert(self, model, args.output_dir)
+        del model
         if "ptq" in args.strategy or "qat" in args.strategy:
             output_dir_list = []
             for width_mult in args.width_mult_list:
@@ -584,8 +586,7 @@ def _load_parameters(dynabert_model, ori_state_dict):
 def _export_dynamic_dynabert_model(self, width_mult):
     model_dir = os.path.join(self.args.output_dir, "width_mult_" + str(round(width_mult, 2)))
     state_dict = paddle.load(os.path.join(model_dir, "model_state.pdparams"))
-    origin_model = self.model.__class__.from_pretrained(model_dir)
-    dynabert_model = _get_dynabert_model(origin_model, width_mult)
+    dynabert_model = _get_dynabert_model(self.model, width_mult)
     dynabert_model = _load_parameters(dynabert_model, state_dict)
     return dynabert_model
 

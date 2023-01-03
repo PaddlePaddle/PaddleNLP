@@ -35,7 +35,7 @@ def read_example(filename, intent2id, slot2id, tokenizer, max_seq_length=16, no_
     Reads data from file.
 
     tokenized_query = ['放', '一', '首', '周', '华', '健', '的', '花', '心']
-    slot_sentence = '放一首<singer>周华健</singer>的<song>花心</song>'
+    slot_sentence = '来一首<singer>周华健</singer>的<song>花心</song>'
     after processing:
     slot_label = ['O', 'O', 'O', 'B-singer', 'I-singer', 'I-singer', 'O', 'B-song', 'I-song']
     """
@@ -126,7 +126,7 @@ def compute_metrics(p):
     accuracy = (slot_right + intent_right_no_slot) / slot_label.shape[0] * 100
     intent_accuracy = intent_right / intent_label.shape[0] * 100
 
-    return {"intent_accuracy": intent_accuracy, "accuracy": accuracy}
+    return {"accuracy": accuracy, "intent_accuracy": intent_accuracy}
 
 
 def read_test_file(filename):
