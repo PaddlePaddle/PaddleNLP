@@ -13,11 +13,12 @@
 # limitations under the License.
 
 from __future__ import annotations
-from typing import List, Union, Dict, Type
 
-from paddlenlp.transformers import PretrainedModel, BertForMaskedLM, BertModel
+from typing import Dict, List, Type
+
+from paddlenlp.transformers import BertForMaskedLM, BertModel, PretrainedModel
+from paddlenlp.utils.converter import Converter, LogitComparer, StateDictNameMapping
 from paddlenlp.utils.import_utils import import_module
-from paddlenlp.utils.converter import StateDictNameMapping, Converter
 
 __all__ = ["BertConverter"]
 
@@ -28,16 +29,10 @@ class BertConverter(Converter):
     _ignore_state_dict_keys = ["embeddings.position_ids"]
     architectures: Dict[str, Type[PretrainedModel]] = {"BertForMaskedLM": BertForMaskedLM, "BertModel": BertModel}
 
-    def get_paddle_pytorch_model_classes(self):
-        pytorch_model_class = import_module("transformers.BertModel")
-        return BertModel, pytorch_model_class
-
-    def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
-        num_layer = self.resolve_num_layer(config_or_num_layers)
-
+    def get_name_mapping(self, num_layers: int, architectures: list[str]) -> List[StateDictNameMapping]:
         mappings: List[StateDictNameMapping] = []
 
-        hard_mappings = [
+        bert_model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
             ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
@@ -47,7 +42,7 @@ class BertConverter(Converter):
             ["pooler.dense.bias", "pooler.dense.bias"],
             # for TokenClassification
         ]
-        for layer_index in range(num_layer):
+        for layer_index in range(num_layers):
             layer_mappings = [
                 [
                     f"encoder.layer.{layer_index}.attention.self.query.weight",
@@ -108,6 +103,25 @@ class BertConverter(Converter):
                 [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
                 [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
             ]
-            hard_mappings.extend(layer_mappings)
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(hard_mappings)]
+            bert_model_mappings.extend(layer_mappings)
+
+        # base-model prefix "BertModel"
+        if "BertModel" not in architectures:
+            for mapping in bert_model_mappings:
+                mapping[0] = "bert." + mapping[0]
+                mapping[1] = "bert." + mapping[1]
+
+        # downstream mappings
+        if "BertForQuestionAnswering" in architectures:
+            bert_model_mappings.append(
+                [["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]]
+            )
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(bert_model_mappings)]
         return mappings
+
+
+class BertLogitComparer(BertConverter, LogitComparer):
+    def get_paddle_pytorch_model_classes(self):
+        pytorch_model_class = import_module("transformers.BertModel")
+        return BertModel, pytorch_model_class

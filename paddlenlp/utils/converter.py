@@ -18,7 +18,7 @@ import inspect
 import json
 import os
 import re
-from abc import ABC, abstractmethod
+from abc import ABC
 from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional, Tuple, Type, TypeVar, Union
@@ -30,7 +30,6 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.transformers import PretrainedModel
-from paddlenlp.transformers.configuration_utils import PretrainedConfig
 from paddlenlp.utils.import_utils import (
     import_module,
     is_package_available,
@@ -38,9 +37,7 @@ from paddlenlp.utils.import_utils import (
     is_transformers_available,
 )
 from paddlenlp.utils.log import logger
-
-# from paddlenlp.utils.serialization import load_torch
-
+from paddlenlp.utils.serialization import load_torch
 
 # the type hinting for pytorch model & layer & tensor
 Module = TypeVar("Module")
@@ -495,27 +492,12 @@ class LogitHooker:
         self.tensor_info_saver.summary()
 
 
-class ConverterLogitMixin(ABC):
-    """Model Weight Converter for developer to convert pytorch/tensorflow/jax pretrained model weight to paddle.
-
-    * you can convert model weight in online/offline mode.
-    * you can convert weight and config file.
-    * you can convert weight/config file in some customization ways.
-    """
-
-    _ignore_state_dict_keys = []
+class Converter(ABC):
     num_layer_regex = r"\.\d+\."
 
-    num_layer_key: str = "num_hidden_layers"
-
-    # when field-name is same as hf models, so you only need to
-    # change this attribute to map the configuration
-    config_fields_to_be_removed: List[str] = ["transformers_version"]
-    architectures: Dict[str, Type[PretrainedModel]] = {}
-    try_compare_logits: bool = True
-
-    # try to compare weights between two paddle model
-    try_compare_weight: bool = True
+    def __init__(self, input_dir: str, output_dir: str | None = None):
+        self.input_dir = input_dir
+        self.output_dir = output_dir or input_dir
 
     @classmethod
     def get_num_layer(cls, state_dict: Union[List[str], Dict[str, ndarray]]) -> Optional[int]:
@@ -537,30 +519,94 @@ class ConverterLogitMixin(ABC):
                 numbers.add(int(spans[0][1:-1]))
         if len(numbers) == 0:
             return None
-
         return max(numbers) + 1
 
-    @classmethod
-    def resolve_num_layer(cls, config_or_num_layers: Union[dict, int] = None) -> int:
-        """resolve the number of transformer layer based on the key of model config, eg: `num_hidden_layers` in BertModel
+    def on_converted(self):
+        """hook method for logit-comparer"""
+        pass
+
+    def convert(self) -> None:
+        """the entry of converting config and converting model file
 
         Args:
-            config_or_num_layers (Union[dict, int], optional): the instance of config or num_layers. Defaults to None.
+            input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
+            output_dir (str): the output dir
+        """
+        os.makedirs(self.output_dir, exist_ok=True)
+
+        # 1. get pytorch weight file
+        weight_file = os.path.join(self.input_dir, "pytorch_model.bin")
+        if not os.path.exists(weight_file):
+            raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
+
+        config_file = os.path.join(self.input_dir, "config.json")
+        if not os.path.exists(config_file):
+            raise FileNotFoundError(f"config file<{weight_file}> not found")
+
+        # 2. construct name mapping
+        with open(config_file, "r", encoding="utf-8") as f:
+            config = json.load(f)
+
+        architectures = config.get("architectures", [])
+        state_dict = load_torch(weight_file)
+        num_layer = self.get_num_layer(state_dict)
+        name_mappings = self.get_name_mapping(num_layer, architectures)
+
+        # 3. convert state_dict
+        all_layer_names = set(state_dict.keys())
+        for name_mapping in name_mappings:
+            if name_mapping.source_name not in state_dict:
+                logger.warning(f"key<{name_mapping.source_name}> not in the pytorch weight file.")
+                continue
+
+            state_dict[name_mapping.target_name] = name_mapping.run(state_dict[name_mapping.source_name])
+            all_layer_names.remove(name_mapping.source_name)
+
+        if all_layer_names:
+            logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")
+            for layer_name in all_layer_names:
+                logger.warning(f"--- {layer_name}")
+
+        paddle.save(state_dict, os.path.join(self.output_dir, "model_state.pdparams"))
+        self.on_converted()
+
+    def get_name_mapping(self, num_layers: int, architectures: list[str]) -> List[StateDictNameMapping]:
+        """get name mapping of PretrainedModel
+
+        Args:
+            num_layers (int): the config or number of transformer layers. Defaults to None.
+            architectures (): the architectures or pretrained model. Defaults to None.
 
         Raises:
-            ValueError: when `config_or_num_layers` is not dict/int, it will raise the error
+            NotImplementedError:
 
         Returns:
-            int: the number of transformer layer
+            List[StateDictNameMapping]: the name-mappings of pretrained model
         """
-        if isinstance(config_or_num_layers, (dict, PretrainedConfig)):
-            num_layer = config_or_num_layers[cls.num_layer_key]
-        elif isinstance(config_or_num_layers, int):
-            num_layer = config_or_num_layers
-        else:
-            raise ValueError(f"the type of config_or_num_layers<{config_or_num_layers}> should be one of <dict, int>")
+        raise NotImplementedError
 
-        return num_layer
+
+class LogitComparer(Converter):
+    """Model Weight Converter for developer to convert pytorch/tensorflow/jax pretrained model weight to paddle.
+
+    * you can convert model weight in online/offline mode.
+    * you can convert weight and config file.
+    * you can convert weight/config file in some customization ways.
+    """
+
+    _ignore_state_dict_keys = []
+    num_layer_regex = r"\.\d+\."
+
+    num_layer_key: str = "num_hidden_layers"
+
+    # when field-name is same as hf models, so you only need to
+    # change this attribute to map the configuration
+    config_fields_to_be_removed: List[str] = ["transformers_version"]
+    architectures: Dict[str, Type[PretrainedModel]] = {}
+    try_compare_logits: bool = True
+
+    # try to compare weights between two paddle model
+    try_compare_weight: bool = True
 
     def get_paddle_pytorch_model_classes(self) -> Tuple[object, object]:
         """return the [PaddleModelClass, PytorchModelClass] to
@@ -669,7 +715,8 @@ class ConverterLogitMixin(ABC):
         paddle_model = PaddleModel.from_pretrained(paddle_pretrained_dir)
 
         # 0. init the name_mapping & tensor_info_saver & logit_hooker
-        name_mappings = self.get_name_mapping(paddle_model.config)
+        num_layer = self.get_num_layer(list(paddle_model.state_dict().keys()))
+        name_mappings = self.get_name_mapping(num_layer, paddle_model.config["architectures"])
         tensor_info_saver = TensorInfoSaver()
 
         logit_hooker = LogitHooker(name_mappings, tensor_info_saver)
@@ -720,192 +767,23 @@ class ConverterLogitMixin(ABC):
 
         return result
 
-    def convert_config(self, pytorch_config: dict) -> dict:
-        """convert torch config to paddle config
+    def on_converted(self):
 
-        Args:
-            pytorch_config (dict): the object of pytorch config file
+        PaddleModelClass, PytorchModelClass = self.get_paddle_pytorch_model_classes()
 
-        Returns:
-            dict: the final converted config object
-        """
-        return pytorch_config
-
-    @abstractmethod
-    def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
-        """construct name-mapping object base on the `torch_state_dict` object. name-mapping is the configuration to convert torch state_dict to paddle state_dict
-
-        Args:
-            torch_state_dict (Dict[str, ndarray]): state_dict of pytorch
-            config_or_num_layers (Union[dict, int]): config or num_layers info to help generate name-mapping info
-
-        Raises:
-            NotImplementedError: you should override `get_name_mapping` method to generate NameMapping info to convert weight file automaticlly
-
-        Returns:
-            List[StateDictNameMapping]: the configuration of name-mapping
-        """
-        raise NotImplementedError(
-            "every Converter should everride `get_name_mapping` method to get the configuration between pytorch model and paddle model"
+        # 1. try to compare two loaded paddle weight file
+        first_paddle_model = PaddleModelClass.from_pretrained(self.input_dir)
+        second_paddle_model = PaddleModelClass.from_pretrained(self.input_dir)
+        mismatched_keys = compare_model_weights(
+            self.get_model_state_dict(first_paddle_model),
+            self.get_model_state_dict(second_paddle_model),
         )
+        for key in mismatched_keys:
+            logger.error(f"the key<{key}> is not set correctly with weight")
 
-    @staticmethod
-    def detect_latent_transpose(name_mappings: List[StateDictNameMapping]):
-        """detect the latent name-mapping rules
-
-        Args:
-            name_mappings (List[StateDictNameMapping]): the mappings object
-        """
-        linear_keys = ["dense", "linear", "fc", "proj"]
-        for name_mapping in name_mappings:
-            if not name_mapping.target_name.endswith(".weight"):
-                continue
-            if any([linear_key in name_mapping.target_name for linear_key in linear_keys]):
-                if not name_mapping.action:
-                    logger.warning(
-                        f"detect that the state_dict<{name_mapping.target_name}> is not supporting `transpose` or `merge_last_two_dim` action"
-                    )
-
-    def convert_state_dict(
-        self, torch_state_dict: Dict[str, ndarray], config: Optional[dict] = None
-    ) -> Dict[str, ndarray]:
-        """if you want to convert state_dict with your own script, you should override this method, which is the simplest way to reuse your script.
-
-        Args:
-            torch_state_dict (Dict[str, ndarray]): state_dict of pytorch
-            config (Optional[dict], optional): model config object used to help generate name-mappings. Defaults to None.
-
-        Returns:
-            Dict[str, ndarray]: the final converted state_dict object
-        """
-        if config is None:
-            config = self.get_num_layer(torch_state_dict)
-
-        mappings = self.get_name_mapping(config_or_num_layers=config)
-        self.detect_latent_transpose(mappings)
-
-        state_dict = {}
-        for mapping in mappings:
-            if mapping.source_name not in torch_state_dict:
-                logger.warning(f"the key<{mapping.source_name}> is not in torch_state_dict")
-                continue
-
-            value = torch_state_dict.pop(mapping.source_name, None)
-            if value is None:
-                logger.warning(f"can't find weight by key<{mapping.source_name}>")
-                continue
-
-            # run custom operation on tensor, eg: transpose, merge_last_two_dim
-            value = mapping.run(value)
-
-            state_dict[mapping.target_name] = value
-
-        # remove the ignore keys
-        for ignore_key in self._ignore_state_dict_keys:
-            if ignore_key in torch_state_dict:
-                logger.warning(f"remove the ignored key<{ignore_key}> from torch state_dict")
-                torch_state_dict.pop(ignore_key)
-
-        if len(torch_state_dict) > 0:
-            keys = ",".join(list(torch_state_dict.keys()))
-            logger.warning(f"there are some weights not converted: <{keys}>")
-
-        return state_dict
-
-    def load_torch_weight_file(self, model_file: str) -> Dict[str, ndarray]:
-        """load torch weight file with torch which should be removed later.
-
-        Args:
-            model_file (str): the path of pytorch model file
-
-        Returns:
-            Dict[str, ndarray]: the state dict object of loaded pytorch state dict
-        """
-        # TODO(wj-Mcat): use torch to load model file
-        import torch
-
-        state_dict = torch.load(model_file, map_location="cpu")
-        for key in state_dict.keys():
-            state_dict[key] = state_dict[key].numpy()
-        return state_dict
-
-    @classmethod
-    def remove_transformer_unused_fields(cls, config: dict) -> None:
-        """remove pytorch transformer unused fields
-
-        Args:
-            config (dict): the config of dict
-        """
-        for field in cls.config_fields_to_be_removed:
-            config.pop(field, None)
-
-    def convert(self, input_dir: str, output_dir: str):
-        """the entry of converting config and converting model file
-
-        Args:
-            input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
-            output_dir (str): the output dir
-        """
-        os.makedirs(output_dir, exist_ok=True)
-
-        # detect the file path of
-        model_config_file, torch_model_file = None, None
-        if os.path.isfile(input_dir):
-            if input_dir.endswith(".json"):
-                model_config_file = input_dir
-            elif input_dir.endswith(".bin"):
-                torch_model_file = input_dir
-
-        else:
-            path = os.path.join(input_dir, "pytorch_model.bin")
-            if os.path.isfile(path):
-                torch_model_file = path
-            else:
-                logger.warning(f"pytorch_model.bin file not found under <{input_dir}>")
-
-            path = os.path.join(input_dir, "config.json")
-            if os.path.isfile(path):
-                model_config_file = path
-            else:
-                logger.warning(f"config.json file not found under <{input_dir}>")
-
-        config = None
-        if model_config_file is not None:
-            with open(model_config_file, "r", encoding="utf-8") as f:
-                config = json.load(f)
-
-            self.remove_transformer_unused_fields(config)
-            config = self.convert_config(config)
-
-            # save config file
-            config_file = os.path.join(output_dir, "model_config.json")
-            with open(config_file, "w", encoding="utf-8") as f:
-                json.dump(config, f)
-
-        if torch_model_file:
-            state_dict = self.load_torch_weight_file(torch_model_file)
-            paddle_state_dict = self.convert_state_dict(state_dict, config)
-
-            paddle.save(paddle_state_dict, os.path.join(output_dir, "model_state.pdparams"))
-
-            if self.try_compare_weight:
-                PaddleModelClass, _ = self.get_paddle_pytorch_model_classes()
-                first_paddle_model = PaddleModelClass.from_pretrained(output_dir)
-                second_paddle_model = PaddleModelClass.from_pretrained(output_dir)
-
-                mismatched_keys = compare_model_weights(
-                    self.get_model_state_dict(first_paddle_model),
-                    self.get_model_state_dict(second_paddle_model),
-                )
-                for key in mismatched_keys:
-                    logger.error(f"the key<{key}> is not set correctly with weight")
-
-        if not self.try_compare_logits:
-            logger.info('`try_compare_logits`=False, so we dont"t compare the logits ...')
-            return
-
+        # 2. try to compare logits between paddle & pytorch model
         if is_torch_available() and is_transformers_available():
-            result = self.compare_logits(paddle_pretrained_dir=output_dir, pytorch_pretrained_dir=input_dir)
+            result = self.compare_logits(paddle_pretrained_dir=self.input_dir, pytorch_pretrained_dir=self.input_dir)
             if result is True:
                 logger.info("the logits between pytorch model and paddle model is absolutly same")
             else:
@@ -916,17 +794,3 @@ class ConverterLogitMixin(ABC):
             logger.warning(
                 "you don't install `torch` and `transformers` package, so we can't compare the logits between paddle & pytorch model"
             )
-
-
-class Converter(ABC):
-    def convert(self, input_dir: str, output_dir: str):
-        """the entry of converting config and converting model file
-
-        Args:
-            input_dir (str): the input dir which contains `pytorch_model.bin` and `config.json` file
-            output_dir (str): the output dir
-        """
-        os.makedirs(output_dir, exist_ok=True)
-
-    def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
-        raise
