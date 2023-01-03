@@ -254,10 +254,8 @@ class AutoTrainerBase(metaclass=ABCMeta):
         Returns:
             A set of objects for interacting with Ray Tune results. You can use it to inspect the trials and obtain the best result.
         """
-        if verbosity > 0:
-            logger.set_level("WARNING")
-        else:
-            logger.set_level("INFO")
+        # Changing logger verbosity here doesn't work. Need to change in the worker's code via the _construct_trainable method.
+        self.verbosity = verbosity
 
         if hasattr(self, "tuner") and self.tuner is not None:
             logger.info("Overwriting the existing Tuner and any previous training results")

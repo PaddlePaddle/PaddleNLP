@@ -15,7 +15,6 @@ import copy
 import functools
 import os
 import shutil
-from asyncio.log import logger
 from typing import Any, Callable, Dict, List
 
 import numpy as np
@@ -42,6 +41,7 @@ from paddlenlp.transformers import (
     AutoTokenizer,
     PretrainedTokenizer,
 )
+from paddlenlp.utils.log import logger
 
 from .auto_trainer_base import AutoTrainerBase
 
@@ -249,6 +249,7 @@ class AutoTrainerForTextClassification(AutoTrainerBase):
 
     def _construct_trainable(self) -> Callable:
         def trainable(config):
+            logger.set_level(self.verbosity)
             config = config["candidates"]
             trainer = self._construct_trainer(config)
             trainer.train()
