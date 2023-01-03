@@ -109,11 +109,11 @@ class PromptTrainer(Trainer):
 
     @property
     def pretrained_model(self):
-        self._set_model_attributes(self.model, "plm")
+        return self._get_model().plm
 
     @pretrained_model.setter
     def pretrained_model(self, model):
-        self._set_model_attributes(self.model, "plm", model)
+        setattr(self._get_model(), "plm", model)
 
     def _map_dataset(self, dataset: MapDataset):
         if dataset is None:
