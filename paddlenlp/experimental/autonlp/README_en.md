@@ -1,11 +1,13 @@
 # AutoNLP
 
+[简体中文🀄](./README_cn.md) |  **English**🌎
+
 **The AutoNLP APIs are subjective to significant changes until formal release**
 
 **AutoNLP** is an experimental project by PaddleNLP to democratize NLP for everyone. Delivering a successful NLP project is not easy, as it requires deep domain knowledge. Time after time, we have seen people struggle to make NLP work on their dataset, for their projects, which is why we are building **AutoNLP**. Compared with the traditional AutoML approach of massive paid compute for State-of-the-Art model performance, we have a different philosphy:
 
 
-1. Instead of training State-of-the-Art models on huge datasets running on huge clusters, our goal is to deliver **decent models under limited compute**. We assume our users have a few GPUs at most and want to get decent models under 8 hours on their own in-house datasets. Note that you can get this level of compute for FREE on [Baidu AiStudio](https://aistudio.baidu.com/aistudio).
+1. Instead of training State-of-the-Art models on huge datasets running on huge clusters, our goal is to deliver **decent models under limited compute**. We assume our users have a few GPUs at most and want to get decent models under 8 hours on their own in-house datasets. Note that you can get this level of compute for FREE on [Baidu AI Studio](https://aistudio.baidu.com/aistudio).
 2. Our solution is **low-code** and enables you to train good models with a few lines of code but it won't be no code / drag and drop.
 3. Leverage the **full-cycle capability** of PaddleNLP, We intent to **automate and abstract away** as much of NLP as possible, ranging from preprocessing to tokenizing, from finetuning to prompt tuning, from model compression to deloyment, etc.
 4. Our work is and always will be **free and open-sourced**.
