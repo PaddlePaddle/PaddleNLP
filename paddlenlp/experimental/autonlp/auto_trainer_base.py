@@ -198,6 +198,12 @@ class AutoTrainerBase(metaclass=ABCMeta):
                 "'AutoTrainer' has no attribute 'training_results'. Have you called the 'train' method?"
             )
 
+    def set_log_level(self):
+        if self.verbosity > 0:
+            logger.set_level("WARNING")
+        else:
+            logger.set_level("INFO")
+
     def show_training_results(self):
         if hasattr(self, "training_results"):
             return self.training_results.get_dataframe()
