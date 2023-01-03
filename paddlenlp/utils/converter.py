@@ -550,7 +550,7 @@ class Converter(ABC):
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        paddle.save(state_dict, os.path.join(self.output_dir, "model_state.pdparams"))
+        paddle.save(state_dict, os.path.join(self.input_dir, "model_state.pdparams"))
         self.on_converted()
 
     def get_name_mapping(self, num_layers: int, architectures: list[str]) -> List[StateDictNameMapping]:

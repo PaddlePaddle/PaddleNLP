@@ -20,7 +20,7 @@ from tests.testing_utils import require_package
 
 
 class BertConverterTest(unittest.TestCase):
-    @require_package("transformers")
+    @require_package("transformers", "torch")
     def test_token_classification(self):
         with tempfile.TemporaryDirectory() as tempdir:
             from transformers import BertConfig, BertForTokenClassification
@@ -37,19 +37,16 @@ class BertConverterTest(unittest.TestCase):
             # compare the state_dict
             comparer = BertLogitComparer(input_dir=tempdir)
 
-            result = comparer.compare_logits(tempdir, tempdir)
+            result = comparer.compare_logits()
             self.assertTrue(result)
 
-    @require_package("transformers")
+    @require_package("transformers", "torch")
     def test_smoke_comparer(self):
         """only test whether it will work fine"""
         with tempfile.TemporaryDirectory() as tempdir:
             from transformers import BertConfig, BertModel
 
-            config: BertConfig = BertConfig.from_pretrained("bert-base-uncased")
-            config.hidden_sizee = 32
-            config.num_hidden_layers = 4
-            config.num_attention_heads = 4
+            config: BertConfig = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel")
 
             pytorch_model = BertModel(config)
             pytorch_model.save_pretrained(tempdir)
@@ -58,17 +55,14 @@ class BertConverterTest(unittest.TestCase):
             comparer = BertLogitComparer(input_dir=tempdir)
             comparer.convert()
 
-            comparer.compare_logits(tempdir, tempdir)
+            comparer.compare_logits()
 
-    @require_package("transformers")
+    @require_package("transformers", "torch")
     def test_smoke(self):
         with tempfile.TemporaryDirectory() as tempdir:
             from transformers import BertConfig, BertModel
 
-            config: BertConfig = BertConfig.from_pretrained("bert-base-uncased")
-            config.hidden_sizee = 32
-            config.num_hidden_layers = 4
-            config.num_attention_heads = 4
+            config: BertConfig = BertConfig.from_pretrained("hf-internal-testing/tiny-random-BertModel")
 
             pytorch_model = BertModel(config)
             pytorch_model.save_pretrained(tempdir)
@@ -80,5 +74,5 @@ class BertConverterTest(unittest.TestCase):
             # compare the state_dict
             comparer = BertLogitComparer(input_dir=tempdir)
 
-            result = comparer.compare_logits(tempdir, tempdir)
+            result = comparer.compare_logits()
             self.assertTrue(result)
