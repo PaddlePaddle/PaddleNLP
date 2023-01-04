@@ -41,7 +41,7 @@ class BTTransformer(nn.Layer):
         # self.save_hyperparameters()
         self.hparams = config
         self.prepare_data_per_node = False
-        self.is_clip = "CLIP" in config["vit"]
+        self.is_clip = "clip" in config["vit"]
         self.is_swin = "swin" in config["vit"]
         self.is_vit = "vit" in config["vit"]
         self.jump_val_first_for_irtr_itm_irc = True

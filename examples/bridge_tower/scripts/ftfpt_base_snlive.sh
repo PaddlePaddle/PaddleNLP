@@ -88,9 +88,10 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --warmup_ratio 0.06 \
                 --logging_steps 50 \
                 --eval_steps 100 \
-                --evaluation_strategy steps \
+                --evaluation_strategy epoch \
                 --per_device_train_batch_size 8 \
                 --per_device_eval_batch_size 64 \
+                --batch_size 64 \
                 --dataloader_num_workers 8 \
                 --save_steps 8000 \
                 --num_train_epochs 5 \
