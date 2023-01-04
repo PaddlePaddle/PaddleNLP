@@ -273,6 +273,12 @@ More information about PaddlePaddle installation please refer to [PaddlePaddle's
 pip install --upgrade paddlenlp
 ```
 
+or you can install the latest develop branch code with the following command:
+
+```shell
+pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
+```
+
 ## Quick Start
 
 **Taskflow** aims to provide off-the-shelf NLP pre-built task covering NLU and NLG scenario, in the meanwhile with extreamly fast infernece satisfying industrial applications.
