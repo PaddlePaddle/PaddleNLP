@@ -338,7 +338,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
 
     const jfieldID j_intent_slot_str_id = env->GetFieldID(
         j_intent_slot_result_clazz, "mStr", "Ljava/lang/String;");
-    const jfieldID j_intent_slot_init_id = env->GetFieldID(
+    const jfieldID j_intent_slot_initialized_id = env->GetFieldID(
         j_intent_slot_result_clazz, "mInitialized", "Z");
     const jfieldID j_intent_slot_intent_id = env->GetFieldID(
         j_intent_slot_result_clazz, "mIntentResult",
@@ -347,17 +347,38 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
         j_intent_slot_result_clazz, "mSlotResult",
         "[Lcom/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$SlotFillResult;");
 
+    // Constructor method
+    const jmethodID j_intent_slot_init_method = env->GetMethodID(
+        j_intent_slot_result_clazz, "<init>", "()V");
+    const jmethodID j_intent_init_method = env->GetMethodID(
+        j_intent_result_clazz, "<init>", "()V");
+    const jmethodID j_slot_init_method = env->GetMethodID(
+        j_slot_result_clazz, "<init>", "()V");
+
     // IntentDetAndSlotFillResult[]
     const int c_results_size = c_results.size();
     jobjectArray j_intent_slot_results_arr = env->NewObjectArray(
         c_results_size, j_intent_slot_result_clazz, NULL);
 
     for (int i = 0; i < c_results_size; ++i) {
+      
       // mStr String
       // mInitialized boolean
       // mIntentResult IntentDetResult
       // mSlotResult SlotFillResult[]
-      
+
+      const auto& curr_c_result = c_results.at(i);
+      // IntentDetAndSlotFillResult
+      jobject j_intent_slot_result_obj = env->NewObject(
+          j_intent_slot_result_clazz, j_intent_slot_init_method);
+      // IntentDetResult
+      jobject j_intent_result_obj = env->NewObject(
+          j_intent_result_clazz, j_intent_init_method);
+      // SlotFillResult[]
+      const int curr_c_slot_size = curr_c_result.slot_result.size();
+      jobject j_slot_result_obj = env->NewObjectArray(
+          curr_c_slot_size, j_slot_result_clazz, NULL);
+
     }
 
 

@@ -11,11 +11,13 @@ public class IntentDetAndSlotFillResult {
     }
 
     static class IntentDetResult {
+        public IntentDetResult() {}
         public String mIntentLabel;
         public float mIntentConfidence;
     }
 
     static class SlotFillResult {
+        public SlotFillResult() {}
         public String mSlotLabel;
         public String mEntity;
         public int[] mPos; // [2]
