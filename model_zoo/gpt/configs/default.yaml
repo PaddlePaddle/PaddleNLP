@@ -7,7 +7,7 @@ msra_ner:
   logging_steps: 25
   save_steps: 250
   output_dir: ./tmp/msra_ner/
-  device: cpu
+  device: gpu 
   do_train: true
 
 glue:
@@ -21,7 +21,7 @@ glue:
   save_steps: 500
   output_dir: ./output_dir/glue
   eval_steps: 1
-  device: cpu
+  device: gpu
   do_train: true
 
 pretrain:
