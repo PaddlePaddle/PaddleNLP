@@ -1308,7 +1308,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 model_state_dict = cls.convert(cache_dir)
             else:
                 raise ValueError(
-                    f"download the pytorch_model.bin weight file, but model<{cls}> don't supported Convertiable"
+                    f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> don't supported Convertiable"
                 )
         else:
             # 4. loading the state dict
