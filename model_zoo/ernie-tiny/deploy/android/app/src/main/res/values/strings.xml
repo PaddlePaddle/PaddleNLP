@@ -1,0 +1,27 @@
+<resources>
+    <!-- Default App name -->
+    <string name="app_name">ERNIE Tiny</string>
+    <!-- Other App name -->
+    <string name="uie_app_name">UIE Nano</string>
+    <string name="start_ui_activity">开始使用</string>
+    <!-- Keys for PreferenceScreen -->
+    <string name="CHOOSE_PRE_INSTALLED_MODEL_KEY">CHOOSE_INSTALLED_MODEL_KEY</string>
+    <string name="MODEL_DIR_KEY">MODEL_DIR_KEY</string>
+    <string name="LABEL_PATH_KEY">LABEL_PATH_KEY</string>
+    <string name="CPU_THREAD_NUM_KEY">CPU_THREAD_NUM_KEY</string>
+    <string name="CPU_POWER_MODE_KEY">CPU_POWER_MODE_KEY</string>
+    <string name="SCORE_THRESHOLD_KEY">SCORE_THRESHOLD_KEY</string>
+    <string name="ENABLE_LITE_FP16_MODE_KEY">ENABLE_LITE_FP16_MODE_KEY</string>
+    <!-- Common default values ... -->
+    <string name="CPU_THREAD_NUM_DEFAULT">2</string>
+    <string name="CPU_POWER_MODE_DEFAULT">LITE_POWER_HIGH</string>
+    <string name="SCORE_THRESHOLD_DEFAULT">0.4</string>
+    <string name="ENABLE_LITE_FP16_MODE_DEFAULT">true</string>
+    <!-- Model assets values -->
+    <string name="UIE_MODEL_DIR_DEFAULT">models/uie-nano</string>
+    <!-- NLP Text values -->
+    <string name="UIE_SCHEMA_HINT">请输入需要的信息模式，如: 时间，选手，赛事名称</string>
+    <string name="UIE_SCHEMA_DEFAULT">时间, 选手, 赛事名称</string>
+    <string name="UIE_INPUT_TEXTS_HINT">请输入需要分析的文本，如：2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！</string>
+    <string name="UIE_INPUT_TEXTS_DEFAULT">2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！</string>
+</resources>
