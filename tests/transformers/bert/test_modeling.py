@@ -590,7 +590,7 @@ class BertCompatibilityTest(unittest.TestCase):
     def test_bert_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
             model: BertModel = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir, from_hf_hub=True
+                "hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir
             )
 
             word_embedding = model.get_input_embeddings().weight

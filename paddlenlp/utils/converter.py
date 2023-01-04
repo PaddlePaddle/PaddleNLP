@@ -514,7 +514,7 @@ class Convertible:
                 logger.warning(f"key<{name_mapping.source_name}> not in the pytorch weight file.")
                 continue
 
-            state_dict[name_mapping.target_name] = name_mapping.run(state_dict[name_mapping.source_name])
+            state_dict[name_mapping.target_name] = name_mapping.run(state_dict.pop(name_mapping.source_name))
             all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
