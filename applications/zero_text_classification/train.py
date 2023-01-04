@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 from dataclasses import dataclass, field
 
 import paddle
-from utils import BCEWithLogitsLossPaddedWithMinusOne, MetricReport, read_local_dataset
+from paddle.static import InputSpec
+from utils import MetricReport, UTCLoss, read_local_dataset
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -25,23 +27,24 @@ from paddlenlp.prompt import (
     UTCTemplate,
 )
 from paddlenlp.trainer import PdArgumentParser
-from paddlenlp.transformers import UTC, AutoTokenizer
+from paddlenlp.transformers import UTC, AutoTokenizer, export_model
 
 
 @dataclass
 class DataArguments:
-    dataset_dir: str = field(
+    dataset_path: str = field(
         metadata={"help": "Local dataset directory including train.txt, dev.txt and label.txt (optional)."}
     )
     train_file: str = field(default="train.txt", metadata={"help": "Train dataset file name."})
     dev_file: str = field(default="dev.txt", metadata={"help": "Dev dataset file name."})
-    shuffle_choices: bool = field(default=False, metadata={"help": "Whether to shuffle choices."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
 
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Build-in pretrained model."})
+    model_name_or_path: str = field(default="utc-large", metadata={"help": "Build-in pretrained model."})
+    export_type: str = field(default="paddle", metadata={"help": "The type to export. Support `paddle` and `onnx`."})
+    export_model_dir: str = field(default="checkpoints/model_best", metadata={"help": "The export model path."})
 
 
 def main():
@@ -55,35 +58,30 @@ def main():
     # Load the pretrained language model.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = UTC.from_pretrained(model_args.model_name_or_path)
-    omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
-    tokenizer.add_special_tokens(omask_dict)
-    model.resize_token_embeddings(len(tokenizer))
+    if not os.path.isdir(model_args.model_name_or_path) and model_args.model_name_or_path != "utc-large":
+        omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
+        tokenizer.add_special_tokens(omask_dict)
+        model.resize_token_embeddings(len(tokenizer))
 
     # Define template for preprocess and verbalizer for postprocess.
-    prompt = (
-        "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True}"
-        "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
-    )
-    template = UTCTemplate(prompt, tokenizer, training_args.max_seq_length, max_position_id=511)
+    template = UTCTemplate(tokenizer, training_args.max_seq_length)
 
     # Load and preprocess dataset.
     train_ds = load_dataset(
         read_local_dataset,
-        data_path=data_args.dataset_dir,
+        data_path=data_args.dataset_path,
         data_file=data_args.train_file,
-        shuffle_choices=data_args.shuffle_choices,
         lazy=False,
     )
     dev_ds = load_dataset(
         read_local_dataset,
-        data_path=data_args.dataset_dir,
+        data_path=data_args.dataset_path,
         data_file=data_args.dev_file,
-        shuffle_choices=data_args.shuffle_choices,
         lazy=False,
     )
 
     # Define the criterion.
-    criterion = BCEWithLogitsLossPaddedWithMinusOne()
+    criterion = UTCLoss()
 
     # Initialize the prompt model.
     prompt_model = PromptModelForSequenceClassification(
@@ -92,12 +90,12 @@ def main():
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        metric = MetricReport()
+        metric = MetricReport(threshold=data_args.threshold)
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.nn.functional.sigmoid(paddle.to_tensor(eval_preds.predictions))
-        labels = labels[preds > 0]
-        preds = preds[preds > 0]
-        acc = float(((preds > data_args.threshold).astype("int64") == labels).mean().numpy())
+        preds = preds[labels != -100]
+        labels = labels[labels != -100]
+        acc = float(((preds > data_args.threshold).astype("int64") == labels).mean())
         metric.update(preds, labels)
         micro_f1, macro_f1 = metric.accumulate()
         return {"acc": acc, "micro_f1": micro_f1, "macro_f1": macro_f1}
@@ -121,6 +119,18 @@ def main():
         trainer.log_metrics("train", metrics)
         trainer.save_metrics("train", metrics)
         trainer.save_state()
+
+    # Export.
+    if training_args.do_export:
+        input_spec = [
+            InputSpec(shape=[None, None], dtype="int64", name="input_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="token_type_ids"),
+            InputSpec(shape=[None, None], dtype="int64", name="position_ids"),
+            InputSpec(shape=[None, None, None, None], dtype="float32", name="attention_mask"),
+            InputSpec(shape=[None, None], dtype="int64", name="omask_positions"),
+            InputSpec(shape=[None], dtype="int64", name="cls_positions"),
+        ]
+        export_model(trainer.pretrained_model, input_spec, model_args.export_model_dir, model_args.export_type)
 
 
 if __name__ == "__main__":

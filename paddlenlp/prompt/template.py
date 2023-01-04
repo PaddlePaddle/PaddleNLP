@@ -805,6 +805,8 @@ class AutoTemplate(object):
                 word_embeddings=word_embeddings,
                 soft_embeddings=soft_embeddings,
             )
+        elif "options" in template_keywords:
+            return UTCTemplate(tokenizer=tokenizer, max_length=max_length)
         else:
             return ManualTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length)
 
@@ -832,9 +834,13 @@ class UTCTemplate(Template):
 
     template_special_tokens = ["text", "hard", "sep", "cls", "options"]
 
-    def __init__(self, prompt: str, tokenizer: PretrainedTokenizer, max_length: int, max_position_id: int = None):
+    def __init__(self, tokenizer: PretrainedTokenizer, max_length: int):
+        prompt = (
+            "{'options': 'choices', 'add_omask': True, 'position': 0, 'token_type': 1}"
+            "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+        )
         super(UTCTemplate, self).__init__(prompt, tokenizer, max_length)
-        self.max_position_id = max_position_id
+        self.max_position_id = self.tokenizer.model_max_length - 1
         self.max_length = max_length
         if not self._has_options():
             raise ValueError(
@@ -868,13 +874,12 @@ class UTCTemplate(Template):
         sep_positions = (
             np.where(np.array(input_dict["input_ids"]) == self.tokenizer.sep_token_id)[0].squeeze().tolist()
         )
-        input_dict["cls_positions"] = sep_positions[1]
+        input_dict["cls_positions"] = sep_positions[0]
 
         # Limit the maximum position ids.
-        if self.max_position_id is not None:
-            position_ids = np.array(input_dict["position_ids"])
-            position_ids[position_ids > self.max_position_id] = self.max_position_id
-            input_dict["position_ids"] = position_ids.tolist()
+        position_ids = np.array(input_dict["position_ids"])
+        position_ids[position_ids > self.max_position_id] = self.max_position_id
+        input_dict["position_ids"] = position_ids.tolist()
 
         return input_dict
 

@@ -88,8 +88,6 @@ class ZeroTextClassificationTask(Task):
     def __init__(self, task: str, model: str = "utc-large", question: str = None, choices: list = None, **kwargs):
         super(ZeroTextClassificationTask, self).__init__(task=task, model=model, **kwargs)
 
-        print("model", self._model)
-
         self._question = "" if question is None else question
         self._choices = choices
         self._max_seq_len = kwargs.get("max_seq_len", 512)
@@ -131,13 +129,9 @@ class ZeroTextClassificationTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self._model)
+        self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
-        prompt = (
-            "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True, 'position': 0}"
-            "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
-        )
-        self._template = UTCTemplate(prompt, self._tokenizer, self._max_seq_len, max_position_id=511)
+        self._template = UTCTemplate(self._tokenizer, self._max_seq_len)
 
     def _check_input_text(self, inputs):
         inputs = inputs[0]
@@ -223,13 +217,12 @@ class ZeroTextClassificationTask(Task):
         outputs = []
         for logits in inputs["batch_logits"]:
             scores = np_sigmoid(logits)
-            for score in scores:
-                output = {}
-                output["predictions"] = []
-                for i, class_score in enumerate(score):
-                    if class_score > self._pred_threshold:
-                        output["predictions"].append({"label": i, "score": class_score})
-                outputs.append(output)
+            output = {}
+            output["predictions"] = []
+            for i, class_score in enumerate(scores):
+                if class_score > self._pred_threshold:
+                    output["predictions"].append({"label": i, "score": class_score})
+            outputs.append(output)
 
         for i, output in enumerate(outputs):
             if len(inputs["text"][i]["text_a"]) > 0:

@@ -1332,16 +1332,16 @@ class UTC(ErniePretrainedModel):
         cls_output = paddle.tensor.gather(flat_sequence_output, cls_positions)
         q = self.linear_q(cls_output)
 
-        flat_length = paddle.unsqueeze(paddle.to_tensor([seq_len * i for i in range(batch_size)]), axis=1)
+        flat_length = paddle.arange(batch_size) * seq_len
+        flat_length = flat_length.unsqueeze(axis=1).astype("int64")
         option_output = paddle.tensor.gather(flat_sequence_output, paddle.reshape(omask_positions + flat_length, [-1]))
         option_output = paddle.reshape(option_output, [batch_size, -1, hidden_size])
         k = self.linear_k(option_output)
 
-        option_logits = paddle.einsum("bh,bmh->bm", q, k)
-        for index, logit in enumerate(option_logits):
-            if (omask_positions[index] == 0).any():
-                option_logits[index] -= (omask_positions[index] == 0) * 1e12
+        option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
         option_logits = option_logits / self.predict_size**0.5
+        for index, logit in enumerate(option_logits):
+            option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
 
         loss = None
         if labels is not None:

@@ -17,14 +17,14 @@ import json
 import os
 
 import numpy as np
+import paddle
 from paddle.metric import Metric
-from paddle.nn import BCEWithLogitsLoss
 from sklearn.metrics import classification_report, f1_score
 
 from paddlenlp.utils.log import logger
 
 
-def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test=False):
+def read_local_dataset(data_path, data_file=None, is_test=False):
     """
     Load datasets with one example per line, formated as:
         {"text_a": X, "text_b": X, "question": X, "choices": [A, B], "labels": [0, 1]}
@@ -33,15 +33,13 @@ def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test
         file_paths = [os.path.join(data_path, fname) for fname in os.listdir(data_path) if fname.endswith(data_file)]
     else:
         file_paths = [data_path]
+    skip_count = 0
     for file_path in file_paths:
         with open(file_path, "r", encoding="utf-8") as fp:
             for example in fp:
                 example = json.loads(example.strip())
-                if (
-                    len(" ".join(example["choices"])) + len(example["question"]) + 6 >= 2400
-                    or len(example["choices"]) < 2
-                ):
-                    logger.warning("Skip example: " + json.dumps(example, ensure_ascii=False))
+                if len(example["choices"]) < 2 or not isinstance(example["text_a"], str) or len(example["text_a"]) < 3:
+                    skip_count += 1
                     continue
                 if "text_b" not in example:
                     example["text_b"] = ""
@@ -53,26 +51,33 @@ def read_local_dataset(data_path, data_file=None, shuffle_choices=False, is_test
                         one_hots[x] = 1
                     example["labels"] = one_hots.tolist()
 
-                if shuffle_choices:
-                    rand_index = np.random.permutation(len(example["choices"]))
-                    example["choices"] = [example["choices"][index] for index in rand_index]
-                    if not is_test:
-                        example["labels"] = [example["labels"][index] for index in rand_index]
+                if is_test:
+                    yield example
+                    continue
                 std_keys = ["text_a", "text_b", "question", "choices", "labels"]
-                std_example = {k: example[k] for k in std_keys}
+                std_example = {k: example[k] for k in std_keys if k in example}
                 yield std_example
+    logger.warning(f"Skip {skip_count} examples.")
 
 
-class BCEWithLogitsLossPaddedWithMinusOne(BCEWithLogitsLoss):
-    def __init__(self, weight=None, reduction="mean", pos_weight=None, name=None):
-        super(BCEWithLogitsLossPaddedWithMinusOne, self).__init__(
-            weight=weight, reduction=reduction, pos_weight=pos_weight, name=name
-        )
+class UTCLoss(object):
+    def __call__(self, logit, label):
+        return self.forward(logit, label)
 
     def forward(self, logit, label):
-        logit = logit[label != -100]
-        label = label[label != -100]
-        return super(BCEWithLogitsLossPaddedWithMinusOne, self).forward(logit, label)
+        logit = (1 - 2 * label) * logit
+        logit_neg = logit - label * 1e12
+        logit_pos = logit - (1 - label) * 1e12
+        zeros = paddle.zeros_like(logit[..., :1])
+        logit_neg = paddle.concat([logit_neg, zeros], axis=-1)
+        logit_pos = paddle.concat([logit_pos, zeros], axis=-1)
+        label = paddle.concat([label, zeros], axis=-1)
+        logit_neg[label == -100] = -1e12
+        logit_pos[label == -100] = -1e12
+        neg_loss = paddle.logsumexp(logit_neg, axis=-1)
+        pos_loss = paddle.logsumexp(logit_pos, axis=-1)
+        loss = (neg_loss + pos_loss).mean()
+        return loss
 
 
 class MetricReport(Metric):
@@ -80,9 +85,10 @@ class MetricReport(Metric):
     F1 score for multi-label text classification task.
     """
 
-    def __init__(self, name="MetricReport", average="micro"):
+    def __init__(self, name="MetricReport", average="micro", threshold=0.5):
         super(MetricReport, self).__init__()
         self.average = average
+        self.threshold = threshold
         self._name = name
         self.reset()
 
@@ -97,8 +103,7 @@ class MetricReport(Metric):
         """
         Compute micro f1 score and macro f1 score
         """
-        threshold = 0.5
-        self.y_pred = y_prob > threshold
+        self.y_pred = y_prob > self.threshold
         micro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="micro")
         macro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="macro")
         return micro_f1_score, macro_f1_score
@@ -127,7 +132,7 @@ class MetricReport(Metric):
         """
         Returns classification report
         """
-        self.y_pred = self.y_prob > 0.5
+        self.y_pred = self.y_prob > self.threshold
         logger.info("classification report:\n" + classification_report(self.y_true, self.y_pred, digits=4))
 
     def name(self):

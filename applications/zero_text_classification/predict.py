@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 from dataclasses import dataclass, field
 
 import paddle
 from paddle.metric import Accuracy
-from utils import read_local_dataset
+from utils import UTCLoss, read_local_dataset
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -31,14 +33,14 @@ from paddlenlp.transformers import UTC, AutoTokenizer
 
 @dataclass
 class DataArguments:
-    test_path: str = field(default="test.txt", metadata={"help": "Test dataset file name."})
+    test_path: str = field(default=None, metadata={"help": "Test dataset file name."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
 
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="ernie-1.0-large-zh-cw", metadata={"help": "Build-in pretrained model."})
-    model_state: str = field(default=None, metadata={"help": "Build-in pretrained model."})
+    model_name_or_path: str = field(default="utc-large", metadata={"help": "Build-in pretrained model."})
+    model_path: str = field(default=None, metadata={"help": "Build-in pretrained model."})
 
 
 def main():
@@ -52,45 +54,33 @@ def main():
     # Load the pretrained language model.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = UTC.from_pretrained(model_args.model_name_or_path)
-    omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
-    tokenizer.add_special_tokens(omask_dict)
-    model.resize_token_embeddings(len(tokenizer))
+    if model_args.model_name_or_path != "utc-large":
+        omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
+        tokenizer.add_special_tokens(omask_dict)
+        model.resize_token_embeddings(len(tokenizer))
 
     # Define template for preprocess and verbalizer for postprocess.
-    prompt = (
-        "{'text': 'question'}{'sep': None, 'token_type': 1}{'options': 'choices', 'add_omask': True}"
-        "{'cls': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
-    )
-    template = UTCTemplate(prompt, tokenizer, training_args.max_seq_length, max_position_id=511)
+    template = UTCTemplate(tokenizer, training_args.max_seq_length)
 
     # Load and preprocess dataset.
-    test_ds = load_dataset(read_local_dataset, data_path=data_args.test_path, lazy=False)
-
-    # Define the criterion.
-    criterion = paddle.nn.BCEWithLogitsLoss()
+    if data_args.test_path is not None:
+        test_ds = load_dataset(read_local_dataset, data_path=data_args.test_path, is_test=True, lazy=False)
 
     # Initialize the prompt model.
     prompt_model = PromptModelForSequenceClassification(
         model, template, None, freeze_plm=training_args.freeze_plm, freeze_dropout=training_args.freeze_dropout
     )
-    if model_args.model_state is not None:
-        model_state = paddle.load(model_args.model_state)
+    if model_args.model_path is not None:
+        model_state = paddle.load(os.path.join(model_args.model_path, "model_state.pdparams"))
         prompt_model.set_state_dict(model_state)
 
     # Define the metric function.
     def compute_metrics(eval_preds):
         metric = Accuracy()
-        print(eval_preds.predictions.shape)
-        print(eval_preds.label_ids.shape)
 
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
-        print("preds", preds)
-        print("labels", labels)
-        preds = paddle.nn.functional.softmax(preds, axis=1)
         labels = paddle.argmax(labels, axis=1)
-        print("preds", preds)
-        print("labels", labels)
         correct = metric.compute(preds, labels)
         metric.update(correct)
         acc = metric.accumulate()
@@ -100,15 +90,26 @@ def main():
         model=prompt_model,
         tokenizer=tokenizer,
         args=training_args,
-        criterion=criterion,
+        criterion=UTCLoss(),
         train_dataset=None,
         eval_dataset=None,
         callbacks=None,
         compute_metrics=compute_metrics,
     )
 
-    test_ret = trainer.predict(test_ds)
-    trainer.log_metrics("test", test_ret.metrics)
+    if data_args.test_path is not None:
+        test_ret = trainer.predict(test_ds)
+        trainer.log_metrics("test", test_ret.metrics)
+        with open(os.path.join(training_args.output_dir, "test_metric.json"), "w", encoding="utf-8") as fp:
+            json.dump(test_ret.metrics, fp)
+
+        with open(os.path.join(training_args.output_dir, "test_predictions.json"), "w", encoding="utf-8") as fp:
+            preds = paddle.nn.functional.sigmoid(paddle.to_tensor(test_ret.predictions))
+            for index, pred in enumerate(preds):
+                result = {"id": index}
+                result["labels"] = paddle.where(pred > data_args.threshold)[0].tolist()
+                result["probs"] = pred[pred > data_args.threshold].tolist()
+                fp.write(json.dumps(result, ensure_ascii=False) + "\n")
 
 
 if __name__ == "__main__":
