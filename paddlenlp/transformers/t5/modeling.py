@@ -1565,6 +1565,9 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             "use_cache": use_cache,
         }
 
+    def prepare_decoder_input_ids_from_labels(self, labels: paddle.Tensor):
+        return self._shift_right(labels)
+
     @staticmethod
     def expand_inputs_for_generation(input_ids, expand_size, attention_mask=None, **model_kwargs):
         index = paddle.tile(paddle.arange(input_ids.shape[0]).unsqueeze(-1), [1, expand_size]).reshape([-1])
@@ -1662,6 +1665,7 @@ class T5EncoderModel(T5PretrainedModel):
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
     ):
+
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         encoder_outputs = self.encoder(
             input_ids=input_ids,
