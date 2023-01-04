@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from args import init_argv, parse_config_file
+from args import init_argv
 
 
 def test_pretrain():
-    config_file = parse_config_file()
+    config_file = "./configs/test.yaml"
     init_argv("pretrain", config_file)
-    print(init_argv)
     from run_pretrain_trainer import main
 
     main()
