@@ -25,17 +25,17 @@ from .tokenizer_utils import (
 )
 from .processing_utils import ProcessorMixin
 from .feature_extraction_utils import BatchFeature, FeatureExtractionMixin
-from .image_processing_utils import ImageProcessingMixin  # flake8: noqa
+from .image_processing_utils import ImageProcessingMixin
 from .attention_utils import create_bigbird_rand_mask_idx_list
 from .export import export_model
 
-# isort: split
+
 from .bert.modeling import *
 from .bert.tokenizer import *
 from .bert.configuration import *
 from .bert.converter import *
 
-# isort: split
+
 from .gpt.modeling import *
 from .gpt.tokenizer import *
 from .roberta.modeling import *
