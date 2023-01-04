@@ -70,10 +70,18 @@ std::ostream& operator<<(std::ostream& os,
   return os;
 }
 
-static std::string Str(const IntentDetAndSlotFillResult& result) {
+static std::string ResultStr(const IntentDetAndSlotFillResult& result) {
   std::ostringstream oss;
   oss << result;
   return oss.str();
+}
+
+static std::string TextsStr(const std::vector<std::string>& texts) {
+  std::string str = "";
+  for (const auto& s: texts) {
+    str += (s + ";");
+  }
+  return str;
 }
 
 struct Predictor {
@@ -81,6 +89,7 @@ struct Predictor {
   ErnieFastTokenizer tokenizer_;
   std::unordered_map<int, std::string> slot_labels_;
   std::unordered_map<int, std::string> intent_labels_;
+  bool runtime_initialed_ = false;
 
   Predictor(const fastdeploy::RuntimeOption& option,
             const ErnieFastTokenizer& tokenizer,
@@ -88,8 +97,13 @@ struct Predictor {
             const std::unordered_map<int, std::string>& intent_labels)
       : tokenizer_(tokenizer), slot_labels_(slot_labels),
         intent_labels_(intent_labels) {
-    runtime_.Init(option);
+    runtime_initialed_ = runtime_.Init(option);
   }
+
+  bool Initialized() {
+    return runtime_initialed_;
+  }
+
   bool Preprocess(const std::vector<std::string>& texts,
                   std::vector<fastdeploy::FDTensor>* inputs) {
     std::vector<fast_tokenizer::core::Encoding> encodings;
@@ -255,8 +269,36 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
                                                                  jstring slot_labels_file,
                                                                  jstring intent_labels_file,
                                                                  jobject runtime_option) {
+  auto c_model_file = ernie_tiny::jni::ConvertTo<std::string>(env, model_file);
+  auto c_params_file = ernie_tiny::jni::ConvertTo<std::string>(env, params_file);
+  auto c_vocab_file = ernie_tiny::jni::ConvertTo<std::string>(env, vocab_file);
+  auto c_slot_labels_file = ernie_tiny::jni::ConvertTo<std::string>(env, slot_labels_file);
+  auto c_intent_labels_file = ernie_tiny::jni::ConvertTo<std::string>(env, intent_labels_file);
+  auto c_runtime_option = ernie_tiny::jni::NewCxxRuntimeOption(env, runtime_option);
+  c_runtime_option.SetModelPath(c_model_file, c_params_file);
 
-  return 0;
+  uint32_t c_max_length = 16;
+  ErnieFastTokenizer c_tokenizer(c_vocab_file);
+  c_tokenizer.EnableTruncMethod(
+      c_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
+  c_tokenizer.EnablePadMethod(
+      fast_tokenizer::core::Direction::RIGHT, 0, 0,
+      "[PAD]", &c_max_length, nullptr);
+  std::unordered_map<int, std::string> c_slot_label_map;
+  std::unordered_map<int, std::string> c_intent_label_map;
+  ReadLabelMapFromTxt(c_slot_labels_file, &c_slot_label_map);
+  ReadLabelMapFromTxt(c_intent_labels_file, &c_intent_label_map);
+
+  auto c_predictor_ptr = new Predictor(
+      c_runtime_option, c_tokenizer, c_slot_label_map, c_intent_label_map);
+
+  if (!c_predictor_ptr->Initialized()) {
+    LOGE("Predictor initialize failed!");
+    return 0;
+  }
+
+  return reinterpret_cast<jlong>(c_predictor_ptr);
 }
 
 JNIEXPORT jobjectArray JNICALL
@@ -264,6 +306,64 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
                                                                     jobject thiz,
                                                                     jlong cxx_context,
                                                                     jobjectArray texts) {
+  if (cxx_context == 0) {
+    return NULL;
+  }
+  auto c_predictor_ptr = reinterpret_cast<Predictor*>(cxx_context);
+  auto c_texts = ernie_tiny::jni::ConvertTo<std::vector<std::string>>(env, texts);
+  if (c_texts.empty()) {
+    LOGE("c_texts is empty!");
+    return NULL;
+  }
+  LOGD("c_texts: %s", TextsStr(c_texts).c_str());
+
+  std::vector<IntentDetAndSlotFillResult> c_results;
+
+  if(c_predictor_ptr->Predict(c_texts, &c_results)) {
+
+    // Show some log info to logcat
+    for (int i = 0; i < c_results.size(); ++i) {
+      std::string info = "No." + std::to_string(i) + " text = "
+          + c_texts[i] + "\n" + ResultStr(c_results[i]);
+      LOGD("%s", info.c_str());
+    }
+
+    // Assign to Java IntentDetAndSlotFillResult[]
+    const jclass j_intent_slot_result_clazz = env->FindClass(
+        "com/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult");
+    const jclass j_intent_result_clazz = env->FindClass(
+        "com/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$IntentDetResult");
+    const jclass j_slot_result_clazz = env->FindClass(
+        "com/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$SlotFillResult");
+
+    const jfieldID j_intent_slot_str_id = env->GetFieldID(
+        j_intent_slot_result_clazz, "mStr", "Ljava/lang/String;");
+    const jfieldID j_intent_slot_init_id = env->GetFieldID(
+        j_intent_slot_result_clazz, "mInitialized", "Z");
+    const jfieldID j_intent_slot_intent_id = env->GetFieldID(
+        j_intent_slot_result_clazz, "mIntentResult",
+        "Lcom/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$IntentDetResult;");
+    const jfieldID j_intent_slot_slot_id = env->GetFieldID(
+        j_intent_slot_result_clazz, "mSlotResult",
+        "[Lcom/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$SlotFillResult;");
+
+    // IntentDetAndSlotFillResult[]
+    const int c_results_size = c_results.size();
+    jobjectArray j_intent_slot_results_arr = env->NewObjectArray(
+        c_results_size, j_intent_slot_result_clazz, NULL);
+
+    for (int i = 0; i < c_results_size; ++i) {
+      // mStr String
+      // mInitialized boolean
+      // mIntentResult IntentDetResult
+      // mSlotResult SlotFillResult[]
+      
+    }
+
+
+  }
+
+
   return NULL;
 }
 
@@ -271,7 +371,14 @@ JNIEXPORT jboolean JNICALL
 Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_releaseNative(JNIEnv *env,
                                                                     jobject thiz,
                                                                     jlong cxx_context) {
-  return JNI_FALSE;
+  if (cxx_context == 0) {
+    return JNI_FALSE;
+  }
+  auto c_predictor_ptr = reinterpret_cast<Predictor*>(cxx_context);
+
+  delete c_predictor_ptr;
+  LOGD("[End] Release Predictor in native !");
+  return JNI_TRUE;
 }
 
 #ifdef __cplusplus
