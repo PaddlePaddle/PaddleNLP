@@ -59,15 +59,14 @@ def build_model(
     vit_remove_last=False,
 ):
     # 采用了硬编码的方式加载了预训练模型，主要用于计算adapt_position_encoding的参数
-    if os.path.join(name, "model_state.pdparams"):
-        model_path = os.path.join(name, "model_state.pdparams")
-        model_state = paddle.load(model_path)
-    else:
+    if not os.path.join(name, "model_state.pdparams"):
         from paddlenlp.transformers import CLIPModel
 
         model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
         model.save_pretrained(name)
 
+    model_path = os.path.join(name, "model_state.pdparams")
+    model_state = paddle.load(model_path)
     # resolution_after会变化，初始化的可能不是默认的模型
     model = CLIPVisionModel.from_pretrained(name, image_resolution=resolution_after)
     # Load original state dict
