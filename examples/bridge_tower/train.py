@@ -14,22 +14,29 @@
 
 import functools
 import json
+import os
 from dataclasses import dataclass, field
 
 import paddle
 from paddle.metric import Accuracy
 from src.modules import BTTransformer
 from src.modules.meter_utils import set_schedule
-from trainer_util import BridgeTowerPreTrainTrainer, BridgeTowerTrainer
+from trainer_util import BridgeTowerPreTrainTrainer, BridgeTowerTrainer, MyCallback
 from utils import collate_fn, get_dataset, get_pretrained_dataset
 
 from paddlenlp.data import DataCollatorForLanguageModeling, DataCollatorForWholeWordMask
 from paddlenlp.trainer import PdArgumentParser, TrainingArguments
 
+os.environ["NCCL_DEBUG"] = "INFO"
+
 
 @dataclass
 class DataArguments:
     test_only: bool = field(default=False, metadata={"help": "Whether to evaluate model on public test datasets."})
+    data_root: str = field(
+        default="/root/paddlejob/workspace/env_run/output/dataset/fine-tune",
+        metadata={"help": "Whether to evaluate model on public test datasets."},
+    )
 
 
 @dataclass
@@ -39,6 +46,8 @@ class ModelArguments:
     lr_end: float = field(default=0.1, metadata={"help": "The dropout used for pretrained model."})
     power: int = field(default=1, metadata={"help": "Save checkpoint every X updates steps."})
     config_name: str = field(default="configs/config.json", metadata={"help": "training config"})
+    checkpoint_path: str = field(default="", metadata={"help": "checkpoint path"})
+    batch_size: int = field(default=4096, metadata={"help": "Total batch size for training."})
 
 
 def get_config(file_path):
@@ -53,21 +62,33 @@ def main():
     model_args, data_args, training_args = parser.parse_args_into_dataclasses()
     training_args.print_config(model_args, "Model")
     training_args.print_config(data_args, "Data")
+
     paddle.set_device(training_args.device)
 
     _config = get_config(model_args.config_name)
-
-    _config["num_workers"] = 0
-    # _config["batch_size"]=2
-
-    # _config['num_gpus']=1
-    # _config['num_workers']=1
-    # _config['per_gpu_batchsize']=8
-    # _config['per_gpu_eval_batchsize']=8
+    _config["data_root"] = data_args.data_root
+    _config["batch_size"] = model_args.batch_size
 
     model = BTTransformer(_config)
 
     optimizer_grouped_parameters = set_schedule(model, _config)
+
+    raw_state_dict = model.state_dict()
+    if os.path.exists(model_args.checkpoint_path):
+        state_dict = paddle.load(model_args.checkpoint_path)
+        with open("converted_torch_param.txt", "w") as f:
+            for k, v in state_dict.items():
+                f.write(k + "\n")
+        f_loaded = open("completed_keys.txt", "w")
+        with open("imcomplete_keys.txt", "w") as f:
+            for k, v in raw_state_dict.items():
+                if k not in state_dict:
+                    f.write(k + "\n")
+                else:
+                    f_loaded.write(k + "\n")
+        f_loaded.close()
+        model.load_dict(state_dict)
+        print("Loading parameters from {}".format(model_args.checkpoint_path))
 
     if _config["group_name"] == "mlm_itm":
         tokenizer, train_dataset, eval_dataset = get_pretrained_dataset(_config)
@@ -80,7 +101,10 @@ def main():
         collate_fn,
         mlm_collator=mlm_collator,
     )
-    # print(training_args)
+    grad_steps = max(
+        _config["batch_size"] // (_config["per_gpu_batchsize"] * _config["num_gpus"] * _config["num_nodes"]), 1
+    )
+    training_args.gradient_accumulation_steps = grad_steps
     checkpoint = None
     if training_args.resume_from_checkpoint is not None:
         checkpoint = training_args.resume_from_checkpoint
@@ -92,7 +116,6 @@ def main():
         preds = paddle.to_tensor(preds)
         label = paddle.to_tensor(p.label_ids)
 
-        # probs = F.softmax(preds, axis=-1)
         metric = Accuracy()
         metric.reset()
         result = metric.compute(preds, label)
@@ -101,7 +124,6 @@ def main():
         metric.reset()
         return {"accuracy": accu}
 
-    # criterion = nn.BCEWithLogitsLoss()
     if _config["group_name"] == "mlm_itm":
         trainer = BridgeTowerPreTrainTrainer(
             model=model,
@@ -110,6 +132,7 @@ def main():
             data_collator=my_collate,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
+            callbacks=[MyCallback],
             tokenizer=tokenizer,
             compute_metrics=compute_metrics,
         )
@@ -121,6 +144,7 @@ def main():
             data_collator=my_collate,
             train_dataset=train_dataset,
             eval_dataset=eval_dataset,
+            callbacks=[MyCallback],
             tokenizer=tokenizer,
             compute_metrics=compute_metrics,
         )

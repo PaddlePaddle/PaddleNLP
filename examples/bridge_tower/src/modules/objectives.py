@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# import torch
 import functools
 import json
 
@@ -29,17 +28,6 @@ class DistributedSampler(paddle.io.DistributedBatchSampler):
         super().__init__(
             dataset=dataset, batch_size=1, num_replicas=num_replicas, rank=rank, shuffle=shuffle, drop_last=drop_last
         )
-
-
-# def init_weights(module):
-#     if isinstance(module, (nn.Linear, nn.Embedding)):
-#         module.weight.data.normal_(mean=0.0, std=0.02)
-#     elif isinstance(module, nn.LayerNorm):
-#         module.bias.data.zero_()
-#         module.weight.data.fill_(1.0)
-
-#     if isinstance(module, nn.Linear) and module.bias is not None:
-#         module.bias.data.zero_()
 
 
 def init_weights(layer):
@@ -64,10 +52,8 @@ def init_weights(layer):
 
 # pre-train
 def compute_mlm(model, batch, split):
-    model_infer = model._layers if isinstance(model, paddle.DataParallel) else model
-    # infer = model_infer.infer(batch)
-    infer = model_infer.infer(batch, mask_text=True, mask_image=False)
-    mlm_logits = model_infer.mlm_score(infer["text_feats"])
+    infer = model.infer(batch, mask_text=True, mask_image=False)
+    mlm_logits = model.mlm_score(infer["text_feats"])
     mlm_labels = infer["text_labels"]
 
     logsoftmax = F.log_softmax(mlm_logits.reshape([-1, mlm_logits.shape[-1]]), axis=1)
@@ -78,8 +64,6 @@ def compute_mlm(model, batch, split):
     #     mlm_labels.reshape([-1]),
     #     ignore_index=-100,
     # )
-    # breakpoint()
-
     ret = {
         "mlm_loss": mlm_loss,
         "mlm_logits": mlm_logits,
@@ -87,19 +71,33 @@ def compute_mlm(model, batch, split):
         "mlm_ids": infer["text_ids"],
     }
 
-    # loss_name = "mlm"
+    loss_name = "mlm"
+    loss = getattr(model, f"{split}_{loss_name}_loss")
+    acc = getattr(model, f"{split}_{loss_name}_accuracy")
+
+    loss.update(ret["mlm_loss"])
+    result = acc.compute(ret["mlm_logits"].reshape([-1, mlm_logits.shape[-1]]), ret["mlm_labels"].reshape([-1]))
+
+    acc.update(result)
+
+    # 聚合各个节点的loss
+    example_train_loss = loss.accumulate()
+    dist.all_reduce(example_train_loss)
+    example_train_loss = example_train_loss / dist.get_world_size()
+    metric_dict = {
+        f"{split}/{loss_name}/loss": example_train_loss.item(),
+        f"{split}/{loss_name}/accuracy": acc.accumulate(),
+    }
+    ret.update(metric_dict)
     return ret
 
 
 def compute_itm(model, batch, split):
 
-    model_infer = model._layers if isinstance(model, paddle.DataParallel) else model
-
     pos_len = len(batch["text"]) // 2
     neg_len = len(batch["text"]) - pos_len
     itm_labels = paddle.concat([paddle.ones([pos_len]), paddle.zeros([neg_len])])
     itm_labels = itm_labels[paddle.randperm(itm_labels.shape[0])]
-    # breakpoint()
     itm_images = [
         paddle.stack([ti if itm_labels[i] == 1 else fi for i, (ti, fi) in enumerate(zip(bti, bfi))])
         for bti, bfi in zip(batch["image"], batch["false_image_0"])
@@ -108,9 +106,9 @@ def compute_itm(model, batch, split):
     batch = {k: v for k, v in batch.items()}
     batch["image"] = itm_images
 
-    infer = model_infer.infer(batch)
+    infer = model.infer(batch)
 
-    itm_logits = model_infer.itm_score(infer["cls_feats"])
+    itm_logits = model.itm_score(infer["cls_feats"])
     itm_loss = F.cross_entropy(itm_logits, itm_labels.astype("int64"))
 
     ret = {
@@ -119,15 +117,25 @@ def compute_itm(model, batch, split):
         "itm_labels": itm_labels,
     }
 
-    # loss_name = "itm"
+    loss_name = "itm"
 
-    # loss = getattr(pl_module, f"{split}_{loss_name}_loss")(ret["itm_loss"])
-    # acc = getattr(pl_module, f"{split}_{loss_name}_accuracy")(
-    #     ret["itm_logits"], ret["itm_labels"]
-    # )
-    # pl_module.log(f"{split}/{loss_name}/loss", loss)
-    # pl_module.log(f"{split}/{loss_name}/accuracy", acc)
+    loss = getattr(model, f"{split}_{loss_name}_loss")
+    acc = getattr(model, f"{split}_{loss_name}_accuracy")
 
+    loss.update(ret["itm_loss"])
+    result = acc.compute(ret["itm_logits"], ret["itm_labels"])
+
+    acc.update(result)
+    loss_name = "itm"
+    # 聚合各个节点的loss
+    example_train_loss = loss.accumulate()
+    dist.all_reduce(example_train_loss)
+    example_train_loss = example_train_loss / dist.get_world_size()
+    metric_dict = {
+        f"{split}/{loss_name}/loss": example_train_loss.item(),
+        f"{split}/{loss_name}/accuracy": acc.accumulate(),
+    }
+    ret.update(metric_dict)
     return ret
 
 
@@ -489,13 +497,11 @@ def compute_itm_itc_meter(pl_module, batch, split, pretrain=False):
 
 # fine-tune
 def compute_snli(model, batch, split):
-    # infer = pl_module.infer(batch)
-    model_infer = model._layers if isinstance(model, paddle.DataParallel) else model
-    infer = model_infer.infer(batch)
-    snli_logits = model_infer.snli_classifier(infer["cls_feats"])
+    infer = model.infer(batch)
+    snli_logits = model.snli_classifier(infer["cls_feats"])
 
     snli_labels = batch["labels"]
-    snli_labels = paddle.to_tensor(snli_labels)
+    # snli_labels = paddle.to_tensor(snli_labels)
     snli_loss = F.cross_entropy(snli_logits, snli_labels.reshape([-1]))
 
     ret = {
@@ -504,41 +510,82 @@ def compute_snli(model, batch, split):
         "snli_labels": snli_labels,
     }
 
-    # loss_name = "snli"
-
+    loss_name = "snli"
     if split == "train":
+        loss = getattr(model, f"{split}_{loss_name}_loss")
+        acc = getattr(model, f"{split}_{loss_name}_accuracy")
+        loss.update(ret["snli_loss"])
+        result = acc.compute(ret["snli_logits"], ret["snli_labels"])
 
-        # do nothging
-        # loss = getattr(pl_module, f"{split}_{loss_name}_loss")(ret["snli_loss"])
-        # acc = getattr(pl_module, f"{split}_{loss_name}_accuracy")(
-        #     ret["snli_logits"], ret["snli_labels"]
-        # )
-        # pl_module.log(f"{split}/{loss_name}/loss", loss)
-        # pl_module.log(f"{split}/{loss_name}/accuracy", acc)
-        return ret
-    # else:
-    #     val_batches = [i for i, n in enumerate(batch["table_name"]) if "dev" in n]
-    #     test_batches = [i for i, n in enumerate(batch["table_name"]) if "test" in n]
+        acc.update(result)
+        # 聚合各个节点的loss
+        example_train_loss = loss.accumulate()
+        dist.all_reduce(example_train_loss)
+        example_train_loss = example_train_loss / dist.get_world_size()
+        metric_dict = {
+            f"{split}/{loss_name}/loss": example_train_loss.item(),
+            f"{split}/{loss_name}/accuracy": acc.accumulate(),
+        }
+        # dist.all_reduce(loss.accumulate())
+        # example_val_loss=example_val_loss / dist.get_world_size()
+        # metric_dict = {f"{split}/{loss_name}/loss": loss.accumulate().item(),
+        #             f"{split}/{loss_name}/accuracy": acc.accumulate()}
+        ret.update(metric_dict)
+    else:
+        val_batches = [i for i, n in enumerate(batch["table_name"]) if "dev" in n]
+        test_batches = [i for i, n in enumerate(batch["table_name"]) if "test" in n]
 
-    # if val_batches:
-    #     val_loss = getattr(pl_module, f"val_{loss_name}_loss")(
-    #         F.cross_entropy(ret["snli_logits"][val_batches], ret["snli_labels"][val_batches])
-    #     )
-    #     val_acc = getattr(pl_module, f"val_{loss_name}_accuracy")(
-    #         ret["snli_logits"][val_batches], ret["snli_labels"][val_batches]
-    #     )
-    #     pl_module.log(f"val/snli/loss", val_loss)
-    #     pl_module.log(f"val/snli/accuracy", val_acc)
+        if val_batches:
+            val_loss = getattr(model, f"val_{loss_name}_loss")
+            val_loss.update(F.cross_entropy(ret["snli_logits"][val_batches], ret["snli_labels"][val_batches]))
+            val_acc = getattr(model, f"val_{loss_name}_accuracy")
+            result = val_acc.compute(ret["snli_logits"][val_batches], ret["snli_labels"][val_batches])
+            val_acc.update(result)
+            # pl_module.log(f"val/snli/loss", val_loss)
+            # pl_module.log(f"val/snli/accuracy", val_acc)
+            example_val_loss = val_loss.accumulate()
+        else:
+            val_loss = getattr(model, f"val_{loss_name}_loss")
+            example_val_loss = val_loss.accumulate()
+            val_acc = getattr(model, f"val_{loss_name}_accuracy")
+        # 聚合各个节点的loss
+        dist.all_reduce(example_val_loss)
+        example_val_loss = example_val_loss / dist.get_world_size()
+        # print(example_val_loss)
+        metric_dict = {"val/snli/loss": example_val_loss.item(), "val/snli/accuracy": val_acc.accumulate()}
+        ret.update(metric_dict)
 
-    # if test_batches:
-    #     test_loss = getattr(pl_module, f"test_{loss_name}_loss")(
-    #         F.cross_entropy(ret["snli_logits"][test_batches], ret["snli_labels"][test_batches])
-    #     )
-    #     test_acc = getattr(pl_module, f"test_{loss_name}_accuracy")(
-    #         ret["snli_logits"][test_batches], ret["snli_labels"][test_batches]
-    #     )
-    #     pl_module.log(f"test/snli/loss", test_loss)
-    #     pl_module.log(f"test/snli/accuracy", test_acc)
+        if test_batches:
+            test_loss = getattr(model, f"test_{loss_name}_loss")
+
+            test_loss.update(F.cross_entropy(ret["snli_logits"][test_batches], ret["snli_labels"][test_batches]))
+            test_acc = getattr(model, f"test_{loss_name}_accuracy")
+
+            result = test_acc.compute(ret["snli_logits"][test_batches], ret["snli_labels"][test_batches])
+            test_acc.update(result)
+
+            # metric_dict = {f"test/{loss_name}/loss": test_loss.accumulate().item(),
+            #             f"test/{loss_name}/accuracy": test_acc.accumulate()}
+
+            example_test_loss = test_loss.accumulate()
+            # print(example_test_loss)
+
+            # pl_module.log(f"test/snli/loss", test_loss)
+            # pl_module.log(f"test/snli/accuracy", test_acc)
+        else:
+            test_loss = getattr(model, f"test_{loss_name}_loss")
+            example_test_loss = test_loss.accumulate()
+            test_acc = getattr(model, f"test_{loss_name}_accuracy")
+        dist.all_reduce(example_test_loss)
+        example_test_loss = example_test_loss / dist.get_world_size()
+        metric_dict = {
+            f"test/{loss_name}/loss": example_test_loss.item(),
+            f"test/{loss_name}/accuracy": test_acc.accumulate(),
+        }
+        # model.log(metric_dict)
+        # model.log(f"{split}/{loss_name}/accuracy", acc)
+        # print(metric_dict)
+        ret.update(metric_dict)
 
     return ret
 

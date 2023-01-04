@@ -12,52 +12,105 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import paddle
 from paddle.metric import Metric
 
 
 class Accuracy(Metric):
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.add_state("correct", default=paddle.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total", default=paddle.tensor(0.0), dist_reduce_fx="sum")
+    def __init__(self, topk=(1,), name=None, *args, **kwargs):
+        super(Accuracy, self).__init__(*args, **kwargs)
+        self.topk = topk
+        self.maxk = max(topk)
+        self._init_name(name)
+        self.reset()
 
-    def update(self, logits, target):
+    def compute(self, logits, target, *args):
         logits, target = (
-            logits.detach().to(self.correct.device),
-            target.detach().to(self.correct.device),
+            logits.detach(),
+            target.detach(),
         )
-        preds = logits.argmax(dim=-1)
+        preds = logits.argmax(axis=-1)
         preds = preds[target != -100]
         target = target[target != -100]
         if target.numel() == 0:
-            return 1
+            correct = 1
+        else:
+            correct = preds == target
+        return paddle.cast(correct, dtype="float32")
 
-        assert preds.shape == target.shape
+    def update(self, correct, *args):
+        if isinstance(correct, (paddle.Tensor, paddle.fluid.core.eager.Tensor)):
+            correct = correct.numpy()
+        num_samples = np.prod(np.array(correct.shape[:-1]))
+        accs = []
+        for i, k in enumerate(self.topk):
+            num_corrects = correct[..., :k].sum()
+            accs.append(float(num_corrects) / num_samples)
+            self.total[i] += num_corrects
+            self.count[i] += num_samples
+        accs = accs[0] if len(self.topk) == 1 else accs
+        return accs
 
-        self.correct += paddle.sum(preds == target)
-        self.total += target.numel()
+    def reset(self):
+        """
+        Resets all of the metric state.
+        """
+        self.total = [0.0] * len(self.topk)
+        self.count = [0] * len(self.topk)
 
-    def compute(self):
-        return self.correct / self.total
+    def accumulate(self):
+        """
+        Computes and returns the accumulated metric.
+        """
+        res = []
+        for t, c in zip(self.total, self.count):
+            r = float(t) / c if c > 0 else 0.0
+            res.append(r)
+        res = res[0] if len(self.topk) == 1 else res
+        return res
+
+    def _init_name(self, name):
+        name = name or "acc"
+        if self.maxk != 1:
+            self._name = ["{}_top{}".format(name, k) for k in self.topk]
+        else:
+            self._name = [name]
+
+    def name(self):
+        """
+        Return name of metric instance.
+        """
+        return self._name
 
 
 class Scalar(Metric):
-    def __init__(self, dist_sync_on_step=False):
-        super().__init__(dist_sync_on_step=dist_sync_on_step)
-        self.add_state("scalar", default=paddle.tensor(0.0), dist_reduce_fx="sum")
-        self.add_state("total", default=paddle.tensor(0.0), dist_reduce_fx="sum")
+    def __init__(self, name="loss", *args, **kwargs):
+        super(Scalar, self).__init__(*args, **kwargs)
+        self._name = name
+        self.reset()
 
     def update(self, scalar):
-        if isinstance(scalar, paddle.Tensor):
-            scalar = scalar.detach().to(self.scalar.device)
-        else:
-            scalar = paddle.tensor(scalar).float().to(self.scalar.device)
         self.scalar += scalar
         self.total += 1
 
-    def compute(self):
+    def accumulate(self):
+        if self.total == 0:
+            return paddle.zeros([1])
         return self.scalar / self.total
+
+    def reset(self):
+        """
+        Resets all of the metric state.
+        """
+        self.total = 0.0
+        self.scalar = 0
+
+    def name(self):
+        """
+        Returns metric name
+        """
+        return self._name
 
 
 class VQAScore(Metric):

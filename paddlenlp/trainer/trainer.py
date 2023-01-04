@@ -1658,7 +1658,7 @@ class Trainer:
                 num_samples = self.num_examples(dataloader)
             else:  # both len(dataloader.dataset) and len(dataloader) fail
                 num_samples = observed_num_examples
-        
+
         # Number of losses has been rounded to a multiple of batch_size and in a distributed training, the number of
         # samplers has been rounded to a multiple of batch_size, so we truncate.
         if all_losses is not None:
@@ -1669,7 +1669,7 @@ class Trainer:
             all_labels = nested_truncate(all_labels, num_samples)
 
         model.train()
-        
+
         # Metrics!
         if self.compute_metrics is not None and all_preds is not None and all_labels is not None:
             metrics = self.compute_metrics(EvalPrediction(predictions=all_preds, label_ids=all_labels))
@@ -1772,10 +1772,6 @@ class Trainer:
                 ignore_keys = []
         # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
         if has_labels:
-            for name in self.label_names:
-                # The labels is a list, convert to tensor first
-                if(type(inputs[name])!=paddle.Tensor):
-                    inputs[name]= paddle.to_tensor(inputs[name])
             labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
             if len(labels) == 1:
                 labels = labels[0]
@@ -1810,7 +1806,6 @@ class Trainer:
         logits = nested_detach(logits)
         if isinstance(logits, (list, tuple)) and len(logits) == 1:
             logits = logits[0]
-        breakpoint()
         return (loss, logits, labels)
 
     def is_local_process_zero(self) -> bool:

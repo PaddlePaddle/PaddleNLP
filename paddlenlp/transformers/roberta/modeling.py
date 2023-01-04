@@ -14,21 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 
@@ -42,6 +41,7 @@ __all__ = [
     "RobertaForMultipleChoice",
     "RobertaForCausalLM",
 ]
+
 
 def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length=0):
     """
@@ -235,7 +235,7 @@ class RobertaModel(RobertaPretrainedModel):
             dropout=config.hidden_dropout_prob,
             activation=config.hidden_act,
             attn_dropout=config.attention_probs_dropout_prob,
-            act_dropout=config.attention_probs_dropout_prob,
+            act_dropout=0,
         )
         self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
         self.pooler = RobertaPooler(config.hidden_size)

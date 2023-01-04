@@ -15,6 +15,7 @@
 import bisect
 import warnings
 
+import numpy as np
 import paddle
 from paddle.io import Dataset
 from src.datasets import (
@@ -38,10 +39,11 @@ def get_dataset(_config):
     val_transform_keys = ["default_val"] if len(_config["val_transform_keys"]) == 0 else _config["val_transform_keys"]
 
     tokenizer_name = _config["tokenizer"]
+    # tokenizer = get_pretrained_tokenizer(tokenizer_name)
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     debug_num = _config["debug_num"]
-    _config["data_root"] = "/root/paddlejob/workspace/env_run/wugaosheng/BridgeTower/~/BT/dataset/fine-tune"
+    # _config["data_root"]='/root/paddlejob/workspace/env_run/output/dataset/fine-tune'
 
     if _config["group_name"] == "vqa":
         train_dataset = VQAv2Dataset(
@@ -111,14 +113,7 @@ def get_pretrained_dataset(_config):
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
 
     debug_num = _config["debug_num"]
-    _config["data_root"] = "/root/paddlejob/workspace/env_run/wugaosheng/BridgeTower/~/BT/dataset/pre-train"
 
-    # "datasets": [
-    #     "coco",
-    #     "vg",
-    #     "sbu",
-    #     "gcc"
-    # ]
     if _config["group_name"] == "mlm_itm":
         list_train_datasets = []
         list_valid_datasets = []
@@ -315,5 +310,7 @@ def collate_fn(batch, mlm_collator):
             dict_batch[f"{txt_key}_ids_mlm"] = mlm_ids
             dict_batch[f"{txt_key}_labels_mlm"] = mlm_labels
             dict_batch[f"{txt_key}_masks"] = attention_mask
+            if "labels" in dict_batch:
+                dict_batch["labels"] = np.array(dict_batch["labels"])
 
     return dict_batch

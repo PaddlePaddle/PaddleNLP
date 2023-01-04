@@ -12,6 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
+import paddle.nn as nn
+import paddle.nn.functional as F
+from visualdl import LogWriter
+
+from paddlenlp.trainer.training_args import default_logdir
+from paddlenlp.transformers import BertConfig, BertModel, RobertaConfig, RobertaModel
+
 # import paddle
 # import paddle.nn as nn
 # import pypaddle_lightning as pl
@@ -21,18 +29,8 @@
 # from . import vit_model as vit
 # from .vit_model import resize_pos_embed
 # flake8: noqa
-import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
-
-from paddlenlp.transformers import BertConfig, BertModel, RobertaConfig, RobertaModel
-
-from . import heads, objectives
+from . import heads, meter_utils, objectives
 from .bert_model import get_extended_attention_mask
-
-# from .clip_model import build_model, adapt_position_encoding
-# # from .swin_helpers import swin_adapt_position_encoding
-# from transformers import RobertaConfig, RobertaModel
 from .clip_model import adapt_position_encoding, build_model
 from .transformer import TransformerDecoderLayer
 
@@ -132,7 +130,11 @@ class BTTransformer(nn.Layer):
             )
 
         if "roberta" in config["tokenizer"]:
-            self.text_transformer = RobertaModel.from_pretrained(config["tokenizer"])
+            self.text_transformer = RobertaModel.from_pretrained(
+                config["tokenizer"],
+                hidden_dropout_prob=config["drop_rate"],
+                attention_probs_dropout_prob=config["drop_rate"],
+            )
         else:
             self.text_transformer = BertModel.from_pretrained(config["tokenizer"])
 
@@ -311,8 +313,13 @@ class BTTransformer(nn.Layer):
                 )
             self.load_state_dict(state_dict, strict=False)
 
-        # meter_utils.set_metrics(self)
+        meter_utils.set_metrics(self)
         self.current_tasks = list()
+        self.global_step = 0
+
+        log_dir = default_logdir()
+        self._LogWriter = LogWriter
+        self.vdl_writer = self._LogWriter(logdir=log_dir)
 
     def get_cls_feats(self, text_feats, image_feats):
         # breakpoint()
@@ -418,8 +425,6 @@ class BTTransformer(nn.Layer):
         for layer in self.text_transformer.encoder.layers[:split_index]:
             # get hidden_states
             text_embeds = layer(text_embeds, src_mask=extend_text_masks)
-            # breakpoint()
-        # breakpoint()
 
         if self.is_clip:
             # image_embeds = self.vit_model.vision_model.forward_pre(img.type(self.vit_model.dtype))
@@ -519,42 +524,34 @@ class BTTransformer(nn.Layer):
 
         return ret
 
-    def forward(self, batch, split):
-        ret = dict()
-        if len(self.current_tasks) == 0:
-            ret.update(self.infer(batch))
+    def forward(self, batch, split, loss_name, **kwargs):
+        self.global_step = kwargs.get("global_step", 0)
+        self.status = kwargs.get("status", None)
+        self.eval_step = kwargs.get("eval_step", 0)
+
+        if self.status is not None:
+            if self.status == "validation_epoch_end":
+                ret = meter_utils.epoch_wrapup(self, "val")
+            elif self.status == "training_epoch_end":
+                ret = meter_utils.epoch_wrapup(self, "train")
+            # Update logs for every step
+            for k, v in ret.items():
+                if isinstance(v, (int, float)):
+                    self.vdl_writer.add_scalar(k, v, self.global_step + self.eval_step)
             return ret
-        # Masked Language Modeling
-        if "mlm" in self.current_tasks:
-            ret.update(objectives.compute_mlm(self, batch, split))
 
-        # Image Text Matching
-        if "itm" in self.current_tasks:
-            ret.update(objectives.compute_itm(self, batch, split))
-
-        if "itc" in self.current_tasks:
-            ret.update(objectives.compute_itc(self, batch, split))
-
-        if "itm_itc" in self.current_tasks:
-            ret.update(objectives.compute_itm_itc(self, batch, split, pretrain=True))
-
-        if "irtr_itm_itc" in self.current_tasks:
-            ret.update(objectives.compute_itm_itc(self, batch, split, pretrain=False))
-
-        # Visual Question Answering
-        if "vqa" in self.current_tasks:
-            ret.update(objectives.compute_vqa(self, batch, split))
-
-        # Natural Language for Visual Reasoning 2
-        if "nlvr2" in self.current_tasks:
-            ret.update(objectives.compute_nlvr2(self, batch, split))
-
-        # SNLI Visual Entailment
-        if "snli" in self.current_tasks:
+        ret = dict()
+        if "snli" in loss_name:
             ret.update(objectives.compute_snli(self, batch, split))
 
-        # Image Retrieval and Text Retrieval
-        if "irtr" in self.current_tasks:
-            ret.update(objectives.compute_irtr(self, batch, split))
-
+        if "mlm" in loss_name:
+            ret.update(objectives.compute_mlm(self, batch, split))
+        if "itm" in loss_name:
+            ret.update(objectives.compute_itm(self, batch, split))
+        # 输出卡0的指标到visualdl
+        if paddle.distributed.get_rank() == 0:
+            # Update logs for every step
+            for k, v in ret.items():
+                if isinstance(v, (int, float)):
+                    self.vdl_writer.add_scalar(k, v, self.global_step + self.eval_step)
         return ret
