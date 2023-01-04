@@ -11,20 +11,31 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import os
+import sys
 
 import numpy as np
 import paddle
 import torch
-from models.pd_bert import BertConfig as PDBertConfig
-from models.pd_bert import (
-    BertForSequenceClassification as PDBertForSequenceClassification,
-)
-from models.pt_bert import BertConfig as HFBertConfig
-from models.pt_bert import (
-    BertForSequenceClassification as HFBertForSequenceClassification,
-)
 from reprod_log import ReprodLogger
 from transformers import AdamW
+
+CURRENT_DIR = os.path.split(os.path.abspath(__file__))[0]  # 当前目录
+CONFIG_PATH = CURRENT_DIR.rsplit("/", 1)[0]
+sys.path.append(CONFIG_PATH)
+
+# isort: off
+
+from models.pd_bert import BertConfig as PDBertConfig  # noqa: E402
+from models.pd_bert import (  # noqa: E402
+    BertForSequenceClassification as PDBertForSequenceClassification,
+)
+from models.pt_bert import BertConfig as HFBertConfig  # noqa: E402
+from models.pt_bert import (  # noqa: E402
+    BertForSequenceClassification as HFBertForSequenceClassification,
+)
+
+# isort: on
 
 
 def pd_train_some_iters(fake_data, fake_label, max_iter=2):
@@ -37,7 +48,7 @@ def pd_train_some_iters(fake_data, fake_label, max_iter=2):
     classifier_weights = paddle.load("../classifier_weights/paddle_classifier_weights.bin")
     model.load_dict(classifier_weights)
     model.eval()
-    criterion = paddle.nn.CrossEntropy()
+    criterion = paddle.nn.CrossEntropyLoss()
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=3e-5,
@@ -51,7 +62,7 @@ def pd_train_some_iters(fake_data, fake_label, max_iter=2):
         input_ids = paddle.to_tensor(fake_data)
         labels = paddle.to_tensor(fake_label)
 
-        output = model(input_ids)
+        output = model(input_ids)[0]
         loss = criterion(output, labels)
         loss.backward()
         optimizer.step()
