@@ -95,9 +95,9 @@ def download_corpus(args: ModelArguments):
     for file in files:
         file_name = file.split("/")[-1]
         file_path = os.path.join(args.input_dir, file_name)
-        if os.path.exists(file_path):
+        if not os.path.exists(file_path):
             logger.info(f"start to download corpus: <{file_name}> into <{args.input_dir}>")
-            get_path_from_url_with_filelock(file_name, root_dir=args.input_dir)
+            get_path_from_url_with_filelock(file, root_dir=args.input_dir)
 
 
 def create_pretrained_dataset(
@@ -328,21 +328,10 @@ def get_train_data_file(args):
     return files
 
 
-def get_device(device: str):
-    if device == "cpu":
-        return "cpu"
-    if paddle.get_device() == "cpu":
-        logger.warning("not detect gpu but receive GPU related params, we will run the model on cpu")
-        return "cpu"
-    return device
-
-
 def do_train():
     model_args: ModelArguments = PdArgumentParser([ModelArguments]).parse_args_into_dataclasses()[0]
     model_args.eval_iters = 10
     model_args.test_iters = model_args.eval_iters * 10
-
-    model_args.device = get_device(model_args.device)
 
     paddle.set_device(model_args.device)
     if paddle.distributed.get_world_size() > 1:

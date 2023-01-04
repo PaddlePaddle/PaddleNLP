@@ -29,7 +29,7 @@ def test_pretrain():
 
 def test_run_eval():
     # do not test under the slow_test
-    if os.getenv("slow_test", None):
+    if os.getenv("RUN_SLOW_TEST", None):
         return
 
     # TODO(wj-Mcat): add eval testing config

@@ -50,7 +50,7 @@ def init_argv(config_name: str, config_file: str):
         config_file (str, optional): the path of config file. Defaults to None.
     """
     # add tag if it's slow test
-    if os.getenv("slow_test", None):
+    if os.getenv("RUN_SLOW_TEST", None):
         config_file = "./configs/test.yaml"
 
     logger.info(f"loading configuration file<{config_file}>")
@@ -69,6 +69,11 @@ def init_argv(config_name: str, config_file: str):
 def get_model_argv():
     """get model argv variables without --config parameter"""
     argv = copy.deepcopy(sys.argv)
+
+    # pytest will add the command path into the argv
+    if "pytest" in argv[0]:
+        argv = argv[1:]
+
     for index in range(len(argv)):
         # [..., '--config', './configs/default.yaml', ...]
         if argv[index] == "--config":
@@ -81,15 +86,6 @@ def get_model_argv():
                 argv = argv[:index] + argv[index + 1 :]
                 break
     return argv
-
-
-def get_device(device: str):
-    if device == "cpu":
-        return "cpu"
-    if paddle.get_device() == "cpu":
-        logger.warning("not detect gpu but receive GPU related params, we will run the model on cpu")
-        return "cpu"
-    return device
 
 
 def str2bool(v):
@@ -267,5 +263,4 @@ def parse_args(MODEL_CLASSES):
     for arg in vars(args):
         logger.info("{:20}:{}".format(arg, getattr(args, arg)))
 
-    args.device = get_device(args.device)
     return args
