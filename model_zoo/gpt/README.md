@@ -86,8 +86,6 @@ mv gpt_en_dataset_300m_idx.npz ./data
 #### 单卡训练
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python run_pretrain.py
-# or
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --config=./configs/default.yaml
 ```
 
@@ -108,7 +106,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --config=./configs/default.yaml
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py --config=./configs/default.yaml
 ```
 
 ### 模型评估
