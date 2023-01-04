@@ -13,14 +13,16 @@
 # limitations under the License.
 
 import re
+
 import numpy as np
 import paddle
+
 from ..data import Pad
 from ..transformers import CodeGenForCausalLM, CodeGenTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+           from paddlenlp import Taskflow
 
            codegen = Taskflow("code_generation")
            codegen("def hello_world():")
@@ -134,7 +136,7 @@ class CodeGenerationTask(Task):
                 num_beams=self._num_beams,
                 length_penalty=self._length_penalty,
                 repetition_penalty=self._repetition_penalty,
-                use_faster=self._use_faster,
+                use_fast=self._use_faster,
             )
             all_ids.extend(ids.numpy().tolist())
             all_scores.extend(scores.numpy().tolist())

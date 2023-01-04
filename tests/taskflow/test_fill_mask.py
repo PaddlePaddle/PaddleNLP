@@ -14,9 +14,10 @@
 
 import os
 import unittest
+from tempfile import TemporaryDirectory
 
 from parameterized import parameterized
-from tempfile import TemporaryDirectory
+
 from paddlenlp.taskflow import Taskflow
 from paddlenlp.taskflow.fill_mask import FillMaskTask
 from paddlenlp.transformers import AutoTokenizer, ErnieForMaskedLM
@@ -27,7 +28,7 @@ class TestFillMaskTask(unittest.TestCase):
         self.temp_dir = TemporaryDirectory()
         self.model_path = os.path.join(self.temp_dir.name, "model")
         model = ErnieForMaskedLM.from_pretrained("__internal_testing__/ernie")
-        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/ernie")
+        tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
         model.save_pretrained(self.model_path)
         tokenizer.save_pretrained(self.model_path)
 
