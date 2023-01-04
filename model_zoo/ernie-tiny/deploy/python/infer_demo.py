@@ -211,3 +211,16 @@ if __name__ == "__main__":
             print(f"No. {j} text = {data[j]}")
             print(out)
             j += 1
+
+    if os.path.exists(args.test_data_path):
+        with open(args.test_data_path, "r") as f:
+            print(f"Read test dataset path from: {args.test_data_path}")
+            data = [text.rstrip("\n") for text in f]
+            batch_data = batchify_text(data, args.batch_size)
+            j = 0
+            for batch in batch_data:
+                output = predictor.predict(batch)
+                for out in output:
+                    print(f"No. {j} text = {data[j]}")
+                    print(out)
+                    j += 1
