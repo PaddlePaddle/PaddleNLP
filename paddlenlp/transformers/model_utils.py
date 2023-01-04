@@ -1030,12 +1030,13 @@ class PretrainedModel(Layer, GenerationMixin):
 
             # check wether the target file exist in the comunity bos server
             if url_file_exists(community_model_file_path):
-                return cls._resolve_model_file_path(pretrained_model_name_or_path, cache_dir=cache_dir)
+                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
 
             logger.warning(
                 f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
             )
+
             return resolve_weight_file_from_hf_hub(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
 
         raise FileNotFoundError(
