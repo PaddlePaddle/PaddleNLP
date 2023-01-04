@@ -16,6 +16,7 @@
 import os
 import unittest
 
+from paddlenlp.transformers.ernie.fast_tokenizer import ErnieFastTokenizer
 from paddlenlp.transformers.ernie.tokenizer import (
     BasicTokenizer,
     ErnieTokenizer,
@@ -23,12 +24,16 @@ from paddlenlp.transformers.ernie.tokenizer import (
 )
 
 from ...testing_utils import slow
-from ...transformers.test_tokenizer_common import TokenizerTesterMixin, filter_non_english
+from ...transformers.test_tokenizer_common import (
+    TokenizerTesterMixin,
+    filter_non_english,
+)
 
 
 class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieTokenizer
+    tokenizer_fast_class = ErnieFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -174,9 +179,18 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"A, naïve {tokenizer.mask_token} AllenNLP sentence."
                 tokens = tokenizer.encode(
+                    sentence,
+                    return_attention_mask=False,
+                    return_token_type_ids=False,
+                    return_offsets_mapping=True,
+                    add_special_tokens=True,
+                )
+
+                tokens_fast = tokenizer_fast.encode(
                     sentence,
                     return_attention_mask=False,
                     return_token_type_ids=False,
@@ -223,7 +237,11 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
                 self.assertEqual(
                     [e[1] for e in expected_results], tokenizer.convert_ids_to_tokens(tokens["input_ids"])
                 )
+                self.assertEqual(
+                    [e[1] for e in expected_results], tokenizer_fast.convert_ids_to_tokens(tokens_fast["input_ids"])
+                )
                 self.assertEqual([e[0] for e in expected_results], tokens["offset_mapping"])
+                self.assertEqual([e[0] for e in expected_results], tokens_fast["offset_mapping"])
 
     def test_change_tokenize_chinese_chars(self):
         list_of_commun_chinese_char = ["的", "人", "有"]
@@ -233,12 +251,18 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 kwargs["tokenize_chinese_chars"] = True
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
 
                 ids_without_spe_char_p = tokenizer.encode(
                     text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
                 )["input_ids"]
+                ids_without_spe_char_fast = tokenizer_fast.encode(
+                    text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
+                )["input_ids"]
 
                 tokens_without_spe_char_p = tokenizer.convert_ids_to_tokens(ids_without_spe_char_p)
+                tokens_without_spe_char_fast = tokenizer.convert_ids_to_tokens(ids_without_spe_char_fast)
 
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
+                self.assertListEqual(tokens_without_spe_char_fast, list_of_commun_chinese_char)
