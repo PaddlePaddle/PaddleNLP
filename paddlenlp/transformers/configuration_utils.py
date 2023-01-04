@@ -259,20 +259,13 @@ def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
     else:
         raise EntryNotFoundError(f"can not find the paddle/pytorch config file from: https://huggingface.co/{repo_id}")
 
-    # /cache/dir/<repo-id>/snapshots/<---commit-id--->/pytorch_model.bin
-    file_path = hf_hub_download(
+    return hf_hub_download(
         repo_id=repo_id,
         filename=file_name,
         cache_dir=cache_dir,
         library_name="PaddleNLP",
         library_version=__version__,
     )
-
-    # copy weight file: /cache/dir/pytorch_model.bin
-    new_file_path = os.path.join(cache_dir, CONFIG_NAME)
-    shutil.copyfile(file_path, new_file_path)
-
-    return new_file_path
 
 
 class PretrainedConfig:

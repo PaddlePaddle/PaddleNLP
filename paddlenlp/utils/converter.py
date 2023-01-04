@@ -29,7 +29,11 @@ from paddle import Tensor
 from paddle.nn import Layer
 
 from paddlenlp.transformers import PretrainedModel
-from paddlenlp.utils.env import PYTORCH_WEIGHT_FILE_NAME
+from paddlenlp.utils.env import (
+    CONFIG_NAME,
+    PADDLE_WEIGHT_FILE_NAME,
+    PYTORCH_WEIGHT_FILE_NAME,
+)
 from paddlenlp.utils.import_utils import (
     is_package_available,
     is_torch_available,
@@ -496,7 +500,7 @@ class Convertible:
         if not os.path.exists(weight_file):
             raise FileNotFoundError(f"pytorch weight file<{weight_file}> not found")
 
-        config_file = os.path.join(input_dir, "config.json")
+        config_file = os.path.join(input_dir, CONFIG_NAME)
         if not os.path.exists(config_file):
             raise FileNotFoundError(f"config file<{weight_file}> not found")
 
@@ -522,7 +526,7 @@ class Convertible:
             for layer_name in all_layer_names:
                 logger.warning(f"--- {layer_name}")
 
-        model_weight_file = os.path.join(input_dir, "model_state.pdparams")
+        model_weight_file = os.path.join(input_dir, PADDLE_WEIGHT_FILE_NAME)
         paddle.save(state_dict, model_weight_file)
         return state_dict
 

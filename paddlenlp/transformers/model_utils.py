@@ -153,20 +153,13 @@ def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str):
     else:
         raise EntryNotFoundError(f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}")
 
-    # /cache/dir/<repo-id>/snapshots/<---commit-id--->/pytorch_model.bin
-    file_path = hf_hub_download(
+    return hf_hub_download(
         repo_id=repo_id,
         filename=file_name,
         cache_dir=cache_dir,
         library_name="PaddleNLP",
         library_version=__version__,
     )
-
-    # copy weight file: /cache/dir/pytorch_model.bin
-    new_file_path = os.path.join(cache_dir, PYTORCH_WEIGHT_FILE_NAME)
-    shutil.copyfile(file_path, new_file_path)
-
-    return new_file_path
 
 
 def register_base_model(cls):
@@ -975,7 +968,7 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. when it's from HF
         if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(pretrained_model_name_or_path, cache_dir=cache_dir)
+            return resolve_weight_file_from_hf_hub(pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME)
 
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
