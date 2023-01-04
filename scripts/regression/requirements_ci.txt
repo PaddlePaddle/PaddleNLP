@@ -25,4 +25,4 @@ parameterized
 scikit-learn
 cma
 paddleocr
-fast_tokenizer
+fast_tokenizer_python
