@@ -955,7 +955,9 @@ public:
 #endif
         }
 
-        if (decoding_params.logits_mask || (args_.min_length_ != 0 && step <= args_.min_length_)) {
+        if (decoding_params.logits_mask ||
+            (args_.min_length_ != 0 && step <= args_.min_length_) ||
+            args_.vocab_size_padded_ != args_.vocab_size_) {
           apply_logits_mask_kernelLauncher(logits_buf_,
                                            finished_buf_,
                                            args_.batch_size_,
