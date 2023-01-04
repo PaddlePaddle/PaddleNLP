@@ -6,7 +6,7 @@ FastGeneration是PaddleNLP v2.2版本加入的文本生成高性能加速功能�
 
 
 <p align="center">
-  <img src="../docs/imgs/faster_generation.png" width="400" height ="600" />
+  <img src="../docs/imgs/fast_generation.png" width="400" height ="600" />
 </p>
 
 ## Featrues
