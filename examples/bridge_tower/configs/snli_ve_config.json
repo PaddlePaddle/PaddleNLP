@@ -54,7 +54,7 @@
     "draw_false_text": 0,
     "input_image_embed_size": 768,
     "input_text_embed_size": 768,
-    "vit": "CLIP-ViT-B/16",
+    "vit": "openai/clip-vit-base-patch16",
     "hidden_size": 768,
     "num_heads": 12,
     "num_layers": 6,

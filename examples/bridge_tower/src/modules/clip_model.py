@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
+
 import numpy as np
 import paddle
 import paddle.nn.functional as F
@@ -56,11 +58,18 @@ def build_model(
     vit_layernorm_shared=True,
     vit_remove_last=False,
 ):
+    # 采用了硬编码的方式加载了预训练模型，主要用于计算adapt_position_encoding的参数
+    if os.path.join(name, "model_state.pdparams"):
+        model_path = os.path.join(name, "model_state.pdparams")
+        model_state = paddle.load(model_path)
+    else:
+        from paddlenlp.transformers import CLIPModel
 
-    model_path = "./clip-vit-base-patch16/model_state.pdparams"
-    model_state = paddle.load(model_path)
+        model = CLIPModel.from_pretrained("openai/clip-vit-base-patch16")
+        model.save_pretrained(name)
 
-    model = CLIPVisionModel.from_pretrained("openai/clip-vit-base-patch16", image_resolution=resolution_after)
+    # resolution_after会变化，初始化的可能不是默认的模型
+    model = CLIPVisionModel.from_pretrained(name, image_resolution=resolution_after)
     # Load original state dict
     state_dict = model_state
 
