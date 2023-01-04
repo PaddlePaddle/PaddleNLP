@@ -31,6 +31,7 @@ add_library(
         ernie_tiny_jni/text_results_jni.cc
         ernie_tiny_jni/uie_model_jni.cc
         ernie_tiny_jni/uie_utils_jni.cc
+        ernie_tiny_jni/predictor_jni.cc
 )
 
 # Searches for a specified prebuilt library and stores the path as a

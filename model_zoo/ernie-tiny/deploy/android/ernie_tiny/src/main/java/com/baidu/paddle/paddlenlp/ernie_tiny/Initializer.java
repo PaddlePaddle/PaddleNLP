@@ -5,7 +5,7 @@ package com.baidu.paddle.paddlenlp.ernie_tiny;
  * classes only. Public users don't have to call them. Public users can get
  * FastDeploy information constants such as JNI lib name in this class.
  */
-public class ERNIETinyInitializer {
+public class Initializer {
     /** name of C++ JNI lib */
     public final static String JNI_LIB_NAME = "ernie_tiny_jni";
 

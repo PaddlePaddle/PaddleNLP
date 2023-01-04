@@ -168,6 +168,6 @@ public class UIEModel {
 
     // Initializes at the beginning.
     static {
-        ERNIETinyInitializer.init();
+        Initializer.init();
     }
 }
