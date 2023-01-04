@@ -1687,7 +1687,15 @@ def transfer_param(p, is_bias=False, dtype="float16", restore_data=False):
     if str(p.dtype)[-len(dtype) :] == dtype and ("gpu" in str(p.place).lower() or "cuda" in str(p.place).lower()):
         return p
     if restore_data:
-        if paddle.in_dynamic_mode():
+        if (
+            getattr(paddle.fluid.framework, "_in_eager_mode_", False)
+            and getattr(paddle.fluid.framework, "_dygraph_tracer_", None) is not None
+        ):
+            param_data = p.numpy()
+            new_p = paddle.create_parameter(shape=param_shape, dtype=dtype, is_bias=is_bias)
+            new_p.set_value(param_data.astype(dtype))
+            return new_p
+        elif paddle.in_dynamic_mode():
             param_data = p.numpy()
             # Creating parameters with Assign initializer is too slow. Maybe we
             # can cast to fp16 directly and get a tensor, while we do it more

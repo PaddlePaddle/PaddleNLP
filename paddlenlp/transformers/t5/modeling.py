@@ -1463,6 +1463,17 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             if decoder_input_ids is not None:
                 decoder_input_ids = decoder_input_ids[:, -1:]
 
+        encoder_attention_mask = attention_mask
+        if attention_mask is not None:
+            if attention_mask.ndim == 4:
+                encoder_attention_mask = attention_mask[:, :, -1:, :]
+            elif attention_mask.ndim == 3:
+                encoder_attention_mask = attention_mask[:, -1:, :].unsqueeze([1])
+            elif attention_mask.ndim == 2:
+                encoder_attention_mask = attention_mask.unsqueeze([1, 2])
+            else:
+                raise ValueError("Invalid attention mask shape. ")
+
         # Decode
         decoder_outputs = self.t5.decoder(
             input_ids=decoder_input_ids,
@@ -1470,7 +1481,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
             inputs_embeds=decoder_inputs_embeds,
             cache=cache,
             encoder_hidden_states=hidden_states,
-            encoder_attention_mask=attention_mask,
+            encoder_attention_mask=encoder_attention_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -1545,6 +1556,7 @@ class T5ForConditionalGeneration(T5PretrainedModel):
         # cut decoder_input_ids if past is used
         if cache is not None:
             input_ids = input_ids[:, -1:]
+
         return {
             "decoder_input_ids": input_ids,
             "cache": cache,
