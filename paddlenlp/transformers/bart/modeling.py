@@ -532,11 +532,23 @@ class BartModel(BartPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_last_hidden_state)
         else:
             cache = None
+
+        memory_mask = attention_mask
+        if attention_mask is not None:
+            if attention_mask.ndim == 4:
+                memory_mask = attention_mask[:, :, -1:, :]
+            elif attention_mask.ndim == 3:
+                memory_mask = attention_mask[:, -1:, :].unsqueeze([1])
+            elif attention_mask.ndim == 2:
+                memory_mask = attention_mask.unsqueeze([1, 2])
+            else:
+                raise ValueError("Invalid attention mask shape. ")
+
         decoder_output = self.decoder(
             decoder_input_ids,
             decoder_attention_mask,
             encoder_last_hidden_state,
-            attention_mask,
+            memory_mask,
             cache=cache,
             decoder_inputs_embeds=decoder_inputs_embeds,
             output_attentions=output_attentions,
