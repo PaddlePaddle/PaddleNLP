@@ -277,7 +277,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
   auto c_runtime_option = ernie_tiny::jni::NewCxxRuntimeOption(env, runtime_option);
   c_runtime_option.SetModelPath(c_model_file, c_params_file);
 
-  uint32_t c_max_length = 16;
+  uint32_t c_max_length = 16; // TODO: not fixed this value
   ErnieFastTokenizer c_tokenizer(c_vocab_file);
   c_tokenizer.EnableTruncMethod(
       c_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
@@ -361,7 +361,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
         c_results_size, j_intent_slot_result_clazz, NULL);
 
     for (int i = 0; i < c_results_size; ++i) {
-      
+
       // mStr String
       // mInitialized boolean
       // mIntentResult IntentDetResult
