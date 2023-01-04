@@ -12,29 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
-import io
-import random
 import time
-import json
-import copy
-from collections import defaultdict
-from dataclasses import asdict, dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Tuple, Union
+from dataclasses import dataclass, field
+from typing import Optional
 
-import numpy as np
 import paddle
-import paddle.distributed as dist
-from paddlenlp.transformers import ErnieHealthForTotalPretraining, ElectraModel
-from paddlenlp.transformers import ErnieHealthDiscriminator, ElectraGenerator
-from paddlenlp.transformers import ElectraTokenizer, ErnieHealthPretrainingCriterion
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
-from paddlenlp.trainer import speed_metrics, get_last_checkpoint
+from args import parse_config_file
+from dataset import DataCollatorForErnieHealth, MedicalCorpus
 
-from dataset import MedicalCorpus, DataCollatorForErnieHealth
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+)
+from paddlenlp.transformers import (
+    ElectraGenerator,
+    ElectraTokenizer,
+    ErnieHealthForTotalPretraining,
+    ErnieHealthPretrainingCriterion,
+)
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "ernie-health": (ErnieHealthForTotalPretraining, ElectraTokenizer),
@@ -88,6 +87,7 @@ def main():
 
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
+    training_args.recompute = True
 
     # Log model and data config
     training_args.print_config(model_args, "Model")
@@ -123,13 +123,7 @@ def main():
 
     if model_args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
-        generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-generator"])
-        )
-        discriminator = ErnieHealthDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[model_args.model_name_or_path + "-discriminator"])
-        )
-        model = model_class(generator, discriminator)
+        model = model_class.from_pretrained(model_args.model_name_or_path)
     else:
         raise ValueError("Only support %s" % (", ".join(pretrained_models)))
 
@@ -204,4 +198,10 @@ def main():
 
 
 if __name__ == "__main__":
+    config_file = parse_config_file()
+    if config_file is not None:
+        from args import init_argv
+
+        init_argv("pretrain", config_file)
+
     main()

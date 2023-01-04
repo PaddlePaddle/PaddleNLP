@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import unittest
-from dataclasses import dataclass
 
 import paddle
 from parameterized import parameterized_class
@@ -30,9 +29,8 @@ from paddlenlp.transformers import (
     ElectraModel,
     ElectraPretrainedModel,
 )
-
-from ...testing_utils import slow
-from ..test_modeling_common import (
+from tests.testing_utils import slow
+from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,

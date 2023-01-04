@@ -13,19 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import TransformerEncoder, TransformerEncoderLayer
-from paddle.nn.layer.transformer import _convert_attention_mask
 
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
-    BaseModelOutputWithPastAndCrossAttentions,
     MaskedLMOutput,
     MultipleChoiceModelOutput,
     QuestionAnsweringModelOutput,
@@ -1031,9 +1028,9 @@ class ElectraForTotalPretraining(ElectraPretrainedModel):
     def __init__(self, config: ElectraConfig):
         super(ElectraForTotalPretraining, self).__init__(config)
 
-        self.generator = config.generator
-        self.discriminator = config.discriminator
-        self.initializer_range = config.discriminator.electra.initializer_range
+        self.generator = ElectraGenerator(config)
+        self.discriminator = ErnieHealthDiscriminator(config)
+        self.initializer_range = self.discriminator.electra.initializer_range
         self.init_weights()
 
     def get_input_embeddings(self):

@@ -27,9 +27,7 @@ from visualdl import LogWriter
 
 from paddlenlp.transformers import (
     ElectraGenerator,
-    ElectraModel,
     ElectraTokenizer,
-    ErnieHealthDiscriminator,
     ErnieHealthForTotalPretraining,
     ErnieHealthPretrainingCriterion,
     LinearDecayWithWarmup,
@@ -150,13 +148,7 @@ def do_train(args):
 
     if args.model_name_or_path in pretrained_models:
         tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
-        generator = ElectraGenerator(
-            ElectraModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-generator"])
-        )
-        discriminator = ErnieHealthDiscriminator(
-            ElectraModel(**model_class.pretrained_init_configuration[args.model_name_or_path + "-discriminator"])
-        )
-        model = model_class(generator, discriminator)
+        model = model_class.from_pretrained(args.model_name_or_path)
         args.init_from_ckpt = False
     else:
         if os.path.isdir(args.model_name_or_path) and args.init_from_ckpt:
@@ -166,13 +158,7 @@ def do_train(args):
                 config_dict = json.load(f)
                 model_name = config_dict["model_name"]
             if model_name in pretrained_models:
-                generator = ElectraGenerator(
-                    ElectraModel(**model_class.pretrained_init_configuration[model_name + "-generator"])
-                )
-                discriminator = ErnieHealthDiscriminator(
-                    ElectraModel(**model_class.pretrained_init_configuration[model_name + "-discriminator"])
-                )
-                model = model_class(generator, discriminator)
+                model = model_class.from_pretrained(args.model_name_or_path)
                 model.set_state_dict(paddle.load(os.path.join(args.model_name_or_path, "model_state.pdparams")))
             else:
                 raise ValueError(

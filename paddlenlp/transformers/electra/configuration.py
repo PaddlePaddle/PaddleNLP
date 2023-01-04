@@ -1,11 +1,11 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# 
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #     http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,9 +15,7 @@
 """ Electra model configuration """
 from __future__ import annotations
 
-from typing import Dict
-
-from paddlenlp.transformers.configuration_utils import PretrainedConfig, attribute_map
+from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 __all__ = ["ElectraConfig", "ELECTRA_PRETRAINED_INIT_CONFIGURATION", "ELECTRA_PRETRAINED_RESOURCE_FILES_MAP"]
 
@@ -251,8 +249,6 @@ ELECTRA_PRETRAINED_RESOURCE_FILES_MAP = {
 
 class ElectraConfig(PretrainedConfig):
     model_type = "electra"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
-
     pretrained_init_configuration = ELECTRA_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(
@@ -271,6 +267,7 @@ class ElectraConfig(PretrainedConfig):
         initializer_range: float = 0.02,
         pad_token_id: int = 0,
         layer_norm_eps: float = 1e-12,
+        num_choices: int = 2,
         **kwargs
     ):
         super().__init__(**kwargs)
@@ -289,3 +286,4 @@ class ElectraConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
         self.layer_norm_eps = layer_norm_eps
+        self.num_choices = num_choices
