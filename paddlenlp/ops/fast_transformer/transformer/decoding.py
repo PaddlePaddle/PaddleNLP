@@ -842,6 +842,221 @@ def infer_unified_decoding(
     )
 
 
+def infer_miro_decoding(
+    input_ids,
+    attn_mask,
+    memory_seq_lens,
+    type_id,
+    decoder_type_id,
+    logits_mask,
+    word_emb,
+    pre_decoder_ln_weight,
+    pre_decoder_ln_bias,
+    slf_ln_weight,
+    slf_ln_bias,
+    slf_q_weight,
+    slf_q_bias,
+    slf_k_weight,
+    slf_k_bias,
+    slf_v_weight,
+    slf_v_bias,
+    slf_out_weight,
+    slf_out_bias,
+    ffn_ln_weight,
+    ffn_ln_bias,
+    ffn_inter_weight,
+    ffn_inter_bias,
+    ffn_out_weight,
+    ffn_out_bias,
+    decoder_ln_weight,
+    decoder_ln_bias,
+    trans_weight,
+    trans_bias,
+    lm_ln_weight,
+    lm_ln_bias,
+    linear_weight,
+    linear_bias,
+    pos_emb,
+    type_emb,
+    role_id,
+    decoder_role_id,
+    role_emb,
+    position_id,
+    decoder_position_id,
+    _decoding_strategy,
+    _beam_size,
+    _topk,
+    _topp,
+    _n_head,
+    _size_per_head,
+    _n_layer,
+    _bos_id,
+    _eos_id,
+    _max_out_len,
+    _diversity_rate,
+    _unk_id,
+    _mask_id,
+    _temperature,
+    _len_penalty,
+    _normalize_before,
+    _pos_bias,
+    _hidden_act,
+    _rel_len,
+    _early_stopping,
+    _min_length,
+):
+
+    tensor_para_size = get_ft_para_conf().tensor_para_size
+    layer_para_size = get_ft_para_conf().layer_para_size
+    layer_para_batch_size = get_ft_para_conf().layer_para_batch_size
+
+    inputs_names = [
+        "InputIds",
+        "AttnMask",
+        "MemSeqLen",
+        "TypeIds",
+        "DecTypeIds",
+        "LogitsMask",
+        "WordEmbedding",
+        "PreDecoderLayernormWeight",
+        "PreDecoderLayernormBias",
+        "SelfLayernormWeight@VECTOR",
+        "SelfLayernormBias@VECTOR",
+        "SelfQueryWeight@VECTOR",
+        "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR",
+        "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR",
+        "SelfValueBias@VECTOR",
+        "SelfOutWeight@VECTOR",
+        "SelfOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR",
+        "FFNLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR",
+        "FFNInterBias@VECTOR",
+        "FFNOutWeight@VECTOR",
+        "FFNOutBias@VECTOR",
+        "DecoderLayernormWeight",
+        "DecoderLayernormBias",
+        "TransWeight",
+        "TransBias",
+        "LMLayernormWeight",
+        "LMLayernormBias",
+        "EmbWeight",
+        "EmbBias",
+        "PositionEncEmb",
+        "TypeEmb",
+        "RoleIds",
+        "DecRoleIds",
+        "RoleEmbedding",
+        "PositionIds",
+        "DecPositionIds",
+    ]
+
+    inputs_var = [
+        input_ids,
+        attn_mask,
+        memory_seq_lens,
+        type_id,
+        decoder_type_id,
+        logits_mask,
+        word_emb,
+        pre_decoder_ln_weight,
+        pre_decoder_ln_bias,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        trans_weight,
+        trans_bias,
+        lm_ln_weight,
+        lm_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+        type_emb,
+        role_id,
+        decoder_role_id,
+        role_emb,
+        position_id,
+        decoder_position_id,
+    ]
+
+    attrs_names = [
+        "decoding_strategy",
+        "beam_size",
+        "topk",
+        "topp",
+        "n_head",
+        "size_per_head",
+        "num_layer",
+        "bos_id",
+        "eos_id",
+        "max_len",
+        "beam_search_diversity_rate",
+        "unk_id",
+        "mask_id",
+        "temperature",
+        "len_penalty",
+        "normalize_before",
+        "pos_bias",
+        "hidden_act",
+        "rel_len",
+        "early_stopping",
+        "min_length",
+        "tensor_para_size",
+        "layer_para_size",
+        "layer_para_batch_size",
+    ]
+
+    attrs_val = [
+        _decoding_strategy,
+        _beam_size,
+        _topk,
+        float(_topp),
+        _n_head,
+        _size_per_head,
+        _n_layer,
+        _bos_id,
+        _eos_id,
+        _max_out_len,
+        _diversity_rate,
+        _unk_id,
+        _mask_id,
+        _temperature,
+        _len_penalty,
+        _normalize_before,
+        _pos_bias,
+        _hidden_act,
+        _rel_len,
+        _early_stopping,
+        _min_length,
+        tensor_para_size,
+        layer_para_size,
+        layer_para_batch_size,
+    ]
+
+    outputs_names = ["OutputIds", "ParentIds", "SequenceLength", "OutputScores"]
+
+    outputs_dtype = ["int32", "int32", "int32", "float32"]
+
+    return run_custom("fusion_miro", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype)
+
+
 def infer_bart_decoding(
     enc_output,
     memory_seq_lens,
@@ -3135,6 +3350,201 @@ class InferUnifiedDecoding(nn.Layer):
             forced_eos_token_id=forced_eos_token_id,
             decoding_strategy=decoding_strategy,
         )
+        return ids, output_scores
+
+
+class InferMIRODecoding(nn.Layer):
+    def __init__(
+        self,
+        model,
+        decoding_lib=None,
+        use_fp16_decoding=False,
+        logits_mask=None,
+        n_head=8,
+        hidden_dims=512,
+        size_per_head=64,
+        n_layer=6,
+        unk_id=0,
+        mask_id=30000,
+        normalize_before=True,
+        hidden_act="relu",
+    ):
+
+        if decoding_lib is not None and os.path.isfile(decoding_lib):
+            # Maybe it has been loadad by `ext_utils.load`
+            if "FasterTransformer" not in LOADED_EXT.keys():
+                ops = paddle.utils.cpp_extension.load_op_meta_info_and_register_op(decoding_lib)
+                LOADED_EXT["FasterTransformer"] = ops
+        else:
+            if decoding_lib is not None:
+                logger.warning("The specified decoding_lib does not exist, and it will be built automatically.")
+            load(
+                "FasterTransformer" if get_ft_para_conf().no_para else "FasterTransformerParallel",
+                verbose=True,
+                need_parallel=not get_ft_para_conf().no_para,
+            )
+
+        super(InferMIRODecoding, self).__init__()
+        for arg, value in locals().items():
+            if arg not in ["self"]:
+                setattr(self, "_" + arg, value)
+
+        params = convert_params(self, model, fuse_qkv=1, use_fp16=use_fp16_decoding, restore_data=True)
+        params["word_emb"].append((model.embeddings.word_embeddings, "weight"))
+        params["pos_emb"].append((model.embeddings.position_embeddings, "weight"))
+        params["type_emb"].append((model.embeddings.token_type_embeddings, "weight"))
+        if getattr(model.embeddings, "role_embeddings", None) is not None:
+            params["role_emb"].append((model.embeddings.role_embeddings, "weight"))
+        else:
+            # inputs of custom op cannot be None
+            params["role_emb"].append((paddle.zeros(shape=[1]), False, partial(setattr, self, "default_role_emb")))
+        # if not self._normalize_before:
+        #     # pre-norm params has been converted in `convert_params`, and this
+        #     # is only for post-norm such as UNIMO.
+        #     params["decoder_ln_weight"].append((model.encoder_norm, "weight"))
+        #     params["decoder_ln_bias"].append((model.encoder_norm, "bias"))
+        params["pre_decoder_ln_weight"].append((model.encoder_norm, "weight"))
+        params["pre_decoder_ln_bias"].append((model.encoder_norm, "bias"))
+
+        params["trans_weight"].append((model.lm_head.transform, "weight"))
+        params["trans_bias"].append((model.lm_head.transform, "bias"))
+        params["lm_ln_weight"].append((model.lm_head.layer_norm, "weight"))
+        params["lm_ln_bias"].append((model.lm_head.layer_norm, "bias"))
+        # NOTE: newly created tensors should be layer attribute refered to be
+        # able to convert to static graph.
+        params["linear_weight"].append((model.lm_head.decoder_weight.t(), False, partial(setattr, self, "dec_weight")))
+        params["linear_bias"].append(
+            (paddle.assign(model.lm_head.decoder_bias), True, partial(setattr, self, "dec_bias"))
+        )
+        for k, v in params.items():
+            setattr(self, k, v)
+
+    def forward(
+        self,
+        input_ids,
+        attn_mask,
+        memory_seq_lens,
+        type_id,
+        decoder_type_id,
+        role_id=None,
+        decoder_role_id=None,
+        position_id=None,
+        decoder_position_id=None,
+        beam_size=4,
+        topk=4,
+        topp=0.0,
+        decoding_strategy="greedy_search",
+        max_out_len=256,
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        forced_eos_token_id=None,
+        temperature=1.0,
+        length_penalty=1.0,
+        diversity_rate=0.0,
+        pos_bias=True,
+        rel_len=False,
+        early_stopping=False,
+        min_length=0,
+    ):
+        if role_id is None:
+            role_id = paddle.zeros(shape=[0], dtype="int32")
+            decoder_role_id = paddle.zeros(shape=[0], dtype="int32")
+        if position_id is None:
+            position_id = paddle.zeros(shape=[0], dtype="int32")
+            decoder_position_id = paddle.zeros(shape=[0], dtype="int32")
+
+        if decoding_strategy == "greedy_search":
+            decoding_strategy = "topk_sampling"
+            topk = 1
+            topp = 0.0
+        elif decoding_strategy in ["sampling", "topk_sampling", "topp_sampling"]:
+            if topp == 1 and topk > 0:
+                decoding_strategy = "topk_sampling"
+                topp = 0.0
+            elif topp > 0 and topk == 0:
+                decoding_strategy = "topp_sampling"
+            else:
+                raise AttributeError(
+                    "Only topk sampling or topp sampling are supported. "
+                    "Topk sampling and topp sampling cannot be both applied in the faster version."
+                )
+        elif decoding_strategy.startswith("beam_search"):
+            decoding_strategy = "beam_search_v3"
+
+        output_ids, parent_ids, sequence_length, output_scores = infer_miro_decoding(
+            input_ids=[input_ids],
+            attn_mask=[attn_mask],
+            memory_seq_lens=[memory_seq_lens],
+            type_id=[type_id],
+            decoder_type_id=[decoder_type_id],
+            logits_mask=[self._logits_mask],
+            word_emb=self.word_emb,
+            pre_decoder_ln_weight=self.pre_decoder_ln_weight,
+            pre_decoder_ln_bias=self.pre_decoder_ln_bias,
+            slf_ln_weight=self.slf_ln_weight,
+            slf_ln_bias=self.slf_ln_bias,
+            slf_q_weight=self.slf_q_weight,
+            slf_q_bias=self.slf_q_bias,
+            slf_k_weight=self.slf_k_weight,
+            slf_k_bias=self.slf_k_bias,
+            slf_v_weight=self.slf_v_weight,
+            slf_v_bias=self.slf_v_bias,
+            slf_out_weight=self.slf_out_weight,
+            slf_out_bias=self.slf_out_bias,
+            ffn_ln_weight=self.ffn_ln_weight,
+            ffn_ln_bias=self.ffn_ln_bias,
+            ffn_inter_weight=self.ffn_inter_weight,
+            ffn_inter_bias=self.ffn_inter_bias,
+            ffn_out_weight=self.ffn_out_weight,
+            ffn_out_bias=self.ffn_out_bias,
+            decoder_ln_weight=self.decoder_ln_weight,
+            decoder_ln_bias=self.decoder_ln_bias,
+            trans_weight=self.trans_weight,
+            trans_bias=self.trans_bias,
+            lm_ln_weight=self.lm_ln_weight,
+            lm_ln_bias=self.lm_ln_bias,
+            linear_weight=self.linear_weight,
+            linear_bias=self.linear_bias,
+            pos_emb=self.pos_emb,
+            type_emb=self.type_emb,
+            role_id=[role_id],
+            decoder_role_id=[decoder_role_id],
+            role_emb=self.role_emb,
+            position_id=[position_id],
+            decoder_position_id=[decoder_position_id],
+            _decoding_strategy=decoding_strategy,
+            _beam_size=beam_size,
+            _topk=topk,
+            _topp=topp,
+            _n_head=self._n_head,
+            _size_per_head=self._size_per_head,
+            _n_layer=self._n_layer,
+            _bos_id=bos_token_id,
+            _eos_id=eos_token_id,
+            _max_out_len=max_out_len,
+            _diversity_rate=-diversity_rate,
+            _unk_id=self._unk_id,
+            _mask_id=self._mask_id,
+            _temperature=temperature,
+            _len_penalty=length_penalty,
+            _normalize_before=self._normalize_before,
+            _pos_bias=pos_bias,
+            _hidden_act=self._hidden_act,
+            _rel_len=rel_len,
+            _early_stopping=early_stopping,
+            _min_length=min_length,
+        )
+
+        ids = finalize(
+            beam_size,
+            output_ids,
+            parent_ids,
+            sequence_length,
+            forced_eos_token_id=forced_eos_token_id,
+            decoding_strategy=decoding_strategy,
+        )
+
         return ids, output_scores
 
 

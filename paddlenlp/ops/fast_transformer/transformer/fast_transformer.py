@@ -24,6 +24,7 @@ from paddlenlp.ops import (
     InferGptDecoding,
     InferGptJDecoding,
     InferMBartDecoding,
+    InferMIRODecoding,
     InferOptDecoding,
     InferPegasusDecoding,
     InferT5Decoding,
@@ -1123,6 +1124,177 @@ class FasterUNIMOText(UNIMOPretrainedModel):
         self.trans_out = kwargs.get("trans_out", False)
 
         self.decoding = InferUnifiedDecoding(
+            model=self._model,
+            decoding_lib=decoding_lib,
+            use_fp16_decoding=use_fp16_decoding,
+            logits_mask=self.logits_mask,
+            n_head=self._n_head,
+            hidden_dims=self._hidden_dims,
+            size_per_head=self._size_per_head,
+            n_layer=self._n_layer,
+            unk_id=self.unk_token_id,
+            mask_id=self.mask_token_id,
+            normalize_before=self._normalize_before,
+            hidden_act=self._hidden_act,
+        )
+
+    def prepare_inputs_for_generation(self, input_ids, token_type_ids, attention_mask, **kwargs):
+        input_ids = input_ids[:, :-1]
+        if input_ids.dtype == paddle.int64:
+            input_ids = paddle.cast(input_ids, dtype="int32")
+
+        if token_type_ids.dtype == paddle.int64:
+            token_type_ids = paddle.cast(token_type_ids, dtype="int32")
+        decoder_type_ids = token_type_ids[:, -1:]
+        token_type_ids = token_type_ids[:, :-1]
+
+        attention_mask = attention_mask[:, :, :-1, :-1]
+        attention_mask = paddle.cast(attention_mask == 0, dtype="float16" if self._use_fp16_decoding else "float32")
+
+        seq_len = kwargs.get("seq_len") - 1
+        if seq_len.dtype == paddle.int64:
+            seq_len = paddle.cast(seq_len, dtype="int32")
+
+        return {
+            "input_ids": input_ids,
+            "token_type_ids": token_type_ids,
+            "attention_mask": attention_mask,
+            "seq_len": seq_len,
+            "decoder_type_ids": decoder_type_ids,
+        }
+
+    def generate_logits_mask(self, use_fp16_decoding):
+        # pre-process distribution
+        logits_mask = np.zeros(shape=[self.vocab_size], dtype=np.float32)
+
+        if use_fp16_decoding:
+            logits_mask[self.unk_token_id] = -1e4
+            logits_mask[self.bos_token_id] = -1e4
+            logits_mask[self.pad_token_id] = -1e4
+        else:
+            logits_mask[self.unk_token_id] = -1e9
+            logits_mask[self.bos_token_id] = -1e9
+            logits_mask[self.pad_token_id] = -1e9
+
+        logits_mask_t = paddle.assign(logits_mask)
+        if use_fp16_decoding:
+            return paddle.cast(logits_mask_t, dtype="float16")
+        else:
+            return logits_mask_t
+
+    def forward(
+        self,
+        input_ids,
+        token_type_ids,
+        attention_mask,
+        seq_len=None,
+        max_length=128,
+        min_length=0,
+        top_k=4,
+        top_p=0.0,
+        num_beams=4,
+        decode_strategy="sampling",
+        bos_token_id=None,
+        eos_token_id=None,
+        pad_token_id=None,
+        diversity_rate=0.0,
+        temperature=1.0,
+        num_return_sequences=1,
+        length_penalty=0.6,
+        early_stopping=False,
+        forced_eos_token_id=None,
+        position_ids=None,
+        **model_kwargs
+    ):
+
+        if seq_len is None:
+            assert input_ids is not None, "You have to specify either input_ids when generating seq_len."
+            seq_len = paddle.sum(paddle.cast(input_ids != self.pad_token_id, dtype="int32"), axis=-1, dtype="int32")
+        if decode_strategy.startswith("beam_search"):
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_beams,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len,
+            )
+        elif decode_strategy == "sampling":
+            input_ids, model_kwargs = self.expand_inputs_for_generation(
+                input_ids,
+                expand_size=num_return_sequences,
+                token_type_ids=token_type_ids,
+                position_ids=position_ids,
+                attention_mask=attention_mask,
+                seq_len=seq_len,
+            )
+        elif decode_strategy == "greedy_search":
+            model_kwargs = {
+                "token_type_ids": token_type_ids,
+                "position_ids": position_ids,
+                "attention_mask": attention_mask,
+                "seq_len": seq_len,
+            }
+        else:
+            raise ValueError("Only greedy search, beam search and sampling are supported. ")
+
+        model_inputs = self.prepare_inputs_for_generation(input_ids, **model_kwargs)
+        seq_len = model_inputs.pop("seq_len")
+        decoder_type_ids = model_inputs.pop("decoder_type_ids")
+
+        ids, output_scores = self.decoding(
+            input_ids=model_inputs["input_ids"],
+            attn_mask=model_inputs["attention_mask"],
+            memory_seq_lens=seq_len,
+            type_id=model_inputs["token_type_ids"],
+            decoder_type_id=decoder_type_ids,
+            beam_size=num_beams,
+            diversity_rate=diversity_rate,
+            topk=top_k,
+            topp=top_p,
+            decoding_strategy=decode_strategy,
+            max_out_len=max_length,
+            bos_token_id=bos_token_id,
+            eos_token_id=eos_token_id,
+            pad_token_id=pad_token_id,
+            temperature=temperature,
+            length_penalty=length_penalty,
+            forced_eos_token_id=forced_eos_token_id,
+            pos_bias=False,
+            early_stopping=early_stopping,
+            min_length=min_length,
+        )
+        if self.trans_out:
+            if decode_strategy.startswith("beam_search"):
+                ids = ids.transpose([1, 2, 0])
+            else:
+                ids = ids.transpose([1, 0])
+        return ids, output_scores
+
+    generate = forward
+
+
+class FasterMIRO(UNIMOPretrainedModel):
+    def __init__(self, model, decoding_lib=None, use_fp16_decoding=False, **kwargs):
+        super(FasterMIRO, self).__init__(model.config)
+        self._model = model
+        self._use_fp16_decoding = use_fp16_decoding
+        self.unk_token_id = self._model.unk_token_id
+        self.mask_token_id = self._model.mask_token_id
+        self.bos_token_id = self._model.bos_token_id
+        self.pad_token_id = self._model.pad_token_id
+        self.vocab_size = model.lm_head.decoder_bias.shape[0]
+
+        self.logits_mask = self.generate_logits_mask(use_fp16_decoding)
+        self._n_head = self._model.num_attention_heads
+        self._hidden_dims = self._model.hidden_size
+        self._normalize_before = self._model.normalize_before
+        self._size_per_head = self._hidden_dims // self._n_head
+        self._n_layer = self._model.num_hidden_layers
+        self._hidden_act = self._model.hidden_act
+        self.trans_out = kwargs.get("trans_out", False)
+
+        self.decoding = InferMIRODecoding(
             model=self._model,
             decoding_lib=decoding_lib,
             use_fp16_decoding=use_fp16_decoding,
