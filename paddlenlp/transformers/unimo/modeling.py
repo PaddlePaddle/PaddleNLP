@@ -523,8 +523,8 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-        if attention_mask is not None:
-            attention_mask = attention_mask[:, :, -1:, :]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
