@@ -92,7 +92,6 @@ def query(request: QueryRequest):
     This endpoint receives the question as a string and allows the requester to set
     additional parameters that will be passed on to the pipelines pipeline.
     """
-    print("query", request)
     with concurrency_limiter.run():
         result = _process_request(PIPELINE, request)
         return result
@@ -162,7 +161,6 @@ def query_qa_pairs(request: QueryQAPairRequest):
 
 def _process_request(pipeline, request) -> Dict[str, Any]:
     start_time = time.time()
-
     params = request.params or {}
 
     # format global, top-level filters (e.g. "params": {"filters": {"name": ["some"]}})
