@@ -18,6 +18,6 @@ msgstr ""
 "Generated-By: Babel 2.10.1\n"
 
 #: ../source/paddlenlp.transformers.tokenizer_utils_fast.rst:2
-msgid "tokenizer\\_utils\\_faster"
+msgid "tokenizer\\_utils\\_fast"
 msgstr ""
 

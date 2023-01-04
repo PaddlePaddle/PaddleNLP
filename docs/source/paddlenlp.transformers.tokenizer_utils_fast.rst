@@ -1,4 +1,4 @@
-tokenizer\_utils\_faster
+tokenizer\_utils\_fast
 ======================================================
 
 .. automodule:: paddlenlp.transformers.tokenizer_utils_fast
