@@ -37,9 +37,11 @@ DEFINE_string(vocab_path, "", "Path of the vocab file.");
 DEFINE_string(slot_label_path, "", "Path of the slot label file.");
 DEFINE_string(intent_label_path, "", "Path of the intent label file.");
 DEFINE_string(test_data_path, "", "The path of the test dataset file.");
-DEFINE_string(device, "cpu",
+DEFINE_string(device,
+              "cpu",
               "Type of inference device, support 'cpu' or 'gpu'.");
-DEFINE_string(backend, "paddle",
+DEFINE_string(backend,
+              "paddle",
               "The inference runtime backend, support: ['onnx_runtime', "
               "'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']");
 DEFINE_int32(batch_size, 1, "The batch size of data.");
@@ -86,7 +88,8 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, 1},
+    option->SetTrtInputShape("input_ids",
+                             {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
@@ -108,8 +111,9 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
   return true;
 }
 
-bool BatchiFyTexts(const std::vector<std::string>& texts, int batch_size,
-                  std::vector<std::vector<std::string>>* batch_texts) {
+bool BatchiFyTexts(const std::vector<std::string>& texts,
+                   int batch_size,
+                   std::vector<std::vector<std::string>>* batch_texts) {
   for (int idx = 0; idx < texts.size(); idx += batch_size) {
     int rest = texts.size() - idx;
     int curr_size = std::min(batch_size, rest);
@@ -160,7 +164,8 @@ struct Predictor {
             const ErnieFastTokenizer& tokenizer,
             const std::unordered_map<int, std::string>& slot_labels,
             const std::unordered_map<int, std::string>& intent_labels)
-      : tokenizer_(tokenizer), slot_labels_(slot_labels),
+      : tokenizer_(tokenizer),
+        slot_labels_(slot_labels),
         intent_labels_(intent_labels) {
     runtime_.Init(option);
   }
@@ -187,8 +192,8 @@ struct Predictor {
     int* input_ids_ptr = reinterpret_cast<int*>((*inputs)[0].MutableData());
     for (int i = 0; i < encodings.size(); ++i) {
       auto&& curr_input_ids = encodings[i].GetIds();
-      std::copy(curr_input_ids.begin(), curr_input_ids.end(),
-                input_ids_ptr + start);
+      std::copy(
+          curr_input_ids.begin(), curr_input_ids.end(), input_ids_ptr + start);
       start += seq_len;
     }
     return true;
@@ -303,7 +308,8 @@ void ReadLabelMapFromTxt(const std::string path,
   }
 }
 
-bool GetFilePath(const std::string& path, const std::string& default_path,
+bool GetFilePath(const std::string& path,
+                 const std::string& default_path,
                  std::string* actual_path) {
   *actual_path = path;
   if (!fastdeploy::CheckFileExists(path)) {
@@ -346,23 +352,29 @@ int main(int argc, char* argv[]) {
   ErnieFastTokenizer tokenizer(vocab_path);
   uint32_t max_length = FLAGS_max_length;
   tokenizer.EnableTruncMethod(
-      max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      max_length,
+      0,
+      fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
-  tokenizer.EnablePadMethod(fast_tokenizer::core::Direction::RIGHT, 0, 0,
-                            "[PAD]", &max_length, nullptr);
+  tokenizer.EnablePadMethod(fast_tokenizer::core::Direction::RIGHT,
+                            0,
+                            0,
+                            "[PAD]",
+                            &max_length,
+                            nullptr);
   std::unordered_map<int, std::string> slot_label_map;
   std::unordered_map<int, std::string> intent_label_map;
 
   std::string slot_label_path;
-  if (!GetFilePath(FLAGS_slot_label_path, "slots_label.txt",
-                   &slot_label_path)) {
+  if (!GetFilePath(
+          FLAGS_slot_label_path, "slots_label.txt", &slot_label_path)) {
     return -1;
   }
   ReadLabelMapFromTxt(slot_label_path, &slot_label_map);
 
   std::string intent_label_path;
-  if (!GetFilePath(FLAGS_intent_label_path, "intent_label.txt",
-                   &intent_label_path)) {
+  if (!GetFilePath(
+          FLAGS_intent_label_path, "intent_label.txt", &intent_label_path)) {
     return -1;
   }
   ReadLabelMapFromTxt(intent_label_path, &intent_label_map);
@@ -370,8 +382,8 @@ int main(int argc, char* argv[]) {
   Predictor predictor(option, tokenizer, slot_label_map, intent_label_map);
 
   std::vector<IntentDetAndSlotFillResult> results;
-  std::vector<std::string> texts = {"来一首周华健的花心", "播放我们都一样",
-                                    "到信阳市汽车配件城"};
+  std::vector<std::string> texts = {
+      "来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
   predictor.Predict(texts, &results);
   for (int i = 0; i < results.size(); ++i) {
     std::cout << "No." << i << " text = " << texts[i] << std::endl;
@@ -380,24 +392,22 @@ int main(int argc, char* argv[]) {
 
   std::string dataset_path;
   if (fastdeploy::CheckFileExists(FLAGS_test_data_path)) {
-    std::cout << "Read dataset path from: " << FLAGS_test_data_path << std::endl;
+    std::cout << "Read dataset path from: " << FLAGS_test_data_path
+              << std::endl;
     texts.clear();
     results.clear();
     ReadDatasetFromTxt(FLAGS_test_data_path, &texts);
-    std::vector<std::string> curr_texts;
-    int text_num = texts.size();
-    int j = 0;
-    for (int i = 0; i < text_num; i += FLAGS_batch_size) {
-      int actual_batch_size = (std::min)(text_num - i, FLAGS_batch_size);
-      curr_texts.insert(curr_texts.end(), texts.begin() + i,
-                        texts.begin() + i + actual_batch_size);
+    std::vector<std::vector<std::string>> batch_texts;
+    BatchiFyTexts(texts, FLAGS_batch_size, &batch_texts);
+    for (int i = 0; i < batch_texts.size(); ++i) {
+      auto& curr_texts = batch_texts[i];
       predictor.Predict(curr_texts, &results);
       for (int k = 0; k < curr_texts.size(); ++k) {
-        std::cout << "No." << i + k << " text = " << curr_texts[k] << std::endl;
+        std::cout << "No." << i * FLAGS_batch_size + k
+                  << " text = " << curr_texts[k] << std::endl;
         std::cout << results[k] << std::endl;
       }
       results.clear();
-      curr_texts.clear();
     }
   }
 
