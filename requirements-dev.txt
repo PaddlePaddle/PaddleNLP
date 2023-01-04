@@ -5,3 +5,4 @@ parameterized
 pytest-cov
 regex
 pytest-xdist
+fast_tokenizer_python
