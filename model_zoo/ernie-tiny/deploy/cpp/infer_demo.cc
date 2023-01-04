@@ -34,8 +34,8 @@ const char sep = '/';
 
 DEFINE_string(model_dir, "", "Directory of the inference model.");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
-DEFINE_string(slot_label_path, "", "Path of the slot_label file.");
-DEFINE_string(intent_label_path, "", "Path of the intent_label file.");
+DEFINE_string(slot_label_path, "", "Path of the slot label file.");
+DEFINE_string(intent_label_path, "", "Path of the intent label file.");
 DEFINE_string(test_data_path, "", "The path of the test dataset file.");
 DEFINE_string(device, "cpu",
               "Type of inference device, support 'cpu' or 'gpu'.");
@@ -86,10 +86,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, FLAGS_max_length},
-                             {FLAGS_batch_size, FLAGS_max_length},
-                             {FLAGS_batch_size, FLAGS_max_length});
-    option->SetTrtInputShape("token_type_ids", {1, FLAGS_max_length},
+    option->SetTrtInputShape("input_ids", {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
@@ -111,7 +108,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
   return true;
 }
 
-bool BatchFyTexts(const std::vector<std::string>& texts, int batch_size,
+bool BatchiFyTexts(const std::vector<std::string>& texts, int batch_size,
                   std::vector<std::vector<std::string>>* batch_texts) {
   for (int idx = 0; idx < texts.size(); idx += batch_size) {
     int rest = texts.size() - idx;
