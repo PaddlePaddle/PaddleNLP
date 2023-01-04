@@ -743,3 +743,11 @@ class LogitComparer:
             logger.warning(
                 "you don't install `torch` and `transformers` package, so we can't compare the logits between paddle & pytorch model"
             )
+
+
+class Converter(Convertible, LogitComparer):
+    """some converters are implemented in ppdiffusers, so if remove it directly, it will make ppdiffusers down."""
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        logger.warning("Converter will be deprecated soon.")
