@@ -1,4 +1,4 @@
-/* Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+/* Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ limitations under the License. */
 #include <vector>
 
 // TODO(guosheng): `HOST` conflict exists in float.h of paddle and mpi.h of mpi
-#include "fusion_unified_decoding_op.h"
+#include "fusion_miro_op.h"
 #include "pd_traits.h"
 #ifdef HOST
 #undef HOST
@@ -31,6 +31,7 @@ limitations under the License. */
 #include "fastertransformer/decoding_beamsearch.h"
 #include "fastertransformer/decoding_sampling.h"
 #include "fastertransformer/utils/common.h"
+#include "fastertransformer/utils/arguments.h"
 
 #ifdef BUILD_GPT  // consistent with FasterTransformer
 #include "parallel_utils.h"
@@ -38,7 +39,7 @@ limitations under the License. */
 
 
 template <paddle::DataType D>
-std::vector<paddle::Tensor> unified_decoding_kernel(
+std::vector<paddle::Tensor> miro_decoding_kernel(
     const paddle::Tensor& input_ids,
     const paddle::Tensor& attn_mask,
     const paddle::Tensor& memory_sequence_length,
@@ -46,6 +47,8 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& decoder_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_emb,
+    const paddle::Tensor& pre_decoder_layernorm_weight,
+    const paddle::Tensor& pre_decoder_layernorm_bias,
     const std::vector<paddle::Tensor>& self_layernorm_weight,
     const std::vector<paddle::Tensor>& self_layernorm_bias,
     const std::vector<paddle::Tensor>& self_attn_query_weight,
@@ -286,6 +289,11 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         reinterpret_cast<const DataType_*>(ffn_output_bias[i].data<data_t_>());
   }
 
+  decoding_params.pre_layernorm.gamma = reinterpret_cast<const DataType_*>(
+      pre_decoder_layernorm_weight.data<data_t_>());
+  decoding_params.pre_layernorm.beta = reinterpret_cast<const DataType_*>(
+      pre_decoder_layernorm_bias.data<data_t_>());
+
   decoding_params.layernorm.gamma = reinterpret_cast<const DataType_*>(
       decoder_layernorm_weight.data<data_t_>());
   decoding_params.layernorm.beta = reinterpret_cast<const DataType_*>(
@@ -341,9 +349,9 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
       ("beam_search_v3" == decoding_strategy) ? beam_width_ : beam_width_ * 2;
 
   if ("beam_search" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
+    DecodingBeamsearch<DecodingTraits_::OpType>* miro_beam_search_;
 
-    unified_decoding_beam_search_ =
+    miro_beam_search_ =
         new DecodingBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
@@ -371,20 +379,21 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             false,  /*early_stopping*/
             false,  /*is_mbart*/
             min_length,
-            inner_coeff);
-    unified_decoding_beam_search_->set_tensor_parallel_param(
+            inner_coeff,
+            true);  /*is_miro*/
+    miro_beam_search_->set_tensor_parallel_param(
         tensor_parallel_param);
-    unified_decoding_beam_search_->set_layer_parallel_param(
+    miro_beam_search_->set_layer_parallel_param(
         layer_parallel_param);
-    unified_decoding_beam_search_->forward_context(params, decoding_params);
-    unified_decoding_beam_search_->forward(params, decoding_params);
+    miro_beam_search_->forward_context(params, decoding_params);
+    miro_beam_search_->forward(params, decoding_params);
 
-    delete unified_decoding_beam_search_;
+    delete miro_beam_search_;
   } else if ("beam_search_v2" == decoding_strategy ||
              "beam_search_v3" == decoding_strategy) {
-    DecodingBeamsearch<DecodingTraits_::OpType>* unified_decoding_beam_search_;
+    DecodingBeamsearch<DecodingTraits_::OpType>* miro_beam_search_;
 
-    unified_decoding_beam_search_ =
+    miro_beam_search_ =
         new DecodingBeamsearch<DecodingTraits_::OpType>(
             allocator_,
             batch_size_,
@@ -412,17 +421,18 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
             early_stopping,
             false,  /*is_mbart*/
             min_length,
-            inner_coeff);
-    unified_decoding_beam_search_->forward_context(params, decoding_params);
-    unified_decoding_beam_search_->forward(params, decoding_params);
+            inner_coeff,
+            true);  /*is_miro*/
+    miro_beam_search_->forward_context(params, decoding_params);
+    miro_beam_search_->forward(params, decoding_params);
 
-    delete unified_decoding_beam_search_;
+    delete miro_beam_search_;
   } else if ("topk_sampling" == decoding_strategy ||
              "topp_sampling" == decoding_strategy ||
              "sampling" == decoding_strategy) {
-    DecodingSampling<DecodingTraits_::OpType>* unified_decoding_sampling_;
+    DecodingSampling<DecodingTraits_::OpType>* miro_sampling_;
 
-    unified_decoding_sampling_ = new DecodingSampling<DecodingTraits_::OpType>(
+    miro_sampling_ = new DecodingSampling<DecodingTraits_::OpType>(
         allocator_,
         batch_size_,
         max_seq_len_,
@@ -449,26 +459,27 @@ std::vector<paddle::Tensor> unified_decoding_kernel(
         inner_coeff,
         seed,
         tensor_para_size,
-        layer_para_size);
-    unified_decoding_sampling_->set_tensor_parallel_param(
+        layer_para_size,
+        true);  /*is_miro*/
+    miro_sampling_->set_tensor_parallel_param(
         tensor_parallel_param);
-    unified_decoding_sampling_->set_layer_parallel_param(layer_parallel_param);
-    unified_decoding_sampling_->forward_context(params, decoding_params);
-    unified_decoding_sampling_->forward(params, decoding_params);
+    miro_sampling_->set_layer_parallel_param(layer_parallel_param);
+    miro_sampling_->forward_context(params, decoding_params);
+    miro_sampling_->forward(params, decoding_params);
 
-    delete unified_decoding_sampling_;
+    delete miro_sampling_;
   } else {
     PD_THROW(
         "Only beam_search, beam_search_v2, topk_sampling and topp_sampling are "
         "supported for "
-        "FastGeneration. ");
+        "FasterTransformer. ");
   }
   delete[] params;
 
   return {output_ids, parent_ids, sequence_length, output_scores};
 }
 
-std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
+std::vector<paddle::Tensor> MIROCUDAForward(
     const paddle::Tensor& input_ids,
     const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
@@ -476,6 +487,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& decoder_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
+    const paddle::Tensor& pre_decoder_ln_weight,
+    const paddle::Tensor& pre_decoder_ln_bias,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
     const std::vector<paddle::Tensor>& self_q_weight,
@@ -542,7 +555,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
 
   switch (self_ln_weight[0].type()) {
     case paddle::DataType::FLOAT16: {
-      ret = unified_decoding_kernel<paddle::DataType::FLOAT16>(
+      ret = miro_decoding_kernel<paddle::DataType::FLOAT16>(
           input_ids,
           attn_mask,
           mem_seq_len,
@@ -550,6 +563,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           decoder_type_id,
           logits_mask,
           word_embedding,
+          pre_decoder_ln_weight,
+          pre_decoder_ln_bias,
           self_ln_weight,
           self_ln_bias,
           self_q_weight,
@@ -612,7 +627,7 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
       break;
     }
     case paddle::DataType::FLOAT32: {
-      ret = unified_decoding_kernel<paddle::DataType::FLOAT32>(
+      ret = miro_decoding_kernel<paddle::DataType::FLOAT32>(
           input_ids,
           attn_mask,
           mem_seq_len,
@@ -620,6 +635,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
           decoder_type_id,
           logits_mask,
           word_embedding,
+          pre_decoder_ln_weight,
+          pre_decoder_ln_bias,
           self_ln_weight,
           self_ln_bias,
           self_q_weight,

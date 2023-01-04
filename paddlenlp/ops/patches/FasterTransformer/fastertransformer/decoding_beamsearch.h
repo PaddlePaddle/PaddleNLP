@@ -111,7 +111,8 @@ public:
                      const bool early_stopping = false,
                      const bool is_mbart = false,
                      const int min_length = 0,
-                     const int inner_coeff = 4)
+                     const int inner_coeff = 4,
+                     const bool is_miro = false)
       : allocator_(allocator),
         is_fuse_topk_softMax_(is_fuse_topk_softMax),
         keep_alive_beam_(keep_alive_beam) {
@@ -147,6 +148,7 @@ public:
 
     args_.prefix_lm_ = prefix_lm;
     args_.is_mbart_ = is_mbart;
+    args_.is_miro_ = is_miro;
 
     args_.finished_candidate_num_ = (finished_candidate_num == -1)
                                         ? beam_width * 2
@@ -450,7 +452,38 @@ public:
       check_cuda_error(cudaGetLastError());
 #endif
 
-      if (args_.normalization_before_) {
+      if (args_.is_miro_) {
+        // Memory reuse. from_tensor[1].
+        start_ids_embeddings_kernel_launcher(from_tensor[1],
+                                            decoding_params.embedding_table,
+                                            decoding_params.position_encoding_table,
+                                            decoding_params.type_table,
+                                            decoding_params.type_id,
+                                            decoding_params.d_start_ids,
+                                            decoding_params.memory_sequence_length,
+                                            1,
+                                            input_len,
+                                            request_batch_size,
+                                            h_1,
+                                            decoding_params.stream,
+                                            decoding_params.role_id,
+                                            decoding_params.role_embedding_table,
+                                            decoding_params.position_ids);
+
+#ifndef NDEBUG
+      cudaDeviceSynchronize();
+      check_cuda_error(cudaGetLastError());
+#endif
+
+        layer_norm(from_tensor[1],
+                   decoding_params.pre_layernorm.gamma,
+                   decoding_params.pre_layernorm.beta,
+                   from_tensor[0],
+                   m,
+                   h_1,
+                   decoding_params.stream);
+
+      } else if (args_.normalization_before_) {
         start_ids_embeddings_kernel_launcher(from_tensor[0],
                                             decoding_params.embedding_table,
                                             decoding_params.position_encoding_table,
@@ -659,7 +692,42 @@ public:
     for (uint step = 1; step <= args_.seq_len_; ++step) {
       // we use two-way buffer
       int kv_cache_id = step & 0x1;
-      if (args_.normalization_before_) {
+      if (args_.is_miro_) {
+        embeddings_kernel_launcher(from_tensor_[1],
+                                   decoding_params.embedding_table,
+                                   decoding_params.position_encoding_table,
+                                   decoding_params.type_table,
+                                   decoding_params.memory_sequence_length,
+                                   decoding_params.decoder_type_id,
+                                   word_ids_buf_,
+                                   step,
+                                   m,
+                                   args_.hidden_units_,
+                                   args_.pos_bias_,
+                                   decoding_params.stream,
+                                   decoding_params.decoder_role_id,
+                                   decoding_params.role_embedding_table,
+                                   decoding_params.decoder_position_ids);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+        layer_norm(from_tensor_[1],
+                   decoding_params.pre_layernorm.gamma,
+                   decoding_params.pre_layernorm.beta,
+                   from_tensor_[0],
+                   m,
+                   k,
+                   decoding_params.stream);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+      } else if (args_.normalization_before_) {
         if (args_.prefix_lm_) {
           embeddings_kernel_launcher(from_tensor_[0],
                                      decoding_params.embedding_table,
@@ -824,7 +892,102 @@ public:
         DataType_ alpha = (DataType_)1.0f;
         DataType_ beta = (DataType_)0.0f;
 
-        if (args_.prefix_lm_) {
+        if (args_.is_miro_) {
+            layer_norm(from_tensor_[out_id],
+                       decoding_params.layernorm.gamma,
+                       decoding_params.layernorm.beta,
+                       decoder_normed_result_buf_,
+                       m,
+                       k,
+                       decoding_params.stream);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+            // trans here
+            cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                                decoding_params.cublas_handle,
+                                                CUBLAS_OP_N,
+                                                CUBLAS_OP_N,
+                                                k,
+                                                m,
+                                                k,
+                                                &alpha,
+                                                decoding_params.trans_kernel,
+                                                AType_,
+                                                k,
+                                                decoder_normed_result_buf_,
+                                                BType_,
+                                                k,
+                                                &beta,
+                                                trans_out_buf_,
+                                                CType_,
+                                                k,
+                                                decoding_params.stream,
+                                                cublasAlgoMap_,
+                                                cublas_workspace_);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+          // add bias decoding_params.trans_bias
+          add_bias_act_kernelLauncher(trans_out_buf_,
+                                      decoding_params.trans_bias,
+                                      m,
+                                      k,
+                                      args_.act_,
+                                      decoding_params.stream);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+          layer_norm(trans_out_buf_,
+                     decoding_params.lm_layernorm.gamma,
+                     decoding_params.lm_layernorm.beta,
+                     lm_normed_result_buf_,
+                     m,
+                     k,
+                     decoding_params.stream);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+          cublasMM_cublasLtMM_wrapper_decoder(decoding_params.cublaslt_handle,
+                                              decoding_params.cublas_handle,
+                                              CUBLAS_OP_N,
+                                              CUBLAS_OP_N,
+                                              n,
+                                              m,
+                                              k,
+                                              &alpha,
+                                              embedding_kernel_ptr,
+                                              AType_,
+                                              n,
+                                              lm_normed_result_buf_,
+                                              BType_,
+                                              k,
+                                              &beta,
+                                              tmp_logits_buf_,
+                                              CType_,
+                                              n,
+                                              decoding_params.stream,
+                                              cublasAlgoMap_,
+                                              cublas_workspace_);
+
+#ifndef NDEBUG
+            cudaDeviceSynchronize();
+            check_cuda_error(cudaGetLastError());
+#endif
+
+        } else if (args_.prefix_lm_) {
           if (args_.normalization_before_) {
             layer_norm(from_tensor_[out_id],
                        decoding_params.layernorm.gamma,
