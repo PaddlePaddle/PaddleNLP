@@ -150,7 +150,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-m-base")
-
+        tokenizer_fast = self.tokenizer_fast_class.from_pretrained("ernie-m-base")
         text = tokenizer.encode("sequence builders", return_token_type_ids=None, add_special_tokens=False)["input_ids"]
         text_2 = tokenizer.encode("multi-sequence build", return_token_type_ids=None, add_special_tokens=False)[
             "input_ids"
@@ -159,11 +159,27 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
 
-        assert encoded_sentence == [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id]
-        assert encoded_pair == [tokenizer.cls_token_id] + text + [
-            tokenizer.sep_token_id,
-            tokenizer.sep_token_id,
-        ] + text_2 + [tokenizer.sep_token_id]
+        expected_ids = [tokenizer.cls_token_id] + text + [tokenizer.sep_token_id]
+        expected_pair_ids = (
+            [tokenizer.cls_token_id]
+            + text
+            + [
+                tokenizer.sep_token_id,
+                tokenizer.sep_token_id,
+            ]
+            + text_2
+            + [tokenizer.sep_token_id]
+        )
+
+        self.assertListEqual(encoded_sentence, expected_ids)
+        self.assertListEqual(encoded_pair, expected_pair_ids)
+        self.assertListEqual(
+            tokenizer_fast("sequence builders", return_token_type_ids=None)["input_ids"], expected_ids
+        )
+        self.assertListEqual(
+            tokenizer_fast("sequence builders", "multi-sequence build", return_token_type_ids=None)["input_ids"],
+            expected_pair_ids,
+        )
 
     def test_token_type_ids(self):
         self.skipTest("Ernie-M model doesn't have token_type embedding. so skip this test")
