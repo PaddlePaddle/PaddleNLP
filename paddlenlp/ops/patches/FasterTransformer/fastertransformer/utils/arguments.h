@@ -66,6 +66,7 @@ public:
   const int *position_ids = nullptr;
   const int *decoder_position_ids = nullptr;
 
+  LayerNormWeight<T> pre_layernorm;
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
   LayerNormWeight<T> mbart_layernorm;
@@ -127,9 +128,11 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float temperature_{1.0};
   float repeat_penalty_{1.0};
   bool prefix_lm_{false};
-  bool is_mbart_{false};
   // For tensor parallel usage currently.
   int seed_{-1};
+
+  bool is_mbart_{false};
+  bool is_miro_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -146,7 +149,9 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   bool prefix_lm_{false};
   int finished_candidate_num_{-1};
   bool early_stopping_{false};
+
   bool is_mbart_{false};
+  bool is_miro_{false};
 };
 
 struct T5SamplingArguments : public DecodingSamplingArguments {

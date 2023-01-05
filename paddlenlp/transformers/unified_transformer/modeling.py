@@ -559,8 +559,8 @@ class UnifiedTransformerLMHeadModel(UnifiedTransformerPretrainedModel):
                 position_ids = position_ids[:, -1:]
             if role_ids is not None:
                 role_ids = role_ids[:, -1:]
-        if attention_mask is not None:
-            attention_mask = attention_mask[:, :, -1:, :]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
