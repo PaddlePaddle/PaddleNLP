@@ -29,6 +29,7 @@ from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.ops.optimizer import layerwise_lr_decay
 from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
     AutoTokenizer,
     ErnieMForSequenceClassification,
     LinearDecayWithWarmup,
@@ -143,7 +144,7 @@ def do_train():
     data_collator = DataCollatorWithPadding(tokenizer)
 
     num_labels = 3
-    model = ErnieMForSequenceClassification.from_pretrained(
+    model = AutoModelForSequenceClassification.from_pretrained(
         model_args.model_name_or_path, num_labels=num_labels, classifier_dropout=model_args.classifier_dropout
     )
     n_layers = model.config.num_hidden_layers
