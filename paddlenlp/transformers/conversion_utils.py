@@ -740,6 +740,27 @@ class Converter(ConversionMixin, LogitComparer):
         super().__init__(*args, **kwargs)
         logger.warning("Converter will be deprecated soon.")
 
+    @classmethod
+    def resolve_num_layer(cls, config_or_num_layers: Union[dict, int] = None) -> int:
+        """resolve the number of transformer layer based on the key of model config, eg: `num_hidden_layers` in BertModel
+        Args:
+            config_or_num_layers (Union[dict, int], optional): the instance of config or num_layers. Defaults to None.
+        Raises:
+            ValueError: when `config_or_num_layers` is not dict/int, it will raise the error
+        Returns:
+            int: the number of transformer layer
+        """
+        from paddlenlp.transformers.configuration_utils import PretrainedConfig
+
+        if isinstance(config_or_num_layers, (dict, PretrainedConfig)):
+            num_layer = config_or_num_layers[cls.num_layer_key]
+        elif isinstance(config_or_num_layers, int):
+            num_layer = config_or_num_layers
+        else:
+            raise ValueError(f"the type of config_or_num_layers<{config_or_num_layers}> should be one of <dict, int>")
+
+        return num_layer
+
     def convert(self, input_dir: str | None = None) -> None:
         """the entry of converting config and converting model file
 
@@ -765,7 +786,7 @@ class Converter(ConversionMixin, LogitComparer):
         state_dict = load_torch(weight_file)
 
         # FIXME(wj-Mcat): add compatibility with downstream models
-        name_mappings = self._get_name_mappings(config)
+        name_mappings = self.get_name_mapping(config)
 
         # 3. convert state_dict
         all_layer_names = set(state_dict.keys())
