@@ -15,8 +15,8 @@
 
 from typing import Any, Dict, List, Union
 
+import numpy as np
 from paddle.static import InputSpec
-from scipy.special import expit as np_sigmoid
 
 from paddlenlp.prompt import PromptDataCollatorWithPadding, UTCTemplate
 from paddlenlp.transformers import UTC, AutoTokenizer
@@ -210,16 +210,20 @@ class ZeroTextClassificationTask(Task):
                 outputs["batch_logits"].append(logits)
         return outputs
 
+    @staticmethod
+    def sigmoid(z):
+        return 1 / (1 + np.exp(-z))
+
     def _postprocess(self, inputs: Dict[str, Any]) -> Dict[str, Any]:
         """
         This function converts the model logits output to class score and predictions
         """
         outputs = []
         for logits in inputs["batch_logits"]:
-            scores = np_sigmoid(logits)
+            scores = self.sigmoid(np.array(logits))
             output = {}
             output["predictions"] = []
-            for i, class_score in enumerate(scores):
+            for i, class_score in enumerate(scores[0]):
                 if class_score > self._pred_threshold:
                     output["predictions"].append({"label": i, "score": class_score})
             outputs.append(output)
@@ -230,6 +234,9 @@ class ZeroTextClassificationTask(Task):
             if len(inputs["text"][i]["text_b"]) > 0:
                 output["text_b"] = inputs["text"][i]["text_b"]
             for j, pred in enumerate(output["predictions"]):
-                output["predictions"][j] = inputs["text"][i]["choices"][pred["label"]]
+                output["predictions"][j] = {
+                    "label": inputs["text"][i]["choices"][pred["label"]],
+                    "score": pred["score"],
+                }
 
         return outputs
