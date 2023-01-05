@@ -676,11 +676,11 @@ class LogitComparer:
 
 class ConversionMixin:
     @classmethod
-    def support_convert(cls) -> bool:
+    def support_conversion(cls, config: dict) -> bool:
         """check wether the model support conversion"""
         try:
             # try to get the name-mapping info
-            _ = cls._get_name_mappings({})
+            _ = cls._get_name_mappings(config)
         except NotImplementedError:
             return False
         finally:

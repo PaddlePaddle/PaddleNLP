@@ -52,6 +52,7 @@ from paddlenlp.utils.downloader import (
 )
 from paddlenlp.utils.env import (
     CONFIG_NAME,
+    ENABLE_TORCH_CHECKPOINT,
     HF_CACHE_HOME,
     LEGACY_CONFIG_NAME,
     MODEL_HOME,
@@ -141,15 +142,22 @@ def _find_weight_file_path(
     )
 
 
-def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str):
+def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool):
     """find the suitable weight file name
 
     Args:
         repo_id (str): repo name of huggingface hub
+        cache_dir (str): cache dir for hf
+        support_conversion (bool): whether support converting pytorch weight file to paddle weight file
     """
     if hf_file_exists(repo_id, "model_state.pdparams"):
         file_name = "model_state.pdparams"
     elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME):
+        if not support_conversion:
+            raise EntryNotFoundError(
+                f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
+                "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+            )
         file_name = PYTORCH_WEIGHT_FILE_NAME
     else:
         raise EntryNotFoundError(f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}")
@@ -938,7 +946,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         cls: Type[PretrainedModel],
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
+        support_conversion: bool = False,
     ) -> str:
         """resolve model target file path from `` and `cache_dir`
 
@@ -959,6 +968,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             cls (Type[PretrainedModel]): the inherited PretrainedModel class
             pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
             cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
+            support_conversion (bool, optional): whether support convert pytorch model to paddle model
 
         Returns:
             str: the model weight file path
@@ -969,7 +979,9 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
         # 1. when it's from HF
         if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME)
+            return resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
+            )
 
         # 2. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
@@ -1038,7 +1050,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
             )
 
-            return resolve_weight_file_from_hf_hub(repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME)
+            # download weight file from hf hub
+            return resolve_weight_file_from_hf_hub(
+                repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
+            )
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>", pretrained_model_name_or_path
@@ -1291,17 +1306,23 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model = cls(config, *init_args, **model_kwargs)
 
         # 3. resolve model_weight file
+        support_conversion = cls.support_conversion(config.to_dict()) and ENABLE_TORCH_CHECKPOINT
+
         model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub,
+            support_conversion=support_conversion,
         )
 
         if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
-            try:
+            if support_conversion:
                 # try to get the name-mapping info
                 model_state_dict = cls.convert(model_weight_file, config.to_dict(), cache_dir)
-            except NotImplementedError:
+            else:
                 raise ValueError(
-                    f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> don't supported Convertiable"
+                    f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
+                    "don't support conversion from pytorch weight file to paddle weight file"
                 )
         else:
             # 4. loading the state dict

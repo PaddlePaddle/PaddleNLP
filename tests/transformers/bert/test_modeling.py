@@ -597,18 +597,17 @@ class BertCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import BertModel
 
-            model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
-            model.eval()
-            paddle_logit = model(paddle.to_tensor(input_ids))[0]
-            model = None  # free the memory
+            paddle_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
             # 3. forward the torch  model
             import torch
             from transformers import BertModel
 
-            model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
-            model.eval()
-            torch_logit = model(torch.tensor(input_ids), return_dict=False)[0]
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
             self.assertTrue(
                 np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
             )
