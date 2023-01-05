@@ -14,9 +14,9 @@
 # limitations under the License.
 
 export nlp_dir=${PWD}
-export log_path=${nlp_dir}/logs
+export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
-export cudaid1=$3
+export cudaid2=$3
 print_info(){
 if [ $1 -ne 0 ];then
     if [[ $2 =~ 'tests' ]];then
@@ -225,46 +225,52 @@ print_info $? electra_pretrain
 }
 # 8 gpt
 gpt(){
-#data process
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-#pretrain
-cd ${nlp_dir}/model_zoo/gpt/
-mkdir pre_data
-cd ./pre_data
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-cd ../
-time (python -m paddle.distributed.launch run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./pre_data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 2\
-    --save_steps 2\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 2 \
-    --device gpu >${log_path}/gpt_pretrain) >>${log_path}/gpt_pretrain 2>&1
-print_info $? gpt_pretrain
-time (
-python export_model.py --model_type=gpt \
-    --model_path=gpt2-medium-en \
-    --output_path=./infer_model/model >${log_path}/gpt_export) >>${log_path}/gpt_export 2>&1
-print_info $? gpt_export
-time (
-python deploy/python/inference.py \
-    --model_type gpt \
-    --model_path ./infer_model/model >${log_path}/gpt_p_depoly) >>${log_path}/gpt_p_depoly 2>&1
-print_info $? gpt_p_depoly
-# test acc
-# cd ${nlp_dir}/tests/examples/gpt/
-# time (python -m unittest test_accuracy.py >${log_path}/gpt_test_acc) >>${log_path}/gpt_test_acc 2>&1
-# print_info $? gpt_test_acc
-# # FT
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+    # data process
+    cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
+    sed -i "s/python3/python/g" Makefile
+    sed -i "s/python-config/python3.7m-config/g" Makefile
+    cd ${nlp_dir}/model_zoo/gpt/
+    mkdir pre_data
+    cd ./pre_data
+    wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
+    wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
+    cd ../
+    # pretrain
+    python -m paddle.distributed.launch run_pretrain.py \
+        --model_type gpt \
+        --model_name_or_path gpt2-en \
+        --input_dir "./pre_data"\
+        --output_dir "output"\
+        --weight_decay 0.01\
+        --grad_clip 1.0\
+        --max_steps 2\
+        --save_steps 2\
+        --decay_steps 320000\
+        --warmup_rate 0.01\
+        --micro_batch_size 2 \
+        --device gpu >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
+    print_info $? gpt_pretrain
+    # export model
+    python export_model.py --model_type=gpt \
+        --model_path=gpt2-medium-en \
+        --output_path=./infer_model/model >${log_path}/gpt_export >>${log_path}/gpt_export 2>&1
+    print_info $? gpt_export
+    # inference
+    python deploy/python/inference.py \
+        --model_type gpt \
+        --model_path ./infer_model/model >${log_path}/gpt_p_depoly >>${log_path}/gpt_p_depoly 2>&1
+    print_info $? gpt_p_depoly
+    # test acc
+    # cd ${nlp_dir}/tests/examples/gpt/
+    # time (python -m unittest test_accuracy.py >${log_path}/gpt_test_acc) >>${log_path}/gpt_test_acc 2>&1
+    # print_info $? gpt_test_acc
+else 
+    pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
+    print_info $? gpt
+fi
+# FT
 cd ${nlp_dir}/
 export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
 wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
@@ -313,46 +319,53 @@ print_info $? gpt_deploy_C_FT
 }
 # 9 ernie-1.0
 ernie-1.0 (){
-#data process
-cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
-sed -i "s/python3/python/g" Makefile
-sed -i "s/python-config/python3.7m-config/g" Makefile
-
-export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-1.0/
-mkdir data && cd data
-wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
-wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
-cd ../
-time (python -u  -m paddle.distributed.launch \
-    --log_dir "./log" \
-    run_pretrain_static.py \
-    --model_type "ernie" \
-    --model_name_or_path "ernie-1.0" \
-    --input_dir "./data/" \
-    --output_dir "./output/" \
-    --max_seq_len 512 \
-    --micro_batch_size 16 \
-    --global_batch_size 32 \
-    --sharding_degree 1 \
-    --dp_degree 2 \
-    --use_sharding false \
-    --use_amp true \
-    --use_recompute false \
-    --max_lr 0.0001 \
-    --min_lr 0.00001 \
-    --max_steps 40 \
-    --save_steps 20 \
-    --checkpoint_steps 5000 \
-    --decay_steps 3960000 \
-    --weight_decay 0.01 \
-    --warmup_rate 0.0025 \
-    --grad_clip 1.0 \
-    --logging_freq 20\
-    --num_workers 2 \
-    --eval_freq 1000 \
-    --device "gpu" >${log_path}/ernie_pretrain) >>${log_path}/ernie_pretrain 2>&1
-print_info $? ernie_pretrain
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+    #data process
+    cd ${nlp_dir}/model_zoo/ernie-1.0/data_tools
+    sed -i "s/python3/python/g" Makefile
+    sed -i "s/python-config/python3.7m-config/g" Makefile
+    export CUDA_VISIBLE_DEVICES=${cudaid2}
+    cd ${nlp_dir}/model_zoo/ernie-1.0/
+    mkdir data && cd data
+    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_ids.npy
+    wget -q https://paddlenlp.bj.bcebos.com/models/transformers/data_tools/ernie_wudao_0903_92M_idx.npz
+    cd ../
+    # pretrain
+    python -u  -m paddle.distributed.launch \
+        --log_dir "./log" \
+        run_pretrain_static.py \
+        --model_type "ernie" \
+        --model_name_or_path "ernie-1.0" \
+        --input_dir "./data/" \
+        --output_dir "./output/" \
+        --max_seq_len 512 \
+        --micro_batch_size 16 \
+        --global_batch_size 32 \
+        --sharding_degree 1 \
+        --dp_degree 2 \
+        --use_sharding false \
+        --use_amp true \
+        --use_recompute false \
+        --max_lr 0.0001 \
+        --min_lr 0.00001 \
+        --max_steps 40 \
+        --save_steps 20 \
+        --checkpoint_steps 5000 \
+        --decay_steps 3960000 \
+        --weight_decay 0.01 \
+        --warmup_rate 0.0025 \
+        --grad_clip 1.0 \
+        --logging_freq 20\
+        --num_workers 2 \
+        --eval_freq 1000 \
+        --device "gpu" >${log_path}/ernie_pretrain >>${log_path}/ernie_pretrain 2>&1
+    print_info $? ernie_pretrain
+else 
+    pytest ${nlp_dir}/model_zoo/ernie-1.0/ >${log_path}/ernie-1.0 >>${log_path}/ernie-1.0 2>&1
+    print_info $? ernie-1.0
+fi
 }
 # 10 xlnet
 xlnet(){
@@ -944,15 +957,21 @@ print_info $? nptag_depoly
 ernie-m() {
 export CUDA_VISIBLE_DEVICES=${cudaid2}
 cd ${nlp_dir}/model_zoo/ernie-m
-python -m paddle.distributed.launch  --log_dir output run_classifier.py  \
-   --task_type cross-lingual-transfer  \
-   --batch_size 8    \
-   --model_name_or_path ernie-m-base \
-   --save_steps 2 \
-   --max_steps 2 \
-   --output_dir output \
-   --logging_steps 1  >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
-print_info $? ernie-m
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+    python -m paddle.distributed.launch  --log_dir output run_classifier.py  \
+        --task_type cross-lingual-transfer  \
+        --batch_size 8    \
+        --model_name_or_path ernie-m-base \
+        --save_steps 2 \
+        --max_steps 2 \
+        --output_dir output \
+        --logging_steps 1  >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
+        print_info $? ernie-m
+else 
+    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    print_info $? ernie-layout
+fi
 }
 #32 clue
 clue (){
@@ -1082,6 +1101,61 @@ print_info $? fast_generation_t5
 cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
 python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
 print_info $? fast_generation_bart
-
+}
+ernie-3.0(){
+cd ${nlp_dir}/model_zoo/ernie-3.0/
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+    #训练
+    python run_seq_cls.py  --model_name_or_path ernie-3.0-medium-zh  --dataset afqmc --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_seq_cls >>${log_path}/ernie-3.0_train_seq_cls 2>&1
+    print_info $? ernie-3.0_train_seq_cls
+    python run_token_cls.py --model_name_or_path ernie-3.0-medium-zh --dataset msra_ner --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_token_cls >>${log_path}/ernie-3.0_train_token_cls 2>&1
+    print_info $? ernie-3.0_train_token_cls
+    python run_qa.py --model_name_or_path ernie-3.0-medium-zh --dataset cmrc2018  --output_dir ./best_models --export_model_dir best_models/ --do_train --do_eval --do_export --config=configs/default.yml --max_steps=2 --save_step=2 >${log_path}/ernie-3.0_train_qa >>${log_path}/ernie-3.0_train_qa 2>&1
+    print_info $? ernie-3.0_train_qa
+    # 预测
+    python run_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_seq_cls >>${log_path}/ernie-3.0_predict_seq_cls 2>&1
+    print_info $? ernie-3.0_predict_seq_cls
+    python run_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_token_cls >>${log_path}/ernie-3.0_predict_token_cls 2>&1
+    print_info $? ernie-3.0_predict_token_cls
+    python run_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_qa >>${log_path}/ernie-3.0_predict_qa 2>&1
+    print_info $? ernie-3.0_predict_qa
+    #压缩
+    python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml >${log_path}/ernie-3.0_compress_seq_cls >>${log_path}/ernie-3.0_compress_seq_cls 2>&1
+    print_info $? ernie-3.0_compress_seq_cls
+    python compress_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models/msra_ner --config=configs/default.yml >${log_path}/ernie-3.0_compress_token_cls >>${log_path}/ernie-3.0_compress_token_cls 2>&1
+    print_info $? ernie-3.0_compress_token_cls
+    python compress_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models/cmrc2018 --config=configs/default.yml >${log_path}/ernie-3.0_compress_qa >>${log_path}/ernie-3.0_compress_qa 2>&1
+    print_info $? ernie-3.0_compress_qa
+else 
+    pytest ${nlp_dir}/model_zoo/ernie-3.0/ >${log_path}/ernie-3.0 >>${log_path}/ernie-3.0 2>&1
+    print_info $? ernie-3.0
+fi
+}
+ernie-health(){
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+else 
+    pytest ${nlp_dir}/model_zoo/ernie-health/ >${log_path}/ernie-health>>${log_path}/ernie-health 2>&1
+    print_info $? ernie-health
+fi
+}
+uie(){
+cd ${nlp_dir}/model_zoo/uie/
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+else 
+    pytest ${nlp_dir}/model_zoo/uie/ >${log_path}/uie>>${log_path}/uie 2>&1
+    print_info $? uie
+fi
+}
+ernie-layout(){
+cd ${nlp_dir}/model_zoo/ernie-layout/  
+if [ ! -f 'test.py' ];then
+    echo '模型测试文件不存在！'
+else 
+    pytest ${nlp_dir}/model_zoo/ernie-layout/ >${log_path}/ernie-layout >>${log_path}/ernie-layout 2>&1
+    print_info $? ernie-layout
+fi
 }
 $1
