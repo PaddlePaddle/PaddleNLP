@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import functools
 import sys
 
 __version__ = "2.4.9"
@@ -191,6 +190,8 @@ def _patch_batch_sampler_init(self, dataset=None, sampler=None, shuffle=False, b
     assert isinstance(drop_last, bool), "drop_last should be a boolean value, but got {}".format(type(drop_last))
     self.drop_last = drop_last
 
+
+import functools
 
 # Any '2.3.X' version would be bigger than '2.3'
 if paddle.__version__ != "0.0.0" and paddle.__version__ < "2.3":
