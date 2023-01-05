@@ -61,7 +61,7 @@
 ├── proguard-rules.pro
 └── src
 ```
-（2）在您的Android工程中的build.gradble引入ERNIE Tiny SDK，如下
+（2）在您的Android工程中的build.gradle引入ERNIE Tiny SDK，如下
 ```groovy
 dependencies {
     implementation fileTree(include: ['ernie_tiny-debug.aar'], dir: 'libs')
@@ -101,12 +101,14 @@ public boolean initialized(); // 检查Predictor是否初始化成功
 
 - RuntimeOption设置说明
 
-```java  
-public void enableLiteFp16();                       // 开启fp16精度推理
-public void disableLiteFP16();                      // 关闭fp16精度推理
-public void setCpuThreadNum(int threadNum);         // 设置线程数
-public void setLitePowerMode(LitePowerMode mode);   // 设置能耗模式
-public void setLitePowerMode(String modeStr);       // 通过字符串形式设置能耗模式
+```java
+public class RuntimeOption {
+  public void enableLiteFp16();                       // 开启fp16精度推理
+  public void disableLiteFP16();                      // 关闭fp16精度推理
+  public void setCpuThreadNum(int threadNum);         // 设置线程数
+  public void setLitePowerMode(LitePowerMode mode);   // 设置能耗模式
+  public void setLitePowerMode(String modeStr);       // 通过字符串形式设置能耗模式
+}
 ```
 
 - 意图和槽位识别结果IntentDetAndSlotFillResult说明  
@@ -136,31 +138,35 @@ public class IntentDetAndSlotFillResult {
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
 import com.baidu.paddle.paddlenlp.ernie_tiny.Predictor;
 import com.baidu.paddle.paddlenlp.ernie_tiny.IntentDetAndSlotFillResult;
+import android.app.Activity;
 
-class TestERNIETiny {
-    public static void main() {
-      Predictor predictor = new Predictor();
+// 以下为伪代码
+class TestERNIETiny extends Activity {
+  @Override
+  protected void onCreate(@Nullable Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Predictor predictor = new Predictor();
 
-      // 设置模型文件和标签文件
-      String modelFile = "ernie-tiny/infer_model.pdmodel";
-      String paramsFile = "ernie-tiny/infer_model.pdiparams";
-      String vocabFile = "ernie-tiny/vocab.txt";
-      String slotLabelsFile = "ernie-tiny/slots_label.txt";
-      String intentLabelsFile = "ernie-tiny/intent_label.txt";
+    // 设置模型文件和标签文件
+    String modelFile = "ernie-tiny/infer_model.pdmodel";
+    String paramsFile = "ernie-tiny/infer_model.pdiparams";
+    String vocabFile = "ernie-tiny/vocab.txt";
+    String slotLabelsFile = "ernie-tiny/slots_label.txt";
+    String intentLabelsFile = "ernie-tiny/intent_label.txt";
 
-      // RuntimeOption 设置 
-      RuntimeOption option = new RuntimeOption();
-      option.setCpuThreadNum(2);  // 设置线程数
-      option.enableLiteFp16();    // 是否开启FP16精度推理
+    // RuntimeOption 设置 
+    RuntimeOption option = new RuntimeOption();
+    option.setCpuThreadNum(2);  // 设置线程数
+    option.enableLiteFp16();    // 是否开启FP16精度推理
 
-      // Predictor初始化        
-      predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile, option, 16);
+    // Predictor初始化        
+    predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile, option, 16);
 
-      // 进行意图识别和槽位分析
-      String[] inputTexts = new String[]{"来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
+    // 进行意图识别和槽位分析
+    String[] inputTexts = new String[]{"来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
 
-      IntentDetAndSlotFillResult[] results = predictor.predict(inputTexts);
-    }
+    IntentDetAndSlotFillResult[] results = predictor.predict(inputTexts);
+  }
 }
 ```
 
@@ -169,7 +175,7 @@ class TestERNIETiny {
 ## 替换App示例中的ERNIE Tiny模型    
 
 替换App示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含vocab.txt、slots_label.txt以及intent_label.txt等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
-  - 将您的PicoDet模型放在 `app/src/main/assets/models` 目录下；
+  - 将您的ERNIE Tiny模型放在 `app/src/main/assets/models` 目录下；
   - 修改 `app/src/main/res/values/strings.xml` 中模型路径的默认值，如：
 
 ```xml
