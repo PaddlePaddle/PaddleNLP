@@ -480,27 +480,3 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_releaseNative(JNIEnv *env,
 #ifdef __cplusplus
 }
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -11,21 +11,21 @@
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/uie_app_name"
+        android:label="@string/ernie_tiny_app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".uie.UIEWelcomeActivity">
+        <activity android:name=".ernie_tiny.ERNIETinyWelcomeActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
         <activity
-            android:name=".uie.UIEMainActivity">
+            android:name=".ernie_tiny.ERNIETinyMainActivity">
         </activity>
         <activity
-            android:name=".uie.UIESettingsActivity"
+            android:name=".ernie_tiny.ERNIETinySettingsActivity"
             android:label="Settings">
         </activity>
     </application>
