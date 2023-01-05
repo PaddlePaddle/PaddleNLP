@@ -50,9 +50,6 @@ find_library( # Sets the name of the path variable.
 target_link_libraries(
         # Specifies the target library.
         ernie_tiny_jni
-        jnigraphics
         ${FASTDEPLOY_LIBS}
-        GLESv2
-        EGL
         ${log-lib}
 )
