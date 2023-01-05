@@ -1,3 +1,4 @@
 parameterized
 sentencepiece
 regex
+fast_tokenizer_python
