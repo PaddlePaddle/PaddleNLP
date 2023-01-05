@@ -13,16 +13,12 @@
 // limitations under the License.
 
 #pragma once
-#include <jni.h>
-
 #ifdef __ANDROID__
 #include <android/log.h>  // NOLINT
 #endif
-#include <fstream>  // NOLINT
-#include <string>   // NOLINT
-#include <vector>   // NOLINT
-
-#include "fastdeploy/fastdeploy_model.h"
+#include <fstream>        // NOLINT
+#include <string>         // NOLINT
+#include <vector>         // NOLINT
 
 #define TAG "[FastDeploy][ERNIE][JNI]"
 #ifdef __ANDROID__
