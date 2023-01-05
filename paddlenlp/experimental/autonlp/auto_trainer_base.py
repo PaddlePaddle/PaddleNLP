@@ -126,7 +126,7 @@ class AutoTrainerBase(metaclass=ABCMeta):
         """
         model_result = self._get_model_result(trial_id=trial_id)
         exported_model_path = os.path.join(model_result.log_dir, self.export_path)
-        shutil.copytree(exported_model_path, export_path, dirs_exist_ok=True)
+        shutil.copytree(exported_model_path, export_path)
         logger.info(f"Exported to {export_path}")
 
     @abstractmethod
