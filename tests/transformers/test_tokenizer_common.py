@@ -56,6 +56,7 @@ class TokenizerTesterMixin:
 
     tokenizer_class = None
     fast_tokenizer_class = None
+    test_fast_tokenizer = False
     space_between_special_tokens = False
     from_pretrained_kwargs = None
     from_pretrained_filter = None

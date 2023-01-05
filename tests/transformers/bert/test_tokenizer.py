@@ -37,6 +37,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BertTokenizer
     fast_tokenizer_class = BertFastTokenizer
+    test_fast_tokenizer = True
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False
@@ -73,15 +74,22 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_full_tokenizer(self):
         tokenizer = self.tokenizer_class(self.vocab_file)
-        tokenizer_fast = self.fast_tokenizer_class(self.vocab_file)
+
+        tokens = tokenizer.tokenize("UNwant\u00E9d,running")
+        self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
+
+    def test_fast_and_python_full_tokenizer(self):
+        if not self.test_fast_tokenizer:
+            return
+
+        tokenizer = self.get_tokenizer()
+        tokenizer_fast = self.get_fast_tokenizer()
 
         sequence = "UNwant\u00E9d,running"
         tokens = tokenizer.tokenize(sequence)
         tokens_fast = tokenizer_fast.tokenize(sequence)
-        self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
-        self.assertListEqual(tokens_fast, ["un", "##want", "##ed", ",", "runn", "##ing"])
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
-        self.assertListEqual(tokenizer_fast.convert_tokens_to_ids(tokens_fast), [9, 6, 7, 12, 10, 11])
+        self.assertListEqual(tokens, tokens_fast)
 
         ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
         ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
