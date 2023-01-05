@@ -89,6 +89,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --logging_steps 50 \
                 --eval_steps 100 \
                 --evaluation_strategy epoch \
+                --num_nodes 1 \
+                --num_gpus 8 \
                 --per_device_train_batch_size 8 \
                 --per_device_eval_batch_size 64 \
                 --batch_size 64 \

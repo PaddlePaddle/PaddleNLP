@@ -48,6 +48,8 @@ class ModelArguments:
     config_name: str = field(default="configs/config.json", metadata={"help": "training config"})
     checkpoint_path: str = field(default="", metadata={"help": "checkpoint path"})
     batch_size: int = field(default=4096, metadata={"help": "Total batch size for training."})
+    num_nodes: int = field(default=1, metadata={"help": "The number of nodes for training."})
+    num_gpus: int = field(default=8, metadata={"help": "The number of gpus per device."})
 
 
 def get_config(file_path):
@@ -64,10 +66,15 @@ def main():
     training_args.print_config(data_args, "Data")
 
     paddle.set_device(training_args.device)
+    if paddle.distributed.get_world_size() > 1:
+        paddle.distributed.init_parallel_env()
 
     _config = get_config(model_args.config_name)
     _config["data_root"] = data_args.data_root
     _config["batch_size"] = model_args.batch_size
+    _config["per_gpu_batchsize"] = training_args.per_device_train_batch_size
+    _config["num_nodes"] = model_args.num_nodes
+    _config["num_gpus"] = model_args.num_gpus
 
     model = BTTransformer(_config)
 

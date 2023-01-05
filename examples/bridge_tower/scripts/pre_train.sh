@@ -33,6 +33,8 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --save_steps 1000 \
                 --dataloader_num_workers 8 \
                 --logging_steps 50 \
+                --num_nodes 1 \
+                --num_gpus 8 \
                 --per_device_train_batch_size 16 \
                 --per_device_eval_batch_size 128 \
                 --batch_size 128 \
