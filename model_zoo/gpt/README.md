@@ -86,7 +86,21 @@ mv gpt_en_dataset_300m_idx.npz ./data
 #### 单卡训练
 
 ```shell
-CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --config=./configs/default.yaml
+CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
+  --model_name_or_path gpt2-en \
+  --input_dir ./data \
+  --output_dir ./output_dir/pretrain \
+  --weight_decay 0.01 \
+  --max_steps 500000 \
+  --save_steps 100000 \
+  --device gpu \
+  --lr_decay_style none \
+  --warmup_steps 320000 \
+  --warmup_ratio 0.01 \
+  --per_device_train_batch_size 4 \
+  --eval_steps 100 \
+  --do_train true \
+  --do_predict true
 ```
 
  配置文件中参数释义如下：
@@ -106,7 +120,21 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py --config=./configs/default.yaml
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py --config=./configs/default.yaml
+python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
+  --model_name_or_path gpt2-en \
+  --input_dir ./data \
+  --output_dir ./output_dir/pretrain \
+  --weight_decay 0.01 \
+  --max_steps 500000 \
+  --save_steps 100000 \
+  --device gpu \
+  --lr_decay_style none \
+  --warmup_steps 320000 \
+  --warmup_ratio 0.01 \
+  --per_device_train_batch_size 4 \
+  --eval_steps 100 \
+  --do_train true \
+  --do_predict true
 ```
 
 ### 模型评估
@@ -115,13 +143,13 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py --c
 
 1. WikiText数据集评估
 ```bash
-python run_eval.py --config ./configs/default.yaml --eval_path ./wikitext-103-v1.zip
+python run_eval.py --eval_path ./wikitext-103-v1.zip --max_step=3
 ```
 
 2. LAMBADA数据集评估
 ```bash
 # 覆盖default.yaml中的eval_path配置字段
-python run_eval.py --config ./configs/default.yaml --eval_path ./lambada_test.jsonl
+python run_eval.py --eval_path ./lambada_test.jsonl
 ```
 
 其中参数释义如下：
@@ -229,7 +257,19 @@ qa(["中国国土面积有多大？", "中国的首都在哪里？"])
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" run_glue.py --config ./configs/default.yaml
+python -m paddle.distributed.launch --gpus "0" run_glue.py \
+  --model_name_or_path gpt2-medium-en \
+  --task_name SST-2 \
+  --max_seq_length 128 \
+  --per_device_train_batch_size 32   \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 1 \
+  --save_steps 500 \
+  --output_dir ./output_dir/glue \
+  --eval_steps 1 \
+  --device gpu \
+  --do_train true
 ```
 
 配置文件中的参数释义如下：
@@ -259,7 +299,17 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py --config ./configs/de
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
-python -m paddle.distributed.launch --gpus "0" run_msra_ner.py --config ./configs/default.yaml
+python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
+  --model_name_or_path gpt-cpm-small-cn-distill \
+  --max_seq_length 128 \
+  --per_device_eval_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 25 \
+  --save_steps 250 \
+  --output_dir ./tmp/msra_ner/ \
+  --device gpu  \
+  --do_train true
 ```
 
 配置文件中参数释义如下：

@@ -23,7 +23,6 @@ from typing import Optional
 import lr
 import numpy as np
 import paddle
-from args import parse_config_file
 from dataset import GPTDataset, get_train_valid_test_split_
 
 from paddlenlp.ops import Topology
@@ -452,11 +451,4 @@ def do_train():
 
 
 if __name__ == "__main__":
-    # support: python run_pretrain.py --config=./configs/default.yaml
-    config_file = parse_config_file()
-    if config_file is not None:
-        from args import init_argv
-
-        init_argv("pretrain", config_file)
-
     do_train()
