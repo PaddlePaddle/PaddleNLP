@@ -23,12 +23,8 @@
 ├── app                   # App示例代码
 ├── build.gradle
 ├── ernie_tiny            # ERNIE Tiny JNI & Java封装代码
-├── gradle
-├── gradle.properties
-├── gradlew
-├── gradlew.bat
+# ...
 ├── local.properties
-├── settings.gradle
 └── ui                    # 一些辅助用的UI代码
 ```
 
@@ -48,12 +44,15 @@
 
 ## ERNIE Tiny Java SDK 说明和使用
 
-本工程除了可以直接编译App体验之外，还可以编译ERNIE Tiny的Java SDK，方便用户开箱即用。 如下图所示，编译Java SDK的步骤为：（1）先在Android Studio中打开ernie_tiny/build.gradle工程文件；（2）选择Build->Make Module 'android:ernietiny'；（3）从ernie_tiny/build/outputs/aar目录中获取编译后得到的SDK，即ernie_tiny-debug.aar.
+本工程除了可以直接编译App体验之外，还可以编译ERNIE Tiny的`Java SDK`，方便用户开箱即用。 如下图所示，编译Java SDK的步骤为：  
+  -（1）先在Android Studio中打开`ernie_tiny/build.gradle`工程文件；  
+  -（2）选择Build->Make Module 'android:ernietiny'；  
+  -（3）从`ernie_tiny/build/outputs/aar`目录中获取编译后得到的SDK，即`ernie_tiny-debug.aar`.
 
 <img width="1073" alt="image" src="https://user-images.githubusercontent.com/31974251/210746163-41d39478-8d5d-4138-9f76-75ff5c25c295.png">
 
-在获取到ernie_tiny-debug.aar后，可将其拷贝到您自己的工程中进行使用。在Android Studio中的配置步骤如下：  
-（1）首先，将ernie_tiny-debug.aar拷贝到您Android工程的libs目录下。
+在获取到`ernie_tiny-debug.aar`后，可将其拷贝到您自己的工程中进行使用。在Android Studio中的配置步骤如下：  
+（1）首先，将`ernie_tiny-debug.aar`拷贝到您Android工程的libs目录下。
 ```bash
 ├── build.gradle
 ├── libs
@@ -72,12 +71,12 @@ dependencies {
 
 ### ERNIE Tiny Java API说明如下  
 
-- ERNIE Tiny Predictor初始化 API: 模型初始化API包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用init函数，在合适的程序节点进行初始化。ERNIE Tiny Predictor初始化参数说明如下：
+- ERNIE Tiny `Predictor`初始化 API: 模型初始化API包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用init函数，在合适的程序节点进行初始化。ERNIE Tiny Predictor初始化参数说明如下：
    - modelFile: String, paddle格式的模型文件路径，如 infer_model.pdmodel
    - paramFile: String, paddle格式的参数文件路径，如 infer_model.pdiparams
    - vocabFile: String, 词表文件，如 vocab.txt 每一行包含一个词
-   - slotLabelsFile: String, 槽位标签文件，如 slots_label.txt 每一行包含一个词
-   - intentLabelsFile: String, 意图标签文件，如 intent_label.txt 每一行包含一个词
+   - slotLabelsFile: String, 槽位标签文件，如 slots_label.txt 每一行包含一个标签
+   - intentLabelsFile: String, 意图标签文件，如 intent_label.txt 每一行包含一个标签
    - runtimeOption: RuntimeOption，可选参数，模型初始化option。如果不传入该参数则会使用默认的运行时选项。
    - maxLength: 最大序列长度，默认为16
 
@@ -88,7 +87,7 @@ public Predictor(String modelFile, String paramsFile, String vocabFile, String s
         int maxLength);
 ```  
 
-- ERNIE Tiny Predictor预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
+- ERNIE Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
 ```java
 public IntentDetAndSlotFillResult[] predict(String[] texts);
 ```
@@ -111,7 +110,7 @@ public class RuntimeOption {
 }
 ```
 
-- 意图和槽位识别结果IntentDetAndSlotFillResult说明  
+- 意图和槽位识别结果`IntentDetAndSlotFillResult`说明  
 
 ```java
 public class IntentDetAndSlotFillResult {
@@ -132,7 +131,7 @@ public class IntentDetAndSlotFillResult {
 }
 ```  
 
-- ERNIE Tiny Predictor调用示例
+- ERNIE Tiny `Predictor`调用示例
 
 ```java
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
