@@ -11,13 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from reprod_log import ReprodDiffHelper
-
-if __name__ == "__main__":
-    diff_helper = ReprodDiffHelper()
-    torch_info = diff_helper.load_info("./bp_align_torch.npy")
-    paddle_info = diff_helper.load_info("./bp_align_paddle.npy")
-    diff_helper.compare_info(torch_info, paddle_info)
-
-    diff_helper.report(diff_threshold=1e-2, path="bp_align_diff.log")
