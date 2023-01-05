@@ -26,28 +26,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from types import MethodType
 
 import paddle
-from paddle.optimizer import Optimizer
-from paddle.fluid.framework import in_dygraph_mode
-from paddle.fluid.clip import ClipGradBase, _squared_l2_norm
-from paddle.fluid.dygraph import base as imperative_base
-from paddle.fluid import core, framework
-from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
-
-# Old version
-from paddle.distributed.fleet.meta_optimizers.dygraph_optimizer.sharding_optimizer_stage2 import (
-    ShardingOptimizerStage2,
-)
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage2 import ShardingStage2
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_stage3 import ShardingStage3
 
 # New version
-from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import GroupShardedOptimizerStage2
-from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage2 import GroupShardedStage2
-from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage3 import GroupShardedStage3
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_optimizer_stage2 import (
+    GroupShardedOptimizerStage2,
+)
+from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_stage2 import (
+    GroupShardedStage2,
+)
+from paddle.fluid import core
+from paddle.fluid.dygraph import base as imperative_base
+from paddle.incubate.distributed.models.moe.grad_clip import ClipGradForMOEByGlobalNorm
+from paddle.optimizer import Optimizer
 
 
 class ClipGradForShardedMOEByGlobalNorm(ClipGradForMOEByGlobalNorm):
@@ -139,16 +132,10 @@ def group_sharded_parallel(
         )
 
     # convert model/optimizer
-    if in_dygraph_mode():
-        optimizer = GroupShardedOptimizerStage2(params=sharded_params, optim=optimizer, group=group, offload=offload)
-        model = GroupShardedStage2(
-            model, optimizer, group=group, sync_buffers=sync_buffers, buffer_max_size=buffer_max_size
-        )
-    else:
-        optimizer = ShardingOptimizerStage2(params=sharded_params, optim=optimizer, group=group, offload=offload)
-        model = ShardingStage2(
-            model, optimizer, group=group, sync_buffers=sync_buffers, buffer_max_size=buffer_max_size
-        )
+    optimizer = GroupShardedOptimizerStage2(params=sharded_params, optim=optimizer, group=group, offload=offload)
+    model = GroupShardedStage2(
+        model, optimizer, group=group, sync_buffers=sync_buffers, buffer_max_size=buffer_max_size
+    )
 
     clear_func = model._clear_gradients
     for opt in model._sharding_optimizers:
