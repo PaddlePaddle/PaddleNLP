@@ -45,9 +45,9 @@
 ## ERNIE Tiny Java SDK 说明和使用
 
 本工程除了可以直接编译App体验之外，还可以编译ERNIE Tiny的`Java SDK`，方便用户开箱即用。 如下图所示，编译Java SDK的步骤为：  
-  -（1）先在Android Studio中打开`ernie_tiny/build.gradle`工程文件；  
-  -（2）选择Build->Make Module 'android:ernietiny'；  
-  -（3）从`ernie_tiny/build/outputs/aar`目录中获取编译后得到的SDK，即`ernie_tiny-debug.aar`.
+   - 先在Android Studio中打开`ernie_tiny/build.gradle`工程文件；  
+   - 选择Build->Make Module 'android:ernietiny'；  
+   - 从`ernie_tiny/build/outputs/aar`目录中获取编译后得到的SDK，即`ernie_tiny-debug.aar`.
 
 <img width="1073" alt="image" src="https://user-images.githubusercontent.com/31974251/210746163-41d39478-8d5d-4138-9f76-75ff5c25c295.png">
 
