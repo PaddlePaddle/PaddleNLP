@@ -18,14 +18,14 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 
 ## 快速开始
 
-以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)导出得到的部署模型。
+以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
 
 ```bash
 
-# 在GPU上使用paddle_inference后端
+# 在GPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
 python infer_demo.py --device gpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
 
-# 在CPU上使用paddle_inference后端
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
 python infer_demo.py --device cpu --backend paddle --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
 
 ```
@@ -44,6 +44,10 @@ No. 2 text = 到信阳市汽车配件城
 
 ```
 
+### 量化模型部署
+
+该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
+
 
 ## 参数说明
 
@@ -51,15 +55,15 @@ No. 2 text = 到信阳市汽车配件城
 
 | 参数 |参数说明 |
 |----------|--------------|
-|--model_dir | 指定部署模型的目录 |
+|--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
+|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
+|--model_dir | 指定部署模型的目录。支持传入Paddle INT8新格式量化模型。 |
 |--slot_label_path| 指定的slot label文件路径 |
 |--intent_label_path| 指定的intent label文件路径 |
 |--test_data_path| 指定的测试集路径，默认为空。 |
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
-|--device | 运行的设备，可选范围: ['cpu', 'kunlunxin', 'gpu']，默认为'cpu' |
-|--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
-|--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
+|--use_trt_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 
 ## 相关文档

@@ -46,7 +46,7 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=16, help="The max length of sequence.")
     parser.add_argument("--cpu_num_threads", type=int, default=1, help="The number of threads when inferring on cpu.")
-    parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_trt_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument(
         "--use_fast",
         type=distutils.util.strtobool,
@@ -121,7 +121,7 @@ class Predictor(object):
                 opt_shape=[args.batch_size, args.max_length],
                 max_shape=[args.batch_size, args.max_length],
             )
-            if args.use_fp16:
+            if args.use_trt_fp16:
                 option.enable_trt_fp16()
                 trt_file = trt_file + ".fp16"
             option.set_trt_cache_file(trt_file)

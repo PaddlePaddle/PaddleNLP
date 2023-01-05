@@ -1,4 +1,4 @@
-# FastDeploy ERNIT Tiny模型高性能部署
+# FastDeploy ERNIE Tiny模型高性能部署
 
 **目录**
    * [FastDeploy部署介绍](#FastDeploy部署介绍)

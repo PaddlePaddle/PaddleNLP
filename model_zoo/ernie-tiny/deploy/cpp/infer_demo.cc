@@ -49,20 +49,20 @@ DEFINE_int32(max_length, 16, "The batch size of data.");
 DEFINE_int32(cpu_num_threads,
              1,
              "The number of threads when inferring on cpu.");
-DEFINE_bool(use_fp16, false, "Wheter to use FP16 mode.");
+DEFINE_bool(use_trt_fp16, false, "Wheter to use FP16 mode.");
 
 void PrintUsage() {
   fastdeploy::FDINFO
       << "Usage: seq_cls_infer_demo --model_dir dir --device [cpu|gpu] "
          "--backend "
          "[onnx_runtime|paddle|openvino|tensorrt|paddle_tensorrt] "
-         "--batch_size size --max_length len --use_fp16 false"
+         "--batch_size size --max_length len --use_trt_fp16 false"
       << std::endl;
   fastdeploy::FDINFO << "Default value of device: cpu" << std::endl;
   fastdeploy::FDINFO << "Default value of backend: onnx_runtime" << std::endl;
   fastdeploy::FDINFO << "Default value of batch_size: 1" << std::endl;
   fastdeploy::FDINFO << "Default value of max_length: 128" << std::endl;
-  fastdeploy::FDINFO << "Default value of use_fp16: false" << std::endl;
+  fastdeploy::FDINFO << "Default value of use_trt_fp16: false" << std::endl;
 }
 
 bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
@@ -96,7 +96,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
                              {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
-    if (FLAGS_use_fp16) {
+    if (FLAGS_use_trt_fp16) {
       option->EnableTrtFP16();
       trt_file = trt_file + ".fp16";
     }
