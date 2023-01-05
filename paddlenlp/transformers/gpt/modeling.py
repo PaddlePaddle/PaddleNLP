@@ -1223,27 +1223,27 @@ class GPTLMHeadModel(GPTPretrainedModel):
             cross_attentions=outputs.cross_attentions,
         )
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the faster version of GPT")
+            raise AttributeError("'beam_search' is not supported yet in the fast version of GPT")
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.gpt.config["hidden_size"] // self.gpt.config["num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPT" % size_per_head
+                "'size_per_head = %d' is not supported yet in the fast version of GPT" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
         if kwargs["min_length"] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
+        self._fast_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs

@@ -65,6 +65,8 @@ class GenerationTesterMixin:
         input_ids = input_ids[:max_batch_size, :sequence_length]
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
+        attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
+
         # generate max 3 tokens
         max_length = 3
 

@@ -1431,7 +1431,7 @@ from paddlenlp import Taskflow
 #  'top_p': 1.0,
 #  'condition_scale': 10.0,
 #  'num_return_images': 2,
-#  'use_faster': False,
+#  'use_fast': False,
 #  'use_fp16_decoding': False,
 #  'image_index_in_returned_images': 0}
 #
@@ -1689,7 +1689,7 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.2。
 * `num_return_sequences`：解码返回序列数，默认为1。
 * `repetition_penalty`：解码重复惩罚值，默认为1。
-* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fast`：表示是否开启基于FastGeneration的高性能预测，注意FastGeneration的高性能预测仅支持gpu，默认为False。
 * `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为False。
 
 </div></details>
