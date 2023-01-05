@@ -45,6 +45,7 @@ def parse_arguments():
     )
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=16, help="The max length of sequence.")
+    parser.add_argument("--cpu_num_threads", type=int, default=1, help="The number of threads when inferring on cpu.")
     parser.add_argument("--use_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument(
         "--use_fast",
@@ -99,6 +100,7 @@ class Predictor(object):
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
+            option.set_cpu_thread_num(args.cpu_num_threads)
         else:
             option.use_gpu()
         if args.backend == "paddle":

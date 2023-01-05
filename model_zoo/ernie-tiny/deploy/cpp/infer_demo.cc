@@ -46,6 +46,9 @@ DEFINE_string(backend,
               "'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']");
 DEFINE_int32(batch_size, 1, "The batch size of data.");
 DEFINE_int32(max_length, 16, "The batch size of data.");
+DEFINE_int32(cpu_num_threads,
+             1,
+             "The number of threads when inferring on cpu.");
 DEFINE_bool(use_fp16, false, "Wheter to use FP16 mode.");
 
 void PrintUsage() {
@@ -67,6 +70,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
     option->UseGpu();
   } else if (FLAGS_device == "cpu") {
     option->UseCpu();
+    option->SetCpuThreadNum(FLAGS_cpu_num_threads);
   } else {
     fastdeploy::FDERROR << "The avilable device should be one of the list "
                            "['cpu', 'gpu']. But receive '"
@@ -382,12 +386,19 @@ int main(int argc, char* argv[]) {
   Predictor predictor(option, tokenizer, slot_label_map, intent_label_map);
 
   std::vector<IntentDetAndSlotFillResult> results;
+  std::vector<std::vector<std::string>> batch_texts;
   std::vector<std::string> texts = {
       "来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
-  predictor.Predict(texts, &results);
-  for (int i = 0; i < results.size(); ++i) {
-    std::cout << "No." << i << " text = " << texts[i] << std::endl;
-    std::cout << results[i] << std::endl;
+  BatchiFyTexts(texts, FLAGS_batch_size, &batch_texts);
+  for (int i = 0; i < batch_texts.size(); ++i) {
+    auto& curr_texts = batch_texts[i];
+    predictor.Predict(curr_texts, &results);
+    for (int k = 0; k < curr_texts.size(); ++k) {
+      std::cout << "No." << i * FLAGS_batch_size + k
+                << " text = " << curr_texts[k] << std::endl;
+      std::cout << results[k] << std::endl;
+    }
+    results.clear();
   }
 
   std::string dataset_path;
@@ -397,7 +408,7 @@ int main(int argc, char* argv[]) {
     texts.clear();
     results.clear();
     ReadDatasetFromTxt(FLAGS_test_data_path, &texts);
-    std::vector<std::vector<std::string>> batch_texts;
+    batch_texts.clear();
     BatchiFyTexts(texts, FLAGS_batch_size, &batch_texts);
     for (int i = 0; i < batch_texts.size(); ++i) {
       auto& curr_texts = batch_texts[i];
