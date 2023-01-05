@@ -149,8 +149,7 @@ class BertPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
 
     @classmethod
-    def _get_name_mappings(cls, config: dict) -> list[StateDictNameMapping]:
-        config: BertConfig = BertConfig.from_dict(config)
+    def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
         mappings: list[StateDictNameMapping] = []
         model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],

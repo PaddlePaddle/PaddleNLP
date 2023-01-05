@@ -1306,7 +1306,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         model = cls(config, *init_args, **model_kwargs)
 
         # 3. resolve model_weight file
-        support_conversion = cls.support_conversion(config.to_dict()) and ENABLE_TORCH_CHECKPOINT
+        support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
 
         model_weight_file = cls._resolve_model_file_path(
             pretrained_model_name_or_path,
@@ -1318,7 +1318,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
             if support_conversion:
                 # try to get the name-mapping info
-                model_state_dict = cls.convert(model_weight_file, config.to_dict(), cache_dir)
+                model_state_dict = cls.convert(model_weight_file, config, cache_dir)
             else:
                 raise ValueError(
                     f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "

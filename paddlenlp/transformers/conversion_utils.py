@@ -52,6 +52,7 @@ from paddlenlp.utils.serialization import load_torch
 
 if TYPE_CHECKING:
     from paddlenlp.transformers import PretrainedModel
+    from paddlenlp.transformers.configuration_utils import PretrainedConfig
 
 
 # the type hinting for pytorch model & layer & tensor
@@ -96,7 +97,8 @@ def tensor_summary(tensor: Union[str, Tensor, PytorchTensor, tuple, list, ndarra
 
 
 def compare_model_weights(first_state_dict: Dict[str, ndarray], second_state_dict: Dict[str, ndarray]) -> List[str]:
-    """compare the values of two state_dict
+    """compare the values of two state_dict.
+       This function has an assumption: the keys between `first_state_dict` and `second_state_dict` are exactly the same.
 
     Args:
         first_state_dict (Dict[str, ndarray]): first state_dict
@@ -676,7 +678,7 @@ class LogitComparer:
 
 class ConversionMixin:
     @classmethod
-    def support_conversion(cls, config: dict) -> bool:
+    def support_conversion(cls, config: PretrainedConfig) -> bool:
         """check wether the model support conversion"""
         try:
             # try to get the name-mapping info
@@ -687,11 +689,12 @@ class ConversionMixin:
             return True
 
     @classmethod
-    def convert(cls, weight_file: str, config: dict, cache_dir: str) -> None:
+    def convert(cls, weight_file: str, config: PretrainedConfig, cache_dir: str) -> None:
         """the entry of converting config and converting model file
 
         Args:
             input_dir (str | None): the input dir which contains `pytorch_model.bin` and `config.json` file
+            config (PretrainedConfig): the PretrainedConfig instance of model
         """
         # FIXME(wj-Mcat): add compatibility with downstream models
         name_mappings = cls._get_name_mappings(config)
@@ -718,11 +721,11 @@ class ConversionMixin:
         return state_dict
 
     @classmethod
-    def _get_name_mappings(cls, config: dict) -> List[StateDictNameMapping]:
+    def _get_name_mappings(cls, config: PretrainedConfig) -> List[StateDictNameMapping]:
         """get name mapping of PretrainedModel
 
         Args:
-            config (dict): the configuration of name-mapping
+            config (PretrainedConfig): the configuration of name-mapping
 
         Raises:
             NotImplementedError:
@@ -734,7 +737,9 @@ class ConversionMixin:
 
 
 class Converter(ConversionMixin, LogitComparer):
-    """some converters are implemented in ppdiffusers, so if remove it directly, it will make ppdiffusers down."""
+    """some converters are implemented in ppdiffusers, so if remove it directly, it will make ppdiffusers down.
+    TODO(wj-Mcat): this class will be removed after v2.6
+    """
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
@@ -780,6 +785,7 @@ class Converter(ConversionMixin, LogitComparer):
             raise FileNotFoundError(f"config file<{weight_file}> not found")
 
         # 2. construct name mapping
+        # TODO(wj-Mcat): when AutoConfig is ready, construct config from AutoConfig.
         with open(config_file, "r", encoding="utf-8") as f:
             config = json.load(f)
 
