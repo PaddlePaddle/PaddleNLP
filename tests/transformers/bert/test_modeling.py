@@ -19,6 +19,7 @@ import tempfile
 import unittest
 from typing import List
 
+import numpy as np
 import paddle
 from parameterized import parameterized_class
 
@@ -589,15 +590,28 @@ class BertCompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_bert_converter(self):
         with tempfile.TemporaryDirectory() as tempdir:
-            model: BertModel = BertModel.from_pretrained(
-                "hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir
-            )
 
-            word_embedding = model.get_input_embeddings().weight
-            expected_slice = paddle.to_tensor(
-                [[-0.03694217, 0.04529607, 0.00205900], [0.01189871, 0.03520557, 0.01278174]]
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel
+
+            model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            model.eval()
+            paddle_logit = model(paddle.to_tensor(input_ids))[0]
+            model = None  # free the memory
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import BertModel
+
+            model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            model.eval()
+            torch_logit = model(torch.tensor(input_ids), return_dict=False)[0]
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
             )
-            self.assertTrue(paddle.allclose(word_embedding[1:3, 1:4], expected_slice, atol=1e-4))
 
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
