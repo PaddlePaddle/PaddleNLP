@@ -1,6 +1,6 @@
 # FastDeploy ERNIE Tiny 模型Android部署示例
 
-本目录提供了快速完成在CPU/GPU的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的Android部署示例。
+本目录提供了快速完成在Android的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的部署示例。
 
 ## 环境准备
 
