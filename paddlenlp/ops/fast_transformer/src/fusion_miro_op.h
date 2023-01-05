@@ -1,4 +1,4 @@
-/* Copyright (c) 2021 PaddlePaddle Authors. All Rights Reserved.
+/* Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ limitations under the License. */
 #endif
 
 
-std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
+std::vector<paddle::Tensor> MIROCUDAForward(
     const paddle::Tensor& input_ids,
     const paddle::Tensor& attn_mask,
     const paddle::Tensor& mem_seq_len,
@@ -38,6 +38,8 @@ std::vector<paddle::Tensor> UnifiedDecodingCUDAForward(
     const paddle::Tensor& decoder_type_id,
     const paddle::Tensor& logits_mask,
     const paddle::Tensor& word_embedding,
+    const paddle::Tensor& pre_decoder_ln_weight,
+    const paddle::Tensor& pre_decoder_ln_bias,
     const std::vector<paddle::Tensor>& self_ln_weight,
     const std::vector<paddle::Tensor>& self_ln_bias,
     const std::vector<paddle::Tensor>& self_q_weight,
