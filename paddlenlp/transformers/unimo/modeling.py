@@ -163,8 +163,14 @@ class UNIMOModel(UNIMOPretrainedModel):
         )
 
         self.encoder_norm = nn.LayerNorm(config.hidden_size)
+        # post_encoder_norm = nn.LayerNorm(config.hidden_size)
+
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer,
+            config.num_hidden_layers,
+            # post_encoder_norm,
+        )
 
         self.apply(self.init_weights)
 
@@ -457,7 +463,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         )
 
     def prepare_fast_entry(self, kwargs):
-        from paddlenlp.ops import FasterUNIMOText
+        from paddlenlp.ops import FasterMIRO, FasterUNIMOText
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decode_strategy = kwargs.get("decode_strategy")
@@ -471,8 +477,15 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
         if kwargs["forced_bos_token_id"] is not None:
             # not support for min_length yet in the fast version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
-        self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
+            raise AttributeError(
+                "Only topk sampling or topp sampling are supported. "
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
+            )
+
+        if getattr(self.encoder, "norm", None) is None:
+            self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
+        else:
+            self._fast_entry = FasterMIRO(self, use_fp16_decoding=use_fp16_decoding).forward
         return self._fast_entry
 
     def adjust_logits_during_generation(self, logits):

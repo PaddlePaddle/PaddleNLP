@@ -18,29 +18,25 @@ import json
 import os
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
-import six
 
 from fast_tokenizer import Encoding as FastEncoding
 from fast_tokenizer import Tokenizer as FastTokenizer
 
-from .utils import InitTrackerMeta, fn_args_to_dict
 from .convert_slow_tokenizer import convert_slow_tokenizer
+from .tokenizer_utils import PretrainedTokenizer
 from .tokenizer_utils_base import (
     AddedToken,
     BatchEncoding,
     EncodedInput,
     EncodedInputPair,
+    PaddingStrategy,
     PreTokenizedInput,
     PreTokenizedInputPair,
     PretrainedTokenizerBase,
-    SpecialTokensMixin,
     TextInput,
     TextInputPair,
     TruncationStrategy,
-    PaddingStrategy,
 )
-from .tokenizer_utils import PretrainedTokenizer
-from paddlenlp.utils.log import logger
 
 TOKENIZER_FILE = "tokenizer.json"
 VOCAB_FILES_NAMES = {"tokenizer_file": TOKENIZER_FILE}
@@ -122,7 +118,7 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
         """
         Size of the full vocabulary with the added tokens.
         """
-        return self._tokenizer.get_vocab_size(with_added_tokens=True)
+        return self._tokenizer.get_vocab_size(with_added_vocabulary=True)
 
     @property
     def backend_tokenizer(self) -> FastTokenizer:
