@@ -79,7 +79,6 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
             "soft_token_ids": soft_token_ids,
             "attention_mask": attention_mask,
             "encoder_ids": encoder_ids,
-            "labels": labels,
             **kwargs,
         }
         input_dict = self.template.process_batch(input_dict)
