@@ -56,7 +56,7 @@ get_diff_TO_P0case(){
 if [[ ${Testcase} =~ "all" ]];then
     P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
-    nptag ernie-m clue taskflow transformers fast_generation)
+    nptag ernie-m clue taskflow transformers fast_generation ernie-3.0)
 elif [[ ${Testcase} =~ "p0" ]];then
     P0case_list=(glue bert skep gpt ernie-1.0 transformer clue)
 else

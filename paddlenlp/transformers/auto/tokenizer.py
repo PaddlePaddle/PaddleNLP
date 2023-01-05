@@ -238,9 +238,9 @@ class AutoTokenizer:
         """
         # Default not to use fast tokenizer
         use_fast = kwargs.pop("use_fast", False)
-        if "use_fast" in kwargs:
-            use_fast = kwargs.pop("use_fast", False)
-            logger.warning("The keyword argument `use_fast` is deprecated in future, please use `use_fast` instead")
+        if "use_faster" in kwargs:
+            use_fast = kwargs.pop("use_faster", False)
+            logger.warning("The keyword argument `use_faster` is deprecated in future, please use `use_fast` instead")
 
         all_tokenizer_names = []
         for names, tokenizer_class in cls._tokenizer_mapping.items():

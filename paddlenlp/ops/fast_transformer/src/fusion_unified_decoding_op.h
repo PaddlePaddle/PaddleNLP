@@ -21,6 +21,7 @@ limitations under the License. */
 // #include "fastertransformer/open_decoder.h"
 // #include "fastertransformer/utils/common.h"
 #include "cublas_handle.h"
+#include "utils.h"
 
 #ifdef PADDLE_ON_INFERENCE
 #include "paddle/include/experimental/ext_all.h"

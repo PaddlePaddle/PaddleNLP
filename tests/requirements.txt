@@ -3,3 +3,4 @@ sentencepiece
 regex
 torch>=1.5
 transformers
+fast_tokenizer_python

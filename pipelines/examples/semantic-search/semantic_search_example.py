@@ -12,14 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
+import os
 
-import paddle
-from pipelines.document_stores import FAISSDocumentStore
-from pipelines.document_stores import MilvusDocumentStore
+from pipelines.document_stores import FAISSDocumentStore, MilvusDocumentStore
 from pipelines.nodes import DensePassageRetriever, ErnieRanker
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
+from pipelines.utils import (
+    convert_files_to_dicts,
+    fetch_archive_from_http,
+    print_documents,
+)
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -29,34 +31,13 @@ parser.add_argument("--search_engine", choices=['faiss', 'milvus'], default="fai
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
-parser.add_argument("--query_embedding_model",
-                    default="rocketqa-zh-nano-query-encoder",
-                    type=str,
-                    help="The query_embedding_model path")
-
-parser.add_argument("--passage_embedding_model",
-                    default="rocketqa-zh-nano-para-encoder",
-                    type=str,
-                    help="The passage_embedding_model path")
-parser.add_argument("--params_path",
-                    default="checkpoints/model_40/model_state.pdparams",
-                    type=str,
-                    help="The checkpoint path")
-parser.add_argument("--embedding_dim",
-                    default=312,
-                    type=int,
-                    help="The embedding_dim of index")
-
-parser.add_argument('--host',
-                    type=str,
-                    default="localhost",
-                    help='host ip of ANN search engine')
-
-parser.add_argument('--port',
-                    type=str,
-                    default="8530",
-                    help='port of ANN search engine')
-
+parser.add_argument("--query_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The query_embedding_model path")
+parser.add_argument("--passage_embedding_model", default="rocketqa-zh-nano-query-encoder", type=str, help="The passage_embedding_model path")
+parser.add_argument("--params_path", default="checkpoints/model_40/model_state.pdparams", type=str, help="The checkpoint path")
+parser.add_argument("--embedding_dim", default=312, type=int, help="The embedding_dim of index")
+parser.add_argument('--host', type=str, default="localhost", help='host ip of ANN search engine')
+parser.add_argument('--port', type=str, default="8530", help='port of ANN search engine')
+parser.add_argument('--model_type', choices=['ernie_search', 'ernie', 'bert', 'neural_search'], default="ernie", help="the ernie model types")
 args = parser.parse_args()
 # yapf: enable
 
@@ -71,7 +52,7 @@ def get_faiss_retriever(use_gpu):
             query_embedding_model=args.query_embedding_model,
             passage_embedding_model=args.passage_embedding_model,
             params_path=args.params_path,
-            output_emb_size=args.embedding_dim,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
             max_seq_len_query=args.max_seq_len_query,
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
@@ -98,7 +79,7 @@ def get_faiss_retriever(use_gpu):
             query_embedding_model=args.query_embedding_model,
             passage_embedding_model=args.passage_embedding_model,
             params_path=args.params_path,
-            output_emb_size=args.embedding_dim,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
             max_seq_len_query=args.max_seq_len_query,
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
@@ -132,7 +113,7 @@ def get_milvus_retriever(use_gpu):
             query_embedding_model=args.query_embedding_model,
             passage_embedding_model=args.passage_embedding_model,
             params_path=args.params_path,
-            output_emb_size=args.embedding_dim,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
             max_seq_len_query=args.max_seq_len_query,
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
@@ -158,7 +139,7 @@ def get_milvus_retriever(use_gpu):
             query_embedding_model=args.query_embedding_model,
             passage_embedding_model=args.passage_embedding_model,
             params_path=args.params_path,
-            output_emb_size=args.embedding_dim,
+            output_emb_size=args.embedding_dim if args.model_type in ["ernie_search", "neural_search"] else None,
             max_seq_len_query=args.max_seq_len_query,
             max_seq_len_passage=args.max_seq_len_passage,
             batch_size=args.retriever_batch_size,
@@ -182,10 +163,10 @@ def semantic_search_tutorial():
     else:
         retriever = get_faiss_retriever(use_gpu)
 
-    ### Ranker
+    # Ranker
     ranker = ErnieRanker(model_name_or_path="rocketqa-zh-dureader-cross-encoder", use_gpu=use_gpu)
 
-    ### Pipeline
+    # Pipeline
     from pipelines import SemanticSearchPipeline
 
     pipe = SemanticSearchPipeline(retriever, ranker)
@@ -194,9 +175,7 @@ def semantic_search_tutorial():
 
     print_documents(prediction)
     # Batch prediction
-    predictions = pipe.run_batch(
-        queries=["亚马逊河流的介绍", "期货交易手续费指的是什么?"], params={"Retriever": {"top_k": 50}, "Ranker": {"top_k": 5}}
-    )
+    predictions = pipe.run_batch(queries=["亚马逊河流的介绍", "期货交易手续费指的是什么?"], params={"Retriever": {"top_k": 10}})
     for i in range(len(predictions["queries"])):
         result = {"documents": predictions["documents"][i], "query": predictions["queries"][i]}
         print_documents(result)
