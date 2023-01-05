@@ -30,7 +30,7 @@ EN_VOCAB = get_tests_dir("fixtures/test_sentencepiece_bpe.vocab.txt")
 class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieMTokenizer
-    tokenizer_fast_class = ErnieMFastTokenizer
+    fast_tokenizer_class = ErnieMFastTokenizer
     space_between_special_tokens = True
 
     def setUp(self):
@@ -45,7 +45,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_fast_tokenizer(self, **kwargs) -> PretrainedFastTokenizer:
-        return self.tokenizer_fast_class.from_pretrained(self.tmpdirname, **kwargs)
+        return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def get_input_output_texts(self, tokenizer):
         input_text = "This is a test"
@@ -150,7 +150,7 @@ class ErnieMEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_sequence_builders(self):
         tokenizer = self.tokenizer_class.from_pretrained("ernie-m-base")
-        tokenizer_fast = self.tokenizer_fast_class.from_pretrained("ernie-m-base")
+        tokenizer_fast = self.fast_tokenizer_class.from_pretrained("ernie-m-base")
         text = tokenizer.encode("sequence builders", return_token_type_ids=None, add_special_tokens=False)["input_ids"]
         text_2 = tokenizer.encode("multi-sequence build", return_token_type_ids=None, add_special_tokens=False)[
             "input_ids"

@@ -33,7 +33,7 @@ from ...transformers.test_tokenizer_common import (
 class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = ErnieTokenizer
-    tokenizer_fast_class = ErnieFastTokenizer
+    fast_tokenizer_class = ErnieFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -179,7 +179,7 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"A, naïve {tokenizer.mask_token} AllenNLP sentence."
                 tokens = tokenizer.encode(
@@ -251,7 +251,7 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 kwargs["tokenize_chinese_chars"] = True
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 ids_without_spe_char_p = tokenizer.encode(
                     text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False

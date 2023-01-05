@@ -36,7 +36,7 @@ from ...transformers.test_tokenizer_common import (
 class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = BertTokenizer
-    tokenizer_fast_class = BertFastTokenizer
+    fast_tokenizer_class = BertFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = False
@@ -73,10 +73,38 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_full_tokenizer(self):
         tokenizer = self.tokenizer_class(self.vocab_file)
+        tokenizer_fast = self.fast_tokenizer_class(self.vocab_file)
 
-        tokens = tokenizer.tokenize("UNwant\u00E9d,running")
+        sequence = "UNwant\u00E9d,running"
+        tokens = tokenizer.tokenize(sequence)
+        tokens_fast = tokenizer_fast.tokenize(sequence)
         self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
+        self.assertListEqual(tokens_fast, ["un", "##want", "##ed", ",", "runn", "##ing"])
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
+        self.assertListEqual(tokenizer_fast.convert_tokens_to_ids(tokens_fast), [9, 6, 7, 12, 10, 11])
+
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        ids = tokenizer.encode(sequence)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        tokenizer = self.get_tokenizer(do_lower_case=True)
+        tokenizer_fast = self.get_fast_tokenizer(do_lower_case=True)
+
+        tokens = tokenizer.tokenize(sequence)
+        tokens_fast = tokenizer_fast.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_fast)
+
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        ids = tokenizer.encode(sequence)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
 
     def test_chinese(self):
         tokenizer = BasicTokenizer()
@@ -186,9 +214,12 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
-
+        tokenizer_fast = self.get_fast_tokenizer()
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual([tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["[UNK]"], [], ["[UNK]"]])
+        self.assertListEqual(
+            [tokenizer_fast.tokenize(t) for t in ["Test", "\xad", "test"]], [["[UNK]"], [], ["[UNK]"]]
+        )
 
     @slow
     def test_sequence_builders(self):
@@ -209,7 +240,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         for tokenizer, pretrained_name, kwargs in self.tokenizers_list:
             with self.subTest(f"{tokenizer.__class__.__name__} ({pretrained_name})"):
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 sentence = f"A, naïve {tokenizer.mask_token} AllenNLP sentence."
                 tokens = tokenizer.encode(
@@ -278,7 +309,7 @@ class BertTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
                 kwargs["tokenize_chinese_chars"] = True
                 tokenizer = self.tokenizer_class.from_pretrained(pretrained_name, **kwargs)
-                tokenizer_fast = self.tokenizer_fast_class.from_pretrained(pretrained_name, **kwargs)
+                tokenizer_fast = self.fast_tokenizer_class.from_pretrained(pretrained_name, **kwargs)
 
                 ids_without_spe_char_p = tokenizer.encode(
                     text_with_chinese_char, return_token_type_ids=None, add_special_tokens=False
