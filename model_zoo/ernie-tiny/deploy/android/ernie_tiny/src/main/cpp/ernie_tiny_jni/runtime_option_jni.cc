@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "ernie_tiny_jni/convert_jni.h"  // NOLINT
+#include "ernie_tiny_jni/convert_jni.h"         // NOLINT
 #include "ernie_tiny_jni/runtime_option_jni.h"  // NOLINT
 
 namespace ernie_tiny {
@@ -25,7 +25,7 @@ fastdeploy::RuntimeOption NewCxxRuntimeOption(
   // Field signatures of Java RuntimeOption.
   // (1) mCpuThreadNum int:               I
   // (2) mEnableLiteFp16 boolean:         Z
-  // (3) mLitePowerMode LitePowerMode:    com/baidu/paddle/fastdeploy/LitePowerMode
+  // (3) mLitePowerMode LitePowerMode:    com/baidu/paddle/paddlenlp/ernie_tiny/LitePowerMode
   // (4) mLiteOptimizedModelDir String:   java/lang/String
 
   const jclass j_runtime_option_clazz = env->FindClass(

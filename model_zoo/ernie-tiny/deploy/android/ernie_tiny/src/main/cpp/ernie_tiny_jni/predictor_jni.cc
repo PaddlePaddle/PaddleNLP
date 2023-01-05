@@ -219,7 +219,11 @@ struct Predictor {
     }
 
     std::vector<fastdeploy::FDTensor> outputs(runtime_.NumOutputs());
+
+    auto t = ernie_tiny::jni::GetCurrentTime();
     runtime_.Infer(inputs, &outputs);
+    LOGD("Runtime cost %f ms.", ernie_tiny::jni::GetElapsedTime(t));
+
     results->resize(texts.size());
     if (!Postprocess(outputs, texts, results)) {
       return false;
@@ -321,7 +325,9 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
 
   std::vector<IntentDetAndSlotFillResult> c_results;
 
+  auto t = ernie_tiny::jni::GetCurrentTime();
   if(c_predictor_ptr->Predict(c_texts, &c_results)) {
+    LOGD("Predict cost %f ms.", ernie_tiny::jni::GetElapsedTime(t));
 
     // Show some log info to logcat
     for (int i = 0; i < c_results.size(); ++i) {

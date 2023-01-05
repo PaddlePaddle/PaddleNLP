@@ -29,7 +29,7 @@ import com.baidu.paddle.paddlenlp.ui.Utils;
 
 public class ERNIETinyMainActivity extends Activity implements View.OnClickListener {
     private static final String TAG = ERNIETinyMainActivity.class.getSimpleName()
-            + "[FastDeploy][ERNIE Tiny][Java]";
+            + "[FastDeploy][ERNIE][Java]";
     private ImageView back;
     private ImageButton btnSettings;
     private EditText etERNIETinyInput;

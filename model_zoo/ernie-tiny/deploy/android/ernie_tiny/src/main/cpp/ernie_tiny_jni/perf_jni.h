@@ -39,8 +39,6 @@
 #define LOGF(...) {}
 #endif
 
-#define ENABLE_RUNTIME_PERF
-
 namespace ernie_tiny {
 namespace jni {
 
@@ -55,35 +53,6 @@ inline int64_t GetCurrentTime() {
 inline double GetElapsedTime(int64_t time) {
   return (GetCurrentTime() - time) / 1000.0f;
 }
-
-/// Show the performance of Runtime
-inline void PerfTimeOfRuntime(
-    fastdeploy::FastDeployModel *c_model_ptr, int64_t start = -1) {
-#ifdef ENABLE_RUNTIME_PERF
-  if (c_model_ptr == nullptr) {
-    return;
-  }
-  if (start > 0) {
-    auto tc = GetElapsedTime(start);
-    LOGD("Predict from native costs %f ms", tc);
-  }
-  if (c_model_ptr->EnabledRecordTimeOfRuntime()) {
-    auto info_of_runtime = c_model_ptr->PrintStatisInfoOfRuntime();
-    const float avg_time = info_of_runtime["avg_time"] * 1000.0f;
-    LOGD("Avg runtime costs %f ms", avg_time);
-  }
-#endif
-}
-
-#define INITIALIZED_OR_RETURN(c_model_ptr) \
-  if (!(c_model_ptr)->Initialized()) { \
-    LOGE("Failed to initialize!"); \
-    delete (c_model_ptr); \
-    return 0; \
-  }
-
-#define PERF_TIME_OF_RUNTIME(c_model_ptr, start) \
-  ernie_tiny::jni::PerfTimeOfRuntime((c_model_ptr), (start));
 
 }  // namespace jni
 }  // namespace ernie_tiny

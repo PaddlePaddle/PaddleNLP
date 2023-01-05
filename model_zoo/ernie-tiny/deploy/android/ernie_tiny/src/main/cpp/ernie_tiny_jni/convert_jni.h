@@ -14,8 +14,7 @@
 
 #pragma once
 
-#include <jni.h>  // NOLINT
-
+#include <jni.h>   // NOLINT
 #include <string>  // NOLINT
 #include <vector>  // NOLINT
 

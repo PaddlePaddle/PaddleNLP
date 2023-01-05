@@ -14,12 +14,10 @@
 
 #pragma once
 
-#include <jni.h>  // NOLINT
-
-#include <string>  // NOLINT
-#include <vector>  // NOLINT
-
-#include "fastdeploy/runtime.h"
+#include <jni.h>                 // NOLINT
+#include <string>                // NOLINT
+#include <vector>                // NOLINT
+#include "fastdeploy/runtime.h"  // NOLINT
 
 namespace ernie_tiny {
 namespace jni {
@@ -29,4 +27,4 @@ fastdeploy::RuntimeOption NewCxxRuntimeOption(
     JNIEnv *env, jobject j_runtime_option_obj);
 
 }  // namespace jni
-}  // namespace fastdeploy
+}  // namespace ernie_tiny

@@ -28,9 +28,6 @@ add_library(
         ernie_tiny_jni
         SHARED
         ernie_tiny_jni/runtime_option_jni.cc
-        ernie_tiny_jni/text_results_jni.cc
-        ernie_tiny_jni/uie_model_jni.cc
-        ernie_tiny_jni/uie_utils_jni.cc
         ernie_tiny_jni/predictor_jni.cc
 )
 

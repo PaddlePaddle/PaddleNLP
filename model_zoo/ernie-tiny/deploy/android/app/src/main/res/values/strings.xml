@@ -1,8 +1,6 @@
 <resources>
-    <!-- Default App name -->
+    <!-- App name -->
     <string name="app_name">PaddleNLP</string>
-    <!-- Other App name -->
-    <string name="uie_app_name">UIE Nano</string>
     <string name="ernie_tiny_app_name">ERNIE Tiny</string>
     <string name="start_ui_activity">开始使用</string>
     <!-- Keys for PreferenceScreen -->
@@ -18,12 +16,6 @@
     <string name="CPU_POWER_MODE_DEFAULT">LITE_POWER_HIGH</string>
     <string name="SCORE_THRESHOLD_DEFAULT">0.4</string>
     <string name="ENABLE_LITE_FP16_MODE_DEFAULT">true</string>
-    <!-- UIE values -->
-    <string name="UIE_MODEL_DIR_DEFAULT">models/uie-nano</string>
-    <string name="UIE_SCHEMA_HINT">请输入需要的信息模式，如: 时间，选手，赛事名称</string>
-    <string name="UIE_SCHEMA_DEFAULT">时间, 选手, 赛事名称</string>
-    <string name="UIE_INPUT_TEXTS_HINT">请输入需要分析的文本，如：2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！</string>
-    <string name="UIE_INPUT_TEXTS_DEFAULT">2月8日上午北京冬奥会自由式滑雪女子大跳台决赛中中国选手谷爱凌以188.25分获得金牌！</string>
     <!-- ERNIE Tiny values -->
     <string name="ERNIE_TINY_MODEL_DIR_DEFAULT">models/ernie-tiny</string>
     <string name="ERNIE_TINY_INPUT_TEXTS_HINT">请输入需要分析的文本，如：来一首周华健的花心</string>

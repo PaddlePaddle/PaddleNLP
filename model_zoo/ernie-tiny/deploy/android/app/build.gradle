@@ -39,10 +39,6 @@ dependencies {
 
 def FD_MODEL = [
         [
-                'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/uie-nano.tgz',
-                'dest': 'src/main/assets/models'
-        ],
-        [
                 'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/ernie-tiny.tgz',
                 'dest': 'src/main/assets/models'
         ]
