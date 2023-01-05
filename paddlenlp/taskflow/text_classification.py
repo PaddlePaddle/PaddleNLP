@@ -158,7 +158,7 @@ class TextClassificationTask(Task):
 
         max_length = self.kwargs["max_length"] if "max_length" in self.kwargs else 512
         collator = DataCollatorWithPadding(self._tokenizer, return_tensors="np" if self.is_static_model else "pd")
-        tokenized_inputs = [self._tokenizer(i, max_length=max_length) for i in inputs]
+        tokenized_inputs = [self._tokenizer(i, max_length=max_length, truncation=True) for i in inputs]
         batches = [tokenized_inputs[idx : idx + batch_size] for idx in range(0, len(tokenized_inputs), batch_size)]
         outputs = {}
         outputs["text"] = inputs

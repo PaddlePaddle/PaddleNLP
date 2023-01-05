@@ -11,24 +11,27 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import random
-import paddle
+
 import numpy as np
+import paddle
 from PIL import Image
+
 from ..transformers import AutoModelForImageGeneration, AutoTokenizer
 from .task import Task
 
 usage = r"""
-           from paddlenlp import Taskflow 
+            from paddlenlp import Taskflow
 
-           text_to_image = Taskflow("text_to_image")
-           image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
-           
-           for batch_index, batch_image in enumerate(image_list):
-               # len(batch_image) == 2 (num_return_images)
-               for image_index_in_returned_images, each_image in enumerate(batch_image):
+            text_to_image = Taskflow("text_to_image")
+            image_list = text_to_image("风阁水帘今在眼，且来先看早梅红")
+
+            for batch_index, batch_image in enumerate(image_list):
+                # len(batch_image) == 2 (num_return_images)
+                for image_index_in_returned_images, each_image in enumerate(batch_image):
                     each_image.save(f"figure_{batch_index}_{image_index_in_returned_images}.png")
-           
+
          """
 
 
@@ -119,7 +122,7 @@ class TextToImageGenerationTask(Task):
                 top_k=self._top_k,
                 top_p=self._top_p,
                 num_return_sequences=self._num_return_images,
-                use_faster=self._use_faster,
+                use_fast=self._use_faster,
                 use_fp16_decoding=self._use_fp16_decoding,
             )
             all_images.append(images.numpy())
@@ -367,18 +370,12 @@ class TextToImageStableDiffusionTask(Task):
         if self._mode == "text2image":
             if isinstance(inputs, str):
                 if len(inputs) == 0:
-                    raise ValueError(
-                        "Invalid inputs, input text should not be empty text, please check your input.".format(
-                            type(inputs)
-                        )
-                    )
+                    raise ValueError("Invalid inputs, input text should not be empty text, please check your input. ")
                 inputs = [inputs]
             elif isinstance(inputs, list):
                 if not (isinstance(inputs[0], str) and len(inputs[0].strip()) > 0):
                     raise TypeError(
-                        "Invalid inputs, input text should be List[str], and first element of list should not be empty text.".format(
-                            type(inputs[0])
-                        )
+                        "Invalid inputs, input text should be List[str], and first element of list should not be empty text. "
                     )
             else:
                 raise TypeError(
