@@ -13,8 +13,8 @@ public class Predictor {
                      String vocabFile,
                      String slotLabelsFile,
                      String intentLabelsFile) {
-        init_(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile,
-                new RuntimeOption());
+        init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
+                intentLabelsFile, new RuntimeOption(), 16);
     }
 
     public Predictor(String modelFile,
@@ -22,9 +22,10 @@ public class Predictor {
                      String vocabFile,
                      String slotLabelsFile,
                      String intentLabelsFile,
-                     RuntimeOption runtimeOption) {
-        init_(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile,
-                runtimeOption);
+                     RuntimeOption runtimeOption,
+                     int maxLength) {
+        init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
+                intentLabelsFile, runtimeOption, maxLength);
     }
 
     public boolean init(String modelFile,
@@ -32,9 +33,10 @@ public class Predictor {
                         String vocabFile,
                         String slotLabelsFile,
                         String intentLabelsFile,
-                        RuntimeOption runtimeOption) {
-        return init_(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile,
-                runtimeOption);
+                        RuntimeOption runtimeOption,
+                        int maxLength) {
+        return init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
+                intentLabelsFile, runtimeOption, maxLength);
     }
 
     public boolean release() {
@@ -62,7 +64,8 @@ public class Predictor {
                           String vocabFile,
                           String slotLabelsFile,
                           String intentLabelsFile,
-                          RuntimeOption runtimeOption) {
+                          RuntimeOption runtimeOption,
+                          int maxLength) {
         if (!mInitialized) {
             mCxxContext = bindNative(
                     modelFile,
@@ -70,7 +73,8 @@ public class Predictor {
                     vocabFile,
                     slotLabelsFile,
                     intentLabelsFile,
-                    runtimeOption
+                    runtimeOption,
+                    maxLength
             );
             if (mCxxContext != 0) {
                 mInitialized = true;
@@ -85,7 +89,8 @@ public class Predictor {
                         vocabFile,
                         slotLabelsFile,
                         intentLabelsFile,
-                        runtimeOption
+                        runtimeOption,
+                        maxLength
                 );
                 if (mCxxContext != 0) {
                     mInitialized = true;
@@ -102,7 +107,8 @@ public class Predictor {
                                    String vocabFile,
                                    String slotLabelsFile,
                                    String intentLabelsFile,
-                                   RuntimeOption runtimeOption);
+                                   RuntimeOption runtimeOption,
+                                   int maxLength);
 
     // Call prediction from native context.
     private native IntentDetAndSlotFillResult[] predictNative(long CxxContext,

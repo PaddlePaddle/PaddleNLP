@@ -268,7 +268,9 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
                                                                  jstring vocab_file,
                                                                  jstring slot_labels_file,
                                                                  jstring intent_labels_file,
-                                                                 jobject runtime_option) {
+                                                                 jobject runtime_option,
+                                                                 jint max_length) {
+
   auto c_model_file = ernie_tiny::jni::ConvertTo<std::string>(env, model_file);
   auto c_params_file = ernie_tiny::jni::ConvertTo<std::string>(env, params_file);
   auto c_vocab_file = ernie_tiny::jni::ConvertTo<std::string>(env, vocab_file);
@@ -277,7 +279,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
   auto c_runtime_option = ernie_tiny::jni::NewCxxRuntimeOption(env, runtime_option);
   c_runtime_option.SetModelPath(c_model_file, c_params_file);
 
-  uint32_t c_max_length = 16; // TODO: not fixed this value
+  uint32_t c_max_length = static_cast<uint32_t>(max_length);
   ErnieFastTokenizer c_tokenizer(c_vocab_file);
   c_tokenizer.EnableTruncMethod(
       c_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
@@ -328,7 +330,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
       LOGD("%s", info.c_str());
     }
 
-    // Assign to Java IntentDetAndSlotFillResult[]
+    // Assign C++ Results -> Java IntentDetAndSlotFillResult[]
     const jclass j_intent_slot_result_clazz = env->FindClass(
         "com/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult");
     const jclass j_intent_result_clazz = env->FindClass(
@@ -336,6 +338,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
     const jclass j_slot_result_clazz = env->FindClass(
         "com/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$SlotFillResult");
 
+    // jfieldID of IntentDetAndSlotFillResult
     const jfieldID j_intent_slot_str_id = env->GetFieldID(
         j_intent_slot_result_clazz, "mStr", "Ljava/lang/String;");
     const jfieldID j_intent_slot_initialized_id = env->GetFieldID(
@@ -347,7 +350,21 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
         j_intent_slot_result_clazz, "mSlotResult",
         "[Lcom/baidu/paddle/paddlenlp/ernie_tiny/IntentDetAndSlotFillResult$SlotFillResult;");
 
-    // Constructor method
+    // jfieldID of IntentDetResult
+    const jfieldID j_intent_label_id = env->GetFieldID(
+        j_intent_result_clazz, "mIntentLabel", "Ljava/lang/String;");
+    const jfieldID j_intent_conf_id = env->GetFieldID(
+        j_intent_result_clazz, "mIntentConfidence", "F");
+
+    // jfieldID of SlotFillResult
+    const jfieldID j_slot_label_id = env->GetFieldID(
+        j_slot_result_clazz, "mSlotLabel", "Ljava/lang/String;");
+    const jfieldID j_slot_entity_id = env->GetFieldID(
+        j_slot_result_clazz, "mEntity", "Ljava/lang/String;");
+    const jfieldID j_slot_pos_id = env->GetFieldID(
+        j_slot_result_clazz, "mPos", "[I");
+
+    // jmethodID of constructor method
     const jmethodID j_intent_slot_init_method = env->GetMethodID(
         j_intent_slot_result_clazz, "<init>", "()V");
     const jmethodID j_intent_init_method = env->GetMethodID(
@@ -361,29 +378,87 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
         c_results_size, j_intent_slot_result_clazz, NULL);
 
     for (int i = 0; i < c_results_size; ++i) {
-
-      // mStr String
-      // mInitialized boolean
-      // mIntentResult IntentDetResult
-      // mSlotResult SlotFillResult[]
-
       const auto& curr_c_result = c_results.at(i);
+
       // IntentDetAndSlotFillResult
       jobject j_intent_slot_result_obj = env->NewObject(
           j_intent_slot_result_clazz, j_intent_slot_init_method);
-      // IntentDetResult
+
+      // 1. Set mStr String
+      env->SetObjectField(j_intent_slot_result_obj, j_intent_slot_str_id,
+                          ernie_tiny::jni::ConvertTo<jstring>(
+                              env,ResultStr(curr_c_result)));
+
+      // 2. Set mInitialized boolean
+      env->SetBooleanField(j_intent_slot_result_obj, j_intent_slot_initialized_id,
+                           JNI_TRUE);
+
+      // 3. Set mIntentResult IntentDetResult
       jobject j_intent_result_obj = env->NewObject(
           j_intent_result_clazz, j_intent_init_method);
-      // SlotFillResult[]
+      const auto& curr_c_intent_result = curr_c_result.intent_result;
+      // 3.1 Set mIntentLabel String
+      env->SetObjectField(j_intent_result_obj, j_intent_label_id,
+                          ernie_tiny::jni::ConvertTo<jstring>(
+                              env, curr_c_intent_result.intent_label));
+      // 3.2 Set mIntentConfidence float
+      env->SetFloatField(j_intent_result_obj, j_intent_conf_id,
+                         static_cast<jfloat>(curr_c_intent_result.intent_confidence));
+
+      // 3.3 Set mIntentResult -> IntentDetAndSlotFillResult
+      env->SetObjectField(j_intent_slot_result_obj, j_intent_slot_intent_id,
+                          j_intent_result_obj);
+
+      env->DeleteLocalRef(j_intent_result_obj);
+
+      // 4. Set mSlotResult SlotFillResult[]
       const int curr_c_slot_size = curr_c_result.slot_result.size();
-      jobject j_slot_result_obj = env->NewObjectArray(
+      jobjectArray j_slot_result_obj = env->NewObjectArray(
           curr_c_slot_size, j_slot_result_clazz, NULL);
+      for (int j = 0; j < curr_c_slot_size; ++j) {
 
+        jobject j_curr_sub_slot_obj = env->NewObject(j_slot_result_clazz, j_slot_init_method);
+        const auto& curr_c_sub_slot_result = curr_c_result.slot_result.at(j);
+
+        // 4.1 Set mSlotLabel String
+        env->SetObjectField(j_curr_sub_slot_obj, j_slot_label_id,
+                            ernie_tiny::jni::ConvertTo<jstring>(
+                                env, curr_c_sub_slot_result.slot_label));
+
+        // 4.2 Set mEntity String
+        env->SetObjectField(j_curr_sub_slot_obj, j_slot_entity_id,
+                            ernie_tiny::jni::ConvertTo<jstring>(
+                                env, curr_c_sub_slot_result.entity));
+
+        // 4.3 Set mPos int[2]
+        std::vector<int> curr_c_sub_slot_pos = {
+            curr_c_sub_slot_result.pos.first, curr_c_sub_slot_result.pos.second
+        };
+        jintArray j_curr_sub_slot_pos_arr = env->NewIntArray(2);
+        env->SetIntArrayRegion(j_curr_sub_slot_pos_arr, 0, 2,
+                               curr_c_sub_slot_pos.data());
+        env->SetObjectField(j_curr_sub_slot_obj, j_slot_pos_id,
+                            j_curr_sub_slot_pos_arr);
+
+        // 4.4 Set j-th value of SlotFillResult[]
+        env->SetObjectArrayElement(j_slot_result_obj, j, j_curr_sub_slot_obj);
+
+        env->DeleteLocalRef(j_curr_sub_slot_pos_arr);
+        env->DeleteLocalRef(j_curr_sub_slot_obj);
+      }
+      // 4.5 Set mSlotResult -> IntentDetAndSlotFillResult
+      env->SetObjectField(j_intent_slot_result_obj, j_intent_slot_slot_id,
+                          j_slot_result_obj);
+
+      env->DeleteLocalRef(j_slot_result_obj);
+
+      // 5. Set i-th value of IntentDetAndSlotFillResult[]
+      env->SetObjectArrayElement(j_intent_slot_results_arr, i, j_intent_slot_result_obj);
+
+      env->DeleteLocalRef(j_intent_slot_result_obj);
     }
-
-
+    return j_intent_slot_results_arr;
   }
-
 
   return NULL;
 }
@@ -398,7 +473,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_releaseNative(JNIEnv *env,
   auto c_predictor_ptr = reinterpret_cast<Predictor*>(cxx_context);
 
   delete c_predictor_ptr;
-  LOGD("[End] Release Predictor in native !");
+  LOGD("[End] Release ERNIE Tiny Predictor in native !");
   return JNI_TRUE;
 }
 
