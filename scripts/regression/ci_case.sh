@@ -940,20 +940,6 @@ print_info $? nptag_export
 python deploy/python/predict.py --model_dir=./export >${log_path}/nptag_depoly >>${log_path}/nptag_deploy 2>&1
 print_info $? nptag_depoly
 }
-#31 ernie-m
-ernie-m() {
-export CUDA_VISIBLE_DEVICES=${cudaid2}
-cd ${nlp_dir}/model_zoo/ernie-m
-python -m paddle.distributed.launch  --log_dir output run_classifier.py  \
-   --task_type cross-lingual-transfer  \
-   --batch_size 8    \
-   --model_name_or_path ernie-m-base \
-   --save_steps 2 \
-   --max_steps 2 \
-   --output_dir output \
-   --logging_steps 1  >${log_path}/ernie-m >>${log_path}/ernie-m 2>&1
-print_info $? ernie-m
-}
 #32 clue
 clue (){
 cd ${nlp_dir}/examples/benchmark/clue/classification
