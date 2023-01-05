@@ -254,8 +254,7 @@ class CLIPTextConfig(Old2NewPretrainedConfig):
         eos_token_id=2,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, bos_token_id=bos_token_id, eos_token_id=eos_token_id, **kwargs)
 
         self.vocab_size = vocab_size
@@ -369,8 +368,7 @@ class CLIPVisionConfig(Old2NewPretrainedConfig):
         initializer_factor=1.0,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         self.hidden_size = hidden_size
@@ -463,8 +461,7 @@ class CLIPConfig(Old2NewPretrainedConfig):
     def __init__(
         self, text_config=None, vision_config=None, projection_dim=512, logit_scale_init_value=2.6592, **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         # If `_config_dict` exist, we use them for the backward compatibility.
@@ -483,8 +480,8 @@ class CLIPConfig(Old2NewPretrainedConfig):
             vision_config = {}
             logger.info("vision_config is None. initializing the CLIPVisionConfig with default values.")
 
-        text_config.update({"projection_dim": projection_dim})
-        vision_config.update({"projection_dim": projection_dim})
+        text_config["projection_dim"] = projection_dim
+        vision_config["projection_dim"] = projection_dim
         self.text_config = CLIPTextConfig(**text_config)
         self.vision_config = CLIPVisionConfig(**vision_config)
 

@@ -31,19 +31,6 @@ class ChineseCLIPConverter(Converter):
     architectures: Dict[str, Type[PretrainedModel]] = {"ChineseCLIPModel": ChineseCLIPModel}
     try_compare_logits: bool = False
 
-    def convert_config(self, pytorch_config: dict) -> dict:
-        """convert torch config to paddle config
-
-        Args:
-            pytorch_config (dict): the object of pytorch config file
-
-        Returns:
-            dict: the final converted config object
-        """
-        self.model_type = pytorch_config.get("model_type", "chinese_clip")
-        self.architecture = pytorch_config.get("architectures", ["ChineseCLIPModel"])[0]
-        return pytorch_config
-
     def resolve_num_layer(self, config_or_num_layers: Union[dict, int] = None) -> int:
         """resolve the number of transformer layer based on the key of model config, eg: `num_hidden_layers` in CLIPModel
         Args:
@@ -98,6 +85,17 @@ class ChineseCLIPConverter(Converter):
         return paddle_clip_model_class, pytorch_clip_model_class
 
     def get_name_mapping(self, config_or_num_layers: Union[dict, int] = None) -> List[StateDictNameMapping]:
+        self.model_type = (
+            config_or_num_layers.get("model_type", "chinese_clip")
+            if isinstance(config_or_num_layers, dict)
+            else "chinese_clip"
+        )
+        self.architecture = (
+            config_or_num_layers.get("architectures", ["ChineseCLIPModel"])[0]
+            if isinstance(config_or_num_layers, dict)
+            else "ChineseCLIPModel"
+        )
+
         num_text_layer, num_vision_layer = self.resolve_num_layer(config_or_num_layers)
 
         mappings: List[StateDictNameMapping] = []

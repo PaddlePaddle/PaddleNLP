@@ -113,8 +113,7 @@ class ErnieViLTextConfig(PretrainedConfig):
         enable_recompute: bool = False,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
@@ -228,8 +227,7 @@ class ErnieViLVisionConfig(PretrainedConfig):
         initializer_factor=1.0,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         self.hidden_size = hidden_size
@@ -312,8 +310,7 @@ class ErnieViLConfig(PretrainedConfig):
     is_composition = True
 
     def __init__(self, text_config=None, vision_config=None, logit_scale_init_value=2.6592, **kwargs):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         # If `_config_dict` exist, we use them for the backward compatibility.

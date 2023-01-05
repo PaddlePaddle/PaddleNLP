@@ -119,8 +119,7 @@ class ChineseCLIPTextConfig(PretrainedConfig):
         use_cache=True,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(pad_token_id=pad_token_id, **kwargs)
 
         self.vocab_size = vocab_size
@@ -240,8 +239,7 @@ class ChineseCLIPVisionConfig(PretrainedConfig):
         initializer_factor=1.0,
         **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
         self.hidden_size = hidden_size
         self.intermediate_size = intermediate_size
@@ -336,8 +334,7 @@ class ChineseCLIPConfig(PretrainedConfig):
     def __init__(
         self, text_config=None, vision_config=None, projection_dim=512, logit_scale_init_value=2.6592, **kwargs
     ):
-        return_dict = kwargs.pop("return_dict", True)
-        kwargs.update({"return_dict": return_dict})
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
         # If `_config_dict` exist, we use them for the backward compatibility.
         text_config_dict = kwargs.pop("text_config_dict", None)
@@ -355,8 +352,8 @@ class ChineseCLIPConfig(PretrainedConfig):
             vision_config = {}
             logger.info("vision_config is None. initializing the ChineseCLIPVisionConfig with default values.")
 
-        text_config.update({"projection_dim": projection_dim})
-        vision_config.update({"projection_dim": projection_dim})
+        text_config["projection_dim"] = projection_dim
+        vision_config["projection_dim"] = projection_dim
         self.text_config = ChineseCLIPTextConfig(**text_config)
         self.vision_config = ChineseCLIPVisionConfig(**vision_config)
 
