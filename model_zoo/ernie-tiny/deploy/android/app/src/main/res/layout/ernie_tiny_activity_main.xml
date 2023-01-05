@@ -53,9 +53,9 @@
             android:layout_marginLeft="20dp"
             android:layout_marginTop="10dp"
             android:layout_marginRight="20dp"
-            android:lines="3"
-            android:inputType="textMultiLine"
             android:hint="@string/ERNIE_TINY_INPUT_TEXTS_HINT"
+            android:inputType="textMultiLine"
+            android:lines="4"
             android:textColor="@android:color/black"
             android:textSize="20sp" />
 
@@ -75,10 +75,10 @@
             android:layout_marginLeft="20dp"
             android:layout_marginTop="10dp"
             android:layout_marginRight="20dp"
-            android:textColor="@android:color/black"
-            android:textSize="20sp"
-            android:lines="4"
+            android:hint="意图识别结果："
             android:inputType="textMultiLine"
-            android:hint="意图识别结果：" />
+            android:lines="6"
+            android:textColor="@android:color/black"
+            android:textSize="20sp" />
     </LinearLayout>
 </LinearLayout>
