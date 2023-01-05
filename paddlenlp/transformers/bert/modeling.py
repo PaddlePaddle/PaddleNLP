@@ -30,7 +30,7 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
-from ...utils.converter import Convertible, StateDictNameMapping
+from ...utils.converter import StateDictNameMapping
 from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -131,7 +131,7 @@ class BertPooler(Layer):
         return pooled_output
 
 
-class BertPretrainedModel(PretrainedModel, Convertible):
+class BertPretrainedModel(PretrainedModel):
     """
     An abstract class for pretrained BERT models. It provides BERT related
     `model_config_file`, `resource_files_names`, `pretrained_resource_files_map`,
@@ -152,7 +152,7 @@ class BertPretrainedModel(PretrainedModel, Convertible):
     def _get_name_mappings(cls, config: dict) -> list[StateDictNameMapping]:
         config: BertConfig = BertConfig.from_dict(config)
         mappings: list[StateDictNameMapping] = []
-        bert_model_mappings = [
+        model_mappings = [
             ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
             ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
             ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
@@ -223,21 +223,19 @@ class BertPretrainedModel(PretrainedModel, Convertible):
                 [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
                 [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
             ]
-            bert_model_mappings.extend(layer_mappings)
+            model_mappings.extend(layer_mappings)
 
         # base-model prefix "BertModel"
         if "BertModel" not in config.architectures:
-            for mapping in bert_model_mappings:
+            for mapping in model_mappings:
                 mapping[0] = "bert." + mapping[0]
                 mapping[1] = "bert." + mapping[1]
 
         # downstream mappings
         if "BertForQuestionAnswering" in config.architectures:
-            bert_model_mappings.extend(
-                [["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]]
-            )
+            model_mappings.extend([["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]])
 
-        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(bert_model_mappings)]
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
         return mappings
 
     def init_weights(self, layer):

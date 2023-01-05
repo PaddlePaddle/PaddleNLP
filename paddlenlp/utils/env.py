@@ -59,3 +59,5 @@ LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
 PYTORCH_WEIGHT_FILE_NAME = "pytorch_model.bin"
 PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
+
+# for converter

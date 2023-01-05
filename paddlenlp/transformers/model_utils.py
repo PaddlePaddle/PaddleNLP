@@ -60,6 +60,7 @@ from paddlenlp.utils.env import (
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
+from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
     InitTrackerMeta,
@@ -201,7 +202,7 @@ class BackboneMixin:
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedModel(Layer, GenerationMixin):
+class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     """
     The base class for all pretrained models. It mainly provides common methods
     for loading (construction and loading) and saving pretrained models. Loading
@@ -1037,7 +1038,7 @@ class PretrainedModel(Layer, GenerationMixin):
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
             )
 
-            return resolve_weight_file_from_hf_hub(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
+            return resolve_weight_file_from_hf_hub(repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME)
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>", pretrained_model_name_or_path
@@ -1295,12 +1296,10 @@ class PretrainedModel(Layer, GenerationMixin):
         )
 
         if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
-            # avoid recursive imports
-            from paddlenlp.utils.converter import Convertible
-
-            if issubclass(cls, Convertible):
-                model_state_dict = cls.convert(cache_dir)
-            else:
+            try:
+                # try to get the name-mapping info
+                model_state_dict = cls.convert(model_weight_file, config.to_dict(), cache_dir)
+            except NotImplementedError:
                 raise ValueError(
                     f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> don't supported Convertiable"
                 )
