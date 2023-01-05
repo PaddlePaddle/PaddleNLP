@@ -83,8 +83,8 @@ dependencies {
 ```java
 public Predictor(); // 空构造函数，之后可以调用init初始化
 public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile);
-public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption,
-        int maxLength);
+public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption, int maxLength);
+public boolean init(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption, int maxLength);
 ```  
 
 - ERNIE Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
