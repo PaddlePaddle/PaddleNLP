@@ -15,6 +15,7 @@
 import argparse
 import os
 import random
+import shutil
 from collections import defaultdict
 from operator import itemgetter
 
@@ -34,6 +35,17 @@ URLS = {
         "https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/SimHei.ttf",
         "c9c9de86d3fa7c4af0d3f1269bb2dff2",
     ],
+}
+
+PROMPT_ITEMS = {
+    "aspect_prompt": "评价维度",
+    "opinion_prompt": "观点词",
+    "sentiment_prompt_prefix": "情感倾向",
+    "sentiment_prompt": "情感倾向[正向,负向,未提及]",
+    "separator": "##",
+    "not_mentioned_option": "未提及",
+    "positive_option": "正向",
+    "negative_option": "负向",
 }
 
 
@@ -439,23 +451,14 @@ class SentimentResult(object):
     load and analyze result of sentiment analysis.
     """
 
-    def __init__(
-        self,
-        file_path,
-        sentiment_prompt="情感倾向[正向,负向,未提及]",
-        not_mentioned_option="未提及",
-        positive_option="正向",
-        negative_option="负向",
-        opinion_prompt="观点词",
-        aspect_prompt="评价维度",
-    ):
+    def __init__(self, file_path):
         self.file_path = file_path
-        self.sentiment_prompt = sentiment_prompt
-        self.opinion_prompt = opinion_prompt
-        self.aspect_prompt = aspect_prompt
-        self.not_mentioned_option = not_mentioned_option
-        self.positive_option = positive_option
-        self.negative_option = negative_option
+        self.sentiment_prompt = PROMPT_ITEMS["sentiment_prompt"]
+        self.opinion_prompt = PROMPT_ITEMS["opinion_prompt"]
+        self.aspect_prompt = PROMPT_ITEMS["aspect_prompt"]
+        self.not_mentioned_option = PROMPT_ITEMS["not_mentioned_option"]
+        self.positive_option = PROMPT_ITEMS["positive_option"]
+        self.negative_option = PROMPT_ITEMS["negative_option"]
         # load the result of sentiment analysis
         self.results = self._load_sentiment_result(file_path)
         # define the parsing middle result for sentiment analysis
@@ -529,7 +532,7 @@ class SentimentResult(object):
                 self._parse_sentiment_polarity(sentiment)
             else:
                 raise ValueError(
-                    "Unknown key {} for sentiment analysis, you could try to map it with corresponding aspect_prompt, opinion_prompt or sentiment prompt.".format(
+                    "Unknown key {} for sentiment analysis, please check that you input the correct parameter task_type or set the correct configuration for aspect_prompt, opinion_prompt or sentiment prompt.".format(
                         key
                     )
                 )
@@ -545,38 +548,41 @@ class SentimentResult(object):
 
 
 def default_visual_analysis(args):
+    # checking generating environment
+    if os.path.exists(args.save_dir):
+        shutil.rmtree(args.save_dir)
+    os.makedirs(args.save_dir)
+    # update sentiment prompt according to task type
+    if args.task_type == "cls":
+        PROMPT_ITEMS["sentiment_prompt"] = PROMPT_ITEMS["sentiment_prompt_prefix"] + "[{},{}]".format(
+            PROMPT_ITEMS["positive_option"], PROMPT_ITEMS["negative_option"]
+        )
     # define sr to process the result of sentiment analysis
-    sr = SentimentResult(
-        args.file_path,
-        sentiment_prompt=args.sentiment_prompt,
-        not_mentioned_option=args.not_mentioned_option,
-        positive_option=args.positive_option,
-        negative_option=args.negative_option,
-        opinion_prompt=args.opinion_prompt,
-        aspect_prompt=args.aspect_prompt,
-    )
+    logger.info("Trying to parse sentiment analysis result: {}".format(args.file_path))
+    sr = SentimentResult(args.file_path)
     # define vs to visualize sentiment result
     vs = VisualSentiment(font_path=args.font_path)
+    logger.info("Start to generate visual images of sentiment analysis for you.")
     # visualize aspect with frequency
-    if sr.aspect_frequency:
+    if args.task_type == "ext" and sr.aspect_frequency:
         save_path = os.path.join(args.save_dir, "aspect_wc.png")
         vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="wordcloud")
         save_path = os.path.join(args.save_dir, "aspect_hist.png")
         vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histogram")
     # visualize opinion with frequency
-    if sr.opinion_frequency:
+    if args.task_type == "ext" and sr.opinion_frequency:
         save_path = os.path.join(args.save_dir, "opinion_wc.png")
         vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="wordcloud")
         save_path = os.path.join(args.save_dir, "opinion_hist.png")
         vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="histogram")
     # visualize aspect and opinion
-    if sr.aspect_opinion:
+    if args.task_type == "ext" and sr.aspect_opinion:
         save_path = os.path.join(args.save_dir, "aspect_opinion_wc.png")
         vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="wordcloud", sentiment="all")
         save_path = os.path.join(args.save_dir, "aspect_opinion_hist.png")
         vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram", sentiment="all", top_n=8)
     # visualize positive aspect and opinion
-    if sr.aspect_opinion_positives:
+    if args.task_type == "ext" and sr.aspect_opinion_positives:
         save_path = os.path.join(args.save_dir, "aspect_opinion_wc_pos.png")
         vs.plot_aspect_with_opinion(
             sr.aspect_opinion_positives, save_path, image_type="wordcloud", sentiment="positive"
@@ -586,7 +592,7 @@ def default_visual_analysis(args):
             sr.aspect_opinion_positives, save_path, image_type="histogram", sentiment="positive", top_n=8
         )
     # visualize negative aspect and opinion
-    if sr.aspect_opinion_negatives:
+    if args.task_type == "ext" and sr.aspect_opinion_negatives:
         save_path = os.path.join(args.save_dir, "aspect_opinion_wc_neg.png")
         vs.plot_aspect_with_opinion(
             sr.aspect_opinion_negatives, save_path, image_type="wordcloud", sentiment="negative"
@@ -596,7 +602,7 @@ def default_visual_analysis(args):
             sr.aspect_opinion_negatives, save_path, image_type="histogram", sentiment="negative", top_n=8
         )
     # visualize aspect and sentiment
-    if sr.aspect_sentiment:
+    if args.task_type == "ext" and sr.aspect_sentiment:
         save_path = os.path.join(args.save_dir, "aspect_sentiment_wc.png")
         vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="wordcloud")
         save_path = os.path.join(args.save_dir, "aspect_sentiment_hist.png")
@@ -604,11 +610,18 @@ def default_visual_analysis(args):
             sr.aspect_sentiment, save_path, image_type="histogram", top_n=15, descend_aspects=sr.descend_aspects
         )
     # visualize sentiment polarity for sentence
-    if sr.sentence_sentiment:
+    if args.task_type == "cls" and sr.sentence_sentiment:
         save_path = os.path.join(args.save_dir, "sentence_sentiment.png")
         vs.plot_sentence_sentiment(sr.sentence_sentiment, save_path)
 
-    logger.info("Visual images for sentiment analysis has been saved to: {}".format(args.save_dir))
+    if not os.listdir(args.save_dir):
+        logger.info(
+            "Nothing generated for task {}, please check that you input the correct parameter task_type or the result of sentiment analysis.".format(
+                args.task_type
+            )
+        )
+    else:
+        logger.info("Visual images for sentiment analysis has been saved to: {}".format(args.save_dir))
 
 
 if __name__ == "__main__":
@@ -617,17 +630,9 @@ if __name__ == "__main__":
     parser.add_argument("--file_path", required=True, type=str, help="The result path of sentiment analysis.")
     parser.add_argument("--save_dir", default="./images", type=str, help="The saving path of images.")
     parser.add_argument("--font_path", default=None, type=str, help="The font Path for showing Chinese in wordcloud.")
-    parser.add_argument("--sentiment_prompt", default="情感倾向[正向,负向,未提及]", type=str, help="The prompt for sentiment polarity prediction in the result of sentiment analysis.")
-    parser.add_argument("--opinion_prompt", default="观点词", type=str, help="The prompt for opinion prediction in the result of sentiment analysis.")
-    parser.add_argument("--aspect_prompt", default="评价维度", type=str, help="The prompt for aspect prediction in the result of sentiment analysis.")
-    parser.add_argument("--not_mentioned_option", default="未提及", type=str, help="The not mentioned option name for sentiment polarity prediction.")
-    parser.add_argument("--positive_option", default="正向", type=str, help="The positive option name of  for sentiment polarity prediction.")
-    parser.add_argument("--negative_option", default="负向", type=str, help="The negative option name  for sentiment polarity prediction.")
+    parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Two task types [ext, cls] are supported, ext represents the aspect-based extraction task and cls represents the sentence-level classification task, defaults to ext.")
 
     args = parser.parse_args()
     # ypdf: enable
-
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
 
     default_visual_analysis(args)
