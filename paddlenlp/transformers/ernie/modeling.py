@@ -1292,7 +1292,6 @@ class UTC(ErniePretrainedModel):
         omask_positions,
         cls_positions,
         inputs_embeds: Optional[Tensor] = None,
-        labels: Optional[Tensor] = None,
         output_hidden_states: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         return_dict: Optional[bool] = None,
@@ -1344,11 +1343,6 @@ class UTC(ErniePretrainedModel):
             option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
 
         loss = None
-        if labels is not None:
-            option_logits = option_logits[omask_positions > 0]
-            labels = labels[omask_positions > 0]
-            loss = paddle.nn.functional.binary_cross_entropy_with_logits(option_logits, labels)
-
         if not return_dict:
             output = (option_logits,)
             if output_hidden_states:

@@ -64,7 +64,7 @@ def main():
 
     # Load and preprocess dataset.
     if data_args.test_path is not None:
-        test_ds = load_dataset(read_local_dataset, data_path=data_args.test_path, is_test=True, lazy=False)
+        test_ds = load_dataset(read_local_dataset, data_path=data_args.test_path, lazy=False)
 
     # Initialize the prompt model.
     prompt_model = PromptModelForSequenceClassification(

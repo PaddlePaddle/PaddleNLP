@@ -43,7 +43,7 @@ def read_local_dataset(data_path, data_file=None, is_test=False):
                     continue
                 if "text_b" not in example:
                     example["text_b"] = ""
-                if not is_test:
+                if not is_test or "labels" in example:
                     if not isinstance(example["labels"], list):
                         example["labels"] = [example["labels"]]
                     one_hots = np.zeros(len(example["choices"]), dtype="float32")
@@ -65,9 +65,9 @@ class UTCLoss(object):
         return self.forward(logit, label)
 
     def forward(self, logit, label):
-        logit = (1 - 2 * label) * logit
+        logit = (1.0 - 2.0 * label) * logit
         logit_neg = logit - label * 1e12
-        logit_pos = logit - (1 - label) * 1e12
+        logit_pos = logit - (1.0 - label) * 1e12
         zeros = paddle.zeros_like(logit[..., :1])
         logit_neg = paddle.concat([logit_neg, zeros], axis=-1)
         logit_pos = paddle.concat([logit_pos, zeros], axis=-1)
