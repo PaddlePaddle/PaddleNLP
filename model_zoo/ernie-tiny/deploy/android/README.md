@@ -35,8 +35,8 @@
 > **注意：**
 >> 如果您在导入项目、编译或者运行过程中遇到 NDK 配置错误的提示，请打开 ` File > Project Structure > SDK Location`，修改 `Andriod NDK location` 为您本机配置的 NDK 所在路径。本工程默认使用的NDK版本为20.
 >> 如果您是通过 Andriod Studio 的 SDK Tools 下载的 NDK (见本章节"环境准备")，可以直接点击下拉框选择默认路径。
->> 还有一种 NDK 配置方法，你可以在 `java/android/local.properties` 文件中手动完成 NDK 路径配置，如下图所示
->> 如果以上步骤仍旧无法解决 NDK 配置错误，请尝试根据 Andriod Studio 官方文档中的[更新 Android Gradle 插件](https://developer.android.com/studio/releases/gradle-plugin?hl=zh-cn#updating-plugin)章节，尝试更新Android Gradle plugin版本。
+>> 还有一种 NDK 配置方法，你可以在 `local.properties` 文件中手动完成 NDK 路径配置，如下图所示
+>> 如果以上步骤仍旧无法解决 NDK 配置错误，请尝试根据 Android Studio 官方文档中的[更新 Android Gradle 插件](https://developer.android.com/studio/releases/gradle-plugin?hl=zh-cn#updating-plugin)章节，尝试更新Android Gradle plugin版本。
 
 
 4. 点击 Run 按钮，自动编译 APP 并安装到手机。(该过程会自动下载预编译的 FastDeploy Android 库 以及 模型文件，需要联网)
@@ -44,7 +44,7 @@
 
 | APP 效果 | APP 演示 | APP设置项 |
   | ---     | --- | --- |
-| <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737269-0fe175c9-7b87-40b3-8249-1c6378e4a5e9.jpg">  | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737041-0e79bd6b-90a8-42b0-8f66-97868386d9f3.gif"> | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/197332983-afbfa6d5-4a3b-4c54-a528-4a3e58441be1.jpg"> |  
+| <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737269-0fe175c9-7b87-40b3-8249-1c6378e4a5e9.jpg">  | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737041-0e79bd6b-90a8-42b0-8f66-97868386d9f3.gif"> | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210774693-b199734c-442c-48ef-90ea-4d2e72ff7304.jpg"> |  
 
 ## ERNIE Tiny Java SDK 说明和使用
 
