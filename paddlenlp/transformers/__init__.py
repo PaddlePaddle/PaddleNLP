@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -38,6 +39,7 @@ from .bert.configuration import *
 # isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
+from .gpt.configuration import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
