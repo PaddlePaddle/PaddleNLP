@@ -40,7 +40,7 @@ PROMPT_ITEMS = {
     "sentiment_prompt_prefix": "情感倾向",
     "separator": "##",
     "not_mentioned_option": "未提及",
-    "postive_option": "正向",
+    "positive_option": "正向",
     "negative_option": "负向",
 }
 
@@ -610,12 +610,12 @@ def do_convert():
     else:
         if args.task_type == "ext":
             PROMPT_ITEMS["options"] = [
-                PROMPT_ITEMS["postive_option"],
+                PROMPT_ITEMS["positive_option"],
                 PROMPT_ITEMS["negative_option"],
                 PROMPT_ITEMS["not_mentioned_option"],
             ]
         else:
-            PROMPT_ITEMS["options"] = [PROMPT_ITEMS["postive_option"], PROMPT_ITEMS["negative_option"]]
+            PROMPT_ITEMS["options"] = [PROMPT_ITEMS["positive_option"], PROMPT_ITEMS["negative_option"]]
 
     # analyze detailed ext task type: ext_a, ext_o, ext_as, ext_ao, ext_aso
     if args.task_type == "ext":
