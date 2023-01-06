@@ -743,7 +743,10 @@ class Converter(ConversionMixin, LogitComparer):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        logger.warning("Converter will be deprecated soon.")
+        logger.warning(
+            "`paddlenlp.utils.converter` module will be deprecated soon, you "
+            "should change it to `paddlenlp.transformers.conversion_utils`"
+        )
 
     @classmethod
     def resolve_num_layer(cls, config_or_num_layers: Union[dict, int] = None) -> int:

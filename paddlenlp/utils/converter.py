@@ -14,11 +14,5 @@
 
 from __future__ import annotations
 
+# FIXME(wj-Mcat): this converter will be deprecated after V2.5.2
 from paddlenlp.transformers.conversion_utils import *  # noqa: F401, F403
-
-from .log import logger
-
-logger.warning(
-    "`paddlenlp.utils.converter` module will be deprecated soon, you "
-    "should change it to `paddlenlp.transformers.conversion_utils`"
-)
