@@ -17,6 +17,12 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+if [ -f "model_logs/" ];then 
+    mkdir model_logs
+fi
+if [ -f "unittest_logs/" ];then 
+    mkdir unittest_logs
+fi
 print_info(){
 if [ $1 -ne 0 ];then
     if [[ $2 =~ 'tests' ]];then
@@ -223,6 +229,54 @@ time (python -u ./run_pretrain.py \
     --device gpu >${log_path}/electra_pretrain) >>${log_path}/electra_pretrain 2>&1
 print_info $? electra_pretrain
 }
+fast_gpt(){
+# FT
+cd ${nlp_dir}/
+export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
+wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+tar -zxf paddle_inference.tgz
+cd ${nlp_dir}/paddlenlp/ops
+export CC=/usr/local/gcc-8.2/bin/gcc
+export CXX=/usr/local/gcc-8.2/bin/g++
+#python
+mkdir build_gpt_so
+cd build_gpt_so/
+cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ON
+make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
+print_info $? gpt_python_FT
+cd ../
+#c++
+mkdir build_gpt_cc
+cd build_gpt_cc/
+cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/gpt.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
+print_info $? gpt_C_FT
+#depoly python
+cd ${nlp_dir}/model_zoo/gpt/fast_gpt/
+python infer.py \
+    --model_name_or_path gpt2-medium-en \
+    --batch_size 1 \
+    --topk 4 \
+    --topp 0.0 \
+    --max_length 32 \
+    --start_token "<|endoftext|>" \
+    --end_token "<|endoftext|>" \
+    --temperature 1.0  >${log_path}/gpt_deploy_P_FT >>${log_path}/gpt_deploy_P_FT 2>&1
+print_info $? gpt_deploy_P_FT
+#depoly C++
+python export_model.py \
+    --model_name_or_path gpt2-medium-en \
+    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_gpt_so/lib/libdecoding_op.so \
+    --topk 4 \
+    --topp 0.0 \
+    --max_out_len 32 \
+    --temperature 1.0 \
+    --inference_model_dir ./infer_model/
+mv infer_model/ ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
+cd ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
+./gpt -batch_size 1 -gpu_id 0 -model_dir ./infer_model -vocab_file ./infer_model/vocab.txt -start_token "<|endoftext|>" -end_token "<|endoftext|>"  >${log_path}/gpt_deploy_C_FT >>${log_path}/gpt_deploy_C_FT 2>&1
+print_info $? gpt_deploy_C_FT
+}
 # 8 gpt
 gpt(){
 if [ ! -f 'test.py' ];then
@@ -271,52 +325,8 @@ else
     pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
     print_info $? gpt
 fi
-# FT
-# cd ${nlp_dir}/
-# export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-# wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
-# tar -zxf paddle_inference.tgz
-# cd ${nlp_dir}/paddlenlp/ops
-# export CC=/usr/local/gcc-8.2/bin/gcc
-# export CXX=/usr/local/gcc-8.2/bin/g++
-# #python
-# mkdir build_gpt_so
-# cd build_gpt_so/
-# cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python -DWITH_GPT=ONcd
-# make -j >${log_path}/GPT_python_FT >>${log_path}/gpt_python_FT 2>&1
-# print_info $? gpt_python_FT
-# cd ../
-# #c++
-# mkdir build_gpt_cc
-# cd build_gpt_cc/
-# cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference/ -DDEMO=${nlp_dir}/paddlenlp/ops/faster_transformer/src/demo/gpt.cc -DON_INFER=ON -DWITH_MKL=ON
-# make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
-# print_info $? gpt_C_FT
-# #depoly python
-# cd ${nlp_dir}/model_zoo/gpt/faster_gpt/
-# python infer.py \
-#     --model_name_or_path gpt2-medium-en \
-#     --batch_size 1 \
-#     --topk 4 \
-#     --topp 0.0 \
-#     --max_length 32 \
-#     --start_token "<|endoftext|>" \
-#     --end_token "<|endoftext|>" \
-#     --temperature 1.0  >${log_path}/gpt_deploy_P_FT >>${log_path}/gpt_deploy_P_FT 2>&1
-# print_info $? gpt_deploy_P_FT
-# #depoly C++
-# python export_model.py \
-#     --model_name_or_path gpt2-medium-en \
-#     --decoding_lib ${nlp_dir}/paddlenlp/ops/build_gpt_so/lib/libdecoding_op.so \
-#     --topk 4 \
-#     --topp 0.0 \
-#     --max_out_len 32 \
-#     --temperature 1.0 \
-#     --inference_model_dir ./infer_model/
-# mv infer_model/ ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-# cd ${nlp_dir}/paddlenlp/ops/build_gpt_cc/bin/
-# ./gpt -batch_size 1 -gpu_id 0 -model_dir ./infer_model -vocab_file ./infer_model/vocab.txt -start_token "<|endoftext|>" -end_token "<|endoftext|>"  >${log_path}/gpt_deploy_C_FT >>${log_path}/gpt_deploy_C_FT 2>&1
-# print_info $? gpt_deploy_C_FT
+
+fast_gpt
 }
 # 9 ernie-1.0
 ernie-1.0 (){
@@ -714,6 +724,66 @@ sed -i 's#init_from_params: "trained_models/step_final/"#init_from_params: "./tr
 python predict.py --config ./config/transformer.yaml >${log_path}/stacl_predict) >>${log_path}/stacl_predict 2>&1
 print_info $? stacl_predict
 }
+fast_transformer(){
+# FT
+cd ${nlp_dir}/
+export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
+wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
+tar -zxf paddle_inference.tgz
+export CC=/usr/local/gcc-8.2/bin/gcc
+export CXX=/usr/local/gcc-8.2/bin/g++
+cd ${nlp_dir}/paddlenlp/ops
+#python op
+mkdir build_tr_so
+cd build_tr_so/
+cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python
+make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
+print_info $? transformer_python_FT
+cd ../
+#C++ op
+mkdir build_tr_cc
+cd build_tr_cc/
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+make -j >${log_path}/transformer_C_FT >>${log_path}/transformer_C_FT 2>&1
+print_info $? transformer_C_FT
+#deploy python
+cd ${nlp_dir}/examples/machine_translation/transformer/fast_transformer/
+sed -i "s#./trained_models/step_final/#./base_trained_models/step_final/#g" ../configs/transformer.base.yaml
+wget -q https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
+tar -zxf transformer-base-wmt_ende_bpe.tar.gz
+export FLAGS_fraction_of_gpu_memory_to_use=0.1
+cp -rf ${nlp_dir}/paddlenlp/ops/build_tr_so/third-party/build/fastertransformer/bin/decoding_gemm ./
+./decoding_gemm 8 4 8 64 38512 32 512 0
+#beam_search
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
+    --decoding_strategy beam_search \
+    --beam_size 5 >${log_path}/transformer_deploy_P_FT >>${log_path}/transformer_deploy_P_FT 2>&1
+print_info $? transformer_deploy_P_FT
+#topk
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
+    --decoding_strategy topk_sampling \
+    --topk 3 >topk.log
+#topp
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
+    --decoding_strategy topp_sampling \
+    --topk 0 \
+    --topp 0.1 >topp.log
+#deploy c++
+python export_model.py  \
+    --config ../configs/transformer.base.yaml  \
+    --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so   \
+    --decoding_strategy beam_search --beam_size 5
+./decoding_gemm 8 5 8 64 38512 256 512 0
+${nlp_dir}/paddlenlp/ops/build_tr_cc/bin/./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_file ${PPNLP_HOME}/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 \
+-data_file ${PPNLP_HOME}/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en  >${log_path}/transformer_deploy_C_FT >>${log_path}/transformer_deploy_C_FT 2>&1
+print_info $? transformer_deploy_C_FT
+}
 # 22 transformer
 transformer (){
 cd ${nlp_dir}/examples/machine_translation/transformer/
@@ -755,64 +825,8 @@ python ./deploy/python/inference.py --config ./configs/transformer.base.yaml \
     --vocab_file ${PWD}/WMT14.en-de.partial/vocab_all.bpe.33708 \
     --unk_token "<unk>" --bos_token "<s>" --eos_token "<e>" >${log_path}/transformer_infer) >>${log_path}/transformer_infer 2>&1
 print_info $? transformer_infer
-# FT
-# cd ${nlp_dir}/
-# export PYTHONPATH=$PWD/PaddleNLP/:$PYTHONPATH
-# wget -q https://paddle-inference-lib.bj.bcebos.com/2.4.0/cxx_c/Linux/GPU/x86-64_gcc8.2_avx_mkl_cuda10.2_cudnn8.1.1_trt7.2.3.4/paddle_inference.tgz
-# tar -zxf paddle_inference.tgz
-# export CC=/usr/local/gcc-8.2/bin/gcc
-# export CXX=/usr/local/gcc-8.2/bin/g++
-# cd ${nlp_dir}/paddlenlp/ops
-# #python op
-# mkdir build_tr_so
-# cd build_tr_so/
-# cmake ..  -DCMAKE_BUILD_TYPE=Release -DPY_CMD=python
-# make -j >${log_path}/transformer_python_FT >>${log_path}/transformer_python_FT 2>&1
-# print_info $? transformer_python_FT
-# cd ../
-# #C++ op
-# mkdir build_tr_cc
-# cd build_tr_cc/
-# cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
-# make -j >${log_path}/transformer_C_FT >>${log_path}/transformer_C_FT 2>&1
-# print_info $? transformer_C_FT
-# #deploy python
-# cd ${nlp_dir}/examples/machine_translation/transformer/faster_transformer/
-# sed -i "s#./trained_models/step_final/#./base_trained_models/step_final/#g" ../configs/transformer.base.yaml
-# wget -q https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
-# tar -zxf transformer-base-wmt_ende_bpe.tar.gz
-# export FLAGS_fraction_of_gpu_memory_to_use=0.1
-# cp -rf ${nlp_dir}/paddlenlp/ops/build_tr_so/third-party/build/fastertransformer/bin/decoding_gemm ./
-# ./decoding_gemm 8 4 8 64 38512 32 512 0
-# #beam_search
-# python encoder_decoding_predict.py \
-#     --config ../configs/transformer.base.yaml \
-#     --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
-#     --decoding_strategy beam_search \
-#     --beam_size 5 >${log_path}/transformer_deploy_P_FT >>${log_path}/transformer_deploy_P_FT 2>&1
-# print_info $? transformer_deploy_P_FT
-# #topk
-# python encoder_decoding_predict.py \
-#     --config ../configs/transformer.base.yaml \
-#     --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
-#     --decoding_strategy topk_sampling \
-#     --topk 3 >topk.log
-# #topp
-# python encoder_decoding_predict.py \
-#     --config ../configs/transformer.base.yaml \
-#     --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so \
-#     --decoding_strategy topp_sampling \
-#     --topk 0 \
-#     --topp 0.1 >topp.log
-# #deploy c++
-# python export_model.py  \
-#     --config ../configs/transformer.base.yaml  \
-#     --decoding_lib ${nlp_dir}/paddlenlp/ops/build_tr_so/lib/libdecoding_op.so   \
-#     --decoding_strategy beam_search --beam_size 5
-# ./decoding_gemm 8 5 8 64 38512 256 512 0
-# ${nlp_dir}/paddlenlp/ops/build_tr_cc/bin/./transformer_e2e -batch_size 8 -gpu_id 0 -model_dir ./infer_model/ -vocab_file ${PPNLP_HOME}/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/vocab_all.bpe.33708 \
-# -data_file ${PPNLP_HOME}/datasets/WMT14ende/WMT14.en-de/wmt14_ende_data_bpe/newstest2014.tok.bpe.33708.en  >${log_path}/transformer_deploy_C_FT >>${log_path}/transformer_deploy_C_FT 2>&1
-# print_info $? transformer_deploy_C_FT
+
+fast_transformer
 }
 # 23 pet
 pet (){
@@ -1104,6 +1118,15 @@ print_info $? fast_generation_t5
 cd ${nlp_dir}/paddlenlp/ops/fast_transformer/sample/
 python bart_decoding_sample.py >${log_path}/fast_generation_bart >>${log_path}/fast_generation_bart 2>&1
 print_info $? fast_generation_bart
+
+python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+print_info $? t5_export_model_sample
+
+python t5_export_model_sample.py >${log_path}/t5_export_model_sample >>${log_path}/t5_export_model_sample 2>&1
+print_info $? t5_export_model_sample
+
+fast_gpt
+fast_transformer
 }
 ernie-3.0(){
 cd ${nlp_dir}/model_zoo/ernie-3.0/
