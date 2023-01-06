@@ -17,6 +17,12 @@ export nlp_dir=${PWD}
 export log_path=${nlp_dir}/model_logs
 export cudaid1=$2
 export cudaid2=$3
+if [ -f "model_logs/" ];then 
+    mkdir model_logs
+fi
+if [ -f "unittest_logs/" ];then 
+    mkdir unittest_logs
+fi
 print_info(){
 if [ $1 -ne 0 ];then
     if [[ $2 =~ 'tests' ]];then
@@ -246,7 +252,7 @@ cmake ..  -DWITH_GPT=ON -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddl
 make -j >${log_path}/GPT_C_FT >>${log_path}/gpt_C_FT 2>&1
 print_info $? gpt_C_FT
 #depoly python
-cd ${nlp_dir}/model_zoo/gpt/faster_gpt/
+cd ${nlp_dir}/model_zoo/gpt/fast_gpt/
 python infer.py \
     --model_name_or_path gpt2-medium-en \
     --batch_size 1 \
@@ -737,11 +743,11 @@ cd ../
 #C++ op
 mkdir build_tr_cc
 cd build_tr_cc/
-cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/faster_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
+cmake .. -DCMAKE_BUILD_TYPE=Release -DPADDLE_LIB=${nlp_dir}/paddle_inference -DDEMO=${nlp_dir}/paddlenlp/ops/fast_transformer/src/demo/transformer_e2e.cc -DON_INFER=ON -DWITH_MKL=ON -DWITH_ONNXRUNTIME=ON
 make -j >${log_path}/transformer_C_FT >>${log_path}/transformer_C_FT 2>&1
 print_info $? transformer_C_FT
 #deploy python
-cd ${nlp_dir}/examples/machine_translation/transformer/faster_transformer/
+cd ${nlp_dir}/examples/machine_translation/transformer/fast_transformer/
 sed -i "s#./trained_models/step_final/#./base_trained_models/step_final/#g" ../configs/transformer.base.yaml
 wget -q https://paddlenlp.bj.bcebos.com/models/transformers/transformer/transformer-base-wmt_ende_bpe.tar.gz
 tar -zxf transformer-base-wmt_ende_bpe.tar.gz
