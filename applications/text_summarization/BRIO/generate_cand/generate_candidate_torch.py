@@ -17,8 +17,9 @@ import json
 from typing import List
 
 import torch
-from tokenizers_pegasus import PegasusTokenizer
 from transformers import PegasusForConditionalGeneration
+
+from paddlenlp.transformers import PegasusChineseTokenizer
 
 
 def generate_summaries(args):
@@ -27,7 +28,7 @@ def generate_summaries(args):
     model = PegasusForConditionalGeneration.from_pretrained(mname)
     model = model.to(device)
     model.eval()
-    tok = PegasusTokenizer.from_pretrained(mname)
+    tok = PegasusChineseTokenizer.from_pretrained(mname)
     bsz = 16
     with open(args.src_dir) as source, open(args.tgt_dir, "w") as fout:
         data = source.readlines()
@@ -76,11 +77,10 @@ def generate_summaries(args):
 
 
 if __name__ == "__main__":
-    split = "test"
     parser = argparse.ArgumentParser(description="Parameters")
-    parser.add_argument("--gpuid", type=int, default=7, help="gpu id")
-    parser.add_argument("--src_dir", type=str, default=f"../data/{split}.json", help="source file")
-    parser.add_argument("--tgt_dir", type=str, default=f"../data_cand/{split}.out", help="target file")
+    parser.add_argument("--gpuid", type=int, default=0, help="gpu id")
+    parser.add_argument("--src_dir", type=str, default="../data/train.json", help="source file")
+    parser.add_argument("--tgt_dir", type=str, default="../data_cand/train.out", help="target file")
     args = parser.parse_args()
 
     generate_summaries(args)

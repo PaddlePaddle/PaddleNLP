@@ -18,12 +18,11 @@ import os
 from multiprocessing import Pool
 
 from nltk import sent_tokenize
-
-# from compare_mt.rouge.rouge_scorer import RougeScorer
 from rouge import Rouge
 from tqdm import tqdm
 
-# all_scorer = RougeScorer(['rouge1', 'rouge2', 'rougeLsum'], use_stemmer=True)
+from paddlenlp.transformers import PegasusChineseTokenizer
+
 rouge = Rouge()
 
 
@@ -35,6 +34,58 @@ def compute_rouge(target, pred):
         rouge1, rouge2, rougel = 0, 0, 0
 
     return (rouge1 + rouge2 + rougel) / 3
+
+
+def data_reformat(args):
+    split = args.split
+    tokenizer = PegasusChineseTokenizer.from_pretrained("IDEA-CCNL/Randeng-Pegasus-238M-Summary-Chinese")
+    print("start reformat!")
+    print("need file: data/split.json and data_cand/split.out")
+    with open(f"data/{split}.json") as fin, open(f"data_cand/{split}.source", "w") as fout1, open(
+        f"data_cand/{split}.target", "w"
+    ) as fout2, open(f"data_cand/{split}.source.tokenized", "w") as fout3, open(
+        f"data_cand/{split}.target.tokenized", "w"
+    ) as fout4:
+        datas = fin.readlines()
+        source = []
+        source_tok = []
+        target = []
+        target_tok = []
+        for i, line in enumerate(datas):
+            if i % 10000 == 0:
+                print(i)
+            data = json.loads(line)
+            source.append(data["content"])
+            source_tok.append(tokenizer.tokenize(data["content"]))
+            target.append(data["title"])
+            target_tok.append(tokenizer.tokenize(data["title"]))
+
+        for src in source:
+            fout1.write(src + "\n")
+            fout1.flush()
+
+        for tgt in target:
+            fout2.write(tgt + "\n")
+            fout2.flush()
+
+        for src_tok in source_tok:
+            fout3.write(" ".join(src_tok) + "\n")
+            fout3.flush()
+
+        for tgt_tok in target_tok:
+            fout4.write(" ".join(tgt_tok) + "\n")
+            fout4.flush()
+
+    with open(f"data_cand/{split}.out") as i, open(f"data_cand/{split}.out.tokenized", "w") as o:
+        lines = i.readlines()
+        out_tok = []
+        for line in lines:
+            out_tok.append(tokenizer.tokenize(line))
+        for o_tok in out_tok:
+            o.write(" ".join(o_tok) + "\n")
+            o.flush()
+    print("reformat finish!")
+    print("data saved in data_cand/")
 
 
 def collect_diverse_beam_data(args):
@@ -99,17 +150,6 @@ def build_diverse_beam(input):
     abstract = sent_tokenize(tgt_line)
     _abstract = "\n".join(abstract)
     article = sent_tokenize(src_line)
-
-    # if dataset == "xsum":
-    #     def compute_rouge(hyp):
-    #         score = all_scorer.score(_abstract, "\n".join(hyp))
-    #         return 2 * score["rouge1"].fmeasure * score["rouge2"].fmeasure / (
-    #                     score["rouge1"].fmeasure + score["rouge2"].fmeasure)
-    # else:
-    #     def compute_rouge(hyp):
-    #         # hyp = ' '.join(hyp)
-    #         score = all_scorer.score(_abstract, " ".join(hyp))
-    #         return (score["rouge1"].fmeasure + score["rouge2"].fmeasure + score["rougeLsum"].fmeasure) / 3
     if [] in cands:
         not_none_cand = ""
         none_idxs = []
@@ -139,6 +179,7 @@ def build_diverse_beam(input):
 
 
 def make_diverse_beam_data(args):
+    print("start make diverse data")
     with open(os.path.join(args.src_dir, f"{args.split}.source")) as f:
         num = sum(1 for _ in f)
     data = collect_diverse_beam_data(args)
@@ -146,6 +187,7 @@ def make_diverse_beam_data(args):
         for _ in tqdm(pool.imap_unordered(build_diverse_beam, data), total=num):
             pass
     print("finish")
+    print("data saved in data/diverse/split/")
 
 
 if __name__ == "__main__":
@@ -157,4 +199,5 @@ if __name__ == "__main__":
     parser.add_argument("--dataset", type=str, default="cnndm", help="Dataset")
     parser.add_argument("-l", "--lower", action="store_true", help="Lowercase")
     args = parser.parse_args()
+    data_reformat(args)
     make_diverse_beam_data(args)

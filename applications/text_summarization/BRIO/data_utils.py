@@ -21,12 +21,6 @@ from paddle.io import Dataset
 from paddlenlp.transformers import PegasusChineseTokenizer
 
 
-def to_cuda(batch, gpuid):
-    for n in batch:
-        if n != "data":
-            batch[n] = batch[n].to(gpuid)
-
-
 class BrioDataset(Dataset):
     def __init__(
         self,
@@ -108,9 +102,6 @@ class BrioDataset(Dataset):
             padding=True,
         )
         candidate_ids = cand["input_ids"]
-
-        # add start token
-        # _candidate_ids = candidate_ids.new_zeros(candidate_ids.size(0), candidate_ids.size(1) + 1)
         _candidate_ids = paddle.zeros(
             shape=[candidate_ids.shape[0], candidate_ids.shape[1] + 1], dtype=candidate_ids.dtype
         )
@@ -133,12 +124,13 @@ def collate_mp_brio(batch, pad_token_id, is_test=False):
             max_len = max(x.shape[0] for x in X)
         result = paddle.ones([len(X), max_len], dtype=X[0].dtype) * pad_token_id
         for (i, x) in enumerate(X):
-            result[i, : x.shape[0]] = x
+            target_len = min(max_len, x.shape[0])
+            result[i, :target_len] = x[:target_len]
         return result
 
     src_input_ids = pad([x["src_input_ids"] for x in batch])
     candidate_ids = [x["candidate_ids"] for x in batch]
-    max_len = max([max([len(c) for c in x]) for x in candidate_ids])
+    max_len = min(24, max([max([len(c) for c in x]) for x in candidate_ids]))
     candidate_ids = [pad(x, max_len) for x in candidate_ids]
     candidate_ids = paddle.stack(candidate_ids)
     if is_test:
