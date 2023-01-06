@@ -173,8 +173,9 @@ class Task(metaclass=abc.ABCMeta):
             self._config.enable_mkldnn()
         else:
             self._config.enable_use_gpu(100, self.kwargs["device_id"])
-            # TODO(linjieccc): enable embedding_eltwise_layernorm_fuse_pass after fixed
+            # TODO(linjieccc): enable after fixed
             self._config.delete_pass("embedding_eltwise_layernorm_fuse_pass")
+            self._config.delete_pass("fused_multi_transformer_encoder_pass")
         self._config.set_cpu_math_library_num_threads(self._num_threads)
         self._config.switch_use_feed_fetch_ops(False)
         self._config.disable_glog_info()

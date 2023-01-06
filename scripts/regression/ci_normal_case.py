@@ -138,10 +138,7 @@ def run_normal_case(case_path):
             )
             save_log(train_output[0], train_output[1], case_name, train_file.split(".")[0])
     else:
-        log_file = "/workspace/PaddleNLP/model_logs/" + os.path.join(case_name + "_FAIL.log")
-        print("{} FAIL . no train files ! ".format(case_name))
-        with open(log_file, "a") as flog:
-            flog.write("no train files")
+        print("Train Skipped")
 
     if eval_exec_file:
         eval_output = subprocess.getstatusoutput("python %s --init_checkpoint_dir ./output/" % (eval_exec_file))

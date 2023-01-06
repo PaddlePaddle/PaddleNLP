@@ -35,10 +35,10 @@ declare -A Normal_dic
 declare -A all_P0case_dic
 declare -A Build_list
 all_P0case_dic=(["waybill_ie"]=3 ["msra_ner"]=15 ["glue"]=2 ["bert"]=2 ["skep"]=10 ["bigbird"]=2 ["electra"]=2  ["gpt"]=2 ["ernie-1.0"]=2 ["xlnet"]=2 \
- ["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
-  ["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
-  ["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 ["transformers"]=20 \
-  ["fast_generation"]=10)
+["ofa"]=2 ["albert"]=2   ["SQuAD"]=20 ["tinybert"]=5 ["lexical_analysis"]=5 ["seq2seq"]=5 ["word_embedding"]=5 \
+["ernie-ctm"]=5 ["distilbert"]=5  ["stacl"]=5 ["transformer"]=5 ["pet"]=5 ["efl"]=5 ["p-tuning"]=5 ["simbert"]=5 ["ernie-doc"]=20 ["transformer-xl"]=5 \
+["pointer_summarizer"]=5 ["question_matching"]=5 ["ernie-csc"]=5 ["nptag"]=5 ["ernie-m"]=5 ["taskflow"]=5 ["clue"]=5 ["textcnn"]=5 ["transformers"]=20 \
+["fast_generation"]=10 ["ernie-3.0"]=5 ["ernie-layout"]=5 ["uie"]=5 ["ernie-health"]=5)
 ####################################
 # set python env
 case ${python} in
@@ -145,12 +145,14 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
     elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
-            # P0case_list[${#P0case_list[*]}]=bert
-            # P0case_list[${#P0case_list[*]}]=gpt
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
+        elif [[ ${dir2} =~ "taskflow" ]];then
+            P0case_list[${#P0case_list[*]}]=taskflow
+        elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
+             P0case_list[${#P0case_list[*]}]=fast_generation
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级
@@ -180,9 +182,6 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
         fi
-    elif [[ ${dir1} =~ "fast_tokenizer" ]] || [[ ${dir1} =~ "fast_generation" ]] ;then #影响编包
-        Build_list[${dir1}]="paddlenlp" # 影响编包
-        P0case_list[${#P0case_list[*]}]=fast_generation
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
     elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包

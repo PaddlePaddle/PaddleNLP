@@ -47,16 +47,21 @@ from paddlenlp.utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
     download_check,
     get_path_from_url_with_filelock,
+    hf_file_exists,
+    url_file_exists,
 )
 from paddlenlp.utils.env import (
     CONFIG_NAME,
+    ENABLE_TORCH_CHECKPOINT,
     HF_CACHE_HOME,
     LEGACY_CONFIG_NAME,
     MODEL_HOME,
+    PYTORCH_WEIGHT_FILE_NAME,
 )
 from paddlenlp.utils.log import logger
 
 from .configuration_utils import PretrainedConfig
+from .conversion_utils import ConversionMixin
 from .generation_utils import GenerationMixin
 from .utils import (
     InitTrackerMeta,
@@ -137,6 +142,35 @@ def _find_weight_file_path(
     )
 
 
+def resolve_weight_file_from_hf_hub(repo_id: str, cache_dir: str, support_conversion: bool):
+    """find the suitable weight file name
+
+    Args:
+        repo_id (str): repo name of huggingface hub
+        cache_dir (str): cache dir for hf
+        support_conversion (bool): whether support converting pytorch weight file to paddle weight file
+    """
+    if hf_file_exists(repo_id, "model_state.pdparams"):
+        file_name = "model_state.pdparams"
+    elif hf_file_exists(repo_id, PYTORCH_WEIGHT_FILE_NAME):
+        if not support_conversion:
+            raise EntryNotFoundError(
+                f"can not download `model_state.pdparams from https://huggingface.co/{repo_id}` "
+                "and current model doesn't support conversion from pytorch weight file to paddle weight file"
+            )
+        file_name = PYTORCH_WEIGHT_FILE_NAME
+    else:
+        raise EntryNotFoundError(f"can not find the paddle/pytorch weight file from: https://huggingface.co/{repo_id}")
+
+    return hf_hub_download(
+        repo_id=repo_id,
+        filename=file_name,
+        cache_dir=cache_dir,
+        library_name="PaddleNLP",
+        library_version=__version__,
+    )
+
+
 def register_base_model(cls):
     """
     A decorator for `PretrainedModel` class. It first retrieves the parent class
@@ -176,7 +210,7 @@ class BackboneMixin:
 
 
 @six.add_metaclass(InitTrackerMeta)
-class PretrainedModel(Layer, GenerationMixin):
+class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
     """
     The base class for all pretrained models. It mainly provides common methods
     for loading (construction and loading) and saving pretrained models. Loading
@@ -912,7 +946,8 @@ class PretrainedModel(Layer, GenerationMixin):
         cls: Type[PretrainedModel],
         pretrained_model_name_or_path: str,
         from_hf_hub: bool = False,
-        cache_dir: Optional[str] = None,
+        cache_dir: str | None = None,
+        support_conversion: bool = False,
     ) -> str:
         """resolve model target file path from `` and `cache_dir`
 
@@ -933,6 +968,7 @@ class PretrainedModel(Layer, GenerationMixin):
             cls (Type[PretrainedModel]): the inherited PretrainedModel class
             pretrained_model_name_or_path (str): the model-name/url/local_dir/local_dir
             cache_dir (Optional[str], optional): cache_dir is used when name_or_path is model-name/url. Defaults to None.
+            support_conversion (bool, optional): whether support convert pytorch model to paddle model
 
         Returns:
             str: the model weight file path
@@ -943,12 +979,8 @@ class PretrainedModel(Layer, GenerationMixin):
 
         # 1. when it's from HF
         if from_hf_hub:
-            return hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=cls.resource_files_names["model_state"],
-                cache_dir=HF_CACHE_HOME,
-                library_name="PaddleNLP",
-                library_version=__version__,
+            return resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
             )
 
         # 2. when it is model-name
@@ -1004,11 +1036,24 @@ class PretrainedModel(Layer, GenerationMixin):
                 return weight_file_path
         else:
             # assume that the community-based models, name format: community/model-name
-            pretrained_model_name_or_path = os.path.join(
+            community_model_file_path = os.path.join(
                 COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.resource_files_names["model_state"]
             )
-            assert is_url(pretrained_model_name_or_path)
-            return cls._resolve_model_file_path(pretrained_model_name_or_path, cache_dir=cache_dir)
+            assert is_url(community_model_file_path)
+
+            # check wether the target file exist in the comunity bos server
+            if url_file_exists(community_model_file_path):
+                return cls._resolve_model_file_path(community_model_file_path, cache_dir=cache_dir)
+
+            logger.warning(
+                f"can not find the model<{pretrained_model_name_or_path}> in the community server, "
+                f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
+            )
+
+            # download weight file from hf hub
+            return resolve_weight_file_from_hf_hub(
+                repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
+            )
 
         raise FileNotFoundError(
             "can't resolve the model_state file according to the <%s>", pretrained_model_name_or_path
@@ -1261,12 +1306,27 @@ class PretrainedModel(Layer, GenerationMixin):
         model = cls(config, *init_args, **model_kwargs)
 
         # 3. resolve model_weight file
+        support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
+
         model_weight_file = cls._resolve_model_file_path(
-            pretrained_model_name_or_path, cache_dir=cache_dir, from_hf_hub=from_hf_hub
+            pretrained_model_name_or_path,
+            cache_dir=cache_dir,
+            from_hf_hub=from_hf_hub,
+            support_conversion=support_conversion,
         )
 
-        # 4. loading the state dict
-        model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+        if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
+            if support_conversion:
+                # try to get the name-mapping info
+                model_state_dict = cls.convert(model_weight_file, config, cache_dir)
+            else:
+                raise ValueError(
+                    f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
+                    "don't support conversion from pytorch weight file to paddle weight file"
+                )
+        else:
+            # 4. loading the state dict
+            model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343

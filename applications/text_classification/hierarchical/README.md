@@ -370,7 +370,7 @@ export/
 使用裁剪功能需要安装 paddleslim：
 
 ```shell
-pip install paddleslim==2.2.2
+pip install paddleslim==2.4.1
 ```
 
 开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
@@ -379,6 +379,7 @@ python prune.py \
     --device "gpu" \
     --dataset_dir "data" \
     --output_dir "prune" \
+    --learning_rate 3e-5 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --num_train_epochs 10 \
@@ -394,7 +395,7 @@ python prune.py \
 * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
 * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `learning_rate`：训练最大学习率；默认为3e-5。
+* `learning_rate`：训练最大学习率；默认为5e-5。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
 * `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
 * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
