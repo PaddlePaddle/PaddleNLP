@@ -14,6 +14,7 @@
 
 import argparse
 import distutils.util
+import gc
 import math
 import os
 import random
@@ -23,24 +24,16 @@ from pprint import pprint
 
 import numpy as np
 import paddle
-from BRIO_model import BRIO, RankingLoss
 from data_utils import BrioDataset, collate_mp_brio
-
-# from datasets import load_dataset
-# from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
 from paddle.io import DataLoader, DistributedBatchSampler
 from tqdm import tqdm
+from utils import RankingLoss, compute_metrics
 
-# from utils import compute_metrics, convert_example, main_process_first
-from utils import compute_metrics
-
-# from paddlenlp.data import DataCollatorForSeq2Seq
-# from paddlenlp.transformers import (
-#     LinearDecayWithWarmup,
-#     PegasusChineseTokenizer,
-#     PegasusForConditionalGeneration,
-# )
-from paddlenlp.transformers import LinearDecayWithWarmup, PegasusChineseTokenizer
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    PegasusChineseTokenizer,
+    PegasusForConditionalGeneration,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -134,13 +127,14 @@ def parse_args():
         "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
     )
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
-    parser.add_argument("--margin", default=0.001, type=float, help="hyper-para")
-    # parser.add_argument("--accumulate_step", default=4, type=int, help="")
-    parser.add_argument("--scale", default=0, type=int, help="")
-    parser.add_argument("--gold_margin", default=-1, type=float, help="")
-    parser.add_argument("--gold_weight", default=-1, type=float, help="")
-    parser.add_argument("--mle_weight", default=-1, type=float, help="")
-    parser.add_argument("--rank_weight", default=-1, type=float, help="")
+    parser.add_argument("--is_brio", default=False, type=bool, help="Whether to use BRIO")
+    parser.add_argument("--margin", default=0.001, type=float, help="Margin for calculate ranking loss")
+    parser.add_argument("--scale", default=0, type=int, help="Scale similarity")
+    parser.add_argument("--gold_margin", default=-1, type=float, help="Margin for calculate gold ranking loss")
+    parser.add_argument("--gold_weight", default=-1, type=float, help="Weight for calculate gold ranking loss")
+    parser.add_argument("--mle_weight", default=-1, type=float, help="Weight for MLE loss")
+    parser.add_argument("--rank_weight", default=-1, type=float, help="Weight for ranking loss")
+
     args = parser.parse_args()
     return args
 
@@ -157,31 +151,20 @@ def set_seed(args):
 
 @paddle.no_grad()
 def evaluate(model, data_loader, tokenizer, min_target_length, max_target_length):
-    # if paddle.distributed.get_world_size() > 1:
-    #     model.module.generation_mode()
-    # else:
-    #     model.generation_mode()
     model.eval()
     all_preds = []
     all_labels = []
     model = model._layers if isinstance(model, paddle.DataParallel) else model
     model.generation_mode()
     for batch in tqdm(data_loader, total=len(data_loader), desc="Eval step"):
-        # labels = batch.pop("labels").numpy()
-        # print(batch)
         labels = batch["candidate_ids"][:, 0, 1:].numpy()
         attention_mask = batch["src_input_ids"] != tokenizer.pad_token_id
-        preds = model.pegasus.generate(
+        preds = model.generate(
             input_ids=batch["src_input_ids"],
             attention_mask=attention_mask,
             min_length=min_target_length,
             max_length=max_target_length,
             use_cache=True,
-            # # TODO:参数设置
-            # no_repeat_ngram_size=3,
-            # num_beams=4,
-            # length_penalty=0.6,
-            # early_stopping=True,
         )[0]
         all_preds.extend(
             tokenizer.batch_decode(preds.numpy(), skip_special_tokens=True, clean_up_tokenization_spaces=False)
@@ -215,12 +198,11 @@ def do_train(args):
     )
 
     tokenizer = PegasusChineseTokenizer.from_pretrained(args.model_name_or_path)
-    model = BRIO(args.model_name_or_path, tokenizer.pad_token_id)
+    model = PegasusForConditionalGeneration.from_pretrained(args.model_name_or_path, is_brio=args.is_brio)
+    model.scoring_mode()
+
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
-        model._layers.scoring_mode()
-    else:
-        model.scoring_mode()
 
     batchify_fn = partial(collate_mp_brio, pad_token_id=tokenizer.pad_token_id, is_test=False)
     batchify_fn_dev = partial(collate_mp_brio, pad_token_id=tokenizer.pad_token_id, is_test=True)
@@ -258,54 +240,44 @@ def do_train(args):
         weight_decay=args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
-    # optimizer = paddle.optimizer.Adam(parameters=model.parameters())
 
-    # TODO: if args.smooth > 0: use label_smoothing_loss
     mle_fn = paddle.nn.CrossEntropyLoss(ignore_index=tokenizer.pad_token_id)
-
-    # if args.use_amp:
-    #     scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-
-    # def eval_fn(rouge1, rouge2, rougeLsum):
-    #     return 1 - (rouge1 * rouge2 + rougeLsum) / 3
 
     global_step = 0
     best_rougel = 0
     model.train()
-    # tic_train = time.time()
-
     for epoch in range(num_train_epochs):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
-            # TODO:amp.auto_cast & use_amp
+            input_mask = batch["src_input_ids"] != tokenizer.pad_token_id
+            cand_mask = batch["candidate_ids"] != tokenizer.pad_token_id
+            cand_mask[:, :, 0] = 1
             output = model(
-                batch["src_input_ids"],
-                batch["candidate_ids"],
+                input_ids=batch["src_input_ids"],
+                attention_mask=input_mask,
+                decoder_input_ids=batch["candidate_ids"],
+                decoder_attention_mask=cand_mask,
+                pad_token_id=tokenizer.pad_token_id,
                 normalize=True,
                 score_mode="log",
                 length_penalty=2.0,
+                require_gold=True,
                 adding=0,
             )
             similarity, gold_similarity = output["score"], output["summary_score"]
             similarity = similarity * args.scale
             gold_similarity = gold_similarity * args.scale
             ranking_loss = RankingLoss(similarity, gold_similarity, args.margin, args.gold_margin, args.gold_weight)
-            probs = output["probs"][:, :-1]  # truncate last token  [bz, seq_len, word_num]
-            gold = batch["candidate_ids"][:, 0, 1:]  # shift right
-            # gold = paddle.repeat_interleave(gold.unsqueeze(2), probs.shape[-1], axis=2)
+            probs = output["probs"][:, :-1]
+            gold = batch["candidate_ids"][:, 0, 1:]
             mle_loss = mle_fn(probs, gold)
             loss = args.rank_weight * ranking_loss + args.mle_weight * mle_loss
-            # loss = loss / args.accumulate_step
-            # avg_loss += loss.item()
-            # avg_mle_loss += mle_loss.item() / args.accumulate_step
-            # avg_ranking_loss += ranking_loss.item() / args.accumulate_step
 
             loss.backward()
             optimizer.step()
             lr_scheduler.step()
             optimizer.clear_grad()
 
-            # if epoch_step % args.logging_steps == 0 and step_cnt == 0:
             if global_step % args.logging_steps == 0:
                 logger.info(
                     "global step %d/%d, epoch: %d, batch: %d, loss: %.6f, ranking loss: %.6f, mle loss: %.6f"
@@ -319,19 +291,9 @@ def do_train(args):
                         mle_loss.item(),
                     )
                 )
-            # del similarity, gold_similarity, loss, mle_loss, ranking_loss, output, probs
-
-            # with paddle.amp.auto_cast(args.use_amp, custom_white_list=["layer_norm", "softmax", "gelu"]):
-            #     lm_logits, new_cache, loss = model(**batch)
-            # if args.use_amp:
-            #     scaled_loss = scaler.scale(loss)
-            #     scaled_loss.backward()
-            #     scaler.minimize(optimizer, scaled_loss)
-            # else:
-            #     loss.backward()
-            #     optimizer.step()
-            # lr_scheduler.step()
-            # optimizer.clear_grad()
+            del similarity, gold_similarity, loss, mle_loss, ranking_loss, output, probs, batch
+            gc.collect()
+            paddle.device.cuda.empty_cache()
 
             if global_step % args.save_steps == 0 or global_step == num_training_steps:
                 tic_eval = time.time()
