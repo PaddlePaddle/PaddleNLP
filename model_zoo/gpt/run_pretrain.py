@@ -50,19 +50,8 @@ MODEL_CLASSES = {
 
 
 @dataclass
-class ModelArguments(TrainingArguments):
-    model_name_or_path: str = field(default="gpt2-en", metadata={"help": ""})
-    max_seq_len: int = field(default=128, metadata={"help": "max sequence length"})
-    input_dir: str = field(default="", metadata={"help": "input idr of dataset"})
-    to_static: bool = field(default=False, metadata={"help": "whether use static pretraining mode."})
+class TrainingArguments(TrainingArguments):
     min_lr: float = field(default=1e-5, metadata={"help": "The initial min learning rate for Adam."})
-    split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
-    lr_decay_style: str = field(default="none", metadata={"help": "style of learning rate decay"})
-    use_amp: bool = field(default=False, metadata={"help": "whether use amp mode."})
-
-    scale_loss: float = field(
-        default=32768, metadata={"help": "The value of scale_loss for fp16. This is only used for AMP training."}
-    )
 
     # per_device_train_batch_size
     @property
@@ -72,6 +61,25 @@ class ModelArguments(TrainingArguments):
     @property
     def eval_freq(self):
         return self.eval_steps
+
+
+@dataclass
+class ModelArguments:
+    model_name_or_path: str = field(default="gpt2-en", metadata={"help": ""})
+    max_seq_len: int = field(default=128, metadata={"help": "max sequence length"})
+    to_static: bool = field(default=False, metadata={"help": "whether use static pretraining mode."})
+
+
+@dataclass
+class DataArguments:
+    """
+    Arguments pertaining to what data we are going to input our model for training and eval.
+    Using `PdArgumentParser` we can turn this class into argparse arguments to be able to
+    specify them on the command line.
+    """
+
+    input_dir: str = field(default="", metadata={"help": "input idr of dataset"})
+    split: str = field(default="949,50,1", metadata={"help": "Train/valid/test data split."})
 
 
 def set_seed(args):
@@ -84,7 +92,7 @@ def set_seed(args):
     paddle.seed(args.seed + idx)
 
 
-def download_corpus(args: ModelArguments):
+def download_corpus(args: DataArguments):
     os.makedirs(args.input_dir, exist_ok=True)
     files = [
         "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy",
@@ -100,7 +108,8 @@ def download_corpus(args: ModelArguments):
 
 
 def create_pretrained_dataset(
-    args,
+    training_args: TrainingArguments,
+    data_args: DataArguments,
     input_path,
     local_rank,
     data_world_rank,
@@ -171,7 +180,7 @@ def create_pretrained_dataset(
         # The sum(sample_lens) should equal len(sample_ids)
         sample_lens = process_data["lens"]
 
-    splits = get_train_valid_test_split_(args.split, len(sample_lens))
+    splits = get_train_valid_test_split_(data_args.split, len(sample_lens))
     assert len(sample_lens) >= splits[-1], "The document nums should larger than max of splits, but %s < %s" % (
         len(sample_lens),
         splits[-1],
@@ -181,7 +190,7 @@ def create_pretrained_dataset(
         return GPTDataset(
             file_prefix=input_prefix,
             build_data_file=local_rank == 0,
-            micro_batch_size=args.micro_batch_size,
+            micro_batch_size=training_args.micro_batch_size,
             name="gpt_" + name,
             max_seq_len=max_seq_len,
             num_samples=num_samples,
@@ -189,21 +198,28 @@ def create_pretrained_dataset(
             sample_ids=sample_ids,
             sample_lens=sample_lens,
             eos_id=eos_id,
-            seed=args.seed,
+            seed=training_args.seed,
         )
 
     # Note, data should be broardcast to all devices.
     # for train, valid, test, the distinct data num is data_world_size
-    train_dataset = build_dataset(0, "train", args.micro_batch_size * args.max_steps * data_world_size)
+    train_dataset = build_dataset(
+        0, "train", training_args.micro_batch_size * training_args.max_steps * data_world_size
+    )
     if pipeline_mode:
         valid_dataset, test_dataset = None, None
     else:
         valid_dataset = build_dataset(
             1,
             "valid",
-            args.micro_batch_size * (args.max_steps // args.eval_freq + 1) * args.eval_iters * data_world_size,
+            training_args.micro_batch_size
+            * (training_args.max_steps // training_args.eval_freq + 1)
+            * training_args.eval_iters
+            * data_world_size,
         )
-        test_dataset = build_dataset(2, "test", args.micro_batch_size * args.test_iters * data_world_size)
+        test_dataset = build_dataset(
+            2, "test", training_args.micro_batch_size * training_args.test_iters * data_world_size
+        )
 
     return train_dataset, valid_dataset, test_dataset
 
@@ -303,7 +319,7 @@ def data_collator(*args, **kwargs):
     }
 
 
-def get_train_data_file(args):
+def get_train_data_file(args: DataArguments):
     files = [
         os.path.join(args.input_dir, f)
         for f in os.listdir(args.input_dir)
@@ -328,24 +344,26 @@ def get_train_data_file(args):
 
 
 def do_train():
-    model_args: ModelArguments = PdArgumentParser([ModelArguments]).parse_args_into_dataclasses()[0]
-    model_args.eval_iters = 10
-    model_args.test_iters = model_args.eval_iters * 10
+    model_args, training_args, data_args = PdArgumentParser(
+        [ModelArguments, TrainingArguments, DataArguments]
+    ).parse_args_into_dataclasses()
+    training_args.eval_iters = 10
+    training_args.test_iters = training_args.eval_iters * 10
 
-    paddle.set_device(model_args.device)
+    paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
     worker_index = paddle.distributed.get_rank()
     worker_num = paddle.distributed.get_world_size()
     local_rank = int(os.getenv("PADDLE_RANK_IN_NODE", 0))
-    set_seed(model_args)
+    set_seed(training_args)
 
     # Detecting last checkpoint.
     last_checkpoint = None
-    if os.path.isdir(model_args.output_dir) and model_args.do_train and not model_args.overwrite_output_dir:
-        last_checkpoint = get_last_checkpoint(model_args.output_dir)
-        if last_checkpoint is not None and model_args.resume_from_checkpoint is None:
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is not None and training_args.resume_from_checkpoint is None:
             logger.info(
                 f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
                 "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
@@ -372,23 +390,23 @@ def do_train():
 
     lr_scheduler = None
 
-    if model_args.lr_decay_style == "none":
+    if training_args.weight_decay == "none":
         lr_scheduler = None
-    elif model_args.lr_decay_style == "cosine":
+    elif training_args.weight_decay == "cosine":
         lr_scheduler = lr.CosineAnnealingWithWarmupDecay(
-            max_lr=model_args.learning_rate, min_lr=model_args.min_lr, warmup_step=model_args.warmup_steps
+            max_lr=training_args.learning_rate, min_lr=training_args.min_lr, warmup_step=training_args.warmup_steps
         )
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
-        learning_rate=lr_scheduler if lr_scheduler is not None else model_args.learning_rate,
-        beta1=model_args.adam_beta1,
-        beta2=model_args.adam_beta2,
-        epsilon=model_args.adam_epsilon,
+        learning_rate=lr_scheduler if lr_scheduler is not None else training_args.learning_rate,
+        beta1=training_args.adam_beta1,
+        beta2=training_args.adam_beta2,
+        epsilon=training_args.adam_epsilon,
         parameters=model.parameters(),
-        weight_decay=model_args.weight_decay,
+        weight_decay=training_args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 
@@ -402,15 +420,16 @@ def do_train():
             logger.warning("No optimizer checkpoint file found in %s." % opt_path)
 
     # check and download corpus
-    download_corpus(model_args)
+    download_corpus(data_args)
 
-    files = get_train_data_file(model_args)
+    files = get_train_data_file(data_args)
     files.sort()
     num_files = len(files)
     for f_id in range(num_files):
         data_file = files[f_id]
         train_dataset, valid_dataset, test_dataset = create_pretrained_dataset(
-            model_args,
+            training_args,
+            data_args,
             [data_file],
             local_rank=local_rank,
             data_world_size=topo.data_info.size,
@@ -422,22 +441,22 @@ def do_train():
         trainer = PretrainingTrainer(
             model=model,
             criterion=criterion,
-            args=model_args,
+            args=training_args,
             data_collator=data_collator,
-            train_dataset=train_dataset if model_args.do_train else None,
-            eval_dataset=valid_dataset if model_args.do_eval else None,
+            train_dataset=train_dataset if training_args.do_train else None,
+            eval_dataset=valid_dataset if training_args.do_eval else None,
             optimizers=(None, lr_scheduler),
             tokenizer=tokenizer,
         )
 
         checkpoint = None
-        if model_args.resume_from_checkpoint is not None:
-            checkpoint = model_args.resume_from_checkpoint
+        if training_args.resume_from_checkpoint is not None:
+            checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
 
         # Training
-        if model_args.do_train:
+        if training_args.do_train:
             train_result = trainer.train(resume_from_checkpoint=checkpoint)
             metrics = train_result.metrics
             trainer.save_model()
@@ -445,7 +464,7 @@ def do_train():
             trainer.save_metrics("train", metrics)
             trainer.save_state()
 
-        if model_args.do_predict:
+        if training_args.do_predict:
             metrics = trainer.evaluate(test_dataset)
             trainer.log_metrics("test", metrics)
 

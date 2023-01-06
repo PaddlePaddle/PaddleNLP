@@ -94,7 +94,6 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
   --max_steps 500000 \
   --save_steps 100000 \
   --device gpu \
-  --lr_decay_style none \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
   --per_device_train_batch_size 4 \
@@ -128,7 +127,6 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
   --max_steps 500000 \
   --save_steps 100000 \
   --device gpu \
-  --lr_decay_style none \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
   --per_device_train_batch_size 4 \
