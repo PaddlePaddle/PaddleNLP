@@ -22,7 +22,7 @@
       - [问题生成](#问题生成)
       - [过滤模型](#过滤模型)
       - [语义索引和召回模型](#语义索引和召回模型)
-      - [排序模型](排序模型)
+      - [排序模型](#排序模型)
   - [References](#References)
 
 ## 简介
@@ -74,7 +74,7 @@
 
 **语义索引**：针对给定问答对语料，我们基于RocketQA（即`rocketqa-zh-base-query-encoder`）对问答对进行语义向量化，并通过ElasticSearch的ANN服务构建索引库。
 
-**召回排序**：给定用户查询，我们给予RocketQA的query-encoder和cross-encoder分别进行召回和排序操作，得到目标的问答对，从而返回给用户查询结果。
+**召回排序**：给定用户查询，我们基于RocketQA的query-encoder和cross-encoder分别进行召回和排序操作，得到目标的问答对，从而返回给用户查询结果。
 
 **Pipelines**：由于本项目设计的模块较多，我们使用PaddleNLP Pipelines进行模块的组合和项目的构建。大体来说，我们的Pipelines包含两个具体的pipeline和三个服务。两个pipeline分别是qa_generation_pipeline和dense_faq_pipeline；三个服务分别是基于ElasticSearch的ANN在线索引库服务，基于RestAPI的模型后端服务以及基于Streamlit的前端WebUI服务。
 
@@ -124,7 +124,6 @@ python run_pipelines_example.py --device cpu --source_file data/source_file.txt 
 
 
 ## 可视化无监督检索式问答系统
-<!-- **【注意】**  关于构建Web可视化问答对自动生成智能检索式问答系统，请参考[Pipelines-无监督智能检索问答系统](../../../pipelines/examples/unsupervised_question_answering/README.md)。 -->
 开发者可以基于Pipelines进一步构建Web可视化的无监督检索式问答系统，其效果如下，
 <div align="center">
     <img src="https://user-images.githubusercontent.com/20476674/199488926-c64d3f4e-8117-475f-afe6-b02088105d09.gif" >
@@ -217,7 +216,7 @@ python -u run_corpus_preparation.py \
 <!-- ### 检索模型训练部署
 在已有问答语料库和语义检索模型前提下，模型部署首先要把语义检索模型由动态图转换成静态图，然后转换成serving的格式，此外还需要基于Milvus和问答语料库构建语义检索引擎。
 
-关于如何对语义检索模型进行无监督训练，以及针对给定问答语料库进行模型部署，请参考[faq_system](../README.md)。 -->
+关于如何对语义检索模型进行无监督训练，以及针对给定问答语料库进行模型部署，请参考faq_system -->
 
 ### 基于Pipelines构建问答系统
 本项目提供了基于Pipelines的低成本构建问答对自动生成智能检索问答系统的能力。开发者只需要提供非结构化的纯文本，就可以使用本项目预制的问答对生成模块生成大量的问答对，并基于此快速搭建一个针对自己业务的检索问答系统，并可以提供Web可视化产品服务。Web可视化产品服务支持问答检索、在线问答对生成，在线文件上传和解析，在线索引库更新等功能，用户也可根据需要自行调整。具体的构建流程请参考[Pipelines-无监督智能检索问答系统](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/unsupervised-question-answering)。
@@ -231,7 +230,7 @@ python -u run_corpus_preparation.py \
 #### 自定义数据
 在许多情况下，我们需要使用本地数据集来微调模型从而得到定制化的能力，让生成的问答对更接近于理想分布，本项目支持使用固定格式本地数据集文件进行微调。
 
-这里我们提供预先标注好的文件样例[train.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/train.json)和[dev.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/test.json)，开发者可直接下载放入`data`目录，此外也可自行构建本地数据集，具体来说，本地数据集主要包含以下文件：
+这里我们提供预先标注好的文件样例[train.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/train.json)和[dev.json](https://paddlenlp.bj.bcebos.com/applications/unsupervised_qa/dev.json)，开发者可直接下载放入`data`目录，此外也可自行构建本地数据集，具体来说，本地数据集主要包含以下文件：
 ```text
 data
 ├── train.json # 训练数据集文件
