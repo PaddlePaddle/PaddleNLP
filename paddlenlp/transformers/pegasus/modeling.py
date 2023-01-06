@@ -638,7 +638,6 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         use_cache=False,
         cache=None,
         labels=None,
-        pad_token_id=None,
         normalize=None,
         score_mode=None,
         length_penalty=None,
@@ -709,7 +708,7 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             probs = output[:, 0]
             output = output[:, :, :-1]
             candidate_id = decoder_input_ids[:, :, 1:]
-            cand_mask = candidate_id != pad_token_id
+            cand_mask = candidate_id != self.pegasus.pad_token_id
             candidate_id = candidate_id.unsqueeze(-1)
             if normalize:
                 if score_mode == "log":

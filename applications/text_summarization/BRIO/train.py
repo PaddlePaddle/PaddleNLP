@@ -257,7 +257,6 @@ def do_train(args):
                 attention_mask=input_mask,
                 decoder_input_ids=batch["candidate_ids"],
                 decoder_attention_mask=cand_mask,
-                pad_token_id=tokenizer.pad_token_id,
                 normalize=True,
                 score_mode="log",
                 length_penalty=2.0,
