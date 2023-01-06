@@ -431,10 +431,10 @@ TASKS = {
                 "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
                 "task_priority_path": "openai/disco-diffusion-clip-rn101",
             },
-            "disco_diffusion_ernie_vil-2.0-base-zh": {
+            "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh": {
                 "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-disco_diffusion_ernie_vil-2.0-base-zh",
-                "task_priority_path": "disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_flag": "text_to_image-PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_priority_path": "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
             },
             "CompVis/stable-diffusion-v1-4": {
                 "task_class": TextToImageStableDiffusionTask,
@@ -509,7 +509,7 @@ support_argument_list = [
     "openai/disco-diffusion-clip-vit-base-patch32",
     "openai/disco-diffusion-clip-rn50",
     "openai/disco-diffusion-clip-rn101",
-    "disco_diffusion_ernie_vil-2.0-base-zh",
+    "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
     "uie-base",
     "uie-medium",
     "uie-mini",

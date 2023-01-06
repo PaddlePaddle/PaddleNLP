@@ -1,6 +1,6 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
-#
+# Copyright 2018 The Google AI Language Team Authors and The HuggingFace Inc. team.
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
@@ -12,21 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Feature extractor class for ErnieViL."""
 
-__all__ = ["ErnieViLFeatureExtractor"]
+from ..bert.tokenizer import BertTokenizer
 
-
-import warnings
-
-from .image_processing import ErnieViLImageProcessor
+__all__ = ["ChineseCLIPTokenizer"]
 
 
-class ErnieViLFeatureExtractor(ErnieViLImageProcessor):
-    def __init__(self, *args, **kwargs) -> None:
-        warnings.warn(
-            "The class ErnieViLFeatureExtractor is deprecated and will be removed in version 5 of PaddleNLP. Please"
-            " use ErnieViLImageProcessor instead.",
-            FutureWarning,
-        )
-        super().__init__(*args, **kwargs)
+class ChineseCLIPTokenizer(BertTokenizer):
+    resource_files_names = {"vocab_file": "vocab.txt"}
+    pretrained_resource_files_map = {"vocab_file": {}}
+    pretrained_init_configuration = {}
+    model_input_names = [
+        "input_ids",
+        "token_type_ids",
+        "attention_mask",
+    ]

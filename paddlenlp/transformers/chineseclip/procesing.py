@@ -1,5 +1,5 @@
 # Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The HuggingFace Inc. team.
+# Copyright 2022 The OFA-Sys Team Authors and The HuggingFace Team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,32 +13,33 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Image/Text processor class for ErnieViL
+Image/Text processor class for Chinese-CLIP
 """
 import warnings
 
 from ..processing_utils import ProcessorMixin
 from ..tokenizer_utils_base import BatchEncoding
 
-__all__ = ["ErnieViLProcessor"]
+__all__ = ["ChineseCLIPProcessor"]
 
 
-class ErnieViLProcessor(ProcessorMixin):
+class ChineseCLIPProcessor(ProcessorMixin):
     r"""
-    Constructs a ErnieViL processor which wraps a ErnieViL image processor and a ErnieViL tokenizer into a single processor.
+    Constructs a Chinese-CLIP processor which wraps a Chinese-CLIP image processor and a Chinese-CLIP tokenizer into a
+    single processor.
 
-    [`ErnieViLProcessor`] offers all the functionalities of [`ErnieViLProcessor`] and [`ErnieViLTokenizer`]. See the
-    [`~ErnieViLProcessor.__call__`] and [`~ErnieViLProcessor.decode`] for more information.
+    [`ChineseCLIPProcessor`] offers all the functionalities of [`ChineseCLIPImageProcessor`] and [`ChineseCLIPTokenizer`].
+    See the [`~ChineseCLIPProcessor.__call__`] and [`~ChineseCLIPProcessor.decode`] for more information.
 
     Args:
-        image_processor ([`ErnieViLImageProcessor`]):
+        image_processor ([`ChineseCLIPImageProcessor`]):
             The image processor is a required input.
-        tokenizer ([`ErnieViLTokenizer`]):
+        tokenizer ([`ChineseCLIPTokenizer`]):
             The tokenizer is a required input.
     """
     attributes = ["image_processor", "tokenizer"]
-    image_processor_class = "ErnieViLImageProcessor"
-    tokenizer_class = "ErnieViLTokenizer"
+    image_processor_class = "ChineseCLIPImageProcessor"
+    tokenizer_class = "ChineseCLIPTokenizer"
 
     def __init__(self, image_processor=None, tokenizer=None, **kwargs):
         if "feature_extractor" in kwargs:
@@ -60,9 +61,9 @@ class ErnieViLProcessor(ProcessorMixin):
     def __call__(self, text=None, images=None, return_tensors=None, **kwargs):
         """
         Main method to prepare for the model one or several sequences(s) and image(s). This method forwards the `text`
-        and `kwargs` arguments to ErnieViLTokenizer's [`~ErnieViLTokenizer.__call__`] if `text` is not `None` to encode
+        and `kwargs` arguments to ChineseCLIPTokenizer's [`~ChineseCLIPTokenizer.__call__`] if `text` is not `None` to encode
         the text. To prepare the image(s), this method forwards the `images` and `kwrags` arguments to
-        ErnieViLImageProcessor's [`~ErnieViLImageProcessor.__call__`] if `images` is not `None`. Please refer to the doctsring
+        ChineseCLIPImageProcessor's [`~ChineseCLIPImageProcessor.__call__`] if `images` is not `None`. Please refer to the doctsring
         of the above two methods for more information.
 
         Args:
@@ -110,14 +111,14 @@ class ErnieViLProcessor(ProcessorMixin):
 
     def batch_decode(self, *args, **kwargs):
         """
-        This method forwards all its arguments to ErnieViLTokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
+        This method forwards all its arguments to ChineseCLIPTokenizer's [`~PreTrainedTokenizer.batch_decode`]. Please
         refer to the docstring of this method for more information.
         """
         return self.tokenizer.batch_decode(*args, **kwargs)
 
     def decode(self, *args, **kwargs):
         """
-        This method forwards all its arguments to ErnieViLTokenizer's [`~PreTrainedTokenizer.decode`]. Please refer to
+        This method forwards all its arguments to ChineseCLIPTokenizer's [`~PreTrainedTokenizer.decode`]. Please refer to
         the docstring of this method for more information.
         """
         return self.tokenizer.decode(*args, **kwargs)
