@@ -165,21 +165,24 @@ def search(
 
 @app.command(help="convert pytorch models to paddle model")
 def convert(input: Optional[str] = None, output: Optional[str] = None):
-    logger.info("convert tool is under development, please keep eyes on it. ...")
-    return
+    """convert pytorch model to paddle model
 
-    # if not os.path.isdir(input):
-    #     logger.warning(
-    #         f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file now. "
-    #         "We will support online-converting<AutoModel.from_pretrained('huggingface-model-name')> feature "
-    #         "as soon as possible. Please keep eyes on the latest version of paddlenlp."
-    #     )
-    #     return
-    # else:
-    #     # TODO(wj-Mcat): support convert from: local_dir & hf hub
-    #     # and enhance the convert tools
-    #     model = AutoModel.from_pretrained(input, from_hf_hub=True)
-    #     model.save_pretrained(output)
+    Args:
+        input (Optional[str], optional): local_dir which contains pytorch_model.bin or model-name of huggingface-hub. Defaults to None.
+        output (Optional[str], optional): output dir. Defaults to None.
+    """
+    if input is None:
+        logger.error("please set the input name in command: paddlenlp convert --input ...")
+        return
+
+    if output is None:
+        if not os.path.isdir(input):
+            logger.error("when output is empty, input should be the local dir")
+            return
+        output = input
+
+    model = AutoModel.from_pretrained(input, from_hf_hub=True)
+    model.save_pretrained(output)
 
 
 @app.command(help="Start the PaddleNLP SimpleServer.")

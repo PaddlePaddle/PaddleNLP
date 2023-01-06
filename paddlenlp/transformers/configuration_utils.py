@@ -802,16 +802,12 @@ class PretrainedConfig:
         if os.path.isfile(pretrained_model_name_or_path):
             resolved_config_file = pretrained_model_name_or_path
 
-        # 2. get the configuration file from HF hub
-        elif from_hf_hub:
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
-
-        # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
+        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
-        # 4. get the configuration file from local dir with default name, eg: /local/path
+        # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
@@ -827,6 +823,10 @@ class PretrainedConfig:
                         "please make sure there is `model_config.json` under the dir, or you can pass the `_configuration_file` "
                         "param into `from_pretarined` method to specific the configuration file name"
                     )  # 4. load it as the community resource file
+
+        # 4. get the configuration file from HF hub
+        elif from_hf_hub:
+            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
 
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
