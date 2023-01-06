@@ -16,11 +16,11 @@ import random
 from functools import partial
 
 import numpy as np
-from rouge import Rouge
-
 import paddle
 import paddle.distributed as dist
-from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+from rouge import Rouge
+
 from paddlenlp.data import Pad
 from paddlenlp.metrics import BLEU
 

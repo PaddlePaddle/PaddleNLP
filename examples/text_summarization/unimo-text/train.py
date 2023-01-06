@@ -12,22 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
-import math
 import argparse
 import json
+import math
+import os
+import time
 
 import paddle
 import paddle.distributed as dist
-import paddle.nn as nn
 import paddle.nn.functional as F
-from paddlenlp.transformers import LinearDecayWithWarmup
 from paddle.optimizer import AdamW
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer, BasicTokenizer
+from utils import compute_metrics, create_data_loader, print_args, select_sum, set_seed
 
-from utils import print_args, set_seed, create_data_loader, select_sum, compute_metrics
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    UNIMOLMHeadModel,
+    UNIMOTokenizer,
+)
 
 
 def parse_args():

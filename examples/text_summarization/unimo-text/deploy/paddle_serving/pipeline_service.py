@@ -11,50 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import argparse
+
 import numpy as np
-from pprint import pprint
+from paddle_serving_server.web_service import Op, WebService
 
-import paddle
-from paddle import inference
-
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
-from paddlenlp.ops.ext_utils import load
 from paddlenlp.data import Pad
-import os
-
-
-def setup_args():
-    """Setup arguments."""
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--inference_model_dir",
-        default="../../inference_model",
-        type=str,
-        help="Path to save inference model of UNIMOText. ",
-    )
-    args = parser.parse_args()
-    return args
-
-
-def setup_predictor(args):
-    """Setup inference predictor."""
-    # Load FasterTransformer lib.
-    load("FasterTransformer", verbose=True)
-    model_file = os.path.join(args.inference_model_dir, "unimo_text.pdmodel")
-    params_file = os.path.join(args.inference_model_dir, "unimo_text.pdiparams")
-    if not os.path.exists(model_file):
-        raise ValueError("not find model file path {}".format(model_file))
-    if not os.path.exists(params_file):
-        raise ValueError("not find params file path {}".format(params_file))
-    config = inference.Config(model_file, params_file)
-    config.enable_use_gpu(100, 0)
-    config.switch_ir_optim()
-    config.enable_memory_optim()
-    config.disable_glog_info()
-
-    predictor = inference.create_predictor(config)
-    return predictor
+from paddlenlp.ops.ext_utils import load
+from paddlenlp.transformers import UNIMOTokenizer
+from paddlenlp.utils.log import logger
 
 
 def convert_example(example, tokenizer, max_seq_len=512, return_length=True):
@@ -115,38 +79,51 @@ def postprocess_response(token_ids, tokenizer):
     return tokens
 
 
-def infer(args, predictor):
-    """Use predictor to inference."""
-    tokenizer = UNIMOTokenizer.from_pretrained("unimo-text-1.0-summary")
+class UnimoTextOp(Op):
+    """Op for unimo_text."""
 
-    inputs = [
-        "雪后的景色可真美丽呀！不管是大树上，屋顶上，还是菜地上，都穿上了一件精美的、洁白的羽绒服。放眼望去，整个世界变成了银装素裹似的，世界就像是粉妆玉砌的一样。",
-        "根据“十个工作日”原则，下轮调价窗口为8月23日24时。卓创资讯分析，原油价格或延续震荡偏弱走势，且新周期的原油变化率仍将负值开局，消息面对国内成品油市场并无提振。受此影响，预计国内成品油批发价格或整体呈现稳中下滑走势，但“金九银十”即将到来，卖方看好后期市场，预计跌幅较为有限。",
-    ]
+    def init_op(self):
+        self.tokenizer = UNIMOTokenizer.from_pretrained("unimo-text-1.0-summary")
 
-    examples = [convert_example(i, tokenizer) for i in inputs]
-    data = batchify_fn(examples, tokenizer.pad_token_id)
+    def preprocess(self, input_dicts, data_id, log_id):
+        # Convert input format
+        ((_, input_dict),) = input_dicts.items()
+        data = input_dict["inputs"]
+        if isinstance(data, str) and "array(" in data:
+            data = eval(data)
+        else:
+            logger.error("input value  {}is not supported.".format(data))
+        data = [i.decode("utf-8") for i in data]
+        examples = [convert_example(i, self.tokenizer) for i in data]
+        input_dict = batchify_fn(examples, self.tokenizer.pad_token_id)
+        # the first return must be a dict or a list of dict, the dict corresponding to a batch of model input
+        return input_dict, False, None, ""
 
-    input_handles = {}
-    for name in predictor.get_input_names():
-        input_handles[name] = predictor.get_input_handle(name)
-        input_handles[name].copy_from_cpu(data[name])
+    def postprocess(self, input_dicts, fetch_dict, data_id, log_id):
+        outputs = fetch_dict["transpose_0.tmp_0"]
+        results = []
+        for sample in outputs:
+            result = []
+            for idx, beam in enumerate(sample):
+                if idx >= len(sample) // 2:
+                    break
+                res = "".join(postprocess_response(beam, self.tokenizer))
+                result.append(res)
+            results.append(result)
+        out_dict = {}
+        out_dict["outputs"] = str(results)
+        # the first return must be a dict or a list of dict, the dict corresponding to a batch of model output
+        return out_dict, None, ""
 
-    output_handles = [predictor.get_output_handle(name) for name in predictor.get_output_names()]
 
-    predictor.run()
-
-    output = [output_handle.copy_to_cpu() for output_handle in output_handles]
-
-    for idx, sample in enumerate(output[0]):
-        for beam_idx, beam in enumerate(sample):
-            if beam_idx > len(sample) // 2:
-                break
-            print(f"Example {idx} beam beam_idx {beam_idx}: ", "".join(postprocess_response(beam, tokenizer)))
+class UnimoTextService(WebService):
+    def get_pipeline_response(self, read_op):
+        return UnimoTextOp(name="text_summarization", input_ops=[read_op])
 
 
 if __name__ == "__main__":
-    args = setup_args()
-    pprint(args)
-    predictor = setup_predictor(args)
-    infer(args, predictor)
+    # Load FasterTransformer lib.
+    load("FasterTransformer", verbose=True)
+    service = UnimoTextService(name="text_summarization")
+    service.prepare_pipeline_config("config.yml")
+    service.run_service()
