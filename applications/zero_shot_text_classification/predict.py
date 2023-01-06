@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 
 import paddle
 from paddle.metric import Accuracy
-from utils import UTCLoss, read_local_dataset
+from utils import MetricReport, UTCLoss, read_local_dataset
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -76,15 +76,22 @@ def main():
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        metric = Accuracy()
-
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
-        labels = paddle.argmax(labels, axis=1)
-        correct = metric.compute(preds, labels)
-        metric.update(correct)
-        acc = metric.accumulate()
-        return {"acc": acc}
+
+        metric_f1 = MetricReport(threshold=data_args.threshold)
+        preds_f1 = paddle.nn.functional.sigmoid(preds)
+        preds_f1 = preds_f1[labels != -100]
+        labels_f1 = labels[labels != -100]
+        metric_f1.update(preds_f1, labels_f1)
+        micro_f1, macro_f1 = metric_f1.accumulate()
+
+        metric_acc = Accuracy()
+        labels_acc = paddle.argmax(labels, axis=1)
+        correct = metric_acc.compute(preds, labels_acc)
+        metric_acc.update(correct)
+        acc = metric_acc.accumulate()
+        return {"acc": acc, "micro_f1": micro_f1, "macro_f1": macro_f1}
 
     trainer = PromptTrainer(
         model=prompt_model,

@@ -12,31 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import json
+from pprint import pprint
 
 import requests
 
-# yapf: disable
-parser = argparse.ArgumentParser()
-parser.add_argument("--max_length", default=512, type=int, help="The maximum total input sequence length after tokenization.")
-parser.add_argument("--batch_size", default=2, type=int, help="Batch size per GPU/CPU for predicting.")
-parser.add_argument("--threshold", default=0.8, type=float, help="Probability threshold for prediction.")
-args = parser.parse_args()
-# yapf: disable
-
-url = "http://0.0.0.0:8190/models/utc"
-headers = {"Content-Type": "application/json"}
-
 if __name__ == "__main__":
-    data = {
-        "data": [{"text_a": "借款贷款。"}],
-        "parameters": {
-            "max_length": args.max_length,
-            "batch_size": args.batch_size,
-            "prob_limit": args.threshold,
-            "choices": ["正向", "负向"],
-        }
-    }
+    url = "http://0.0.0.0:8190/taskflow/utc"
+
+    headers = {"Content-Type": "application/json"}
+
+    texts = ["中性粒细胞比率偏低", "男性小腹疼痛是什么原因？"]
+
+    data = {"data": {"text": texts}}
     r = requests.post(url=url, headers=headers, data=json.dumps(data))
-    print(r.text)
+    datas = json.loads(r.text)
+    pprint(datas)

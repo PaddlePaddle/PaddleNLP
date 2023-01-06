@@ -27,69 +27,30 @@ from .utils import static_mode_guard
 usage = r"""
         from paddlenlp import Taskflow
 
-        question = '酒店评价情感分析'
-        choices = ['这是一条差评', '这是一条好评']
-        text_cls = Taskflow("zero_text_classification", question=question, choices=choices)
-        text_cls('房间很整洁，相当不错')
+        schema = ['这是一条差评', '这是一条好评']
+        text_cls = Taskflow("zero_shot_text_classification", schema=schema)
+        text_cls('房间干净明亮，非常不错')
         '''
-        [{'text': '房间很整洁，相当不错', 'label': '这是一条好评', 'score': 0.80}]
+        [{'predictions': [{'label': '这是一条好评', 'score': 0.9695149765679986}], 'text_a': '房间干净明亮，非常不错'}]
         '''
          """
 
 
-class ZeroTextClassificationTask(Task):
+class ZeroShotTextClassificationTask(Task):
     """
-    Unified Tag Classification Task.
+    Zero-shot Universial Text Classification Task.
 
     Args:
         task (string): The name of task.
         model (string): The model_name in the task.
-        question (string): Discription of the task.
-        choices (list): List of candidate labels.
+        schema (list): List of candidate labels.
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
-    resource_files_names = {
-        "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",
-        "vocab_file": "vocab.txt",
-        "special_tokens_map": "special_tokens_map.json",
-        "tokenizer_config": "tokenizer_config.json",
-    }
-    resource_files_urls = {
-        "utc-large": {
-            "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/model_state.pdparams",
-                "a4b4693f0021ec94cdd32ecf3c5e168c",
-            ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/model_config.json",
-                "21f3fa9aa4465d4d07afb0f24f57fae4",
-            ],
-            "vocab_file": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/vocab.txt",
-                "afc01b5680a53525df5afd7518b42b48",
-            ],
-            "special_tokens_map": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/special_tokens_map.json",
-                "2458e2131219fc1f84a6e4843ae07008",
-            ],
-            "tokenizer_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/tokenizer_config.json",
-                "dcb0f3257830c0eb1f2de47f2d86f89a",
-            ],
-            "added_tokens.json": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/added_tokens.json",
-                "ac8532655ddc0a1ce3b8a87dda81de5b",
-            ],
-        },
-    }
+    def __init__(self, task: str, model: str = "utc-large", schema: list = None, **kwargs):
+        super(ZeroShotTextClassificationTask, self).__init__(task=task, model=model, **kwargs)
 
-    def __init__(self, task: str, model: str = "utc-large", question: str = None, choices: list = None, **kwargs):
-        super(ZeroTextClassificationTask, self).__init__(task=task, model=model, **kwargs)
-
-        self._question = "" if question is None else question
-        self._choices = choices
+        self._set_utc_schema(schema)
         self._max_seq_len = kwargs.get("max_seq_len", 512)
         self._batch_size = kwargs.get("batch_size", 1)
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
@@ -99,10 +60,22 @@ class ZeroTextClassificationTask(Task):
         self._check_predictor_type()
         self._get_inference_model()
 
-    def set_argument(self, argument: dict):
-        for k, v in argument.items():
-            if k == "question" or k == "choices":
-                setattr(self, f"_{k}", v)
+    def _set_utc_schema(self, schema):
+        if schema is None:
+            self._question = None
+            self._choices = None
+        elif isinstance(schema, list):
+            self._question = ""
+            self._choices = schema
+        elif isinstance(schema, dict) and len(schema) == 1:
+            for key, value in schema.items():
+                self._question = key
+                self._choices = value
+        else:
+            raise ValueError(f"Invalid schema: {schema}.")
+
+    def set_schema(self, schema):
+        self._set_utc_schema(schema)
 
     def _construct_input_spec(self):
         """

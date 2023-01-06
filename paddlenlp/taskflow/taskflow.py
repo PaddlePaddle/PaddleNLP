@@ -43,7 +43,7 @@ from .text_to_image import (
     TextToImageStableDiffusionTask,
 )
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
-from .zero_text_classification import ZeroTextClassificationTask
+from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
@@ -477,11 +477,11 @@ TASKS = {
         },
         "default": {"model": "unimo-text-1.0-dureader_qg"},
     },
-    "zero_text_classification": {
+    "zero_shot_text_classification": {
         "models": {
             "utc-large": {
-                "task_class": ZeroTextClassificationTask,
-                "task_flag": "zero_text_classification-utc-large",
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-large",
             },
         },
         "default": {"model": "utc-large"},

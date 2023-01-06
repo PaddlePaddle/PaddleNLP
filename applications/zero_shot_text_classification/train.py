@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 from dataclasses import dataclass, field
 
 import paddle
+from paddle.metric import Accuracy
 from paddle.static import InputSpec
 from utils import MetricReport, UTCLoss, read_local_dataset
 
@@ -42,7 +42,9 @@ class DataArguments:
 
 @dataclass
 class ModelArguments:
-    model_name_or_path: str = field(default="utc-large", metadata={"help": "Build-in pretrained model."})
+    model_name_or_path: str = field(
+        default="utc-large", metadata={"help": "The build-in pretrained UTC model name or path to its checkpoints."}
+    )
     export_type: str = field(default="paddle", metadata={"help": "The type to export. Support `paddle` and `onnx`."})
     export_model_dir: str = field(default="checkpoints/model_best", metadata={"help": "The export model path."})
 
@@ -58,10 +60,6 @@ def main():
     # Load the pretrained language model.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     model = UTC.from_pretrained(model_args.model_name_or_path)
-    if not os.path.isdir(model_args.model_name_or_path) and model_args.model_name_or_path != "utc-large":
-        omask_dict = {"additional_special_tokens": ["[O-MASK]"]}
-        tokenizer.add_special_tokens(omask_dict)
-        model.resize_token_embeddings(len(tokenizer))
 
     # Define template for preprocess and verbalizer for postprocess.
     template = UTCTemplate(tokenizer, training_args.max_seq_length)
@@ -90,14 +88,21 @@ def main():
 
     # Define the metric function.
     def compute_metrics(eval_preds):
-        metric = MetricReport(threshold=data_args.threshold)
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
-        preds = paddle.nn.functional.sigmoid(paddle.to_tensor(eval_preds.predictions))
-        preds = preds[labels != -100]
-        labels = labels[labels != -100]
-        acc = float(((preds > data_args.threshold).astype("int64") == labels).mean())
-        metric.update(preds, labels)
-        micro_f1, macro_f1 = metric.accumulate()
+        preds = paddle.to_tensor(eval_preds.predictions)
+
+        metric_f1 = MetricReport(threshold=data_args.threshold)
+        preds_f1 = paddle.nn.functional.sigmoid(preds)
+        preds_f1 = preds_f1[labels != -100]
+        labels_f1 = labels[labels != -100]
+        metric_f1.update(preds_f1, labels_f1)
+        micro_f1, macro_f1 = metric_f1.accumulate()
+
+        metric_acc = Accuracy()
+        labels_acc = paddle.argmax(labels, axis=1)
+        correct = metric_acc.compute(preds, labels_acc)
+        metric_acc.update(correct)
+        acc = metric_acc.accumulate()
         return {"acc": acc, "micro_f1": micro_f1, "macro_f1": macro_f1}
 
     trainer = PromptTrainer(
