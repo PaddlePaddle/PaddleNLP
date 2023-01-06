@@ -22,8 +22,6 @@ from visualdl import LogWriter
 
 from paddlenlp.data import DataCollator
 from paddlenlp.trainer import Trainer, TrainerCallback
-
-# from paddlenlp.trainer.trainer_utils import EvalLoopOutput, has_length, find_batch_size
 from paddlenlp.trainer.trainer_utils import (
     EvalLoopOutput,
     EvalPrediction,
@@ -32,9 +30,6 @@ from paddlenlp.trainer.trainer_utils import (
     has_length,
 )
 from paddlenlp.trainer.training_args import TrainingArguments
-from paddlenlp.utils.batch_sampler import (
-    DistributedBatchSampler as NlpDistributedBatchSampler,
-)
 from paddlenlp.trainer.utils.helper import (
     nested_concat,
     nested_detach,
@@ -43,6 +38,9 @@ from paddlenlp.trainer.utils.helper import (
 )
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.transformers.tokenizer_utils import PretrainedTokenizer
+from paddlenlp.utils.batch_sampler import (
+    DistributedBatchSampler as NlpDistributedBatchSampler,
+)
 from paddlenlp.utils.log import logger
 
 

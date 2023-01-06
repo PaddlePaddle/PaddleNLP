@@ -18,11 +18,11 @@
 import random
 
 import numpy as np
+import paddle
 import PIL
 import PIL.ImageDraw
 import PIL.ImageEnhance
 import PIL.ImageOps
-import paddle
 from PIL import Image
 
 
