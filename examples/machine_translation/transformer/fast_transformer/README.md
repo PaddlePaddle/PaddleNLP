@@ -126,6 +126,28 @@ python encoder_decoding_predict.py \
 
 翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
 
+#### 使用动态图预测(使用 int8 decoding 预测)
+
+int8 与 float16 和 float32 预测的执行方式基本相同，不过在使用 float16 的 decoding 进行预测的时候，需要再加上 `--use_int8_decoding` 选项，表示使用 int8 进行预测。后按照与之前相同的方式执行即可。具体执行方式如下：
+
+``` sh
+# setting visible devices for prediction
+export CUDA_VISIBLE_DEVICES=0
+# 执行 decoding_gemm 目的是基于当前环境、配置，提前确定一个性能最佳的矩阵乘算法，不是必要的步骤
+cp -rf ../../../../paddlenlp/ops/build/third-party/build/fastertransformer/bin/decoding_gemm ./
+./decoding_gemm 8 4 8 64 38512 32 512 1
+python encoder_decoding_predict.py \
+    --config ../configs/transformer.base.yaml \
+    --decoding_lib ../../../../paddlenlp/ops/build/lib/libdecoding_op.so \
+    --use_int8_decoding \
+    --decoding_strategy beam_search \
+    --beam_size 5
+```
+
+其中，`--config` 选项用于指明配置文件的位置，而 `--decoding_lib` 选项用于指明编译好的 FastGeneration decoding lib 的位置。
+
+翻译结果会输出到 `output_file` 指定的文件。执行预测时需要设置 `init_from_params` 来给出模型所在目录，更多参数的使用可以在 `./sample/config/transformer.base.yaml` 文件中查阅注释说明并进行更改设置。如果执行不提供 `--config` 选项，程序将默认使用 base model 的配置。
+
 需要注意的是，目前预测仅实现了单卡的预测，原因在于，翻译后面需要的模型评估依赖于预测结果写入文件顺序，多卡情况下，目前暂未支持将结果按照指定顺序写入文件。
 
 #### 使用自定义数据集进行预测
