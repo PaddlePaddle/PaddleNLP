@@ -78,45 +78,6 @@ __global__ void find_channel_abs_max_kernel_quant(const T* input,
   }
 }
 
-/*
-// add bias to matrix of m * n, CUBLASLT_ORDER_COL32
-// grid, thread = (m), (n/4)
-// using char4
-// for per-channel-quantization weight
-// template <typename T>
-__global__ void quantized_kernel(char4 *dst, const float4* src, const int
-size_div_4, const int n, const float* scale_ptr)
-{
-  int tid = (blockIdx.x * blockDim.x + threadIdx.x);
-  if (tid < size_div_4){
-    const float scale = __ldg(scale_ptr[tid / (n / 4)]);
-    char4 tmp;
-    const float4 floatTmp = __ldg(src + tid);
-    tmp.x = __float2int_rn(floatTmp.x*scale);
-    tmp.y = __float2int_rn(floatTmp.y*scale);
-    tmp.z = __float2int_rn(floatTmp.z*scale);
-    tmp.w = __float2int_rn(floatTmp.w*scale);
-    dst[tid] = tmp;
-  }
-}
-__global__ void quantized_kernel(char4 *dst, const half2* src, const int
-size_div_4, const int n, const float* scale_ptr)
-{
-  int tid = (blockIdx.x * blockDim.x + threadIdx.x);
-  if (tid < size_div_4){
-    const float scale = __ldg(scale_ptr[tid / (n / 4)]);
-    char4 tmp;
-    int src_id = tid << 1;
-    const half2 half2Tmp = __ldg(src + src_id);
-    tmp.x = __float2int_rn(static_cast<float>(half2Tmp.x) * scale);
-    tmp.y = __float2int_rn(static_cast<float>(half2Tmp.y) * scale);
-    const half2 half2Tmp2 = __ldg(src + src_id + 1);
-    tmp.z = __float2int_rn(static_cast<float>(half2Tmp2.x) * scale);
-    tmp.w = __float2int_rn(static_cast<float>(half2Tmp2.y) * scale);
-    dst[tid] = tmp;
-  }
-}
-*/
 
 // transpose matrix & transfrom row-major to COL32
 // input matrix is (n, m) row-major
