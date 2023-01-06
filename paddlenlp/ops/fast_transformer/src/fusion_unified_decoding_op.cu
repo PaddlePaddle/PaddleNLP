@@ -37,15 +37,6 @@ limitations under the License. */
 #endif
 
 
-const int64_t numel(const std::vector<int64_t>& tensor_shape) {
-    int size = tensor_shape.size();
-    int64_t n = 1;
-    for (int i = 0; i < size; ++i) {
-        n *= tensor_shape[i];
-    }
-    return n;
-}
-
 template <paddle::DataType D>
 std::vector<paddle::Tensor> unified_decoding_kernel(
     const paddle::Tensor& input_ids,

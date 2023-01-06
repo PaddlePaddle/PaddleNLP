@@ -27,7 +27,7 @@ from itertools import takewhile
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from paddlenlp.transformers import PretrainedTokenizer
+from paddlenlp.transformers import PretrainedFastTokenizer, PretrainedTokenizer
 from paddlenlp.transformers.tokenizer_utils import AddedToken, Trie
 from paddlenlp.transformers.tokenizer_utils_base import PretrainedTokenizerBase
 
@@ -55,6 +55,8 @@ def filter_roberta_detectors(_, pretrained_name: str):
 class TokenizerTesterMixin:
 
     tokenizer_class = None
+    fast_tokenizer_class = None
+    test_fast_tokenizer = False
     space_between_special_tokens = False
     from_pretrained_kwargs = None
     from_pretrained_filter = None
@@ -137,6 +139,9 @@ class TokenizerTesterMixin:
 
     def get_tokenizer(self, **kwargs) -> PretrainedTokenizer:
         return self.tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
+
+    def get_fast_tokenizer(self, **kwargs) -> PretrainedFastTokenizer:
+        return self.fast_tokenizer_class.from_pretrained(self.tmpdirname, **kwargs)
 
     def tokenizer_integration_test_util(
         self,
