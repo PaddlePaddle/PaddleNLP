@@ -3,7 +3,7 @@
     "data_root": "~/BT/dataset/fine-tune",
     "log_dir": "~/BT/logs",
     "output_dir": "~/BT/checkpoints",
-    "load_path": "./pretrained/BridgeTower_pt_base.pdparams",
+    "load_path": "",
     "num_gpus": 8,
     "num_nodes": 1,
     "num_workers": 8,

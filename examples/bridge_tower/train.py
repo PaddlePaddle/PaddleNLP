@@ -75,6 +75,7 @@ def main():
     _config["per_gpu_batchsize"] = training_args.per_device_train_batch_size
     _config["num_nodes"] = model_args.num_nodes
     _config["num_gpus"] = model_args.num_gpus
+    _config['load_path']= model_args.checkpoint_path
 
     model = BTTransformer(_config)
 
