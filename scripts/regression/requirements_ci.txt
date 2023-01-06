@@ -1,3 +1,4 @@
+opencv-python==4.6.0.66
 regex
 attrdict==2.0.1
 PyYAML==5.4.1
@@ -25,4 +26,5 @@ parameterized
 scikit-learn
 cma
 paddleocr
+paddleslim
 fast_tokenizer_python
