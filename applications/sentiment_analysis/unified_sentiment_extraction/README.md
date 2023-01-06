@@ -313,7 +313,7 @@ python3 -m pip install wordcloud==1.8.2.2
 <a name="4.2.1"></a>
 
 #### **4.2.1 数据描述**
-输入数据如下方式进行组织，每行表示一个文本评论。可以点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/test_hotel.txt)下载酒店场景的测试数据进行分析。
+输入数据如下方式进行组织，每行表示一个文本评论。可以点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/test_hotel.tar.gz)下载酒店场景的测试数据进行分析。
 
 ```
 非常好的酒店 不枉我们爬了近一个小时的山，另外 大厨手艺非常棒 竹筒饭 竹筒鸡推荐入住的客人必须要点，
@@ -495,7 +495,7 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
     <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
 </div>
 
-为方便用户使用，本项目提供了300+条酒店场景的标注数据，可点击[label_studio.json](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.json)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
+为方便用户使用，本项目提供了300+条酒店场景的标注数据，可点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.tar.gz)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
 
 
 <a name="5.1.1"></a>
