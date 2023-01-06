@@ -452,7 +452,7 @@ class TrainingArguments:
 
     run_name: Optional[str] = field(default=None, metadata={"help": "An optional descriptor for the run."})
 
-    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
+    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu, npu devices."})
 
     disable_tqdm: Optional[bool] = field(
         default=None, metadata={"help": "Whether or not to disable the tqdm progress bars."}

@@ -102,7 +102,16 @@ def main():
         max_seq_length=data_args.max_seq_length,
     )
     # Define data collector
-    data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=data_args.ignore_label)
+    if training_args.device == "npu":
+        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+        data_collator = DataCollatorForTokenClassification(
+            tokenizer=tokenizer,
+            label_pad_token_id=data_args.ignore_label,
+            padding="max_length",
+            max_length=data_args.max_seq_length,
+        )
+    else:
+        data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=data_args.ignore_label)
 
     # Dataset pre-process
     if training_args.do_train:
