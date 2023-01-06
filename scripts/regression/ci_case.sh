@@ -239,12 +239,12 @@ if [ ! -f 'test.py' ];then
     cd ../
     # pretrain
     python -m paddle.distributed.launch run_pretrain.py \
-    --model_name_or_path gpt2-en \
+    --model_name_or_path "__internal_testing__/gpt" \
     --input_dir "./pre_data" \
     --output_dir "output" \
     --weight_decay 0.01 \
-    --max_steps 500000 \
-    --save_steps 100000 \
+    --max_steps 2 \
+    --save_steps 2 \
     --device gpu \
     --warmup_steps 320000 \
     --warmup_ratio 0.01 \
