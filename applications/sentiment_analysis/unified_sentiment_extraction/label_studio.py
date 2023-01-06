@@ -40,7 +40,8 @@ PROMPT_ITEMS = {
     "sentiment_prompt_prefix": "情感倾向",
     "separator": "##",
     "not_mentioned_option": "未提及",
-    "options": "正向,负向,未提及",
+    "postive_option": "正向",
+    "negative_option": "负向",
 }
 
 
@@ -55,7 +56,7 @@ class Convertor(object):
         self.sentiment_prompt_prefix = PROMPT_ITEMS["sentiment_prompt_prefix"]
         self.separator = PROMPT_ITEMS["separator"]
         self.not_mentioned_option = PROMPT_ITEMS["not_mentioned_option"]
-        self.options = PROMPT_ITEMS["options"].split(",")
+        self.options = PROMPT_ITEMS["options"]
 
     def process_text_tag(self, line, task_type="ext"):
         items = {}
@@ -603,11 +604,23 @@ def do_convert():
         indexes = np.random.permutation(len(raw_examples))
         raw_examples = [raw_examples[i] for i in indexes]
 
+    # construct options according
+    if args.options:
+        PROMPT_ITEMS["options"] = args.options
+    else:
+        if args.task_type == "ext":
+            PROMPT_ITEMS["options"] = [
+                PROMPT_ITEMS["postive_option"],
+                PROMPT_ITEMS["negative_option"],
+                PROMPT_ITEMS["not_mentioned_option"],
+            ]
+        else:
+            PROMPT_ITEMS["options"] = [PROMPT_ITEMS["postive_option"], PROMPT_ITEMS["negative_option"]]
+
     # analyze detailed ext task type: ext_a, ext_o, ext_as, ext_ao, ext_aso
     if args.task_type == "ext":
         args.task_type = parse_ext_task_type(raw_examples)
-    else:
-        PROMPT_ITEMS["options"] = "正向,负向"
+
     logger.info("You are trying perform dataset construction operation for task {}.\n".format(args.task_type))
 
     # load synonyms
@@ -707,16 +720,18 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--label_studio_file", default="./data/label_studio.json", type=str, help="The annotation file exported from label studio platform.")
-    parser.add_argument("--synonym_file", default="", type=str, help="The synonmy file of aspect to support aspect aggregation.")
-    parser.add_argument("--implicit_file", default="", type=str, help="The implicit opinion file whose aspect not be mentioned in text, to support extraction of implicit opinion.")
+    parser.add_argument("--synonym_file", type=str, help="The synonmy file of aspect to support aspect aggregation.")
+    parser.add_argument("--implicit_file", type=str, help="The implicit opinion file whose aspect not be mentioned in text, to support extraction of implicit opinion.")
     parser.add_argument("--save_dir", default="./data", type=str, help="The path of data that you wanna save.")
     parser.add_argument("--negative_ratio", default=5, type=int, help="Worked only for the extraction task, it means that for each task (aspect-based opinion extraction, aspect-based sentiment classicition) of an example, at least negative_ratio negative examples will be generated without considering synonym_file and implicit_file.")
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Two task types [ext, cls] are supported, ext represents the aspect-based extraction task and cls represents the sentence-level classification task, defaults to ext.")
+    parser.add_argument("--options", type=str, nargs="+", help="Used only for the classification task, the options for classification")
     parser.add_argument("--is_shuffle", default=True, type=bool, help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
 
     args = parser.parse_args()
-    # yapf: enable
+    # yapf: enablecl
+    logger.info("Parameter Description:\n{}\n".format(args.__dict__))
 
     do_convert()
