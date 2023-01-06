@@ -27,3 +27,4 @@ scikit-learn
 cma
 paddleocr
 paddleslim
+fast_tokenizer_python

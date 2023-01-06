@@ -11,14 +11,5 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from __future__ import annotations
-
-from paddlenlp.transformers.conversion_utils import *  # noqa: F401, F403
-
-from .log import logger
-
-logger.warning(
-    "`paddlenlp.utils.converter` module will be deprecated soon, you "
-    "should change it to `paddlenlp.transformers.conversion_utils`"
-)
+# flake8: noqa
+from .text_classification import *
