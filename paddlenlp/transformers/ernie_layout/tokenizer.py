@@ -90,9 +90,6 @@ class ErnieLayoutTokenizer(PretrainedTokenizer):
         self._pad_token = pad_token
         self._mask_token = mask_token
         self.sp_model = spm.SentencePieceProcessor()
-        if not os.path.isfile(vocab_file):
-            raise ValueError("Can't find a vocabulary file at path '{}'.".format(vocab_file))
-        self.vocab = self.load_vocabulary(vocab_file, unk_token=unk_token)
         self.vocab_file = vocab_file
         self.sentencepiece_model_file = sentencepiece_model_file
         if os.path.isfile(sentencepiece_model_file):
