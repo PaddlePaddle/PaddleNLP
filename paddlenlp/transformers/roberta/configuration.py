@@ -212,4 +212,4 @@ class RobertaConfig(PretrainedConfig):
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
         self.cls_token_id = cls_token_id
-        self.layer_norm_eps=layer_norm_eps
+        self.layer_norm_eps = layer_norm_eps

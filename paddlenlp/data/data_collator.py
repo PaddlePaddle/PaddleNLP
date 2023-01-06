@@ -13,15 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
+import random
+import warnings
 from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Any, Callable, Dict, List, NewType, Optional, Tuple, Union
 
 import numpy as np
 import paddle
-import random
-import warnings
-from dataclasses import dataclass
-from ..transformers.tokenizer_utils_base import BatchEncoding, PretrainedTokenizerBase, PaddingStrategy
+
+from ..transformers import BertTokenizer
+from ..transformers.tokenizer_utils_base import (
+    BatchEncoding,
+    PaddingStrategy,
+    PretrainedTokenizerBase,
+)
 
 __all__ = [
     "DataCollatorWithPadding",
@@ -31,7 +37,7 @@ __all__ = [
     "DataCollatorForTokenClassification",
     "DataCollatorForSeq2Seq",
     "DataCollatorForLanguageModeling",
-    "DataCollatorForWholeWordMask"
+    "DataCollatorForWholeWordMask",
 ]
 
 InputDataClass = NewType("InputDataClass", Any)
@@ -388,13 +394,14 @@ class DataCollatorForSeq2Seq:
 
         return features
 
+
 def _paddle_collate_batch(examples, tokenizer, pad_to_multiple_of: Optional[int] = None):
     """Collate `examples` into a batch, using the information in `tokenizer` for padding if necessary."""
     import paddle
 
     # Tensorize if necessary.
     if isinstance(examples[0], (list, tuple, np.ndarray)):
-        examples = [paddle.to_tensor(e, dtype='int64') for e in examples]
+        examples = [paddle.to_tensor(e, dtype="int64") for e in examples]
 
     length_of_first = examples[0].shape[0]
 
@@ -422,6 +429,49 @@ def _paddle_collate_batch(examples, tokenizer, pad_to_multiple_of: Optional[int]
         else:
             result[i, -example.shape[0] :] = example
     return result
+
+
+def _numpy_collate_batch(examples, tokenizer, pad_to_multiple_of: Optional[int] = None):
+    import numpy as np
+
+    """Collate `examples` into a batch, using the information in `tokenizer` for padding if necessary."""
+    # Tensorize if necessary.
+    if isinstance(examples[0], (list, tuple)):
+        examples = [np.array(e, dtype=np.int64) for e in examples]
+
+    # Check if padding is necessary.
+    length_of_first = len(examples[0])
+    are_tensors_same_length = all(len(x) == length_of_first for x in examples)
+    if are_tensors_same_length and (pad_to_multiple_of is None or length_of_first % pad_to_multiple_of == 0):
+        return np.stack(examples, axis=0)
+
+    # If yes, check if we have a `pad_token`.
+    if tokenizer._pad_token is None:
+        raise ValueError(
+            "You are attempting to pad samples but the tokenizer you are using"
+            f" ({tokenizer.__class__.__name__}) does not have a pad token."
+        )
+
+    # Creating the full tensor and filling it with our data.
+    max_length = max(len(x) for x in examples)
+    if pad_to_multiple_of is not None and (max_length % pad_to_multiple_of != 0):
+        max_length = ((max_length // pad_to_multiple_of) + 1) * pad_to_multiple_of
+    result = np.full(shape=(len(examples), max_length), fill_value=tokenizer.pad_token_id, dtype=examples[0].dtype)
+    for i, example in enumerate(examples):
+        if tokenizer.padding_side == "right":
+            result[i, : example.shape[0]] = example
+        else:
+            result[i, -example.shape[0] :] = example
+    return result
+
+
+def tolist(x):
+    if isinstance(x, list):
+        return x
+    elif hasattr(x, "numpy"):  # Checks for TF tensors without needing the import
+        x = x.numpy()
+    return x.tolist()
+
 
 @dataclass
 class DataCollatorForLanguageModeling(DataCollatorMixin):
@@ -459,7 +509,9 @@ class DataCollatorForLanguageModeling(DataCollatorMixin):
             batch = self.tokenizer.pad(examples, return_tensors="pd", pad_to_multiple_of=self.pad_to_multiple_of)
         else:
             batch = {
-                "input_ids": _paddle_collate_batch(examples, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of)
+                "input_ids": _paddle_collate_batch(
+                    examples, self.tokenizer, pad_to_multiple_of=self.pad_to_multiple_of
+                )
             }
 
         # If special token mask has been preprocessed, pop it from the dict.
@@ -488,25 +540,29 @@ class DataCollatorForLanguageModeling(DataCollatorMixin):
             special_tokens_mask = [
                 self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
             ]
-            special_tokens_mask = paddle.to_tensor(special_tokens_mask, dtype='bool')
+            special_tokens_mask = paddle.to_tensor(special_tokens_mask, dtype="bool")
         else:
-            special_tokens_mask = special_tokens_mask.cast('bool')
+            special_tokens_mask = special_tokens_mask.cast("bool")
+
         def masked_fill(x, mask, value):
             y = paddle.full(x.shape, value, x.dtype)
             return paddle.where(mask, y, x)
+
         # probability_matrix.masked_fill_(special_tokens_mask, value=0.0)
         probability_matrix = masked_fill(probability_matrix, special_tokens_mask, value=0.0)
-        masked_indices = paddle.bernoulli(probability_matrix).cast('bool')
+        masked_indices = paddle.bernoulli(probability_matrix).cast("bool")
         labels[~masked_indices] = -100  # We only compute loss on masked tokens
 
         # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-        indices_replaced = paddle.bernoulli(paddle.full(labels.shape, 0.8)).cast('bool') & masked_indices
+        indices_replaced = paddle.bernoulli(paddle.full(labels.shape, 0.8)).cast("bool") & masked_indices
         inputs[indices_replaced] = self.tokenizer.convert_tokens_to_ids(self.tokenizer.mask_token)
 
         # 10% of the time, we replace masked input tokens with random word
-        indices_random = paddle.bernoulli(paddle.full(labels.shape, 0.5)).cast('bool') & masked_indices & ~indices_replaced
+        indices_random = (
+            paddle.bernoulli(paddle.full(labels.shape, 0.5)).cast("bool") & masked_indices & ~indices_replaced
+        )
         # breakpoint()
-        random_words = paddle.randint(len(self.tokenizer), shape=labels.shape, dtype='int64')
+        random_words = paddle.randint(len(self.tokenizer), shape=labels.shape, dtype="int64")
         inputs[indices_random] = random_words[indices_random]
 
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
@@ -571,6 +627,7 @@ class DataCollatorForLanguageModeling(DataCollatorMixin):
         # The rest of the time (10% of the time) we keep the masked input tokens unchanged
         return inputs, labels
 
+
 @dataclass
 class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
     """
@@ -611,7 +668,6 @@ class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
         inputs, labels = self.paddle_mask_tokens(batch_input, batch_mask)
         return {"input_ids": inputs, "labels": labels}
 
-
     def numpy_call(self, examples: List[Union[List[int], Any, Dict[str, Any]]]) -> Dict[str, Any]:
         if isinstance(examples[0], Mapping):
             input_ids = [e["input_ids"] for e in examples]
@@ -644,7 +700,7 @@ class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
         """
         Get 0/1 labels for masked tokens with whole word mask proxy
         """
-        if not isinstance(self.tokenizer, (BertTokenizer, BertTokenizerFast)):
+        if not isinstance(self.tokenizer, (BertTokenizer)):
             warnings.warn(
                 "DataCollatorForWholeWordMask is only suitable for BertTokenizer-like tokenizers. "
                 "Please refer to the documentation for more information."
@@ -707,21 +763,25 @@ class DataCollatorForWholeWordMask(DataCollatorForLanguageModeling):
         special_tokens_mask = [
             self.tokenizer.get_special_tokens_mask(val, already_has_special_tokens=True) for val in labels.tolist()
         ]
+
         def masked_fill(x, mask, value):
             y = paddle.full(x.shape, value, x.dtype)
             return paddle.where(mask, y, x)
+
         # probability_matrix.masked_fill_(paddle.tensor(special_tokens_mask, dtype=paddle.bool), value=0.0)
-        probability_matrix = masked_fill(probability_matrix, paddle.to_tensor(special_tokens_mask,dtype="bool"), value=0.0)
+        probability_matrix = masked_fill(
+            probability_matrix, paddle.to_tensor(special_tokens_mask, dtype="bool"), value=0.0
+        )
         if self.tokenizer._pad_token is not None:
             padding_mask = labels.eq(self.tokenizer.pad_token_id)
             # probability_matrix.masked_fill_(padding_mask, value=0.0)
-            probability_matrix=masked_fill(probability_matrix, padding_mask, value=0.0)
+            probability_matrix = masked_fill(probability_matrix, padding_mask, value=0.0)
 
-        masked_indices = probability_matrix.cast('bool')
+        masked_indices = probability_matrix.cast("bool")
         labels[~masked_indices] = -100  # We only compute loss on masked tokens
 
         # 80% of the time, we replace masked input tokens with tokenizer.mask_token ([MASK])
-        indices_replaced = paddle.bernoulli(paddle.full(labels.shape, 0.8)).cast('bool') & masked_indices
+        indices_replaced = paddle.bernoulli(paddle.full(labels.shape, 0.8)).cast("bool") & masked_indices
         inputs[indices_replaced] = self.tokenizer.convert_tokens_to_ids(self.tokenizer.mask_token)
 
         # 10% of the time, we replace masked input tokens with random word
