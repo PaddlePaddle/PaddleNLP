@@ -186,5 +186,39 @@ class ErnieLayoutEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase
                 self.assertGreater(tokens[0], tokenizer.vocab_size - 1)
                 self.assertGreater(tokens[-2], tokenizer.vocab_size - 1)
 
+    def test_padding_to_multiple_of(self):
+        tokenizers = self.get_tokenizers(model_max_length=64)
+        for tokenizer in tokenizers:
+            with self.subTest(f"{tokenizer.__class__.__name__}"):
+                if tokenizer.pad_token is None:
+                    self.skipTest("No padding token.")
+                else:
+                    empty_tokens = tokenizer("", padding=True, pad_to_multiple_of=8)
+                    normal_tokens = tokenizer("This is a sample input", padding=True, pad_to_multiple_of=8)
+                    for key, value in empty_tokens.items():
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
+                    for key, value in normal_tokens.items():
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
+
+                    normal_tokens = tokenizer("This", pad_to_multiple_of=8)
+                    for key, value in normal_tokens.items():
+                        self.assertNotEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
+
+                    # Should also work with truncation
+                    normal_tokens = tokenizer("This", padding=True, truncation=True, pad_to_multiple_of=8)
+                    for key, value in normal_tokens.items():
+                        self.assertEqual(len(value) % 8, 0, f"BatchEncoding.{key} is not multiple of 8")
+
+                    # truncation to something which is not a multiple of pad_to_multiple_of raises an error
+                    self.assertRaises(
+                        ValueError,
+                        tokenizer.__call__,
+                        "This",
+                        padding=True,
+                        truncation=True,
+                        max_length=12,
+                        pad_to_multiple_of=8,
+                    )
+
     def test_token_type_ids(self):
         self.skipTest("Ernie-Layout model doesn't have token_type embedding. so skip this test")
