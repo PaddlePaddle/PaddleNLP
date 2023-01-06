@@ -14,13 +14,15 @@
 import random
 import string
 import time
-import uvicorn
+
 import paddle
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import CodeGenTokenizer, CodeGenForCausalLM
-from sse_starlette.sse import EventSourceResponse
+import uvicorn
 from fastapi import FastAPI, Response, status
 from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
+
+from paddlenlp.transformers import CodeGenForCausalLM, CodeGenTokenizer
+from paddlenlp.utils.log import logger
 
 
 class DefaultConfig:
@@ -95,7 +97,7 @@ async def gen(item: Input):
         top_k=top_k,
         repetition_penalty=repetition_penalty,
         temperature=temperature,
-        use_faster=generate_config.use_faster,
+        use_fast=generate_config.use_faster,
         use_fp16_decoding=generate_config.use_fp16_decoding,
     )
     logger.info("Finish generating code")

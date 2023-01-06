@@ -497,24 +497,24 @@ class GenerationMixin(object):
 
         return logits
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         return False
 
-    def _convert_to_faster(self, kwargs):
+    def _convert_to_fast(self, kwargs):
         # try general convert
         pass
 
-    def _build_faster(self, kwargs):
-        self._faster_entry = False
+    def _build_fast(self, kwargs):
+        self._fast_entry = False
         if kwargs["num_beam_groups"] != 1:
-            # not support for group_beam_search yet in the faster version
-            raise AttributeError("'num_beam_groups != 1' is not supported yet in the faster version")
+            # not support for group_beam_search yet in the fast version
+            raise AttributeError("'num_beam_groups != 1' is not supported yet in the fast version")
         if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
             kwargs["use_fp16_decoding"] = True
-        self.prepare_faster_entry(kwargs)
+        self.prepare_fast_entry(kwargs)
 
     @paddle.no_grad()
     def generate(
@@ -541,7 +541,7 @@ class GenerationMixin(object):
         num_return_sequences=1,
         diversity_rate=0.0,
         use_cache=True,
-        use_faster=False,
+        use_fast=False,
         use_fp16_decoding=False,
         **model_kwargs
     ):
@@ -611,10 +611,10 @@ class GenerationMixin(object):
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to
                 speed up decoding. Default to True.
-            use_faster: (bool, optional): Whether to use faster entry of model
-                for FasterGeneration. Default to False.
+            use_fast: (bool, optional): Whether to use fast entry of model
+                for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when faster entry is avalible. Default to False.
+                Only works when fast entry is avalible. Default to False.
             model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
@@ -722,6 +722,16 @@ class GenerationMixin(object):
             decode_strategy
         )
 
+        if getattr(self, "deprecated_warnings", None) is None:
+            self.deprecated_warnings = {}
+
+        if "use_faster" in model_kwargs:
+            use_fast = model_kwargs.pop("use_faster")
+            if not self.deprecated_warnings.get("use_faster", False):
+                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
+                self.deprecated_warnings["use_faster"] = True
+
+        # TODO: change from model.attribute to model.config.attribute when all models are integrated with PretrainedConfig
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
         eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
@@ -740,22 +750,22 @@ class GenerationMixin(object):
             no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
         )
 
-        if getattr(self, "_faster_entry", None) is not False and use_faster:
+        if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
             args.pop("__class__", None)
             model_kwargs = args.pop("model_kwargs")
             args.update(model_kwargs)
             try:
-                if not hasattr(self, "_faster_entry"):
-                    self._build_faster(args)
-                if self._faster_entry:
-                    output = self._faster_entry(**args)
+                if getattr(self, "_fast_entry", None) is None:
+                    self._build_fast(args)
+                if self._fast_entry:
+                    output = self._fast_entry(**args)
                     if isinstance(output, tuple):
                         output_ids, dummy_srore = output
                     else:
                         output_ids = output
-                        # make result and faster result oneconsistent
+                        # make result and fast result oneconsistent
                         dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
@@ -769,10 +779,10 @@ class GenerationMixin(object):
             except Exception as e:
                 args["model_kwargs"] = model_kwargs
                 # TODO
-                # Prevent self._convert_to_faster to throw Exception
-                self._convert_to_faster(args)
+                # Prevent self._convert_to_fast to throw Exception
+                self._convert_to_fast(args)
                 logger.warning(e)
-                logger.warning("FasterGeneration is not available, " "and the original version would be used instead.")
+                logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
 
         # params check
         if input_ids is None:
