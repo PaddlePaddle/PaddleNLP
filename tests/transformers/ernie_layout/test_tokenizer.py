@@ -48,7 +48,7 @@ class ErnieLayoutEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase
         tokens = tokenizer.tokenize("This is a test")
         self.assertListEqual(tokens, ["▁This", "▁is", "▁a", "▁test"])
 
-        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [475, 98, 6, 4, 264])
+        self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [3293, 83, 10, 3034])
 
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
         self.assertListEqual(
