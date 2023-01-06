@@ -1065,6 +1065,8 @@ print_info $? textcnn_predict
 #33 taskflow
 taskflow (){
 cd ${nlp_dir}
+pytest tests/taskflow/test_*.py >${nlp_dir}/unittest_logs/taskflow_unittest >>${nlp_dir}/unittest_logs/taskflow_unittest 2>&1
+print_info $? taskflow_unittest
 python scripts/regression/test_taskflow.py >${log_path}/taskflow >>${log_path}/taskflow 2>&1
 print_info $? taskflow
 }

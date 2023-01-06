@@ -151,6 +151,8 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
+        elif [[ ${dir2} =~ "taskflow" ]];then
+            P0case_list[${#P0case_list[*]}]=taskflow
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级

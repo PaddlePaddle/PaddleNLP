@@ -1,3 +1,4 @@
+opencv-python==4.6.0.66
 regex
 attrdict==2.0.1
 PyYAML==5.4.1
