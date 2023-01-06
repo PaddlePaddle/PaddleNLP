@@ -35,7 +35,7 @@ WordSubstitute 参数介绍：
 
     aug_type(str or list(str))：
         词替换增强策略类别。可以选择"antonym"、"embedding"、"synonym"、"homonym"、"custom"、"random"、"mlm"或者
-        前三种词替换增强策略组合。
+        前四种词替换增强策略组合。
 
     custom_file_path (str，*可选*）：
         本地数据增强词表路径。如果词替换增强策略选择"custom"，本地数据增强词表路径不能为None。默认为None。

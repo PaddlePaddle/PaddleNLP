@@ -69,13 +69,14 @@ class WordSubstitute(BaseAugment):
         aug_max=10,
         tf_idf=False,
         tf_idf_file=None,
+        model_name="ernie-1.0-large-zh-cw",
     ):
         super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
         self.tf_idf = tf_idf
-        self.model_name = "ernie-1.0-large-zh-cw"
+        self.model_name = model_name
         if self.tf_idf:
             self._count_idf(tf_idf_file)
 
@@ -339,12 +340,13 @@ class WordInsert(BaseAugment):
         aug_percent=0.1,
         aug_min=1,
         aug_max=10,
+        model_name="ernie-1.0-large-zh-cw",
     ):
         super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
-        self.model_name = "ernie-1.0-large-zh-cw"
+        self.model_name = model_name
         if isinstance(aug_type, str):
             self.type = aug_type
             if aug_type in ["antonym", "embedding", "synonym", "homonym", "custom"]:
