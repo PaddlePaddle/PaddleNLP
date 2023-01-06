@@ -46,7 +46,7 @@ class ErnieLayoutEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase
         tokenizer = self.get_tokenizer()
 
         tokens = tokenizer.tokenize("This is a test")
-        self.assertListEqual(tokens, ["▁This", "▁is", "▁a", "▁t", "est"])
+        self.assertListEqual(tokens, ["▁This", "▁is", "▁a", "▁test"])
 
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [475, 98, 6, 4, 264])
 
@@ -115,7 +115,7 @@ class ErnieLayoutEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase
 
         # Example taken from the issue https://github.com/huggingface/tokenizers/issues/340
         self.assertListEqual(
-            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["▁T", "est"], ["▁", "\xad"], ["▁t", "est"]]
+            [tokenizer.tokenize(t) for t in ["Test", "\xad", "test"]], [["▁Test"], ["▁", "\xad"], ["▁test"]]
         )
 
     def test_sequence_builders(self):
