@@ -267,11 +267,14 @@ class PegasusDecoder(PegasusPretrainedModel):
             Its data type should be float32 and has a shape of [batch_size, sequence_length, hidden_size].
 
         """
-        if decoder_attention_mask is None:
-            decoder_length = paddle.shape(decoder_input_ids)[-1]
-            decoder_attention_mask = paddle.tensor.triu(
-                (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
-            )
+        decoder_length = paddle.shape(decoder_input_ids)[-1]
+        casual_attention_mask = paddle.tensor.triu(
+            (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
+        )
+        if decoder_attention_mask is not None:
+            decoder_attention_mask = decoder_attention_mask + casual_attention_mask
+        else:
+            decoder_attention_mask = casual_attention_mask
 
         decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
         past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
@@ -436,6 +439,9 @@ class PegasusModel(PegasusPretrainedModel):
             scale_embedding,
             init_std,
         )
+        self.is_brio = False
+        self.is_scoring_mode = False
+
         self.apply(self.init_weights)
 
     def get_encoder(self):
@@ -443,6 +449,12 @@ class PegasusModel(PegasusPretrainedModel):
 
     def get_decoder(self):
         return self.decoder
+
+    def scoring_mode(self):
+        self.is_scoring_mode = True
+
+    def generation_mode(self):
+        self.is_scoring_mode = False
 
     def get_input_embeddings(self):
         return self.shared
@@ -543,6 +555,22 @@ class PegasusModel(PegasusPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
+
+        if self.is_scoring_mode and self.is_brio:
+            cand_num = decoder_input_ids.shape[1]
+            encoder_output = paddle.repeat_interleave(encoder_output, cand_num, axis=0)
+            attention_mask = paddle.repeat_interleave(attention_mask, cand_num, axis=0)
+            decoder_input_ids = decoder_input_ids.reshape([-1, decoder_input_ids.shape[-1]])
+            if decoder_attention_mask is not None:
+                decoder_attention_mask = decoder_attention_mask.reshape([-1, decoder_attention_mask.shape[-1]])
+
+            if decoder_attention_mask.ndim == 2:
+                decoder_attention_mask = paddle.unsqueeze(decoder_attention_mask, axis=[1, 2]).astype(
+                    paddle.get_default_dtype()
+                )
+                decoder_attention_mask = (1.0 - decoder_attention_mask) * -1e4
+                decoder_attention_mask.stop_gradient = True
+
         decoder_output, new_cache = self.decoder(
             decoder_input_ids, decoder_attention_mask, encoder_output, attention_mask, cache
         )
@@ -558,9 +586,10 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
             An instance of PegasusModel.
     """
 
-    def __init__(self, pegasus):
+    def __init__(self, pegasus, is_brio=False):
         super().__init__()
         self.pegasus = pegasus
+        self.pegasus.is_brio = is_brio
         self.lm_head_weight = self.create_parameter(
             shape=[self.pegasus.config["vocab_size"], self.pegasus.config["d_model"]],
             dtype=self.pegasus.shared.weight.dtype,
@@ -576,28 +605,28 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     def get_decoder(self):
         return self.pegasus.get_decoder()
 
-    def prepare_fast_entry(self, kwargs):
+    def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterPegasus
 
         decode_strategy = kwargs.get("decode_strategy")
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
-        enable_fast_encoder = kwargs.get("enable_fast_encoder", True)
+        enable_faster_encoder = kwargs.get("enable_faster_encoder", True)
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the fast version."
+                "Topk sampling and topp sampling cannot be both applied in the faster version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the fast version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
-        self._fast_entry = FasterPegasus(
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+        self._faster_entry = FasterPegasus(
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
-            enable_fast_encoder=enable_fast_encoder,
+            enable_faster_encoder=enable_faster_encoder,
         ).forward
-        return self._fast_entry
+        return self._faster_entry
 
     def forward(
         self,
@@ -609,6 +638,12 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         use_cache=False,
         cache=None,
         labels=None,
+        pad_token_id=None,
+        normalize=None,
+        score_mode=None,
+        length_penalty=None,
+        adding=None,
+        require_gold=None,
     ):
         r"""
         The PegasusForConditionalGeneration forward method, overrides the __call__() special method.
@@ -667,7 +702,38 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 lm_logits.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
             )
 
+        if self.pegasus.is_brio and self.pegasus.is_scoring_mode:
+            batch_size = input_ids.shape[0]
+            output = lm_logits
+            output = output.reshape([batch_size, -1, output.shape[1], output.shape[2]])
+            probs = output[:, 0]
+            output = output[:, :, :-1]
+            candidate_id = decoder_input_ids[:, :, 1:]
+            cand_mask = candidate_id != pad_token_id
+            candidate_id = candidate_id.unsqueeze(-1)
+            if normalize:
+                if score_mode == "log":
+                    _output = paddle.nn.functional.log_softmax(output, axis=3)
+                else:
+                    _output = paddle.nn.functional.softmax(output, axis=3)
+                scores = paddle.take_along_axis(_output, candidate_id, 3).squeeze(-1)
+            else:
+                scores = paddle.take_along_axis(output, candidate_id, 3).squeeze(-1)
+            cand_mask = paddle.cast(cand_mask, dtype="float32")
+            scores = paddle.multiply(scores, cand_mask).sum(-1) / ((cand_mask.sum(-1) + adding) ** length_penalty)
+            if require_gold:
+                output = {"score": scores[:, 1:], "summary_score": scores[:, 0], "probs": probs}
+            else:
+                output = {"score": scores, "probs": probs}
+            return output
+
         return lm_logits, new_cache, masked_lm_loss
+
+    def scoring_mode(self):
+        self.pegasus.scoring_mode()
+
+    def generation_mode(self):
+        self.pegasus.generation_mode()
 
     def prepare_decoder_input_ids_from_labels(self, labels):
         return shift_tokens_right(labels, self.pegasus.pad_token_id, self.pegasus.config["decoder_start_token_id"])
