@@ -1,0 +1,2 @@
+ray[tune]>=2.0
+hyperopt>=0.2.5

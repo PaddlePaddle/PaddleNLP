@@ -350,10 +350,10 @@ __global__ void apply_logits_mask_kernel(int vocab_size_padded,
   bool finish = (finished != nullptr) ? finished[bbid] : false;
 
   if (!finish) {
-    for (int i = tid + bid * blockDim.x; i < vocab_size;
+    for (int i = tid + bid * blockDim.x; i < vocab_size_padded;
           i += blockDim.x * gridDim.x) {
-      if (min_penalty && i == end_id) {
-        log_probs[i + bbid * vocab_size_padded] += -MAX_T_VAL;
+      if ((min_penalty && i == end_id) || i >= vocab_size) {
+        log_probs[i + bbid * vocab_size_padded] = -MAX_T_VAL;
       } else if (logits_mask) {
         log_probs[i + bbid * vocab_size_padded] += logits_mask[i];
       } else if (bias) {
@@ -377,7 +377,7 @@ void apply_logits_mask_kernelLauncher(T* log_probs,
                                       const bool min_penalty,
                                       const int end_id,
                                       const T* bias) {
-  if (logits_mask == nullptr && !min_penalty && bias == nullptr) return;
+  if (logits_mask == nullptr && !min_penalty && bias == nullptr && vocab_size == vocab_size_padded) return;
 
   dim3 block(256);
   dim3 grid((vocab_size_padded + block.x - 1) / block.x,

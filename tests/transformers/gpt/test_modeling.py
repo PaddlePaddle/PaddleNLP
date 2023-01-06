@@ -23,6 +23,7 @@ import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
+    GPTConfig,
     GPTForSequenceClassification,
     GPTForTokenClassification,
     GPTLMHeadModel,
@@ -30,9 +31,8 @@ from paddlenlp.transformers import (
     GPTTokenizer,
 )
 from tests.testing_utils import PaddleNLPModelTest, slow
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import (
+from tests.transformers.test_generation_utils import GenerationTesterMixin
+from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -125,22 +125,24 @@ class GPTModelTester:
         )
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "bos_token_id": self.bos_token_id,
-            "eos_token_id": self.eos_token_id,
-            "pad_token_id": self.pad_token_id,
-        }
+        return GPTConfig(
+            **{
+                "vocab_size": self.vocab_size,
+                "hidden_size": self.hidden_size,
+                "num_hidden_layers": self.num_hidden_layers,
+                "num_attention_heads": self.num_attention_heads,
+                "intermediate_size": self.intermediate_size,
+                "hidden_act": self.hidden_act,
+                "hidden_dropout_prob": self.hidden_dropout_prob,
+                "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
+                "max_position_embeddings": self.max_position_embeddings,
+                "type_vocab_size": self.type_vocab_size,
+                "initializer_range": self.initializer_range,
+                "bos_token_id": self.bos_token_id,
+                "eos_token_id": self.eos_token_id,
+                "pad_token_id": self.pad_token_id,
+            }
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -169,7 +171,7 @@ class GPTModelTester:
         )
 
     def create_and_check_gpt_model(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
@@ -180,7 +182,7 @@ class GPTModelTester:
         self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
 
     def create_and_check_gpt_model_past(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # first forward pass
@@ -212,7 +214,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_gpt_model_attention_mask_past(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # create attention mask
@@ -257,7 +259,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_gpt_model_past_large_inputs(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # first forward pass
@@ -296,8 +298,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
-        base_model = GPTModel(**config)
-        model = GPTLMHeadModel(base_model)
+        model = GPTLMHeadModel(config)
         model.eval()
 
         result = model(
@@ -313,8 +314,7 @@ class GPTModelTester:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
-        base_model = GPTModel(**config)
-        model = GPTLMHeadModel(base_model)
+        model = GPTLMHeadModel(config)
 
         if self.parent.use_labels:
             loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
@@ -323,8 +323,8 @@ class GPTModelTester:
             loss.backward()
 
     def create_and_check_gpt_for_sequence_classification(self, config, input_ids, input_mask, sequence_labels, *args):
-        base_model = GPTModel(**config)
-        model = GPTForSequenceClassification(base_model, self.num_labels)
+        config.num_labels = self.num_labels
+        model = GPTForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -343,9 +343,8 @@ class GPTModelTester:
     def create_and_check_gpt_for_token_classification(
         self, config, input_ids, input_mask, sequence_labels, token_labels, *args
     ):
-        # config.num_labels = self.num_labels
-        base_model = GPTModel(**config)
-        model = GPTForTokenClassification(base_model, self.num_labels)
+        config.num_labels = self.num_labels
+        model = GPTForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -362,7 +361,7 @@ class GPTModelTester:
             self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_gpt_weight_initialization(self, config, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model_std = model.config["initializer_range"] / math.sqrt(2 * model.config["num_hidden_layers"])
         for key in model.state_dict().keys():
             if "out_proj" in key and "weight" in key:
