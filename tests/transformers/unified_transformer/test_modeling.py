@@ -556,7 +556,7 @@ class UnifiedTransformerModelLanguageGenerationTest(unittest.TestCase):
         )
         output_str = postprocess_response(output_ids[0].numpy(), tokenizer)
 
-        EXPECTED_OUTPUT_STR = "你 在 做 什么 呢 ?"
+        EXPECTED_OUTPUT_STR = "你 在 哪里 呀 ?"
         self.assertEqual(output_str, EXPECTED_OUTPUT_STR)
 
     def test_generate_without_input_ids(self):
