@@ -51,8 +51,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.serialization import load_torch
 
 if TYPE_CHECKING:
-    from paddlenlp.transformers import PretrainedModel
-    from paddlenlp.transformers.configuration_utils import PretrainedConfig
+    from paddlenlp.transformers import PretrainedConfig, PretrainedModel
 
 
 # the type hinting for pytorch model & layer & tensor

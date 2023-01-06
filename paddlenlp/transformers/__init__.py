@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
