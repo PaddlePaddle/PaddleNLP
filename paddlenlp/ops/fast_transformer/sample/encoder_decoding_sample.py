@@ -38,12 +38,16 @@ def parse_args():
         "--decoding_lib", default="./build/lib/libdecoding_op.so", type=str, help="Path of libdecoding_op.so. "
     )
     parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--use_int8_decoding", action="store_true", help="Whether to use int8 decoding to predict. ")
     parser.add_argument(
         "--enable_fast_encoder",
         action="store_true",
         help="Whether to use fast version encoder to predict. This is experimental option for now. ",
     )
     parser.add_argument("--use_fp16_encoder", action="store_true", help="Whether to use fp16 encoder to predict. ")
+    parser.add_argument("--batch_size", default=None, type=int, help="Batch size to use. ")
+    parser.add_argument("--beam_size", default=None, type=int, help="Beam size to use. ")
+    parser.add_argument("--seq_len", default=None, type=int, help="Sequence length to use. ")
     args = parser.parse_args()
     return args
 
@@ -87,6 +91,7 @@ def do_predict(args):
         use_fp16_decoding=args.use_fp16_decoding,
         enable_fast_encoder=args.enable_fast_encoder,
         use_fp16_encoder=args.use_fp16_encoder,
+        use_int8=args.use_int8_decoding,
     )
 
     # Set evaluate mode
@@ -104,14 +109,17 @@ def do_predict(args):
     )
 
     with paddle.no_grad():
-        for i in range(100):
+        for i in range(500):
             # For warmup.
             if 50 == i:
                 paddle.device.cuda.synchronize(place)
                 start = time.time()
             transformer(src_word=src_word)
         paddle.device.cuda.synchronize(place)
-        logger.info("Average test time for encoder-decoding is %f ms" % ((time.time() - start) / 50 * 1000))
+        logger.info(
+            "Average test time for batch_size: %d, seq_len: %d, beam_size: %d, encoder-decoding is %f ms"
+            % (args.infer_batch_size, args.max_length, args.beam_size, (time.time() - start) / 450 * 1000)
+        )
 
 
 if __name__ == "__main__":
@@ -121,8 +129,17 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.use_int8_decoding = ARGS.use_int8_decoding
     args.enable_fast_encoder = ARGS.enable_fast_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
+    if ARGS.batch_size is not None:
+        args.infer_batch_size = ARGS.batch_size
+    if ARGS.beam_size is not None:
+        args.beam_size = ARGS.beam_size
+    if ARGS.seq_len is not None:
+        args.max_out_len = ARGS.seq_len
+        args.max_length = ARGS.seq_len
+
     pprint(args)
 
     do_predict(args)

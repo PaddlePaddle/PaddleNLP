@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import functools
 import os
 from collections import defaultdict
@@ -401,6 +402,403 @@ def infer_force_decoding(
 
     return run_custom(
         "fusion_force_decoding", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype
+    )
+
+
+def infer_quant_decoding(
+    enc_output,
+    memory_seq_lens,
+    word_emb,
+    slf_ln_weight,
+    slf_ln_bias,
+    slf_q_weight,
+    slf_q_weight_scale,
+    slf_q_bias,
+    slf_k_weight,
+    slf_k_weight_scale,
+    slf_k_bias,
+    slf_v_weight,
+    slf_v_weight_scale,
+    slf_v_bias,
+    slf_out_weight,
+    slf_out_weight_scale,
+    slf_out_bias,
+    cross_ln_weight,
+    cross_ln_bias,
+    cross_q_weight,
+    cross_q_weight_scale,
+    cross_q_bias,
+    cross_k_weight,
+    cross_k_weight_scale,
+    cross_k_bias,
+    cross_v_weight,
+    cross_v_weight_scale,
+    cross_v_bias,
+    cross_out_weight,
+    cross_out_weight_scale,
+    cross_out_bias,
+    ffn_ln_weight,
+    ffn_ln_bias,
+    ffn_inter_weight,
+    ffn_inter_weight_scale,
+    ffn_inter_bias,
+    ffn_out_weight,
+    ffn_out_weight_scale,
+    ffn_out_bias,
+    decoder_ln_weight,
+    decoder_ln_bias,
+    linear_weight,
+    linear_bias,
+    pos_emb,
+    _decoding_strategy,
+    _beam_size,
+    _topk,
+    _topp,
+    _n_head,
+    _size_per_head,
+    _n_layer,
+    _bos_id,
+    _eos_id,
+    _max_out_len,
+    _diversity_rate,
+    _rel_len,
+    _alpha,
+):
+
+    inputs_names = [
+        "Input",
+        "MemSeqLen",
+        "WordEmbedding",
+        "SelfLayernormWeight@VECTOR",
+        "SelfLayernormBias@VECTOR",
+        "SelfQueryWeight@VECTOR",
+        "SelfQueryWeightScale@VECTOR",
+        "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR",
+        "SelfKeyWeightScale@VECTOR",
+        "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR",
+        "SelfValueWeightScale@VECTOR",
+        "SelfValueBias@VECTOR",
+        "SelfOutWeight@VECTOR",
+        "SelfOutWeightScale@VECTOR",
+        "SelfOutBias@VECTOR",
+        "CrossLayernormWeight@VECTOR",
+        "CrossLayernormBias@VECTOR",
+        "CrossQueryWeight@VECTOR",
+        "CrossQueryWeightScale@VECTOR",
+        "CrossQueryBias@VECTOR",
+        "CrossKeyWeight@VECTOR",
+        "CrossKeyWeightScale@VECTOR",
+        "CrossKeyBias@VECTOR",
+        "CrossValueWeight@VECTOR",
+        "CrossValueWeightScale@VECTOR",
+        "CrossValueBias@VECTOR",
+        "CrossOutWeight@VECTOR",
+        "CrossOutWeightScale@VECTOR",
+        "CrossOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR",
+        "FFNLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR",
+        "FFNInterWeightScale@VECTOR",
+        "FFNInterBias@VECTOR",
+        "FFNOutWeight@VECTOR",
+        "FFNOutWeightScale@VECTOR",
+        "FFNOutBias@VECTOR",
+        "DecoderLayernormWeight",
+        "DecoderLayernormBias",
+        "EmbWeight",
+        "EmbBias",
+        "PositionEncEmb",
+    ]
+
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_weight_scale,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_weight_scale,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_weight_scale,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_weight_scale,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_weight_scale,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_weight_scale,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_weight_scale,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_weight_scale,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_weight_scale,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_weight_scale,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+    ]
+
+    attrs_names = [
+        "decoding_strategy",
+        "beam_size",
+        "topk",
+        "topp",
+        "n_head",
+        "size_per_head",
+        "num_layer",
+        "bos_id",
+        "eos_id",
+        "max_len",
+        "beam_search_diversity_rate",
+        "rel_len",
+        "alpha",
+    ]
+
+    attrs_val = [
+        _decoding_strategy,
+        _beam_size,
+        _topk,
+        _topp,
+        _n_head,
+        _size_per_head,
+        _n_layer,
+        _bos_id,
+        _eos_id,
+        _max_out_len,
+        _diversity_rate,
+        _rel_len,
+        _alpha,
+    ]
+
+    outputs_names = ["OutputIds", "ParentIds", "SequenceLength"]
+
+    outputs_dtype = ["int32"] * len(outputs_names)
+
+    return run_custom(
+        "fusion_quant_decoding", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype
+    )
+
+
+def infer_quant_force_decoding(
+    enc_output,
+    memory_seq_lens,
+    word_emb,
+    slf_ln_weight,
+    slf_ln_bias,
+    slf_q_weight,
+    slf_q_weight_scale,
+    slf_q_bias,
+    slf_k_weight,
+    slf_k_weight_scale,
+    slf_k_bias,
+    slf_v_weight,
+    slf_v_weight_scale,
+    slf_v_bias,
+    slf_out_weight,
+    slf_out_weight_scale,
+    slf_out_bias,
+    cross_ln_weight,
+    cross_ln_bias,
+    cross_q_weight,
+    cross_q_weight_scale,
+    cross_q_bias,
+    cross_k_weight,
+    cross_k_weight_scale,
+    cross_k_bias,
+    cross_v_weight,
+    cross_v_weight_scale,
+    cross_v_bias,
+    cross_out_weight,
+    cross_out_weight_scale,
+    cross_out_bias,
+    ffn_ln_weight,
+    ffn_ln_bias,
+    ffn_inter_weight,
+    ffn_inter_weight_scale,
+    ffn_inter_bias,
+    ffn_out_weight,
+    ffn_out_weight_scale,
+    ffn_out_bias,
+    decoder_ln_weight,
+    decoder_ln_bias,
+    linear_weight,
+    linear_bias,
+    pos_emb,
+    trg_word,
+    _decoding_strategy,
+    _beam_size,
+    _topk,
+    _topp,
+    _n_head,
+    _size_per_head,
+    _n_layer,
+    _bos_id,
+    _eos_id,
+    _max_out_len,
+    _diversity_rate,
+    _rel_len,
+    _alpha,
+):
+
+    inputs_names = [
+        "Input",
+        "MemSeqLen",
+        "WordEmbedding",
+        "SelfLayernormWeight@VECTOR",
+        "SelfLayernormBias@VECTOR",
+        "SelfQueryWeight@VECTOR",
+        "SelfQueryWeightScale@VECTOR",
+        "SelfQueryBias@VECTOR",
+        "SelfKeyWeight@VECTOR",
+        "SelfKeyWeightScale@VECTOR",
+        "SelfKeyBias@VECTOR",
+        "SelfValueWeight@VECTOR",
+        "SelfValueWeightScale@VECTOR",
+        "SelfValueBias@VECTOR",
+        "SelfOutWeight@VECTOR",
+        "SelfOutWeightScale@VECTOR",
+        "SelfOutBias@VECTOR",
+        "CrossLayernormWeight@VECTOR",
+        "CrossLayernormBias@VECTOR",
+        "CrossQueryWeight@VECTOR",
+        "CrossQueryWeightScale@VECTOR",
+        "CrossQueryBias@VECTOR",
+        "CrossKeyWeight@VECTOR",
+        "CrossKeyWeightScale@VECTOR",
+        "CrossKeyBias@VECTOR",
+        "CrossValueWeight@VECTOR",
+        "CrossValueWeightScale@VECTOR",
+        "CrossValueBias@VECTOR",
+        "CrossOutWeight@VECTOR",
+        "CrossOutWeightScale@VECTOR",
+        "CrossOutBias@VECTOR",
+        "FFNLayernormWeight@VECTOR",
+        "FFNLayernormBias@VECTOR",
+        "FFNInterWeight@VECTOR",
+        "FFNInterWeightScale@VECTOR",
+        "FFNInterBias@VECTOR",
+        "FFNOutWeight@VECTOR",
+        "FFNOutWeightScale@VECTOR",
+        "FFNOutBias@VECTOR",
+        "DecoderLayernormWeight",
+        "DecoderLayernormBias",
+        "EmbWeight",
+        "EmbBias",
+        "PositionEncEmb",
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        "TrgWord",
+    ]
+
+    inputs_var = [
+        enc_output,
+        memory_seq_lens,
+        word_emb,
+        slf_ln_weight,
+        slf_ln_bias,
+        slf_q_weight,
+        slf_q_weight_scale,
+        slf_q_bias,
+        slf_k_weight,
+        slf_k_weight_scale,
+        slf_k_bias,
+        slf_v_weight,
+        slf_v_weight_scale,
+        slf_v_bias,
+        slf_out_weight,
+        slf_out_weight_scale,
+        slf_out_bias,
+        cross_ln_weight,
+        cross_ln_bias,
+        cross_q_weight,
+        cross_q_weight_scale,
+        cross_q_bias,
+        cross_k_weight,
+        cross_k_weight_scale,
+        cross_k_bias,
+        cross_v_weight,
+        cross_v_weight_scale,
+        cross_v_bias,
+        cross_out_weight,
+        cross_out_weight_scale,
+        cross_out_bias,
+        ffn_ln_weight,
+        ffn_ln_bias,
+        ffn_inter_weight,
+        ffn_inter_weight_scale,
+        ffn_inter_bias,
+        ffn_out_weight,
+        ffn_out_weight_scale,
+        ffn_out_bias,
+        decoder_ln_weight,
+        decoder_ln_bias,
+        linear_weight,
+        linear_bias,
+        pos_emb,
+        # The input of custom op must be given.
+        # Dispensable() and Intermediate() are not supported.
+        trg_word,
+    ]
+
+    attrs_names = [
+        "decoding_strategy",
+        "beam_size",
+        "topk",
+        "topp",
+        "n_head",
+        "size_per_head",
+        "num_layer",
+        "bos_id",
+        "eos_id",
+        "max_len",
+        "beam_search_diversity_rate",
+        "rel_len",
+        "alpha",
+    ]
+
+    attrs_val = [
+        _decoding_strategy,
+        _beam_size,
+        _topk,
+        _topp,
+        _n_head,
+        _size_per_head,
+        _n_layer,
+        _bos_id,
+        _eos_id,
+        _max_out_len,
+        _diversity_rate,
+        _rel_len,
+        _alpha,
+    ]
+
+    outputs_names = ["OutputIds", "ParentIds", "SequenceLength"]
+
+    outputs_dtype = ["int32"] * len(outputs_names)
+
+    return run_custom(
+        "fusion_quant_force_decoding", inputs_names, inputs_var, attrs_names, attrs_val, outputs_names, outputs_dtype
     )
 
 
@@ -2146,6 +2544,7 @@ class InferTransformerDecoding(nn.Layer):
         use_fp16_decoding=False,
         rel_len=False,
         alpha=0.6,
+        use_int8=True,
     ):
         # if decoding_lib is None:
         #     raise ValueError(
@@ -2217,30 +2616,40 @@ class InferTransformerDecoding(nn.Layer):
         self.slf_ln_weight = []
         self.slf_ln_bias = []
         self.slf_q_weight = []
+        self.slf_q_weight_scale = []
         self.slf_q_bias = []
         self.slf_k_weight = []
+        self.slf_k_weight_scale = []
         self.slf_k_bias = []
         self.slf_v_weight = []
+        self.slf_v_weight_scale = []
         self.slf_v_bias = []
         self.slf_out_weight = []
+        self.slf_out_weight_scale = []
         self.slf_out_bias = []
 
         self.cross_ln_weight = []
         self.cross_ln_bias = []
         self.cross_q_weight = []
+        self.cross_q_weight_scale = []
         self.cross_q_bias = []
         self.cross_k_weight = []
+        self.cross_k_weight_scale = []
         self.cross_k_bias = []
         self.cross_v_weight = []
+        self.cross_v_weight_scale = []
         self.cross_v_bias = []
         self.cross_out_weight = []
+        self.cross_out_weight_scale = []
         self.cross_out_bias = []
 
         self.ffn_ln_weight = []
         self.ffn_ln_bias = []
         self.ffn_inter_weight = []
+        self.ffn_inter_weight_scale = []
         self.ffn_inter_bias = []
         self.ffn_out_weight = []
+        self.ffn_out_weight_scale = []
         self.ffn_out_bias = []
 
         for i, mod in enumerate(decoder.layers):
@@ -2257,7 +2666,13 @@ class InferTransformerDecoding(nn.Layer):
                     dtype="float16" if use_fp16_decoding else "float32",
                 )
                 setattr(self, "slf_q_weight_" + str(i), q_weights)
-                self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
+
+                if use_int8:
+                    self.create_int8_parameter(
+                        prefix="self_attn_q_proj_weight", parameter=getattr(self, "slf_q_weight_" + str(i)), layer=i
+                    )
+                else:
+                    self.slf_q_weight.append(getattr(self, "slf_q_weight_" + str(i)))
 
                 q_bias_shape = mod.self_attn.q_proj.bias.shape
                 k_bias_shape = mod.self_attn.k_proj.bias.shape
@@ -2271,32 +2686,107 @@ class InferTransformerDecoding(nn.Layer):
                 setattr(self, "slf_q_bias_" + str(i), q_biases)
                 self.slf_q_bias.append(getattr(self, "slf_q_bias_" + str(i)))
             else:
-                self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+
+                if use_int8:
+                    self.create_int8_parameter(
+                        prefix="self_attn_q_proj_weight", parameter=mod.self_attn.q_proj.weight, layer=i
+                    )
+                else:
+                    self.slf_q_weight.append(mod.self_attn.q_proj.weight)
+
                 self.slf_q_bias.append(mod.self_attn.q_proj.bias)
 
-            self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+            self.fake_scale = paddle.zeros(shape=[0], dtype="float16" if use_fp16_decoding else "float32")
+            if use_int8:
+                self.create_int8_parameter(
+                    prefix="self_attn_k_proj_weight", parameter=mod.self_attn.k_proj.weight, layer=i
+                )
+                self.create_int8_parameter(
+                    prefix="self_attn_v_proj_weight", parameter=mod.self_attn.v_proj.weight, layer=i
+                )
+                self.create_int8_parameter(
+                    prefix="self_attn_out_proj_weight", parameter=mod.cross_attn.out_proj.weight, layer=i
+                )
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_q_proj_weight", parameter=mod.cross_attn.q_proj.weight, layer=i
+                )
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_k_proj_weight", parameter=mod.cross_attn.k_proj.weight, layer=i
+                )
+                self.create_int8_parameter(
+                    prefix="cross_attn_v_proj_weight", parameter=mod.cross_attn.v_proj.weight, layer=i
+                )
+
+                self.create_int8_parameter(
+                    prefix="cross_attn_out_proj_weight", parameter=mod.cross_attn.out_proj.weight, layer=i
+                )
+
+                self.create_int8_parameter(prefix="linear1_weight", parameter=mod.linear1.weight, layer=i)
+                self.create_int8_parameter(prefix="linear2_weight", parameter=mod.linear2.weight, layer=i)
+
+                # Append corresponding param into the list.
+                self.slf_q_weight.append(getattr(self, "self_attn_q_proj_weight_" + str(i)))
+                self.slf_q_weight_scale.append(getattr(self, "self_attn_q_proj_weight_scale_" + str(i)))
+
+                self.slf_k_weight.append(getattr(self, "self_attn_k_proj_weight_" + str(i)))
+                self.slf_k_weight_scale.append(getattr(self, "self_attn_k_proj_weight_scale_" + str(i)))
+
+                self.slf_v_weight.append(getattr(self, "self_attn_v_proj_weight_" + str(i)))
+                self.slf_v_weight_scale.append(getattr(self, "self_attn_v_proj_weight_scale_" + str(i)))
+
+                self.slf_out_weight.append(getattr(self, "self_attn_out_proj_weight_" + str(i)))
+                self.slf_out_weight_scale.append(getattr(self, "self_attn_out_proj_weight_scale_" + str(i)))
+
+                self.cross_q_weight.append(getattr(self, "cross_attn_q_proj_weight_" + str(i)))
+                self.cross_q_weight_scale.append(getattr(self, "cross_attn_q_proj_weight_scale_" + str(i)))
+
+                self.cross_k_weight.append(getattr(self, "cross_attn_k_proj_weight_" + str(i)))
+                self.cross_k_weight_scale.append(getattr(self, "cross_attn_k_proj_weight_scale_" + str(i)))
+
+                self.cross_v_weight.append(getattr(self, "cross_attn_v_proj_weight_" + str(i)))
+                self.cross_v_weight_scale.append(getattr(self, "cross_attn_v_proj_weight_scale_" + str(i)))
+
+                self.cross_out_weight.append(getattr(self, "cross_attn_out_proj_weight_" + str(i)))
+                self.cross_out_weight_scale.append(getattr(self, "cross_attn_out_proj_weight_scale_" + str(i)))
+
+                self.ffn_inter_weight.append(getattr(self, "linear1_weight_" + str(i)))
+                self.ffn_inter_weight_scale.append(getattr(self, "linear1_weight_scale_" + str(i)))
+
+                self.ffn_out_weight.append(getattr(self, "linear2_weight_" + str(i)))
+                self.ffn_out_weight_scale.append(getattr(self, "linear2_weight_scale_" + str(i)))
+            else:
+                self.slf_k_weight.append(mod.self_attn.k_proj.weight)
+                self.slf_v_weight.append(mod.self_attn.v_proj.weight)
+                self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+
+                self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
+                self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
+                self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
+                self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+
+                self.ffn_inter_weight.append(mod.linear1.weight)
+                self.ffn_out_weight.append(mod.linear2.weight)
+
             self.slf_k_bias.append(mod.self_attn.k_proj.bias)
-            self.slf_v_weight.append(mod.self_attn.v_proj.weight)
             self.slf_v_bias.append(mod.self_attn.v_proj.bias)
-            self.slf_out_weight.append(mod.self_attn.out_proj.weight)
+
             self.slf_out_bias.append(mod.self_attn.out_proj.bias)
 
             self.cross_ln_weight.append(mod.norm2.weight)
             self.cross_ln_bias.append(mod.norm2.bias)
-            self.cross_q_weight.append(mod.cross_attn.q_proj.weight)
+
             self.cross_q_bias.append(mod.cross_attn.q_proj.bias)
-            self.cross_k_weight.append(mod.cross_attn.k_proj.weight)
             self.cross_k_bias.append(mod.cross_attn.k_proj.bias)
-            self.cross_v_weight.append(mod.cross_attn.v_proj.weight)
             self.cross_v_bias.append(mod.cross_attn.v_proj.bias)
-            self.cross_out_weight.append(mod.cross_attn.out_proj.weight)
+
             self.cross_out_bias.append(mod.cross_attn.out_proj.bias)
 
             self.ffn_ln_weight.append(mod.norm3.weight)
             self.ffn_ln_bias.append(mod.norm3.bias)
-            self.ffn_inter_weight.append(mod.linear1.weight)
+
             self.ffn_inter_bias.append(mod.linear1.bias)
-            self.ffn_out_weight.append(mod.linear2.weight)
             self.ffn_out_bias.append(mod.linear2.bias)
 
         self.decoder_ln_weight = [decoder.norm.weight]
@@ -2307,6 +2797,29 @@ class InferTransformerDecoding(nn.Layer):
 
         self.linear_weight = [linear.weight]
         self.linear_bias = [linear.bias]
+
+    def create_int8_parameter(self, prefix, parameter, layer):
+        setattr(self, prefix + "_" + str(layer), paddle.cast(parameter, dtype="int8"))
+        setattr(
+            self,
+            prefix + "_scale_" + str(layer),
+            paddle.create_parameter(
+                shape=[parameter.shape[1]], dtype="float16" if self._use_fp16_decoding else "float32"
+            ),
+        )
+
+        del parameter
+
+    def get_scale(self, scale):
+        if len(scale) == 0:
+            # Reuse the same param to prevent performance issue.
+            return [self.fake_scale]
+        else:
+            return scale
+
+    def get_sm(self):
+        major, minor = paddle.device.cuda.get_device_capability()
+        return major * 10 + minor
 
     def forward(self, enc_output, memory_seq_lens, trg_word=None):
         def parse_function(func_name):
@@ -2359,6 +2872,66 @@ class InferTransformerDecoding(nn.Layer):
                 _alpha=self._alpha,
             )
 
+        def parse_quant_function(func_name):
+            return partial(
+                func_name,
+                word_emb=self.word_emb,
+                slf_ln_weight=self.slf_ln_weight,
+                slf_ln_bias=self.slf_ln_bias,
+                slf_q_weight=self.slf_q_weight,
+                slf_q_weight_scale=self.get_scale(self.slf_q_weight_scale),
+                slf_q_bias=self.slf_q_bias,
+                slf_k_weight=self.slf_k_weight,
+                slf_k_weight_scale=self.get_scale(self.slf_k_weight_scale),
+                slf_k_bias=self.slf_k_bias,
+                slf_v_weight=self.slf_v_weight,
+                slf_v_weight_scale=self.get_scale(self.slf_v_weight_scale),
+                slf_v_bias=self.slf_v_bias,
+                slf_out_weight=self.slf_out_weight,
+                slf_out_weight_scale=self.get_scale(self.slf_out_weight_scale),
+                slf_out_bias=self.slf_out_bias,
+                cross_ln_weight=self.cross_ln_weight,
+                cross_ln_bias=self.cross_ln_bias,
+                cross_q_weight=self.cross_q_weight,
+                cross_q_weight_scale=self.get_scale(self.cross_q_weight_scale),
+                cross_q_bias=self.cross_q_bias,
+                cross_k_weight=self.cross_k_weight,
+                cross_k_weight_scale=self.get_scale(self.cross_k_weight_scale),
+                cross_k_bias=self.cross_k_bias,
+                cross_v_weight=self.cross_v_weight,
+                cross_v_weight_scale=self.get_scale(self.cross_v_weight_scale),
+                cross_v_bias=self.cross_v_bias,
+                cross_out_weight=self.cross_out_weight,
+                cross_out_weight_scale=self.get_scale(self.cross_out_weight_scale),
+                cross_out_bias=self.cross_out_bias,
+                ffn_ln_weight=self.ffn_ln_weight,
+                ffn_ln_bias=self.ffn_ln_bias,
+                ffn_inter_weight=self.ffn_inter_weight,
+                ffn_inter_weight_scale=self.get_scale(self.ffn_inter_weight_scale),
+                ffn_inter_bias=self.ffn_inter_bias,
+                ffn_out_weight=self.ffn_out_weight,
+                ffn_out_weight_scale=self.get_scale(self.ffn_out_weight_scale),
+                ffn_out_bias=self.ffn_out_bias,
+                decoder_ln_weight=self.decoder_ln_weight,
+                decoder_ln_bias=self.decoder_ln_bias,
+                linear_weight=self.linear_weight,
+                linear_bias=self.linear_bias,
+                pos_emb=self.pos_emb,
+                _decoding_strategy=self._decoding_strategy,
+                _beam_size=self._beam_size,
+                _topk=self._topk,
+                _topp=self._topp,
+                _n_head=self._n_head,
+                _size_per_head=int(self._d_model / self._n_head),
+                _n_layer=self._num_decoder_layers,
+                _bos_id=self._bos_id,
+                _eos_id=self._eos_id,
+                _max_out_len=self._max_out_len,
+                _diversity_rate=self._diversity_rate,
+                _rel_len=self._rel_len,
+                _alpha=self._alpha,
+            )
+
         if self._decoding_strategy.startswith("beam_search"):
             # TODO: Due to paddle.tile bug in static graph, tile_beam_merge_with_batch
             # cannot work properly. These comments should be opened after PaddlePaddle v2.2.2.
@@ -2380,14 +2953,25 @@ class InferTransformerDecoding(nn.Layer):
                     [batch_size * self._beam_size]
                 )
 
-        if trg_word is None:
-            output_ids, parent_ids, sequence_length = parse_function(infer_transformer_decoding)(
-                enc_output=[enc_output], memory_seq_lens=[memory_seq_lens]
-            )
+        if self._use_int8:
+            if trg_word is None:
+                output_ids, parent_ids, sequence_length = parse_quant_function(infer_quant_decoding)(
+                    enc_output=[enc_output], memory_seq_lens=[memory_seq_lens]
+                )
+            else:
+                output_ids, parent_ids, sequence_length = parse_quant_function(infer_quant_force_decoding)(
+                    enc_output=[enc_output], memory_seq_lens=[memory_seq_lens], trg_word=[trg_word]
+                )
+
         else:
-            output_ids, parent_ids, sequence_length = parse_function(infer_force_decoding)(
-                enc_output=[enc_output], memory_seq_lens=[memory_seq_lens], trg_word=[trg_word]
-            )
+            if trg_word is None:
+                output_ids, parent_ids, sequence_length = parse_function(infer_transformer_decoding)(
+                    enc_output=[enc_output], memory_seq_lens=[memory_seq_lens]
+                )
+            else:
+                output_ids, parent_ids, sequence_length = parse_function(infer_force_decoding)(
+                    enc_output=[enc_output], memory_seq_lens=[memory_seq_lens], trg_word=[trg_word]
+                )
 
         ids = finalize(
             self._beam_size, output_ids, parent_ids, sequence_length, decoding_strategy=self._decoding_strategy

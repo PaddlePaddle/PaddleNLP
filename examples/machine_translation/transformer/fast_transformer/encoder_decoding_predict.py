@@ -41,6 +41,7 @@ def parse_args():
         help="Path of libdecoding_op.so. ",
     )
     parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--use_int8_decoding", action="store_true", help="Whether to use int8 decoding to predict. ")
     parser.add_argument(
         "--enable_fast_encoder",
         action="store_true",
@@ -168,12 +169,15 @@ def do_predict(args):
         pad_id=args.pad_idx,
         decoding_strategy=args.decoding_strategy,
         beam_size=args.beam_size,
+        topk=args.topk,
+        topp=args.topp,
         max_out_len=args.max_out_len,
         diversity_rate=args.diversity_rate,
         decoding_lib=args.decoding_lib,
         use_fp16_decoding=args.use_fp16_decoding,
         enable_fast_encoder=args.enable_fast_encoder,
         use_fp16_encoder=args.use_fp16_encoder,
+        use_int8=args.use_int8_decoding,
     )
 
     # Set evaluate mode
@@ -240,6 +244,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.use_int8_decoding = ARGS.use_int8_decoding
     args.enable_fast_encoder = ARGS.enable_fast_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy

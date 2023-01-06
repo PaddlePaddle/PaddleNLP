@@ -40,6 +40,7 @@ def parse_args():
         help="Path of libdecoding_op.so. ",
     )
     parser.add_argument("--use_fp16_decoding", action="store_true", help="Whether to use fp16 decoding to predict. ")
+    parser.add_argument("--use_int8_decoding", action="store_true", help="Whether to use int8 decoding to predict. ")
     parser.add_argument(
         "--enable_fast_encoder",
         action="store_true",
@@ -129,6 +130,7 @@ def do_predict(args):
         use_fp16_encoder=args.use_fp16_encoder,
         rel_len=args.use_rel_len,
         alpha=args.alpha,
+        use_int8=args.use_int8_decoding,
     )
 
     # Set evaluate mode
@@ -163,6 +165,7 @@ if __name__ == "__main__":
         args = AttrDict(yaml.safe_load(f))
     args.decoding_lib = ARGS.decoding_lib
     args.use_fp16_decoding = ARGS.use_fp16_decoding
+    args.use_int8_decoding = ARGS.use_int8_decoding
     args.enable_fast_encoder = ARGS.enable_fast_encoder
     args.use_fp16_encoder = ARGS.use_fp16_encoder
     args.decoding_strategy = ARGS.decoding_strategy

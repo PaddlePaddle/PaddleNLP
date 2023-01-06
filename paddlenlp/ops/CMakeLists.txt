@@ -54,10 +54,11 @@ if(NOT WITH_GPU)
   message(FATAL_ERROR "Faster transformer custom op doesn't support CPU. Please add the flag -DWITH_GPU=ON to use GPU. ")
 endif()
 
-list(APPEND decoding_op_files cublas_handle.cc)
+list(APPEND decoding_op_files cublas_handle.cc sm.cc)
 
 if(WITH_TRANSFORMER)
   list(APPEND decoding_op_files fusion_decoding_op.cc fusion_decoding_op.cu fusion_force_decoding_op.cc fusion_force_decoding_op.cu)
+  list(APPEND decoding_op_files fusion_quant_decoding_op.cc fusion_quant_decoding_op.cu fusion_quant_force_decoding_op.cc fusion_quant_force_decoding_op.cu)
 endif()
 
 if(WITH_GPT)
@@ -282,6 +283,9 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common.h common_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common.h common_dst)
 
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/functions.h functions_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/functions.h functions_dst)
+
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/utils/common_structure.h common_structure_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/utils/common_structure.h common_structure_dst)
 
@@ -304,6 +308,12 @@ file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/cuda_kernels.cu cuda_kernels_cu_src)
 file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_kernels.cu cuda_kernels_cu_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/cuda_int8_kernels.h cuda_int8_kernels_h_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_int8_kernels.h cuda_int8_kernels_h_dst)
+
+file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/cuda_int8_kernels.cu cuda_int8_kernels_cu_src)
+file(TO_NATIVE_PATH ${CMAKE_BINARY_DIR}/${THIRD_PATH}/source/${THIRD_PARTY_NAME}/fastertransformer/cuda/cuda_int8_kernels.cu cuda_int8_kernels_cu_dst)
 
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/decoding_kernels.cu decoding_kernels_cu_src)
 file(TO_NATIVE_PATH ${OPS_SOURCE_DIR}/patches/FasterTransformer/fastertransformer/cuda/transformer_decoding_kernels.cu trans_decoding_kernels_cu_src)
@@ -396,10 +406,10 @@ set(FT_PATCH_COMMAND
   && cp ${standard_encoder_h_src} ${standard_encoder_h_dst}
   && cp ${bert_encoder_transformer_h_src} ${bert_encoder_transformer_h_dst}
   && cp ${trans_kernels_cu_src} ${trans_kernels_cu_dst}
-  && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
   && cp ${open_attention_h_src} ${open_attention_h_dst}
   && cp ${fastertransformer_cmakelists_src} ${fastertransformer_cmakelists_dst}
   && cp ${gpt_h_src} ${gpt_h_dst}
+  && cp ${masked_multihead_attention_cu_src} ${masked_multihead_attention_cu_dst}
   && cp ${opt_h_src} ${opt_h_dst}
   && cp ${gptj_h_src} ${gptj_h_dst}
   && cp ${masked_multihead_attention_h_src} ${masked_multihead_attention_h_dst}
@@ -411,11 +421,14 @@ set(FT_PATCH_COMMAND
   && cat blank_lines ${cuda_kernels_h_src} >> ${cuda_kernels_h_dst}
   && cat blank_lines ${lightseq_kernels_cu_src} >> ${topk_kernels_dst}
   && cat blank_lines ${cuda_kernels_cu_src} >> ${cuda_kernels_cu_dst}
+  && cat blank_lines ${cuda_int8_kernels_h_src} >> ${cuda_int8_kernels_h_dst}
+  && cat blank_lines ${cuda_int8_kernels_cu_src} >> ${cuda_int8_kernels_cu_dst}
   && cat blank_lines ${decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${topk_kernels_cuh_src} >> ${topk_kernels_cuh_dst}
   && cat blank_lines ${trans_decoding_kernels_cu_src} >> ${decoding_kernels_cu_dst}
   && cat blank_lines ${open_decoder_cu_src} >> ${open_decoder_cu_dst}
   && cat blank_lines ${open_decoder_cuh_src} >> ${open_decoder_cuh_dst}
+  && cat blank_lines ${functions_src} >> ${functions_dst}
   && cat blank_lines ${trans_kernels_cuh_src} >> ${trans_kernels_cuh_dst}
   && sed -i "s/^#define NEW_TRANSPOSE_BATCH_MAJOR 1/#define NEW_TRANSPOSE_BATCH_MAJOR 0/g" ${open_decoder_cu_dst}
   && sed -i "2091,2119d" ${open_attention_cu_dst}

@@ -11,8 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 import shutil
+from functools import partial
 
 import numpy as np
 import paddle
@@ -52,6 +54,7 @@ from paddlenlp.transformers import (
 from paddlenlp.utils.log import logger
 
 from .encoder import enable_fast_encoder
+from .quant_utils import weight_channel_wise_quantize, weight_COL_channel_wise_quantize
 
 
 class FasterTransformer(TransformerModel):
@@ -138,6 +141,13 @@ class FasterTransformer(TransformerModel):
             The power number in length penalty calculation. Only works in `v2`
             temporarily. Refer to `GNMT <https://arxiv.org/pdf/1609.08144.pdf>`_.
             Default to 0.6 if not set.
+        use_int8(bool, optional):
+            Whether to use int8 to decode. Defaults to False which mean do NOT use
+            int8 to decode.
+        sm(int, optional):
+            When `use_int8` is True. It's necessary to provide the compute capability
+            of the GPU to use. Otherwise, if it's None, the compute capability of the
+            current GPU will be used. For example, T4(sm = 75), P4(sm = 61).
     """
 
     def __init__(
@@ -169,6 +179,8 @@ class FasterTransformer(TransformerModel):
         use_fp16_encoder=False,
         rel_len=False,
         alpha=0.6,
+        use_int8=False,
+        sm=None,
     ):
         # if decoding_lib is None:
         #     raise ValueError(
@@ -191,6 +203,8 @@ class FasterTransformer(TransformerModel):
         self.use_fp16_encoder = args.pop("use_fp16_encoder")
         self.rel_len = args.pop("rel_len")
         self.alpha = args.pop("alpha")
+        self.use_int8 = args.pop("use_int8")
+        self.sm = args.pop("sm")
         self.dropout = dropout
         self.weight_sharing = weight_sharing
         self.trg_vocab_size = trg_vocab_size
@@ -231,6 +245,7 @@ class FasterTransformer(TransformerModel):
             use_fp16_decoding=self.use_fp16_decoding,
             rel_len=self.rel_len,
             alpha=self.alpha,
+            use_int8=self.use_int8,
         )
 
     def forward(self, src_word, trg_word=None):
@@ -310,6 +325,42 @@ class FasterTransformer(TransformerModel):
                 state_dict["trg_pos_embedding.pos_encoder.weight"]
             )
             state_dict["decoding_linear.bias"] = np.zeros([self.trg_vocab_size], dtype="float16")
+
+        if self.use_int8:
+            if self.sm is None:
+                self.sm = self.decoding.get_sm()
+
+            if self.sm >= 75:
+                quantize_function = partial(
+                    weight_COL_channel_wise_quantize, use_fp16_decoding=self.use_fp16_decoding, sm=self.sm
+                )
+            else:
+                quantize_function = partial(weight_channel_wise_quantize, use_fp16_decoding=self.use_fp16_decoding)
+
+            for item in self.state_dict():
+                if "decoder" in item and "weight" in item and "norm" not in item and "embedding" not in item:
+
+                    item_list = item.split(".")
+                    num_layer = item_list[3]
+
+                    # Fused qkv setting.
+                    if self.decoding._fuse_qkv and "self_attn.q_proj" in item:
+                        param_type = item_list[-1]
+                        w_int8, w_scale = quantize_function(
+                            weight=state_dict["decoding.slf_q_" + param_type + "_" + num_layer]
+                        )
+                        state_dict["decoding.slf_q_" + param_type + "_" + num_layer] = None
+                        del state_dict["decoding.slf_q_" + param_type + "_" + num_layer]
+                    else:
+                        w_int8, w_scale = quantize_function(weight=state_dict[item])
+
+                    param_state = "_".join(item_list[4:])
+
+                    param = getattr(self.decoding, param_state + "_" + num_layer)
+                    param.set_value(w_int8)
+
+                    scale = getattr(self.decoding, param_state + "_scale_" + num_layer)
+                    scale.set_value(w_scale)
 
         self.load_dict(state_dict)
 

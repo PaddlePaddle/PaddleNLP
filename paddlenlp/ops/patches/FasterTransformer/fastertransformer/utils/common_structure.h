@@ -17,10 +17,16 @@
 
 #pragma once
 
+#include "fastertransformer/utils/common.h"
+
+
 template<typename T>
 struct DenseWeight{
     const T* kernel = nullptr;
     const T* bias = nullptr;
+
+    const int8_t* int8_kernel = nullptr;
+    const T* kernel_scale = nullptr;
 };
 
 template<typename T>

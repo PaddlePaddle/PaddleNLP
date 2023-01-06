@@ -53,6 +53,8 @@ private:
   DataType_ **V_mem_cache_;
   DataType_ *from_tensor_[2];
   DataType_ *decoder_buf_;
+  void *decoder_int8_buf_;
+
   DataType_ *decoder_normed_result_buf_;
   DataType_ *embedding_buf_;
   DataType_ *trans_out_buf_;
@@ -65,6 +67,8 @@ private:
   void *buf_;
   int *finished_count_buf_;
   bool *h_finished_buf_;
+
+  bool use_int8_ = false;
 
   void *topk_workspace_ = nullptr;
   size_t topk_workspace_size_ = 0;
@@ -106,8 +110,10 @@ public:
                    const int inner_coeff = 4,
                    const int seed = -1,
                    const int tensor_para_size = 1,
-                   const int layer_para_size = 1)
-      : allocator_(allocator) {
+                   const int layer_para_size = 1,
+                   const bool use_int8 = false,
+                   const int sm = -1)
+      : allocator_(allocator), use_int8_(use_int8) {
     args_.batch_size_ = batch_size;
     args_.seq_len_ = seq_len;
     args_.memory_max_seq_len_ = memory_max_seq_len;
@@ -171,8 +177,17 @@ public:
                                         is_fuse_qkv,
                                         normalization_before,
                                         args_.act_,
-                                        inner_coeff);
+                                        inner_coeff,
+                                        -1,
+                                        false,
+                                        use_int8_,
+                                        args_.memory_max_seq_len_,
+                                        sm);
+
     decoder_->set_max_batch_size(batch_size);
+
+    size_t decoder_int8_workspace_size =
+        (use_int8_) ? ceil(decoder_->getInt8WorkspaceSize() / 32.) * 32 : 0;
 
     size_t from_tensor_size =
         args_.batch_size_ * args_.hidden_units_;                   // type T
@@ -256,6 +271,7 @@ public:
         decoder_normed_result_buffer_size * 3;
 
     buf_ = reinterpret_cast<void *>(allocator_.malloc(
+        decoder_int8_workspace_size +
         ((sizeof(DataType_) == sizeof(half)) ? CUBLAS_WORKSPACE_SIZE : 0) +
         sizeof(DataType_) * (datatype_buf_size + logits_buf_size) +
         sizeof(DataType_) *
@@ -266,7 +282,14 @@ public:
         topp_workspace_size_ + topk_workspace_size_ +
         curandState_size * sizeof(curandState_t)));
 
-    if (sizeof(DataType_) == sizeof(half)) {
+    if (use_int8_) {
+      decoder_int8_buf_ = buf_;
+      buf_ = buf_ + decoder_int8_workspace_size;
+    } else {
+      decoder_int8_buf_ = nullptr;
+    }
+
+    if (sizeof(DataType_) == sizeof(half) && !use_int8_) {
       cublas_workspace_ = buf_;
       from_tensor_[0] =
           (DataType_ *)((char *)cublas_workspace_ + CUBLAS_WORKSPACE_SIZE);
@@ -726,7 +749,11 @@ public:
 
             The decoder_buf_ is reused.
           */
-          decoder_->initialize(param[layer], decoder_buf_, cublas_workspace_);
+          decoder_->initialize(param[layer],
+                               decoder_buf_,
+                               cublas_workspace_,
+                               true,
+                               decoder_int8_buf_);
 
 #ifndef NDEBUG
           cudaDeviceSynchronize();
@@ -1148,6 +1175,11 @@ public:
     delete[] h_finished_buf_;
     delete[] h_trg_length_;
     delete decoder_;
+
+    if (use_int8_) {
+      buf_ = decoder_int8_buf_;
+    }
+
     allocator_.free(buf_);
   }
 };
