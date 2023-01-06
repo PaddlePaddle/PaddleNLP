@@ -87,21 +87,22 @@ mv gpt_en_dataset_300m_idx.npz ./data
 
 ```shell
 CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+  --model_name_or_path gpt2-en \
+  --input_dir ./data \
+  --output_dir ./output_dir/pretrain \
+  --weight_decay 0.01 \
+  --max_steps 500000 \
+  --save_steps 100000 \
+  --device gpu \
+  --warmup_steps 320000 \
+  --warmup_ratio 0.01 \
+  --per_device_train_batch_size 4 \
+  --eval_steps 100 \
+  --do_train true \
+  --do_predict true
 ```
 
-其中参数释义如下：
+ 配置文件中参数释义如下：
 - `model_name_or_path` 要训练的模型或者之前训练的checkpoint。
 - `input_dir` 指定输入文件，可以使用目录，指定目录时将包括目录中的所有文件。
 - `output_dir` 指定输出文件。
@@ -112,8 +113,6 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 - `mirco_batch_size` 训练的batch大小
 - `device` 训练设备
 
-用户也可以使用提供的shell脚本直接训练`sh scripts/run.sh`.
-
 #### 单机多卡
 
 同样，可以执行如下命令实现八卡训练：
@@ -121,21 +120,20 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-en \
-    --input_dir "./data"\
-    --output_dir "output"\
-    --weight_decay 0.01\
-    --grad_clip 1.0\
-    --max_steps 500000\
-    --save_steps 100000\
-    --decay_steps 320000\
-    --warmup_rate 0.01\
-    --micro_batch_size 4\
-    --device gpu
+  --model_name_or_path gpt2-en \
+  --input_dir ./data \
+  --output_dir ./output_dir/pretrain \
+  --weight_decay 0.01 \
+  --max_steps 500000 \
+  --save_steps 100000 \
+  --device gpu \
+  --warmup_steps 320000 \
+  --warmup_ratio 0.01 \
+  --per_device_train_batch_size 4 \
+  --eval_steps 100 \
+  --do_train true \
+  --do_predict true
 ```
-
-用户也可以使用提供的shell脚本直接训练`sh scripts/run_multi.sh`.
 
 ### 模型评估
 
@@ -153,6 +151,7 @@ python run_eval.py --model_name gpt2-en \
 
 2. LAMBADA数据集评估
 ```bash
+# 覆盖default.yaml中的eval_path配置字段
 python run_eval.py --model_name gpt2-en \
     --eval_path ./lambada_test.jsonl \
     --cloze_eval \
@@ -160,6 +159,7 @@ python run_eval.py --model_name gpt2-en \
     --batch_size 8 \
     --device gpu
 ```
+
 其中参数释义如下：
 `model_name` 使用的模型名称，如gpt2-en、gpt2-medium-en等。
 `eval_path` 数据集地址。
@@ -172,7 +172,6 @@ python run_eval.py --model_name gpt2-en \
 其中数据集WikiText采用的是PPL(perplexity)评估指标，LAMBADA采用的是ACC(accuracy)指标。
 
 注：不设置`init_checkpoint_path` 参数时，可以评估默认预训练好的模型参数。
-
 
 ### 文本生成
 
@@ -268,21 +267,21 @@ qa(["中国国土面积有多大？", "中国的首都在哪里？"])
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_glue.py \
-    --model_type gpt \
-    --model_name_or_path gpt2-medium-en \
-    --task_name SST-2 \
-    --max_seq_length 128 \
-    --batch_size 32   \
-    --learning_rate 2e-5 \
-    --num_train_epochs 3 \
-    --logging_steps 1 \
-    --save_steps 500 \
-    --output_dir ./tmp/ \
-    --device gpu \
-    --use_amp False
+  --model_name_or_path gpt2-medium-en \
+  --task_name SST-2 \
+  --max_seq_length 128 \
+  --per_device_train_batch_size 32   \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 1 \
+  --save_steps 500 \
+  --output_dir ./output_dir/glue \
+  --eval_steps 1 \
+  --device gpu \
+  --do_train true
 ```
 
-其中参数释义如下：
+配置文件中的参数释义如下：
 - `model_type` 指示了模型类型。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `task_name` 表示Fine-tuning的任务。
@@ -310,18 +309,19 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus "0" run_msra_ner.py \
-    --model_name_or_path gpt-cpm-small-cn-distill \
-    --max_seq_length 128 \
-    --batch_size 32 \
-    --learning_rate 2e-5 \
-    --num_train_epochs 3 \
-    --logging_steps 25 \
-    --save_steps 250 \
-    --output_dir ./tmp/msra_ner/ \
-    --device gpu
+  --model_name_or_path gpt-cpm-small-cn-distill \
+  --max_seq_length 128 \
+  --per_device_eval_batch_size 32 \
+  --learning_rate 2e-5 \
+  --num_train_epochs 3 \
+  --logging_steps 25 \
+  --save_steps 250 \
+  --output_dir ./tmp/msra_ner/ \
+  --device gpu  \
+  --do_train true
 ```
 
-其中参数释义如下：
+配置文件中参数释义如下：
 - `model_name_or_path`: 指示了某种特定配置的模型。
 - `max_seq_length`: 表示最大句子长度，超过该长度将被截断。
 - `batch_size`: 表示每次迭代**每张卡**上的样本数目。

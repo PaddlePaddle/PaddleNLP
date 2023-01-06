@@ -239,18 +239,19 @@ if [ ! -f 'test.py' ];then
     cd ../
     # pretrain
     python -m paddle.distributed.launch run_pretrain.py \
-        --model_type gpt \
-        --model_name_or_path gpt2-en \
-        --input_dir "./pre_data"\
-        --output_dir "output"\
-        --weight_decay 0.01\
-        --grad_clip 1.0\
-        --max_steps 2\
-        --save_steps 2\
-        --decay_steps 320000\
-        --warmup_rate 0.01\
-        --micro_batch_size 2 \
-        --device gpu >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
+    --model_name_or_path "__internal_testing__/gpt" \
+    --input_dir "./pre_data" \
+    --output_dir "output" \
+    --weight_decay 0.01 \
+    --max_steps 2 \
+    --save_steps 2 \
+    --device gpu \
+    --warmup_steps 320000 \
+    --warmup_ratio 0.01 \
+    --per_device_train_batch_size 4 \
+    --eval_steps 100 \
+    --do_train true \
+    --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
     print_info $? gpt_pretrain
     # export model
     python export_model.py --model_type=gpt \

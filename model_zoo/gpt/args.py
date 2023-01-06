@@ -11,11 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import argparse
 
 import paddle
-from paddlenlp.utils.log import logger
+
+from paddlenlp.utils.log import logger  # noqa: E402
 
 
 def str2bool(v):
@@ -166,9 +168,6 @@ def parse_args(MODEL_CLASSES):
     )
     parser.add_argument(
         "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu", "npu"], help="select cpu, gpu, xpu devices."
-    )
-    parser.add_argument(
-        "--lr_decay_style", type=str, default="cosine", choices=["cosine", "none"], help="Learning rate decay style."
     )
     parser.add_argument(
         "-p",
