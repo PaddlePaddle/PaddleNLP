@@ -1,31 +1,31 @@
 # 端上语义理解压缩方案
 
  **目录**
-   * [ERNIE 3.0 Tiny v2 介绍🔥](#模型介绍)
+   * [ERNIE 3.0 Tiny v2 介绍](#模型介绍)
    * [预训练模型效果](#模型效果)
    * [代码结构](#代码结构)
    * [开始运行](#开始运行)
+       * [任务介绍](#任务介绍)
        * [环境要求](#环境要求)
        * [数据准备](#数据准备)
    * [模型训练](#模型训练)
    * [模型评估](#模型评估)
    * [端上模型压缩方案🔥](#模型压缩)
-       * [环境依赖](#环境依赖)
        * [压缩效果](#压缩效果)
-   * [FastDeploy 部署🔥](#部署)
+   * [FastDeploy 部署🔥](#FastDeploy部署)
    * [参考文献](#参考文献)
 
 
-本项目开源了 **ERNIE 3.0 Tiny v2** 预训练模型及**端上语义理解压缩方案**。
+本项目开源了 **ERNIE 3.0 Tiny v2** 预训练模型及 **端上语义理解压缩方案**。
 
-**ERNIE 3.0 Tiny v2** 预训练模型在 in-domain、out-domain、low-resourced 的下游任务上比 ERNIE 3.0 Tiny v1 平均提升了X。并且 v2 版本新增开源了 3L128H 结构的模型。
+- **ERNIE 3.0 Tiny v2** 预训练模型在 in-domain、out-domain、low-resourced 的下游任务上比 ERNIE 3.0 Tiny v1 平均提升了X。并且 v2 版本新增开源了 3L128H 结构的模型。
 
-**端上语义理解压缩方案**以车载语音任务型对话为背景，使用了模型裁剪、量化策略，将模型大小减小了X倍，推理时延降低X倍，内存占用减小X倍，达到XKB。使 ERNIE 类模型能轻松地部署至移动端。由于移动端部署对内存占用的要求比起服务端更高，因此该方案也同样适用于服务端部署。
+- **端上语义理解压缩方案** 以车载语音任务型对话为背景，使用了模型裁剪、量化策略，将模型大小减小了X倍，推理时延降低X倍，内存占用减小X倍，达到XKB。使 ERNIE 类模型能轻松地部署至移动端。由于移动端部署对内存占用的要求比起服务端更高，因此该方案也同样适用于服务端部署。
 
 <a name="模型介绍"></a>
 
 ## ERNIE 3.0 Tiny v2 介绍
-由于预训练语言模型越来越大，过大的参数量导致了模型难以部署，因此 [ERNIE 3.0 Tiny v1](../ernie-3.0/)（即 ERNIE 3.0 轻量级模型）通过 task-agnostic 知识蒸馏的方式将大模型压缩成开箱即用的小模型，小模型在下游任务上直接微调就能取得不错的效果。然而，蒸馏出来的小模型和教师模型在效果上仍然存在差距，对此我们提出并开源了 **ERNIE 3.0 Tiny v2** 。ERNIE 3.0 Tiny v2 使教师模型参与**多任务训练**，大大提高了小模型在下游任务上的效果。
+由于预训练语言模型越来越大，过大的参数量导致了模型难以部署，因此 [ERNIE 3.0 Tiny v1](../ernie-3.0/)（即 ERNIE 3.0 轻量级模型）通过 task-agnostic 知识蒸馏的方式将大模型压缩成开箱即用的小模型，小模型在下游任务上直接微调就能取得不错的效果。然而，蒸馏出来的小模型和教师模型在效果上仍然存在差距，对此我们提出并开源了 **ERNIE 3.0 Tiny v2** 。ERNIE 3.0 Tiny v2 使教师模型参与 **多任务训练**，大大提高了小模型在下游任务上的效果。
 
 ### 注入下游知识
 ERNIE-Tiny v1 通过 task-agnostic 蒸馏技术将预训练大模型压缩成预训练小模型，然而由于小模型在微调之前没有接触到下游任务的相关知识，导致效果和大模型仍然存在差距。因此我们提出 **ERNIE 3.0 Tiny v2**，通过微调教师模型，让教师模型学习到下游任务的相关知识，进而能够在蒸馏的过程中传导给学生模型。尽管学生模型完全没有见过下游数据，通过预先注入下游知识到教师模型，蒸馏得到的学生模型也能够获取到下游任务的相关知识，进而使下游任务上的效果得到提升。
@@ -39,10 +39,11 @@ ERNIE 3.0 Tiny v2 比起 ERNIE 3.0 Tiny v1 在 in-domain、out-domain、low-reso
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/210303124-c9df89a9-e291-4322-a6a5-37d2c4c1c008.png" title="ERNIE 3.0 Tiny v2">
 </p>
 
-<center><font size=1> ERNIE 3.0 Tiny v2 训练流程图</font></center>
+<p align="center"> ERNIE 3.0 Tiny v2 训练流程图</p>
 <br>
 
 <a name="模型效果"></a>
+
 ## 预训练模型效果
 
 本项目开源 **ERNIE 3.0 Tiny _Base_ v2** 、**ERNIE 3.0 Tiny _Medium_ v2** 、 **ERNIE 3.0 Tiny _Mini_ v2** 、 **ERNIE 3.0 Tiny _Micro_ v2** 、 **ERNIE 3.0 Tiny _Nano_ v2**、**ERNIE 3.0 Tiny _Pico_ v2** 六个中文模型：
@@ -358,17 +359,23 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 ├── model.py                     # 模型结构脚本
 ├── evaluate.py                  # 评估脚本
 ├── data                         # 数据目录（自定义数据）
-│ └── train.txt                  # 训练集
-│ └── dev.txt                    # 验证集
+│ └── train.txt                  # 训练集（待用户新增）
+│ └── dev.txt                    # 验证集（待用户新增）
 │ └── intent_label.txt           # 意图标签文件
 │ └── slot_label.txt             # 槽位标签文件
 ├── deploy                       # 部署目录
+│ └── README.md                  # Fastdeploy 部署文档
+│ └── android                    # 移动端部署目录
+│ └── cpp                        # 服务端部署目录（C++）
+│ └── python                     # 服务端部署目录（Python）
 └── README.md                    # 文档
 ```
 
 <a name="开始运行"></a>
 
 ## 开始运行
+
+<a name="任务介绍"></a>
 
 ### 任务介绍
 
@@ -513,7 +520,7 @@ python train.py \
 ## 模型评估
 - 动态图
 
-使用动态图进行评估，可以直接使用 #模型训练 中的评估脚本，取消 `--do_train` 和 `--do_export` 并设置 `--do_eval`，并将 `--model_name_or_path` 设置成微调后的模型路径即可。
+使用动态图进行评估，可以直接使用 [模型训练](#模型训练) 中的评估脚本，取消设置 `--do_train` 和 `--do_export` 并保留设置 `--do_eval`，并将 `--model_name_or_path` 设置成微调后的模型路径即可。
 
 - 静态图
 
@@ -549,17 +556,14 @@ python evaluate.py  \
 
 ## 模型压缩
 
-尽管 ERNIE 3.0 Tiny v2 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的**端上语义理解压缩方案**对上一步微调后的模型进行压缩，为了方便实现，[模型压缩 API](../../../docs/compression.md) 已经具备了以下压缩功能。
+尽管 ERNIE 3.0 Tiny v2 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩，为了方便实现，[模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
 
 端上模型压缩流程如下图所示：
 
 <p align="center">
-        <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/210979192-9ba27e12-9cb9-479f-86a8-7168468bb1ec.png" title="compression plan">
+        <img width="1000" alt="image" src="https://user-images.githubusercontent.com/26483581/211022166-0558371b-c5b2-4a7a-a019-674f0a321ccf.png" title="compression plan">
 </p>
-<center><font size=1> 端上语义理解模型压缩方案流程图 </center>
-
 <br>
-
 在本项目中，运行下面的脚本，可对上面微调后的模型进行压缩：
 
 ```shell
@@ -604,9 +608,7 @@ python train.py \
 
 ### 压缩效果
 
-模型经过压缩后，可以使用 FastDeploy 进行云边端的高性能部署。
-
-本项目基于 FastDeploy 选用 Paddle Lite 作为后端进行了测试（max_seq_length=16，batch_size=1），得到模型精度、时延、内存占用的数据如下：
+模型经过压缩后，使用 FastDeploy 在移动端选用 Paddle Lite 作为后端部署，并进行了精度和性能的测试（max_seq_length=16，batch_size=1），得到模型精度、时延、内存占用的数据如下：
 
 | 模型                                | 精度(acc.) | 时延(ms) | 内存占用 Pss (MB)  | 磁盘占用(MB)  |
 |-----------------------------------|----------|--------|----------------|-----------|
@@ -615,13 +617,13 @@ python train.py \
 | 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21    | TBD    | TBD            | 11.0      |
 | 原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding） | TBD      | TBD    | TBD            | 5.4       |
 
-由此可见，经过压缩后，精度基本无损。性能，内存。
+由此可见，经过压缩后，精度基本无损，性能TBD，内存占用TBD，磁盘占用减小 92.2%。
 
-<a name="部署"></a>
+<a name="FastDeploy部署"></a>
 
 ## FastDeplopy 部署
 
-下面的动图是 ERNIE 3.0 Tiny v2 模型在 Android App 上的推理展示，场景是车载语音场景下的意图识别和槽位填充任务。
+以下动图是 ERNIE 3.0 Tiny v2 意图识别、槽位填充模型部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
