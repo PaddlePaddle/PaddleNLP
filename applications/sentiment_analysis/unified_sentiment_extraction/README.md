@@ -538,6 +538,7 @@ python label_studio.py \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
+    --options "正向" "负向" "未提及" \
     --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
@@ -584,7 +585,8 @@ python label_studio.py \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    -- negative_ratio 5 \
+    --options "正向" "负向" "未提及" \
+    --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```
@@ -617,7 +619,8 @@ python label_studio.py \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    -- negative_ratio 5 \
+    --options "正向" "负向" "未提及" \
+    --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```
