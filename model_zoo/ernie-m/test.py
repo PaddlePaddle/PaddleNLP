@@ -56,3 +56,14 @@ def test_translate_train_all():
     from run_classifier import do_train
 
     do_train()
+
+
+def test_predict():
+    # do not test under the slow_test
+    if os.getenv("slow_test", None):
+        return
+
+    init_argv("predict", DEFAULT_CONFIG_FILE)
+    from run_classifier import do_train
+
+    do_train()

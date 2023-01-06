@@ -1,31 +1,53 @@
 cross-lingual-transfer:
-  model_name_or_path: __internal_testing__/ernie-m
+  do_train: True
+  do_eval: True
+  do_export: True
   task_type: cross-lingual-transfer
+  model_name_or_path: __internal_testing__/ernie-m
+  output_dir: ./tmp/
+  export_model_dir: ./tmp/
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 16
   max_seq_length: 256
-  per_device_train_batch_size: 16 
   learning_rate: 5e-5
   classifier_dropout: 0.1
   weight_decay: 0.0
   layerwise_decay: 0.8
   max_steps: 2
   logging_steps: 1
-  save_steps: 2
-  output_dir: ./tmp/
+  save_steps: 1
+  eval_steps: 1
   device: gpu
   fp16: False
+  load_best_model_at_end: True
+  metric_for_best_model: eval_accuracy
 
 translate-train-all:
-  model_name_or_path: __internal_testing__/ernie-m
+  do_train: True
+  do_eval: True
+  do_export: True
   task_type: translate-train-all
+  model_name_or_path: __internal_testing__/ernie-m
+  output_dir: ./tmp/
+  export_model_dir: ./tmp/
+  per_device_train_batch_size: 16
+  per_device_eval_batch_size: 16
   max_seq_length: 256
-  per_device_train_batch_size: 16 
   learning_rate: 5e-5
   classifier_dropout: 0.1
   weight_decay: 0.0
   layerwise_decay: 0.8
   max_steps: 2
   logging_steps: 1
-  save_steps: 2
-  output_dir: ./tmp/
+  save_steps: 1
+  eval_steps: 1
   device: gpu
   fp16: False
+  load_best_model_at_end: True
+  metric_for_best_model: eval_accuracy
+
+predict:
+  do_predict: True
+  task_type: cross-lingual-transfer
+  model_name_or_path: ./tmp/
+  output_dir: ./tmp/

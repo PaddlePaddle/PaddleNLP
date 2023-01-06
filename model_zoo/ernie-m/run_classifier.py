@@ -12,10 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
+import json
+import os
 import random
 from dataclasses import dataclass, field
 from functools import partial
+from typing import Optional
 
 import numpy as np
 import paddle
@@ -25,15 +27,22 @@ from paddle.io import Dataset
 from paddle.metric import Accuracy
 from paddle.optimizer import AdamW
 
+import paddlenlp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.ops.optimizer import layerwise_lr_decay
-from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
+from paddlenlp.trainer import (
+    PdArgumentParser,
+    Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
+)
 from paddlenlp.transformers import (
     AutoModelForSequenceClassification,
     AutoTokenizer,
     ErnieMForSequenceClassification,
     LinearDecayWithWarmup,
 )
+from paddlenlp.utils.log import logger
 
 all_languages = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
 task_type_list = ["cross-lingual-transfer", "translate-train-all"]
@@ -52,15 +61,19 @@ class ModelArguments:
             + ", ".join(list(ErnieMForSequenceClassification.pretrained_init_configuration.keys()))
         },
     )
-    max_seq_length: int = field(
+    max_seq_length: Optional[int] = field(
         default=256,
         metadata={
             "help": "The maximum total input sequence length after tokenization. Sequences longer "
             "than this will be truncated, sequences shorter will be padded."
         },
     )
-    classifier_dropout: float = field(default=0.1, metadata={"help": "Dropout rate."})
-    layerwise_decay: float = field(default=0.8, metadata={"help": "Layerwise decay ratio."})
+    classifier_dropout: Optional[float] = field(default=0.1, metadata={"help": "Dropout rate."})
+    layerwise_decay: Optional[float] = field(default=0.8, metadata={"help": "Layerwise decay ratio."})
+    export_model_dir: Optional[str] = field(
+        default="./best_models",
+        metadata={"help": "Path to directory to store the exported inference model."},
+    )
 
 
 def set_seed(seed):
@@ -122,24 +135,53 @@ def do_train():
         paddle.distributed.init_parallel_env()
 
     set_seed(training_args.seed)
+
+    # Detecting last checkpoint.
+    last_checkpoint = None
+    if os.path.isdir(training_args.output_dir) and training_args.do_train and not training_args.overwrite_output_dir:
+        last_checkpoint = get_last_checkpoint(training_args.output_dir)
+        if last_checkpoint is None and len(os.listdir(training_args.output_dir)) > 0:
+            raise ValueError(
+                f"Output directory ({training_args.output_dir}) already exists and is not empty. "
+                "Use --overwrite_output_dir to overcome."
+            )
+        elif last_checkpoint is not None and training_args.resume_from_checkpoint is None:
+            logger.info(
+                f"Checkpoint detected, resuming training at {last_checkpoint}. To avoid this behavior, change "
+                "the `--output_dir` or add `--overwrite_output_dir` to train from scratch."
+            )
+
+    # Dataset pre-process
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=model_args.max_seq_length)
     remove_columns = ["premise", "hypothesis"]
-    if model_args.task_type == "cross-lingual-transfer":
-        train_ds = load_dataset("xnli", "en", split="train")
-        eval_ds = load_dataset("xnli", "en", split="test")
-        train_ds = train_ds.map(trans_func, batched=True, remove_columns=remove_columns)
-        eval_ds = eval_ds.map(trans_func, batched=True, remove_columns=remove_columns)
-    elif model_args.task_type == "translate-train-all":
-        all_train_ds = []
-        all_eval_ds = []
+
+    def collect_all_languages_dataset(split):
+        all_ds = []
         for language in all_languages:
-            train_ds = load_dataset("xnli", language, split="train")
-            eval_ds = load_dataset("xnli", language, split="test")
-            all_train_ds.append(train_ds.map(trans_func, batched=True, remove_columns=remove_columns))
-            all_eval_ds.append(eval_ds.map(trans_func, batched=True, remove_columns=remove_columns))
-        train_ds = XnliDataset(all_train_ds)
-        eval_ds = XnliDataset(all_eval_ds)
+            ds = load_dataset("xnli", language, split=split)
+            all_ds.append(ds.map(trans_func, batched=True, remove_columns=remove_columns))
+        return XnliDataset(all_ds)
+
+    if model_args.task_type == "cross-lingual-transfer":
+        raw_datasets = load_dataset("xnli", "en")
+        if training_args.do_train:
+            train_ds = raw_datasets["train"].map(trans_func, batched=True, remove_columns=remove_columns)
+        if training_args.do_eval:
+            eval_ds = raw_datasets["validation"].map(trans_func, batched=True, remove_columns=remove_columns)
+        if training_args.do_predict:
+            test_ds = raw_datasets["test"].map(trans_func, batched=True, remove_columns=remove_columns)
+    elif model_args.task_type == "translate-train-all":
+        if training_args.do_train:
+            train_ds = collect_all_languages_dataset("train")
+        if training_args.do_eval:
+            eval_ds = collect_all_languages_dataset("validation")
+        if training_args.do_predict:
+            test_ds = collect_all_languages_dataset("test")
+    else:
+        raise ValueError(
+            f"task_type should be 'cross-lingual-transfer' or 'translate-train-all' but '{model_args.task_type}' is specificed."
+        )
 
     data_collator = DataCollatorWithPadding(tokenizer)
 
@@ -152,12 +194,14 @@ def do_train():
         model = paddle.DataParallel(model)
 
     warmup = training_args.warmup_steps if training_args.warmup_steps > 0 else training_args.warmup_ratio
-
-    num_training_steps = (
-        training_args.max_steps
-        if training_args.max_steps > 0
-        else len(train_ds) // training_args.train_batch_size * training_args.num_train_epochs
-    )
+    if training_args.do_train:
+        num_training_steps = (
+            training_args.max_steps
+            if training_args.max_steps > 0
+            else len(train_ds) // training_args.train_batch_size * training_args.num_train_epochs
+        )
+    else:
+        num_training_steps = 10
     lr_scheduler = LinearDecayWithWarmup(training_args.learning_rate, num_training_steps, warmup)
 
     # Generate parameter names needed to perform weight decay.
@@ -183,6 +227,7 @@ def do_train():
 
     criterion = nn.CrossEntropyLoss()
 
+    # Define the metrics of tasks.
     def compute_metrics(p):
         # Define the metrics of tasks.
         preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
@@ -210,20 +255,28 @@ def do_train():
         optimizers=[optimizer, lr_scheduler],
     )
 
+    checkpoint = None
+    if training_args.resume_from_checkpoint is not None:
+        checkpoint = training_args.resume_from_checkpoint
+    elif last_checkpoint is not None:
+        checkpoint = last_checkpoint
+
     # training
     if training_args.do_train:
-        train_result = trainer.train()
+        train_result = trainer.train(resume_from_checkpoint=checkpoint)
         metrics = train_result.metrics
         trainer.save_model()
         trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
         trainer.save_state()
 
+    # Evaluating
     if training_args.do_eval:
         combined = {}
         for language in all_languages:
-            test_ds = load_dataset("xnli", language, split="test")
-            test_ds = test_ds.map(trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=True)
-            metrics = trainer.evaluate(eval_dataset=test_ds)
+            eval_ds = load_dataset("xnli", language, split="validation")
+            eval_ds = eval_ds.map(trans_func, batched=True, remove_columns=remove_columns, load_from_cache_file=True)
+            metrics = trainer.evaluate(eval_dataset=eval_ds)
             metrics = {k + f"_{language}": v for k, v in metrics.items()}
             combined.update({f"eval_accuracy_{language}": metrics.get(f"eval_accuracy_{language}", 0.0)})
             trainer.log_metrics("eval", metrics)
@@ -231,6 +284,32 @@ def do_train():
         combined.update({"eval_accuracy_average": np.mean(list(combined.values()))})
         trainer.log_metrics("eval", combined)
         trainer.save_metrics("eval", combined)
+
+    # Predicting
+    if training_args.do_predict:
+        test_ret = trainer.predict(test_ds)
+        trainer.log_metrics("test", test_ret.metrics)
+        logits = test_ret.predictions
+        max_value = np.max(logits, axis=1, keepdims=True)
+        exp_data = np.exp(logits - max_value)
+        probs = exp_data / np.sum(exp_data, axis=1, keepdims=True)
+        out_dict = {"label": probs.argmax(axis=-1).tolist(), "confidence": probs.max(axis=-1).tolist()}
+        out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
+        json.dump(out_dict, out_file)
+
+    # Export inference model
+    if training_args.do_export:
+        # You can also load from certain checkpoint
+        # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
+        # input_spec = [
+        #     paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
+        #     paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
+        # ]
+        input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64")]
+        model_args.export_model_dir = os.path.join(model_args.export_model_dir, "export")
+        paddlenlp.transformers.export_model(
+            model=trainer.model, input_spec=input_spec, path=model_args.export_model_dir
+        )
 
 
 if __name__ == "__main__":
