@@ -41,7 +41,6 @@ PROMPT_ITEMS = {
     "aspect_prompt": "评价维度",
     "opinion_prompt": "观点词",
     "sentiment_prompt_prefix": "情感倾向",
-    "sentiment_prompt": "情感倾向[正向,负向,未提及]",
     "separator": "##",
     "not_mentioned_option": "未提及",
     "positive_option": "正向",
@@ -454,11 +453,14 @@ class SentimentResult(object):
     def __init__(self, file_path):
         self.file_path = file_path
         self.sentiment_prompt = PROMPT_ITEMS["sentiment_prompt"]
+        self.sentiment_prompt_prefix = PROMPT_ITEMS["sentiment_prompt_prefix"]
+        self.options = PROMPT_ITEMS["options"]
         self.opinion_prompt = PROMPT_ITEMS["opinion_prompt"]
         self.aspect_prompt = PROMPT_ITEMS["aspect_prompt"]
         self.not_mentioned_option = PROMPT_ITEMS["not_mentioned_option"]
         self.positive_option = PROMPT_ITEMS["positive_option"]
         self.negative_option = PROMPT_ITEMS["negative_option"]
+        self.prompts = set()
         # load the result of sentiment analysis
         self.results = self._load_sentiment_result(file_path)
         # define the parsing middle result for sentiment analysis
@@ -511,6 +513,8 @@ class SentimentResult(object):
                     else:
                         self.aspect_opinion_negatives[aspect_opinion_name] += 1
 
+        self.prompts.update(aspect["relations"].keys())
+
     def _parse_opinion(self, opinion):
         opinion_name = opinion["text"]
         self.opinion_frequency[opinion_name] += 1
@@ -527,15 +531,16 @@ class SentimentResult(object):
             elif key == self.opinion_prompt:
                 for opinion in result[self.opinion_prompt]:
                     self._parse_opinion(opinion)
-            elif key.startswith(self.sentiment_prompt):
+            elif key == self.sentiment_prompt:
                 sentiment = result[self.sentiment_prompt][0]
                 self._parse_sentiment_polarity(sentiment)
             else:
                 raise ValueError(
-                    "Unknown key {} for sentiment analysis, please check that you input the correct parameter task_type or set the correct configuration for aspect_prompt, opinion_prompt or sentiment prompt.".format(
-                        key
+                    "Unknown key {} for sentiment analysis, you can check it as follows: 1. whether the parameter task_type is right; 2. whether the sentiment prompt {} created by the parameter options matches with the prompt {} in the file of sentiment analysis results; 3. whether the aspect_prompt, opinion_prompt or sentiment prompt are right.".format(
+                        key, self.sentiment_prompt, key
                     )
                 )
+            self.prompts.add(key)
 
     def parse_sentiment_result(self, results):
         for result in results:
@@ -545,6 +550,14 @@ class SentimentResult(object):
         # parse descend_aspects
         descend_aspects_items = sorted(self.aspect_frequency.items(), key=itemgetter(1), reverse=True)
         self.descend_aspects = [item[0] for item in descend_aspects_items]
+        # check whether sentiment prompt is parsed correctly
+        for prompt in self.prompts:
+            if prompt.startswith(self.sentiment_prompt_prefix) and prompt != self.sentiment_prompt:
+                logger.warning(
+                    "The visual images related to sentiment ploarity cannot be generated. Because the sentiment prompt {} created by the opinions you input cannot be match with the one {} in the file of sentiment analysis result.".format(
+                        self.sentiment_prompt, prompt
+                    )
+                )
 
 
 def default_visual_analysis(args):
@@ -553,10 +566,21 @@ def default_visual_analysis(args):
         shutil.rmtree(args.save_dir)
     os.makedirs(args.save_dir)
     # update sentiment prompt according to task type
-    if args.task_type == "cls":
-        PROMPT_ITEMS["sentiment_prompt"] = PROMPT_ITEMS["sentiment_prompt_prefix"] + "[{},{}]".format(
-            PROMPT_ITEMS["positive_option"], PROMPT_ITEMS["negative_option"]
-        )
+    if args.options:
+        PROMPT_ITEMS["options"] = args.options
+    else:
+        if args.task_type == "ext":
+            PROMPT_ITEMS["options"] = [
+                PROMPT_ITEMS["positive_option"],
+                PROMPT_ITEMS["negative_option"],
+                PROMPT_ITEMS["not_mentioned_option"],
+            ]
+        else:
+            PROMPT_ITEMS["options"] = [PROMPT_ITEMS["positive_option"], PROMPT_ITEMS["negative_option"]]
+    PROMPT_ITEMS["sentiment_prompt"] = PROMPT_ITEMS["sentiment_prompt_prefix"] + "[{}]".format(
+        ",".join(PROMPT_ITEMS["options"])
+    )
+
     # define sr to process the result of sentiment analysis
     logger.info("Trying to parse sentiment analysis result: {}".format(args.file_path))
     sr = SentimentResult(args.file_path)
@@ -631,6 +655,7 @@ if __name__ == "__main__":
     parser.add_argument("--save_dir", default="./images", type=str, help="The saving path of images.")
     parser.add_argument("--font_path", default=None, type=str, help="The font Path for showing Chinese in wordcloud.")
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Two task types [ext, cls] are supported, ext represents the aspect-based extraction task and cls represents the sentence-level classification task, defaults to ext.")
+    parser.add_argument("--options", type=str, nargs="+", help="Used only for the classification task, the options for classification")
 
     args = parser.parse_args()
     # ypdf: enable
