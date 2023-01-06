@@ -65,6 +65,24 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 
 该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
 
+```bash
+
+# 在GPU上使用paddle_tensorrt后端运行量化模型，模型目录可按照实际模型路径设置
+./infer_demo --device gpu --backend paddle_tensorrt --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../../data/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+./infer_demo --device cpu --backend paddle --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path /path/to/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+
+```
+
+运行完成后返回的结果如下：
+
+```bash
+
+
+
+```
+
 ## 参数说明
 
 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
@@ -81,6 +99,7 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
 |--use_trt_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
+|--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'infer_model'|
 
 ## 相关文档
 

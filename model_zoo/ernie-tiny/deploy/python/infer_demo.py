@@ -29,6 +29,7 @@ def parse_arguments():
     parser.add_argument("--slot_label_path", type=str, default="", help="Path of the slot label file.")
     parser.add_argument("--intent_label_path", type=str, default="", help="Path of the intent label file.")
     parser.add_argument("--test_data_path", type=str, default="", help="The path of the test dataset file.")
+    parser.add_argument("--model_prefix", type=str, default="infer_model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -95,8 +96,8 @@ class Predictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, "infer_model.pdmodel")
-        params_path = os.path.join(args.model_dir, "infer_model.pdiparams")
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()

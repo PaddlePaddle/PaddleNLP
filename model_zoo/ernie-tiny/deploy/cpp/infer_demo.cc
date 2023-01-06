@@ -33,6 +33,7 @@ const char sep = '/';
 #endif
 
 DEFINE_string(model_dir, "", "Directory of the inference model.");
+DEFINE_string(model_prefix, "infer_model", "The model and params file prefix");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
 DEFINE_string(slot_label_path, "", "Path of the slot label file.");
 DEFINE_string(intent_label_path, "", "Path of the intent label file.");
@@ -107,8 +108,11 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
                         << FLAGS_backend << "'" << std::endl;
     return false;
   }
-  std::string model_path = FLAGS_model_dir + sep + "infer_model.pdmodel";
-  std::string param_path = FLAGS_model_dir + sep + "infer_model.pdiparams";
+
+  std::string model_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdmodel";
+  std::string param_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdiparams";
   fastdeploy::FDINFO << "model_path = " << model_path
                      << ", param_path = " << param_path << std::endl;
   option->SetModelPath(model_path, param_path);

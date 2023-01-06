@@ -48,6 +48,23 @@ No. 2 text = 到信阳市汽车配件城
 
 该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
 
+```bash
+
+# 在GPU上使用paddle_tensorrt后端，模型目录可按照实际模型路径设置
+python infer_demo.py --device gpu --backend paddle --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_dir ../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../data/slots_label.txt --intent_label_path ../../data/intent_label.txt
+
+```
+
+运行完成后返回的结果如下：
+
+```bash
+
+
+
+```
 
 ## 参数说明
 
@@ -65,6 +82,7 @@ No. 2 text = 到信阳市汽车配件城
 |--max_length |最大序列长度，默认为 128|
 |--use_trt_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
+|--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'infer_model'|
 
 ## 相关文档
 
