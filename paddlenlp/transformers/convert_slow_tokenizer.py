@@ -261,11 +261,57 @@ class ErnieMConverter(SpmConverter):
         )
 
 
+class AlbertChineseConverter(BertConverter):
+    pass
+
+
+class AlbertEnglishConverter(SpmConverter):
+    def vocab(self, proto):
+        return [
+            (piece.piece, piece.score) if check_number_comma(piece.piece) else (piece.piece, piece.score - 100)
+            for piece in proto.pieces
+        ]
+
+    def normalizer(self, proto):
+        list_normalizers = [normalizers.ReplaceNormalizer("``", '"'), normalizers.ReplaceNormalizer("''", '"')]
+        if not self.original_tokenizer.keep_accents:
+            list_normalizers.append(normalizers.NFKDNormalizer())
+            list_normalizers.append(normalizers.StripAccentsNormalizer())
+        if self.original_tokenizer.do_lower_case:
+            list_normalizers.append(normalizers.LowercaseNormalizer())
+
+        precompiled_charsmap = proto.normalizer_spec.precompiled_charsmap
+        list_normalizers.append(normalizers.PrecompiledNormalizer(precompiled_charsmap))
+        list_normalizers.append(normalizers.ReplaceNormalizer(" {2,}", " "))
+        return normalizers.SequenceNormalizer(list_normalizers)
+
+    def postprocessor(self):
+        return postprocessors.TemplatePostProcessor(
+            single="[CLS]:0 $A:0 [SEP]:0",
+            pair="[CLS]:0 $A:0 [SEP]:0 $B:1 [SEP]:1",
+            special_tokens=[
+                ("[CLS]", self.original_tokenizer.convert_tokens_to_ids("[CLS]")),
+                ("[SEP]", self.original_tokenizer.convert_tokens_to_ids("[SEP]")),
+            ],
+        )
+
+
+class AlbertConverter(Converter):
+    def converted(self) -> Tokenizer:
+        converter_class = AlbertEnglishConverter
+        if self.original_tokenizer.vocab_file is not None:
+            converter_class = AlbertChineseConverter
+        return converter_class(self.original_tokenizer)
+
+
 SLOW_TO_FAST_CONVERTERS = {
     "BertTokenizer": BertConverter,
     "ErnieTokenizer": ErnieConverter,
     "TinyBertTokenizer": TinyBertConverter,
-    "ErnieMTokenizer": ErnieMConverter
+    "ErnieMTokenizer": ErnieMConverter,
+    "AlbertTokenizer": AlbertConverter,
+    "AlbertChineseTokenizer": AlbertChineseConverter,
+    "AlbertEnglishTokenizer": AlbertEnglishConverter,
     # TODO(zhoushunjie): Need to implement more TokenizerConverter
 }
 

@@ -170,7 +170,7 @@ from .gptj.tokenizer import *
 from .pegasus.modeling import *
 from .pegasus.tokenizer import *
 
-# For faster tokenizer
+# For fast tokenizer
 from ..utils.import_utils import is_fast_tokenizer_available
 
 if is_fast_tokenizer_available():
@@ -178,3 +178,4 @@ if is_fast_tokenizer_available():
     from .ernie.fast_tokenizer import *
     from .tinybert.fast_tokenizer import *
     from .ernie_m.fast_tokenizer import *
+    from .albert.fast_tokenizer import *
