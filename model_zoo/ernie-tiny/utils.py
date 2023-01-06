@@ -34,7 +34,7 @@ def read_example(filename, intent2id, slot2id, tokenizer, max_seq_length=16, no_
     """
     Reads data from file.
 
-    tokenized_query = ['放', '一', '首', '周', '华', '健', '的', '花', '心']
+    tokenized_query = ['来', '一', '首', '周', '华', '健', '的', '花', '心']
     slot_sentence = '来一首<singer>周华健</singer>的<song>花心</song>'
     after processing:
     slot_label = ['O', 'O', 'O', 'B-singer', 'I-singer', 'I-singer', 'O', 'B-song', 'I-song']
@@ -46,7 +46,6 @@ def read_example(filename, intent2id, slot2id, tokenizer, max_seq_length=16, no_
         _, query, intent_label, slot_sentence = line
         # skip correction data
         if "||" in slot_sentence:
-            # print(slot_sentence)
             continue
         tokenized_query = tokenizer.tokenize(query)
         slot_label = ["O"] * len(tokenized_query)
@@ -66,7 +65,7 @@ def read_example(filename, intent2id, slot2id, tokenizer, max_seq_length=16, no_
                     curr_label = "O"
                 continue
             if slot_char == ">":
-                if "B-" in curr_label:  # 肯定是第一个
+                if "B-" in curr_label:
                     process_id = 2
                 else:
                     process_id = 0
@@ -113,17 +112,15 @@ def compute_metrics(p):
     intent_preds = intent_logits.argmax(axis=-1)
     intent_label, slot_label = p.label_ids
     slot_right, intent_right = 0, 0
-
-    intent_right_no_slot = 0
-    slot_right = 0
     for i, slot_pred in enumerate(slot_preds):
-        if (intent_label[i] == intent_preds[i]) and (intent_label[i] in (0, 2, 3, 4, 6, 7, 8, 10)):
-            intent_right_no_slot += 1
-        elif ((slot_pred == slot_label[i]) | padding_mask[i]).all() == 1:
-            slot_right += 1
+        if intent_label[i] == intent_preds[i]:
+            if intent_label[i] in (0, 2, 3, 4, 6, 7, 8, 10):
+                slot_right += 1
+            elif ((slot_pred == slot_label[i]) | padding_mask[i]).all():
+                slot_right += 1
 
     intent_right += sum(intent_preds == intent_label)
-    accuracy = (slot_right + intent_right_no_slot) / slot_label.shape[0] * 100
+    accuracy = slot_right / slot_label.shape[0] * 100
     intent_accuracy = intent_right / intent_label.shape[0] * 100
 
     return {"accuracy": accuracy, "intent_accuracy": intent_accuracy}

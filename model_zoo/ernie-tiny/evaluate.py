@@ -49,7 +49,7 @@ class DataArguments:
             "than this will be truncated, sequences shorter will be padded."
         },
     )
-    ignore_index: Optional[int] = field(default=9999, metadata={"help": ""})
+    ignore_index: Optional[int] = field(default=0, metadata={"help": ""})
 
 
 @dataclass
@@ -60,7 +60,7 @@ class ModelArguments:
 
     model_name_or_path: Optional[str] = field(
         default="ernie-3.0-tiny-nano-v2-zh",
-        metadata={"help": "Path to pretrained model. Defaults to 'ernie-3.0-tiny-nano-v2'"},
+        metadata={"help": "Path to pretrained model. Defaults to 'ernie-3.0-tiny-nano-v2-zh'"},
     )
     infer_prefix: Optional[str] = field(
         default=None,
@@ -68,6 +68,7 @@ class ModelArguments:
     )
 
     dropout: float = field(default=0.1, metadata={"help": "Dropout rate for JointErnie. Defaults to 0.1."})
+    dynamic: bool = field(default=False)
 
 
 def main():
@@ -99,13 +100,12 @@ def main():
             no_entity_id=data_args.ignore_index,
             lazy=False,
         )
-        intent_right, slot_right, intent_right_no_slot = 0, 0, 0
+        intent_right, slot_right = 0, 0
         for data in test_dataset:
             input_ids = np.array(data["input_ids"])
             intent_logits, slot_logits = exe.run(
                 program, feed={"input_ids": input_ids.reshape(1, -1).astype("int32")}, fetch_list=fetch_targets
             )
-
             slot_pred = slot_logits.argmax(axis=-1)
             intent_pred = intent_logits.argmax(axis=-1)
 
@@ -118,11 +118,12 @@ def main():
             if intent_label == intent_pred:
                 intent_right += 1
                 if intent_label in (0, 2, 3, 4, 6, 7, 8, 10):
-                    intent_right_no_slot += 1
+                    slot_right += 1
                 elif ((slot_pred == slot_label) | padding_mask).all():
                     slot_right += 1
-        accuracy = (slot_right + intent_right_no_slot) / len(test_dataset) * 100
+        accuracy = slot_right / len(test_dataset) * 100
         intent_accuracy = intent_right / len(test_dataset) * 100
+
         print("accuray: %.2f, intent_accuracy: %.2f" % (accuracy, intent_accuracy))
     else:
         test_dataset = load_dataset(

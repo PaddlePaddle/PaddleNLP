@@ -55,7 +55,6 @@ class JointErnie(ErniePretrainedModel):
         if paddle.in_dynamic_mode():
             padding_mask = input_ids == 0
             padding_mask |= (input_ids == 2) | (input_ids == 1)
-            padding_mask = padding_mask.astype(paddle.int32)
             return intent_logits, slot_logits, padding_mask
 
         return intent_logits, slot_logits
