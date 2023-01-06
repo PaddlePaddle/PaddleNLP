@@ -688,7 +688,7 @@ class ErnieCtmNptagModel(ErnieCtmPretrainedModel):
 
         if not return_dict:
             outputs = (logits,) + outputs[2:]
-            return (loss,) + outputs
+            return (loss,) + outputs if loss is not None else outputs
 
         return TokenClassifierOutput(
             loss=loss, logits=logits, hidden_states=outputs.hidden_states, attentions=outputs.attentions
