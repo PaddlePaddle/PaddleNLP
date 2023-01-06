@@ -416,6 +416,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
+        false, // is_miro
         use_int8,
         sm);
 
@@ -452,6 +453,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
+        false, // is_miro
         use_int8,
         sm);
 
@@ -487,6 +489,7 @@ std::vector<paddle::Tensor> decoding_kernel(
         false,                 // is_mbart
         0,                     // min_length
         4,                     // inner_coeff
+        false, // is_miro
         use_int8,
         sm);
 

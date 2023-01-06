@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
@@ -23,7 +25,7 @@ __all__ = ["ErnieDualEncoder", "ErnieCrossEncoder"]
 
 
 class ErnieEncoder(ErniePretrainedModel):
-    def __init__(self, config: ErnieConfig, output_emb_size: int):
+    def __init__(self, config: ErnieConfig, output_emb_size: int | None = None):
         super(ErnieEncoder, self).__init__(config)
 
         self.ernie = ErnieModel(config)
