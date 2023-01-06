@@ -22,7 +22,7 @@ import PIL
 import PIL.ImageDraw
 import PIL.ImageEnhance
 import PIL.ImageOps
-import torch
+import paddle
 from PIL import Image
 
 
@@ -226,8 +226,8 @@ class Lighting(object):
 
     def __init__(self, alphastd, eigval, eigvec):
         self.alphastd = alphastd
-        self.eigval = torch.Tensor(eigval)
-        self.eigvec = torch.Tensor(eigvec)
+        self.eigval = paddle.Tensor(eigval)
+        self.eigvec = paddle.Tensor(eigvec)
 
     def __call__(self, img):
         if self.alphastd == 0:
@@ -266,7 +266,7 @@ class CutoutDefault(object):
         x2 = np.clip(x + self.length // 2, 0, w)
 
         mask[y1:y2, x1:x2] = 0.0
-        mask = torch.from_numpy(mask)
+        mask = paddle.from_numpy(mask)
         mask = mask.expand_as(img)
         img *= mask
         return img

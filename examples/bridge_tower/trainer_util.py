@@ -32,7 +32,7 @@ from paddlenlp.trainer.trainer_utils import (
     has_length,
 )
 from paddlenlp.trainer.training_args import TrainingArguments
-from paddlenlp.trainer.utils.batch_sampler import (
+from paddlenlp.utils.batch_sampler import (
     DistributedBatchSampler as NlpDistributedBatchSampler,
 )
 from paddlenlp.trainer.utils.helper import (

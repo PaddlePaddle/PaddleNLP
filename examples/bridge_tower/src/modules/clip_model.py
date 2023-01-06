@@ -69,6 +69,7 @@ def build_model(
 
     model_state = paddle.load(model_path)
     # resolution_after会变化，初始化的可能不是默认的模型
+    print(name)
     model = CLIPVisionModel.from_pretrained(name, image_resolution=resolution_after)
     # Load original state dict
     state_dict = model_state

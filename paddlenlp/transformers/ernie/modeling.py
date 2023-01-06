@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -148,7 +149,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ernie"
@@ -165,9 +166,7 @@ class ErniePretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -634,7 +633,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         super(ErnieForTokenClassification, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.num_labels = config.num_labels
-        print(self.num_labels)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
@@ -1222,16 +1220,15 @@ class UIE(ErniePretrainedModel):
     output to compute `start_prob` and `end_prob`,
     designed for Universal Information Extraction.
     Args:
-        ernie (`ErnieModel`):
-            An instance of `ErnieModel`.
+        config (:class:`ErnieConfig`):
+            An instance of ErnieConfig used to construct ErnieForMultipleChoice
     """
 
-    def __init__(self, ernie):
-        super(UIE, self).__init__()
-        self.ernie = ernie
-        hidden_size = self.ernie.config["hidden_size"]
-        self.linear_start = paddle.nn.Linear(hidden_size, 1)
-        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+    def __init__(self, config: ErnieConfig):
+        super(UIE, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 

@@ -29,16 +29,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import EntryNotFoundError
 
 from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import HF_CACHE_HOME, LEGACY_CONFIG_NAME
+from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
-    get_path_from_url,
+    get_path_from_url_with_filelock,
+    hf_file_exists,
     is_url,
     url_file_exists,
 )
@@ -148,7 +150,7 @@ def cached_path(
             shutil.rmtree(file_path, ignore_errors=True)
 
         # URL, so get it from the cache (downloading if necessary)
-        output_path = get_path_from_url(
+        output_path = get_path_from_url_with_filelock(
             url_or_filename,
             root_dir=cache_dir,
         )
@@ -240,6 +242,30 @@ def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
         return True
 
     return "init_class" not in config and "architectures" in config
+
+
+def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
+    """resolve config file from hf hub
+
+    Args:
+        repo_id (str): the repo name from huggingface hub
+        cache_dir (str): the cachedir
+
+    Returns:
+        str: the downloaded config file
+    """
+    if hf_file_exists(repo_id, CONFIG_NAME):
+        file_name = CONFIG_NAME
+    else:
+        raise EntryNotFoundError(f"can not find the paddle/pytorch config file from: https://huggingface.co/{repo_id}")
+
+    return hf_hub_download(
+        repo_id=repo_id,
+        filename=file_name,
+        cache_dir=cache_dir,
+        library_name="PaddleNLP",
+        library_version=__version__,
+    )
 
 
 class PretrainedConfig:
@@ -441,8 +467,8 @@ class PretrainedConfig:
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
-    # map hf attribute to paddle attribute
-    # { "standard_field": "paddle_field", ... }
+    # model-specific attribute map from hf attribute to paddle attribute
+    # { "paddle_field": "standard_field", ... }
     standard_config_map: Dict[str, str] = {}
 
     _auto_class: Optional[str] = None
@@ -450,12 +476,16 @@ class PretrainedConfig:
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         super().__setattr__(key, value)
         assert hasattr(self, key)
 
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
+        elif key != "standard_config_map" and key in super().__getattribute__("standard_config_map"):
+            key = super().__getattribute__("standard_config_map")[key]
         return super().__getattribute__(key)
 
     def __getitem__(self, key):
@@ -775,17 +805,11 @@ class PretrainedConfig:
 
         # 2. get the configuration file from HF hub
         elif from_hf_hub:
-            resolved_config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=CONFIG_NAME,
-                cache_dir=HF_CACHE_HOME,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
+            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
 
         # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
         elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url(
+            resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
         # 4. get the configuration file from local dir with default name, eg: /local/path
@@ -813,6 +837,9 @@ class PretrainedConfig:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
+            # resolve CONFIG_NAME from huggingface hub
+            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
 
         try:
             logger.info(f"loading configuration file {resolved_config_file}")

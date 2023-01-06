@@ -11,19 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import argparse
 import random
 import time
 from functools import partial
 from pprint import pprint
+
 import numpy as np
 import paddle
 from paddle.io import BatchSampler, DataLoader
+from utils import compute_metrics, convert_example
+
+from paddlenlp.data import Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Tuple, Stack
 from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
-from utils import convert_example, compute_metrics
 
 summarization_name_mapping = {"cnn_dailymail": ("article", "highlights")}
 
@@ -89,13 +90,11 @@ def parse_args():
         help="Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.",
     )
     parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity of beam search. ")
-    parser.add_argument(
-        "--faster", action="store_true", help="Whether to process inference using faster transformer. "
-    )
+    parser.add_argument("--faster", action="store_true", help="Whether to process inference using FastGeneration. ")
     parser.add_argument(
         "--use_fp16_decoding",
         action="store_true",
-        help="Whether to use fp16 when using faster transformer. Only works when using faster transformer. ",
+        help="Whether to use fp16 when using FastGeneration. Only works when using FastGeneration. ",
     )
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for testing or evaluation.")
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
@@ -127,6 +126,17 @@ def set_seed(args):
     paddle.seed(args.seed)
 
 
+def batchify_fn(samples):
+    fn = Tuple(
+        Stack(dtype="int64"),  # input_ids
+        Stack(dtype="int64"),  # attention mask
+        Stack(dtype="int32"),  # mem_seq_lens
+        Stack(dtype="int64"),  # decoder_input_ids
+        Stack(dtype="int64"),  # labels
+    )
+    return fn(samples)
+
+
 @paddle.no_grad()
 def generate(args):
     paddle.set_device(args.device)
@@ -145,13 +155,6 @@ def generate(args):
         ignore_pad_token_for_loss=args.ignore_pad_token_for_loss,
         is_train=False,
     )
-    batchify_fn = lambda samples, fn=Tuple(
-        Stack(dtype="int64"),  # input_ids
-        Stack(dtype="int64"),  # attention mask
-        Stack(dtype="int32"),  # mem_seq_lens
-        Stack(dtype="int64"),  # decoder_input_ids
-        Stack(dtype="int64"),  # labels
-    ): fn(samples)
 
     dataset = dataset.map(trans_func, lazy=True)
     batch_sampler = BatchSampler(dataset, batch_size=args.batch_size, shuffle=False)
@@ -179,7 +182,7 @@ def generate(args):
             length_penalty=args.length_penalty,
             early_stopping=args.early_stopping,
             diversity_rate=args.diversity_rate,
-            use_faster=args.faster,
+            use_fast=args.faster,
         )
         total_time += time.time() - start_time
         if step % args.logging_steps == 0:

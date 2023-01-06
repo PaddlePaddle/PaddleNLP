@@ -77,7 +77,7 @@ export PYTHONPATH=/root/paddlejob/workspace/env_run/wugaosheng/PaddleNLP:$PYTHON
 # pretrained/BridgeTower_pt_base.zip.ckpt.pdparams
 # --disable_tqdm 1 \
 # learning_rate 1.0 paddle的分层学习率跟torch不一样，在使用分层学习率的时候，base的学习率需要设置成1.0
-rm -rf runs/
+# rm -rf runs/
 log_dir=train_log
 python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --log_dir ${log_dir}  \
@@ -105,7 +105,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --seed 1 \
                 --data_root /root/paddlejob/workspace/env_run/afs/laion400m_new/wugaosheng/dataset/fine-tune \
                 --lr_scheduler_type polynomial \
-                --checkpoint_path ./pretrained/BridgeTower_pt_base.zip.ckpt.pdparams \
+                --checkpoint_path ./checkpoints/checkpoint-40000/model_state.pdparams \
                 --lr_end 0 \
                 --power 1 \
                 --max_grad_norm -1 \

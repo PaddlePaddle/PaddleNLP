@@ -12,17 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
 import math
-import paddle
-import paddle.nn as nn
-from paddle.io import DataLoader
-import paddle.distributed as dist
+import time
 
+import paddle
 from args import parse_args, print_args
+from dataset import OneBillionWordDataset, load_vocab
 from elmo import ELMo, ELMoLoss
-from dataset import load_vocab, OneBillionWordDataset
+from paddle.io import DataLoader
 
 
 @paddle.no_grad()
@@ -67,14 +64,14 @@ def eval(args):
         loss = elmo_loss(outputs, [next_ids, next_ids_reverse])
         ppl = paddle.exp(loss)
 
-        total_loss += loss.numpy()[0]
+        total_loss += float(loss)
         total_step += 1
 
         total_time += time.time() - batch_start_time
         if step % args.log_freq == 0:
             print(
                 "Eval step %d - loss: %.4f - Perplexity: %.4f - %.3fs/step"
-                % (step, loss.numpy()[0] * args.unroll_steps, ppl.numpy()[0], total_time / args.log_freq)
+                % (step, float(loss) * args.unroll_steps, float(ppl), total_time / args.log_freq)
             )
             total_time = 0.0
         batch_start_time = time.time()

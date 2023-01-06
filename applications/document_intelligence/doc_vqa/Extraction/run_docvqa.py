@@ -12,24 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import sys
-import copy
-import json
-import random
-import logging
-import warnings
 import argparse
+import json
+import logging
+import os
+import random
+import warnings
+from collections import Counter
+
 import numpy as np
-from collections import OrderedDict, Counter
-
 import paddle
-from paddle.static import InputSpec
-from paddle.jit import to_static
-from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
-
 from docvqa import DocVQA
 from model import LayoutXLMForTokenClassification_with_CRF
+
+from paddlenlp.transformers import LayoutXLMModel, LayoutXLMTokenizer
 
 warnings.filterwarnings("ignore")
 logger = logging.getLogger(__name__)
@@ -166,7 +162,6 @@ def main(args):
     global_step = 0
     tr_loss = 0.0
     set_seed(args)
-    best_metrics = None
     for epoch_id in range(args.num_train_epochs):
         print("epoch id:{}".format(epoch_id))
         for step, batch in enumerate(train_dataloader):
@@ -193,7 +188,7 @@ def main(args):
                         step,
                         len(train_dataloader),
                         lr_scheduler.get_lr(),
-                        loss.numpy()[0],
+                        float(loss),
                     )
                 )
 
@@ -322,7 +317,6 @@ def _normalize(in_str):
 
 
 def calc_f1_score(answer, prediction):
-    f1_scores = []
     ans_segs = _tokenize_chinese_chars(_normalize(answer))
     prediction_segs = _tokenize_chinese_chars(_normalize(prediction))
     f1 = fast_f1(prediction_segs, ans_segs)
@@ -436,7 +430,6 @@ def evaluate(args, model, tokenizer, label2id_map, id2label_map, pad_token_label
             line_json["question"] = line_label["question"]
             line_json["label_answer"] = line_text[1]
             line_json["predict_answer"] = line_text[2]
-            all_boxes = line_res[3]
             label_bbox_index, predict_bbox_index = line_text[3], line_text[4]
             label_bboxes, predict_bboxes = [], []
             for i in range(len(line_label["bboxes"])):

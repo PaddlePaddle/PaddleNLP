@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
+
 import gc
 import inspect
 import os
@@ -267,7 +269,7 @@ def nested_simplify(obj, decimals=3):
         raise Exception(f"Not supported: {type(obj)}")
 
 
-def require_package(package_name: str):
+def require_package(*package_names):
     """decorator which can detect that it will require the specific package
 
     Args:
@@ -275,9 +277,9 @@ def require_package(package_name: str):
     """
 
     def decorator(func):
-        if not is_package_available(package_name):
-            return unittest.skip(f"package<{package_name}> not found, so to skip this test")(func)
-        else:
-            return func
+        for package_name in package_names:
+            if not is_package_available(package_name):
+                return unittest.skip(f"package<{package_name}> not found, so to skip this test")(func)
+        return func
 
     return decorator
