@@ -19,11 +19,12 @@ from functools import partial
 import numpy as np
 import paddle
 import paddle.nn as nn
-from datasets import load_dataset, load_metric
+from datasets import load_metric
 from utils import DataArguments, ModelArguments, load_config, token_convert_example
 
 import paddlenlp
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
     Trainer,
@@ -72,11 +73,10 @@ def main():
             )
 
     raw_datasets = load_dataset(data_args.dataset)
-    label_list = raw_datasets["train"].features["ner_tags"].feature.names
+    label_list = raw_datasets["train"].label_list
     data_args.label_list = label_list
     data_args.ignore_label = -100
     data_args.no_entity_id = 0
-    print(label_list)
 
     num_classes = len(label_list)
 
@@ -168,38 +168,43 @@ def main():
     if training_args.do_eval:
         eval_metrics = trainer.evaluate()
         trainer.log_metrics("eval", eval_metrics)
+
     if training_args.do_predict:
         test_ret = trainer.predict(test_dataset)
         trainer.log_metrics("test", test_ret.metrics)
         tokens_label = test_ret.predictions.argmax(axis=-1)
         tokens_label = tokens_label.tolist()
         value = []
-        for idx, token_label in enumerate(tokens_label):
+        for batch, token_label in enumerate(tokens_label):
+            start = -1
             label_name = ""
             items = []
-            input_data = tokenizer.convert_ids_to_tokens(test_dataset[idx]["input_ids"])[1:-1]
-            input_len = len(input_data)
-            words = ""
-            tag = " "
-            start = 0
-            for i, label in enumerate(token_label[1 : input_len + 1]):
-                label_name = data_args.label_list[label]
-                if label_name == "O" or label_name.startswith("B-"):
-                    if len(words):
-                        items.append({"pos": [start, i], "entity": words, "label": tag})
-
-                    if label_name.startswith("B-"):
-                        tag = label_name.split("-")[1]
-                    else:
-                        tag = label_name
-                    start = i
-                    words = input_data[i]
-                else:
-                    words += input_data[i]
-            if len(words) > 0:
-                items.append({"pos": [start, i], "entity": words, "label": tag})
+            input_data = tokenizer.convert_ids_to_tokens(test_dataset[batch]["input_ids"])[1:-1]
+            for i, label in enumerate(token_label):
+                if (data_args.label_list[label] == "O" or "B-" in data_args.label_list[label]) and start >= 0:
+                    entity = input_data[start : i - 1]
+                    if isinstance(entity, list):
+                        entity = "".join(entity)
+                    items.append(
+                        {
+                            "pos": [start, i - 2],
+                            "entity": entity,
+                            "label": label_name,
+                        }
+                    )
+                    start = -1
+                if "B-" in data_args.label_list[label]:
+                    start = i - 1
+                    label_name = data_args.label_list[label][2:]
+            if start >= 0:
+                items.append(
+                    {
+                        "pos": [start, len(token_label) - 1],
+                        "entity": input_data[start : len(token_label) - 1],
+                        "label": "",
+                    }
+                )
             value.append(items)
-
         out_dict = {"value": value, "tokens_label": tokens_label}
         out_file = open(os.path.join(training_args.output_dir, "test_results.json"), "w")
         json.dump(out_dict, out_file, ensure_ascii=True)
