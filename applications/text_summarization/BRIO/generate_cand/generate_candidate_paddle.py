@@ -32,15 +32,14 @@ def generate_summaries(args):
     model = PegasusForConditionalGeneration.from_pretrained(model_name_or_path)
     tokenizer = PegasusChineseTokenizer.from_pretrained(model_name_or_path)
     model.eval()
-    # 转到左边
     count = 0
-    bsz = 2
+    bsz = 16
     with open(args.src_dir) as source, open(args.tgt_dir, "w") as fout:
         data = source.readlines()
         slines = []
         for i, sline in enumerate(data):
             sline = json.loads(sline)["content"]
-            if count % 10 == 0:
+            if count % 1000 == 0:
                 print(count)
             if count % bsz == 0 and count > 0:
                 batch = tokenizer(slines, padding=True, truncation=True, return_tensors="pd")
@@ -82,11 +81,10 @@ def generate_summaries(args):
 
 
 if __name__ == "__main__":
-    split = "train"
     parser = argparse.ArgumentParser(description="Parameters")
     parser.add_argument("--gpuid", type=int, default=7, help="gpu id")
-    parser.add_argument("--src_dir", type=str, default=f"data/{split}.json", help="source file")
-    parser.add_argument("--tgt_dir", type=str, default=f"data_cand/{split}.out", help="target file")
+    parser.add_argument("--src_dir", type=str, default="data/train.json", help="source file")
+    parser.add_argument("--tgt_dir", type=str, default="data_cand/train.out", help="target file")
     args = parser.parse_args()
 
     generate_summaries(args)
