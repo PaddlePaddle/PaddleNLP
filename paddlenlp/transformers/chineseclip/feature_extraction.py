@@ -12,21 +12,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Feature extractor class for ErnieViL."""
+"""Feature extractor class for Chinese-CLIP."""
 
-__all__ = ["ErnieViLFeatureExtractor"]
+__all__ = ["ChineseCLIPFeatureExtractor"]
 
 
 import warnings
 
-from .image_processing import ErnieViLImageProcessor
+from .image_processing import ChineseCLIPImageProcessor
 
 
-class ErnieViLFeatureExtractor(ErnieViLImageProcessor):
+class ChineseCLIPFeatureExtractor(ChineseCLIPImageProcessor):
     def __init__(self, *args, **kwargs) -> None:
         warnings.warn(
-            "The class ErnieViLFeatureExtractor is deprecated and will be removed in version 5 of PaddleNLP. Please"
-            " use ErnieViLImageProcessor instead.",
+            "The class ChineseCLIPFeatureExtractor is deprecated and will be removed in version 5 of PaddleNLP. Please"
+            " use CLIPImageProcessor instead.",
             FutureWarning,
         )
         super().__init__(*args, **kwargs)
