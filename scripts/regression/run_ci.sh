@@ -145,14 +145,14 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
     elif [[ ${dir1} =~ "paddlenlp" ]];then # API 升级
         if [[ ${dir2} =~ "__init__" ]];then # 针对发版mini test
             P0case_list[${#P0case_list[*]}]=bert
-            # P0case_list[${#P0case_list[*]}]=bert
-            # P0case_list[${#P0case_list[*]}]=gpt
         elif [[ ${!all_P0case_dic[*]} =~ ${dir2} ]];then
             P0case_list[${#P0case_list[*]}]=${dir2}
         elif [[ ${dir2} =~ "transformers" ]];then
             P0case_list[${#P0case_list[*]}]=transformers
         elif [[ ${dir2} =~ "taskflow" ]];then
             P0case_list[${#P0case_list[*]}]=taskflow
+        elif [[ ${dir3} =~ "fast_transformer" ]] || [[ ${dir4} =~ "FasterTransformer" ]] ;then
+             P0case_list[${#P0case_list[*]}]=fast_generation
         fi
         Build_list[${dir1}]="paddlenlp" # 影响编包
     elif [[ ${dir1} =~ "examples" ]];then # 模型升级
@@ -182,9 +182,6 @@ for file_name in `git diff --numstat origin |awk '{print $NF}'`;do
         elif [[ ${dir2} =~ "taskflow" ]] ;then
             APIcase_list[${#APIcase_list[*]}]=${dir2}
         fi
-    elif [[ ${dir1} =~ "fast_tokenizer" ]] || [[ ${dir1} =~ "fast_generation" ]] ;then #影响编包
-        Build_list[${dir1}]="paddlenlp" # 影响编包
-        P0case_list[${#P0case_list[*]}]=fast_generation
     elif [[ ${dir1} =~ "pipelines" ]];then # 影响编包
         Build_list[${dir1}]=${dir1}
     elif [[ ${dir1} =~ "ppdiffusers" ]];then # 影响编包
