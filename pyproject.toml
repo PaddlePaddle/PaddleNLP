@@ -11,14 +11,21 @@ exclude = ['.flake8']
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra -q"
+pythonpath = ["."]
 testpaths = [
     "tests/data",
     "tests/datasets",
     "tests/embeddings",
+    "tests/experimental",
     "tests/metrics",
     "tests/ops",
     "tests/transformers",
     "tests/prompt",
     "tests/taskflow",
     "tests/utils",
+    "model_zoo",
+]
+python_files = [
+    "test.py",
+    "test_*.py"
 ]

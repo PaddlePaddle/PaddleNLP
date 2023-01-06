@@ -29,31 +29,36 @@ class NERPostHandler(BasePostHandler):
         tokens_label = predictions.argmax(axis=-1)
         tokens_label = tokens_label.tolist()
         value = []
-        for idx, token_label in enumerate(tokens_label):
+        for batch, token_label in enumerate(tokens_label):
+            start = -1
             label_name = ""
             items = []
-            input_data = input_datas[idx]
-            input_len = len(input_data)
-            words = ""
-            tag = " "
-            start = 0
-            for i, label in enumerate(token_label[1 : input_len + 1]):
-                label_name = label_list[label]
-                if label_name == "O" or label_name.startswith("B-"):
-                    if len(words):
-                        items.append({"pos": [start, i], "entity": words, "label": tag})
-                    if label_name.startswith("B-"):
-                        tag = label_name.split("-")[1]
-                    else:
-                        tag = label_name
-                    start = i
-                    words = input_data[i]
-                else:
-                    words += input_data[i]
-            if len(words) > 0:
-                items.append({"pos": [start, i], "entity": words, "label": tag})
+            input_data = input_datas[batch]
+            for i, label in enumerate(token_label):
+                if (label_list[label] == "O" or "B-" in label_list[label]) and start >= 0:
+                    entity = input_data[start : i - 1]
+                    if isinstance(entity, list):
+                        entity = "".join(entity)
+                    items.append(
+                        {
+                            "pos": [start, i - 2],
+                            "entity": entity,
+                            "label": label_name,
+                        }
+                    )
+                    start = -1
+                if "B-" in label_list[label]:
+                    start = i - 1
+                    label_name = label_list[label][2:]
+            if start >= 0:
+                items.append(
+                    {
+                        "pos": [start, len(token_label) - 1],
+                        "entity": input_data[start : len(token_label) - 1],
+                        "label": "",
+                    }
+                )
             value.append(items)
-
         out_dict = {"value": value, "tokens_label": tokens_label}
         return out_dict
 

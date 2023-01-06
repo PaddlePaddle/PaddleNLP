@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -35,18 +36,16 @@ from .configuration_utils import PretrainedConfig
 from .bert.modeling import *
 from .bert.tokenizer import *
 from .bert.configuration import *
-from .bert.converter import *
 
 # isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
+from .gpt.configuration import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
-from .roberta.converter import *
 from .electra.modeling import *
 from .electra.tokenizer import *
-from .electra.converter import *
 from .albert.modeling import *
 from .albert.tokenizer import *
 from .bit.modeling import *
@@ -145,7 +144,6 @@ from .unimo.tokenizer import *
 from .unimo.configuration import *
 from .xlnet.modeling import *
 from .xlnet.tokenizer import *
-from .xlnet.converter import *
 from .xlm.modeling import *
 from .xlm.tokenizer import *
 from .gau_alpha.modeling import *
@@ -167,7 +165,6 @@ from .clip.modeling import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
-from .clip.converter import *
 from .clip.image_processing import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *

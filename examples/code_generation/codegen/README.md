@@ -32,7 +32,7 @@
 本项目是基于预训练语言模型CodeGen的代码生成，具有以下优势：
 - **效果领先**。CodeGen（16B）在HumanEval benchmark上评估指标已经超过[OpenAI's Codex](https://arxiv.org/pdf/2107.03374.pdf)。
 - **免费的Github Copilot**。支持通过Github Copilot调用该模型，让你免费体验代码AI助理。
-- **高性能**。基于[FasterGeneration](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/faster_generation)打造高性能推理，毫秒级响应。具体加速指标可参考[perf](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/faster_generation/README.md)。
+- **高性能**。基于[FastGeneration](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/fast_generation)打造高性能推理，毫秒级响应。具体加速指标可参考[perf](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/fast_generation/README.md)。
 - **支持自定义数据集训练**。可增加自己的代码数据加以微调，让其更智能。
 - **开箱即用**。本项目提供TaskFlow接口，无需训练，仅需几行代码便可预测。
 
@@ -120,7 +120,7 @@ python codegen_server.py
 - `max_length`：生成的最大长度，默认为16
 - `decode_strategy`：解码策略，默认为"greedy_search"
 - `load_state_as_np`：以numpy格式加载模型参数，可节省显存，默认为True
-- `use_faster`：是否使用Fastergeneration，可加速推理，默认为True
+- `use_fast`：是否使用FastGeneration，可加速推理，默认为True
 - `use_fp16_decoding`：是否使用fp16推理，可节省显存和加速推理，默认为True
 
 ### 测试服务
@@ -166,12 +166,12 @@ print(result)
 
 
 #### 注意事项
-- 如果使用FasterGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_faster=True`，第一次推理会涉及到编译，会耗费一些时间。FasterGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
+- 如果使用FastGeneration，需要设置[codegen_server.py](#配置参数说明)中`use_fast=True`，第一次推理会涉及到编译，会耗费一些时间。FastGeneration的环境依赖参考[这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/paddlenlp/ops/README.md#%E4%BD%BF%E7%94%A8%E7%8E%AF%E5%A2%83%E8%AF%B4%E6%98%8E)。
 - 如果要使用自己训练好的模型，可以设置[codegen_server.py](#配置参数说明)中`model_name_or_path`为本地模型路径。
 - 如果要从本地访问服务器，上述的`127.0.0.1`需要换成服务器的对外IP。
-- 如果出现下方的提示和报错，则说明FasterGeneration没有启动成功，需要定位下失败的原因。或者也可设置`use_faster=False`，不启动FasterGeneration加速，但推理速度会较慢。
+- 如果出现下方的提示和报错，则说明FastGeneration没有启动成功，需要定位下失败的原因。或者也可设置`use_fast=False`，不启动FastGeneration加速，但推理速度会较慢。
 ```shell
-  FasterGeneration is not available, and the original version would be used instead.
+  FastGeneration is not available, and the original version would be used instead.
 ```
 ```shell
   RuntimeError: (NotFound) There are no kernels which are registered in the unsqueeze2 operator.

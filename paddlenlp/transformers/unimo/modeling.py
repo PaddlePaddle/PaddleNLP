@@ -20,8 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import CausalLMOutputWithCrossAttentions
@@ -64,9 +63,7 @@ class UNIMOPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.unimo.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -166,8 +163,14 @@ class UNIMOModel(UNIMOPretrainedModel):
         )
 
         self.encoder_norm = nn.LayerNorm(config.hidden_size)
+        # post_encoder_norm = nn.LayerNorm(config.hidden_size)
+
         self.dropout = nn.Dropout(config.hidden_dropout_prob)
-        self.encoder = nn.TransformerEncoder(encoder_layer, config.num_hidden_layers)
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer,
+            config.num_hidden_layers,
+            # post_encoder_norm,
+        )
 
         self.apply(self.init_weights)
 
@@ -459,24 +462,31 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
             cross_attentions=outputs.cross_attentions,
         )
 
-    def prepare_faster_entry(self, kwargs):
-        from paddlenlp.ops import FasterUNIMOText
+    def prepare_fast_entry(self, kwargs):
+        from paddlenlp.ops import FasterMIRO, FasterUNIMOText
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
-        self._faster_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError(
+                "Only topk sampling or topp sampling are supported. "
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
+            )
+
+        if getattr(self.encoder, "norm", None) is None:
+            self._fast_entry = FasterUNIMOText(self, use_fp16_decoding=use_fp16_decoding).forward
+        else:
+            self._fast_entry = FasterMIRO(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def adjust_logits_during_generation(self, logits):
         # pre-process distribution
@@ -526,8 +536,8 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
                 token_type_ids = token_type_ids[:, -1].unsqueeze(-1)
             if position_ids is not None:
                 position_ids = position_ids[:, -1].unsqueeze(-1)
-        if attention_mask is not None:
-            attention_mask = attention_mask[:, :, -1:, :]
+            if attention_mask is not None:
+                attention_mask = attention_mask[:, :, -1:, :]
 
         return {
             "input_ids": input_ids,
@@ -542,10 +552,7 @@ class UNIMOLMHeadModel(UNIMOPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)
 
 
 UNIMOForMaskedLM = UNIMOLMHeadModel

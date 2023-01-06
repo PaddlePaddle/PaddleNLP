@@ -117,8 +117,14 @@ def create_pretrained_dataset(
         size = sum(len(x[3]) for x in data)
         # masked_lm_positions
         # Organize as a 1D tensor for gather or use gather_nd
-        if size % 8 != 0:
-            size += 8 - (size % 8)
+        if args.device == "npu":
+            # For NPU device, fixed input sentence length, in
+            # order to reduce the number of op compile.
+            if size % 80 != 0:
+                size += 80 - (size % 80)
+        else:
+            if size % 8 != 0:
+                size += 8 - (size % 8)
         out[3] = np.full(size, 0, dtype=np.int32)
         # masked_lm_labels
         out[4] = np.full([size, 1], -1, dtype=np.int64)
@@ -534,12 +540,16 @@ def do_train(args):
                 ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
 
             with ctx_manager:
+                # For NPU device, using fp16 data type to execute `dropout` NPU op
+                # can improve performance, which can change `Cast` CANN OP from
+                # AICPU operator to AICore operator.
                 with paddle.amp.auto_cast(
                     args.use_amp,
                     custom_white_list=[
                         "softmax",
                         "layer_norm",
                         "gelu",
+                        "dropout",
                     ],
                     custom_black_list=[
                         "c_softmax_with_cross_entropy",
@@ -600,7 +610,12 @@ def do_train(args):
             else:
                 optimizer.step()
 
-            optimizer.clear_grad()
+            if args.device == "npu":
+                # For NPU device, set set_to_zero to False can improve
+                # performance.
+                optimizer.clear_grad(set_to_zero=False)
+            else:
+                optimizer.clear_grad()
             train_run_cost += time.time() - train_start
             tr_loss.subtract_(tr_loss)
 

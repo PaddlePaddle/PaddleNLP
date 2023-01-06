@@ -22,8 +22,7 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.nn import Embedding, Layer, MultiHeadAttention
 
-from paddlenlp.utils.env import CONFIG_NAME
-
+from ...utils.env import CONFIG_NAME
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -94,7 +93,7 @@ class MBartPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.init_std if hasattr(self, "init_std") else self.mbart.config.init_std,
+                        std=self.config.init_std,
                         shape=layer.weight.shape,
                     )
                 )
@@ -549,11 +548,23 @@ class MBartModel(MBartPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_last_hidden_state)
         else:
             cache = None
+
+        memory_mask = attention_mask
+        if attention_mask is not None:
+            if attention_mask.ndim == 4:
+                memory_mask = attention_mask[:, :, -1:, :]
+            elif attention_mask.ndim == 3:
+                memory_mask = attention_mask[:, -1:, :].unsqueeze([1])
+            elif attention_mask.ndim == 2:
+                memory_mask = attention_mask.unsqueeze([1, 2])
+            else:
+                raise ValueError("Invalid attention mask shape. ")
+
         decoder_output = self.decoder(
             decoder_input_ids,
             decoder_attention_mask,
             encoder_last_hidden_state,
-            attention_mask,
+            memory_mask,
             cache,
             decoder_inputs_embeds=decoder_inputs_embeds,
             output_attentions=output_attentions,
@@ -955,7 +966,7 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
     def get_decoder(self):
         return self.mbart.get_decoder()
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterMBART
 
         decode_strategy = kwargs.get("decode_strategy")
@@ -963,16 +974,16 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
         if kwargs["min_length"] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterMBART(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
+        self._fast_entry = FasterMBART(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def forward(
         self,
@@ -1132,7 +1143,4 @@ class MBartForConditionalGeneration(MBartPretrainedModel):
         try:
             return super().__getattr__(name)
         except AttributeError:
-            try:
-                return getattr(getattr(self, self.base_model_prefix), name)
-            except AttributeError:
-                return getattr(getattr(self, self.base_model_prefix).config, name)
+            return getattr(getattr(self, self.base_model_prefix), name)

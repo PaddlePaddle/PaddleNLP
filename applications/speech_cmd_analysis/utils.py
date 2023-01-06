@@ -14,35 +14,16 @@
 # limitations under the License.
 
 import json
-import time
 import math
 import random
-import numpy as np
-from tqdm import tqdm
-
-from urllib.request import urlopen
-from urllib.request import Request
+import time
 from urllib.error import URLError
 from urllib.parse import urlencode
+from urllib.request import Request, urlopen
 
+import numpy as np
 import paddle
-
-MODEL_MAP = {
-    "uie-base": {
-        "encoding_model": "ernie-3.0-base-zh",
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-        },
-    },
-    "uie-tiny": {
-        "encoding_model": "ernie-3.0-medium-zh",
-        "resource_file_urls": {
-            "model_state.pdparams": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_state.pdparams",
-            "model_config.json": "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_tiny/model_config.json",
-        },
-    },
-}
+from tqdm import tqdm
 
 
 def set_seed(seed):
@@ -83,12 +64,12 @@ def mandarin_asr_api(api_key, secret_key, audio_file, audio_format="wav"):
         result_str = urlopen(request).read()
     except URLError as error:
         print("token http response http code : " + str(error.code))
-        result_str = err.read()
+        result_str = error.read()
     result_str = result_str.decode()
 
     result = json.loads(result_str)
     if "access_token" in result.keys() and "scope" in result.keys():
-        if SCOPE and (not SCOPE in result["scope"].split(" ")):
+        if SCOPE and (SCOPE not in result["scope"].split(" ")):
             raise ASRError("scope is not correct!")
         token = result["access_token"]
     else:
@@ -319,7 +300,7 @@ def convert_ext_examples(raw_examples, negative_ratio):
     entity_name_set = []
     predicate_set = []
 
-    print(f"Converting doccano data...")
+    print("Converting doccano data...")
     with tqdm(total=len(raw_examples)) as pbar:
         for line in raw_examples:
             items = json.loads(line)
@@ -402,13 +383,13 @@ def convert_ext_examples(raw_examples, negative_ratio):
             relation_prompts.append(relation_prompt)
             pbar.update(1)
 
-    print(f"Adding negative samples for first stage prompt...")
+    print("Adding negative samples for first stage prompt...")
     entity_examples = add_negative_example(entity_examples, texts, entity_prompts, entity_label_set, negative_ratio)
     if len(predicate_set) != 0:
-        print(f"Constructing relation prompts...")
+        print("Constructing relation prompts...")
         relation_prompt_set = construct_relation_prompt_set(entity_name_set, predicate_set)
 
-        print(f"Adding negative samples for second stage prompt...")
+        print("Adding negative samples for second stage prompt...")
         relation_examples = add_negative_example(
             relation_examples, texts, relation_prompts, relation_prompt_set, negative_ratio
         )

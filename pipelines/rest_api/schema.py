@@ -12,13 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# flake8: noqa
 
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import BaseConfig, BaseModel, Extra, Field
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 
-from pipelines.schema import Answer, Document, Label
+from pipelines.schema import Answer, Document, Label, Span
 
 try:
     from typing import Literal
