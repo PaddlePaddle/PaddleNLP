@@ -16,16 +16,17 @@
 import os
 import unittest
 
+from paddlenlp.transformers.albert.fast_tokenizer import (
+    AlbertChineseFastTokenizer,
+    AlbertEnglishFastTokenizer,
+)
 from paddlenlp.transformers.albert.tokenizer import (
-    AlbertEnglishTokenizer,
     AlbertChineseTokenizer,
+    AlbertEnglishTokenizer,
 )
-from paddlenlp.transformers.bert.tokenizer import (
-    BasicTokenizer,
-    WordpieceTokenizer,
-)
+from paddlenlp.transformers.bert.tokenizer import BasicTokenizer, WordpieceTokenizer
 
-from ...testing_utils import slow, get_tests_dir
+from ...testing_utils import get_tests_dir, slow
 from ..test_tokenizer_common import TokenizerTesterMixin, filter_non_english
 
 SAMPLE_VOCAB = get_tests_dir("fixtures/spiece.model")
@@ -33,7 +34,9 @@ SAMPLE_VOCAB = get_tests_dir("fixtures/spiece.model")
 
 class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
     tokenizer_class = AlbertEnglishTokenizer
+    fast_tokenizer_class = AlbertEnglishFastTokenizer
     from_pretrained_vocab_key = "sentencepiece_model_file"
+    test_fast_tokenizer = True
     test_sentencepiece = True
     test_sentencepiece_ignore_case = True
 
@@ -67,6 +70,26 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
 
     def test_vocab_size(self):
         self.assertEqual(self.get_tokenizer().vocab_size, 30_000)
+
+    def test_fast_and_python_full_tokenizer(self):
+        if not self.test_fast_tokenizer:
+            return
+        tokenizer = self.get_tokenizer()
+        tokenizer_fast = self.get_fast_tokenizer()
+
+        sequence = "I was born in 92000, and this is falsé."
+
+        tokens = tokenizer.tokenize(sequence)
+        tokens_fast = tokenizer_fast.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_fast)
+
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        ids = tokenizer.encode(sequence)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
 
     def test_full_tokenizer(self):
         tokenizer = AlbertEnglishTokenizer(SAMPLE_VOCAB, keep_accents=True)
@@ -114,24 +137,24 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
             ],
-                               [
-                                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                                   1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-                               ],
-                               [
-                                   1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-                               ]],
+                [
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+                [
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]],
             'input_ids': [[
                 2, 21970, 13, 5, 6092, 167, 28, 7103, 2153, 673, 8, 7028, 12051,
                 18, 17, 7103, 2153, 673, 8, 3515, 18684, 8, 4461, 6, 1927, 297,
@@ -142,25 +165,25 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 2761, 19, 808, 2430, 2556, 17, 855, 1480, 9477, 4091, 128,
                 11712, 15, 7103, 2153, 673, 17, 24883, 9990, 9, 3
             ],
-                          [
-                              2, 11502, 25, 1006, 20, 782, 8, 11809, 855, 1732,
-                              19393, 18667, 37, 367, 21018, 69, 1854, 34, 11860,
-                              19124, 27, 156, 225, 17, 193, 4141, 19, 65, 9124,
-                              9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0
-                          ],
-                          [
-                              2, 14, 2231, 886, 2385, 17659, 84, 14, 16792,
-                              1952, 9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                              0, 0, 0, 0, 0, 0, 0, 0
-                          ]],
+                [
+                2, 11502, 25, 1006, 20, 782, 8, 11809, 855, 1732,
+                19393, 18667, 37, 367, 21018, 69, 1854, 34, 11860,
+                19124, 27, 156, 225, 17, 193, 4141, 19, 65, 9124,
+                9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0
+            ],
+                [
+                2, 14, 2231, 886, 2385, 17659, 84, 14, 16792,
+                1952, 9, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0
+            ]],
             'token_type_ids': [[
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -168,24 +191,24 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ],
-                               [
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-                               ],
-                               [
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                                   0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-                               ]]
+                [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+                [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]]
         }  # noqa: E501
         # fmt: on
 
@@ -198,6 +221,7 @@ class AlbertEnglishTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
 class AlbertChineseTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
 
     tokenizer_class = AlbertChineseTokenizer
+    fast_tokenizer_class = AlbertChineseFastTokenizer
     space_between_special_tokens = True
     from_pretrained_filter = filter_non_english
     test_seq2seq = True
@@ -238,6 +262,41 @@ class AlbertChineseTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
         tokens = tokenizer.tokenize("UNwant\u00E9d,running")
         self.assertListEqual(tokens, ["un", "##want", "##ed", ",", "runn", "##ing"])
         self.assertListEqual(tokenizer.convert_tokens_to_ids(tokens), [9, 6, 7, 12, 10, 11])
+
+    def test_fast_and_python_full_tokenizer(self):
+        if not self.test_fast_tokenizer:
+            return
+
+        tokenizer = self.get_tokenizer()
+        tokenizer_fast = self.get_fast_tokenizer()
+
+        sequence = "UNwant\u00E9d,running"
+        tokens = tokenizer.tokenize(sequence)
+        tokens_fast = tokenizer_fast.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_fast)
+
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        ids = tokenizer.encode(sequence)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        tokenizer = self.get_tokenizer(do_lower_case=True)
+        tokenizer_fast = self.get_fast_tokenizer(do_lower_case=True)
+
+        tokens = tokenizer.tokenize(sequence)
+        tokens_fast = tokenizer_fast.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_fast)
+
+        ids = tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
+
+        ids = tokenizer.encode(sequence)["input_ids"]
+        ids_fast = tokenizer_fast.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_fast)
 
     def test_chinese(self):
         tokenizer = BasicTokenizer()
