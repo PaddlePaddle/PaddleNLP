@@ -18,22 +18,19 @@ import unittest
 
 import numpy as np
 import paddle
+from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DanceDiffusionPipeline, IPNDMScheduler, UNet1DModel
 from ppdiffusers.utils import slow
 
 
-class PipelineFastTests(unittest.TestCase):
-    def tearDown(self):
-        # clean up the VRAM after each test
-        super().tearDown()
-        gc.collect()
-        paddle.device.cuda.empty_cache()
+class DanceDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+    pipeline_class = DanceDiffusionPipeline
+    test_attention_slicing = False
 
-    @property
-    def dummy_unet(self):
+    def get_dummy_components(self):
         paddle.seed(0)
-        model = UNet1DModel(
+        unet = UNet1DModel(
             block_out_channels=(32, 32, 64),
             extra_in_channels=16,
             sample_size=512,
@@ -44,32 +41,40 @@ class PipelineFastTests(unittest.TestCase):
             use_timestep_embedding=False,
             time_embedding_type="fourier",
             mid_block_type="UNetMidBlock1D",
-            down_block_types=["DownBlock1DNoSkip"] + ["DownBlock1D"] + ["AttnDownBlock1D"],
-            up_block_types=["AttnUpBlock1D"] + ["UpBlock1D"] + ["UpBlock1DNoSkip"],
+            down_block_types=("DownBlock1DNoSkip", "DownBlock1D", "AttnDownBlock1D"),
+            up_block_types=("AttnUpBlock1D", "UpBlock1D", "UpBlock1DNoSkip"),
         )
-        return model
-
-    def test_dance_diffusion(self):
         scheduler = IPNDMScheduler()
 
-        pipe = DanceDiffusionPipeline(unet=self.dummy_unet, scheduler=scheduler)
+        components = {
+            "unet": unet,
+            "scheduler": scheduler,
+        }
+        return components
+
+    def get_dummy_inputs(self, seed=0):
+        generator = paddle.Generator().manual_seed(seed)
+        inputs = {
+            "batch_size": 1,
+            "generator": generator,
+            "num_inference_steps": 4,
+        }
+        return inputs
+
+    def test_dance_diffusion(self):
+        components = self.get_dummy_components()
+        pipe = DanceDiffusionPipeline(**components)
         pipe.set_progress_bar_config(disable=None)
 
-        generator = paddle.Generator().manual_seed(0)
-        output = pipe(generator=generator, num_inference_steps=4)
+        inputs = self.get_dummy_inputs()
+        output = pipe(**inputs)
         audio = output.audios
 
-        generator = paddle.Generator().manual_seed(0)
-        output = pipe(generator=generator, num_inference_steps=4, return_dict=False)
-        audio_from_tuple = output[0]
-
         audio_slice = audio[0, -3:, -3:]
-        audio_from_tuple_slice = audio_from_tuple[0, -3:, -3:]
 
-        assert audio.shape == (1, 2, self.dummy_unet.sample_size)
+        assert audio.shape == (1, 2, components["unet"].sample_size)
         expected_slice = np.array([0.3497878611087799, -0.10828632861375809, -1.0, -1.0, -1.0, 0.1466890275478363])
         assert np.abs(audio_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(audio_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow
