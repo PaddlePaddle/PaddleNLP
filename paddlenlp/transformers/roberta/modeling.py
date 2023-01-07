@@ -14,21 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 
@@ -44,6 +43,22 @@ __all__ = [
 ]
 
 
+def create_position_ids_from_input_ids(input_ids, padding_idx, past_key_values_length=0):
+    """
+    Replace non-padding symbols with their position numbers. Position numbers begin at padding_idx+1. Padding symbols
+    are ignored. This is modified from fairseq's `utils.make_positions`.
+
+    Args:
+        x: paddle.Tensor x:
+    Returns: paddle.Tensor
+
+    """
+    # The series of casts and type-conversions here are carefully balanced to both work with ONNX export and XLA.
+    mask = (input_ids != padding_idx).cast("int64")
+    incremental_indices = (paddle.cumsum(mask, axis=1) + past_key_values_length) * mask
+    return incremental_indices + padding_idx
+
+
 class RobertaEmbeddings(nn.Layer):
     r"""
     Include embeddings from word, position and token_type embeddings.
@@ -51,7 +66,8 @@ class RobertaEmbeddings(nn.Layer):
 
     def __init__(self, config: RobertaConfig):
         super(RobertaEmbeddings, self).__init__()
-        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=config.pad_token_id)
+        # , padding_idx=config.pad_token_id
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
         self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
         self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
         self.layer_norm = nn.LayerNorm(config.hidden_size)
@@ -62,14 +78,16 @@ class RobertaEmbeddings(nn.Layer):
     def forward(self, input_ids, token_type_ids=None, position_ids=None, past_key_values_length=None):
         if position_ids is None:
             # maybe need use shape op to unify static graph and dynamic graph
-            ones = paddle.ones_like(input_ids, dtype="int64")
-            seq_length = paddle.cumsum(ones, axis=-1)
-            if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
-                position_ids = seq_length + self.padding_idx + 1 - ones
-            else:  # postion_ids for RobertaTokenizer
-                position_ids = seq_length - ones
-            if past_key_values_length is not None:
-                position_ids += past_key_values_length
+            # ones = paddle.ones_like(input_ids, dtype="int64")
+            # seq_length = paddle.cumsum(ones, axis=-1)
+            # if self.cls_token_id == 0 or input_ids[0][0] == 0:  # postion_ids for RobertaBPETokenizer
+            #     position_ids = seq_length + self.padding_idx + 1 - ones
+            # else:  # postion_ids for RobertaTokenizer
+            #     position_ids = seq_length - ones
+            # if past_key_values_length is not None:
+            #     position_ids += past_key_values_length
+            # position_ids.stop_gradient = True
+            position_ids = create_position_ids_from_input_ids(input_ids, padding_idx=self.padding_idx)
             position_ids.stop_gradient = True
         if token_type_ids is None:
             token_type_ids = paddle.zeros_like(input_ids, dtype="int64")

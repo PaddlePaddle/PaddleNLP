@@ -194,12 +194,11 @@ class RobertaConfig(PretrainedConfig):
         type_vocab_size: int = 16,
         initializer_range: float = 0.02,
         pad_token_id: int = 0,
-        layer_norm_eps: float = 1e-12,
         cls_token_id: int = 101,
+        layer_norm_eps: float = 1e-12,
         **kwargs
     ):
         super().__init__(pad_token_id=pad_token_id, cls_token_id=cls_token_id, **kwargs)
-
         self.vocab_size = vocab_size
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
@@ -212,5 +211,5 @@ class RobertaConfig(PretrainedConfig):
         self.type_vocab_size = type_vocab_size
         self.initializer_range = initializer_range
         self.pad_token_id = pad_token_id
-        self.layer_norm_eps = layer_norm_eps
         self.cls_token_id = cls_token_id
+        self.layer_norm_eps = layer_norm_eps

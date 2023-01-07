@@ -1843,7 +1843,6 @@ class Trainer:
                 ignore_keys = getattr(self.model.config, "keys_to_ignore_at_inference", [])
             else:
                 ignore_keys = []
-
         # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
         if has_labels:
             labels = nested_detach(tuple(inputs.get(name) for name in self.label_names))
@@ -1880,7 +1879,6 @@ class Trainer:
         logits = nested_detach(logits)
         if isinstance(logits, (list, tuple)) and len(logits) == 1:
             logits = logits[0]
-
         return (loss, logits, labels)
 
     def is_local_process_zero(self) -> bool:

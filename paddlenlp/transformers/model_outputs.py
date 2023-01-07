@@ -95,6 +95,7 @@ def _transformer_encoder_layer_fwd(self, src, src_mask=None, cache=None, output_
     if self.normalize_before:
         src = self.norm2(src)
     src = self.linear2(self.dropout(self.activation(self.linear1(src))))
+
     src = residual + self.dropout2(src)
     if not self.normalize_before:
         src = self.norm2(src)

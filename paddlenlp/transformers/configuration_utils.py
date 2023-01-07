@@ -542,6 +542,7 @@ class PretrainedConfig:
         self.forced_eos_token_id = kwargs.pop("forced_eos_token_id", None)
         self.remove_invalid_values = kwargs.pop("remove_invalid_values", False)
         self.exponential_decay_length_penalty = kwargs.pop("exponential_decay_length_penalty", None)
+        self.layer_norm_eps = kwargs.pop("layer_norm_eps", None)
 
         # Fine-tuning task arguments
         self.architectures = kwargs.pop("architectures", None)
