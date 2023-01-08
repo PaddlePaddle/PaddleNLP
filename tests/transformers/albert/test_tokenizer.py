@@ -482,5 +482,33 @@ class AlbertTokenizerTest(unittest.TestCase):
 
         tokenizer1 = AlbertFastTokenizer.from_pretrained("albert-base-v2")
         tokenizer2 = AlbertFastTokenizer.from_pretrained("albert-chinese-base")
-        self.assertIsInstance(tokenizer1.backend_tokenizer, AlbertEnglishTokenizer)
-        self.assertIsInstance(tokenizer2.backend_tokenizer, AlbertChineseTokenizer)
+        english_tokenizer = AlbertEnglishFastTokenizer.from_pretrained("albert-base-v2")
+        chinese_tokenizer = AlbertChineseFastTokenizer.from_pretrained("albert-chinese-base")
+
+        # Test English Tokenizer if is equal
+        sequence = "I was born in 92000, and this is falsé."
+        tokens = tokenizer1.tokenize(sequence)
+        tokens_english = english_tokenizer.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_english)
+
+        ids = tokenizer1.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_english = english_tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_english)
+
+        ids = tokenizer1.encode(sequence, add_special_tokens=True)["input_ids"]
+        ids_english = english_tokenizer.encode(sequence, add_special_tokens=True)["input_ids"]
+        self.assertListEqual(ids, ids_english)
+
+        # Test Chinese Tokenizer if is equal
+        sequence = "UNwant\u00E9d,running"
+        tokens = tokenizer2.tokenize(sequence)
+        tokens_chinese = chinese_tokenizer.tokenize(sequence)
+        self.assertListEqual(tokens, tokens_chinese)
+
+        ids = tokenizer2.encode(sequence, add_special_tokens=False)["input_ids"]
+        ids_chinese = chinese_tokenizer.encode(sequence, add_special_tokens=False)["input_ids"]
+        self.assertListEqual(ids, ids_chinese)
+
+        ids = tokenizer2.encode(sequence)["input_ids"]
+        ids_chinese = chinese_tokenizer.encode(sequence)["input_ids"]
+        self.assertListEqual(ids, ids_chinese)

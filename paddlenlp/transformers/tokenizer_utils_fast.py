@@ -19,6 +19,7 @@ import os
 from collections import defaultdict
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from fast_tokenizer import AddedToken as FastAddedToken
 from fast_tokenizer import Encoding as FastEncoding
 from fast_tokenizer import Tokenizer as FastTokenizer
 
@@ -42,6 +43,26 @@ TOKENIZER_FILE = "tokenizer.json"
 VOCAB_FILES_NAMES = {"tokenizer_file": TOKENIZER_FILE}
 ADDED_TOKENS_FILE = "added_tokens.json"
 SPECIAL_TOKENS_MAP_FILE = "special_tokens_map.json"
+
+
+def convert_added_tokens_fast(tokens):
+    c_added_tokens = []
+    for token in tokens:
+        if isinstance(token, str):
+            c_added_tokens.append(token)
+        elif isinstance(token, AddedToken):
+            c_added_tokens.append(
+                FastAddedToken(
+                    content=token.content,
+                    single_word=token.single_word,
+                    lstrip=token.lstrip,
+                    rstrip=token.rstrip,
+                    normalized=token.normalized,
+                )._added_token
+            )
+        else:
+            raise ValueError("The argument of tokens should be List[Union[str, AddedToken]]")
+    return c_added_tokens
 
 
 class PretrainedFastTokenizer(PretrainedTokenizerBase):
@@ -206,9 +227,9 @@ class PretrainedFastTokenizer(PretrainedTokenizerBase):
 
     def _add_tokens(self, new_tokens: List[Union[str, AddedToken]], special_tokens=False) -> int:
         if special_tokens:
-            return self._tokenizer.add_special_tokens(new_tokens)
+            return self._tokenizer.add_special_tokens(convert_added_tokens_fast(new_tokens))
 
-        return self._tokenizer.add_tokens(new_tokens)
+        return self._tokenizer.add_tokens(convert_added_tokens_fast(new_tokens))
 
     def num_special_tokens_to_add(self, pair: bool = False) -> int:
         return self._tokenizer.num_special_tokens_to_add(pair)

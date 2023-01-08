@@ -64,8 +64,11 @@ class Converter:
 
 
 class BertConverter(Converter):
+    def get_vocab(self):
+        return self.original_tokenizer.vocab
+
     def converted(self) -> Tokenizer:
-        vocab = self.original_tokenizer.vocab
+        vocab = self.get_vocab()
         tokenizer = Tokenizer(
             FastWordPiece(
                 vocab._token_to_idx, unk_token=str(self.original_tokenizer.unk_token), with_pretokenization=True
@@ -262,7 +265,11 @@ class ErnieMConverter(SpmConverter):
 
 
 class AlbertChineseConverter(BertConverter):
-    pass
+    def get_vocab(self):
+        if hasattr(self.original_tokenizer, "vocab"):
+            # AlbertChineseTokenizer has vocab attr
+            return self.original_tokenizer.vocab
+        return self.original_tokenizer.tokenizer.vocab
 
 
 class AlbertEnglishConverter(SpmConverter):
