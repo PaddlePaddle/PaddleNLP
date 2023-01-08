@@ -19,10 +19,12 @@ import unittest
 from paddlenlp.transformers.albert.fast_tokenizer import (
     AlbertChineseFastTokenizer,
     AlbertEnglishFastTokenizer,
+    AlbertFastTokenizer,
 )
 from paddlenlp.transformers.albert.tokenizer import (
     AlbertChineseTokenizer,
     AlbertEnglishTokenizer,
+    AlbertTokenizer,
 )
 from paddlenlp.transformers.bert.tokenizer import BasicTokenizer, WordpieceTokenizer
 
@@ -467,3 +469,18 @@ class AlbertChineseTokenizerTest(TokenizerTesterMixin, unittest.TestCase):
 
                 # it is expected that each Chinese character is not preceded by "##"
                 self.assertListEqual(tokens_without_spe_char_p, list_of_commun_chinese_char)
+
+
+class AlbertTokenizerTest(unittest.TestCase):
+    @slow
+    def test_from_pretrained(self):
+        tokenizer1 = AlbertTokenizer.from_pretrained("albert-base-v2")
+        tokenizer2 = AlbertTokenizer.from_pretrained("albert-chinese-base")
+
+        self.assertIsInstance(tokenizer1.tokenizer, AlbertEnglishTokenizer)
+        self.assertIsInstance(tokenizer2.tokenizer, AlbertChineseTokenizer)
+
+        tokenizer1 = AlbertFastTokenizer.from_pretrained("albert-base-v2")
+        tokenizer2 = AlbertFastTokenizer.from_pretrained("albert-chinese-base")
+        self.assertIsInstance(tokenizer1.backend_tokenizer, AlbertEnglishTokenizer)
+        self.assertIsInstance(tokenizer2.backend_tokenizer, AlbertChineseTokenizer)

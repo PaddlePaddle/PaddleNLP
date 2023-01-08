@@ -301,7 +301,7 @@ class AlbertConverter(Converter):
         converter_class = AlbertEnglishConverter
         if self.original_tokenizer.vocab_file is not None:
             converter_class = AlbertChineseConverter
-        return converter_class(self.original_tokenizer)
+        return converter_class(self.original_tokenizer).converted()
 
 
 SLOW_TO_FAST_CONVERTERS = {
