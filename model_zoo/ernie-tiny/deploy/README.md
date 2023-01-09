@@ -30,6 +30,14 @@
 ├── python
 │   ├── infer_demo.py     # Python 部署示例代码
 │   └── README.md         # Python 部署示例文档
+├── android
+│   ├── README.md         # Android部署文档
+│   ├── app               # App示例代码
+│   ├── build.gradle
+│   ├── ernie_tiny        # ERNIE Tiny JNI & Java封装代码
+│   ├── ......            # Android相关的工程文件及目录
+│   ├── local.properties
+│   └── ui                # 一些辅助用的UI代码
 └── README.md             # 文档
 
 ```
