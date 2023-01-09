@@ -3,7 +3,17 @@
 我们非常欢迎并希望您对`PaddleNLP`做出开源贡献。在您开始提交您的贡献之前，请先行签署[PaddlePaddle 贡献者许可协议](https://cla-assistant.io/PaddlePaddle/PaddleNLP)。
 本文接下来将介绍我们的开发与贡献流程：
 
-## 开发与贡献流程
+## 贡献方式
+
+我们欢迎不同的向`PaddleNLP`做出贡献的方式，例如：
+
+- 修复已知的Issue
+- 提交新的Issue，例如提出功能需求或者bug报告
+- 实现新的模型结构
+
+如果您不知道从哪里开始，请查看Issues板块中的`Good First Issue`标签。它为您提供一个对初学者友好的已知Issue列表，可以降低贡献的门槛，帮助您开始为开源做出贡献。您只需在您想处理的Issue中告知我们您想负责此Issue即可。
+
+## 开发流程
 
 PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branching-model/)。对于常见的开源贡献，我们有以下的贡献流程：
 
@@ -31,7 +41,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
 #### 4. 配置开发环境
    在开始编码之前，您需要设置开发环境。我们强烈建议您在虚拟环境中进行所有开发，例如[venv](https://docs.python.org/3/library/venv.html)或[conda](https://docs.conda.io/en/latest/)。
    请您设置并激活虚拟环境后，运行以下命令：
-   
+
    ```bash
    make install
    ```
@@ -58,7 +68,7 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    我们使用 [`pre-commit`](http://pre-commit.com/)工具（包括[black](https://black.readthedocs.io/en/stable/)、[isort](https:/ /pycqa.github.io/isort/) 和
    [flake8](https://flake8.pycqa.org/en/latest/)）来检查每次提交中的代码和文档的风格。当你运行 `git commit` 时，你会看到
    类似于以下内容：
-   
+
    ```
     ➜  (my-virtual-env) git commit -m "commiting my cool feature"
     black....................................................................Passed
@@ -105,27 +115,27 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
 
    [Google][http://google.com/] 或 [StackOverflow](https://stackoverflow.com/) 是帮助您了解代码风格错误的好工具。
    如果您仍然无法弄清楚，请不要担心。您可以使用 `git commit -m "style error" --no-verify` 提交，我们很乐意在您创建 Pull Request 后帮助您。
-   
-7. git pull与代码冲突
+
+#### 7. git pull与代码冲突
 
    有经验的 Git 用户经常从官方Repo中git pull。因为这样子他们会及早注意到与其他人的代码冲突，并且让代码冲突更容易解决
-   
+
    ```bash
    git remote add upstream https://github.com/PaddlePaddle/PaddleNLP
    git pull upstream develop
    ```
 
-8. git push与提交Pull Request
+#### 8. git push与提交Pull Request
 
    您可以将您的本地开发分支中的工作 push 到您的fork的分支中：
-   
+
    ```bash
    git push origin my-cool-stuff
    ```
 
    git pushi之后，您可以提交Pull Request，请求[官方repo](https://github.com/PaddlePaddle/PaddleNLP) 采纳您的开发工作。请您依照[这些步骤](https://help.github.com/articles/creating-a-pull-request/)创建Pull Request。
 
-9. 删除已经合入的本地和远程分支
+#### 9. 删除已经合入的本地和远程分支
 
    为了保持您本地的工作区和fork分支的干净整洁，建议您在Pull Request合入之后删除本地的残余分支：
 
@@ -136,9 +146,9 @@ PaddleNLP 使用 [Git 分支模型](http://nvie.com/posts/a-successful-git-branc
    git branch -d my-cool-stuff
    ```
 
-### 代码Review
+## 代码Review
 
-- 欢迎通过 IM 或电子邮件将您的Pull Request发送Reviewer。
+- 在您的Pull Request能够顺利通过本地测试以及CI的情况下，您可以在Pull Request中 @ 相关的Reviewer，提醒他们尽快对您的Pull Request进行Review。
 
 - 请处理Reviewer的每一条评论。如果您已按照评论修改，请回复“完成”；否则，可以在评论下展开讨论。
 
