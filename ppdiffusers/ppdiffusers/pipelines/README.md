@@ -26,7 +26,7 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 
 下表总结了所有支持的Pipelines，以及相应的论文、任务、推理脚本。
 
-| Pipeline                                                                                                                      | 源链接                                                                                                                       | 任务 | 推理
+| Pipeline                                                                                                                      | 源链接                                                                                                                       | 任务 | 推理脚本
 |-------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|:---:|:---:|
 | [alt_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/alt_diffusion)                 | [**Alt Diffusion**](https://arxiv.org/abs/2211.06679)   | *Text-to-Image Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-alt_diffusion.py)
 | [alt_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/alt_diffusion)                 | [**Alt Diffusion**](https://arxiv.org/abs/2211.06679)   | *Image-to-Image Text-Guided Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_to_image_text_guided_generation-alt_diffusion.py)
@@ -74,7 +74,7 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 
 
 ## 任务展示
-### 文图多模态
+### 文本图像跨多模态
 <details><summary>&emsp;文图生成（Text-to-Image Generation）</summary>
 
 - stable_diffusion
@@ -149,7 +149,7 @@ upscaled_image.save("upsampled_cat_sd2.png")
 </details>
 
 
-<details><summary>&emsp;文本指导的图像变换（Image-to-Image Text-Guided Generation）</summary>
+<details><summary>&emsp;文本引导的图像变换（Image-to-Image Text-Guided Generation）</summary>
 
 - stable_diffusion
 ```python
