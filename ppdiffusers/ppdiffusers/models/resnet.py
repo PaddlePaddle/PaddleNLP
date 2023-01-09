@@ -416,7 +416,14 @@ class ResnetBlock2D(nn.Layer):
         self.conv1 = nn.Conv2D(in_channels, out_channels, kernel_size=3, stride=1, padding=1)
 
         if temb_channels is not None:
-            self.time_emb_proj = nn.Linear(temb_channels, out_channels)
+            if self.time_embedding_norm == "default":
+                time_emb_proj_out_channels = out_channels
+            elif self.time_embedding_norm == "scale_shift":
+                time_emb_proj_out_channels = out_channels * 2
+            else:
+                raise ValueError(f"unknown time_embedding_norm : {self.time_embedding_norm} ")
+
+            self.time_emb_proj = nn.Linear(temb_channels, time_emb_proj_out_channels)
         else:
             self.time_emb_proj = None
 
@@ -472,9 +479,16 @@ class ResnetBlock2D(nn.Layer):
 
         if temb is not None:
             temb = self.time_emb_proj(self.nonlinearity(temb))[:, :, None, None]
+
+        if temb is not None and self.time_embedding_norm == "default":
             hidden_states = hidden_states + temb
 
         hidden_states = self.norm2(hidden_states)
+
+        if temb is not None and self.time_embedding_norm == "scale_shift":
+            scale, shift = paddle.chunk(temb, 2, axis=1)
+            hidden_states = hidden_states * (1 + scale) + shift
+
         hidden_states = self.nonlinearity(hidden_states)
 
         hidden_states = self.dropout(hidden_states)

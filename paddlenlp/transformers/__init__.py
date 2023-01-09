@@ -13,6 +13,7 @@
 # limitations under the License.
 
 
+from .configuration_utils import PretrainedConfig
 from .model_utils import PretrainedModel, register_base_model
 from .tokenizer_utils import (
     PretrainedTokenizer,
@@ -38,6 +39,7 @@ from .bert.configuration import *
 # isort: split
 from .gpt.modeling import *
 from .gpt.tokenizer import *
+from .gpt.configuration import *
 from .roberta.modeling import *
 from .roberta.tokenizer import *
 from .roberta.configuration import *
@@ -132,10 +134,12 @@ from .transformer.modeling import *
 from .unified_transformer.modeling import *
 from .unified_transformer.tokenizer import *
 from .unified_transformer.configuration import *
+from .ernie_vil.configuration import *
 from .ernie_vil.modeling import *
 from .ernie_vil.feature_extraction import *
 from .ernie_vil.tokenizer import *
 from .ernie_vil.procesing import *
+from .ernie_vil.image_processing import *
 from .unimo.modeling import *
 from .unimo.tokenizer import *
 from .unimo.configuration import *
@@ -159,10 +163,17 @@ from .artist.tokenizer import *
 from .dallebart.modeling import *
 from .dallebart.tokenizer import *
 from .clip.modeling import *
+from .clip.configuration import *
 from .clip.feature_extraction import *
 from .clip.tokenizer import *
 from .clip.procesing import *
 from .clip.image_processing import *
+from .chineseclip.modeling import *
+from .chineseclip.configuration import *
+from .chineseclip.feature_extraction import *
+from .chineseclip.procesing import *
+from .chineseclip.image_processing import *
+from .chineseclip.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *

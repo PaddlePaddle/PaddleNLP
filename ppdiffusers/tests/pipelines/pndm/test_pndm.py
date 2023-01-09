@@ -17,13 +17,12 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import PNDMPipeline, PNDMScheduler, UNet2DModel
 from ppdiffusers.utils.testing_utils import slow
 
 
-class PNDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class PNDMPipelineFastTests(unittest.TestCase):
     @property
     def dummy_uncond_unet(self):
         paddle.seed(0)
