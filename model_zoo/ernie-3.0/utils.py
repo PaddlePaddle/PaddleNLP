@@ -434,6 +434,8 @@ class DataArguments:
         },
     )
 
+    # TODO(wj-Mcat): support padding configuration: `max_length`, `longest_firs`
+
 
 @dataclass
 class ModelArguments:
