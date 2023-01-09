@@ -14,7 +14,7 @@
 import numpy as np
 import paddle
 
-from .. import Taskflow
+from ..taskflow import Taskflow
 from ..transformers import (
     AutoModelForCausalLM,
     AutoModelForConditionalGeneration,
