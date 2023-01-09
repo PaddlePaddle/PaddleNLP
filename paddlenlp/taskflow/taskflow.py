@@ -506,6 +506,7 @@ support_schema_list = [
     "uie-senta-mini",
     "uie-senta-micro",
     "uie-senta-nano",
+    "utc-large",
 ]
 
 support_argument_list = [
@@ -531,7 +532,6 @@ support_argument_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
-    "utc-large",
 ]
 
 

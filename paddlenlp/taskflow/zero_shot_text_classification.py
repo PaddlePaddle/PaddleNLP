@@ -47,8 +47,16 @@ class ZeroShotTextClassificationTask(Task):
         kwargs (dict, optional): Additional keyword arguments passed along to the specific task.
     """
 
+    resource_files_names = {
+        "model_state": "model_state.pdparams",
+        "config": "config.json",
+        "vocab_file": "vocab.txt",
+        "special_tokens_map": "special_tokens_map.json",
+        "tokenizer_config": "tokenizer_config.json",
+    }
+
     def __init__(self, task: str, model: str = "utc-large", schema: list = None, **kwargs):
-        super(ZeroShotTextClassificationTask, self).__init__(task=task, model=model, **kwargs)
+        super().__init__(task=task, model=model, **kwargs)
 
         self._set_utc_schema(schema)
         self._max_seq_len = kwargs.get("max_seq_len", 512)
@@ -176,11 +184,18 @@ class ZeroShotTextClassificationTask(Task):
         }
         with static_mode_guard():
             for batch in inputs["batches"]:
-                for i, input_name in enumerate(self.predictor.get_input_names()):
-                    self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
-                self.predictor.run()
-                logits = self.output_handle[0].copy_to_cpu().tolist()
+                if self._predictor_type == "paddle-inference":
+                    for i, input_name in enumerate(self.input_names):
+                        self.input_handles[i].copy_from_cpu(batch[input_name].astype(dtype_dict[input_name]))
+                    self.predictor.run()
+                    logits = self.output_handle[0].copy_to_cpu().tolist()
+                else:
+                    input_dict = {}
+                    for input_name in dtype_dict:
+                        input_dict[input_name] = batch[input_name].astype(dtype_dict[input_name])
+                    logits = self.predictor.run(None, input_dict)[0].tolist()
                 outputs["batch_logits"].append(logits)
+
         return outputs
 
     @staticmethod

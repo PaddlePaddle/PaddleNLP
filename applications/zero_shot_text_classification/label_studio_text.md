@@ -46,7 +46,7 @@ label-studio start
 - 填写项目名称、描述
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/25607475/210772704-7d8ebe91-eeb7-4760-82ac-f3c6478b754b.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/25607475/210772704-7d8ebe91-eeb7-4760-82ac-f3c6478b754b.png />
 </div>
 
 - 数据上传，从本地上传txt格式文件，选择``List of tasks``，然后选择导入本项目
@@ -54,7 +54,7 @@ label-studio start
 <a name="data"></a>
 
 <div align="center">
-    <img src=https://user-images.githubusercontent.com/25607475/210775940-59809038-fa55-44cf-8c9d-1b19dcbdc8a6.png height=230 width=1200 />
+    <img src=https://user-images.githubusercontent.com/25607475/210775940-59809038-fa55-44cf-8c9d-1b19dcbdc8a6.png  />
 </div>
 
 - 设置任务，添加标签
