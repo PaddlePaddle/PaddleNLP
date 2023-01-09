@@ -22,6 +22,7 @@ from distutils.util import strtobool
 
 import numpy as np
 import paddle
+import yaml
 
 from paddlenlp.utils.import_utils import is_package_available
 
@@ -283,3 +284,35 @@ def require_package(*package_names):
         return func
 
     return decorator
+
+
+def load_argv(config_file: str, key: str):
+    """parse config file to argv
+
+    Args:
+        config_dir (str, optional): the path of config file. Defaults to None.
+        config_name (str, optional): the name key in config file. Defaults to None.
+    """
+    # 1. load the config with key and test env(default, test)
+    with open(config_file, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)[key]
+
+    sub_key = "tiny"
+    if os.getenv("RUN_SLOW_TEST", None):
+        sub_key = "gpu"
+
+    config = config[sub_key]
+
+    # 2. init argv
+    # get current test
+    # refer to: https://docs.pytest.org/en/latest/example/simple.html#pytest-current-test-environment-variable
+    current_test = "tests/__init__.py"
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        current_test = os.getenv("PYTEST_CURRENT_TEST").split("::")[0]
+
+    argv = [current_test]
+    for key, value in config.items():
+        argv.append(f"--{key}")
+        argv.append(str(value))
+
+    return argv
