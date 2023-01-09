@@ -71,7 +71,6 @@ class BaseDataset(Dataset):
                 for name in names
                 if os.path.isfile(f"{data_dir}/{name}.arrow")
             ]
-            # breakpoint()
             self.table_names = list()
             for i, name in enumerate(names):
                 self.table_names += [name] * len(tables[i])

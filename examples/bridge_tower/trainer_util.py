@@ -109,23 +109,20 @@ class BridgeTowerTrainer(Trainer):
             optimizers,
             preprocess_logits_for_metrics,
         )
-        # meter_utils.set_metrics(model)
 
     def compute_loss(self, model, inputs, split, eval_step, return_outputs=False):
-        # print(inputs.keys())
         loss_name = "snli"
-        # print(eval_step)
         ret = model(inputs, split, loss_name=loss_name, global_step=self.state.global_step, eval_step=eval_step)
-        # loss = {k:v for k,v in ret.items() if "loss" in k}
-        # logits = {k:v for k,v in ret.items() if "logits" in k}
         loss = ret["snli_loss"]
         outputs = (ret["snli_loss"], ret["snli_logits"])
-        # outputs = (loss, logits)
-
+        # print(inputs.keys())
+        # print(inputs["text_ids"].shape)
         if self.criterion is not None:
             loss = self.criterion(outputs, ret["snli_labels"])
             outputs = (loss, outputs)
             # Save past state if it exists
+        del ret
+        del inputs
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]
@@ -183,9 +180,6 @@ class BridgeTowerTrainer(Trainer):
                 eval_step=0,
             )
             # # Add multiple loss
-            # if isinstance(loss, dict):
-            #     loss = sum([v for k, v in loss.items() if "loss" in k])
-
         if self.args.gradient_accumulation_steps > 1:
             loss = loss / self.args.gradient_accumulation_steps
 
@@ -312,7 +306,6 @@ class BridgeTowerTrainer(Trainer):
         # Main evaluation loop
         losses = []
         for step, inputs in enumerate(dataloader):
-            # if(metric_key_prefix =='train'):
             # Update the observed num examples
             observed_batch_size = find_batch_size(inputs)
             if observed_batch_size is not None:
@@ -320,11 +313,6 @@ class BridgeTowerTrainer(Trainer):
                 # For batch samplers, batch_size is not known by the dataloader in advance.
                 if batch_size is None:
                     batch_size = observed_batch_size
-            # else:
-            #     val_batches = [i for i, n in enumerate(inputs["table_name"]) if "dev" in n]
-            #     test_batches = [i for i, n in enumerate(inputs["table_name"]) if "test" in n]
-            #     val_batch_size = len(val_batches)
-            #     test_batch_size = len(test_batches)
 
             # Prediction step
             loss, logits, labels = self.prediction_step(
@@ -338,23 +326,6 @@ class BridgeTowerTrainer(Trainer):
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
-                # if isinstance(loss, dict):
-                #     for key, loss in loss.items():
-                #         if "dev" in key:
-                #             val_losses = self._nested_gather(paddle.tile(loss, repeat_times=[val_batch_size, 1]))
-                #             losses_hosts[key] = (
-                #                 losses
-                #                 if key not in losses_hosts
-                #                 else paddle.concat((losses_hosts[key], val_losses), axis=0)
-                #             )
-                #         elif "test" in key:
-                #             test_losses = self._nested_gather(paddle.tile(loss, repeat_times=[test_batch_size, 1]))
-                #             losses_hosts[key] = (
-                #                 losses
-                #                 if key not in losses_hosts
-                #                 else paddle.concat((losses_hosts[key], test_losses), axis=0)
-                #             )
-                # else:
                 losses = self._nested_gather(paddle.tile(loss, repeat_times=[batch_size, 1]))
                 losses_host = losses if losses_host is None else paddle.concat((losses_host, losses), axis=0)
             if labels is not None:
@@ -371,11 +342,6 @@ class BridgeTowerTrainer(Trainer):
             if max_eval_iters > 0 and step >= max_eval_iters - 1:
                 break
         # Gather all remaining tensors and put them back on the CPU
-        # if losses_hosts is not None:
-        #     for key, loss in losses_hosts.items():
-        #         losses_hosts[key]=losses_hosts[key].cpu().numpy()
-        #         all_losses_dicts[key]=losses_hosts[key] if losses_hosts[key] is None else np.concatenate((losses_hosts[key], losses[key]), axis=0)
-
         if losses_host is not None:
             losses = nested_numpify(losses_host)
             all_losses = losses if all_losses is None else np.concatenate((all_losses, losses), axis=0)
@@ -420,10 +386,6 @@ class BridgeTowerTrainer(Trainer):
 
         if all_losses is not None:
             metrics[f"{metric_key_prefix}_loss"] = all_losses.mean().item()
-
-        # if all_losses_dicts is not None:
-        #     for key,loss in all_losses_dicts.items():
-        #         metrics[key] = loss.mean().item()
 
         # Prefix all keys with metric_key_prefix + '_'
         for key in list(metrics.keys()):
@@ -487,11 +449,6 @@ class BridgeTowerTrainer(Trainer):
                     )
                     loss = loss.mean().detach()
                 # Add multiple loss
-                # if isinstance(loss, dict):
-                #     loss = {k:v.mean().detach() for k, v in loss.items() if "loss" in k}
-                # else:
-                #     loss = loss.mean().detach()
-
                 if isinstance(outputs, dict):
                     logits = tuple(v for k, v in outputs.items() if k not in ignore_keys + ["loss"])
                 else:
@@ -528,6 +485,8 @@ class BridgeTowerPreTrainTrainer(BridgeTowerTrainer):
             loss = self.criterion(outputs, ret["item_labels"])
             outputs = (loss, outputs)
             # Save past state if it exists
+        del ret
+        del inputs
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
             self._past = outputs[self.args.past_index]

@@ -20,14 +20,6 @@ from visualdl import LogWriter
 from paddlenlp.trainer.training_args import default_logdir
 from paddlenlp.transformers import BertConfig, BertModel, RobertaConfig, RobertaModel
 
-# import paddle
-# import paddle.nn as nn
-# import pypaddle_lightning as pl
-# import paddle.nn.functional as F
-# from .bert_model import BertConfig, BertModel, BertCrossLayer
-# from . import swin_transformer as swin
-# from . import vit_model as vit
-# from .vit_model import resize_pos_embed
 # flake8: noqa
 from . import heads, meter_utils, objectives
 from .bert_model import get_extended_attention_mask
@@ -505,7 +497,7 @@ class BTTransformer(nn.Layer):
                 )
             else:
                 y1_ = image_link_tower(image_embeds_, y1)
-            # breakpoint()
+
             x1 = self.cross_modal_text_layers[link_layer_index + 1](x1_, y1_, extend_text_masks, extend_image_masks)
             y1 = self.cross_modal_image_layers[link_layer_index + 1](y1_, x1_, extend_image_masks, extend_text_masks)
 
@@ -543,7 +535,6 @@ class BTTransformer(nn.Layer):
         ret = dict()
         if "snli" in loss_name:
             ret.update(objectives.compute_snli(self, batch, split))
-
         if "mlm" in loss_name:
             ret.update(objectives.compute_mlm(self, batch, split))
         if "itm" in loss_name:

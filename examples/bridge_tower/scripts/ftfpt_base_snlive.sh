@@ -19,7 +19,7 @@ unset DISTRIBUTED_TRAINER_ENDPOINTS
 unset FLAGS_START_PORT
 unset PADDLE_ELASTIC_TIMEOUT
 
-export NCCL_IB_DISABLE=0
+# export NCCL_IB_DISABLE=0
 export PYTHONPATH=/root/paddlejob/workspace/env_run/wugaosheng/PaddleNLP:$PYTHONPATH
 # 启动方式
 # export PADDLE_MASTER=10.78.122.11:2379 # etcd://10.11.60.193:2379

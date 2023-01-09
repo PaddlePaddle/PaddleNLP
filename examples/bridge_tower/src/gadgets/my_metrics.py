@@ -91,6 +91,10 @@ class Scalar(Metric):
         self.reset()
 
     def update(self, scalar):
+        if isinstance(scalar, paddle.Tensor):
+            scalar = scalar.detach()
+        else:
+            scalar = paddle.to_tensor(scalar, "float32")
         self.scalar += scalar
         self.total += 1
 

@@ -512,24 +512,23 @@ def compute_snli(model, batch, split):
 
     loss_name = "snli"
     if split == "train":
-        loss = getattr(model, f"{split}_{loss_name}_loss")
-        acc = getattr(model, f"{split}_{loss_name}_accuracy")
-        loss.update(ret["snli_loss"])
-        result = acc.compute(ret["snli_logits"], ret["snli_labels"])
+        loss_fn = getattr(model, f"{split}_{loss_name}_loss")
+        acc_metric = getattr(model, f"{split}_{loss_name}_accuracy")
+        result = acc_metric.compute(ret["snli_logits"], ret["snli_labels"])
 
-        acc.update(result)
+        acc_metric.update(result)
         # 聚合各个节点的loss
-        example_train_loss = loss.accumulate()
+        example_train_loss = loss_fn.accumulate()
         dist.all_reduce(example_train_loss)
         example_train_loss = example_train_loss / dist.get_world_size()
+        # Get accumulated loss and accuracy
+        example_train_loss = example_train_loss.item()
+        accuracy = acc_metric.accumulate()
+
         metric_dict = {
-            f"{split}/{loss_name}/loss": example_train_loss.item(),
-            f"{split}/{loss_name}/accuracy": acc.accumulate(),
+            f"{split}/{loss_name}/loss": example_train_loss,
+            f"{split}/{loss_name}/accuracy": accuracy,
         }
-        # dist.all_reduce(loss.accumulate())
-        # example_val_loss=example_val_loss / dist.get_world_size()
-        # metric_dict = {f"{split}/{loss_name}/loss": loss.accumulate().item(),
-        #             f"{split}/{loss_name}/accuracy": acc.accumulate()}
         ret.update(metric_dict)
     else:
         val_batches = [i for i, n in enumerate(batch["table_name"]) if "dev" in n]
@@ -548,11 +547,14 @@ def compute_snli(model, batch, split):
             val_loss = getattr(model, f"val_{loss_name}_loss")
             example_val_loss = val_loss.accumulate()
             val_acc = getattr(model, f"val_{loss_name}_accuracy")
+
         # 聚合各个节点的loss
         dist.all_reduce(example_val_loss)
         example_val_loss = example_val_loss / dist.get_world_size()
-        # print(example_val_loss)
-        metric_dict = {"val/snli/loss": example_val_loss.item(), "val/snli/accuracy": val_acc.accumulate()}
+        # Get accumulated loss and accuracy
+        example_val_loss = example_val_loss.item()
+        val_acc = val_acc.accumulate()
+        metric_dict = {"val/snli/loss": example_val_loss, "val/snli/accuracy": val_acc}
         ret.update(metric_dict)
 
         if test_batches:
@@ -566,21 +568,24 @@ def compute_snli(model, batch, split):
 
             # metric_dict = {f"test/{loss_name}/loss": test_loss.accumulate().item(),
             #             f"test/{loss_name}/accuracy": test_acc.accumulate()}
-
             example_test_loss = test_loss.accumulate()
-            # print(example_test_loss)
-
             # pl_module.log(f"test/snli/loss", test_loss)
             # pl_module.log(f"test/snli/accuracy", test_acc)
         else:
             test_loss = getattr(model, f"test_{loss_name}_loss")
             example_test_loss = test_loss.accumulate()
             test_acc = getattr(model, f"test_{loss_name}_accuracy")
+
+        # 聚合各个节点的loss
         dist.all_reduce(example_test_loss)
         example_test_loss = example_test_loss / dist.get_world_size()
+        # Get accumulated loss and accuracy
+        example_test_loss = example_test_loss.item()
+        test_acc = test_acc.accumulate()
+
         metric_dict = {
-            f"test/{loss_name}/loss": example_test_loss.item(),
-            f"test/{loss_name}/accuracy": test_acc.accumulate(),
+            f"test/{loss_name}/loss": example_test_loss,
+            f"test/{loss_name}/accuracy": test_acc,
         }
         # model.log(metric_dict)
         # model.log(f"{split}/{loss_name}/accuracy", acc)
