@@ -33,7 +33,13 @@ def load_config(config_file_path, task_name, dataset_name, model_args, data_args
     return model_args, data_args, training_args
 
 
-def prepare_train_features(examples, tokenizer, args):
+def get_dynamic_max_length(examples, default_max_length: int) -> int:
+    """get max_length by examples which you can change it by examples in batch"""
+    # TODO: you can add control code at here
+    return default_max_length
+
+
+def prepare_train_features(examples, tokenizer, args, dynamic_max_length: bool = False):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -41,7 +47,13 @@ def prepare_train_features(examples, tokenizer, args):
     contexts = examples["context"]
     questions = examples["question"]
 
-    tokenized_examples = tokenizer(questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length)
+    max_length = args.max_seq_length
+    if dynamic_max_length:
+        max_length = get_dynamic_max_length(examples, max_length)
+
+    tokenized_examples = tokenizer(
+        questions, contexts, stride=args.doc_stride, max_length=max_length, padding=True, truncation=True
+    )
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -102,7 +114,7 @@ def prepare_train_features(examples, tokenizer, args):
     return tokenized_examples
 
 
-def prepare_validation_features(examples, tokenizer, args):
+def prepare_validation_features(examples, tokenizer, args, dynamic_max_length: bool = False):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
     # context that overlaps a bit the context of the previous feature.
@@ -111,8 +123,18 @@ def prepare_validation_features(examples, tokenizer, args):
     contexts = examples["context"]
     questions = examples["question"]
 
+    max_length = args.max_seq_length
+    if dynamic_max_length:
+        max_length = get_dynamic_max_length(examples, max_length)
+
     tokenized_examples = tokenizer(
-        questions, contexts, stride=args.doc_stride, max_seq_len=args.max_seq_length, return_attention_mask=True
+        questions,
+        contexts,
+        stride=args.doc_stride,
+        max_length=max_length,
+        padding=True,
+        truncation=True,
+        return_attention_mask=True,
     )
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
@@ -235,7 +257,9 @@ class QuestionAnsweringTrainer(Trainer):
 
 
 # Data pre-process function for clue benchmark datatset
-def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512, **kwargs):
+def seq_convert_example(
+    example, label_list, tokenizer=None, max_seq_length=512, dynamic_max_length: bool = False, **kwargs
+):
     """convert a glue example into necessary features"""
     is_test = False
     if "label" not in example.keys():
@@ -278,9 +302,15 @@ def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512,
     if tokenizer is None:
         return example
     if "sentence" in example:
-        example = tokenizer(example["sentence"], max_seq_len=max_seq_length)
+        example = tokenizer(example["sentence"], max_length=max_seq_length, padding=True, truncation=True)
     elif "sentence1" in example:
-        example = tokenizer(example["sentence1"], text_pair=example["sentence2"], max_seq_len=max_seq_length)
+        example = tokenizer(
+            example["sentence1"],
+            text_pair=example["sentence2"],
+            max_length=max_seq_length,
+            padding=True,
+            truncation=True,
+        )
 
     if not is_test:
         if "token_type_ids" in example:
@@ -291,12 +321,19 @@ def seq_convert_example(example, label_list, tokenizer=None, max_seq_length=512,
         return {"input_ids": example["input_ids"], "token_type_ids": example["token_type_ids"]}
 
 
-def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512, return_length=False):
+def token_convert_example(
+    example, tokenizer, no_entity_id, max_seq_length=512, return_length=False, dynamic_max_length: bool = False
+):
     if "labels" in example:
         labels = example["labels"]
         example = example["tokens"]
         tokenized_input = tokenizer(
-            example, is_split_into_words=True, max_seq_len=max_seq_length, return_length=return_length
+            example,
+            is_split_into_words=True,
+            max_length=max_seq_length,
+            padding=True,
+            truncation=True,
+            return_length=return_length,
         )
 
         # -2 for [CLS] and [SEP]
@@ -316,7 +353,9 @@ def token_convert_example(example, tokenizer, no_entity_id, max_seq_length=512, 
             return tokenized_input
         tokenized_input = tokenizer(
             example["tokens"],
-            max_seq_len=max_seq_length,
+            max_length=max_seq_length,
+            padding=True,
+            truncation=True,
             # We use this argument because the texts in our dataset are lists of words (with a label for each word).
             is_split_into_words=True,
             return_length=return_length,

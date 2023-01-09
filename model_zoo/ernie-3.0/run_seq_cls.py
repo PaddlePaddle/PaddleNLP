@@ -82,18 +82,18 @@ def main():
     criterion = nn.loss.CrossEntropyLoss() if data_args.label_list else nn.loss.MSELoss()
 
     # Define dataset pre-process function
+    # dyanmic max-length for npu
+    dynamic_max_length = training_args.device == "npu"
     trans_fn = partial(
-        seq_convert_example, tokenizer=tokenizer, label_list=data_args.label_list, max_seq_len=data_args.max_seq_length
+        seq_convert_example,
+        tokenizer=tokenizer,
+        label_list=data_args.label_list,
+        max_seq_len=data_args.max_seq_length,
+        dynamic_max_length=dynamic_max_length,
     )
 
     # Define data collector
-    if training_args.device == "npu":
-        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
-        data_collator = DataCollatorWithPadding(
-            tokenizer=tokenizer, padding="max_length", max_length=data_args.max_seq_length
-        )
-    else:
-        data_collator = DataCollatorWithPadding(tokenizer)
+    data_collator = DataCollatorWithPadding(tokenizer)
 
     # Dataset pre-process
     if training_args.do_train:
