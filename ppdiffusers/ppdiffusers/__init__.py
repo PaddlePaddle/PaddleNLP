@@ -14,29 +14,35 @@
 # limitations under the License.
 # flake8: noqa
 
+from .configuration_utils import ConfigMixin
+from .fastdeploy_utils import FastDeployRuntimeModel
 from .ppnlp_patch_utils import *
 from .utils import (
+    OptionalDependencyNotAvailable,
     is_fastdeploy_available,
     is_inflect_available,
+    is_k_diffusion_available,
+    is_librosa_available,
     is_onnx_available,
     is_paddle_available,
     is_paddlenlp_available,
     is_scipy_available,
     is_unidecode_available,
+    logging,
 )
-from .version import VERSION
+from .version import VERSION as __version__
 
-__version__ = VERSION
-
-from .configuration_utils import ConfigMixin
-from .fastdeploy_utils import FastDeployRuntimeModel
-from .utils import logging
-
-if is_paddle_available():
+try:
+    if not is_paddle_available():
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_objects import *  # noqa F403
+else:
     from .initializer import *
     from .modeling_utils import ModelMixin
     from .models import (
         AutoencoderKL,
+        PriorTransformer,
         Transformer2DModel,
         UNet1DModel,
         UNet2DConditionModel,
@@ -68,6 +74,7 @@ if is_paddle_available():
         DDIMScheduler,
         DDPMScheduler,
         DPMSolverMultistepScheduler,
+        DPMSolverSinglestepScheduler,
         EulerAncestralDiscreteScheduler,
         EulerDiscreteScheduler,
         HeunDiscreteScheduler,
@@ -79,25 +86,33 @@ if is_paddle_available():
         RePaintScheduler,
         SchedulerMixin,
         ScoreSdeVeScheduler,
-        ScoreSdeVpScheduler,
+        UnCLIPScheduler,
         VQDiffusionScheduler,
     )
     from .training_utils import EMAModel
-else:
-    from .utils.dummy_paddle_objects import *  # noqa F403
 
-if is_paddle_available() and is_scipy_available():
-    from .schedulers import LMSDiscreteScheduler
-else:
+try:
+    if not (is_paddle_available() and is_scipy_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
     from .utils.dummy_paddle_and_scipy_objects import *  # noqa F403
+else:
+    from .schedulers import LMSDiscreteScheduler
 
-if is_paddle_available() and is_paddlenlp_available():
+try:
+    if not (is_paddle_available() and is_paddlenlp_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
+else:
     from .pipelines import (
         AltDiffusionImg2ImgPipeline,
         AltDiffusionPipeline,
         CycleDiffusionPipeline,
         LDMBertModel,
         LDMTextToImagePipeline,
+        PaintByExamplePipeline,
+        StableDiffusionDepth2ImgPipeline,
         StableDiffusionImageVariationPipeline,
         StableDiffusionImg2ImgPipeline,
         StableDiffusionInpaintPipeline,
@@ -107,16 +122,28 @@ if is_paddle_available() and is_paddlenlp_available():
         StableDiffusionPipelineAllinOne,
         StableDiffusionPipelineSafe,
         StableDiffusionUpscalePipeline,
+        UnCLIPPipeline,
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
         VersatileDiffusionPipeline,
         VersatileDiffusionTextToImagePipeline,
         VQDiffusionPipeline,
     )
-else:
-    from .utils.dummy_paddle_and_paddlenlp_objects import *  # noqa F403
 
-if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available():
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_paddlenlp_and_k_diffusion_objects import *  # noqa F403
+else:
+    from .pipelines import StableDiffusionKDiffusionPipeline
+
+try:
+    if not (is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
+else:
     from .pipelines import (
         FastDeployStableDiffusionImg2ImgPipeline,
         FastDeployStableDiffusionInpaintPipeline,
@@ -124,5 +151,10 @@ if is_paddle_available() and is_paddlenlp_available() and is_fastdeploy_availabl
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
     )
+try:
+    if not (is_paddle_available() and is_librosa_available()):
+        raise OptionalDependencyNotAvailable()
+except OptionalDependencyNotAvailable:
+    from .utils.dummy_paddle_and_librosa_objects import *  # noqa F403
 else:
-    from .utils.dummy_paddle_and_paddlenlp_and_fastdeploy_objects import *  # noqa F403
+    from .pipelines import AudioDiffusionPipeline, Mel

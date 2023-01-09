@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import inspect
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import paddle
 
@@ -44,7 +44,7 @@ class LDMPipeline(DiffusionPipeline):
     def __call__(
         self,
         batch_size: int = 1,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         eta: float = 0.0,
         num_inference_steps: int = 50,
         output_type: Optional[str] = "pil",
@@ -56,7 +56,7 @@ class LDMPipeline(DiffusionPipeline):
             batch_size (`int`, *optional*, defaults to 1):
                 Number of images to generate.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             num_inference_steps (`int`, *optional*, defaults to 50):
                 The number of denoising steps. More denoising steps usually lead to a higher quality image at the
                 expense of slower inference.

@@ -795,7 +795,9 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
                 input_ids, pad_token_id, eos_token_id
             )
-        self.is_encoder_decoder = hasattr(self, "encoder") and hasattr(self, "decoder")
+        self.is_encoder_decoder = (
+            getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
+        )
         if self.is_encoder_decoder:
             model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
             # set input_ids as decoder_input_ids
