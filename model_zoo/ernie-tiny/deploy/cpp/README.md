@@ -92,7 +92,8 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--model_dir | 指定部署模型的目录。支持传入Paddle INT8新格式量化模型。 |
-|--vocab_path| 指定的模型词表路径 |
+|--vocab_path| 指定的模型词表路径，默认为`model_dir`目录下的vocab.txt文件 |
+|--added_tokens_path| 指定的模型词表路径，默认为`model_dir`目录下的added_tokens.json文件 |
 |--slot_label_path| 指定的slot label文件路径 |
 |--intent_label_path| 指定的intent label文件路径 |
 |--test_data_path| 指定的测试集路径，默认为空。 |
