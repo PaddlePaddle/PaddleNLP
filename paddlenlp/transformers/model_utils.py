@@ -1315,7 +1315,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
             else:
                 raise ValueError(
                     f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
-                    "don't support conversion from pytorch weight file to paddle weight file"
+                    "don't support conversion from pytorch weight file to paddle weight file "
+                    "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                 )
         else:
             # 4. loading the state dict
