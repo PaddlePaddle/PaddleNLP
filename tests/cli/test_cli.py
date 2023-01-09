@@ -17,8 +17,6 @@ from __future__ import annotations
 import sys
 from unittest import TestCase
 
-import pytest
-
 from paddlenlp.cli.main import main
 
 
@@ -26,5 +24,5 @@ class CliTest(TestCase):
     def test_smoke(self):
         """smoke test for cli command"""
         sys.argv = ["", "--help"]
-        with pytest.raises(SystemExit):
+        with self.assertRaises(SystemExit):
             main()
