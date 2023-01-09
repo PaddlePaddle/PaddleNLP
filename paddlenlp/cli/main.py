@@ -14,7 +14,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
 from uvicorn.config import LOGGING_CONFIG
 
