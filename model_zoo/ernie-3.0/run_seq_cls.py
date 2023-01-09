@@ -11,10 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import json
 import os
-from functools import partial
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
@@ -23,7 +25,8 @@ from paddle.metric import Accuracy
 from utils import DataArguments, ModelArguments, load_config, seq_convert_example
 
 import paddlenlp
-from paddlenlp.data import DataCollatorWithPadding
+
+# from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
@@ -31,8 +34,77 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
 )
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.transformers import (
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    PretrainedTokenizer,
+)
 from paddlenlp.utils.log import logger
+
+
+@dataclass
+class DataCollatorWithDyanmicMaxLength:
+    """
+    Data collator that will dynamically pad the inputs to the longest sequence in the batch.
+
+    Args:
+        tokenizer (`paddlenlp.transformers.PretrainedTokenizer`):
+            The tokenizer used for encoding the data.
+    """
+
+    tokenizer: PretrainedTokenizer
+    padding: Union[bool, str] = True
+    max_length: Optional[int] = None
+    pad_to_multiple_of: Optional[int] = None
+    return_tensors: str = "pd"
+    return_attention_mask: Optional[bool] = None
+    label_list: Optional[int] = None
+
+    # [32, 64, 128]
+    dynamic_max_length: Optional[list[int]] = None
+
+    def get_dynamic_max_length(self, examples):
+        if not self.dynamic_max_length:
+            return self.max_length
+
+        if "sentence1" in examples[0]:
+            lengths = map(
+                lambda example: len(self.tokenizer(example["sentence"]) + self.tokenizer(example["sentence1"])) + 3,
+                examples,
+            )
+
+        else:
+            lengths = map(lambda example: len(self.tokenizer(example["sentence"])) + 2, examples)
+        max_length = min(max(lengths), self.max_length)
+        lengths = [length for length in self.dynamic_max_length if max_length < length]
+        if not lengths:
+            return max_length
+        return lengths[0]
+
+    def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
+        max_length = self.get_dynamic_max_length(examples)
+        examples = list(
+            map(
+                lambda example: seq_convert_example(
+                    example,
+                    tokenizer=self.tokenizer,
+                    label_list=self.label_list,
+                    max_seq_length=max_length,
+                ),
+                examples,
+            )
+        )
+        features = {}
+        for key in examples[0].keys():
+            features[key] = np.array([example[key] for example in examples])
+
+        if "label" in features:
+            features["labels"] = features["label"]
+            del features["label"]
+        if "label_ids" in features:
+            features["labels"] = features["label_ids"]
+            del features["label_ids"]
+        return features
 
 
 def main():
@@ -81,27 +153,18 @@ def main():
     tokenizer = ErnieTokenizer.from_pretrained(model_args.model_name_or_path)
     criterion = nn.loss.CrossEntropyLoss() if data_args.label_list else nn.loss.MSELoss()
 
-    # Define dataset pre-process function
-    trans_fn = partial(
-        seq_convert_example, tokenizer=tokenizer, label_list=data_args.label_list, max_seq_len=data_args.max_seq_length
-    )
-
     # Define data collector
-    if training_args.device == "npu":
-        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
-        data_collator = DataCollatorWithPadding(
-            tokenizer=tokenizer, padding="max_length", max_length=data_args.max_seq_length
-        )
-    else:
-        data_collator = DataCollatorWithPadding(tokenizer)
+    data_collator = DataCollatorWithDyanmicMaxLength(
+        tokenizer, max_length=data_args.max_seq_length, label_list=data_args.label_list
+    )
 
     # Dataset pre-process
     if training_args.do_train:
-        train_dataset = raw_datasets["train"].map(trans_fn)
+        train_dataset = raw_datasets["train"]
     if training_args.do_eval:
-        eval_dataset = raw_datasets["dev"].map(trans_fn)
+        eval_dataset = raw_datasets["dev"]
     if training_args.do_predict:
-        test_dataset = raw_datasets["test"].map(trans_fn)
+        test_dataset = raw_datasets["test"]
 
     # Define the metrics of tasks.
     def compute_metrics(p):
