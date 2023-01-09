@@ -67,18 +67,23 @@ class DataCollatorWithDyanmicMaxLength:
         if not self.dynamic_max_length:
             return self.max_length
 
-        if "sentence1" in examples[0]:
-            lengths = map(
-                lambda example: len(self.tokenizer(example["sentence"]) + self.tokenizer(example["sentence1"])) + 3,
-                examples,
+        if "sentence2" in examples[0]:
+            lengths = list(
+                map(
+                    lambda example: len(
+                        self.tokenizer.tokenize(example["sentence1"]) + self.tokenizer.tokenize(example["sentence2"])
+                    )
+                    + 3,
+                    examples,
+                )
             )
 
         else:
-            lengths = map(lambda example: len(self.tokenizer(example["sentence"])) + 2, examples)
+            lengths = list(map(lambda example: len(self.tokenizer.tokenize(example["sentence1"])) + 2, examples))
         max_length = min(max(lengths), self.max_length)
         lengths = [length for length in self.dynamic_max_length if max_length < length]
         if not lengths:
-            return max_length
+            return self.max_length
         return lengths[0]
 
     def __call__(self, examples: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -154,8 +159,15 @@ def main():
     criterion = nn.loss.CrossEntropyLoss() if data_args.label_list else nn.loss.MSELoss()
 
     # Define data collector
+    dynamic_max_length = None
+    if data_args.dynamic_max_length:
+        dynamic_max_length = [int(item) for item in data_args.dynamic_max_length.split(",")]
+
     data_collator = DataCollatorWithDyanmicMaxLength(
-        tokenizer, max_length=data_args.max_seq_length, label_list=data_args.label_list
+        tokenizer,
+        max_length=data_args.max_seq_length,
+        label_list=data_args.label_list,
+        dynamic_max_length=dynamic_max_length,
     )
 
     # Dataset pre-process

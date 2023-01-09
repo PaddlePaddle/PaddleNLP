@@ -412,6 +412,11 @@ class DataArguments:
         metadata={"help": "Max answer length."},
     )
 
+    dynamic_max_length: str = field(
+        default="",
+        metadata={"help": "dynamic max length from batch, it can be array of length, eg: [16, 32, 64, 128]"},
+    )
+
     do_lower_case: bool = field(
         default=False,
         metadata={
@@ -433,6 +438,8 @@ class DataArguments:
             "Only useful when `version_2_with_negative=True`."
         },
     )
+
+    # TODO(wj-Mcat): support padding configuration: `max_length`, `longest_firs`
 
 
 @dataclass
