@@ -62,10 +62,10 @@
 
 
 ```shell
-wget https://bj.bcebos.com/paddlenlp/datasets/medical.tar.gz
-tar -xvf medical.tar.gz
-mv medical data
-rm medical.tar.gz
+wget https://bj.bcebos.com/paddlenlp/datasets/utc-medical.tar.gz
+tar -xvf utc-medical.tar.gz
+mv utc-medical data
+rm utc-medical.tar.gz
 ```
 
 生成训练/验证集文件：
@@ -179,7 +179,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" train.py \
 ```shell
 python predict.py \
     --model_path ./checkpoint/model_best \
-    --test_path ./data/dev.txt \
+    --test_path ./data/test.txt \
     --per_device_eval_batch_size 2 \
     --max_seq_len 512 \
     --output_dir ./checkpoint_test \
@@ -219,7 +219,7 @@ from paddlenlp import SimpleServer, Taskflow
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
                schema=schema,
-                task_path="../../checkpoint/model_best/")
+               task_path="../../checkpoint/model_best/")
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
 ```
@@ -245,4 +245,4 @@ paddlenlp server server:app --host 0.0.0.0 --port 8990
   | full-set | 81.81 | 96.65 | 89.87 |
 
 
-商业版本UTC模型支持极多标签分类，首创单双塔统一训练，多标签并行预测，进一步解决大规模标签和高效推理问题，可显著提升跨领域少样本分类能力。如需体验或使用，可联系XX。
+商业版本UTC模型支持极多标签分类，首创单双塔统一训练，多标签并行预测，进一步解决大规模标签和高效推理问题，可显著提升跨领域少样本分类能力。

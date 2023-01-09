@@ -18,8 +18,6 @@ import os
 
 import numpy as np
 import paddle
-from paddle.metric import Metric
-from sklearn.metrics import classification_report, f1_score
 
 from paddlenlp.utils.log import logger
 
@@ -78,65 +76,3 @@ class UTCLoss(object):
         pos_loss = paddle.logsumexp(logit_pos, axis=-1)
         loss = (neg_loss + pos_loss).mean()
         return loss
-
-
-class MetricReport(Metric):
-    """
-    F1 score for multi-label text classification task.
-    """
-
-    def __init__(self, name="MetricReport", average="micro", threshold=0.5):
-        super(MetricReport, self).__init__()
-        self.average = average
-        self.threshold = threshold
-        self._name = name
-        self.reset()
-
-    def reset(self):
-        """
-        Resets all of the metric state.
-        """
-        self.y_prob = None
-        self.y_true = None
-
-    def f1_score(self, y_prob):
-        """
-        Compute micro f1 score and macro f1 score
-        """
-        self.y_pred = y_prob > self.threshold
-        micro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="micro")
-        macro_f1_score = f1_score(y_pred=self.y_pred, y_true=self.y_true, average="macro")
-        return micro_f1_score, macro_f1_score
-
-    def update(self, probs, labels):
-        """
-        Update the probability and label
-        """
-        if self.y_prob is not None:
-            self.y_prob = np.append(self.y_prob, probs.numpy(), axis=0)
-        else:
-            self.y_prob = probs.numpy()
-        if self.y_true is not None:
-            self.y_true = np.append(self.y_true, labels.numpy(), axis=0)
-        else:
-            self.y_true = labels.numpy()
-
-    def accumulate(self):
-        """
-        Returns micro f1 score and macro f1 score
-        """
-        micro_f1_score, macro_f1_score = self.f1_score(y_prob=self.y_prob)
-        return micro_f1_score, macro_f1_score
-
-    def report(self):
-        """
-        Returns classification report
-        """
-        self.y_pred = self.y_prob > self.threshold
-        logger.info("classification report:\n" + classification_report(self.y_true, self.y_pred, digits=4))
-
-    def name(self):
-        """
-        Returns metric name
-        """
-        return self._name

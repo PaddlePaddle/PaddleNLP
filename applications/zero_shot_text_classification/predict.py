@@ -17,8 +17,8 @@ import os
 from dataclasses import dataclass, field
 
 import paddle
-from paddle.metric import Accuracy
-from utils import MetricReport, UTCLoss, read_local_dataset
+from sklearn.metrics import f1_score
+from utils import UTCLoss, read_local_dataset
 
 from paddlenlp.datasets import load_dataset
 from paddlenlp.prompt import (
@@ -79,19 +79,14 @@ def main():
         labels = paddle.to_tensor(eval_preds.label_ids, dtype="int64")
         preds = paddle.to_tensor(eval_preds.predictions)
 
-        metric_f1 = MetricReport(threshold=data_args.threshold)
-        preds_f1 = paddle.nn.functional.sigmoid(preds)
-        preds_f1 = preds_f1[labels != -100]
-        labels_f1 = labels[labels != -100]
-        metric_f1.update(preds_f1, labels_f1)
-        micro_f1, macro_f1 = metric_f1.accumulate()
+        preds = paddle.nn.functional.sigmoid(preds)
+        preds = preds[labels != -100].numpy()
+        labels = labels[labels != -100].numpy()
+        preds = preds > data_args.threshold
+        micro_f1 = f1_score(y_pred=preds, y_true=labels, average="micro")
+        macro_f1 = f1_score(y_pred=preds, y_true=labels, average="macro")
 
-        metric_acc = Accuracy()
-        labels_acc = paddle.argmax(labels, axis=1)
-        correct = metric_acc.compute(preds, labels_acc)
-        metric_acc.update(correct)
-        acc = metric_acc.accumulate()
-        return {"acc": acc, "micro_f1": micro_f1, "macro_f1": macro_f1}
+        return {"micro_f1": micro_f1, "macro_f1": macro_f1}
 
     trainer = PromptTrainer(
         model=prompt_model,
