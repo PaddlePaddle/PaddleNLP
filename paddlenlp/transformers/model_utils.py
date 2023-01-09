@@ -56,6 +56,7 @@ from paddlenlp.utils.env import (
     HF_CACHE_HOME,
     LEGACY_CONFIG_NAME,
     MODEL_HOME,
+    PADDLE_WEIGHT_FILE_NAME,
     PYTORCH_WEIGHT_FILE_NAME,
 )
 from paddlenlp.utils.log import logger
@@ -1051,10 +1052,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
             )
 
-            # download weight file from hf hub
-            return resolve_weight_file_from_hf_hub(
-                repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
-            )
+            if ENABLE_TORCH_CHECKPOINT:
+                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+            else:
+                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
+
+            raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(

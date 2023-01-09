@@ -837,8 +837,7 @@ class PretrainedConfig:
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
-            # resolve CONFIG_NAME from huggingface hub
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
+            raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
