@@ -1,4 +1,4 @@
-# FastDeploy ERNIE Tiny 模型C++部署示例
+# FastDeploy ERNIE 3.0 Tiny 模型C++部署示例
 
 在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy C++ SDK。
 
@@ -18,7 +18,7 @@ tar xvf fastdeploy-linux-x64-gpu-x.x.x.tgz
 
 ## 快速开始
 
-以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
+以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照[ERNIE 3.0 Tiny训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
 
 ```bash
 
@@ -63,23 +63,37 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 
 ### 量化模型部署
 
-该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
+该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE 3.0 Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
 
 ```bash
 
 # 在GPU上使用paddle_tensorrt后端运行量化模型，模型目录可按照实际模型路径设置
-./infer_demo --device gpu --backend paddle_tensorrt --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path ../../../data/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+./infer_demo --device gpu --backend paddle_tensorrt --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path ../../../data/slots_label.txt --intent_label_path ../../../data/intent_label.txt
 
 # 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
-./infer_demo --device cpu --backend paddle --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1 --slot_label_path /path/to/slots_label.txt --intent_label_path ../../../data/intent_label.txt
+./infer_demo --device cpu --backend paddle --model_prefix int8 --model_dir ../../../output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1_quant --slot_label_path /path/to/slots_label.txt --intent_label_path ../../../data/intent_label.txt
 
 ```
 
 运行完成后返回的结果如下：
 
 ```bash
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+No.0 text = 来一首周华健的花心
+intent result: label = music.play, confidence = 0.997125
+slot result:
+slot = singer, entity = '周华健', pos = [3, 5]
+slot = song, entity = '花心', pos = [7, 8]
 
+No.1 text = 播放我们都一样
+intent result: label = music.play, confidence = 0.997346
+slot result:
+slot = song, entity = '我们都一样', pos = [2, 6]
 
+No.2 text = 到信阳市汽车配件城
+intent result: label = navigation.navigation, confidence = 0.998141
+slot result:
+slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 
 ```
 
@@ -104,10 +118,10 @@ slot = destination, entity = '信阳市汽车配件城', pos = [1, 8]
 
 ## 相关文档
 
-[ERNIE Tiny模型详细介绍](../../README.md)
+[ERNIE 3.0 Tiny模型详细介绍](../../README.md)
 
-[ERNIE Tiny模型Python部署方法](../python/README.md)
+[ERNIE 3.0 Tiny模型Python部署方法](../python/README.md)
 
-[ERNIE Tiny模型Android部署方法](../android/README.md)
+[ERNIE 3.0 Tiny模型Android部署方法](../android/README.md)
 
 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)
