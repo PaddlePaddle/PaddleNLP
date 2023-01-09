@@ -67,7 +67,7 @@ class DataCollatorWithDyanmicMaxLength:
         if not self.dynamic_max_length:
             return self.max_length
 
-        if "sentence2" in examples[0]:
+        if "sentence1" in examples[0]:
             lengths = list(
                 map(
                     lambda example: len(
@@ -79,7 +79,7 @@ class DataCollatorWithDyanmicMaxLength:
             )
 
         else:
-            lengths = list(map(lambda example: len(self.tokenizer.tokenize(example["sentence1"])) + 2, examples))
+            lengths = list(map(lambda example: len(self.tokenizer.tokenize(example["sentence"])) + 2, examples))
         max_length = min(max(lengths), self.max_length)
         lengths = [length for length in self.dynamic_max_length if max_length < length]
         if not lengths:
