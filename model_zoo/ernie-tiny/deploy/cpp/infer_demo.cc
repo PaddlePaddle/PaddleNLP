@@ -23,6 +23,7 @@
 #include "fastdeploy/runtime.h"
 #include "fastdeploy/utils/path.h"
 #include "gflags/gflags.h"
+#include "nlohmann/json.hpp"
 
 using namespace paddlenlp;
 using namespace fast_tokenizer::tokenizers_impl;
@@ -35,6 +36,7 @@ const char sep = '/';
 DEFINE_string(model_dir, "", "Directory of the inference model.");
 DEFINE_string(model_prefix, "infer_model", "The model and params file prefix");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
+DEFINE_string(added_tokens_path, "", "Path of the added tokens json file.");
 DEFINE_string(slot_label_path, "", "Path of the slot label file.");
 DEFINE_string(intent_label_path, "", "Path of the intent label file.");
 DEFINE_string(test_data_path, "", "The path of the test dataset file.");
@@ -160,6 +162,59 @@ std::ostream& operator<<(std::ostream& os,
        << std::endl;
   }
   return os;
+}
+
+bool AddTokensToTokenizer(const std::string& path,
+                          ErnieFastTokenizer* tokenizer) {
+  std::string actual_path = path;
+  if (!fastdeploy::CheckFileExists(actual_path)) {
+    actual_path = fastdeploy::PathJoin(FLAGS_model_dir, "added_tokens.json");
+    if (!fastdeploy::CheckFileExists(actual_path)) {
+      fastdeploy::FDINFO << "No added_tokens have been added to tokenizer."
+                         << std::endl;
+      return false;
+    }
+  }
+  std::ifstream fin(actual_path);
+  nlohmann::json j;
+  fin >> j;
+  using VOCAB_ITEM = std::pair<std::string, uint32_t>;
+  std::vector<VOCAB_ITEM> vocab_list;
+  for (nlohmann::json::iterator it = j.begin(); it != j.end(); ++it) {
+    vocab_list.emplace_back(it.key(), it.value());
+  }
+  std::sort(vocab_list.begin(),
+            vocab_list.end(),
+            [](const VOCAB_ITEM& a, const VOCAB_ITEM& b) {
+              return a.second < b.second;
+            });
+  std::vector<fast_tokenizer::core::AddedToken> added_tokens;
+  int increase_idx = 0;
+  for (auto&& vocab_item : vocab_list) {
+    if (vocab_item.second != tokenizer->GetVocabSize() + increase_idx) {
+      fastdeploy::FDERROR << "Non-consecutive added token '" << vocab_item.first
+                          << "' found. "
+                          << "Should have index " << tokenizer->GetVocabSize()
+                          << " but has index " << vocab_item.second
+                          << " in saved vocabulary." << std::endl;
+      return false;
+    }
+    added_tokens.emplace_back(vocab_item.first);
+    ++increase_idx;
+  }
+  std::ostringstream oss;
+  oss << "Try to add the following tokens to tokenizer vocab. AddedTokens = [";
+  for (int i = 0; i < added_tokens.size(); ++i) {
+    auto&& token = added_tokens[i];
+    oss << token.GetContent();
+    if (i < added_tokens.size() - 1) {
+      oss << ", ";
+    }
+  }
+  oss << "]";
+  fastdeploy::FDINFO << oss.str() << std::endl;
+  tokenizer->AddTokens(added_tokens);
+  return true;
 }
 
 struct Predictor {
@@ -358,6 +413,8 @@ int main(int argc, char* argv[]) {
     return -1;
   }
   ErnieFastTokenizer tokenizer(vocab_path);
+  AddTokensToTokenizer(FLAGS_added_tokens_path, &tokenizer);
+
   uint32_t max_length = FLAGS_max_length;
   tokenizer.EnableTruncMethod(
       max_length,
