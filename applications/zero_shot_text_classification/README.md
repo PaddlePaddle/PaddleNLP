@@ -43,10 +43,12 @@
 
 ```shell
 .
-├── deploy/           # 模型部署脚本
-├── utils.py          # 数据处理工具
-├── train.py          # 模型微调、压缩脚本
-├── predict.py        # 模型评估脚本
+├── deploy/                # 模型部署脚本
+├── utils.py               # 数据处理工具
+├── run_train.py           # 模型微调脚本
+├── run_eval.py            # 模型评估脚本
+├── label_studio.py        # 数据格式转换脚本
+├── label_studio_text.md   # 数据标注说明文档
 └── README.md
 ```
 
@@ -89,7 +91,7 @@ python label_studio.py \
 单卡启动：
 
 ```shell
-python train.py  \
+python run_train.py  \
     --device gpu \
     --logging_steps 10 \
     --save_steps 100 \
@@ -118,7 +120,7 @@ python train.py  \
 如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
 
 ```shell
-python -u -m paddle.distributed.launch --gpus "0,1" train.py \
+python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
     --device gpu \
     --logging_steps 10 \
     --save_steps 100 \
@@ -177,7 +179,7 @@ python -u -m paddle.distributed.launch --gpus "0,1" train.py \
 通过运行以下命令进行模型评估预测：
 
 ```shell
-python predict.py \
+python run_eval.py \
     --model_path ./checkpoint/model_best \
     --test_path ./data/test.txt \
     --per_device_eval_batch_size 2 \
@@ -202,7 +204,7 @@ python predict.py \
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
->>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best')
+>>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best', precision="fp16")
 >>> pprint(my_cls("中性粒细胞比率偏低"))
 ```
 
@@ -219,7 +221,8 @@ from paddlenlp import SimpleServer, Taskflow
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
                schema=schema,
-               task_path="../../checkpoint/model_best/")
+               task_path="../../checkpoint/model_best/",
+               precision="fp16")
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
 ```

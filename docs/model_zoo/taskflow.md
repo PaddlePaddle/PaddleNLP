@@ -46,7 +46,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
-| [文本分类](#文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成 适配多场景的通用文本分类工具       |
+| [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
 
 ## QuickStart
 
@@ -1695,10 +1695,10 @@ from paddlenlp import Taskflow
 
 </div></details>
 
-### 文本分类
-<details><summary>&emsp; 适配多场景的通用文本分类工具 </summary><div>
+### 零样本文本分类
+<details><summary>&emsp; 适配多场景的零样本通用文本分类工具 </summary><div>
 
-通用文本分类是文本分类的一种全新范式，主要思想是利用单一模型支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务。用户可以自定义任意标签组合，在不限定领域、不设定 prompt 的情况下进行文本分类。
+通用文本分类主要思想是利用单一模型支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务。用户可以自定义任意标签组合，在不限定领域、不设定 prompt 的情况下进行文本分类。
 
 
 #### 情感分析
@@ -1840,7 +1840,7 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
-  <tr><td>通用文本分类<td>UTC<td> - <td> 百度自建数据集
+  <tr><td>零样本文本分类<td>UTC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification"> 训练详情  <td> 百度自建数据集
 </table>
 
 </div></details>

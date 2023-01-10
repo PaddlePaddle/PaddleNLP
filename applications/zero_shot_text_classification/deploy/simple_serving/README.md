@@ -57,9 +57,9 @@ service.register_taskflow("taskflow/utc", [utc1, utc2])
 
 ```python
 >>> from paddlenlp import Taskflow
-
+>>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
 >>> utc = Taskflow("zero_shot_text_classification",
-                   schema=["正向", "负向"],
+                   schema=schema,
                    model="utc-large",
                    max_seq_len=512,
                    batch_size=1,
