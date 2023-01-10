@@ -187,6 +187,7 @@ public class ERNIETinyMainActivity extends Activity implements View.OnClickListe
             String vocabFile = realModelDir + "/" + "vocab.txt";
             String slotLabelsFile = realModelDir + "/" + "slots_label.txt";
             String intentLabelsFile = realModelDir + "/" + "intent_label.txt";
+            String addedTokensFile = realModelDir + "/" + "added_tokens.json";
             RuntimeOption option = new RuntimeOption();
             option.setCpuThreadNum(ERNIETinySettingsActivity.cpuThreadNum);
             option.setLitePowerMode(ERNIETinySettingsActivity.cpuPowerMode);
@@ -194,7 +195,7 @@ public class ERNIETinyMainActivity extends Activity implements View.OnClickListe
                 option.enableLiteFp16();
             }
             predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile,
-                    intentLabelsFile, option, 16);
+                    intentLabelsFile, addedTokensFile, option, 16);
         }
     }
 

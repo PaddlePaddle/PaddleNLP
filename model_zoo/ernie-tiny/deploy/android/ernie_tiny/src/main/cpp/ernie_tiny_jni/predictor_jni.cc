@@ -24,12 +24,13 @@
 #include "fast_tokenizer/utils/utf8.h"                           // NOLINT
 #include "fastdeploy/function/functions.h"                       // NOLINT
 #include "fastdeploy/runtime.h"                                  // NOLINT
+#include "nlohmann/json.hpp"                                     // NOLINT
 
 using namespace paddlenlp;
 using namespace fast_tokenizer::tokenizers_impl;
 
-static bool BatchFyTexts(const std::vector<std::string>& texts, int batch_size,
-                         std::vector<std::vector<std::string>>* batch_texts) {
+static bool BatchiFyTexts(const std::vector<std::string>& texts, int batch_size,
+                          std::vector<std::vector<std::string>>* batch_texts) {
   for (int idx = 0; idx < texts.size(); idx += batch_size) {
     int rest = texts.size() - idx;
     int curr_size = std::min(batch_size, rest);
@@ -82,6 +83,51 @@ static std::string TextsStr(const std::vector<std::string>& texts) {
     str += (s + ";");
   }
   return str;
+}
+
+static bool AddTokensToTokenizer(
+    const std::string& path, ErnieFastTokenizer* tokenizer) {
+  std::string actual_path = path;
+  std::ifstream fin(actual_path);
+  nlohmann::json j;
+  fin >> j;
+  using VOCAB_ITEM = std::pair<std::string, uint32_t>;
+  std::vector<VOCAB_ITEM> vocab_list;
+  for (nlohmann::json::iterator it = j.begin(); it != j.end(); ++it) {
+    vocab_list.emplace_back(it.key(), it.value());
+  }
+  std::sort(vocab_list.begin(),
+            vocab_list.end(),
+            [](const VOCAB_ITEM& a, const VOCAB_ITEM& b) {
+              return a.second < b.second;
+            });
+  std::vector<fast_tokenizer::core::AddedToken> added_tokens;
+  int increase_idx = 0;
+  for (auto&& vocab_item : vocab_list) {
+    if (vocab_item.second != tokenizer->GetVocabSize() + increase_idx) {
+      fastdeploy::FDERROR << "Non-consecutive added token '" << vocab_item.first
+                          << "' found. "
+                          << "Should have index " << tokenizer->GetVocabSize()
+                          << " but has index " << vocab_item.second
+                          << " in saved vocabulary." << std::endl;
+      return false;
+    }
+    added_tokens.emplace_back(vocab_item.first);
+    ++increase_idx;
+  }
+  std::ostringstream oss;
+  oss << "Try to add the following tokens to tokenizer vocab. AddedTokens = [";
+  for (int i = 0; i < added_tokens.size(); ++i) {
+    auto&& token = added_tokens[i];
+    oss << token.GetContent();
+    if (i < added_tokens.size() - 1) {
+      oss << ", ";
+    }
+  }
+  oss << "]";
+  fastdeploy::FDINFO << oss.str() << std::endl;
+  tokenizer->AddTokens(added_tokens);
+  return true;
 }
 
 struct Predictor {
@@ -272,6 +318,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
                                                                  jstring vocab_file,
                                                                  jstring slot_labels_file,
                                                                  jstring intent_labels_file,
+                                                                 jstring added_tokens_file,
                                                                  jobject runtime_option,
                                                                  jint max_length) {
 
@@ -280,17 +327,27 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_bindNative(JNIEnv *env,
   auto c_vocab_file = ernie_tiny::jni::ConvertTo<std::string>(env, vocab_file);
   auto c_slot_labels_file = ernie_tiny::jni::ConvertTo<std::string>(env, slot_labels_file);
   auto c_intent_labels_file = ernie_tiny::jni::ConvertTo<std::string>(env, intent_labels_file);
+  auto c_added_tokens_file = ernie_tiny::jni::ConvertTo<std::string>(env, added_tokens_file);
   auto c_runtime_option = ernie_tiny::jni::NewCxxRuntimeOption(env, runtime_option);
   c_runtime_option.SetModelPath(c_model_file, c_params_file);
 
   uint32_t c_max_length = static_cast<uint32_t>(max_length);
   ErnieFastTokenizer c_tokenizer(c_vocab_file);
+  AddTokensToTokenizer(c_added_tokens_file, &c_tokenizer);
+
   c_tokenizer.EnableTruncMethod(
-      c_max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      c_max_length,
+      0,
+      fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
   c_tokenizer.EnablePadMethod(
-      fast_tokenizer::core::Direction::RIGHT, 0, 0,
-      "[PAD]", &c_max_length, nullptr);
+      fast_tokenizer::core::Direction::RIGHT,
+      0,
+      0,
+      "[PAD]",
+      &c_max_length,
+      nullptr);
+
   std::unordered_map<int, std::string> c_slot_label_map;
   std::unordered_map<int, std::string> c_intent_label_map;
   ReadLabelMapFromTxt(c_slot_labels_file, &c_slot_label_map);
@@ -326,6 +383,7 @@ Java_com_baidu_paddle_paddlenlp_ernie_1tiny_Predictor_predictNative(JNIEnv *env,
   std::vector<IntentDetAndSlotFillResult> c_results;
 
   auto t = ernie_tiny::jni::GetCurrentTime();
+  // TODO: may add BatchiFyTexts (not need now)
   if(c_predictor_ptr->Predict(c_texts, &c_results)) {
     LOGD("Predict cost %f ms.", ernie_tiny::jni::GetElapsedTime(t));
 

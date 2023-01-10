@@ -12,9 +12,10 @@ public class Predictor {
                      String paramsFile,
                      String vocabFile,
                      String slotLabelsFile,
-                     String intentLabelsFile) {
+                     String intentLabelsFile,
+                     String addedTokensFile) {
         init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
-                intentLabelsFile, new RuntimeOption(), 16);
+                intentLabelsFile, addedTokensFile, new RuntimeOption(), 16);
     }
 
     public Predictor(String modelFile,
@@ -22,10 +23,11 @@ public class Predictor {
                      String vocabFile,
                      String slotLabelsFile,
                      String intentLabelsFile,
+                     String addedTokensFile,
                      RuntimeOption runtimeOption,
                      int maxLength) {
         init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
-                intentLabelsFile, runtimeOption, maxLength);
+                intentLabelsFile, addedTokensFile, runtimeOption, maxLength);
     }
 
     public boolean init(String modelFile,
@@ -33,10 +35,11 @@ public class Predictor {
                         String vocabFile,
                         String slotLabelsFile,
                         String intentLabelsFile,
+                        String addedTokensFile,
                         RuntimeOption runtimeOption,
                         int maxLength) {
         return init_(modelFile, paramsFile, vocabFile, slotLabelsFile,
-                intentLabelsFile, runtimeOption, maxLength);
+                intentLabelsFile, addedTokensFile, runtimeOption, maxLength);
     }
 
     public boolean release() {
@@ -64,6 +67,7 @@ public class Predictor {
                           String vocabFile,
                           String slotLabelsFile,
                           String intentLabelsFile,
+                          String addedTokensFile,
                           RuntimeOption runtimeOption,
                           int maxLength) {
         if (!mInitialized) {
@@ -73,6 +77,7 @@ public class Predictor {
                     vocabFile,
                     slotLabelsFile,
                     intentLabelsFile,
+                    addedTokensFile,
                     runtimeOption,
                     maxLength
             );
@@ -89,6 +94,7 @@ public class Predictor {
                         vocabFile,
                         slotLabelsFile,
                         intentLabelsFile,
+                        addedTokensFile,
                         runtimeOption,
                         maxLength
                 );
@@ -107,6 +113,7 @@ public class Predictor {
                                    String vocabFile,
                                    String slotLabelsFile,
                                    String intentLabelsFile,
+                                   String addedTokensFile,
                                    RuntimeOption runtimeOption,
                                    int maxLength);
 

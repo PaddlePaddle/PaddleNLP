@@ -1,4 +1,4 @@
-# FastDeploy ERNIE Tiny 模型Android部署示例
+# FastDeploy ERNIE 3.0 Tiny 模型Android部署示例
 
 本目录提供了快速完成在Android的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的部署示例。
 
@@ -9,7 +9,7 @@
 
 ## App示例编译和使用步骤
 
-1. ERNIE Tiny Android部署示例位于`PaddleNLP/model_zoo/ernie-tiny/deploy/android`目录
+1. ERNIE 3.0 Tiny Android部署示例位于`PaddleNLP/model_zoo/ernie-tiny/deploy/android`目录
 2. 用 Android Studio 打开 ernie-tiny/deploy/android 工程
 3. 手机连接电脑，打开 USB 调试和文件传输模式，并在 Android Studio 上连接自己的手机设备（手机需要开启允许从 USB 安装软件权限）
 
@@ -23,14 +23,14 @@
 ├── app                   # App示例代码
 ├── build.gradle
 ├── ernie_tiny            # ERNIE Tiny JNI & Java封装代码
-# ...
+# ...                     # 一些和gradle相关的工程配置文件
 ├── local.properties
 └── ui                    # 一些辅助用的UI代码
 ```
 
 > **注意：**
 >> 如果您在导入项目、编译或者运行过程中遇到 NDK 配置错误的提示，请打开 ` File > Project Structure > SDK Location`，修改 `Andriod NDK location` 为您本机配置的 NDK 所在路径。本工程默认使用的NDK版本为20.
->> 如果您是通过 Andriod Studio 的 SDK Tools 下载的 NDK (见本章节"环境准备")，可以直接点击下拉框选择默认路径。
+>> 如果您是通过 Android Studio 的 SDK Tools 下载的 NDK (见本章节"环境准备")，可以直接点击下拉框选择默认路径。
 >> 还有一种 NDK 配置方法，你可以在 `local.properties` 文件中手动完成 NDK 路径配置，如下图所示
 >> 如果以上步骤仍旧无法解决 NDK 配置错误，请尝试根据 Android Studio 官方文档中的[更新 Android Gradle 插件](https://developer.android.com/studio/releases/gradle-plugin?hl=zh-cn#updating-plugin)章节，尝试更新Android Gradle plugin版本。
 
@@ -69,9 +69,9 @@ dependencies {
 }
 ```
 
-### ERNIE Tiny Java API说明如下  
+### ERNIE 3.0 Tiny Java API说明如下  
 
-- ERNIE Tiny `Predictor`初始化 API: 模型初始化API包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用init函数，在合适的程序节点进行初始化。ERNIE Tiny Predictor初始化参数说明如下：
+- ERNIE 3.0 Tiny `Predictor`初始化 API: 模型初始化API包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用init函数，在合适的程序节点进行初始化。ERNIE 3.0 Tiny Predictor初始化参数说明如下：
    - modelFile: String, paddle格式的模型文件路径，如 infer_model.pdmodel
    - paramFile: String, paddle格式的参数文件路径，如 infer_model.pdiparams
    - vocabFile: String, 词表文件，如 vocab.txt 每一行包含一个词
@@ -87,12 +87,12 @@ public Predictor(String modelFile, String paramsFile, String vocabFile, String s
 public boolean init(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption, int maxLength);
 ```  
 
-- ERNIE Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
+- ERNIE 3.0 Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
 ```java
 public IntentDetAndSlotFillResult[] predict(String[] texts);
 ```
 
-- ERNIE Tiny Predictor资源释放 API: 调用 release() API 可以释放模型资源，返回true表示释放成功，false表示失败；调用 initialized() 可以判断Predictor是否初始化成功，true表示初始化成功，false表示失败。
+- ERNIE 3.0 Tiny Predictor资源释放 API: 调用 release() API 可以释放模型资源，返回true表示释放成功，false表示失败；调用 initialized() 可以判断Predictor是否初始化成功，true表示初始化成功，false表示失败。
 ```java
 public boolean release(); // 释放native资源  
 public boolean initialized(); // 检查Predictor是否初始化成功
@@ -131,7 +131,7 @@ public class IntentDetAndSlotFillResult {
 }
 ```  
 
-- ERNIE Tiny `Predictor`调用示例
+- ERNIE 3.0 Tiny `Predictor`调用示例
 
 ```java
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
@@ -171,10 +171,10 @@ class TestERNIETiny extends Activity {
 
 更详细的用法请参考 [ERNIETinyMainActivity](./app/src/main/java/com/baidu/paddle/paddlenlp/app/ernie_tiny/ERNIETinyMainActivity.java) 中的用法
 
-## 替换App示例中的ERNIE Tiny模型    
+## 替换App示例中的ERNIE 3.0 Tiny模型    
 
-替换App示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含vocab.txt、slots_label.txt以及intent_label.txt等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
-  - 将您的ERNIE Tiny模型放在 `app/src/main/assets/models` 目录下；
+替换App示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含vocab.txt、slots_label.txt、intent_label.txt以及added_token.json等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
+  - 将您的ERNIE 3.0 Tiny模型放在 `app/src/main/assets/models` 目录下；
   - 修改 `app/src/main/res/values/strings.xml` 中模型路径的默认值，如：
 
 ```xml
@@ -182,16 +182,16 @@ class TestERNIETiny extends Activity {
 <string name="ERNIE_TINY_MODEL_DIR_DEFAULT">models/ernie-tiny</string>
 ```  
 
-## 关于ERNIE Tiny JNI的封装  
+## 关于ERNIE 3.0 Tiny JNI的封装  
 
-如果您对ERNIE Tiny JNI封装的实现感兴趣，可以参考 [ernie_tiny_jni/predictor_jni.cc](./ernie_tiny/src/main/cpp/ernie_tiny_jni/predictor_jni.cc), 关于如何使用JNI进行模型封装并和Java通信，可以参考 [FastDeploy/use_cpp_sdk_on_android.md](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/faq/use_cpp_sdk_on_android.md) 文档中的说明。
+如果您对ERNIE 3.0 Tiny JNI封装的实现感兴趣，可以参考 [ernie_tiny_jni/predictor_jni.cc](./ernie_tiny/src/main/cpp/ernie_tiny_jni/predictor_jni.cc), 关于如何使用JNI进行模型封装并和Java通信，可以参考 [FastDeploy/use_cpp_sdk_on_android.md](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/faq/use_cpp_sdk_on_android.md) 文档中的说明。
 
 ## 相关文档
 
-[ERNIE Tiny模型详细介绍](../../README.md)
+[ERNIE 3.0 Tiny模型详细介绍](../../README.md)
 
-[ERNIE Tiny模型C++部署方法](../cpp/README.md)
+[ERNIE 3.0 Tiny模型C++部署方法](../cpp/README.md)
 
-[ERNIE Tiny模型Python部署方法](../python/README.md)
+[ERNIE 3.0 Tiny模型Python部署方法](../python/README.md)
 
 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)
