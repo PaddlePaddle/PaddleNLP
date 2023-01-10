@@ -43,7 +43,7 @@
 
 ```shell
 .
-├── deploy/                # 模型部署脚本
+├── deploy/simple_serving/ # 模型部署脚本
 ├── utils.py               # 数据处理工具
 ├── run_train.py           # 模型微调脚本
 ├── run_eval.py            # 模型评估脚本
