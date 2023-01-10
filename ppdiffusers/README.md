@@ -98,7 +98,7 @@ ___为了方便国内用户下载使用及快速体验Stable Diffusion模型，�
 ___Stable Diffusion是基于以下的License:
 The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
 
-下面将以最近较为火热的 **🔥Stable Diffusion** 模型为例，来说明如何快速使用 **ppdiffusers**，在开始之前我们可以点开下面的折叠按钮，查看当前 Stable Diffusion 模型所支持的权重！
+下面将以最近较为火热的 **🔥Stable Diffusion** 模型为例，来说明如何快速使用 **PPDiffusers**，在开始之前我们可以点开下面的折叠按钮，查看当前 Stable Diffusion 模型所支持的权重！
 
 ### PPDiffusers模型支持的权重
 
@@ -118,7 +118,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 # pipe_mega.inpaint_legacy() 等于 pipe_inpaint_legacy()
 ```
 
-| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
+| PPDiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
 | :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | CompVis/stable-diffusion-v1-4           | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | Stable-Diffusion-v1-4 使用 Stable-Diffusion-v1-2 的权重进行初始化。随后在"laion-aesthetics v2 5+"数据集上以 **512x512** 分辨率微调了 **225k** 步数，对文本使用了 **10%** 的dropout（即：训练过程中文图对中的文本有 10% 的概率会变成空文本）。模型使用了[CLIP ViT-L/14](https://huggingface.co/openai/clip-vit-large-patch14)作为文本编码器。| [地址](https://huggingface.co/CompVis/stable-diffusion-v1-4) |
 | CompVis/ldm-text2im-large-256               | LDMTextToImagePipeline | [LDM论文](https://arxiv.org/pdf/2112.10752.pdf) LDM-KL-8-G* 权重。| [地址](https://huggingface.co/CompVis/ldm-text2im-large-256) |
@@ -143,7 +143,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（中文和多语言） </summary>
 
 
-| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
+| PPDiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
 | :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | BAAI/AltDiffusion                           | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline | 该模型使用 [AltCLIP](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，在 Stable Diffusion 基础上训练了**双语Diffusion模型**，其中训练数据来自 [WuDao数据集](https://data.baai.ac.cn/details/WuDaoCorporaText) 和 [LAION](https://huggingface.co/datasets/ChristophSchuhmann/improved_aesthetics_6plus) 。| [地址](https://huggingface.co/BAAI/AltDiffusion) |
 | BAAI/AltDiffusion-m9                        | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline |该模型使用9种语言的 [AltCLIP-m9](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，其他同上。| [地址](https://huggingface.co/BAAI/AltDiffusion-m9) |
@@ -416,7 +416,7 @@ image_inpaint_legacy.save("image_inpaint_legacy.png")
 ## License
 PPDiffusers 遵循 [Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
 
-Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license).
+Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license)。
 > The CreativeML OpenRAIL M is an [Open RAIL M license](https://www.licenses.ai/blog/2022/8/18/naming-convention-of-responsible-ai-licenses), adapted from the work that [BigScience](https://bigscience.huggingface.co/) and [the RAIL Initiative](https://www.licenses.ai/) are jointly carrying in the area of responsible AI licensing. See also [the article about the BLOOM Open RAIL license](https://bigscience.huggingface.co/blog/the-bigscience-rail-license) on which this license is based.
 
 ## Acknowledge
