@@ -14,6 +14,7 @@
 
 import copy
 import inspect
+import json
 import math
 import os
 import time
@@ -69,7 +70,7 @@ def compress(self, custom_evaluate=None):
             ), "Custom model using DynaBERT strategy needs to pass in parameters `custom_evaluate`."
         model = copy.deepcopy(self.model)
         self.original_model = model
-        _dynabert(self, self.model, args.output_dir)
+        _dynabert(self, self.model)
 
         del self.original_model
         if "ptq" in args.strategy or "qat" in args.strategy:
@@ -142,7 +143,7 @@ def generate_input_spec(model, dataset, input_dtype="int64"):
     return input_spec
 
 
-def _dynabert(self, model, output_dir):
+def _dynabert(self, model):
     args = self.args
     model = _replace_auto_model_forward(model)
     if args.width_mult_list is None:
@@ -1026,19 +1027,13 @@ def cut_embeddings(model, tokenizer, config, word_emb_index, max_seq_length, max
         f.write(tokenizer.convert_ids_to_tokens(idx) + "\n")
     f.close()
 
-    # tokenizer.init_config["vocab_file"] =
     tokenizer.init_config["model_max_length"] = max_seq_length
     if "vocab_file" in tokenizer.init_config:
         tokenizer.init_config.pop("vocab_file")
     f = open(os.path.join(output_dir, tokenizer.tokenizer_config_file), "w")
-    import json
 
     f.write(json.dumps(tokenizer.init_config))
     f.close()
-
-    # from paddlenlp.transformers import AutoTokenizer
-    # tokenizer = AutoTokenizer.from_pretrained(output_dir)
-    # import pdb; pdb.set_trace()
 
 
 Trainer.compress = compress

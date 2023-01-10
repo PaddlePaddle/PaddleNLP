@@ -1,7 +1,7 @@
 # 端上语义理解压缩方案
 
  **目录**
-   * [ERNIE 3.0 Tiny v2 介绍](#模型介绍)
+   * [ERNIE 3.0 Tiny 介绍](#模型介绍)
    * [预训练模型效果](#模型效果)
    * [代码结构](#代码结构)
    * [开始运行](#开始运行)
@@ -12,23 +12,40 @@
    * [模型评估](#模型评估)
    * [端上模型压缩方案🔥](#模型压缩)
        * [压缩效果](#压缩效果)
-   * [FastDeploy 部署🔥](#FastDeploy部署)
+   * [⚡️ FastDeploy 部署](#FastDeploy部署)
    * [参考文献](#参考文献)
 
 
-本项目开源了 **ERNIE 3.0 Tiny v2** 预训练模型及 **端上语义理解压缩方案**。
+本项目开源了 **ERNIE 3.0 Tiny** 预训练模型及 **端上语义理解压缩方案**。
 
-- **ERNIE 3.0 Tiny v2** 预训练模型在 in-domain、out-domain、low-resourced 的下游任务上比 ERNIE 3.0 Tiny v1 平均提升了X。并且 v2 版本新增开源了 3L128H 结构的模型。
+- **ERNIE 3.0 Tiny** 百度 ERNIE 使用 ERNIE-Tiny 系列的知识蒸馏技术，将 ERNIE 3.0 Titan 大模型的能力传递给小模型，产出并开源了易于部署的 ERNIE 3.0 Tiny 系列预训练模型，刷新了中文小模型的 SOTA 成绩。在这些较少参数量的 ERNIE 3.0 Tiny 系列模型中，有一部分可以直接部署在 CPU 上。
 
-- **端上语义理解压缩方案** 以车载语音任务型对话为背景，使用了模型裁剪、量化策略，将模型大小减小了X倍，推理时延降低X倍，内存占用减小X倍，达到XKB。使 ERNIE 类模型能轻松地部署至移动端。由于移动端部署对内存占用的要求比起服务端更高，因此该方案也同样适用于服务端部署。
+- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 进行微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，将模型体积减小为原来的 7.8%，从而将 ERNIE 3.0 Tiny 模型成功部署至 **移动端**。通过模型压缩，ERNIE 3.0 Tiny 的推理时延降低X倍，内存占用减小X倍，达到XKB。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于服务端部署。
 
 <a name="模型介绍"></a>
 
-## ERNIE 3.0 Tiny v2 介绍
-由于预训练语言模型越来越大，过大的参数量导致了模型难以部署，因此 [ERNIE 3.0 Tiny v1](../ernie-3.0/)（即 ERNIE 3.0 轻量级模型）通过 task-agnostic 知识蒸馏的方式将大模型压缩成开箱即用的小模型，小模型在下游任务上直接微调就能取得不错的效果。然而，蒸馏出来的小模型和教师模型在效果上仍然存在差距，对此我们提出并开源了 **ERNIE 3.0 Tiny v2** 。ERNIE 3.0 Tiny v2 使教师模型参与 **多任务训练**，大大提高了小模型在下游任务上的效果。
+## ERNIE 3.0 Tiny 介绍
+
+百度 ERNIE 团队在 2021 年底发布了百亿级别大模型 ERNIE 3.0 和千亿级别的大模型 ERNIE 3.0 Titan。为了让大模型的能力能够真正在一线业务发挥威力，ERNIE 团队推出了 ERNIE-Tiny 系列的知识蒸馏技术，通过任务无关蒸馏的方法，产出了多个轻量级模型 ERNIE 3.0 Tiny，刷新了中文小模型的成绩，并使这些模型能够直接在 CPU 上进行预测，大大拓展了 ERNIE 模型的使用场景。
+
+2023 年初，ERNIE 团队进一步开源了 ERNIE 3.0 Tiny 模型的 v2 版本，使教师模型参与 **多任务训练**，大大提高了小模型在下游任务上的效果。ERNIE 3.0 Tiny v2 模型在 in-domain、out-domain、low-resourced 的下游任务上比 v1 有了进一步的提升，并且 v2 还开源了 3L128H 结构的模型。
+
+下面是对 ERNIE 3.0 Tiny 模型训练策略的简单介绍：
+
+### 在线蒸馏技术
+
+在线蒸馏技术在模型学习的过程中周期性地将知识信号传递给若干个学生模型同时训练，从而在蒸馏阶段一次性产出多种尺寸的学生模型。相对传统蒸馏技术，该技术极大节省了因大模型额外蒸馏计算以及多个学生的重复知识传递带来的算力消耗。
+
+这种新颖的蒸馏方式利用了文心大模型的规模优势，在蒸馏完成后保证了学生模型的效果和尺寸丰富性，方便不同性能需求的应用场景使用。此外，由于文心大模型的模型尺寸与学生模型差距巨大，模型蒸馏难度极大甚至容易失效。为此，通过引入了助教模型进行蒸馏的技术，利用助教作为知识传递的桥梁以缩短学生模型和大模型表达空间相距过大的问题，从而促进蒸馏效率的提升。
+
+<p align="center">
+        <img width="644" alt="image" src="https://user-images.githubusercontent.com/1371212/168516904-3fff73e0-010d-4bef-adc1-4d7c97a9c6ff.png" title="ERNIE 3.0 Online Distillation">
+</p>
+
+<br>
 
 ### 注入下游知识
-ERNIE-Tiny v1 通过 task-agnostic 蒸馏技术将预训练大模型压缩成预训练小模型，然而由于小模型在微调之前没有接触到下游任务的相关知识，导致效果和大模型仍然存在差距。因此我们提出 **ERNIE 3.0 Tiny v2**，通过微调教师模型，让教师模型学习到下游任务的相关知识，进而能够在蒸馏的过程中传导给学生模型。尽管学生模型完全没有见过下游数据，通过预先注入下游知识到教师模型，蒸馏得到的学生模型也能够获取到下游任务的相关知识，进而使下游任务上的效果得到提升。
+ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训练小模型，然而由于小模型在微调之前没有接触到下游任务的相关知识，导致效果和大模型仍然存在差距。因此 ERNIE 团队进一步提出 **ERNIE 3.0 Tiny v2**，通过微调教师模型，让教师模型学习到下游任务的相关知识，进而能够在蒸馏的过程中传导给学生模型。尽管学生模型完全没有见过下游数据，通过预先注入下游知识到教师模型，蒸馏得到的学生模型也能够获取到下游任务的相关知识，进而使下游任务上的效果得到提升。
 
 ### 多任务学习提升泛化性
 多任务学习已经被证明对增强模型泛化性有显著的效果，例如 MT-DNN、MUPPET、FLAN 等。通过对教师模型加入多下游任务微调，不但能够对教师模型注入下游知识、提高教师模型的泛化性，并且能够通过蒸馏传给学生模型，大幅度提升小模型的泛化性。具体地，我们对教师模型进行了 28 个任务的多任务微调。
@@ -38,15 +55,13 @@ ERNIE 3.0 Tiny v2 比起 ERNIE 3.0 Tiny v1 在 in-domain、out-domain、low-reso
 <p align="center">
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/210303124-c9df89a9-e291-4322-a6a5-37d2c4c1c008.png" title="ERNIE 3.0 Tiny v2">
 </p>
-
-<p align="center"> ERNIE 3.0 Tiny v2 训练流程图</p>
 <br>
 
 <a name="模型效果"></a>
 
 ## 预训练模型效果
 
-本项目开源 **ERNIE 3.0 Tiny _Base_ v2** 、**ERNIE 3.0 Tiny _Medium_ v2** 、 **ERNIE 3.0 Tiny _Mini_ v2** 、 **ERNIE 3.0 Tiny _Micro_ v2** 、 **ERNIE 3.0 Tiny _Nano_ v2**、**ERNIE 3.0 Tiny _Pico_ v2** 六个中文模型：
+本项目新增开源 **ERNIE 3.0 Tiny _Base_ v2** 、**ERNIE 3.0 Tiny _Medium_ v2** 、 **ERNIE 3.0 Tiny _Mini_ v2** 、 **ERNIE 3.0 Tiny _Micro_ v2** 、 **ERNIE 3.0 Tiny _Nano_ v2**、**ERNIE 3.0 Tiny _Pico_ v2** 六个中文模型：
 
 - [**ERNIE 3.0-Tiny-_Base_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams) (_12-layer, 768-hidden, 12-heads_)
 - [**ERNIE 3.0-Tiny-_Medium_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams) (_6-layer, 768-hidden, 12-heads_)
@@ -89,7 +104,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=2 align=center>12L768H</td>
-        <td>ERNIE 3.0 Tiny-Base v1</td>
+        <td>ERNIE 3.0 Tiny-Base-v1-zh</td>
         <td>76.05</td>
         <td>75.93</td>
         <td>58.26</td>
@@ -110,7 +125,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>62.29</td>
     </tr>
     <tr>
-        <td><b>ERNIE 3.0 Tiny-Base v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Base-v2-zh</b></td>
         <td>76.31</td>
         <td>77.43</td>
         <td>59.11</td>
@@ -132,7 +147,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=2 align=center>6L768H</td>
-        <td>ERNIE 3.0 Tiny-Medium v1</td>
+        <td>ERNIE 3.0 Tiny-Medium-v1-zh</td>
         <td>72.49</td>
         <td>73.37</td>
         <td>57.00</td>
@@ -153,7 +168,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>61.48</td>
     </tr>
     <tr>
-        <td><b>ERNIE 3.0 Tiny-Medium v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Medium-v2-zh</b></td>
         <td>74.22</td>
         <td>75.88</td>
         <td>57.86</td>
@@ -175,7 +190,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=2 align=center>6L384H</td>
-        <td>ERNIE 3.0 Tiny-Mini v1</td>
+        <td>ERNIE 3.0 Tiny-Mini-v1-zh</td>
         <td>66.90</td>
         <td>71.85</td>
         <td>55.24</td>
@@ -196,7 +211,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>50.07</td>
     </tr>
     <tr>
-        <td><b>ERNIE 3.0 Tiny-Mini v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Mini-v2-zh</b></td>
         <td>68.67</td>
         <td><b>74.40</b></td>
         <td>56.20</td>
@@ -218,7 +233,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=2 align=center>4L384H</td>
-        <td>ERNIE 3.0 Tiny-Micro v1</td>
+        <td>ERNIE 3.0 Tiny-Micro-v1-zh</td>
         <td>64.21</td>
         <td>71.15</td>
         <td>55.05</td>
@@ -239,7 +254,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>47.12</td>
     </tr>
     <tr>
-        <td><b>ERNIE 3.0 Tiny-Micro v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Micro-v2-zh</b></td>
         <td>64.05</td>
         <td>72.52</td>
         <td>55.45</td>
@@ -261,7 +276,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=2 align=center>4L312H</td>
-        <td>ERNIE 3.0 Tiny-Nano v1</td>
+        <td>ERNIE 3.0 Tiny-Nano-v1-zh</td>
         <td>62.97</td>
         <td>70.51</td>
         <td>54.57</td>
@@ -282,7 +297,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>21.40</td>
     </tr>
     <tr>
-        <td><b>ERNIE 3.0 Tiny-Nano v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Nano-v2-zh</b></td>
         <td>63.71</td>
         <td>72.75</td>
         <td>55.38</td>
@@ -304,7 +319,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
     </tr>
     <tr>
         <td rowspan=1 align=center>3L128H2A</td>
-        <td><b>ERNIE 3.0 Tiny-Pico v2</b></td>
+        <td><b>ERNIE 3.0 Tiny-Pico-v2-zh</b></td>
         <td>49.02</td>
         <td>69.35</td>
         <td>52.50</td>
@@ -327,7 +342,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
 </table>
 
 
-使用 PaddleNLP 只需要一行代码就可以下载并获取 ERNIE 3.0 Tiny v2 预训练模型，之后可以用自己的下游数据下进行微调。
+使用 PaddleNLP 只需要一行代码就可以下载并获取 ERNIE 3.0 Tiny 预训练模型，之后可以用自己的下游数据下进行微调。
 
 ```python
 
@@ -354,10 +369,10 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 
 ```text
 .
-├── train.py                     # 微调和压缩脚本
+├── run_train.py                 # 微调和压缩脚本
+├── run_eval.py                  # 评估脚本
 ├── utils.py                     # 训练工具脚本
 ├── model.py                     # 模型结构脚本
-├── evaluate.py                  # 评估脚本
 ├── data                         # 数据目录（自定义数据）
 │ └── train.txt                  # 训练集（待用户新增）
 │ └── dev.txt                    # 验证集（待用户新增）
@@ -379,7 +394,7 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 
 ### 任务介绍
 
-本项目是使用 ERNIE 3.0 Tiny v2 预训练模型移动端部署方案，任务背景是车载语音场景下的口语理解（Spoken Language Understanding，SLU）。本项目包括微调、压缩和部署的全流程。
+本项目是使用 ERNIE 3.0 Tiny 预训练模型移动端部署方案，任务背景是车载语音场景下的口语理解（Spoken Language Understanding，SLU）。本项目包括微调、压缩和部署的全流程。
 
 SLU 任务主要将用户的自然语言表达解析为结构化信息。结构化信息的解析主要包括意图识别和槽位填充两个步骤。
 
@@ -433,7 +448,7 @@ tail -n $[num_lines-num_lines/5] corpus.train.txt.shuf > train.txt
 
 ## 模型训练
 
-本项目自定义了继承自 `ErniePretrainedModel` 的模型 `JointErnie`，使意图识别和槽位填充两个任务可以共用一个预训练模型 `ernie-3.0-tiny-nano-v2-zh`，但是各自也分别拥有最后一层独立的全连接层。模型的定义依然可以使用 `from_pretrained` API 传入使用的预训练模型和相关参数。这里也可以按照需求使用 ERNIE 3.0 Tiny v2 的其他大小的模型，如果不知道如何选择，可以对多个大小的模型都进行训练和压缩，最后根据在硬件上的精度、时延、内存占用等指标来选择模型。
+本项目自定义了继承自 `ErniePretrainedModel` 的模型 `JointErnie`，使意图识别和槽位填充两个任务可以共用一个预训练模型 `ernie-3.0-tiny-nano-v2-zh`，但是各自也分别拥有最后一层独立的全连接层。模型的定义依然可以使用 `from_pretrained` API 传入使用的预训练模型和相关参数。这里也可以按照需求使用 ERNIE 3.0 Tiny 其他大小的模型，如果不知道如何选择，可以对多个大小的模型都进行训练和压缩，最后根据在硬件上的精度、时延、内存占用等指标来选择模型。
 
 ```python
 from model import JointErnie
@@ -448,31 +463,27 @@ model = JointErnie.from_pretrained(
 运行下面的脚本，使用 Trainer API 启动训练：
 
 ```shell
-BS=64
-LR=5e-5
-EPOCHS=30
+mkdir output/BS64_LR5e-5_EPOCHS30
 
-export finetuned_model=./output/BS${BS}_LR${LR}_${EPOCHS}EPOCHS
-mkdir $finetuned_model
-
-python train.py \
+python run_train.py \
     --device gpu \
     --logging_steps 100 \
     --save_steps 100 \
     --eval_steps 100 \
     --model_name_or_path ernie-3.0-tiny-nano-v2-zh \
+    --num_train_epochs 30 \
+    --per_device_eval_batch_size 64 \
+    --per_device_train_batch_size  64 \
+    --learning_rate 5e-5 \
     --prune_embeddings \
     --max_vocab_size 6000 \
     --max_seq_length 16  \
-    --output_dir $finetuned_model \
+    --output_dir output/BS64_LR5e-5_EPOCHS30 \
     --train_path data/train.txt \
     --dev_path data/dev.txt \
     --intent_label_path data/intent_label.txt \
     --slot_label_path data/slot_label.txt \
     --label_names  'intent_label' 'slot_label' \
-    --per_device_eval_batch_size ${BS} \
-    --per_device_train_batch_size  ${BS} \
-    --learning_rate ${LR} \
     --weight_decay 0.01 \
     --warmup_ratio 0.1 \
     --do_train \
@@ -481,7 +492,6 @@ python train.py \
     --input_dtype "int32" \
     --disable_tqdm True \
     --overwrite_output_dir \
-    --num_train_epochs $EPOCHS \
     --load_best_model_at_end  True \
     --save_total_limit 1 \
     --metric_for_best_model eval_accuracy \
@@ -524,13 +534,13 @@ python train.py \
 
 - 静态图
 
-如果使用静态图进行评估或者预测，可以参考脚本 `evaluate.py`，参考下面的命令启动评估：
+如果使用静态图进行评估或者预测，可以参考脚本 `run_eval.py`，参考下面的命令启动评估：
 
 ```shell
-python evaluate.py  \
+python run_eval.py  \
     --device gpu \
-    --model_name_or_path output/BS64_LR5e-5_30EPOCHS/checkpoint-7700/ \
-    --infer_prefix output/BS64_LR5e-5_30EPOCHS/infer_model \
+    --model_name_or_path output/BS64_LR5e-5_EPOCHS30/checkpoint-7700/ \
+    --infer_prefix output/BS64_LR5e-5_EPOCHS30/infer_model \
     --output_dir ./ \
     --test_path data/dev.txt \
     --intent_label_path data/intent_label.txt \
@@ -556,7 +566,7 @@ python evaluate.py  \
 
 ## 模型压缩
 
-尽管 ERNIE 3.0 Tiny v2 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩，为了方便实现，[模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
+尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩，为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
 
 端上模型压缩流程如下图所示：
 
@@ -564,34 +574,33 @@ python evaluate.py  \
         <img width="1000" alt="image" src="https://user-images.githubusercontent.com/26483581/211022166-0558371b-c5b2-4a7a-a019-674f0a321ccf.png" title="compression plan">
 </p>
 <br>
-在本项目中，运行下面的脚本，可对上面微调后的模型进行压缩：
+
+在本项目中，模型压缩和模型训练共用了脚本 `run_train.py`，压缩时只需设置 `--do_compress`，并取消设置 `--do_train` 即可。运行下面的脚本，可对上面微调后的模型进行压缩：
 
 ```shell
-EPOCHS=10
-
-python train.py \
-    --device gpu \
-    --logging_steps 100 \
-    --save_steps 100 \
-    --eval_steps 100 \
-    --model_name_or_path $finetuned_model/checkpoint-6700 \
-    --output_dir $finetuned_model \
+python run_train.py \
+    --do_compress \
+    --strategy 'dynabert+qat+embeddings' \
+    --num_train_epochs 10 \
+    --model_name_or_path output/BS64_LR5e-5_EPOCHS30/checkpoint-6700 \
+    --output_dir output/BS64_LR5e-5_EPOCHS30/ \
+    --max_seq_length 16  \
+    --per_device_eval_batch_size 64 \
+    --per_device_train_batch_size  64 \
+    --learning_rate 5e-5 \
     --train_path data/train.txt \
     --dev_path data/dev.txt \
     --intent_label_path data/intent_label.txt \
     --slot_label_path data/slot_label.txt \
     --label_names  'intent_label' 'slot_label' \
-    --max_seq_length 16  \
-    --per_device_eval_batch_size ${BS} \
-    --per_device_train_batch_size  ${BS} \
-    --learning_rate ${LR} \
     --weight_decay 0.01 \
     --warmup_ratio 0.1 \
     --input_dtype "int32" \
-    --do_compress \
-    --strategy 'dynabert+qat+embeddings' \
+    --device gpu \
+    --logging_steps 100 \
+    --save_steps 100 \
+    --eval_steps 100 \
     --disable_tqdm True \
-    --num_train_epochs $EPOCHS \
     --save_total_limit 1 \
     --metric_for_best_model eval_accuracy \
 ```
@@ -610,34 +619,36 @@ python train.py \
 
 模型经过压缩后，使用 FastDeploy 在移动端选用 Paddle Lite 作为后端部署，并进行了精度和性能的测试（max_seq_length=16，batch_size=1），得到模型精度、时延、内存占用的数据如下：
 
-| 模型                                | 精度(acc.) | 时延(ms) | 内存占用 Pss (MB)  | 磁盘占用(MB)  |
+| 模型                                | 精度(acc.) | 时延(ms) | 内存占用 Pss (MB)  | 模型体积(MB)  |
 |-----------------------------------|----------|--------|----------------|-----------|
 | 原模型                               | 82.34    | TBD    | TBD            | 69.0      |
 | 原模型+裁剪（词表+模型宽度）                   | 82.11    | TBD    | TBD            | 64.0      |
 | 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21    | TBD    | TBD            | 11.0      |
 | 原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding） | TBD      | TBD    | TBD            | 5.4       |
 
-由此可见，经过压缩后，精度基本无损，性能TBD，内存占用TBD，磁盘占用减小 92.2%。
+
+由此可见，经过压缩后，精度基本无损，模型体积减小了 92.2%。
 
 <a name="FastDeploy部署"></a>
 
 ## FastDeplopy 部署
 
-以下动图是 ERNIE 3.0 Tiny v2 意图识别、槽位填充模型部署在 Android App 上推理的效果展示：
+以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充模型部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
 </p>
 
-针对 ERNIE 3.0 Tiny v2 模型，本项目已提供基于 FastDeploy 的云边端高性能部署示例代码和文档，欢迎参考 [FastDeploy ERNIE Tiny 模型高性能部署](deploy/README.md)。目前，FastDeploy 已支持多种后端：
+针对 ERNIE 3.0 Tiny 模型，本项目已提供基于 FastDeploy 的云边端高性能部署示例代码和文档，欢迎参考 [FastDeploy ERNIE 3.0 Tiny 模型高性能部署](deploy/README.md)。目前，FastDeploy 已支持多种后端：
 
-- 在移动端上支持 `PaddleLite` 后端。
+- 在移动端上支持 `Paddle Lite` 后端。
 
-- 在服务端的 GPU 硬件上，支持 `PaddleInference`、`ONNX Runtime`、`Paddle TensorRT` 以及`TensorRT` 后端；在服务端的 CPU 硬件上支持 `PaddleInference`、`ONNX Runtime` 以及 `OpenVINO` 后端；
+- 在服务端的 GPU 硬件上，支持 `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及`TensorRT` 后端；在服务端的 CPU 硬件上支持 `Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO` 后端；
 
 <a name="参考文献"></a>
 
 ## 参考文献
-* TBD
-
+* Liu W, Chen X, Liu J, et al. ERNIE 3.0 Tiny: Frustratingly Simple Method to Improve Task-Agnostic Distillation Generalization[J]. arXiv preprint arXiv:2301.03416, 2023.
 * Su W, Chen X, Feng S, et al. ERNIE-Tiny: A Progressive Distillation Framework for Pretrained Transformer Compression[J]. arXiv preprint arXiv:2106.02241, 2021.
+* Wang S, Sun Y, Xiang Y, et al. ERNIE 3.0 Titan: Exploring Larger-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2112.12731, 2021.
+* Sun Y, Wang S, Feng S, et al. ERNIE 3.0: Large-scale Knowledge Enhanced Pre-training for Language Understanding and Generation[J]. arXiv preprint arXiv:2107.02137, 2021.

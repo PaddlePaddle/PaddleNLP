@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ class JointErnie(ErniePretrainedModel):
             padding_mask |= (input_ids == 2) | (input_ids == 1)
             return intent_logits, slot_logits, padding_mask
 
-        return intent_logits, slot_logits
+        return intent_logits * 1.0, slot_logits * 1.0
 
 
 class NLULoss(Layer):
