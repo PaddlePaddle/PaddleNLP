@@ -18,7 +18,11 @@ from typing import Any, Dict, Optional
 import paddle
 from paddle.static import InputSpec
 
-from ..transformers.model_outputs import MaskedLMOutput, SequenceClassifierOutput
+from ..transformers.model_outputs import (
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    SequenceClassifierOutput,
+)
 from .prompt_utils import signature
 from .template import Template
 from .verbalizer import Verbalizer
@@ -66,6 +70,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         **kwargs: Dict[str, Any]
     ):
         return_dict = return_dict if return_dict is not None else False
+        return_hidden_states = kwargs.get("return_hidden_states", False)
         input_dict = {
             "input_ids": input_ids,
             "token_type_ids": token_type_ids,
@@ -74,6 +79,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
             "soft_token_ids": soft_token_ids,
             "attention_mask": attention_mask,
             "encoder_ids": encoder_ids,
+            **kwargs,
         }
         input_dict = self.template.process_batch(input_dict)
         model_inputs = {k: input_dict[k] for k in input_dict if k in self.forward_keys}
@@ -89,6 +95,9 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
         elif isinstance(model_outputs, SequenceClassifierOutput):
             logits = model_outputs.logits
             num_labels = self.plm.num_labels if self.plm.num_labels is not None else self.plm.num_labels
+        elif isinstance(model_outputs, MultipleChoiceModelOutput):
+            logits = model_outputs.logits
+            num_labels = -1
         else:
             raise Exception(f"Model type not support yet: {type(model_outputs)}")
 
@@ -97,7 +106,7 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
             if num_labels == 1:
                 loss_fct = paddle.nn.MSELoss()
                 loss = loss_fct(logits, labels)
-            elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+            elif num_labels > 0 and (labels.dtype == paddle.int64 or labels.dtype == paddle.int32):
                 loss_fct = paddle.nn.CrossEntropyLoss()
                 loss = loss_fct(logits.reshape((-1, num_labels)), labels.reshape((-1,)))
             else:
@@ -105,8 +114,15 @@ class PromptModelForSequenceClassification(paddle.nn.Layer):
                 loss = loss_fct(logits, labels)
 
         if not return_dict:
-            output = (logits, model_outputs.logits)
-            return ((loss,) + output) if loss is not None else output
+            output = (logits,)
+            if return_hidden_states:
+                output = output + (model_outputs.logits,)
+            if loss is not None:
+                return (loss,) + output
+            if isinstance(output, (list, tuple)) and len(output) == 1:
+                output = output[0]
+            return output
+
         return SequenceClassifierOutput(
             loss=loss,
             logits=logits,
