@@ -40,7 +40,20 @@ def FD_MODEL = [
         [
                 'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/ernie-tiny.tgz',
                 'dest': 'src/main/assets/models'
+        ],
+        [
+                'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/ernie-tiny-clip.tgz',
+                'dest': 'src/main/assets/models'
+        ],
+        [
+                'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/ernie-tiny-clip-qat.tgz',
+                'dest': 'src/main/assets/models'
+        ],
+        [
+                'src' : 'https://bj.bcebos.com/paddlehub/fastdeploy/ernie-tiny-clip-qat-embedding-int8.tgz',
+                'dest': 'src/main/assets/models'
         ]
+
 ]
 
 task downloadAndExtractModels(type: DefaultTask) {

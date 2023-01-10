@@ -75,16 +75,17 @@ dependencies {
    - modelFile: String, paddle格式的模型文件路径，如 infer_model.pdmodel
    - paramFile: String, paddle格式的参数文件路径，如 infer_model.pdiparams
    - vocabFile: String, 词表文件，如 vocab.txt 每一行包含一个词
-   - slotLabelsFile: String, 槽位标签文件，如 slots_label.txt 每一行包含一个标签
+   - slotLabelsFile: String, 槽位标签文件，如 slots_label.txt
    - intentLabelsFile: String, 意图标签文件，如 intent_label.txt 每一行包含一个标签
+   - addedTokensFile: String, 额外词表文件，如 added_tokens.json，json文件
    - runtimeOption: RuntimeOption，可选参数，模型初始化option。如果不传入该参数则会使用默认的运行时选项。
    - maxLength: 最大序列长度，默认为16
 
 ```java
 public Predictor(); // 空构造函数，之后可以调用init初始化
-public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile);
-public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption, int maxLength);
-public boolean init(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, RuntimeOption runtimeOption, int maxLength);
+public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, String addedTokensFile);
+public Predictor(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, String addedTokensFile, RuntimeOption runtimeOption, int maxLength);
+public boolean init(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, String addedTokensFile, RuntimeOption runtimeOption, int maxLength);
 ```  
 
 - ERNIE 3.0 Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
@@ -103,7 +104,9 @@ public boolean initialized(); // 检查Predictor是否初始化成功
 ```java
 public class RuntimeOption {
   public void enableLiteFp16();                       // 开启fp16精度推理
-  public void disableLiteFP16();                      // 关闭fp16精度推理
+  public void disableLiteFP16();                      // 关闭fp16精度推理（默认关闭）
+  public void enableLiteInt8();                       // 开启int8精度推理（需要先准备好量化模型）
+  public void disableLiteInt8();                      // 关闭int8精度推理（默认关闭）
   public void setCpuThreadNum(int threadNum);         // 设置线程数
   public void setLitePowerMode(LitePowerMode mode);   // 设置能耗模式
   public void setLitePowerMode(String modeStr);       // 通过字符串形式设置能耗模式
@@ -131,7 +134,7 @@ public class IntentDetAndSlotFillResult {
 }
 ```  
 
-- ERNIE 3.0 Tiny `Predictor`调用示例
+- ERNIE 3.0 Tiny `Predictor` FP32/FP16推理示例
 
 ```java
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
@@ -152,6 +155,7 @@ class TestERNIETiny extends Activity {
     String vocabFile = "ernie-tiny/vocab.txt";
     String slotLabelsFile = "ernie-tiny/slots_label.txt";
     String intentLabelsFile = "ernie-tiny/intent_label.txt";
+    String addedTokensFile = "ernie-tiny/added_tokens.json";
 
     // RuntimeOption 设置 
     RuntimeOption option = new RuntimeOption();
@@ -159,7 +163,46 @@ class TestERNIETiny extends Activity {
     option.enableLiteFp16();    // 是否开启FP16精度推理
 
     // Predictor初始化        
-    predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile, option, 16);
+    predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile, addedTokensFile, option, 16);
+
+    // 进行意图识别和槽位分析
+    String[] inputTexts = new String[]{"来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
+
+    IntentDetAndSlotFillResult[] results = predictor.predict(inputTexts);
+  }
+}
+```  
+
+- ERNIE 3.0 Tiny `Predictor` Int8量化模型推理示例
+
+```java
+import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
+import com.baidu.paddle.paddlenlp.ernie_tiny.Predictor;
+import com.baidu.paddle.paddlenlp.ernie_tiny.IntentDetAndSlotFillResult;
+import android.app.Activity;
+
+// 以下为伪代码
+class TestERNIETiny extends Activity {
+  @Override
+  protected void onCreate(@Nullable Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    Predictor predictor = new Predictor();
+
+    // 设置模型文件和标签文件
+    String modelFile = "ernie-tiny-clip-qat-embedding-int8/infer_model.pdmodel";
+    String paramsFile = "ernie-tiny-clip-qat-embedding-int8/infer_model.pdiparams";
+    String vocabFile = "ernie-tiny-clip-qat-embedding-int8/vocab.txt";
+    String slotLabelsFile = "ernie-tiny-clip-qat-embedding-int8/slots_label.txt";
+    String intentLabelsFile = "ernie-tiny-clip-qat-embedding-int8/intent_label.txt";
+    String addedTokensFile = "ernie-tiny-clip-qat-embedding-int8/added_tokens.json";
+
+    // RuntimeOption 设置 
+    RuntimeOption option = new RuntimeOption();
+    option.setCpuThreadNum(2);  // 设置线程数
+    option.enableLiteInt8();    // 开启int8精度推理（需要先准备好量化模型）
+
+    // Predictor初始化        
+    predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile, intentLabelsFile, addedTokensFile, option, 16);
 
     // 进行意图识别和槽位分析
     String[] inputTexts = new String[]{"来一首周华健的花心", "播放我们都一样", "到信阳市汽车配件城"};
