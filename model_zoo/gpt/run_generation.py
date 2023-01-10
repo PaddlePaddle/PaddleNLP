@@ -12,16 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import random
 import argparse
+import random
 
 import numpy as np
 import paddle
-from paddlenlp.transformers import (
-    GPTLMHeadModel,
-    GPTTokenizer,
-    GPTChineseTokenizer,
-)
+
+from paddlenlp.transformers import GPTChineseTokenizer, GPTLMHeadModel, GPTTokenizer
 
 MODEL_CLASSES = {
     "gpt2": (GPTLMHeadModel, GPTTokenizer),
@@ -156,7 +153,11 @@ def main(args, input_text):
     return generated_sequences
 
 
-if __name__ == "__main__":
+def run():
     args = parse_args()
     input_text = "花间一壶酒，独酌无相亲。举杯邀明月，"
     main(args, input_text)
+
+
+if __name__ == "__main__":
+    run()

@@ -99,7 +99,7 @@ class UnpicklerWrapperStage(pickle.Unpickler):
             return _rebuild_tensor_stage
 
         # pytorch_lightning tensor builder
-        if mod_name == "pytorch_lightning":
+        if "pytorch_lightning" in mod_name:
             return dumpy
         return super().find_class(mod_name, name)
 
@@ -219,7 +219,8 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            metadata.append(result)
+            if result not in metadata:
+                metadata.append(result)
 
     extract_maybe_dict(result_stage1)
     metadata = sorted(metadata, key=lambda x: x.key)
@@ -227,15 +228,10 @@ def load_torch(path: str, **pickle_load_args):
     stage1_key_to_tensor = {}
     content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
-        prefix_key = read_prefix_key(file_handler, content_size).decode("latin")
         file_handler.seek(pre_offset)
-
         for tensor_meta in metadata:
             key = tensor_meta.key
-            # eg: archive/data/1FB
-            filename = f"{prefix_key}/data/{key}"
-            seek_by_string(file_handler, filename, content_size)
-            file_handler.seek(2, 1)
+            seek_by_string(file_handler, "FB", content_size)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
             file_handler.seek(padding_offset, 1)

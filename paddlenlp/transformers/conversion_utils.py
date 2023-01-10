@@ -51,8 +51,7 @@ from paddlenlp.utils.log import logger
 from paddlenlp.utils.serialization import load_torch
 
 if TYPE_CHECKING:
-    from paddlenlp.transformers import PretrainedModel
-    from paddlenlp.transformers.configuration_utils import PretrainedConfig
+    from paddlenlp.transformers import PretrainedConfig, PretrainedModel
 
 
 # the type hinting for pytorch model & layer & tensor
@@ -743,7 +742,10 @@ class Converter(ConversionMixin, LogitComparer):
 
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        logger.warning("Converter will be deprecated soon.")
+        logger.warning(
+            "`paddlenlp.utils.converter` module will be deprecated soon, you "
+            "should change it to `paddlenlp.transformers.conversion_utils`"
+        )
 
     @classmethod
     def resolve_num_layer(cls, config_or_num_layers: Union[dict, int] = None) -> int:

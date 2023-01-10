@@ -13,38 +13,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import glob
 import json
-import math
 import os
-import copy
-import csv
-import itertools
 from collections import OrderedDict
 
 import numpy as np
 import paddle
-import paddle.nn as nn
 
-try:
-    from paddle.text import ViterbiDecoder
-except:
-    raise ImportError(
-        "Taskflow requires paddle version >= 2.2.0, but current paddle version is {}".format(
-            paddle.version.full_version
-        )
-    )
-from paddlenlp.layers.crf import LinearChainCrf
-from paddlenlp.utils.tools import compare_version
-
-from ..datasets import MapDataset, load_dataset
-from ..data import Stack, Pad, Tuple
-from ..transformers import ErnieCtmWordtagModel, ErnieCtmNptagModel, ErnieCtmTokenizer
+from ..datasets import load_dataset
+from ..transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, ErnieCtmWordtagModel
 from ..transformers.ernie_ctm.configuration import ErnieCtmConfig
-from .utils import download_file, add_docstrings, static_mode_guard, dygraph_mode_guard
-from .utils import TermTree, BurkhardKellerTree
-from .utils import Customization, WordTagRelationExtractor
 from .task import Task
+from .utils import (
+    BurkhardKellerTree,
+    Customization,
+    DataCollatorForErnieCtm,
+    TermTree,
+    WordTagRelationExtractor,
+    add_docstrings,
+)
 
 LABEL_TO_SCHEMA = {
     "人物类_实体": ["人物|E", "虚拟角色|E", "演艺团体|E"],
@@ -112,46 +99,46 @@ LABEL_TO_SCHEMA = {
 }
 
 usage = r"""
-          from paddlenlp import Taskflow 
+            from paddlenlp import Taskflow
 
-          # 默认使用WordTag词类知识标注工具
-          wordtag = Taskflow("knowledge_mining", model="wordtag")
-          wordtag("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
-          '''
-          [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
-          '''
+            # 默认使用WordTag词类知识标注工具
+            wordtag = Taskflow("knowledge_mining", model="wordtag")
+            wordtag("《孤女》是2010年九州出版社出版的小说，作者是余兼羽")
+            '''
+            [{'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+            '''
 
-          wordtag= Taskflow("knowledge_mining", batch_size=2)
-          wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
-                   "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
-          '''
-          [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}, {'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
-          '''
+            wordtag= Taskflow("knowledge_mining", batch_size=2)
+            wordtag(["热梅茶是一道以梅子为主要原料制作的茶饮",
+                    "《孤女》是2010年九州出版社出版的小说，作者是余兼羽"])
+            '''
+            [{'text': '热梅茶是一道以梅子为主要原料制作的茶饮', 'items': [{'item': '热梅茶', 'offset': 0, 'wordtag_label': '饮食类_饮品', 'length': 3}, {'item': '是', 'offset': 3, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '一道', 'offset': 4, 'wordtag_label': '数量词', 'length': 2}, {'item': '以', 'offset': 6, 'wordtag_label': '介词', 'length': 1, 'termid': '介词_cb_以'}, {'item': '梅子', 'offset': 7, 'wordtag_label': '饮食类', 'length': 2, 'termid': '饮食_cb_梅'}, {'item': '为', 'offset': 9, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_为'}, {'item': '主要原料', 'offset': 10, 'wordtag_label': '物体类', 'length': 4, 'termid': '物品_cb_主要原料'}, {'item': '制作', 'offset': 14, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_制作'}, {'item': '的', 'offset': 16, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '茶饮', 'offset': 17, 'wordtag_label': '饮食类_饮品', 'length': 2, 'termid': '饮品_cb_茶饮'}]}, {'text': '《孤女》是2010年九州出版社出版的小说，作者是余兼羽', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '孤女', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 2}, {'item': '》', 'offset': 3, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 4, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '2010年', 'offset': 5, 'wordtag_label': '时间类', 'length': 5, 'termid': '时间阶段_cb_2010年'}, {'item': '九州出版社', 'offset': 10, 'wordtag_label': '组织机构类', 'length': 5, 'termid': '组织机构_eb_九州出版社'}, {'item': '出版', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2, 'termid': '场景事件_cb_出版'}, {'item': '的', 'offset': 17, 'wordtag_label': '助词', 'length': 1, 'termid': '助词_cb_的'}, {'item': '小说', 'offset': 18, 'wordtag_label': '作品类_概念', 'length': 2, 'termid': '小说_cb_小说'}, {'item': '，', 'offset': 20, 'wordtag_label': 'w', 'length': 1}, {'item': '作者', 'offset': 21, 'wordtag_label': '人物类_概念', 'length': 2, 'termid': '人物_cb_作者'}, {'item': '是', 'offset': 23, 'wordtag_label': '肯定词', 'length': 1, 'termid': '肯定否定词_cb_是'}, {'item': '余兼羽', 'offset': 24, 'wordtag_label': '人物类_实体', 'length': 3}]}]
+            '''
 
-          # 使用WordTag-IE进行信息抽取
-          wordtag = Taskflow("knowledge_mining", model="wordtag", with_ie=True)
-          '''
-          [[{'text': '《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 5, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 6, 'wordtag_label': '肯定词', 'length': 1}, {'item': '一首', 'offset': 7, 'wordtag_label': '数量词_单位数量词', 'length': 2}, {'item': '由', 'offset': 9, 'wordtag_label': '介词', 'length': 1}, {'item': '王杰', 'offset': 10, 'wordtag_label': '人物类_实体', 'length': 2}, {'item': '作词', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2}, {'item': '、', 'offset': 14, 'wordtag_label': 'w', 'length': 1}, {'item': '作曲', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '并', 'offset': 17, 'wordtag_label': '连词', 'length': 1}, {'item': '演唱', 'offset': 18, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 20, 'wordtag_label': '助词', 'length': 1}, {'item': '歌曲', 'offset': 21, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 23, 'wordtag_label': 'w', 'length': 1}, {'item': '收录', 'offset': 24, 'wordtag_label': '场景事件', 'length': 2}, {'item': '在', 'offset': 26, 'wordtag_label': '介词', 'length': 1}, {'item': '专辑', 'offset': 27, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '同名', 'offset': 29, 'wordtag_label': '场景事件', 'length': 2}, {'item': '《', 'offset': 31, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 32, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 36, 'wordtag_label': 'w', 'length': 1}, {'item': '中', 'offset': 37, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 38, 'wordtag_label': 'w', 'length': 1}, {'item': '由', 'offset': 39, 'wordtag_label': '介词', 'length': 1}, {'item': '波丽佳音', 'offset': 40, 'wordtag_label': '人物类_实体', 'length': 4}, {'item': '唱片', 'offset': 44, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '于', 'offset': 46, 'wordtag_label': '介词', 'length': 1}, {'item': '1996年08月31日', 'offset': 47, 'wordtag_label': '时间类_具体时间', 'length': 11}, {'item': '发行', 'offset': 58, 'wordtag_label': '场景事件', 'length': 2}, {'item': '。', 'offset': 60, 'wordtag_label': 'w', 'length': 1}]}], [[{'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '创作', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}], 'GROUP': '创作者', 'SRC': 'HTG', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '歌曲', 'offset': 21, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '收录', 'TRIG': [{'item': '收录', 'offset': 24}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '收录于', 'SRC': 'HGT', 'TRIG': [{'item': '收录', 'offset': 24}]}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '王杰', 'type': '人物类_实体', 'offset': 10}], 'GROUP': '创作者', 'TRIG': [{'item': '专辑', 'offset': 27}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '王杰', 'type': '人物类_实体', 'offset': 10}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '创作', 'SRC': 'HGT', 'TRIG': [{'item': '专辑', 'offset': 27}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 32}, 'TAIL_ROLE': [{'item': '唱片', 'offset': 44, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}]]]
-          '''
-          
-          # 切换为NPTag名词短语标注工具
-          nptag = Taskflow("knowledge_mining", model="nptag")
-          nptag("糖醋排骨")
-          '''
-          [{'text': '糖醋排骨', 'label': '菜品'}]
-          '''
+            # 使用WordTag-IE进行信息抽取
+            wordtag = Taskflow("knowledge_mining", model="wordtag", with_ie=True)
+            '''
+            [[{'text': '《忘了所有》是一首由王杰作词、作曲并演唱的歌曲，收录在专辑同名《忘了所有》中，由波丽佳音唱片于1996年08月31日发行。', 'items': [{'item': '《', 'offset': 0, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 1, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 5, 'wordtag_label': 'w', 'length': 1}, {'item': '是', 'offset': 6, 'wordtag_label': '肯定词', 'length': 1}, {'item': '一首', 'offset': 7, 'wordtag_label': '数量词_单位数量词', 'length': 2}, {'item': '由', 'offset': 9, 'wordtag_label': '介词', 'length': 1}, {'item': '王杰', 'offset': 10, 'wordtag_label': '人物类_实体', 'length': 2}, {'item': '作词', 'offset': 12, 'wordtag_label': '场景事件', 'length': 2}, {'item': '、', 'offset': 14, 'wordtag_label': 'w', 'length': 1}, {'item': '作曲', 'offset': 15, 'wordtag_label': '场景事件', 'length': 2}, {'item': '并', 'offset': 17, 'wordtag_label': '连词', 'length': 1}, {'item': '演唱', 'offset': 18, 'wordtag_label': '场景事件', 'length': 2}, {'item': '的', 'offset': 20, 'wordtag_label': '助词', 'length': 1}, {'item': '歌曲', 'offset': 21, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '，', 'offset': 23, 'wordtag_label': 'w', 'length': 1}, {'item': '收录', 'offset': 24, 'wordtag_label': '场景事件', 'length': 2}, {'item': '在', 'offset': 26, 'wordtag_label': '介词', 'length': 1}, {'item': '专辑', 'offset': 27, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '同名', 'offset': 29, 'wordtag_label': '场景事件', 'length': 2}, {'item': '《', 'offset': 31, 'wordtag_label': 'w', 'length': 1}, {'item': '忘了所有', 'offset': 32, 'wordtag_label': '作品类_实体', 'length': 4}, {'item': '》', 'offset': 36, 'wordtag_label': 'w', 'length': 1}, {'item': '中', 'offset': 37, 'wordtag_label': '词汇用语', 'length': 1}, {'item': '，', 'offset': 38, 'wordtag_label': 'w', 'length': 1}, {'item': '由', 'offset': 39, 'wordtag_label': '介词', 'length': 1}, {'item': '波丽佳音', 'offset': 40, 'wordtag_label': '人物类_实体', 'length': 4}, {'item': '唱片', 'offset': 44, 'wordtag_label': '作品类_概念', 'length': 2}, {'item': '于', 'offset': 46, 'wordtag_label': '介词', 'length': 1}, {'item': '1996年08月31日', 'offset': 47, 'wordtag_label': '时间类_具体时间', 'length': 11}, {'item': '发行', 'offset': 58, 'wordtag_label': '场景事件', 'length': 2}, {'item': '。', 'offset': 60, 'wordtag_label': 'w', 'length': 1}]}], [[{'HEAD_ROLE': {'item': '王杰', 'offset': 10, 'type': '人物类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '创作', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '王杰', 'offset': 10, 'type': '人物类_实体'}], 'GROUP': '创作者', 'SRC': 'HTG', 'TRIG': [{'item': '作词', 'offset': 12}, {'item': '作曲', 'offset': 15}, {'item': '演唱', 'offset': 18}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '歌曲', 'offset': 21, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}], 'GROUP': '收录', 'TRIG': [{'item': '收录', 'offset': 24}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 1}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '收录于', 'SRC': 'HGT', 'TRIG': [{'item': '收录', 'offset': 24}]}, {'HEAD_ROLE': {'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}, 'TAIL_ROLE': [{'item': '王杰', 'type': '人物类_实体', 'offset': 10}], 'GROUP': '创作者', 'TRIG': [{'item': '专辑', 'offset': 27}], 'SRC': 'REVERSE'}, {'HEAD_ROLE': {'item': '王杰', 'type': '人物类_实体', 'offset': 10}, 'TAIL_ROLE': [{'item': '忘了所有', 'offset': 32, 'type': '作品类_实体'}], 'GROUP': '创作', 'SRC': 'HGT', 'TRIG': [{'item': '专辑', 'offset': 27}]}, {'HEAD_ROLE': {'item': '忘了所有', 'type': '作品类_实体', 'offset': 32}, 'TAIL_ROLE': [{'item': '唱片', 'offset': 44, 'type': '作品类_概念'}], 'GROUP': '类型', 'SRC': 'TAIL'}]]]
+            '''
 
-          nptag(["糖醋排骨", "红曲霉菌"])
-          '''
-          [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
-          '''
+            # 切换为NPTag名词短语标注工具
+            nptag = Taskflow("knowledge_mining", model="nptag")
+            nptag("糖醋排骨")
+            '''
+            [{'text': '糖醋排骨', 'label': '菜品'}]
+            '''
 
-          # 输出粗粒度类别标签`category`，即WordTag的词汇标签。
-          nptag = Taskflow("knowledge_mining", model="nptag", linking=True)
-          nptag(["糖醋排骨", "红曲霉菌"])
-          '''
-          [{'text': '糖醋排骨', 'label': '菜品', 'category': '饮食类_菜品'}, {'text': '红曲霉菌', 'label': '微生物', 'category': '生物类_微生物'}]
-          '''
+            nptag(["糖醋排骨", "红曲霉菌"])
+            '''
+            [{'text': '糖醋排骨', 'label': '菜品'}, {'text': '红曲霉菌', 'label': '微生物'}]
+            '''
+
+            # 输出粗粒度类别标签`category`，即WordTag的词汇标签。
+            nptag = Taskflow("knowledge_mining", model="nptag", linking=True)
+            nptag(["糖醋排骨", "红曲霉菌"])
+            '''
+            [{'text': '糖醋排骨', 'label': '菜品', 'category': '饮食类_菜品'}, {'text': '红曲霉菌', 'label': '微生物', 'category': '生物类_微生物'}]
+            '''
          """
 
 
@@ -178,8 +165,8 @@ class WordTagTask(Task):
     resource_files_urls = {
         "wordtag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.3/model_state.pdparams",
-                "32b4ed27e99d6b2c76e50a24d1a9fd56",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.4/model_state.pdparams",
+                "f035cc909a96817573ae33d8028ff6f8",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/wordtag_v1.1/model_config.json",
@@ -208,7 +195,6 @@ class WordTagTask(Task):
         self,
         model,
         task,
-        params_path=None,
         tag_path=None,
         term_schema_path=None,
         term_data_path=None,
@@ -220,7 +206,6 @@ class WordTagTask(Task):
     ):
         super().__init__(model=model, task=task, **kwargs)
         self._tag_path = tag_path
-        self._params_path = params_path
         self._term_schema_path = term_schema_path
         self._term_data_path = term_data_path
         self._user_dict = user_dict
@@ -300,7 +285,6 @@ class WordTagTask(Task):
         """
         Create the dataset and dataloader for the predict.
         """
-        infer_data = []
         max_predict_len = self._max_seq_len - self.summary_num - 1
         filter_input_texts = []
         for input_text in input_texts:
@@ -318,21 +302,23 @@ class WordTagTask(Task):
                 tokenized_output = self._tokenizer(
                     list(text), return_length=True, is_split_into_words=True, max_length=self._max_seq_len
                 )
-                yield tokenized_output["input_ids"], tokenized_output["token_type_ids"], tokenized_output["seq_len"]
+                yield {
+                    "input_ids": tokenized_output["input_ids"],
+                    "token_type_ids": tokenized_output["token_type_ids"],
+                    "seq_len": tokenized_output["seq_len"],
+                }
 
         infer_ds = load_dataset(read, inputs=short_input_texts, lazy=self._lazy_load)
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
-            Stack(dtype="int64"),  # seq_len
-        ): fn(samples)
+
+        data_collator = DataCollatorForErnieCtm(self._tokenizer, model="wordtag")
+
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
         infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
+            dataset=infer_ds,
+            batch_sampler=batch_sampler,
+            collate_fn=data_collator,
             num_workers=self._num_workers,
-            batch_size=self._batch_size,
-            shuffle=False,
             return_list=True,
         )
 
@@ -414,16 +400,18 @@ class WordTagTask(Task):
                     if len(term_id) == 0:
                         continue
 
-                term_id.sort(key=lambda d: (self._termtree[
-                    d].termtype == target_type or target_type in self._termtree[
-                        d].subtype, self._termtree[d].term == item["item"]),
-                             reverse=True)
+                term_id.sort(
+                    key=lambda d: (
+                        self._termtree[d].termtype == target_type or target_type in self._termtree[d].subtype,
+                        self._termtree[d].term == item["item"],
+                    ),
+                    reverse=True,
+                )
                 if self._termtree[term_id[0]].term == item["item"]:
                     high_priority = True
                     item["termid"] = term_id[0]
                 if high_priority:
                     break
-
 
     def _construct_input_spec(self):
         """
@@ -441,12 +429,8 @@ class WordTagTask(Task):
         """
 
         model_config = ErnieCtmConfig.from_pretrained(self._task_path, num_labels=len(self._tags_to_index))
-        model_instance = ErnieCtmWordtagModel.from_pretrained(
-            self._task_path, config=model_config)
+        model_instance = ErnieCtmWordtagModel.from_pretrained(self._task_path, config=model_config)
 
-        if self._params_path is not None:
-            state_dict = paddle.load(self._params_path)
-            model_instance.set_dict(state_dict)
         self._model = model_instance
         self._model.eval()
 
@@ -531,8 +515,8 @@ class NPTagTask(Task):
     resource_files_urls = {
         "nptag": {
             "model_state": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_state.pdparams",
-                "05ed1906b42126d3e04b4ac5c210b010",
+                "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag_v1.1/model_state.pdparams",
+                "956031b4024a9e965096d9fb78f8c1f0",
             ],
             "model_config": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/knowledge_mining/nptag/model_config.json",
@@ -556,6 +540,8 @@ class NPTagTask(Task):
         self._name_dict = None
         self._summary_num = 2
         self._max_cls_len = 5
+        self._lazy_load = kwargs.get("lazy_load", False)
+        self._num_workers = kwargs.get("num_workers", 0)
         self._construct_dict_map()
 
         self._get_inference_model()
@@ -661,8 +647,6 @@ class NPTagTask(Task):
         """
         inputs = self._check_input_text(inputs)
         self._max_cls_len = 5
-        num_workers = self.kwargs["num_workers"] if "num_workers" in self.kwargs else 0
-        lazy_load = self.kwargs["lazy_load"] if "lazy_load" in self.kwargs else False
 
         # Prompt template: input_text + "是" + "[MASK]" * cls_seq_length
         prompt_template = ["是"] + ["[MASK]"] * self._max_cls_len
@@ -680,21 +664,23 @@ class NPTagTask(Task):
                     range(tokenized_output["seq_len"] - 1 - self._max_cls_len, tokenized_output["seq_len"] - 1)
                 )
 
-                yield tokenized_output["input_ids"], tokenized_output["token_type_ids"], label_indices
+                yield {
+                    "input_ids": tokenized_output["input_ids"],
+                    "token_type_ids": tokenized_output["token_type_ids"],
+                    "label_indices": label_indices,
+                }
 
-        infer_ds = load_dataset(read, inputs=inputs, lazy=lazy_load)
-        batchify_fn = lambda samples, fn=Tuple(
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_id, dtype="int64"),  # input_ids
-            Pad(axis=0, pad_val=self._tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
-            Stack(dtype="int64"),  # label_indices
-        ): fn(samples)
+        infer_ds = load_dataset(read, inputs=inputs, lazy=self._lazy_load)
+
+        data_collator = DataCollatorForErnieCtm(self._tokenizer, model="nptag")
+
+        batch_sampler = paddle.io.BatchSampler(dataset=infer_ds, batch_size=self._batch_size, shuffle=False)
 
         infer_data_loader = paddle.io.DataLoader(
-            infer_ds,
-            collate_fn=batchify_fn,
-            num_workers=num_workers,
-            batch_size=self._batch_size,
-            shuffle=False,
+            dataset=infer_ds,
+            batch_sampler=batch_sampler,
+            collate_fn=data_collator,
+            num_workers=self._num_workers,
             return_list=True,
         )
 

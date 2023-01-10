@@ -44,9 +44,9 @@ ERNIE_CTM_PRETRAINED_INIT_CONFIGURATION = {
 
 ERNIE_CTM_PRETRAINED_RESOURCE_FILES_MAP = {
     "model_state": {
-        "ernie-ctm": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/ernie_ctm_base_pos.pdparams",
-        "wordtag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/wordtag_pos.pdparams",
-        "nptag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/nptag.pdparams",
+        "ernie-ctm": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/ernie_ctm_v2.pdparams",
+        "wordtag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/wordtag_v2.pdparams",
+        "nptag": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_ctm/nptag_v2.pdparams",
     }
 }
 

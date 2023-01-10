@@ -16,7 +16,11 @@
 
 import paddle
 
-from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
+from paddlenlp.transformers import (
+    BartForConditionalGeneration,
+    BartTokenizer,
+    PretrainedConfig,
+)
 from paddlenlp.transformers.generation_utils import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
@@ -70,9 +74,14 @@ class GenerationTesterMixin:
         # generate max 3 tokens
         max_length = 3
 
-        if config.get("eos_token_id", None) is not None and config.get("pad_token_id", None) is None:
+        if config.eos_token_id or config.pad_token_id:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
+        # if config.get(
+        #         "eos_token_id",
+        #         None) is not None and config.get("pad_token_id", None) is None:
+        #     # hack to allow generate for models such as GPT2 as is done in `generate()`
+        #     config["pad_token_id"] = config["eos_token_id"]
 
         return config, input_ids, attention_mask, max_length
 
@@ -525,11 +534,15 @@ class GenerationTesterMixin:
         config, _, _, max_length = self._get_input_ids_and_config()
 
         # if no bos token id => cannot generate from None
-        if config.get("bos_token_id", None) is None:
+        if config.bos_token_id is None:
             return
 
         for model_class in self.all_generative_model_classes.keys():
-            model = self._make_model_instance(config, model_class)
+            if isinstance(config, PretrainedConfig):
+                model = model_class(config)
+            else:
+                pretrained_model = self.all_generative_model_classes[model_class][0](**config)
+                model = model_class(pretrained_model)
             model.eval()
 
             output_ids_generate = model.generate(
