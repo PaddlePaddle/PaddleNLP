@@ -18,7 +18,6 @@ from functools import partial
 
 import numpy as np
 import paddle
-from args import parse_config_file
 from paddle.io import DataLoader
 from paddle.metric import Accuracy
 
@@ -224,11 +223,4 @@ def do_train():
 
 
 if __name__ == "__main__":
-    # support: python run_glue.py --config=./configs/default.yaml
-    config_file = parse_config_file()
-    if config_file is not None:
-        from args import init_argv
-
-        init_argv("glue", config_file)
-
     do_train()

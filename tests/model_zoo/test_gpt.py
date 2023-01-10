@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 from unittest import TestCase
 
-from tests.testing_utils import load_argv
+from tests.testing_utils import load_argv, slow
 
 
 class GPTTest(TestCase):
@@ -31,40 +31,39 @@ class GPTTest(TestCase):
     def test_pretrain(self):
         argv = load_argv(self.config_path, "pretrain")
         sys.argv = argv
-
         from run_pretrain import do_train
 
         do_train()
 
-    # def test_run_eval():
-    #     # do not test under the slow_test
-    #     if os.getenv("RUN_SLOW_TEST", None):
-    #         return
+    def test_msra_ner(self):
+        argv = load_argv(self.config_path, "msra_ner")
+        sys.argv = argv
 
-    #     # TODO(wj-Mcat): add eval testing config
-    #     # init_argv("eval", DEFAULT_CONFIG_FILE)
-    #     # from run_eval import run
+        from run_msra_ner import do_train
 
-    #     # run()
+        do_train()
 
-    # def test_run_glue():
-    #     load_argv("glue", DEFAULT_CONFIG_FILE)
-    #     from run_glue import do_train
+    def test_glue(self):
+        argv = load_argv(self.config_path, "glue")
+        sys.argv = argv
+        from run_glue import do_train
 
-    #     do_train()
+        do_train()
 
-    # def test_msra_ner():
-    #     load_argv("msra_ner", DEFAULT_CONFIG_FILE)
-    #     from run_msra_ner import do_train
+    @slow
+    def test_eval(self):
+        argv = load_argv(self.config_path, "eval")
+        sys.argv = argv
 
-    #     do_train()
+        from run_eval import run
 
-    # def test_generation():
-    #     # do not test under the slow_test
-    #     if os.getenv("slow_test", None):
-    #         return
+        run()
 
-    #     load_argv("generation", DEFAULT_CONFIG_FILE)
-    #     from run_generation import run
+    @slow
+    def test_generation(self):
+        argv = load_argv(self.config_path, "generation")
+        sys.argv = argv
 
-    #     run()
+        from run_generation import run
+
+        run()
