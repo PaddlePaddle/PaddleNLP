@@ -970,7 +970,7 @@ def auto_model_forward(
         past_key_values_length = past_key_values[0][0].shape[2]
 
     if attention_mask is None:
-        attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(paddle.float32), axis=[1, 2])
+        attention_mask = paddle.unsqueeze((input_ids == self.pad_token_id).astype(paddle.float32) * -1e4, axis=[1, 2])
         if past_key_values is not None:
             batch_size = past_key_values[0][0].shape[0]
             past_mask = paddle.zeros([batch_size, 1, 1, past_key_values_length], dtype=attention_mask.dtype)

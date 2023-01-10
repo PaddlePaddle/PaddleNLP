@@ -20,7 +20,7 @@
 
 - **ERNIE 3.0 Tiny** 百度 ERNIE 使用 ERNIE-Tiny 系列的知识蒸馏技术，将 ERNIE 3.0 Titan 大模型的能力传递给小模型，产出并开源了易于部署的 ERNIE 3.0 Tiny 系列预训练模型，刷新了中文小模型的 SOTA 成绩。在这些较少参数量的 ERNIE 3.0 Tiny 系列模型中，有一部分可以直接部署在 CPU 上。
 
-- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 进行微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，将模型体积减小为原来的 7.8%，从而将 ERNIE 3.0 Tiny 模型成功部署至 **移动端**。通过模型压缩，ERNIE 3.0 Tiny 的推理时延降低X倍，内存占用减小X倍，达到XKB。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于服务端部署。
+- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱移动端**。经过模型压缩并使用 FastTokenizer，端到端的推理性能也有显著 🚀加速。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
 
 <a name="模型介绍"></a>
 
@@ -50,25 +50,26 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 ### 多任务学习提升泛化性
 多任务学习已经被证明对增强模型泛化性有显著的效果，例如 MT-DNN、MUPPET、FLAN 等。通过对教师模型加入多下游任务微调，不但能够对教师模型注入下游知识、提高教师模型的泛化性，并且能够通过蒸馏传给学生模型，大幅度提升小模型的泛化性。具体地，我们对教师模型进行了 28 个任务的多任务微调。
 
-ERNIE 3.0 Tiny v2 比起 ERNIE 3.0 Tiny v1 在 in-domain、out-domain、low-resourced 数据上获得显著的提升。
-
 <p align="center">
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/210303124-c9df89a9-e291-4322-a6a5-37d2c4c1c008.png" title="ERNIE 3.0 Tiny v2">
 </p>
 <br>
+因此，ERNIE 3.0 Tiny v2 比起 ERNIE 3.0 Tiny v1，在 out-domain、low-resourced 数据上获得显著的提升。
 
 <a name="模型效果"></a>
 
 ## 预训练模型效果
 
-本项目新增开源 **ERNIE 3.0 Tiny _Base_ v2** 、**ERNIE 3.0 Tiny _Medium_ v2** 、 **ERNIE 3.0 Tiny _Mini_ v2** 、 **ERNIE 3.0 Tiny _Micro_ v2** 、 **ERNIE 3.0 Tiny _Nano_ v2**、**ERNIE 3.0 Tiny _Pico_ v2** 六个中文模型：
+本项目开源 **ERNIE 3.0 Tiny _Base_** 、**ERNIE 3.0 Tiny _Medium_** 、 **ERNIE 3.0 Tiny _Mini_** 、 **ERNIE 3.0 Tiny _Micro_** 、 **ERNIE 3.0 Tiny _Nano_**、**ERNIE 3.0 Tiny _Pico_** 六种结构的中文模型：
 
-- [**ERNIE 3.0-Tiny-_Base_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams) (_12-layer, 768-hidden, 12-heads_)
-- [**ERNIE 3.0-Tiny-_Medium_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams) (_6-layer, 768-hidden, 12-heads_)
-- [**ERNIE 3.0-Tiny-_Mini_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2.pdparams) (_6-layer, 384-hidden, 12-heads_)
-- [**ERNIE 3.0-Tiny-_Micro_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams) (_4-layer, 384-hidden, 12-heads_)
-- [**ERNIE 3.0-Tiny-_Nano_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams) (_4-layer, 312-hidden, 12-heads_)
-- [**ERNIE 3.0-Tiny-_Pico_-v2**](https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams) (_4-layer, 312-hidden, 2-heads_)
+- **ERNIE 3.0-Tiny-_Base_** (_12-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Medium_**(_6-layer, 768-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Mini_** (_6-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Micro_** (_4-layer, 384-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Nano_** (_4-layer, 312-hidden, 12-heads_)
+- **ERNIE 3.0-Tiny-_Pico_** (_4-layer, 312-hidden, 2-heads_)
+
+其中，v2 版本开源了 6 个大小的模型，v1 版本开源了前 5 个 大小的模型。
 
 ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resourced 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../../examples/benchmark/clue) 复现。
 
@@ -361,6 +362,8 @@ qa_model = AutoModelForQuestionAnswering.from_pretrained("ernie-3.0-tiny-medium-
 
 ```
 
+如果使用 v1 版本模型，只需要把 v2 替换成 v1 即可。
+
 <a name="代码结构"></a>
 
 ## 代码结构
@@ -564,7 +567,7 @@ python run_eval.py  \
 
 <a name="模型压缩"></a>
 
-## 模型压缩
+## 🔥端上模型压缩方案
 
 尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩，为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
 
@@ -617,29 +620,34 @@ python run_train.py \
 
 ### 压缩效果
 
-模型经过压缩后，使用 FastDeploy 在移动端选用 Paddle Lite 作为后端部署，并进行了精度和性能的测试（max_seq_length=16，batch_size=1），得到模型精度、时延、内存占用的数据如下：
+将模型压缩后，使用 FastDeploy 部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端测试精度和性能，得到模型精度、端到端时延（包括前后处理）、内存占用的数据如下：
 
-| 模型                                | 精度(acc.) | 时延(ms) | 内存占用 Pss (MB)  | 模型体积(MB)  |
-|-----------------------------------|----------|--------|----------------|-----------|
-| 原模型                               | 82.34    | TBD    | TBD            | 69.0      |
-| 原模型+裁剪（词表+模型宽度）                   | 82.11    | TBD    | TBD            | 64.0      |
-| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21    | TBD    | TBD            | 11.0      |
-| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding） | TBD      | TBD    | TBD            | 5.4       |
+| 模型                                | 模型精度(acc.)   | 推理精度      | 端到端时延(ms)    | 内存占用 Pss (MB)  | 模型体积(MB)     |
+|-----------------------------------|--------------|-----------|--------------|----------------|--------------|
+| 原模型                               | 82.34        | FP32      | 23.22        | 115.72         | 69.0         |
+| 原模型                               | 82.34(-0.00) | FP16      | 19.52(1.00x) | 106.24(-8.2%)  | 69.0(-0.0%)  |
+| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP32      | 20.34(1.14x) | 59.49(-48.59%) | 64.0(-7.2%)  |
+| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP16      | 15.97(1.45x) | 52.23(-54.87%) | 64.0(-7.2%)  |
+| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21(-0.13) | FP32+INT8 | 15.59(1.49x) | 49.17(-57.51%) | 11.0(-84.1%) |
+| **原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）** | 82.21(-0.13) | FP32+INT8 |**15.92(1.46x)**|**43.77(-62.18%)**| **5.4(-92.2%)**  |
 
+（**测试条件**：max_seq_length=16，batch_size=1，thread_num=1）
 
-由此可见，经过压缩后，精度基本无损，模型体积减小了 92.2%。
+由此可见，模型经过压缩后，精度基本无损，体积减小了 92.2%。在以上测试条件下，端到端推理速度达到原来的 1.46 倍，内存占用（包括 FastTokenizer 库）减小了 62.18%。
 
 <a name="FastDeploy部署"></a>
 
-## FastDeplopy 部署
+## ⚡️FastDeplopy 部署
 
-以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充模型部署在 Android App 上推理的效果展示：
+FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目提供了对 ERNIE 3.0 Tiny 使用 FastDeploy 云边端高性能部署的示例代码和文档，欢迎参考 [ERNIE 3.0 Tiny 模型高性能部署文档](deploy/README.md)。
+
+以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
 </p>
 
-针对 ERNIE 3.0 Tiny 模型，本项目已提供基于 FastDeploy 的云边端高性能部署示例代码和文档，欢迎参考 [FastDeploy ERNIE 3.0 Tiny 模型高性能部署](deploy/README.md)。目前，FastDeploy 已支持多种后端：
+想要更多了解 FastDeploy 可以参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。目前，FastDeploy 已支持多种后端：
 
 - 在移动端上支持 `Paddle Lite` 后端。
 
