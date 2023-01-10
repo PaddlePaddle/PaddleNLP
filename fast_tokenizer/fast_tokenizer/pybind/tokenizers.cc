@@ -12,6 +12,10 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
+#include "fast_tokenizer/pybind/tokenizers.h"
+
+#include <Python.h>
+
 #include <unordered_map>
 
 #include "fast_tokenizer/core/tokenizer.h"
@@ -20,13 +24,9 @@ limitations under the License. */
 #include "fast_tokenizer/normalizers/normalizers.h"
 #include "fast_tokenizer/postprocessors/postprocessors.h"
 #include "fast_tokenizer/pretokenizers/pretokenizers.h"
-#include "glog/logging.h"
-
-#include <Python.h>
-
 #include "fast_tokenizer/pybind/exception.h"
-#include "fast_tokenizer/pybind/tokenizers.h"
 #include "fast_tokenizer/pybind/utils.h"
+#include "glog/logging.h"
 
 namespace py = pybind11;
 
@@ -459,9 +459,18 @@ static PyObject* AddSpecialTokens(TokenizerObject* self,
       std::vector<core::AddedToken> added_tokens;
       Py_ssize_t tokens_num = PyList_GET_SIZE(kw_special_tokens);
       for (Py_ssize_t i = 0; i < tokens_num; ++i) {
-        added_tokens.push_back(core::AddedToken(
-            CastPyArg2AttrString(PyList_GetItem(kw_special_tokens, i), 0),
-            true));
+        PyObject* obj = PyList_GetItem(kw_special_tokens, i);
+        if (PyUnicode_Check(obj)) {
+          added_tokens.push_back(
+              core::AddedToken(CastPyArg2AttrString(obj, 0), true));
+        } else {
+          py::handle py_obj(obj);
+          if (!py::type::of(py_obj).is(py::type::of<core::AddedToken>())) {
+            throw std::runtime_error("The argument of tokens should be List[Union[str, AddedToken]]");
+          }
+          auto added_token = py_obj.cast<core::AddedToken>();
+          added_tokens.push_back(added_token);
+        }
       }
       return ToPyObject(self->tokenizer.AddSpecialTokens(added_tokens));
     } else {
@@ -495,8 +504,18 @@ static PyObject* AddTokens(TokenizerObject* self,
       std::vector<core::AddedToken> added_tokens;
       Py_ssize_t tokens_num = PyList_GET_SIZE(kw_tokens);
       for (Py_ssize_t i = 0; i < tokens_num; ++i) {
-        added_tokens.push_back(core::AddedToken(
-            CastPyArg2AttrString(PyList_GetItem(kw_tokens, i), 0), true));
+        PyObject* obj = PyList_GetItem(kw_tokens, i);
+        if (PyUnicode_Check(obj)) {
+          added_tokens.push_back(
+              core::AddedToken(CastPyArg2AttrString(obj, 0), true));
+        } else {
+          py::handle py_obj(obj);
+          if (!py::type::of(py_obj).is(py::type::of<core::AddedToken>())) {
+            throw std::runtime_error("The argument of tokens should be List[Union[str, AddedToken]]");
+          }
+          auto added_token = py_obj.cast<core::AddedToken>();
+          added_tokens.push_back(added_token);
+        }
       }
       return ToPyObject(self->tokenizer.AddTokens(added_tokens));
     } else {

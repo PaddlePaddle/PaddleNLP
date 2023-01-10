@@ -109,11 +109,11 @@ class PromptTrainer(Trainer):
 
     @property
     def pretrained_model(self):
-        self._set_model_attributes(self.model, "plm")
+        return self._get_model().plm
 
     @pretrained_model.setter
     def pretrained_model(self, model):
-        self._set_model_attributes(self.model, "plm", model)
+        setattr(self._get_model(), "plm", model)
 
     def _map_dataset(self, dataset: MapDataset):
         if dataset is None:
@@ -136,6 +136,10 @@ class PromptTrainer(Trainer):
             self.template.save(output_dir)
         if self.verbalizer is not None:
             self.verbalizer.save(output_dir)
+        if self.args.save_plm:
+            plm_output_dir = os.path.join(output_dir, "plm")
+            os.makedirs(plm_output_dir, exist_ok=True)
+            self.pretrained_model.save_pretrained(plm_output_dir)
 
     def load_state_dict_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
         if resume_from_checkpoint is not None:
@@ -231,6 +235,7 @@ class PromptTrainer(Trainer):
         if self.criterion is not None:
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
+            input_dict["return_hidden_states"] = True
             logits, hidden_states = model(**input_dict)
             loss = self.criterion(logits, labels)
 

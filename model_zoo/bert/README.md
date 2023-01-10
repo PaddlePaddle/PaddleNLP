@@ -128,14 +128,16 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
     --model_name_or_path bert-base-uncased \
     --task_name SST2 \
     --max_seq_length 128 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
+    --per_device_eval_batch_size 32   \
     --learning_rate 2e-5 \
     --num_train_epochs 3 \
     --logging_steps 1 \
     --save_steps 500 \
     --output_dir ./tmp/ \
     --device gpu \
-    --use_amp False
+    --do_train
+    --do_eval
 ```
 
 其中参数释义如下：
@@ -150,7 +152,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `save_steps` 表示模型保存及评估间隔。
 - `output_dir` 表示模型保存路径。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
-- `use_amp` 指示是否启用自动混合精度训练。
+- `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
+- `do_eval` 是否进行评估任务。同上。(`bool`, 可选, 默认为 `False`)
 
 基于`bert-base-uncased`在GLUE各评测任务上Fine-tuning后，在验证集上有如下结果：
 

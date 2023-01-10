@@ -13,31 +13,32 @@
 # limitations under the License.
 
 import argparse
-import collections
-import itertools
+import distutils.util
 import logging
 import os
 import random
 import time
-import h5py
-import yaml
-import distutils.util
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 
+import h5py
 import numpy as np
-
 import paddle
-import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.data import Stack
+from paddlenlp.transformers import (
+    BertForPretraining,
+    BertModel,
+    BertPretrainingCriterion,
+    BertTokenizer,
+    ErnieForPretraining,
+    ErnieModel,
+    ErniePretrainingCriterion,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 from paddlenlp.utils import profiler
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import BertForPretraining, BertModel, BertPretrainingCriterion, BertConfig
-from paddlenlp.transformers import ErnieForPretraining, ErnieModel, ErniePretrainingCriterion
-from paddlenlp.transformers import BertTokenizer, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -179,8 +180,8 @@ def create_pretraining_dataset(input_file, max_pred_length, shared_list, args, w
         # masked_lm_labels, next_sentence_labels, mask_token_num
         for i in (0, 1, 2, 5):
             out[i] = stack_fn([x[i] for x in data])
-        batch_size, seq_length = out[0].shape
-        size = num_mask = sum(len(x[3]) for x in data)
+        batch_size, seq_length = out[0].shape  # noqa: F841
+        size = num_mask = sum(len(x[3]) for x in data)  # noqa: F841
         # Padding for divisibility by 8 for fp16 or int8 usage
         if size % 8 != 0:
             size += 8 - (size % 8)
@@ -258,7 +259,7 @@ class PretrainingDataset(Dataset):
             mask_token_num = index
         else:
             index = self.max_pred_length
-            mask_token_num = self.max_pred_length
+            mask_token_num = self.max_pred_length  # noqa: F841
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]
@@ -299,7 +300,11 @@ def do_train(args):
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
-    num_training_steps = args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
+    # num_training_steps = (
+    #     args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
+    # )
+
+    num_training_steps = args.max_steps
 
     lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
 
@@ -323,7 +328,7 @@ def do_train(args):
 
     pool = ThreadPoolExecutor(1)
     global_step = 0
-    tic_train = time.time()
+    tic_train = time.time()  # noqa: F841
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f)
@@ -374,7 +379,7 @@ def do_train(args):
                     (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
                 ]
 
-            previous_file = data_file
+            previous_file = data_file  # noqa: F841
             dataset_future = pool.submit(
                 create_pretraining_dataset,
                 data_file,

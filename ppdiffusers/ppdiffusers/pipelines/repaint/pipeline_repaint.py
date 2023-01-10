@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -22,22 +22,50 @@ import PIL
 from ...models import UNet2DModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
 from ...schedulers import RePaintScheduler
+from ...utils import PIL_INTERPOLATION, logging
+
+logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 
-def _preprocess_image(image: PIL.Image.Image):
-    image = np.array(image.convert("RGB"))
-    image = image[None].transpose(0, 3, 1, 2)
-    image = paddle.to_tensor(image).cast("float32") / 127.5 - 1.0
+# Copied from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion_img2img.preprocess
+def _preprocess_image(image: Union[List, PIL.Image.Image, paddle.Tensor]):
+    if isinstance(image, paddle.Tensor):
+        return image
+    elif isinstance(image, PIL.Image.Image):
+        image = [image]
+
+    if isinstance(image[0], PIL.Image.Image):
+        w, h = image[0].size
+        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+
+        image = [np.array(i.resize((w, h), resample=PIL_INTERPOLATION["lanczos"]))[None, :] for i in image]
+        image = np.concatenate(image, axis=0)
+        image = np.array(image).astype(np.float32) / 255.0
+        image = image.transpose(0, 3, 1, 2)
+        image = 2.0 * image - 1.0
+        image = paddle.to_tensor(image)
+    elif isinstance(image[0], paddle.Tensor):
+        image = paddle.concat(image, axis=0)
     return image
 
 
-def _preprocess_mask(mask: PIL.Image.Image):
-    mask = np.array(mask.convert("L"))
-    mask = mask.astype(np.float32) / 255.0
-    mask = mask[None, None]
-    mask[mask < 0.5] = 0
-    mask[mask >= 0.5] = 1
-    mask = paddle.to_tensor(mask)
+def _preprocess_mask(mask: Union[List, PIL.Image.Image, paddle.Tensor]):
+    if isinstance(mask, paddle.Tensor):
+        return mask
+    elif isinstance(mask, PIL.Image.Image):
+        mask = [mask]
+
+    if isinstance(mask[0], PIL.Image.Image):
+        w, h = mask[0].size
+        w, h = map(lambda x: x - x % 32, (w, h))  # resize to integer multiple of 32
+        mask = [np.array(m.convert("L").resize((w, h), resample=PIL_INTERPOLATION["nearest"]))[None, :] for m in mask]
+        mask = np.concatenate(mask, axis=0)
+        mask = mask.astype(np.float32) / 255.0
+        mask[mask < 0.5] = 0
+        mask[mask >= 0.5] = 1
+        mask = paddle.to_tensor(mask)
+    elif isinstance(mask[0], paddle.Tensor):
+        mask = paddle.concat(mask, axis=0)
     return mask
 
 
@@ -52,19 +80,19 @@ class RePaintPipeline(DiffusionPipeline):
     @paddle.no_grad()
     def __call__(
         self,
-        original_image: Union[paddle.Tensor, PIL.Image.Image],
+        image: Union[paddle.Tensor, PIL.Image.Image],
         mask_image: Union[paddle.Tensor, PIL.Image.Image],
         num_inference_steps: int = 250,
         eta: float = 0.0,
         jump_length: int = 10,
         jump_n_sample: int = 10,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
     ) -> Union[ImagePipelineOutput, Tuple]:
         r"""
         Args:
-            original_image (`paddle.Tensor` or `PIL.Image.Image`):
+            image (`paddle.Tensor` or `PIL.Image.Image`):
                 The original image to inpaint on.
             mask_image (`paddle.Tensor` or `PIL.Image.Image`):
                 The mask_image where 0.0 values define which part of the original image to inpaint (change).
@@ -81,7 +109,7 @@ class RePaintPipeline(DiffusionPipeline):
                 The number of times we will make forward time jump for a given chosen time sample. Take a look at
                 Figure 9 and 10 in https://arxiv.org/pdf/2201.09865.pdf.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             output_type (`str`, *optional*, defaults to `"pil"`):
                 The output format of the generate image. Choose between
                 [PIL](https://pillow.readthedocs.io/en/stable/): `PIL.Image.Image` or `np.array`.
@@ -93,23 +121,34 @@ class RePaintPipeline(DiffusionPipeline):
             `return_dict` is True, otherwise a `tuple. When returning a tuple, the first element is a list with the
             generated images.
         """
+        original_image = _preprocess_image(image)
+        original_image = original_image.cast(self.unet.dtype)
+        mask_image = _preprocess_mask(mask_image)
+        mask_image = mask_image.cast(self.unet.dtype)
 
-        if not isinstance(original_image, paddle.Tensor):
-            original_image = _preprocess_image(original_image)
-        if not isinstance(mask_image, paddle.Tensor):
-            mask_image = _preprocess_mask(mask_image)
+        batch_size = original_image.shape[0]
 
         # sample gaussian noise to begin the loop
-        image = paddle.randn(
-            original_image.shape,
-            generator=generator,
-        )
+        if isinstance(generator, list) and len(generator) != batch_size:
+            raise ValueError(
+                f"You have passed a list of generators of length {len(generator)}, but requested an effective batch"
+                f" size of {batch_size}. Make sure the batch size matches the length of the generators."
+            )
+
+        image_shape = original_image.shape
+        if isinstance(generator, list):
+            shape = (1,) + image_shape[1:]
+            image = [paddle.randn(shape, generator=generator[i], dtype=self.unet.dtype) for i in range(batch_size)]
+            image = paddle.concat(image, axis=0)
+        else:
+            image = paddle.randn(image_shape, generator=generator, dtype=self.unet.dtype)
 
         # set step values
         self.scheduler.set_timesteps(num_inference_steps, jump_length, jump_n_sample)
         self.scheduler.eta = eta
 
         t_last = self.scheduler.timesteps[0] + 1
+        generator = generator[0] if isinstance(generator, list) else generator
         for i, t in enumerate(self.progress_bar(self.scheduler.timesteps)):
             if t < t_last:
                 # predict the noise residual
