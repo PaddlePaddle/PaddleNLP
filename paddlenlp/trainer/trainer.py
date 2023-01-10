@@ -1342,7 +1342,8 @@ class Trainer:
 
         if self.sharding is not None:
             dist.barrier()
-            if self.dp_group.rank == 0:
+            # If only one dp_group, the rank is -1 by default.
+            if self.dp_group.rank <= 0:
                 paddle.save(
                     self.optimizer.state_dict(),
                     os.path.join(output_dir, OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"),
