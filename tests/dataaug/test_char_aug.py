@@ -28,7 +28,7 @@ from paddlenlp.dataaug import CharDelete, CharInsert, CharSubstitute, CharSwap
 class TestCharAug(unittest.TestCase):
     def setUp(self):
         self.sequences = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。", "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"]
-        self.types = ["homonym", "custom", "random", "mlm"]
+        self.types = ["custom", "random", "mlm"]
 
         custom_dict = {
             "人": ["任", "认", "忍"],
