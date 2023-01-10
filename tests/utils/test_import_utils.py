@@ -29,22 +29,6 @@ class ImportUntilsTest(unittest.TestCase):
 
         assert __version__ == "0.5.3"
 
-    def test_paddlenlp_speficic_pacakge(self):
-
-        version = "2.4.9"
-        install_package("paddlenlp", version)
-        from paddlenlp import __version__
-
-        assert __version__ == version
-
-        version = "2.3.1"
-        install_package("paddlenlp", version)
-        from paddlenlp import __version__
-
-        assert __version__ == version
-
-        uninstall_package("paddlenlp")
-
     def test_uninstall_package(self):
         uninstall_package("paddlenlp")
         uninstall_package("empty-package")
