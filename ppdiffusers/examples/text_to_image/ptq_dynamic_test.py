@@ -96,6 +96,29 @@ for i, j, k in indice:
 mnames = list(set(linear_moduels) - set(mnames))
 print(mnames)
 
+
+conv_moduels = get_all_sub_module_names(pipe.unet, "", lambda x: isinstance(x[1], torch.nn.Conv2d))
+indice = itertools.product(range(0, 4), range(3), range(1, 3))
+for i, j, k in indice:
+    mnames += [
+        # f"up_blocks.{i}.attentions.{j}.proj_in",
+        # f"up_blocks.{i}.attentions.{j}.proj_out",
+        f"up_blocks.{i}.resnets.{j}.conv{k}",
+        f"up_blocks.{i}.resnets.{j}.conv_shortcut",
+        f"up_blocks.{i}.upsamplers.{j}.conv",
+    ]
+    mnames += [
+        # f"down_blocks.{i}.attentions.{j}.proj_in",
+        # f"down_blocks.{i}.attentions.{j}.proj_out",
+        f"down_blocks.{i}.resnets.{j}.conv{k}",
+        f"down_blocks.{i}.resnets.{j}.conv_shortcut",
+        f"down_blocks.{i}.downsamplers.{j}.conv",
+    ]
+# mnames += get_all_sub_module_names(pipe.unet.mid_block, "mid_block", lambda x: isinstance(x[1], torch.nn.Linear))
+mnames = list(set(conv_moduels) - set(mnames))
+print(mnames)
+
+
 pnames = [mname + "._packed_params._packed_params" for mname in mnames]
 default_qconfig = torch.quantization.QConfig(
     # activation=torch.quantization.observer.PerChannelMinMaxObserver.with_args(
@@ -109,8 +132,14 @@ default_qconfig = torch.quantization.QConfig(
 )
 qconfig_spec = dict(zip(mnames, itertools.repeat(default_qconfig)))
 # qconfig_spec = dict(zip([torch.nn.Linear], itertools.repeat(default_qconfig)))
+
+mapping = {
+    torch.nn.Linear: torch.nn.quantized.dynamic.Linear,
+    torch.nn.Conv2d: torch.nn.quantized.dynamic.Conv2d,
+}
+
 unet_int8 = torch.quantization.quantize_dynamic(
-    pipe.unet, qconfig_spec, dtype=torch.qint8  # the original model
+    pipe.unet, qconfig_spec, dtype=torch.qint8, mapping=mapping  # the original model
 )  # the target dtype for quantized weights
 unet_fp32 = pipe.unet
 pipe.unet = unet_int8
