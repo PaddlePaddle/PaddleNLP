@@ -597,7 +597,9 @@ class BertCompatibilityTest(unittest.TestCase):
             # 2. forward the paddle model
             from paddlenlp.transformers import BertModel
 
-            paddle_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            paddle_model = BertModel.from_pretrained(
+                "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, cache_dir=tempdir
+            )
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 
@@ -608,6 +610,53 @@ class BertCompatibilityTest(unittest.TestCase):
             torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
             torch_model.eval()
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
+
+    @require_package("transformers", "torch")
+    def test_bert_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import BertModel
+
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel")
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                BertModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_bert_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import BertModel
+
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel")
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel
+
+            paddle_model = BertModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
             self.assertTrue(
                 np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
             )
