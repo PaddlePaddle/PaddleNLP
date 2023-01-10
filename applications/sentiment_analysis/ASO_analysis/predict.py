@@ -15,6 +15,7 @@
 import argparse
 import copy
 import json
+import re
 from collections import defaultdict
 from functools import partial
 
@@ -46,11 +47,17 @@ def concate_aspect_and_opinion(text, aspect, opinions):
     return aspect_text
 
 
+def remove_blanks(example):
+    example["text"] = re.sub(" +", "", example["text"])
+    return example
+
+
 def predict_ext(args):
     # load dict and dataset
     model_name = "skep_ernie_1.0_large_ch"
     ext_label2id, ext_id2label = load_dict(args.ext_label_path)
     datasets = load_dataset("text", data_files={"test": args.test_path})
+    datasets["test"] = datasets["test"].map(remove_blanks)
 
     tokenizer = SkepTokenizer.from_pretrained(model_name)
     trans_func = partial(
