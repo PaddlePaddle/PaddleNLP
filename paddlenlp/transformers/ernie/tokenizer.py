@@ -98,6 +98,7 @@ PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES = {
     "ernie-3.0-tiny-micro-v2-zh": 2048,
     "ernie-3.0-tiny-nano-v2-zh": 2048,
     "ernie-3.0-tiny-pico-v2-zh": 2048,
+    "utc-large": 512,
 }
 
 
@@ -223,6 +224,7 @@ class ErnieTokenizer(PretrainedTokenizer):
             "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2_vocab.txt",
             "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2_vocab.txt",
             "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2_vocab.txt",
+            "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/utc-large/vocab.txt",
         }
     }
     pretrained_init_configuration = {
@@ -296,6 +298,7 @@ class ErnieTokenizer(PretrainedTokenizer):
         "ernie-3.0-tiny-micro-v2-zh": {"do_lower_case": True},
         "ernie-3.0-tiny-nano-v2-zh": {"do_lower_case": True},
         "ernie-3.0-tiny-pico-v2-zh": {"do_lower_case": True},
+        "utc-large": {"do_lower_case": True},
     }
 
     max_model_input_sizes = PRETRAINED_POSITIONAL_EMBEDDINGS_SIZES
