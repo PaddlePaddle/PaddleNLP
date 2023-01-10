@@ -20,7 +20,7 @@ import paddle
 import paddle.nn as nn
 from paddle.nn import Embedding
 
-from .. import PretrainedModel, register_base_model
+from paddlenlp.transformers import PretrainedModel, register_base_model
 
 __all__ = [
     "PegasusModel",
@@ -245,7 +245,14 @@ class PegasusDecoder(PegasusPretrainedModel):
         self.apply(self.init_weights)
 
     def forward(
-        self, decoder_input_ids=None, decoder_attention_mask=None, encoder_output=None, memory_mask=None, cache=None
+        self,
+        decoder_input_ids=None,
+        decoder_attention_mask=None,
+        encoder_output=None,
+        memory_mask=None,
+        cache=None,
+        x=None,
+        mix_ratio=None,
     ):
         """
         The PegasusDecoder forward method, overrides the `__call__()` special method.
@@ -273,7 +280,13 @@ class PegasusDecoder(PegasusPretrainedModel):
                 (paddle.full((decoder_length, decoder_length), -np.inf, dtype=paddle.get_default_dtype())), 1
             )
 
-        decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
+        if x is None:
+            decoder_inputs_embeds = self.embed_tokens(decoder_input_ids) * self.embed_scale
+        else:
+            decoder_inputs_embeds = self.embed_tokens(
+                decoder_input_ids
+            ) * self.embed_scale * mix_ratio + self.embed_scale * x * (1 - mix_ratio)
+
         past_key_values_length = paddle.shape(cache[0][0].k)[2] if cache is not None else 0
         decoder_inputs_embed_pos = self.decoder_embed_positions(
             paddle.shape(decoder_input_ids), past_key_values_length
@@ -294,6 +307,7 @@ class PegasusDecoder(PegasusPretrainedModel):
         else:
             new_cache = None
         decoder_output = self.decoder_layernorm(decoder_output)
+
         return decoder_output, new_cache
 
 
@@ -543,10 +557,12 @@ class PegasusModel(PegasusPretrainedModel):
                 cache = self.decoder.decoder.gen_cache(encoder_output)
         else:
             cache = None
+
         decoder_output, new_cache = self.decoder(
             decoder_input_ids, decoder_attention_mask, encoder_output, attention_mask, cache
         )
-        return decoder_output, new_cache
+
+        return decoder_output, new_cache, encoder_output, attention_mask
 
 
 class PegasusForConditionalGeneration(PegasusPretrainedModel):
@@ -576,28 +592,28 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     def get_decoder(self):
         return self.pegasus.get_decoder()
 
-    def prepare_fast_entry(self, kwargs):
+    def prepare_faster_entry(self, kwargs):
         from paddlenlp.ops import FasterPegasus
 
         decode_strategy = kwargs.get("decode_strategy")
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
-        enable_fast_encoder = kwargs.get("enable_fast_encoder", True)
+        enable_faster_encoder = kwargs.get("enable_faster_encoder", True)
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the fast version."
+                "Topk sampling and topp sampling cannot be both applied in the faster version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the fast version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
-        self._fast_entry = FasterPegasus(
+            # not support for repetition_penalty yet in the faster version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
+        self._faster_entry = FasterPegasus(
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
-            enable_fast_encoder=enable_fast_encoder,
+            enable_faster_encoder=enable_faster_encoder,
         ).forward
-        return self._fast_entry
+        return self._faster_entry
 
     def forward(
         self,
@@ -609,6 +625,9 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
         use_cache=False,
         cache=None,
         labels=None,
+        mode=None,
+        mix_ratio=0,
+        temperature=1,
     ):
         r"""
         The PegasusForConditionalGeneration forward method, overrides the __call__() special method.
@@ -655,19 +674,54 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
                 outputs = model(**inputs)
 
         """
-        output, new_cache = self.pegasus(
+        output, new_cache, encoder_output, attention_mask = self.pegasus(
             input_ids, attention_mask, decoder_input_ids, decoder_attention_mask, encoder_output, use_cache, cache
         )
         lm_logits = paddle.tensor.matmul(output, self.lm_head_weight, transpose_y=True) + self.final_logits_bias
 
+        lm_logits_2 = None
         masked_lm_loss = None
+        if mode == "training" and 0 < mix_ratio < 1:
+            x = lm_logits.clone()
+            length = len(x[0])
+            for idx in range(length - 1, -1, -1):
+                x[:, idx] = x[:, idx - 1]
+            x[:, 0, 2] = 2 * paddle.max(x[:, 0])
+            x = paddle.nn.functional.softmax(x / temperature, axis=2)
+
+            with paddle.no_grad():
+                embed_matrix = self.pegasus.decoder.embed_tokens.weight.clone()
+                decoder_in = paddle.einsum("blv,ve->ble", x, embed_matrix)
+
+            output_2, _ = self.pegasus.decoder(
+                decoder_input_ids,
+                decoder_attention_mask,
+                encoder_output,
+                attention_mask,
+                cache,
+                x=decoder_in,
+                mix_ratio=mix_ratio,
+            )
+            lm_logits_2 = (
+                paddle.tensor.matmul(output_2, self.lm_head_weight, transpose_y=True) + self.final_logits_bias
+            )
+
         if labels is not None:
             loss_fct = nn.CrossEntropyLoss()
             masked_lm_loss = loss_fct(
                 lm_logits.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
             )
+            if mode == "training" and 0 < mix_ratio < 1:
+                masked_lm_loss = (1 - mix_ratio) * masked_lm_loss
+                masked_lm_loss += mix_ratio * loss_fct(
+                    lm_logits_2.reshape((-1, self.pegasus.config["vocab_size"])), labels.reshape((-1,))
+                )
+                loss_fcn = nn.KLDivLoss(reduction="sum")
+                p = paddle.nn.functional.log_softmax(lm_logits_2, axis=2)
+                q = paddle.nn.functional.softmax(lm_logits, axis=2)
+                masked_lm_loss += loss_fcn(p, q)
 
-        return lm_logits, new_cache, masked_lm_loss
+        return masked_lm_loss, lm_logits, lm_logits_2
 
     def prepare_decoder_input_ids_from_labels(self, labels):
         return shift_tokens_right(labels, self.pegasus.pad_token_id, self.pegasus.config["decoder_start_token_id"])
