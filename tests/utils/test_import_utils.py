@@ -31,7 +31,7 @@ class ImportUntilsTest(unittest.TestCase):
 
     def test_paddlenlp_speficic_pacakge(self):
 
-        version = "2.3.9"
+        version = "2.4.9"
         install_package("paddlenlp", version)
         from paddlenlp import __version__
 
