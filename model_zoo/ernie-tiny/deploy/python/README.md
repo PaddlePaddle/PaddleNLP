@@ -173,9 +173,9 @@ FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fas
         <td align=center> use_ascend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> use_paddle_lite_backend() </td>
+        <td align=center> ✅ </td>
         <td align=center> ❔ </td>
-        <td align=center> ❔ </td>
-        <td align=center> ❔ </td>
+        <td align=center> ✅ </td>
     </tr>
     <tr>
         <td align=center> Graphcore IPU </td>

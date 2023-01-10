@@ -199,9 +199,9 @@ FastDeploy在C++端上，提供`fastdeploy::RuntimeOption::UseXXX()`以及`fastd
         <td align=center> use_ascend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
+        <td align=center> ✅ </td>
         <td align=center> ❔ </td>
-        <td align=center> ❔ </td>
-        <td align=center> ❔ </td>
+        <td align=center> ✅ </td>
     </tr>
     <tr>
         <td align=center> Graphcore IPU </td>

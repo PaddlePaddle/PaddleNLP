@@ -56,7 +56,7 @@ DEFINE_bool(use_trt_fp16, false, "Wheter to use FP16 mode.");
 
 void PrintUsage() {
   fastdeploy::FDINFO
-      << "Usage: seq_cls_infer_demo --model_dir dir --device [cpu|gpu] "
+      << "Usage: infer_demo --model_dir dir --device [cpu|gpu] "
          "--backend "
          "[onnx_runtime|paddle|openvino|tensorrt|paddle_tensorrt] "
          "--batch_size size --max_length len --use_trt_fp16 false"
