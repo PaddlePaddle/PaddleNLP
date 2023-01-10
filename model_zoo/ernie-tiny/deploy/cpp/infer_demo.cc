@@ -39,7 +39,6 @@ DEFINE_string(vocab_path, "", "Path of the vocab file.");
 DEFINE_string(added_tokens_path, "", "Path of the added tokens json file.");
 DEFINE_string(slot_label_path, "", "Path of the slot label file.");
 DEFINE_string(intent_label_path, "", "Path of the intent label file.");
-DEFINE_string(test_data_path, "", "The path of the test dataset file.");
 DEFINE_string(device,
               "cpu",
               "Type of inference device, support 'cpu' or 'gpu'.");
@@ -387,18 +386,6 @@ bool GetFilePath(const std::string& path,
   return true;
 }
 
-void ReadDatasetFromTxt(const std::string path,
-                        std::vector<std::string>* dataset) {
-  std::fstream fin(path);
-  std::string text;
-  while (fin >> text) {
-    if (text.length() > 0) {
-      dataset->push_back(text);
-    } else {
-      break;
-    }
-  }
-}
 
 int main(int argc, char* argv[]) {
   google::ParseCommandLineFlags(&argc, &argv, true);
@@ -462,26 +449,6 @@ int main(int argc, char* argv[]) {
     results.clear();
   }
 
-  std::string dataset_path;
-  if (fastdeploy::CheckFileExists(FLAGS_test_data_path)) {
-    std::cout << "Read dataset path from: " << FLAGS_test_data_path
-              << std::endl;
-    texts.clear();
-    results.clear();
-    ReadDatasetFromTxt(FLAGS_test_data_path, &texts);
-    batch_texts.clear();
-    BatchiFyTexts(texts, FLAGS_batch_size, &batch_texts);
-    for (int i = 0; i < batch_texts.size(); ++i) {
-      auto& curr_texts = batch_texts[i];
-      predictor.Predict(curr_texts, &results);
-      for (int k = 0; k < curr_texts.size(); ++k) {
-        std::cout << "No." << i * FLAGS_batch_size + k
-                  << " text = " << curr_texts[k] << std::endl;
-        std::cout << results[k] << std::endl;
-      }
-      results.clear();
-    }
-  }
 
   return 0;
 }

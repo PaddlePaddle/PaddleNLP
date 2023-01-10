@@ -28,7 +28,6 @@ def parse_arguments():
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
     parser.add_argument("--slot_label_path", type=str, default="", help="Path of the slot label file.")
     parser.add_argument("--intent_label_path", type=str, default="", help="Path of the intent label file.")
-    parser.add_argument("--test_data_path", type=str, default="", help="The path of the test dataset file.")
     parser.add_argument("--model_prefix", type=str, default="infer_model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
@@ -214,16 +213,3 @@ if __name__ == "__main__":
             print(f"No. {j} text = {data[j]}")
             print(out)
             j += 1
-
-    if os.path.exists(args.test_data_path):
-        with open(args.test_data_path, "r") as f:
-            print(f"Read test dataset path from: {args.test_data_path}")
-            data = [text.rstrip("\n") for text in f]
-            batch_data = batchify_text(data, args.batch_size)
-            j = 0
-            for batch in batch_data:
-                output = predictor.predict(batch)
-                for out in output:
-                    print(f"No. {j} text = {data[j]}")
-                    print(out)
-                    j += 1

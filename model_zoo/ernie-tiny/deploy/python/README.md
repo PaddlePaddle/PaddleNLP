@@ -83,7 +83,6 @@ No. 2 text = 到信阳市汽车配件城
 |--model_dir | 指定部署模型的目录。支持传入Paddle INT8新格式量化模型。 |
 |--slot_label_path| 指定的slot label文件路径 |
 |--intent_label_path| 指定的intent label文件路径 |
-|--test_data_path| 指定的测试集路径，默认为空。 |
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
 |--use_trt_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
