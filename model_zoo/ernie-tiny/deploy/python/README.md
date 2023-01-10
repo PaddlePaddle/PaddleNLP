@@ -90,6 +90,104 @@ No. 2 text = 到信阳市汽车配件城
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
 |--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'infer_model'|
 
+## FastDeploy 高阶用法
+
+FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fastdeploy.RuntimeOption.use_xxx_backend()`接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署ERNIE 3.0 Tiny模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署ERNIE 3.0 Tiny模型。
+
+符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
+
+<table>
+    <tr>
+        <td align=center> 硬件</td>
+        <td align=center> 硬件对应的接口</td>
+        <td align=center> 可用的推理引擎  </td>
+        <td align=center> 推理引擎对应的接口 </td>
+        <td align=center> 是否支持ERNIE 3.0 Tiny模型 </td>
+        <td align=center> 是否支持Paddle新格式量化模型 </td>
+        <td align=center> 是否支持FP16模式 </td>
+    </tr>
+    <tr>
+        <td rowspan=3 align=center> CPU </td>
+        <td rowspan=3 align=center> use_cpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> use_ort_backend() </td>
+      <td align=center> ✅ </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> OpenVINO </td>
+      <td align=center> use_openvino_backend() </td>
+      <td align=center> ✅ </td>
+      <td align=center> ❔ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+        <td rowspan=4 align=center> GPU </td>
+        <td rowspan=4 align=center> use_gpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> use_ort_backend() </td>
+      <td align=center> ✅ </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  ❔ </td>
+    </tr>
+    <tr>
+      <td align=center> Paddle TensorRT </td>
+      <td align=center> use_trt_backend() + enable_paddle_to_trt() </td>
+      <td align=center> ✅  </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> TensorRT </td>
+      <td align=center> use_trt_backend() </td>
+      <td align=center> ✅  </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 昆仑芯 XPU </td>
+        <td align=center> use_kunlunxin() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> use_paddle_lite_backend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+        <td align=center> 华为 昇腾 </td>
+        <td align=center> use_ascend() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> use_paddle_lite_backend() </td>
+        <td align=center> ❔ </td>
+        <td align=center> ❔ </td>
+        <td align=center> ❔ </td>
+    </tr>
+    <tr>
+        <td align=center> Graphcore IPU </td>
+        <td align=center> use_ipu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> use_paddle_infer_backend() </td>
+        <td align=center> ❔ </td>
+        <td align=center> ❔ </td>
+        <td align=center> N/A </td>
+    </tr>
+</table>
+
 ## 相关文档
 
 [ERNIE 3.0 Tiny模型详细介绍](../../README.md)
