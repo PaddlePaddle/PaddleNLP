@@ -67,7 +67,7 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 - **ERNIE 3.0-Tiny-_Mini_** (_6-layer, 384-hidden, 12-heads_)
 - **ERNIE 3.0-Tiny-_Micro_** (_4-layer, 384-hidden, 12-heads_)
 - **ERNIE 3.0-Tiny-_Nano_** (_4-layer, 312-hidden, 12-heads_)
-- **ERNIE 3.0-Tiny-_Pico_** (_4-layer, 312-hidden, 2-heads_)
+- **ERNIE 3.0-Tiny-_Pico_** (_3-layer, 128-hidden, 2-heads_)
 
 其中，v2 版本开源了 6 个大小的模型，v1 版本开源了前 5 个 大小的模型。
 
@@ -639,7 +639,7 @@ python run_train.py \
 
 ## ⚡️FastDeplopy 部署
 
-FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目提供了对 ERNIE 3.0 Tiny 使用 FastDeploy 云边端高性能部署的示例代码和文档，欢迎参考 [ERNIE 3.0 Tiny 模型高性能部署文档](deploy/README.md)。
+FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目提供了对 ERNIE 3.0 Tiny 使用 FastDeploy 云边端部署的示例代码和文档，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。
 
 以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 

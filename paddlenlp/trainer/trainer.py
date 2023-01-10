@@ -1255,10 +1255,10 @@ class Trainer:
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
         """
-        if self.criterion is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        elif self.criterion is not None:
-            if "start_positions" in inputs and "end_positions" in inputs:
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+            elif "start_positions" in inputs and "end_positions" in inputs:
                 labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
             elif self.label_names is not None:
                 labels = []
