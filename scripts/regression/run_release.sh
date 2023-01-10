@@ -75,7 +75,13 @@ get_diff_TO_P0case
         let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"
-cd ${nlp_dir}/logs
+cd ${nlp_dir}/model_logs/
+FF=`ls *_FAIL*|wc -l`
+if [ "${FF}" -gt "0" ];then
+    P0case_EXCODE=1
+else
+    P0case_EXCODE=0
+fi
 if [ $P0case_EXCODE -ne 0 ] ; then
     cd logs
     FF=`ls *_FAIL*|wc -l`

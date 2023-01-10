@@ -575,7 +575,6 @@ class Transformer2DModelTests(unittest.TestCase):
         spatial_transformer_block = Transformer2DModel(num_attention_heads=1, attention_head_dim=32, in_channels=32)
 
         assert spatial_transformer_block.transformer_blocks[0].norm1.__class__ == nn.LayerNorm
-        assert spatial_transformer_block.transformer_blocks[0].norm2.__class__ == nn.LayerNorm
         assert spatial_transformer_block.transformer_blocks[0].norm3.__class__ == nn.LayerNorm
 
     def test_spatial_transformer_ada_norm_layers(self):
@@ -587,7 +586,6 @@ class Transformer2DModelTests(unittest.TestCase):
         )
 
         assert spatial_transformer_block.transformer_blocks[0].norm1.__class__ == AdaLayerNorm
-        assert spatial_transformer_block.transformer_blocks[0].norm2.__class__ == AdaLayerNorm
         assert spatial_transformer_block.transformer_blocks[0].norm3.__class__ == nn.LayerNorm
 
     def test_spatial_transformer_default_ff_layers(self):

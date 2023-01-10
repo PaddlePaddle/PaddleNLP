@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -214,7 +214,7 @@ class VQDiffusionScheduler(SchedulerMixin, ConfigMixin):
         model_output: paddle.Tensor,
         timestep: paddle.Tensor,
         sample: paddle.Tensor,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[VQDiffusionSchedulerOutput, Tuple]:
         """

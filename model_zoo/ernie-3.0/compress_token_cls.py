@@ -16,10 +16,10 @@ from functools import partial
 
 import paddle
 import paddle.nn as nn
-from datasets import load_dataset
 from utils import DataArguments, ModelArguments, load_config, token_convert_example
 
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import CompressionArguments, PdArgumentParser, Trainer
 from paddlenlp.transformers import ErnieForTokenClassification, ErnieTokenizer
 
@@ -41,7 +41,7 @@ def main():
     compression_args.print_config(data_args, "Data")
 
     raw_datasets = load_dataset(data_args.dataset)
-    label_list = raw_datasets["train"].features["ner_tags"].feature.names
+    label_list = raw_datasets["train"].label_list
     data_args.label_list = label_list
     data_args.ignore_label = -100
 
