@@ -12,13 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .base_handler import BaseModelHandler, BasePostHandler, BaseTaskflowHandler
-from .cls_post_handler import (
-    MultiClassificationPostHandler,
-    MultiLabelClassificationPostHandler,
+from paddlenlp import SimpleServer
+from paddlenlp.server import MultiClassificationPostHandler, SingleInputModelHandler
+
+app = SimpleServer()
+app.register(
+    "models/ernie_m_cls",
+    model_path="../../finetuned_models/export",
+    tokenizer_name="ernie-m-base",
+    model_handler=SingleInputModelHandler,
+    post_handler=MultiClassificationPostHandler,
 )
-from .custom_model_handler import CustomModelHandler
-from .qa_model_handler import QAModelHandler
-from .single_input_model_handler import SingleInputModelHandler
-from .taskflow_handler import TaskflowHandler
-from .token_model_handler import TokenClsModelHandler

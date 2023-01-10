@@ -301,10 +301,6 @@ def do_train():
     if training_args.do_export:
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
-        # input_spec = [
-        #     paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # input_ids
-        #     paddle.static.InputSpec(shape=[None, None], dtype="int64"),  # segment_ids
-        # ]
         input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64")]
         model_args.export_model_dir = os.path.join(model_args.export_model_dir, "export")
         paddlenlp.transformers.export_model(
