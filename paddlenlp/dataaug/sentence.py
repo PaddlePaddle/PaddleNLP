@@ -60,22 +60,9 @@ class SentenceGenerate:
         self.max_length = max_length
         self.top_p = top_p
 
-        if isinstance(self.model_name, str):
-            if self.model_name in [
-                "roformer-chinese-sim-char-ft-base",
-                "roformer-chinese-sim-char-base",
-                "roformer-chinese-sim-char-ft-small",
-                "roformer-chinese-sim-char-small",
-            ]:
-                self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
-                self.model.eval()
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-            else:
-                raise ValueError(
-                    "model_name: {} should be one of ['roformer-chinese-sim-char-ft-base', 'roformer-chinese-sim-char-ft-base', 'roformer-chinese-sim-char-base', roformer-chinese-sim-char-ft-small', 'roformer-chinese-sim-char-small']".format(
-                        model_name
-                    )
-                )
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+        self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
 
     def augment(self, sequences):
         """
@@ -224,6 +211,8 @@ class SentenceBackTranslate:
         num_beams=4,
         use_faster=True,
         decode_strategy="beam_search",
+        from_model_name=None,
+        to_model_name=None,
     ):
         self.src_lang = src_lang
         self.tgt_lang = tgt_lang
@@ -232,6 +221,8 @@ class SentenceBackTranslate:
         self.num_beams = num_beams
         self.use_faster = use_faster
         self.decode_strategy = decode_strategy
+        self.from_model_name = from_model_name
+        self.to_model_name = to_model_name
         self.MBART_MAP = {
             "ar": "ar_AR",
             "cs": "cs_CZ",
@@ -286,13 +277,17 @@ class SentenceBackTranslate:
             "gl": "gl_ES",
             "sl": "sl_SI",
         }
+        if self.from_model_name is None:
+            if tgt_lang == "en":
+                self.from_model_name = "mbart-large-50-many-to-one-mmt"
+            else:
+                self.from_model_name = "mbart-large-50-many-to-many-mmt"
 
-        if tgt_lang == "en":
-            self.from_model_name = "mbart-large-50-many-to-one-mmt"
-            self.to_model_name = "mbart-large-50-one-to-many-mmt"
-        else:
-            self.from_model_name = "mbart-large-50-many-to-many-mmt"
-            self.to_model_name = "mbart-large-50-many-to-many-mmt"
+        if to_model_name is None:
+            if tgt_lang == "en":
+                self.to_model_name = "mbart-large-50-one-to-many-mmt"
+            else:
+                self.to_model_name = "mbart-large-50-many-to-many-mmt"
 
         self.from_model = AutoModelForConditionalGeneration.from_pretrained(self.from_model_name)
         self.to_model = AutoModelForConditionalGeneration.from_pretrained(self.to_model_name)
@@ -314,7 +309,7 @@ class SentenceBackTranslate:
             sequences = [sequences]
         sequences = self._translate(self.from_model, self.from_tokenizer, sequences, self.tgt_lang)
         sequences = self._translate(self.to_model, self.to_tokenizer, sequences, self.src_lang)
-        return sequences
+        return [[sequence] for sequence in sequences]
 
     @paddle.no_grad()
     def _translate(self, model, tokenizer, sequences, lang):
@@ -337,7 +332,7 @@ class SentenceBackTranslate:
                     eos_pos = len(output) - 1
                 else:
                     eos_pos = eos[0]
-                translated_texts.append([tokenizer.convert_ids_to_string(output[1:eos_pos])])
+                translated_texts.append(tokenizer.convert_ids_to_string(output[1:eos_pos]))
         return translated_texts
 
 
@@ -487,7 +482,7 @@ class SentenceContinue:
         max_length=64,
         decode_strategy="sampling",
         use_faster=False,
-        create_n=5,
+        create_n=1,
         top_k=50,
         temperature=1.0,
         top_p=0.9,
@@ -502,20 +497,11 @@ class SentenceContinue:
         self.temperature = temperature
         self.top_p = top_p
         self.batch_size = batch_size
-        if isinstance(self.model_name, str):
-            if self.model_name in ["gpt-cpm-large-cn", "gpt-cpm-small-cn-distill"]:
-                self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
-                self.model.eval()
-                self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
-                self.tokenizer.add_special_tokens(
-                    {"pad_token": self.tokenizer.convert_ids_to_tokens(self.model.pad_token_id)}
-                )
-            else:
-                raise ValueError(
-                    "model_name: {} should be one of ['gpt-cpm-large-cn', 'gpt-cpm-small-cn-distill']".format(
-                        model_name
-                    )
-                )
+
+        self.model = AutoModelForCausalLM.from_pretrained(self.model_name)
+        self.model.eval()
+        self.tokenizer = AutoTokenizer.from_pretrained(self.model_name)
+        self.tokenizer.add_special_tokens({"pad_token": self.tokenizer.convert_ids_to_tokens(self.model.pad_token_id)})
 
     def augment(self, sequences):
         """

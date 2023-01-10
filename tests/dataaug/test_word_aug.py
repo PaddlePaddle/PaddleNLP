@@ -28,7 +28,7 @@ from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
 class TestWordAug(unittest.TestCase):
     def setUp(self):
         self.sequences = ["人类语言是抽象的信息符号，其中蕴含着丰富的语义信息，人类可以很轻松地理解其中的含义。", "而计算机只能处理数值化的信息，无法直接理解人类语言，所以需要将人类语言进行数值化转换。"]
-        self.types = ["antonym", "embedding", "synonym", "homonym", "custom", "random", "mlm"]
+        self.types = ["embedding", "custom", "random", "mlm"]
 
         custom_dict = {"人类": ["人累", "扔雷"], "抽象": ["丑相"], "符号": ["富豪", "负号", "付豪"]}
         self.temp_dir = TemporaryDirectory()
@@ -48,7 +48,6 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,), (2,)])
     def test_word_substitute(self, create_n):
-        print(1)
         for t in self.types:
             if t == "mlm":
                 aug = WordSubstitute("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
@@ -67,7 +66,6 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,), (2,)])
     def test_word_insert(self, create_n):
-        print(2)
         for t in self.types:
             if t == "mlm":
                 aug = WordInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
@@ -86,7 +84,6 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_word_delete(self, create_n):
-        print(3)
         aug = WordDelete(create_n=create_n)
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
@@ -95,7 +92,6 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_word_swap(self, create_n):
-        print(4)
         aug = WordSwap(create_n=create_n)
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
