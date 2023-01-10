@@ -36,6 +36,6 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 
 ## **3. 快速开始**
 
-- 👉 [基于UIE的情感分析方案](./unified_sentiment_extraction/README)
+- 👉 [基于UIE的情感分析方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction)
 
-- 👉 [基于SKEP的情感分析方案](./ASO_analysis/README)
+- 👉 [基于SKEP的情感分析方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/ASO_analysis)
