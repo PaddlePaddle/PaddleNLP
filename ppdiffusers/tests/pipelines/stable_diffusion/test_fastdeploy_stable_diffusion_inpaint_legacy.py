@@ -22,8 +22,8 @@ from ppdiffusers import FastDeployStableDiffusionInpaintPipelineLegacy
 from ppdiffusers.utils.testing_utils import (
     is_fastdeploy_available,
     load_image,
+    nightly,
     require_fastdeploy,
-    slow,
 )
 
 if is_fastdeploy_available():
@@ -43,12 +43,13 @@ def create_runtime_option(device_id=-1, backend="paddle"):
     return option
 
 
+@require_fastdeploy
 class FastDeployStableDiffusionInpaintPipelineLegacyFastTests(FastDeployPipelineTesterMixin, unittest.TestCase):
     # FIXME: add fast tests
     pass
 
 
-@slow
+@nightly
 @require_fastdeploy
 class FastDeployStableDiffusionInpaintPipelineLegacyIntegrationTests(FastDeployPipelineTesterMixin):
     @property

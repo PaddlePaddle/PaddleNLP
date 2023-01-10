@@ -21,7 +21,7 @@ from diffusers import (
     StableDiffusionUpscalePipeline as DiffusersStableDiffusionUpscalePipeline,
 )
 
-from paddlenlp.transformers import CLIPTextModel, CLIPTokenizer
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel, CLIPTokenizer
 from ppdiffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -129,15 +129,17 @@ def convert_diffusers_stable_diffusion_to_ppdiffusers(pretrained_model_name_or_p
     max_noise_level = diffusers_pipe.max_noise_level
 
     # 1. vae
-    pp_vae = AutoencoderKL(**diffusers_pipe.vae.config)
+    pp_vae = AutoencoderKL.from_config(diffusers_pipe.vae.config)
+
     pp_vae.set_dict(vae_state_dict)
 
     # 2. unet
-    pp_unet = UNet2DConditionModel(**diffusers_pipe.unet.config)
+    pp_unet = UNet2DConditionModel.from_config(diffusers_pipe.unet.config)
+
     pp_unet.set_dict(unet_state_dict)
 
     # 3. text_encoder
-    pp_text_encoder = CLIPTextModel(**text_encoder_config)
+    pp_text_encoder = CLIPTextModel(CLIPTextConfig.from_dict(text_encoder_config))
     pp_text_encoder.set_dict(text_encoder_state_dict)
 
     # 4. scheduler

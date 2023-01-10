@@ -14,7 +14,6 @@
 # limitations under the License.
 
 import gc
-import random
 import unittest
 
 import numpy as np
@@ -33,29 +32,15 @@ from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
     RobertaSeriesConfig,
     RobertaSeriesModelWithTransformation,
 )
-from ppdiffusers.utils import floats_tensor, slow
+from ppdiffusers.utils import slow
 
 
 class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
-    def tearDown(self):
-        # clean up the VRAM after each test
-        super().tearDown()
-        gc.collect()
-        paddle.device.cuda.empty_cache()
+    pipeline_class = AltDiffusionPipeline
 
-    @property
-    def dummy_image(self):
-        batch_size = 1
-        num_channels = 3
-        sizes = (32, 32)
-
-        image = floats_tensor((batch_size, num_channels) + sizes, rng=random.Random(0))
-        return image
-
-    @property
-    def dummy_cond_unet(self):
+    def get_dummy_components(self):
         paddle.seed(0)
-        model = UNet2DConditionModel(
+        unet = UNet2DConditionModel(
             block_out_channels=(32, 64),
             layers_per_block=2,
             sample_size=64,
@@ -65,27 +50,15 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             up_block_types=("CrossAttnUpBlock2D", "UpBlock2D"),
             cross_attention_dim=32,
         )
-        return model
-
-    @property
-    def dummy_cond_unet_inpaint(self):
-        paddle.seed(0)
-        model = UNet2DConditionModel(
-            block_out_channels=(32, 64),
-            layers_per_block=2,
-            sample_size=64,
-            in_channels=9,
-            out_channels=4,
-            down_block_types=("DownBlock2D", "CrossAttnDownBlock2D"),
-            up_block_types=("CrossAttnUpBlock2D", "UpBlock2D"),
-            cross_attention_dim=32,
+        scheduler = DDIMScheduler(
+            beta_start=0.00085,
+            beta_end=0.012,
+            beta_schedule="scaled_linear",
+            clip_sample=False,
+            set_alpha_to_one=False,
         )
-        return model
-
-    @property
-    def dummy_vae(self):
         paddle.seed(0)
-        model = AutoencoderKL(
+        vae = AutoencoderKL(
             block_out_channels=[32, 64],
             in_channels=3,
             out_channels=3,
@@ -93,10 +66,6 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             up_block_types=["UpDecoderBlock2D", "UpDecoderBlock2D"],
             latent_channels=4,
         )
-        return model
-
-    @property
-    def dummy_text_encoder(self):
         paddle.seed(0)
         config = RobertaSeriesConfig(
             hidden_size=32,
@@ -108,69 +77,46 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             vocab_size=5002,
             return_dict=True,
         )
-        model = RobertaSeriesModelWithTransformation(config)
-        model.eval()
-        return model
+        text_encoder = RobertaSeriesModelWithTransformation(config)
+        text_encoder.eval()
 
-    @property
-    def dummy_extractor(self):
-        def extract(*args, **kwargs):
-            class Out:
-                def __init__(self):
-                    self.pixel_values = paddle.ones([0])
+        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta", model_max_length=77)
 
-                def to(self, *args, **kwargs):
-                    return self
+        components = {
+            "unet": unet,
+            "scheduler": scheduler,
+            "vae": vae,
+            "text_encoder": text_encoder,
+            "tokenizer": tokenizer,
+            "safety_checker": None,
+            "feature_extractor": None,
+        }
+        return components
 
-            return Out()
-
-        return extract
+    def get_dummy_inputs(self, seed=0):
+        generator = paddle.Generator().manual_seed(seed)
+        inputs = {
+            "prompt": "A painting of a squirrel eating a burger",
+            "generator": generator,
+            "num_inference_steps": 2,
+            "guidance_scale": 6.0,
+            "output_type": "numpy",
+        }
+        return inputs
 
     def test_alt_diffusion_ddim(self):
-        unet = self.dummy_cond_unet
-        scheduler = DDIMScheduler(
-            beta_start=0.00085,
-            beta_end=0.012,
-            beta_schedule="scaled_linear",
-            clip_sample=False,
-            set_alpha_to_one=False,
-        )
-
-        vae = self.dummy_vae
-        bert = self.dummy_text_encoder
-        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta")
-        tokenizer.model_max_length = 77
-
+        components = self.get_dummy_components()
+        paddle.seed(0)
         # make sure here that pndm scheduler skips prk
-        alt_pipe = AltDiffusionPipeline(
-            unet=unet,
-            scheduler=scheduler,
-            vae=vae,
-            text_encoder=bert,
-            tokenizer=tokenizer,
-            safety_checker=None,
-            feature_extractor=self.dummy_extractor,
-        )
+        alt_pipe = AltDiffusionPipeline(**components)
         alt_pipe.set_progress_bar_config(disable=None)
 
-        prompt = "A photo of an astronaut"
-
-        generator = paddle.Generator().manual_seed(0)
-        output = alt_pipe([prompt], generator=generator, guidance_scale=6.0, num_inference_steps=2, output_type="np")
+        inputs = self.get_dummy_inputs()
+        inputs["prompt"] = "A photo of an astronaut"
+        output = alt_pipe(**inputs)
         image = output.images
 
-        generator = paddle.Generator().manual_seed(0)
-        image_from_tuple = alt_pipe(
-            [prompt],
-            generator=generator,
-            guidance_scale=6.0,
-            num_inference_steps=2,
-            output_type="np",
-            return_dict=False,
-        )[0]
-
         image_slice = image[0, -3:, -3:, -1]
-        image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array(
@@ -187,46 +133,20 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
     def test_alt_diffusion_pndm(self):
-        unet = self.dummy_cond_unet
-        scheduler = PNDMScheduler(skip_prk_steps=True)
-        vae = self.dummy_vae
-        bert = self.dummy_text_encoder
-        tokenizer = XLMRobertaTokenizer.from_pretrained("hf-internal-testing/tiny-xlm-roberta")
-        tokenizer.model_max_length = 77
+        components = self.get_dummy_components()
+        components["scheduler"] = PNDMScheduler(skip_prk_steps=True)
 
         # make sure here that pndm scheduler skips prk
-        alt_pipe = AltDiffusionPipeline(
-            unet=unet,
-            scheduler=scheduler,
-            vae=vae,
-            text_encoder=bert,
-            tokenizer=tokenizer,
-            safety_checker=None,
-            feature_extractor=self.dummy_extractor,
-        )
+        alt_pipe = AltDiffusionPipeline(**components)
         alt_pipe.set_progress_bar_config(disable=None)
 
-        prompt = "A painting of a squirrel eating a burger"
-        generator = paddle.Generator().manual_seed(0)
-        output = alt_pipe([prompt], generator=generator, guidance_scale=6.0, num_inference_steps=2, output_type="np")
-
+        inputs = self.get_dummy_inputs()
+        output = alt_pipe(**inputs)
         image = output.images
 
-        generator = paddle.Generator().manual_seed(0)
-        image_from_tuple = alt_pipe(
-            [prompt],
-            generator=generator,
-            guidance_scale=6.0,
-            num_inference_steps=2,
-            output_type="np",
-            return_dict=False,
-        )[0]
-
         image_slice = image[0, -3:, -3:, -1]
-        image_from_tuple_slice = image_from_tuple[0, -3:, -3:, -1]
 
         assert image.shape == (1, 128, 128, 3)
         expected_slice = np.array(
@@ -243,7 +163,6 @@ class AltDiffusionPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             ]
         )
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2
-        assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
 
 @slow

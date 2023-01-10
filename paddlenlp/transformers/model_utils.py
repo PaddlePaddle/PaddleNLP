@@ -56,6 +56,7 @@ from paddlenlp.utils.env import (
     HF_CACHE_HOME,
     LEGACY_CONFIG_NAME,
     MODEL_HOME,
+    PADDLE_WEIGHT_FILE_NAME,
     PYTORCH_WEIGHT_FILE_NAME,
 )
 from paddlenlp.utils.log import logger
@@ -103,7 +104,7 @@ def get_parameter_dtype(parameter: nn.Layer) -> paddle.dtype:
 
 def _find_weight_file_path(
     cache_dir: str, model_class: Type[PretrainedModel], resource_uri: Optional[str] = None
-) -> str:
+) -> str | None:
     """find the target weight file under the cache dir, because there are some conflicts about weight file names.
 
     Args:
@@ -134,11 +135,13 @@ def _find_weight_file_path(
         )
         return os.path.join(cache_dir, weight_file_names[0])
 
-    raise ValueError(
-        'can"t find the target weight files<%s> or <%s> under the cache_dir<%s>',
-        resouce_uri_file_name,
-        resource_weight_file_name,
-        cache_dir,
+    # 4. try to find pytorch model weight file under cache_dir
+    pytorch_model_weight_file = os.path.join(cache_dir, PYTORCH_WEIGHT_FILE_NAME)
+    if os.path.isfile(pytorch_model_weight_file):
+        return pytorch_model_weight_file
+
+    raise FileNotFoundError(
+        f"can not find paddle weight file<model_state.pdparams> and pytorch pytorch weight file<pytorch_model.bin> under <{cache_dir}>"
     )
 
 
@@ -977,13 +980,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if os.path.isfile(pretrained_model_name_or_path):
             return pretrained_model_name_or_path
 
-        # 1. when it's from HF
-        if from_hf_hub:
-            return resolve_weight_file_from_hf_hub(
-                pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
-            )
-
-        # 2. when it is model-name
+        # 1. when it is model-name
         if pretrained_model_name_or_path in cls.pretrained_init_configuration:
             # check the cache_dir:
             os.makedirs(cache_dir, exist_ok=True)
@@ -998,7 +995,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 pretrained_model_name_or_path
             ]
 
-        # 3. when it is url
+        # 2. when it is url
         if is_url(pretrained_model_name_or_path):
             weight_file_path = get_path_from_url_with_filelock(pretrained_model_name_or_path, cache_dir)
             # # check the downloaded weight file and registered weight file name
@@ -1025,15 +1022,20 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
             return weight_file_path
 
-        # 4. when it is local dir
+        # 3. when it is local dir
         if os.path.isdir(pretrained_model_name_or_path):
             # in-order to compatible with old style:
             # file name in pretrained_resouce_file_maps is https://path/to/bert-base-uncased.pdparams, but the registered model-state file name in `resouce_file_maps` is `model_state.pdparams`
 
-            weight_file_path = _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
+            return _find_weight_file_path(cache_dir=pretrained_model_name_or_path, model_class=cls)
 
-            if os.path.exists(weight_file_path):
-                return weight_file_path
+        # 4. when it's from HF
+        if from_hf_hub:
+            return resolve_weight_file_from_hf_hub(
+                pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
+            )
+
+        # 5. download from community or hf-hub
         else:
             # assume that the community-based models, name format: community/model-name
             community_model_file_path = os.path.join(
@@ -1050,14 +1052,12 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
                 f"so try to download model from: https://huggingface.co/{pretrained_model_name_or_path}."
             )
 
-            # download weight file from hf hub
-            return resolve_weight_file_from_hf_hub(
-                repo_id=pretrained_model_name_or_path, cache_dir=HF_CACHE_HOME, support_conversion=support_conversion
-            )
+            if ENABLE_TORCH_CHECKPOINT:
+                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> or <{PYTORCH_WEIGHT_FILE_NAME}> not found"
+            else:
+                msg = f"weight file<{PADDLE_WEIGHT_FILE_NAME}> not found"
 
-        raise FileNotFoundError(
-            "can't resolve the model_state file according to the <%s>", pretrained_model_name_or_path
-        )
+            raise FileNotFoundError(msg)
 
     @classmethod
     def _load_pretrained_model(
@@ -1301,11 +1301,7 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if not os.path.exists(os.path.join(cache_dir, CONFIG_NAME)):
             config.save_pretrained(cache_dir)
 
-        # 2. init the model
-        init_args = config["init_args"] or ()
-        model = cls(config, *init_args, **model_kwargs)
-
-        # 3. resolve model_weight file
+        # 2. resolve model_weight file
         support_conversion = cls.support_conversion(config) and ENABLE_TORCH_CHECKPOINT
 
         model_weight_file = cls._resolve_model_file_path(
@@ -1318,15 +1314,24 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
         if model_weight_file.endswith(PYTORCH_WEIGHT_FILE_NAME):
             if support_conversion:
                 # try to get the name-mapping info
+                logger.info(
+                    f"start to convert pytorch weight file<{model_weight_file}> to "
+                    f"paddle weight file<{os.path.join(cache_dir, PADDLE_WEIGHT_FILE_NAME)}> ..."
+                )
                 model_state_dict = cls.convert(model_weight_file, config, cache_dir)
             else:
                 raise ValueError(
                     f"download the {PYTORCH_WEIGHT_FILE_NAME} weight file, but model<{cls}> "
-                    "don't support conversion from pytorch weight file to paddle weight file"
+                    "don't support conversion from pytorch weight file to paddle weight file "
+                    "or conversion is been disabled by `ENABLE_TORCH_CHECKPOINT` environment variable"
                 )
         else:
             # 4. loading the state dict
             model_state_dict = paddle.load(model_weight_file, return_numpy=load_state_as_np)
+
+        # 3. init the model
+        init_args = config["init_args"] or ()
+        model = cls(config, *init_args, **model_kwargs)
 
         loaded_state_dict_keys = list(model_state_dict.keys())
         # TODO(wj-Mcat): load shard checkpoint weight file, refer to: https://github.com/huggingface/transformers/pull/16343
