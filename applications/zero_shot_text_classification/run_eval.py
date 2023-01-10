@@ -33,7 +33,7 @@ from paddlenlp.transformers import UTC, AutoTokenizer
 
 @dataclass
 class DataArguments:
-    test_path: str = field(default=None, metadata={"help": "Test dataset file name."})
+    test_path: str = field(default="./data/test.txt", metadata={"help": "Test dataset file name."})
     threshold: float = field(default=0.5, metadata={"help": "The threshold to produce predictions."})
 
 

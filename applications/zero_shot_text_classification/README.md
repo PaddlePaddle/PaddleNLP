@@ -184,7 +184,7 @@ python run_eval.py \
     --test_path ./data/test.txt \
     --per_device_eval_batch_size 2 \
     --max_seq_len 512 \
-    --output_dir ./checkpoint_test \
+    --output_dir ./checkpoint_test
 ```
 
 可配置参数说明：
