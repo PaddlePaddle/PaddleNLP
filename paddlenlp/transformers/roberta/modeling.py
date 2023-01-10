@@ -13,22 +13,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from ...utils.converter import StateDictNameMapping
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 
@@ -123,6 +123,82 @@ class RobertaPretrainedModel(PretrainedModel):
         }
     }
     base_model_prefix = "roberta"
+
+    @classmethod
+    def _get_name_mappings(cls, config: RobertaConfig) -> list[StateDictNameMapping]:
+        mappings = [
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
+            ["pooler.dense.bias", "pooler.dense.bias"],
+        ]
+
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            mappings.extend(layer_mappings)
+        return [StateDictNameMapping(*mapping) for mapping in mappings]
 
     def init_weights(self, layer):
         """Initialization hook"""

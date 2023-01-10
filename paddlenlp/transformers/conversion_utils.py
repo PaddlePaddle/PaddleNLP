@@ -270,6 +270,12 @@ class StateDictNameMapping:
             shape = tensor.shape
             assert len(shape) == 3
             return np.reshape(tensor, [shape[0], -1])
+        if self.action == "split":
+            assert self.index is not None, "when action is `split`, index field is required."
+
+            # qkv is stored in same tensor, so it should be split into 3 arr
+            tensors = np.split(tensor, 3, axis=-1)
+            return tensors[self.index]
         return tensor
 
     def matched(self, text: str) -> bool:
