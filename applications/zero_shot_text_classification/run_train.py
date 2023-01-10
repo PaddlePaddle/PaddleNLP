@@ -33,7 +33,8 @@ from paddlenlp.transformers import UTC, AutoTokenizer, export_model
 @dataclass
 class DataArguments:
     dataset_path: str = field(
-        metadata={"help": "Local dataset directory including train.txt, dev.txt and label.txt (optional)."}
+        default="./data",
+        metadata={"help": "Local dataset directory including train.txt, dev.txt and label.txt (optional)."},
     )
     train_file: str = field(default="train.txt", metadata={"help": "Train dataset file name."})
     dev_file: str = field(default="dev.txt", metadata={"help": "Dev dataset file name."})
