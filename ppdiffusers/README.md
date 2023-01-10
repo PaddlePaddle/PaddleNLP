@@ -152,7 +152,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 </details>
 
 
-### 文生图 （Text-to-Image Generation）
+### 文图生成 （Text-to-Image Generation）
 
 ```python
 import paddle
@@ -178,7 +178,7 @@ image.save("shiba_dog_with_a_red_cap.png")
 <img width="500" alt="image" src="https://user-images.githubusercontent.com/50394665/204796701-d7911f76-8670-47d5-8d1b-8368b046c5e4.png">
 </div>
 
-### 基于文本引导的图生图（Image-to-Image Text-Guided Generation）
+### 文本引导的图像变换（Image-to-Image Text-Guided Generation）
 
 <details><summary>&emsp;Image-to-Image Text-Guided Generation Demo </summary>
 
@@ -212,7 +212,7 @@ image.save("image_Kurisu_img2img.png")
 </div>
 </details>
 
-### 基于文本引导的图像编辑（Text-Guided Image Inpainting）
+### 文本引导的图像编辑（Text-Guided Image Inpainting）
 
 注意！当前有两种版本的图像编辑代码，一个是Legacy版本，一个是正式版本，下面将分别介绍两种代码如何使用！
 
@@ -282,7 +282,7 @@ image.save("a_yellow_cat.png")
 </div>
 </details>
 
-### 基于文本引导的图像放大 & 图像超分（Text-Guided Image Upscaling & Super Superresolution）
+### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super Superresolution）
 
 <details><summary>&emsp;Text-Guided Image Upscaling Demo</summary>
 
@@ -334,7 +334,7 @@ image.save("ldm-super-resolution-image.png")
 </details>
 
 ## 模型部署
-StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 上的 **StableDiffusion** 模型文生图、图生图、图像编辑等任务的部署示例，用户可以按照我们提供 [StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md) 将模型导出 或者使用 [一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py) 导出模型，然后使用我们提供的`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
+StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，包括文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，或者使用[一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py)导出模型，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
@@ -411,8 +411,19 @@ image_inpaint_legacy.save("image_inpaint_legacy.png")
 <img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/205297240-46b80992-34af-40cd-91a6-ae76589d0e21.png">
 </div>
 
-## Credits
 
+
+## License
+PPDiffusers 遵循 [Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
+
+Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license).
+> The CreativeML OpenRAIL M is an [Open RAIL M license](https://www.licenses.ai/blog/2022/8/18/naming-convention-of-responsible-ai-licenses), adapted from the work that [BigScience](https://bigscience.huggingface.co/) and [the RAIL Initiative](https://www.licenses.ai/) are jointly carrying in the area of responsible AI licensing. See also [the article about the BLOOM Open RAIL license](https://bigscience.huggingface.co/blog/the-bigscience-rail-license) on which this license is based.
+
+## Acknowledge
+我们借鉴了🤗 Hugging Face的[Diffusers](https://github.com/huggingface/diffusers)关于预训练扩散模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
+
+
+## Credits
 This library concretizes previous work by many different authors and would not have been possible without their great research and implementations. We'd like to thank, in particular, the following implementations which have helped us in our development and without which the API could not have been as polished today:
 - @huggingface' diffusers library, available [here](https://github.com/huggingface/diffusers)
 - @CompVis' latent diffusion models library, available [here](https://github.com/CompVis/latent-diffusion)
@@ -434,13 +445,3 @@ We also want to thank @heejkoo for the very helpful overview of papers, code and
   howpublished = {\url{https://github.com/huggingface/diffusers}}
 }
 ```
-
-## Acknowledge
-我们借鉴了🤗 Hugging Face的[Diffusers](https://github.com/huggingface/diffusers)关于预训练扩散模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
-
-## License
-
-PPDiffusers 遵循 [Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
-
-Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license).
-> The CreativeML OpenRAIL M is an [Open RAIL M license](https://www.licenses.ai/blog/2022/8/18/naming-convention-of-responsible-ai-licenses), adapted from the work that [BigScience](https://bigscience.huggingface.co/) and [the RAIL Initiative](https://www.licenses.ai/) are jointly carrying in the area of responsible AI licensing. See also [the article about the BLOOM Open RAIL license](https://bigscience.huggingface.co/blog/the-bigscience-rail-license) on which this license is based.
