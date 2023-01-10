@@ -43,6 +43,7 @@ from .text_to_image import (
     TextToImageStableDiffusionTask,
 )
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
+from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
@@ -476,6 +477,15 @@ TASKS = {
         },
         "default": {"model": "unimo-text-1.0-dureader_qg"},
     },
+    "zero_shot_text_classification": {
+        "models": {
+            "utc-large": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-large",
+            },
+        },
+        "default": {"model": "utc-large"},
+    },
 }
 
 support_schema_list = [
@@ -496,6 +506,7 @@ support_schema_list = [
     "uie-senta-mini",
     "uie-senta-micro",
     "uie-senta-nano",
+    "utc-large",
 ]
 
 support_argument_list = [
@@ -632,7 +643,8 @@ class Taskflow(object):
         self.task_instance.set_schema(schema)
 
     def set_argument(self, argument):
-        assert (
-            self.task_instance.model in support_argument_list
-        ), "This method can only be used by the task of text-to-image generation or information extraction."
+        assert self.task_instance.model in support_argument_list, (
+            "This method can only be used by the task of text-to-image generation, information extraction "
+            "or zero-text-classification."
+        )
         self.task_instance.set_argument(argument)

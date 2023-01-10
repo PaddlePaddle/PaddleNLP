@@ -79,7 +79,7 @@ from .trainer_utils import (
     speed_metrics,
 )
 from .training_args import TrainingArguments
-from .utils.helper import (
+from .utils.helper import (  # nested_truncate,
     distributed_concat,
     nested_concat,
     nested_detach,
@@ -1683,6 +1683,7 @@ class Trainer:
 
             # Prediction step
             loss, logits, labels = self.prediction_step(model, inputs, prediction_loss_only, ignore_keys=ignore_keys)
+
             # Update containers on host
             if loss is not None:
                 # losses = self._nested_gather(loss.repeat(batch_size))
