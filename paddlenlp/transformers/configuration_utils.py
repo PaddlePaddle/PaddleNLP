@@ -491,10 +491,7 @@ class PretrainedConfig:
         # Attributes with defaults
         # map the old attr to new atr, eg: num_classes -> num_labels
         kwargs = attribute_map(self, kwargs=kwargs)
-        from pprint import pprint
 
-        print("init")
-        pprint(kwargs)
         self.return_dict = kwargs.pop("return_dict", False)
         self.output_hidden_states = kwargs.pop("output_hidden_states", False)
         self.output_attentions = kwargs.pop("output_attentions", False)
@@ -553,7 +550,8 @@ class PretrainedConfig:
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            self.num_labels = kwargs.pop("num_labels", 2)
+            num_labels = kwargs.pop("num_labels", 2)
+            self.num_labels = num_labels if num_labels is not None else 2
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
