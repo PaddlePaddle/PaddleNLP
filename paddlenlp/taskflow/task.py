@@ -183,7 +183,7 @@ class Task(metaclass=abc.ABCMeta):
 
         # TODO(linjieccc): some temporary settings and will be remove in future
         # after fixed
-        if self.task in ["document_intelligence", "knowledge_mining"]:
+        if self.task in ["document_intelligence", "knowledge_mining", "zero_shot_text_classification"]:
             self._config.switch_ir_optim(False)
         if self.model == "uie-data-distill-gp":
             self._config.enable_memory_optim(False)

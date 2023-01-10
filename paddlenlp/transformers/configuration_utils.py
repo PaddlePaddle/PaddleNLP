@@ -802,16 +802,12 @@ class PretrainedConfig:
         if os.path.isfile(pretrained_model_name_or_path):
             resolved_config_file = pretrained_model_name_or_path
 
-        # 2. get the configuration file from HF hub
-        elif from_hf_hub:
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
-
-        # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
+        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
         elif is_url(pretrained_model_name_or_path):
             resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
-        # 4. get the configuration file from local dir with default name, eg: /local/path
+        # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
@@ -828,6 +824,10 @@ class PretrainedConfig:
                         "param into `from_pretarined` method to specific the configuration file name"
                     )  # 4. load it as the community resource file
 
+        # 4. get the configuration file from HF hub
+        elif from_hf_hub:
+            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
+
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
             if url_file_exists(community_url):
@@ -837,8 +837,7 @@ class PretrainedConfig:
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
 
-            # resolve CONFIG_NAME from huggingface hub
-            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
+            raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
             logger.info(f"loading configuration file {resolved_config_file}")

@@ -104,10 +104,10 @@ class TemplateTest(unittest.TestCase):
         self.assertEqual(encoded_token_types, [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0])
 
     def test_attention_mask(self):
-        expected_att = np.zeros([14, 14])
+        expected_att = np.zeros([15, 15])
         expected_att[1:5, 5:9] = -1e4
         expected_att[5:9, 1:5] = -1e4
-        prompt = "{'options':'choices','add_omask':True,'add_prompt':'[OPT]好。'}{'text': 'text_a'}"
+        prompt = "{'options':'choices','add_omask':True,'add_prompt':'[OPT]好。'}{'sep'}{'text': 'text_a'}"
         template = ManualTemplate(prompt, self.tokenizer, self.max_length)
         encoded_att = template(self.example)["attention_mask"]
         self.assertListEqual(encoded_att.tolist(), expected_att.tolist())
