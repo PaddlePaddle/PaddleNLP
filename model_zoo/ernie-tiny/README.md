@@ -28,9 +28,7 @@
 
 百度 ERNIE 团队在 2021 年底发布了百亿级别大模型 ERNIE 3.0 和千亿级别的大模型 ERNIE 3.0 Titan。为了让大模型的能力能够真正在一线业务发挥威力，ERNIE 团队推出了 ERNIE-Tiny 系列的知识蒸馏技术，通过任务无关蒸馏的方法，产出了多个轻量级模型 ERNIE 3.0 Tiny，刷新了中文小模型的成绩，并使这些模型能够直接在 CPU 上进行预测，大大拓展了 ERNIE 模型的使用场景。
 
-2023 年初，ERNIE 团队进一步开源了 ERNIE 3.0 Tiny 模型的 v2 版本，使教师模型参与 **多任务训练**，大大提高了小模型在下游任务上的效果。ERNIE 3.0 Tiny v2 模型在 in-domain、out-domain、low-resourced 的下游任务上比 v1 有了进一步的提升，并且 v2 还开源了 3L128H 结构的模型。
-
-下面是对 ERNIE 3.0 Tiny 模型训练策略的简单介绍：
+2023 年初，ERNIE 团队进一步开源了 ERNIE 3.0 Tiny 模型的 v2 版本，使教师模型预先**注入下游知识**并参与 **多任务训练**，大大提高了小模型在下游任务上的效果。ERNIE 3.0 Tiny v2 模型在 out-domain、low-resourced 的下游任务上比 v1 有了进一步的提升，并且 v2 还开源了 3L128H 结构的模型。
 
 ### 在线蒸馏技术
 
@@ -54,7 +52,8 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
         <img width="644" alt="image" src="https://user-images.githubusercontent.com/26483581/210303124-c9df89a9-e291-4322-a6a5-37d2c4c1c008.png" title="ERNIE 3.0 Tiny v2">
 </p>
 <br>
-因此，ERNIE 3.0 Tiny v2 比起 ERNIE 3.0 Tiny v1，在 out-domain、low-resourced 数据上获得显著的提升。
+
+因此，ERNIE 3.0 Tiny v2 相比 ERNIE 3.0 Tiny v1 在 out-domain、low-resourced 数据上获得显著的提升。
 
 <a name="模型效果"></a>
 
@@ -69,7 +68,7 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 - **ERNIE 3.0-Tiny-_Nano_** (_4-layer, 312-hidden, 12-heads_)
 - **ERNIE 3.0-Tiny-_Pico_** (_3-layer, 128-hidden, 2-heads_)
 
-其中，v2 版本开源了 6 个大小的模型，v1 版本开源了前 5 个 大小的模型。
+其中，v2 版本开源了 6 种结构的模型，v1 版本开源了前 5 种结构的模型。
 
 ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resourced 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../../examples/benchmark/clue) 复现。
 
@@ -569,7 +568,9 @@ python run_eval.py  \
 
 ## 🔥端上模型压缩方案
 
-尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但如果有模型部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩，为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
+尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至移动端还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
+
+为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
 
 端上模型压缩流程如下图所示：
 
@@ -578,7 +579,9 @@ python run_eval.py  \
 </p>
 <br>
 
-在本项目中，模型压缩和模型训练共用了脚本 `run_train.py`，压缩时只需设置 `--do_compress`，并取消设置 `--do_train` 即可。运行下面的脚本，可对上面微调后的模型进行压缩：
+在本项目中，模型压缩和模型训练共用了脚本 `run_train.py`，压缩时需设置 `--do_compress` 开启模型压缩，并取消设置 `--do_train` 关闭普通训练。模型压缩还需要设置 `--strategy` 参数，本项目中选择 `'dynabert+qat+embeddings'` 组合策略。
+
+运行下面的脚本，可对上面微调后的模型进行压缩：
 
 ```shell
 python run_train.py \
@@ -618,9 +621,12 @@ python run_train.py \
 
 其他参数同训练参数，如`learning_rate`、`num_train_epochs`、`per_device_train_batch_size` 等，是指压缩过程中的训练（`"dynabert"` 裁剪 以及 `"qat"` 量化）时所使用的参数，一般可以和微调时保持一致即可，其中 `num_train_epochs` 可比微调时略小。
 
+<a name="压缩效果"></a>
+
 ### 压缩效果
 
-将模型压缩后，使用 FastDeploy 部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端测试精度和性能，得到模型精度、端到端时延（包括前后处理）、内存占用的数据如下：
+使用 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 将压缩后的模型部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端进行测试，得到模型精度、端到端时延（包括前后处理）、内存占用的数据如下：
+
 
 | 模型                                | 模型精度(acc.)   | 推理精度      | 端到端时延(ms)    | 内存占用 Pss (MB)  | 模型体积(MB)     |
 |-----------------------------------|--------------|-----------|--------------|----------------|--------------|
@@ -629,11 +635,11 @@ python run_train.py \
 | 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP32      | 20.34(1.14x) | 59.49(-48.59%) | 64.0(-7.2%)  |
 | 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP16      | 15.97(1.45x) | 52.23(-54.87%) | 64.0(-7.2%)  |
 | 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21(-0.13) | FP32+INT8 | 15.59(1.49x) | 49.17(-57.51%) | 11.0(-84.1%) |
-| **原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）** | 82.21(-0.13) | FP32+INT8 |**15.92(1.46x)**|**43.77(-62.18%)**| **5.4(-92.2%)**  |
+|**原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）** | 82.21(-0.13) | FP32+INT8 |**15.92(1.46x)**|**43.77(-62.18%)**| **5.4(-92.2%)**  |
 
-（**测试条件**：max_seq_length=16，batch_size=1，thread_num=1）
+**测试条件**：max_seq_length=16，batch_size=1，thread_num=1
 
-由此可见，模型经过压缩后，精度基本无损，体积减小了 92.2%。在以上测试条件下，端到端推理速度达到原来的 1.46 倍，内存占用（包括 FastTokenizer 库）减小了 62.18%。
+由此可见，模型经过压缩后，精度基本无损，体积减小了 92.2%。在以上测试条件下，端到端推理（包括前后处理）速度达到原来的 1.46 倍，内存占用（包括加载 FastTokenizer 库）减小了 62.18%。
 
 <a name="FastDeploy部署"></a>
 
@@ -641,7 +647,7 @@ python run_train.py \
 
 FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目提供了对 ERNIE 3.0 Tiny 使用 FastDeploy 云边端部署的示例代码和文档，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。
 
-以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
+以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
@@ -649,9 +655,9 @@ FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署�
 
 想要更多了解 FastDeploy 可以参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。目前，FastDeploy 已支持多种后端：
 
-- 在移动端上支持 `Paddle Lite` 后端。
+- 在移动端上支持 `Paddle Lite` 后端；
 
-- 在服务端的 GPU 硬件上，支持 `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及`TensorRT` 后端；在服务端的 CPU 硬件上支持 `Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO` 后端；
+- 在服务端的 GPU 硬件上，支持 `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及`TensorRT` 后端；在服务端的 CPU 硬件上支持 `Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO` 后端。
 
 <a name="参考文献"></a>
 
