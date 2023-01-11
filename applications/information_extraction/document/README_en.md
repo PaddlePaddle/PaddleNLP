@@ -47,7 +47,7 @@ For quick start, you can directly use ```paddlenlp.Taskflow``` out-of-the-box, l
 
 ### 2.2 Data Annotation
 
-We recommend using [Label Studio](https://labelstud.io/) for data labeling. We provide an end-to-end pipeline for the labeling -> training process. You can export the labeled data in Label Studio through [label_studio.py](../label_studio.py) script to export and convert the data into the required input form for the model. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio_doc.md).
+We recommend using [Label Studio](https://labelstud.io/) for data labeling. We provide an end-to-end pipeline for the labeling -> training process. You can export the labeled data in Label Studio through [label_studio.py](../label_studio.py) script to export and convert the data into the required input form for the model. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio_doc_en.md).
 
 Here we provide the pre-labeled example dataset `VAT invoice dataset`, which you can download by running the following command. We will demonstrate how to use the data conversion script to generate training/validation/test set files for finetuning.
 
@@ -80,7 +80,7 @@ python ../label_studio.py \
      --layout_analysis True
 ```
 
-For more labeling rules and parameter descriptions for different types of tasks (including entity extraction, relationship extraction, document classification, etc.), please refer to [Label Studio Data Labeling Guide](../label_studio_doc.md).
+For more labeling rules and parameter descriptions for different types of tasks (including entity extraction, relationship extraction, document classification, etc.), please refer to [Label Studio Data Labeling Guide](../label_studio_doc_en.md).
 
 <a name="23"></a>
 
