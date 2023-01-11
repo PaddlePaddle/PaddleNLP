@@ -174,6 +174,12 @@ from .chineseclip.feature_extraction import *
 from .chineseclip.procesing import *
 from .chineseclip.image_processing import *
 from .chineseclip.tokenizer import *
+from .cmsim_lock.modeling import *
+from .cmsim_lock.configuration import *
+from .cmsim_lock.feature_extraction import *
+from .cmsim_lock.procesing import *
+from .cmsim_lock.image_processing import *
+from .cmsim_lock.tokenizer import *
 from .gptj.modeling import *
 from .gptj.tokenizer import *
 from .pegasus.modeling import *
