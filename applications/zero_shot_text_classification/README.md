@@ -18,7 +18,7 @@
 本项目提供基于通用文本分类 UTC（Universial Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
 
 <div align="center">
-    <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/210748712-58cf3654-b991-4a1d-b5e0-390d5198ec42.png">
+    <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/211755652-dac155ca-649e-470c-ac8b-06156b444b58.png">
 </div>
 
 文本分类简单来说就是对给定的句子或文本使用分类模型分类。在文本分类的落地过程中通常面临领域多变、任务多样、数据稀缺等许多挑战。针对文本分类领域的痛点和难点，PaddleNLPl零样本文本分类应用 UTC 通过统一语义匹配方式 USM（Unified Semantic Matching）统一建模标签与文本的语义匹配能力，具备低资源迁移能力，支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务，助力开发者简单高效实现多任务文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
