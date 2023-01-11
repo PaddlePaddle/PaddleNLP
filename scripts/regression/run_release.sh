@@ -54,7 +54,7 @@ export all_P0case_time=0
 declare -A all_P0case_dic
 get_diff_TO_P0case(){
 if [[ ${Testcase} =~ "all" ]];then
-    P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
+    P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
     nptag ernie-m clue taskflow transformers fast_generation ernie-3.0)
 elif [[ ${Testcase} =~ "p0" ]];then
