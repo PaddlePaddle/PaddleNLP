@@ -222,7 +222,7 @@ schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就�
 utc = Taskflow("zero_shot_text_classification",
                schema=schema,
                task_path="../../checkpoint/model_best/",
-               precision="fp16")
+               precision="fp32")
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
 ```
@@ -232,13 +232,13 @@ app.register_taskflow("taskflow/utc", utc)
 paddlenlp server server:app --host 0.0.0.0 --port 8990
 ```
 
-具体的使用方法可以见[UTC SimpleServing 使用方法](./deploy/simple_serving/README.md)
+支持FP16半精度推理加速，详见[UTC SimpleServing 使用方法](./deploy/simple_serving/README.md)
 
 <a name="实验指标"></a>
 
 ### 2.7 实验指标
 
-医疗意图分类数据集实验指标：
+医疗意图分类数据集 KUAKE-QIC 验证集实验指标：
 
   |          |  Accuracy  | Micro F1   | Macro F1   |
   | :------: | :--------: | :--------: | :--------: |
@@ -247,5 +247,4 @@ paddlenlp server server:app --host 0.0.0.0 --port 8990
   | 10-shot  | 65.88 | 93.76 | 81.34 |
   | full-set | 81.81 | 96.65 | 89.87 |
 
-
-商业版本UTC模型支持极多标签分类，首创单双塔统一训练，多标签并行预测，进一步解决大规模标签和高效推理问题，可显著提升跨领域少样本分类能力。
+其中 k-shot 表示每个标签有 k 条标注样本用于训练。
