@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import types
+
 import numpy as np
 import paddle
 from paddle.fluid.layer_helper import LayerHelper
@@ -21,7 +23,7 @@ from ...utils.log import logger
 
 
 def opt_npu_warp(optimizer):
-    optimizer.step = _optimizer_step_with_flatten_param_grads
+    optimizer.step = types.MethodType(_optimizer_step_with_flatten_param_grads, optimizer)
 
 
 def _optimizer_step_with_flatten_param_grads(optimizer):
