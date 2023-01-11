@@ -169,12 +169,11 @@ class Task(metaclass=abc.ABCMeta):
         Construct the input data and predictor in the PaddlePaddele static mode.
         """
         if paddle.get_device() == "cpu":
-            if "npu" in paddle.device.get_all_custom_device_type():
-                self._config.disable_gpu()
-                self._config.enable_npu()
-            else:
-                self._config.disable_gpu()
-                self._config.enable_mkldnn()
+            self._config.disable_gpu()
+            self._config.enable_mkldnn()
+        elif paddle.get_device().split(":", 1)[0] == "npu":
+            self._config.disable_gpu()
+            self._config.enable_npu(self.kwargs["device_id"])
         else:
             self._config.enable_use_gpu(100, self.kwargs["device_id"])
             # TODO(linjieccc): enable after fixed
