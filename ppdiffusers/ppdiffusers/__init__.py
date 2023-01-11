@@ -123,6 +123,7 @@ else:
         StableDiffusionPipelineSafe,
         StableDiffusionUpscalePipeline,
         UnCLIPPipeline,
+        UPaintingPipeline,
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,
         VersatileDiffusionPipeline,

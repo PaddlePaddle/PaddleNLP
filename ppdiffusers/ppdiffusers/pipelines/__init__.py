@@ -79,6 +79,7 @@ else:
     )
     from .stable_diffusion_safe import StableDiffusionPipelineSafe
     from .unclip import UnCLIPPipeline
+    from .upainting import UPaintingPipeline
     from .versatile_diffusion import (
         VersatileDiffusionDualGuidedPipeline,
         VersatileDiffusionImageVariationPipeline,

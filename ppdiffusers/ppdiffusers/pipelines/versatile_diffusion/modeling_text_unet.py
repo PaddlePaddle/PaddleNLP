@@ -767,7 +767,7 @@ class DownBlockFlat(nn.Layer):
         output_states = ()
 
         for resnet in self.resnets:
-            if self.training and self.gradient_checkpointing:
+            if self.gradient_checkpointing:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
@@ -884,7 +884,7 @@ class CrossAttnDownBlockFlat(nn.Layer):
         output_states = ()
 
         for resnet, attn in zip(self.resnets, self.attentions):
-            if self.training and self.gradient_checkpointing:
+            if self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
                     def custom_forward(*inputs):
@@ -976,7 +976,7 @@ class UpBlockFlat(nn.Layer):
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
 
-            if self.training and self.gradient_checkpointing:
+            if self.gradient_checkpointing:
 
                 def create_custom_forward(module):
                     def custom_forward(*inputs):
@@ -1096,7 +1096,7 @@ class CrossAttnUpBlockFlat(nn.Layer):
             res_hidden_states_tuple = res_hidden_states_tuple[:-1]
             hidden_states = paddle.concat([hidden_states, res_hidden_states], axis=1)
 
-            if self.training and self.gradient_checkpointing:
+            if self.gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=None):
                     def custom_forward(*inputs):
