@@ -62,20 +62,19 @@ def patch_to(cls, as_prop=False, cls_method=False):
 if is_paddle_available():
     import paddle
     import paddle.nn as nn
-    from paddle.fluid import framework
 
     @contextlib.contextmanager
     def device_scope(device="cpu"):
-        new_device = framework._get_paddle_place(device.replace("cuda", "gpu"))
-        old_device = framework._current_expected_place()
+        new_device = device.replace("cuda", "gpu")
+        old_device = paddle.get_device()
         if str(new_device) == str(old_device):
             yield
         else:
             try:
-                framework._set_expected_place(new_device)
+                paddle.set_device(new_device)
                 yield
             finally:
-                framework._set_expected_place(old_device)
+                paddle.set_device(old_device)
 
     paddle.device_scope = device_scope
 
@@ -184,186 +183,6 @@ if is_paddle_available() and is_paddlenlp_available():
             return next(self.named_parameters())[1].place
         except StopIteration:
             return paddle.get_device()
-
-    try:
-        from paddlenlp.transformers import (
-            CLIPTextModelWithProjection,
-            CLIPVisionModelWithProjection,
-        )
-    except ImportError:
-        # patch model
-        from dataclasses import dataclass
-
-        from paddlenlp.transformers import (
-            CLIPPretrainedModel,
-            TextTransformer,
-            VisionTransformer,
-            register_base_model,
-        )
-        from paddlenlp.transformers.model_outputs import ModelOutput
-
-        @dataclass
-        class CLIPVisionModelOutput(ModelOutput):
-            image_embeds: Optional[paddle.Tensor] = None
-            last_hidden_state: paddle.Tensor = None
-            hidden_states: Optional[Tuple[paddle.Tensor]] = None
-            attentions: Optional[Tuple[paddle.Tensor]] = None
-
-        @dataclass
-        class CLIPTextModelOutput(ModelOutput):
-            text_embeds: Optional[paddle.Tensor] = None
-            last_hidden_state: paddle.Tensor = None
-            hidden_states: Optional[Tuple[paddle.Tensor]] = None
-            attentions: Optional[Tuple[paddle.Tensor]] = None
-
-        @register_base_model
-        class CLIPTextModelWithProjection(CLIPPretrainedModel):
-            base_model_class = None
-
-            def __init__(
-                self,
-                max_text_length=77,
-                text_embed_dim=512,
-                text_heads=8,
-                text_layers=12,
-                vocab_size=49408,
-                text_hidden_act="quick_gelu",
-                initializer_range=0.02,
-                initializer_factor=1.0,
-                projection_dim=512,
-                **kwargs
-            ):
-                super().__init__()
-                self.initializer_range = initializer_range
-                self.initializer_factor = initializer_factor
-                self.text_embed_dim = text_embed_dim
-                self.text_layers = text_layers
-                self.text_model = TextTransformer(
-                    context_length=max_text_length,
-                    transformer_width=text_embed_dim,
-                    transformer_heads=text_heads,
-                    transformer_layers=text_layers,
-                    vocab_size=vocab_size,
-                    activation=text_hidden_act,
-                    normalize_before=True,
-                )
-                self.text_projection = paddle.create_parameter(
-                    (text_embed_dim, projection_dim), paddle.get_default_dtype()
-                )
-                self.apply(self._init_weights)
-
-            def get_input_embeddings(self) -> nn.Layer:
-                return self.text_model.token_embedding
-
-            def set_input_embeddings(self, value):
-                self.text_model.token_embedding = value
-
-            def forward(
-                self,
-                input_ids=None,
-                attention_mask=None,
-                position_ids=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False,
-            ):
-                text_outputs = self.text_model(
-                    input_ids=input_ids,
-                    position_ids=position_ids,
-                    attention_mask=attention_mask,
-                    output_attentions=output_attentions,
-                    output_hidden_states=output_hidden_states,
-                    return_dict=return_dict,
-                )
-                pooled_output = text_outputs[1]
-                text_embeds = paddle.matmul(pooled_output, self.text_projection)
-
-                if not return_dict:
-                    outputs = (text_embeds, text_outputs[0]) + text_outputs[2:]
-                    return tuple(output for output in outputs if output is not None)
-
-                return CLIPTextModelOutput(
-                    text_embeds=text_embeds,
-                    last_hidden_state=text_outputs.last_hidden_state,
-                    hidden_states=text_outputs.hidden_states,
-                    attentions=text_outputs.attentions,
-                )
-
-        @register_base_model
-        class CLIPVisionModelWithProjection(CLIPPretrainedModel):
-            base_model_class = None
-
-            def __init__(
-                self,
-                image_resolution=224,
-                vision_patch_size=32,
-                vision_embed_dim=768,
-                vision_layers=12,
-                vision_heads=12,
-                vision_hidden_act="quick_gelu",
-                vision_mlp_ratio=4,
-                initializer_range=0.02,
-                initializer_factor=1.0,
-                projection_dim=512,
-                **kwargs
-            ):
-                super().__init__()
-                self.initializer_range = initializer_range
-                self.initializer_factor = initializer_factor
-                self.vision_embed_dim = vision_embed_dim
-                self.vision_layers = vision_layers
-
-                if vision_heads is None:
-                    vision_heads = vision_embed_dim // 64
-                self.vision_model = VisionTransformer(
-                    input_resolution=image_resolution,
-                    patch_size=vision_patch_size,
-                    width=vision_embed_dim,
-                    layers=vision_layers,
-                    heads=vision_heads,
-                    activation=vision_hidden_act,
-                    mlp_ratio=vision_mlp_ratio,
-                    normalize_before=True,
-                )
-                self.vision_projection = paddle.create_parameter(
-                    (vision_embed_dim, projection_dim), paddle.get_default_dtype()
-                )
-                self.apply(self._init_weights)
-
-            def get_input_embeddings(self) -> nn.Layer:
-                return self.vision_model.conv1
-
-            def forward(
-                self,
-                pixel_values=None,
-                output_attentions=False,
-                output_hidden_states=False,
-                return_dict=False,
-            ):
-                vision_outputs = self.vision_model(
-                    pixel_values,
-                    output_attentions=output_attentions,
-                    output_hidden_states=output_hidden_states,
-                    return_dict=return_dict,
-                )
-                pooled_output = vision_outputs[1]  # pooled_output
-                image_embeds = paddle.matmul(pooled_output, self.vision_projection)
-                if not return_dict:
-                    outputs = (image_embeds, vision_outputs[0]) + vision_outputs[2:]
-                    return tuple(output for output in outputs if output is not None)
-
-                return CLIPVisionModelOutput(
-                    image_embeds=image_embeds,
-                    last_hidden_state=vision_outputs.last_hidden_state,
-                    hidden_states=vision_outputs.hidden_states,
-                    attentions=vision_outputs.attentions,
-                )
-
-        CLIPTextModelWithProjection.base_model_class = CLIPTextModelWithProjection
-        CLIPVisionModelWithProjection.base_model_class = CLIPVisionModelWithProjection
-
-        paddlenlp.transformers.CLIPTextModelWithProjection = CLIPTextModelWithProjection
-        paddlenlp.transformers.CLIPVisionModelWithProjection = CLIPVisionModelWithProjection
 
     try:
         from paddlenlp.transformers import XLMRobertaTokenizer

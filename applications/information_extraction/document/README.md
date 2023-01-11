@@ -39,6 +39,8 @@
 
 ```shell
 .
+├── deploy            # 部署目录
+│ └── simple_serving  # 基于PaddleNLP SimpleServing 服务化部署
 ├── utils.py          # 数据处理工具
 ├── finetune.py       # 模型微调、压缩脚本
 ├── evaluate.py       # 模型评估脚本

@@ -37,7 +37,7 @@ from ..model_utils import BackboneMixin, PretrainedModel
 from .configuration import BitConfig
 
 __all__ = [
-    "BitPreTrainedModel",
+    "BitPretrainedModel",
     "BitModel",
     "BitForImageClassification",
     "BitBackbone",
@@ -638,7 +638,7 @@ class BitEncoder(nn.Layer):
         )
 
 
-class BitPreTrainedModel(PretrainedModel):
+class BitPretrainedModel(PretrainedModel):
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
@@ -656,7 +656,7 @@ class BitPreTrainedModel(PretrainedModel):
             zeros_(module.bias)
 
 
-class BitModel(BitPreTrainedModel):
+class BitModel(BitPretrainedModel):
     """
     The bare BiT model outputting raw features without any specific head on top.
 
@@ -733,7 +733,7 @@ class BitModel(BitPreTrainedModel):
         )
 
 
-class BitForImageClassification(BitPreTrainedModel):
+class BitForImageClassification(BitPretrainedModel):
     """
     BiT Model with an image classification head on top (a linear layer on top of the pooled features), e.g. for
     ImageNet.
@@ -824,7 +824,7 @@ class BitForImageClassification(BitPreTrainedModel):
         return ImageClassifierOutputWithNoAttention(loss=loss, logits=logits, hidden_states=outputs.hidden_states)
 
 
-class BitBackbone(BitPreTrainedModel, BackboneMixin):
+class BitBackbone(BitPretrainedModel, BackboneMixin):
     """
     BiT backbone, to be used with frameworks like DETR and MaskFormer.
 

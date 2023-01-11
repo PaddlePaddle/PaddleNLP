@@ -49,6 +49,21 @@ class AutoencoderKL(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class PriorTransformer(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class Transformer2DModel(metaclass=DummyObject):
     _backends = ["paddle"]
 
@@ -392,6 +407,21 @@ class DPMSolverMultistepScheduler(metaclass=DummyObject):
         requires_backends(cls, ["paddle"])
 
 
+class DPMSolverSinglestepScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
 class EulerAncestralDiscreteScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
@@ -513,6 +543,21 @@ class SchedulerMixin(metaclass=DummyObject):
 
 
 class ScoreSdeVeScheduler(metaclass=DummyObject):
+    _backends = ["paddle"]
+
+    def __init__(self, *args, **kwargs):
+        requires_backends(self, ["paddle"])
+
+    @classmethod
+    def from_config(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+    @classmethod
+    def from_pretrained(cls, *args, **kwargs):
+        requires_backends(cls, ["paddle"])
+
+
+class UnCLIPScheduler(metaclass=DummyObject):
     _backends = ["paddle"]
 
     def __init__(self, *args, **kwargs):
