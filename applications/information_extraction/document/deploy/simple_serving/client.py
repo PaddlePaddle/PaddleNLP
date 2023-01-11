@@ -12,27 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import requests
 import json
+
+import requests
+
 from paddlenlp.utils.doc_parser import DocParser
 
 # Define the docuemnt parser
 doc_parser = DocParser()
 
-image_paths = ['../../data/images/b1.jpg']
+image_paths = ["../../data/images/b1.jpg"]
 image_base64_docs = []
 
 # Get the image base64 to post
 for image_path in image_paths:
     req_dict = {}
     doc = doc_parser.parse({"doc": image_path}, do_ocr=False)
-    base64 = doc['image']
-    req_dict['doc'] = base64
+    base64 = doc["image"]
+    req_dict["doc"] = base64
     image_base64_docs.append(req_dict)
 
 url = "http://0.0.0.0:8189/taskflow/uie"
 headers = {"Content-Type": "application/json"}
-data = {'data': image_base64_docs}
+data = {"data": {"text": image_base64_docs}}
 
 # Post the requests
 r = requests.post(url=url, headers=headers, data=json.dumps(data))
