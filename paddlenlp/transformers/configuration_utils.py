@@ -194,9 +194,13 @@ def convert_to_legacy_config(attribute_map: Dict[str, str], config: Dict[str, An
             init_arg = convert_to_legacy_config(attribute_map, init_arg)
             args.append(init_arg)
         config["init_args"] = args
-    else:
-        for standard_field, paddle_field in attribute_map.items():
-            config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+
+    # TODO(wj-Mcat): to improve compatibility for: old local config and new PretrainedConfig, eg:
+    # { "init_args": [], "init_class": "", "num_classes": 12 }
+    for standard_field, paddle_field in attribute_map.items():
+        value = config.pop(standard_field, None) or config.pop(paddle_field, None)
+        if value is not None:
+            config[paddle_field] = value
     return config
 
 
