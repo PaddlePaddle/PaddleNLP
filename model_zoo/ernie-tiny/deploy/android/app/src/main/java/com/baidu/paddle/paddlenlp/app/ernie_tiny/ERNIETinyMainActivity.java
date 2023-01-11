@@ -14,6 +14,7 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -28,8 +29,7 @@ import com.baidu.paddle.paddlenlp.ui.Utils;
 
 
 public class ERNIETinyMainActivity extends Activity implements View.OnClickListener {
-    private static final String TAG = ERNIETinyMainActivity.class.getSimpleName()
-            + "[FastDeploy][ERNIE][Java]";
+    private static final String TAG = ERNIETinyMainActivity.class.getSimpleName();
     private ImageView back;
     private ImageButton btnSettings;
     private EditText etERNIETinyInput;
@@ -179,6 +179,10 @@ public class ERNIETinyMainActivity extends Activity implements View.OnClickListe
 
     public void checkAndUpdateSettings() {
         if (ERNIETinySettingsActivity.checkAndUpdateSettings(this)) {
+            // Clear output text first
+            etERNIETinyOutput.setText("");
+
+            // Update predictor
             String realModelDir = getCacheDir() + "/" + ERNIETinySettingsActivity.modelDir;
             Utils.copyDirectoryFromAssets(this, ERNIETinySettingsActivity.modelDir, realModelDir);
 
@@ -191,10 +195,14 @@ public class ERNIETinyMainActivity extends Activity implements View.OnClickListe
             RuntimeOption option = new RuntimeOption();
             option.setCpuThreadNum(ERNIETinySettingsActivity.cpuThreadNum);
             option.setLitePowerMode(ERNIETinySettingsActivity.cpuPowerMode);
-            if (Boolean.parseBoolean(ERNIETinySettingsActivity.enableLiteFp16)) {
-                option.enableLiteFp16();
+            if (Boolean.parseBoolean(ERNIETinySettingsActivity.enableLiteInt8)) {
+                option.enableLiteInt8(); // For quantized models
+            } else {
+                // Enable FP16 if Int8 option is not ON.
+                if (Boolean.parseBoolean(ERNIETinySettingsActivity.enableLiteFp16)) {
+                    option.enableLiteFp16();
+                }
             }
-            // option.enableLiteInt8(); // For quantized models
             predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile,
                     intentLabelsFile, addedTokensFile, option, 16);
         }

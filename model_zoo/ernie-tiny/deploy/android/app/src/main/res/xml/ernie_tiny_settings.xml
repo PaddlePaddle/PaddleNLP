@@ -1,15 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
     <ListPreference
-        android:defaultValue="@string/ERNIE_TINY_MODEL_DIR_DEFAULT"
+        android:defaultValue="@string/CHOOSE_PRE_INSTALLED_MODEL_DEFAULT"
         android:key="@string/CHOOSE_PRE_INSTALLED_MODEL_KEY"
+        android:entries="@array/preinstalled_models_entries"
+        android:entryValues="@array/preinstalled_models_values"
         android:negativeButtonText="@null"
         android:positiveButtonText="@null"
         android:title="Choose Pre-Installed Models" />
-    <EditTextPreference
-        android:defaultValue="@string/ERNIE_TINY_MODEL_DIR_DEFAULT"
-        android:key="@string/MODEL_DIR_KEY"
-        android:title="Model Dir" />
     <ListPreference
         android:defaultValue="@string/CPU_THREAD_NUM_DEFAULT"
         android:entries="@array/cpu_thread_num_entries"
@@ -34,4 +32,12 @@
         android:negativeButtonText="@null"
         android:positiveButtonText="@null"
         android:title="Enable Lite FP16" />
+    <ListPreference
+        android:defaultValue="@string/ENABLE_LITE_INT8_MODE_DEFAULT"
+        android:entries="@array/enable_lite_int8_mode_entries"
+        android:entryValues="@array/enable_lite_int8_mode_values"
+        android:key="@string/ENABLE_LITE_INT8_MODE_KEY"
+        android:negativeButtonText="@null"
+        android:positiveButtonText="@null"
+        android:title="Enable Lite Int8" />
 </PreferenceScreen>

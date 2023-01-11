@@ -36,11 +36,21 @@
 
 
 4. 点击 Run 按钮，自动编译 APP 并安装到手机。(该过程会自动下载预编译的 FastDeploy Android 库 以及 模型文件，需要联网)
-   成功后效果如下，图一：APP 安装到手机；图二： APP 打开后的效果，输入文本后点击"开始分析意图"后即会自动进行意图识别和槽位分析；图三：APP设置选项，点击右上角的设置图片，可以设置不同选项进行体验。
+   成功后效果如下，图一：APP 安装到手机；图二： APP 打开后的效果，输入文本后点击"开始分析意图"后即会自动进行意图识别和槽位分析；图三：APP 设置选项，点击右上角的设置图片，可以设置不同选项进行体验。
 
 | APP 效果 | APP 演示 | APP设置项 |
   | ---     | --- | --- |
-| <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737269-0fe175c9-7b87-40b3-8249-1c6378e4a5e9.jpg">  | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737041-0e79bd6b-90a8-42b0-8f66-97868386d9f3.gif"> | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210774693-b199734c-442c-48ef-90ea-4d2e72ff7304.jpg"> |  
+| <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/210737269-0fe175c9-7b87-40b3-8249-1c6378e4a5e9.jpg">  | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/211800602-2790c799-0823-4f91-8ce3-7b4a45896b41.gif"> | <img width="300" height="500" alt="image" src="https://user-images.githubusercontent.com/31974251/211800645-bc274593-26a4-4ed0-a258-c0615fcafce1.jpg"> |  
+
+5. 点击 APP 右上角的设置选项，可以跳转到设置页。在设置页，您可以选择不同的模型和不同的推理精度，即是否开启 FP16 和 Int8 推理，两种推理精度只能二选一。FP32各模型都支持的，只要设置项中的 FP16 和 Int8 选项都为 false 时，即使用FP32进行推理。各模型FP16和Int8推理的支持情况为：  
+
+|模型选项|模型名称|FP16|Int8|  
+|---|---|---|---|  
+|models/ernie-tiny|原模型|✅|-|   
+|models/ernie-tiny-clip|原模型+裁剪（词表+模型宽度）|✅|-|   
+|models/ernie-tiny-clip-qat|原模型+裁剪（词表+模型宽度）+量化（矩阵乘）|-|✅|   
+|models/ernie-tiny-clip-qat-embedding-int8|原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）|-|✅|   
+
 
 ## ERNIE Tiny Java SDK 说明和使用
 
@@ -216,13 +226,13 @@ class TestERNIETiny extends Activity {
 
 ## 替换 App 示例中的 ERNIE 3.0 Tiny 模型    
 
-替换 App 示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含 vocab.txt、slots_label.txt、intent_label.txt以及added_token.json 等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
+替换 App 示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含 vocab.txt、slots_label.txt、intent_label.txt 以及 added_token.json 等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
   - 将您的 ERNIE 3.0 Tiny 模型放在 `app/src/main/assets/models` 目录下；
   - 修改 `app/src/main/res/values/strings.xml` 中模型路径的默认值，如：
 
 ```xml
-<!-- 将这个路径指修改成您的模型，如 models/ernie-tiny -->
-<string name="ERNIE_TINY_MODEL_DIR_DEFAULT">models/ernie-tiny</string>
+<!-- 将这个路径指修改成您的模型，如 models/ernie-tiny-clip-qat-embedding-int8 -->
+<string name="ERNIE_TINY_MODEL_DIR_DEFAULT">models/ernie-tiny-clip-qat-embedding-int8</string>
 ```  
 
 ## 关于 ERNIE 3.0 Tiny JNI 的封装  
