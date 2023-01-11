@@ -1,6 +1,6 @@
 # FastDeploy ERNIE 3.0 Tiny 模型Android部署示例
 
-本目录提供了快速完成在Android的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的部署示例。
+本目录提供了快速完成在 Android 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的部署示例。
 
 ## 环境准备
 
@@ -9,7 +9,7 @@
 
 ## App示例编译和使用步骤
 
-1. ERNIE 3.0 Tiny Android部署示例位于`PaddleNLP/model_zoo/ernie-tiny/deploy/android`目录
+1. ERNIE 3.0 Tiny Android 部署示例位于`PaddleNLP/model_zoo/ernie-tiny/deploy/android`目录
 2. 用 Android Studio 打开 ernie-tiny/deploy/android 工程
 3. 手机连接电脑，打开 USB 调试和文件传输模式，并在 Android Studio 上连接自己的手机设备（手机需要开启允许从 USB 安装软件权限）
 
@@ -44,15 +44,15 @@
 
 ## ERNIE Tiny Java SDK 说明和使用
 
-本工程除了可以直接编译App体验之外，还可以编译ERNIE Tiny的`Java SDK`，方便用户开箱即用。 如下图所示，编译Java SDK的步骤为：  
-   - 先在Android Studio中打开`ernie_tiny/build.gradle`工程文件；  
-   - 选择Build->Make Module 'android:ernietiny'；  
-   - 从`ernie_tiny/build/outputs/aar`目录中获取编译后得到的SDK，即`ernie_tiny-debug.aar`.
+本工程除了可以直接编译 App 体验之外，还可以编译 ERNIE 3.0 Tiny 的`Java SDK`，方便用户开箱即用。 如下图所示，编译 Java SDK 的步骤为：  
+   - 先在 Android Studio 中打开`ernie_tiny/build.gradle`工程文件；  
+   - 选择 Build->Make Module 'android:ernietiny'；  
+   - 从`ernie_tiny/build/outputs/aar`目录中获取编译后得到的 SDK，即`ernie_tiny-debug.aar`.
 
 <img width="1073" alt="image" src="https://user-images.githubusercontent.com/31974251/210746163-41d39478-8d5d-4138-9f76-75ff5c25c295.png">
 
-在获取到`ernie_tiny-debug.aar`后，可将其拷贝到您自己的工程中进行使用。在Android Studio中的配置步骤如下：  
-（1）首先，将`ernie_tiny-debug.aar`拷贝到您Android工程的libs目录下。
+在获取到`ernie_tiny-debug.aar`后，可将其拷贝到您自己的工程中进行使用。在 Android Studio 中的配置步骤如下：  
+（1）首先，将`ernie_tiny-debug.aar`拷贝到您 Android 工程的libs目录下。
 ```bash
 ├── build.gradle
 ├── libs
@@ -60,7 +60,7 @@
 ├── proguard-rules.pro
 └── src
 ```
-（2）在您的Android工程中的build.gradle引入ERNIE Tiny SDK，如下
+（2）在您的 Android 工程中的 build.gradle 引入 ERNIE 3.0 Tiny SDK，如下
 ```groovy
 dependencies {
     implementation fileTree(include: ['ernie_tiny-debug.aar'], dir: 'libs')
@@ -71,14 +71,14 @@ dependencies {
 
 ### ERNIE 3.0 Tiny Java API说明如下  
 
-- ERNIE 3.0 Tiny `Predictor`初始化 API: 模型初始化API包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用init函数，在合适的程序节点进行初始化。ERNIE 3.0 Tiny Predictor初始化参数说明如下：
-   - modelFile: String, paddle格式的模型文件路径，如 infer_model.pdmodel
-   - paramFile: String, paddle格式的参数文件路径，如 infer_model.pdiparams
+- ERNIE 3.0 Tiny `Predictor` 初始化 API: 模型初始化 API 包含两种方式，方式一是通过构造函数直接初始化；方式二是，通过调用 init 函数，在合适的程序节点进行初始化。ERNIE 3.0 Tiny Predictor 初始化参数说明如下：
+   - modelFile: String, paddle 格式的模型文件路径，如 infer_model.pdmodel
+   - paramFile: String, paddle 格式的参数文件路径，如 infer_model.pdiparams
    - vocabFile: String, 词表文件，如 vocab.txt 每一行包含一个词
    - slotLabelsFile: String, 槽位标签文件，如 slots_label.txt
    - intentLabelsFile: String, 意图标签文件，如 intent_label.txt 每一行包含一个标签
    - addedTokensFile: String, 额外词表文件，如 added_tokens.json，json文件
-   - runtimeOption: RuntimeOption，可选参数，模型初始化option。如果不传入该参数则会使用默认的运行时选项。
+   - runtimeOption: RuntimeOption，可选参数，模型初始化 option。如果不传入该参数则会使用默认的运行时选项。
    - maxLength: 最大序列长度，默认为16
 
 ```java
@@ -88,12 +88,12 @@ public Predictor(String modelFile, String paramsFile, String vocabFile, String s
 public boolean init(String modelFile, String paramsFile, String vocabFile, String slotLabelsFile, String intentLabelsFile, String addedTokensFile, RuntimeOption runtimeOption, int maxLength);
 ```  
 
-- ERNIE 3.0 Tiny `Predictor`预测 API：Predictor提供predict接口对输出的文本进行意图识别。  
+- ERNIE 3.0 Tiny `Predictor` 预测 API：Predictor 提供 predict 接口对输出的文本进行意图识别。  
 ```java
 public IntentDetAndSlotFillResult[] predict(String[] texts);
 ```
 
-- ERNIE 3.0 Tiny Predictor资源释放 API: 调用 release() API 可以释放模型资源，返回true表示释放成功，false表示失败；调用 initialized() 可以判断Predictor是否初始化成功，true表示初始化成功，false表示失败。
+- ERNIE 3.0 Tiny Predictor 资源释放 API: 调用 release() API 可以释放模型资源，返回 true 表示释放成功，false 表示失败；调用 initialized() 可以判断 Predictor 是否初始化成功，true 表示初始化成功，false 表示失败。
 ```java
 public boolean release(); // 释放native资源  
 public boolean initialized(); // 检查Predictor是否初始化成功
@@ -134,7 +134,7 @@ public class IntentDetAndSlotFillResult {
 }
 ```  
 
-- ERNIE 3.0 Tiny `Predictor` FP32/FP16推理示例
+- ERNIE 3.0 Tiny `Predictor` FP32/FP16 推理示例
 
 ```java
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
@@ -173,7 +173,7 @@ class TestERNIETiny extends Activity {
 }
 ```  
 
-- ERNIE 3.0 Tiny `Predictor` Int8量化模型推理示例
+- ERNIE 3.0 Tiny `Predictor` Int8 量化模型推理示例
 
 ```java
 import com.baidu.paddle.paddlenlp.ernie_tiny.RuntimeOption;
@@ -214,10 +214,10 @@ class TestERNIETiny extends Activity {
 
 更详细的用法请参考 [ERNIETinyMainActivity](./app/src/main/java/com/baidu/paddle/paddlenlp/app/ernie_tiny/ERNIETinyMainActivity.java) 中的用法
 
-## 替换App示例中的ERNIE 3.0 Tiny模型    
+## 替换 App 示例中的 ERNIE 3.0 Tiny 模型    
 
-替换App示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含vocab.txt、slots_label.txt、intent_label.txt以及added_token.json等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
-  - 将您的ERNIE 3.0 Tiny模型放在 `app/src/main/assets/models` 目录下；
+替换 App 示例中的模型的步骤非常简单，模型所在的位置为 `app/src/main/assets/models`。替换模型之前请确保您的模型目录中包含 vocab.txt、slots_label.txt、intent_label.txt以及added_token.json 等意图识别和槽位分析所需要的词表和标签文件。替换模型的步骤为：  
+  - 将您的 ERNIE 3.0 Tiny 模型放在 `app/src/main/assets/models` 目录下；
   - 修改 `app/src/main/res/values/strings.xml` 中模型路径的默认值，如：
 
 ```xml
@@ -225,16 +225,16 @@ class TestERNIETiny extends Activity {
 <string name="ERNIE_TINY_MODEL_DIR_DEFAULT">models/ernie-tiny</string>
 ```  
 
-## 关于ERNIE 3.0 Tiny JNI的封装  
+## 关于 ERNIE 3.0 Tiny JNI 的封装  
 
-如果您对ERNIE 3.0 Tiny JNI封装的实现感兴趣，可以参考 [ernie_tiny_jni/predictor_jni.cc](./ernie_tiny/src/main/cpp/ernie_tiny_jni/predictor_jni.cc), 关于如何使用JNI进行模型封装并和Java通信，可以参考 [FastDeploy/use_cpp_sdk_on_android.md](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/faq/use_cpp_sdk_on_android.md) 文档中的说明。
+如果您对 ERNIE 3.0 Tiny JNI 封装的实现感兴趣，可以参考 [ernie_tiny_jni/predictor_jni.cc](./ernie_tiny/src/main/cpp/ernie_tiny_jni/predictor_jni.cc), 关于如何使用 JNI 进行模型封装并和 Java 通信，可以参考 [FastDeploy/use_cpp_sdk_on_android.md](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/faq/use_cpp_sdk_on_android.md) 文档中的说明。
 
 ## 相关文档
 
-[ERNIE 3.0 Tiny模型详细介绍](../../README.md)
+[ERNIE 3.0 Tiny 模型详细介绍](../../README.md)
 
-[ERNIE 3.0 Tiny模型C++部署方法](../cpp/README.md)
+[ERNIE 3.0 Tiny 模型C++部署方法](../cpp/README.md)
 
-[ERNIE 3.0 Tiny模型Python部署方法](../python/README.md)
+[ERNIE 3.0 Tiny 模型Python部署方法](../python/README.md)
 
-[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)
+[FastDeploy SDK 安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)
