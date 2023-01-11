@@ -300,8 +300,9 @@ if [ ! -f 'test.py' ];then
     --micro_batch_size 8 \
     --eval_steps 100 \
     --overwrite_output_dir true \
+    --dataloader_drop_last true \
     --do_train true \
-    --do_predict false >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
+    --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
     print_info $? gpt_pretrain
     # export model
     python export_model.py --model_type=gpt \
