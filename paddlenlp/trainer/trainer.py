@@ -27,6 +27,7 @@ import shutil
 import sys
 import time
 import types
+from collections import defaultdict
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -37,11 +38,13 @@ import paddle.amp.auto_cast as autocast
 import paddle.distributed as dist
 import paddle.nn as nn
 from packaging import version
+from paddle.amp.grad_scaler import OptimizerState, _refresh_optimizer_state
 from paddle.distributed import fleet
 from paddle.distributed.fleet.utils.hybrid_parallel_util import (
     fused_allreduce_gradients,
 )
 from paddle.fluid.dygraph.parallel import sync_params_buffers
+from paddle.fluid.layer_helper import LayerHelper
 from paddle.io import DataLoader, Dataset, DistributedBatchSampler
 from tqdm.auto import tqdm
 
@@ -685,12 +688,18 @@ class Trainer:
                     optimizer_was_run = True
                     if self.do_grad_scaling:
                         scale_before = self.scaler._scale.numpy()
-                        self.scaler.step(self.optimizer)
+                        if self.args.device == "npu" and self.args.flatten_param_grads_on_npu:
+                            self._npu_grad_scaler_step()
+                        else:
+                            self.scaler.step(self.optimizer)
                         self.scaler.update()
                         scale_after = self.scaler._scale.numpy()
                         optimizer_was_run = scale_before <= scale_after
                     else:
-                        self.optimizer.step()
+                        if self.args.device == "npu" and self.args.flatten_param_grads_on_npu:
+                            self._npu_step()
+                        else:
+                            self.optimizer.step()
 
                     if optimizer_was_run:
                         self.lr_scheduler.step()
@@ -763,6 +772,124 @@ class Trainer:
         self.control = self.callback_handler.on_train_end(args, self.state, self.control)
 
         return TrainOutput(self.state.global_step, train_loss, metrics)
+
+    def _npu_grad_scaler_step(self):
+        if not self.scaler._enable:
+            return self._npu_step(self.optimizer)
+
+        optimizer_state = self.scaler._optimizer_states[id(self.optimizer)]
+        if optimizer_state["state"] is OptimizerState.STEPPED:
+            raise RuntimeError("step() has already been called since the last update().")
+
+        #  unscale the grad
+        if optimizer_state["state"] is OptimizerState.INIT:
+            self.scaler._unscale(self.optimizer)
+
+        if self.scaler._found_inf:
+            self.scaler._cache_founf_inf = True
+        else:
+            self._npu_step(self.optimizer)
+            self.scaler._cache_founf_inf = False
+
+        optimizer_state["state"] = OptimizerState.STEPPED
+
+        if not self.scaler._use_dynamic_loss_scaling:
+            self.scaler._optimizer_states = defaultdict(_refresh_optimizer_state)
+
+    def _npu_step(self):
+        if not isinstance(self.optimizer._param_groups[0], dict):
+            params_grads = []
+            for param in self.optimizer._param_groups:
+                if param.stop_gradient:
+                    continue
+                if param._grad_ivar() is not None:
+                    grad_var = param._grad_ivar()
+                    params_grads.append((param, grad_var))
+
+            # currently, only support ClipGradByGlobalNorm and without regularization.
+            if isinstance(params_grads, list) and self.optimizer.regularization is None:
+                if self.optimizer._grad_clip is None or isinstance(
+                    self.optimizer._grad_clip, paddle.nn.ClipGradByGlobalNorm
+                ):
+                    params_grads = self._flatten_param_grads(self.optimizer, params_grads)
+
+            self.optimizer._apply_optimize(
+                loss=None,
+                startup_program=None,
+                params_grads=params_grads,
+                param_group_idx=0,
+            )
+        else:
+            raise RuntimeError("flatten_param_grads is not supported when _param_groups[0] is dict.")
+
+    def _flatten_param_grads(self, params_grads):
+        self.optimizer.helper = LayerHelper(self.optimizer.__class__.__name__)
+        need_flatten_params = []
+        need_flatten_grads = []
+        for p, g in params_grads:
+            if g is None:
+                continue
+            g.persistable = True
+            if getattr(p, "need_clip", True) is False or getattr(p, "regularizer", None) is not None:
+                logger.warning(
+                    f"flatten_param_grads=True will be discarded since paramter {p.name}'s need_clip is False or "
+                    "the regularizer is set."
+                )
+                # self._flatten_param_grads = False
+                return params_grads
+
+            need_flatten_params.append(p)
+            need_flatten_grads.append(g)
+
+        shape = [np.prod(p.shape) for p in need_flatten_params]
+
+        flatten_param = self.optimizer.helper.create_global_variable(
+            name="flatten_param",
+            persistable=True,
+            dtype=need_flatten_params[0].dtype,
+            shape=[np.sum(shape)],
+            belong_to_optimizer=True,
+        )
+
+        flatten_grad = self.optimizer.helper.create_global_variable(
+            name="flatten_grad",
+            persistable=True,
+            dtype=need_flatten_grads[0].dtype,
+            shape=[np.sum(shape)],
+            belong_to_optimizer=True,
+        )
+
+        flatten_param.stop_gradient = False
+        # In the final state of the dynamic graph, the `coalesce_tensor` op
+        # does not support passing the output as an input into the op in
+        # temporary, so _legacy_C_ops is temporarily used here.
+        # `use_align` is set to false, which is different from the behavior
+        # under static graphs. `use_align` can be set to true after calling
+        # the coalesce_tensor op of the final state (_C_ops).
+        paddle._legacy_C_ops.coalesce_tensor(
+            need_flatten_params,
+            need_flatten_params,
+            flatten_param,
+            "copy_data",
+            True,
+            "use_align",
+            False,
+            "dtype",
+            need_flatten_params[0].dtype,
+        )
+
+        paddle._legacy_C_ops.coalesce_tensor(
+            need_flatten_grads,
+            need_flatten_grads,
+            flatten_grad,
+            "copy_data",
+            True,
+            "use_align",
+            False,
+            "dtype",
+            need_flatten_grads[0].dtype,
+        )
+        return [(flatten_param, flatten_grad)]
 
     def _get_train_sampler(self) -> Optional[paddle.io.Sampler]:
         if self.train_dataset is None or not has_length(self.train_dataset):
