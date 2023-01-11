@@ -194,9 +194,9 @@ def convert_to_legacy_config(attribute_map: Dict[str, str], config: Dict[str, An
             init_arg = convert_to_legacy_config(attribute_map, init_arg)
             args.append(init_arg)
         config["init_args"] = args
-
-    for standard_field, paddle_field in attribute_map.items():
-        config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+    else:
+        for standard_field, paddle_field in attribute_map.items():
+            config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
     return config
 
 
@@ -864,6 +864,8 @@ class PretrainedConfig:
 
         # convert local config to legacy config
         config_dict = convert_to_legacy_config(cls.attribute_map, config_dict)
+
+        config_dict = flatten_model_config(config_dict)
 
         config = cls(**config_dict)
 
