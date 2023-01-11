@@ -1,4 +1,4 @@
-# 端上语义理解压缩方案
+# ERNIE 3.0 Tiny: Frustratingly Simple Method to Improve Task-Agnostic Distillation Generalization
 
  **目录**
    * [ERNIE 3.0 Tiny 介绍](#模型介绍)
@@ -14,7 +14,6 @@
        * [压缩效果](#压缩效果)
    * [⚡️ FastDeploy 部署](#FastDeploy部署)
    * [参考文献](#参考文献)
-
 
 本项目开源了 **ERNIE 3.0 Tiny** 预训练模型及 **端上语义理解压缩方案**。
 
