@@ -560,7 +560,7 @@ class GPTCompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
+            input_ids = np.array([[i for i in range(10)]])
 
             # 2. forward the paddle model
             from paddlenlp.transformers import GPTModel
@@ -609,7 +609,7 @@ class GPTCompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
+            input_ids = np.array([[i for i in range(10)]])
 
             # 2. forward the torch  model
             import torch
@@ -638,7 +638,7 @@ class GPTCompatibilityTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
-            input_ids = np.random.randint(100, 200, [1, 20])
+            input_ids = np.array([[i for i in range(10)]])
 
             # 2. forward the torch  model
             import torch
