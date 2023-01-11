@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/core/base.h"
+
 #include <thread>
 
 namespace paddlenlp {
@@ -28,16 +29,22 @@ int GetThreadNum() { return fast_tokenizer_thread_num; }
 void RunMultiThread(std::function<void(size_t, size_t)> func,
                     size_t batch_size) {
   int thread_num = GetThreadNum();
-  std::vector<std::thread> vectorOfThread;
-  size_t start_index = 0;
-  size_t step_index = ceil(batch_size / float(thread_num));
+  if (thread_num == 1) {
+    // Note(zhoushunjie): No need to create threads when
+    // thread_num equals to 1.
+    func(0, batch_size);
+  } else {
+    std::vector<std::thread> vectorOfThread;
+    size_t start_index = 0;
+    size_t step_index = ceil(batch_size / float(thread_num));
 
-  for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread.emplace_back(std::thread(func, start_index, step_index));
-    start_index = start_index + step_index;
-  }
-  for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
-    vectorOfThread[thread_index].join();
+    for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
+      vectorOfThread.emplace_back(std::thread(func, start_index, step_index));
+      start_index = start_index + step_index;
+    }
+    for (size_t thread_index = 0; thread_index < thread_num; thread_index++) {
+      vectorOfThread[thread_index].join();
+    }
   }
 }
 
