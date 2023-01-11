@@ -194,6 +194,7 @@ public class ERNIETinyMainActivity extends Activity implements View.OnClickListe
             if (Boolean.parseBoolean(ERNIETinySettingsActivity.enableLiteFp16)) {
                 option.enableLiteFp16();
             }
+            // option.enableLiteInt8(); // For quantized models
             predictor.init(modelFile, paramsFile, vocabFile, slotLabelsFile,
                     intentLabelsFile, addedTokensFile, option, 16);
         }
