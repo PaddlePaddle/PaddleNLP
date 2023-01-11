@@ -1,4 +1,4 @@
-# 端上语义理解压缩方案
+# ERNIE 3.0 Tiny
 
  **目录**
    * [ERNIE 3.0 Tiny 介绍](#模型介绍)
@@ -14,7 +14,6 @@
        * [压缩效果](#压缩效果)
    * [⚡️ FastDeploy 部署](#FastDeploy部署)
    * [参考文献](#参考文献)
-
 
 本项目开源了 **ERNIE 3.0 Tiny** 预训练模型及 **端上语义理解压缩方案**。
 
@@ -70,7 +69,7 @@ ERNIE 3.0 Tiny v1 通过在线蒸馏技术将预训练大模型压缩成预训�
 
 其中，v2 版本开源了 6 种结构的模型，v1 版本开源了前 5 种结构的模型。
 
-ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resourced 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../../examples/benchmark/clue) 复现。
+ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、问答等各种 NLU 任务中。下表是 ERNIE 3.0 Tiny 模型在 in-domain、out-domain 和 low-resourced 三类数据集上的效果。其中 CLUE 指标可以通过 [PaddleNLP CLUE Benchmark](../../examples/benchmark/clue) 复现。
 
 <table>
     <tr>
@@ -570,7 +569,7 @@ python run_eval.py  \
 
 尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至移动端还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
 
-为了方便实现，[PaddleNLP 模型压缩 API](../../../docs/compression.md) 已提供了以下压缩功能。
+为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能。
 
 端上模型压缩流程如下图所示：
 
