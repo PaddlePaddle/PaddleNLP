@@ -775,7 +775,7 @@ class Trainer:
 
     def _npu_grad_scaler_step(self):
         if not self.scaler._enable:
-            return self._npu_step(self.optimizer)
+            return self._npu_step()
 
         optimizer_state = self.scaler._optimizer_states[id(self.optimizer)]
         if optimizer_state["state"] is OptimizerState.STEPPED:
@@ -788,7 +788,7 @@ class Trainer:
         if self.scaler._found_inf:
             self.scaler._cache_founf_inf = True
         else:
-            self._npu_step(self.optimizer)
+            self._npu_step()
             self.scaler._cache_founf_inf = False
 
         optimizer_state["state"] = OptimizerState.STEPPED
@@ -811,7 +811,7 @@ class Trainer:
                 if self.optimizer._grad_clip is None or isinstance(
                     self.optimizer._grad_clip, paddle.nn.ClipGradByGlobalNorm
                 ):
-                    params_grads = self._flatten_param_grads(self.optimizer, params_grads)
+                    params_grads = self._flatten_param_grads(params_grads)
 
             self.optimizer._apply_optimize(
                 loss=None,
@@ -835,7 +835,7 @@ class Trainer:
                     f"flatten_param_grads=True will be discarded since paramter {p.name}'s need_clip is False or "
                     "the regularizer is set."
                 )
-                # self._flatten_param_grads = False
+                self.args.flatten_param_grads_on_npu = False
                 return params_grads
 
             need_flatten_params.append(p)
