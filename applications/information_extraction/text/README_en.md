@@ -17,7 +17,7 @@
 
 This project provides an end-to-end application solution for plain text extraction based on UIE fine-tuning and goes through the full lifecycle of **data labeling, model training and model deployment**. We hope this guide can help you apply Information Extraction techniques in your own products or models.a
 
-Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction] (https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapated models specialized for different industry sectors.
+Information Extraction (IE) is the process of extracting structured information from given input data such as text, pictures or scanned document. While IE brings immense value, applying IE techniques is never easy with challenges such as domain adaptation, heterogeneous structures, lack of labeled data, etc. This PaddleNLP Information Extraction Guide builds on the foundation of our work in [Universal Information Extraction](https://arxiv.org/abs/2203.12277) and provides an industrial-level solution that not only supports **extracting entities, relations, events and opinions from plain text**, but also supports **cross-modal extraction out of documents, tables and pictures.** Our method features a flexible prompt, which allows you to specify extraction targets with simple natural language. We also provide a few different domain-adapated models specialized for different industry sectors.
 
 **Highlights:**
 - **Comprehensive Coverage🎓:** Covers various mainstream tasks of information extraction for plain text and document scenarios, supports multiple languages
@@ -47,7 +47,7 @@ For quick start, you can directly use ```paddlenlp.Taskflow``` out-of-the-box, l
 
 ### 2.2 Data labeling
 
-We recommend using [Label Studio](https://labelstud.io/) for data labeling. We provide an end-to-end pipeline for the labeling -> training process. You can export the labeled data in Label Studio through [label_studio.py]( ../label_studio.py) script to export and convert the data into the required input form for the model. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio_text.md).
+We recommend using [Label Studio](https://labelstud.io/) for data labeling. We provide an end-to-end pipeline for the labeling -> training process. You can export the labeled data in Label Studio through [label_studio.py](../label_studio.py) script to export and convert the data into the required input form for the model. For a detailed introduction to labeling methods, please refer to [Label Studio Data Labeling Guide](../label_studio_text_en.md).
 
 Here we provide a pre-labeled example dataset `Military Relationship Extraction Dataset`, which you can download with the following command. We will show how to use the data conversion script to generate training/validation/test set files for fine-tuning .
 
@@ -70,7 +70,7 @@ python ../label_studio.py \
      --task_type ext
 ```
 
-For more labeling rules and parameter descriptions for different types of tasks (including entity extraction, relationship extraction, document classification, etc.), please refer to [Label Studio Data Labeling Guide](../label_studio.md).
+For more labeling rules and parameter descriptions for different types of tasks (including entity extraction, relationship extraction, document classification, etc.), please refer to [Label Studio Data Labeling Guide](../label_studio_text_en.md).
 
 
 <a name="23"></a>
@@ -274,4 +274,4 @@ Same with the pretrained models, you can use `paddlenlp.Taskflow` to load your c
 
 ### 2.7 Closed Domain Distillation
 
-Some industrial application scenarios have high inference performance requirements and the model cannot go into production without being effectively compressed. We built the [UIE Slim Data Distillation](./data_distill/README.md) with knowledge distillation techniques. The principle is to use the data as a bridge to transfer the knowledge of the UIE model to the smaller closed-domain information extraction model in order to achieve speedup inference significantly with minimal loss to accuracy.
+Some industrial application scenarios have high inference performance requirements and the model cannot go into production without being effectively compressed. We built the [UIE Slim Data Distillation](./data_distill/README_en.md) with knowledge distillation techniques. The principle is to use the data as a bridge to transfer the knowledge of the UIE model to the smaller closed-domain information extraction model in order to achieve speedup inference significantly with minimal loss to accuracy.
