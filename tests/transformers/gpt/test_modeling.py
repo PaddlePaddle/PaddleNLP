@@ -634,7 +634,7 @@ class GPTCompatibilityTest(unittest.TestCase):
             )
 
     @require_package("transformers", "torch")
-    def test_gpt_for_token_classification(self):
+    def test_gpt_for_lm_head(self):
         with tempfile.TemporaryDirectory() as tempdir:
 
             # 1. create commmon input
@@ -642,17 +642,17 @@ class GPTCompatibilityTest(unittest.TestCase):
 
             # 2. forward the torch  model
             import torch
-            from transformers import GPT2ForTokenClassification
+            from transformers import GPT2LMHeadModel
 
-            torch_model = GPT2ForTokenClassification.from_pretrained("hf-internal-testing/tiny-random-GPT2Model")
+            torch_model = GPT2LMHeadModel.from_pretrained("hf-internal-testing/tiny-random-GPT2Model")
             torch_model.eval()
             torch_model.save_pretrained(tempdir)
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0][0]
 
             # 2. forward the paddle model
-            from paddlenlp.transformers import GPTForTokenClassification
+            from paddlenlp.transformers import GPTLMHeadModel
 
-            paddle_model = GPTForTokenClassification.from_pretrained(tempdir)
+            paddle_model = GPTLMHeadModel.from_pretrained(tempdir)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
 

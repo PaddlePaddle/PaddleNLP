@@ -524,19 +524,13 @@ class GPTPretrainedModel(PretrainedModel):
 
             model_mappings.extend(layer_mappings)
 
-        prefix = None
-        if "GPTModel" not in config.architectures and "GPT2Model" not in config.architectures:
-            prefix = "gpt"
-        elif (
-            "GPT2ForSequenceClassification" in config.architectures
-            or "GPT2ForTokenClassification" in config.architectures
-        ):
-            prefix = "transformer"
-
-        if prefix:
+        if "GPT2Model" not in config.architectures:
             for mapping in model_mappings:
-                mapping[0] = prefix + mapping[0]
-                mapping[1] = prefix + mapping[1]
+                mapping[0] = "transformer." + mapping[0]
+                mapping[1] = "gpt." + mapping[1]
+
+        if "GPT2LMHeadModel" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.decoder_weight"])
 
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
