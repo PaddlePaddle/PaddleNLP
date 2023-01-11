@@ -14,6 +14,7 @@
 
 import os
 import sys
+from functools import partial
 
 import paddle.nn as nn
 from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
@@ -25,13 +26,13 @@ from paddlenlp.utils.log import logger
 
 from .model_base import BenchmarkBase
 
-sys.path.append(
+sys.path.insert(
+    0,
     os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "model_zoo", "ernie-3.0")
-    )
+    ),
 )
 
-from functools import partial  # noqa: E402
 
 from utils import seq_convert_example  # noqa: E402
 
