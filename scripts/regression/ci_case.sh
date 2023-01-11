@@ -297,10 +297,11 @@ if [ ! -f 'test.py' ];then
     --device gpu \
     --warmup_steps 320000 \
     --warmup_ratio 0.01 \
-    --mirco_batch_size 4 \
+    --micro_batch_size 8 \
     --eval_steps 100 \
+    --overwrite_output_dir true \
     --do_train true \
-    --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
+    --do_predict false >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
     print_info $? gpt_pretrain
     # export model
     python export_model.py --model_type=gpt \
