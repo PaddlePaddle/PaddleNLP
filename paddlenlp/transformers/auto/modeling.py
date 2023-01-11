@@ -58,6 +58,7 @@ MAPPING_NAMES = OrderedDict(
         ("BlenderbotSmall", "blenderbot_small"),
         ("Blenderbot", "blenderbot"),
         ("ChineseCLIP", "chineseclip"),
+        ("CMSIMLock", "cmsim_lock"),
         ("ChineseBert", "chinesebert"),
         ("ConvBert", "convbert"),
         ("CTRL", "ctrl"),
