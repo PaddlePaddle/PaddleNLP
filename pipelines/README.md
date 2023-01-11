@@ -31,7 +31,7 @@ PaddleNLP Pipelines NLP流水线系统针对 NLP 部分高频场景开源了经�
 
 * 快速搭建产品级[**语义检索**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/semantic-search)系统：使用自然语言文本通过语义进行智能文档查询，而不是关键字匹配
 * 快速搭建产品级[**智能问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/question-answering)系统：用自然语言提问，即可获得精准答案片段
-* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/frequently-asked-question)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
+* 快速搭建产品级 [**FAQ 问答**](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/pipelines/examples/FAQ)系统：用自然语言提问，匹配相关的高频问题，并返回匹配到的高频问题的答案
 * 快速搭建产品级**多模态信息抽取**系统（即将开放，敬请期待）
 
 ### 效果展示
