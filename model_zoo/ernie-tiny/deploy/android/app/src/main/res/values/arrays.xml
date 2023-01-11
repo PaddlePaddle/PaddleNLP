@@ -36,4 +36,25 @@
         <item>true</item>
         <item>false</item>
     </string-array>
+    <string-array name="enable_lite_int8_mode_entries">
+        <item>true</item>
+        <item>false</item>
+    </string-array>
+    <string-array name="enable_lite_int8_mode_values">
+        <item>true</item>
+        <item>false</item>
+    </string-array>
+    <string-array name="preinstalled_models_entries">
+        <item>models/ernie-tiny</item>
+        <item>models/ernie-tiny-clip</item>
+        <item>models/ernie-tiny-clip-qat</item>
+        <item>models/ernie-tiny-clip-qat-embedding-int8</item>
+    </string-array>
+
+    <string-array name="preinstalled_models_values">
+        <item>models/ernie-tiny</item>
+        <item>models/ernie-tiny-clip</item>
+        <item>models/ernie-tiny-clip-qat</item>
+        <item>models/ernie-tiny-clip-qat-embedding-int8</item>
+    </string-array>
 </resources>
