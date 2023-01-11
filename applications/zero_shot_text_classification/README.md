@@ -18,7 +18,7 @@
 本项目提供基于通用文本分类 UTC（Universial Text Classification） 模型微调的文本分类端到端应用方案，打通**数据标注-模型训练-模型调优-预测部署全流程**，可快速实现文本分类产品落地。
 
 <div align="center">
-    <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/210748712-58cf3654-b991-4a1d-b5e0-390d5198ec42.png">
+    <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/211755652-dac155ca-649e-470c-ac8b-06156b444b58.png">
 </div>
 
 文本分类简单来说就是对给定的句子或文本使用分类模型分类。在文本分类的落地过程中通常面临领域多变、任务多样、数据稀缺等许多挑战。针对文本分类领域的痛点和难点，PaddleNLPl零样本文本分类应用 UTC 通过统一语义匹配方式 USM（Unified Semantic Matching）统一建模标签与文本的语义匹配能力，具备低资源迁移能力，支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务，助力开发者简单高效实现多任务文本分类数据标注、训练、调优、上线，降低文本分类落地技术门槛。
@@ -222,7 +222,7 @@ schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就�
 utc = Taskflow("zero_shot_text_classification",
                schema=schema,
                task_path="../../checkpoint/model_best/",
-               precision="fp16")
+               precision="fp32")
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
 ```
@@ -232,13 +232,13 @@ app.register_taskflow("taskflow/utc", utc)
 paddlenlp server server:app --host 0.0.0.0 --port 8990
 ```
 
-具体的使用方法可以见[UTC SimpleServing 使用方法](./deploy/simple_serving/README.md)
+支持FP16半精度推理加速，详见[UTC SimpleServing 使用方法](./deploy/simple_serving/README.md)
 
 <a name="实验指标"></a>
 
 ### 2.7 实验指标
 
-医疗意图分类数据集实验指标：
+医疗意图分类数据集 KUAKE-QIC 验证集实验指标：
 
   |          |  Accuracy  | Micro F1   | Macro F1   |
   | :------: | :--------: | :--------: | :--------: |
@@ -247,5 +247,4 @@ paddlenlp server server:app --host 0.0.0.0 --port 8990
   | 10-shot  | 65.88 | 93.76 | 81.34 |
   | full-set | 81.81 | 96.65 | 89.87 |
 
-
-商业版本UTC模型支持极多标签分类，首创单双塔统一训练，多标签并行预测，进一步解决大规模标签和高效推理问题，可显著提升跨领域少样本分类能力。
+其中 k-shot 表示每个标签有 k 条标注样本用于训练。
