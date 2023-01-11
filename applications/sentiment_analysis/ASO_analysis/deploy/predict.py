@@ -16,6 +16,7 @@ import argparse
 import copy
 import json
 import os
+import re
 from collections import defaultdict
 from functools import partial
 
@@ -146,6 +147,11 @@ def convert_example_to_feature_cls(example, tokenizer, label2id, max_seq_len=512
     return encoded_inputs
 
 
+def remove_blanks(example):
+    example["text"] = re.sub(" +", "", example["text"])
+    return example
+
+
 class Predictor(object):
     def __init__(self, args):
         self.args = args
@@ -202,6 +208,7 @@ class Predictor(object):
 
     def predict_ext(self, args):
         datasets = load_dataset("text", data_files={"test": args.test_path})
+        datasets["test"] = datasets["test"].map(remove_blanks)
         trans_func = partial(
             convert_example_to_feature_ext,
             tokenizer=self.tokenizer,

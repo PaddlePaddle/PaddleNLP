@@ -102,7 +102,10 @@ class ZeroShotTextClassificationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        model_instance = UTC.from_pretrained(model)
+        if self.from_hf_hub:
+            model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
+        else:
+            model_instance = UTC.from_pretrained(model)
         self._model = model_instance
         self._model.eval()
 
@@ -110,7 +113,10 @@ class ZeroShotTextClassificationTask(Task):
         """
         Construct the tokenizer for the predictor.
         """
-        self._tokenizer = AutoTokenizer.from_pretrained(self.model)
+        if self.from_hf_hub:
+            self._tokenizer = AutoTokenizer.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
+        else:
+            self._tokenizer = AutoTokenizer.from_pretrained(self.model)
         self._collator = PromptDataCollatorWithPadding(self._tokenizer, return_tensors="np")
         self._template = UTCTemplate(self._tokenizer, self._max_seq_len)
 
