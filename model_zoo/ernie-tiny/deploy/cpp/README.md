@@ -191,7 +191,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> UsePaddleLiteBackend() </td>
         <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
-        <td align=center>  N/A </td>
+        <td align=center>  ✅ </td>
     </tr>
     <tr>
         <td align=center> 华为 昇腾 </td>
