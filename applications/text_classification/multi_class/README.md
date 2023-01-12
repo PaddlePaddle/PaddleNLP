@@ -50,7 +50,7 @@
 wget https://paddlenlp.bj.bcebos.com/datasets/KUAKE_QIC.tar.gz
 tar -zxvf KUAKE_QIC.tar.gz
 mv KUAKE_QIC data
-rm KUAKE_QIC.tar.gz
+rm -rf KUAKE_QIC.tar.gz
 ```
 
 <div align="center">
@@ -68,7 +68,7 @@ rm KUAKE_QIC.tar.gz
 
 - python >= 3.6
 - paddlepaddle >= 2.3
-- paddlenlp >= 2.4
+- paddlenlp >= 2.4.8
 - scikit-learn >= 1.0.2
 
 **安装PaddlePaddle：**
@@ -188,7 +188,7 @@ data.txt(待预测数据文件)，需要预测标签的文本数据。
 #### 2.4.1 预训练模型微调
 
 
-使用CPU/GPU训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device cpu`：
+使用CPU/GPU训练，默认为GPU训练。使用CPU训练只需将设备参数配置改为`--device cpu`，可以使用`--device gpu:0`指定GPU卡号：
 ```shell
 python train.py \
     --model_name_or_path ernie-3.0-medium-zh \
@@ -196,7 +196,6 @@ python train.py \
     --output_dir checkpoint \
     --device gpu \
     --learning_rate 3e-5 \
-    --num_train_epochs 100 \
     --early_stopping_patience 4 \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
@@ -211,39 +210,16 @@ python train.py \
     --save_total_limit 1
 ```
 
-如果在CPU环境下训练，可以指定`nproc_per_node`参数进行多核训练：
-```shell
-python -m paddle.distributed.launch --nproc_per_node 8 --backend gloo train.py \
-    --model_name_or_path ernie-3.0-medium-zh \
-    --data_dir ./data/ \
-    --output_dir checkpoint \
-    --device cpu \
-    --learning_rate 3e-5 \
-    --num_train_epochs 100 \
-    --max_seq_length 128 \
-    --per_device_eval_batch_size 32 \
-    --per_device_train_batch_size 32 \
-    --num_train_epochs 100 \
-    --early_stopping_patience 4 \
-    --do_train \
-    --do_eval \
-    --metric_for_best_model accuracy \
-    --load_best_model_at_end \
-    --evaluation_strategy epoch \
-    --save_strategy epoch \
-    --save_total_limit 1
-```
-
-如果在GPU环境中使用，可以指定`gpus`参数进行单卡/多卡训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus 0,1。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
+如果在GPU环境中使用，可以指定`gpus`参数进行多卡分布式训练。使用多卡训练可以指定多个GPU卡号，例如 --gpus 0,1。如果设备只有一个GPU卡号默认为0，可使用`nvidia-smi`命令查看GPU使用情况:
 
 ```shell
 unset CUDA_VISIBLE_DEVICES
 python -m paddle.distributed.launch --gpus 0,1 train.py \
+    --model_name_or_path ernie-3.0-medium-zh \
     --data_dir ./data/ \
     --output_dir checkpoint \
     --device gpu \
     --learning_rate 3e-5 \
-    --num_train_epochs 100 \
     --max_seq_length 128 \
     --per_device_eval_batch_size 32 \
     --per_device_train_batch_size 32 \
@@ -278,10 +254,13 @@ python -m paddle.distributed.launch --gpus 0,1 train.py \
 
 ```text
 checkpoint/
-├── model_config.json
-├── model_state.pdparams
-├── tokenizer_config.json
-└── vocab.txt
+├── checkpoint-xxx
+├── checkpoint-xxx
+├── config.json # 模型配置文件，paddlenlp 2.4.5以前为model_config.json
+├── model_state.pdparams # 模型参数文件
+├── tokenizer_config.json # 分词器配置文件
+├── vocab.txt
+└── ...
 ```
 
 **NOTE:**
@@ -308,17 +287,14 @@ python analysis/evaluate.py --device "gpu" --max_seq_length 128 --batch_size 32 
 
 ```text
 [2022-08-10 06:28:37,219] [    INFO] - -----Evaluate model-------
-[2022-08-10 06:28:37,219] [    INFO] - Train dataset size: 6931
 [2022-08-10 06:28:37,220] [    INFO] - Dev dataset size: 1955
 [2022-08-10 06:28:37,220] [    INFO] - Accuracy in dev dataset: 81.79%
 [2022-08-10 06:28:37,221] [    INFO] - Top-2 accuracy in dev dataset: 92.48%
 [2022-08-10 06:28:37,222] [    INFO] - Top-3 accuracy in dev dataset: 97.24%
 [2022-08-10 06:28:37,222] [    INFO] - Class name: 病情诊断
-[2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in train dataset: 877(12.7%) | precision: 97.14 | recall: 96.92 | F1 score 97.03
 [2022-08-10 06:28:37,222] [    INFO] - Evaluation examples in dev dataset: 288(14.7%) | precision: 80.32 | recall: 86.46 | F1 score 83.28
 [2022-08-10 06:28:37,223] [    INFO] - ----------------------------
 [2022-08-10 06:28:37,223] [    INFO] - Class name: 治疗方案
-[2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in train dataset: 1750(25.2%) | precision: 96.84 | recall: 99.89 | F1 score 98.34
 [2022-08-10 06:28:37,223] [    INFO] - Evaluation examples in dev dataset: 676(34.6%) | precision: 88.46 | recall: 94.08 | F1 score 91.18
 ...
 ```
@@ -416,7 +392,7 @@ export/
 使用裁剪功能需要安装 paddleslim：
 
 ```shell
-pip install paddleslim==2.2.2
+pip install paddleslim==2.4.1
 ```
 
 开始模型裁剪训练，默认为GPU训练，使用CPU训练只需将设备参数配置改为`--device "cpu"`：
@@ -425,6 +401,7 @@ python prune.py \
     --device "gpu" \
     --dataset_dir "data" \
     --output_dir "prune" \
+    --learning_rate 3e-5 \
     --per_device_train_batch_size 32 \
     --per_device_eval_batch_size 32 \
     --num_train_epochs 10 \
@@ -440,7 +417,7 @@ python prune.py \
 * `device`: 选用什么设备进行裁剪，选择cpu、gpu。如使用gpu训练，可使用参数--gpus指定GPU卡号。
 * `per_device_train_batch_size`：训练集裁剪训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
 * `per_device_eval_batch_size`：开发集评测过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为32。
-* `learning_rate`：训练最大学习率；默认为3e-5。
+* `learning_rate`：训练最大学习率；默认为5e-5。
 * `num_train_epochs`: 训练轮次，使用早停法时可以选择100；默认为10。
 * `logging_steps`: 训练过程中日志打印的间隔steps数，默认100。
 * `save_steps`: 训练过程中保存模型checkpoint的间隔steps数，默认100。
@@ -459,7 +436,7 @@ prune/
 │   ├── pruned_model.pdiparams.info
 │   ├── pruned_model.pdmodel
 │   ├── model_state.pdparams
-│   └── model_config.json
+│   └── config.json
 └── ...
 ```
 
@@ -476,7 +453,7 @@ prune/
 
 - 离线部署搭建请参考[离线部署](deploy/predictor/README.md)。
 
-- 在线服务化部署搭建请参考 [Paddle Serving部署指南](deploy/paddle_serving/README.md) (Paddle Serving支持X86、Arm CPU、NVIDIA GPU、昆仑/昇腾等多种硬件)或[Triton部署指南](deploy/triton_serving/README.md)。
+- 在线服务化部署搭建请参考 [PaddleNLP SimpleServing部署指南](deploy/simple_serving/README.md) 或 [Triton部署指南](deploy/triton_serving/README.md)。
 
 
 <a name="模型效果"></a>

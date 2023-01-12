@@ -29,16 +29,18 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from huggingface_hub import hf_hub_download
+from huggingface_hub.utils import EntryNotFoundError
 
 from paddlenlp import __version__
 from paddlenlp.transformers.utils import resolve_cache_dir
-from paddlenlp.utils.env import HF_CACHE_HOME, LEGACY_CONFIG_NAME
+from paddlenlp.utils.env import LEGACY_CONFIG_NAME
 from paddlenlp.utils.log import logger
 
 from ..utils import CONFIG_NAME
 from ..utils.downloader import (
     COMMUNITY_MODEL_PREFIX,
-    get_path_from_url,
+    get_path_from_url_with_filelock,
+    hf_file_exists,
     is_url,
     url_file_exists,
 )
@@ -148,7 +150,7 @@ def cached_path(
             shutil.rmtree(file_path, ignore_errors=True)
 
         # URL, so get it from the cache (downloading if necessary)
-        output_path = get_path_from_url(
+        output_path = get_path_from_url_with_filelock(
             url_or_filename,
             root_dir=cache_dir,
         )
@@ -178,23 +180,27 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str,
     return kwargs
 
 
-def convert_to_legacy_config(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
+def convert_to_legacy_config(attribute_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
     """
     works when there are different fields between huggingface and paddle
     Args:
-        standard_config_map (Dict[str, str]): mapping of between standard config and paddle config
+        attribute_map (Dict[str, str]): mapping of between standard config and paddle config
         config (Dict[str, Any]): config of huggingface transformers models
     Returns: the config which can be mapped into config of paddle model
     """
     if "init_args" in config:
         args = []
         for init_arg in config["init_args"]:
-            init_arg = convert_to_legacy_config(standard_config_map, init_arg)
+            init_arg = convert_to_legacy_config(attribute_map, init_arg)
             args.append(init_arg)
         config["init_args"] = args
 
-    for standard_field, paddle_field in standard_config_map.items():
-        config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+    # TODO(wj-Mcat): to improve compatibility for: old local config and new PretrainedConfig, eg:
+    # { "init_args": [], "init_class": "", "num_classes": 12 }
+    for standard_field, paddle_field in attribute_map.items():
+        value = config.pop(standard_field, None) or config.pop(paddle_field, None)
+        if value is not None:
+            config[paddle_field] = value
     return config
 
 
@@ -240,6 +246,30 @@ def is_standard_config(config: Union[PretrainedConfig, Dict[str, Any]]) -> bool:
         return True
 
     return "init_class" not in config and "architectures" in config
+
+
+def resolve_hf_config_path(repo_id: str, cache_dir: str) -> str:
+    """resolve config file from hf hub
+
+    Args:
+        repo_id (str): the repo name from huggingface hub
+        cache_dir (str): the cachedir
+
+    Returns:
+        str: the downloaded config file
+    """
+    if hf_file_exists(repo_id, CONFIG_NAME):
+        file_name = CONFIG_NAME
+    else:
+        raise EntryNotFoundError(f"can not find the paddle/pytorch config file from: https://huggingface.co/{repo_id}")
+
+    return hf_hub_download(
+        repo_id=repo_id,
+        filename=file_name,
+        cache_dir=cache_dir,
+        library_name="PaddleNLP",
+        library_version=__version__,
+    )
 
 
 class PretrainedConfig:
@@ -441,10 +471,6 @@ class PretrainedConfig:
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
-    # map hf attribute to paddle attribute
-    # { "standard_field": "paddle_field", ... }
-    standard_config_map: Dict[str, str] = {}
-
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):
@@ -528,7 +554,8 @@ class PretrainedConfig:
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            self.num_labels = kwargs.pop("num_labels", 2)
+            num_labels = kwargs.pop("num_labels", 2)
+            self.num_labels = num_labels if num_labels is not None else 2
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
@@ -706,16 +733,6 @@ class PretrainedConfig:
 
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
-        # do standard config map: there are some old-school pretrained-config not refactored.
-        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
-
-        config_dict = flatten_model_config(config_dict)
-        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
-            logger.warning(
-                f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
-                f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
-            )
-
         return cls.from_dict(config_dict, **kwargs)
 
     @classmethod
@@ -772,22 +789,12 @@ class PretrainedConfig:
         if os.path.isfile(pretrained_model_name_or_path):
             resolved_config_file = pretrained_model_name_or_path
 
-        # 2. get the configuration file from HF hub
-        elif from_hf_hub:
-            resolved_config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=CONFIG_NAME,
-                cache_dir=HF_CACHE_HOME,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
-
-        # 3. get the configuration file from url, eg: https://ip/path/to/model_config.jsons
+        # 2. get the configuration file from url, eg: https://ip/path/to/model_config.json
         elif is_url(pretrained_model_name_or_path):
-            resolved_config_file = get_path_from_url(
+            resolved_config_file = get_path_from_url_with_filelock(
                 pretrained_model_name_or_path, cache_dir, check_exist=not force_download
             )
-        # 4. get the configuration file from local dir with default name, eg: /local/path
+        # 3. get the configuration file from local dir with default name, eg: /local/path
         elif os.path.isdir(pretrained_model_name_or_path):
             configuration_file = kwargs.pop("_configuration_file", CONFIG_NAME)
             configuration_file = os.path.join(pretrained_model_name_or_path, configuration_file)
@@ -804,6 +811,10 @@ class PretrainedConfig:
                         "param into `from_pretarined` method to specific the configuration file name"
                     )  # 4. load it as the community resource file
 
+        # 4. get the configuration file from HF hub
+        elif from_hf_hub:
+            resolved_config_file = resolve_hf_config_path(repo_id=pretrained_model_name_or_path, cache_dir=cache_dir)
+
         else:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, CONFIG_NAME)
             if url_file_exists(community_url):
@@ -812,6 +823,8 @@ class PretrainedConfig:
             community_url = os.path.join(COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, LEGACY_CONFIG_NAME)
             if url_file_exists(community_url):
                 return cls._get_config_dict(community_url, cache_dir=cache_dir, **kwargs)
+
+            raise FileNotFoundError(f"configuration file<{CONFIG_NAME}> or <{LEGACY_CONFIG_NAME}> not found")
 
         try:
             logger.info(f"loading configuration file {resolved_config_file}")
@@ -840,11 +853,17 @@ class PretrainedConfig:
             [`PretrainedConfig`]: The configuration object instantiated from those parameters.
         """
         return_unused_kwargs = kwargs.pop("return_unused_kwargs", False)
-        # Those arguments may be passed along for our internal telemetry.
-        # We remove them so they don't appear in `return_unused_kwargs`.
 
-        # convert local config to legacy config
-        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
+        # do standard config map: there are some old-school pretrained-config not refactored.
+        config_dict = convert_to_legacy_config(cls.attribute_map, config_dict)
+
+        config_dict = flatten_model_config(config_dict)
+
+        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
+            logger.warning(
+                f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
+                f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
+            )
 
         config = cls(**config_dict)
 

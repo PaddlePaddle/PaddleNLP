@@ -38,10 +38,7 @@ from paddle.distributed.fleet.meta_parallel import get_rng_state_tracker
 from paddle.distributed.fleet.meta_parallel.sharding.group_sharded_utils import (
     GroupShardedScaler,
 )
-from paddle.distributed.fleet.meta_parallel.sharding.sharding_utils import (
-    ShardingScaler,
-)
-from paddle.fluid.framework import core, in_dygraph_mode
+from paddle.fluid.framework import core
 from paddle.incubate.distributed.models import moe
 from utils import get_timers, set_timers
 from visualdl import LogWriter
@@ -426,8 +423,7 @@ def do_train(args):
             scaler = fleet.distributed_scaler(scaler)
             scaler._unscale = MethodType(unscale_method, scaler)
         else:
-            wrap_scale_func = GroupShardedScaler if in_dygraph_mode() else ShardingScaler
-            scaler = wrap_scale_func(scaler)
+            scaler = GroupShardedScaler(scaler)
 
         model = paddle.amp.decorate(models=model, optimizers=None, level="O2", save_dtype="float32")
 

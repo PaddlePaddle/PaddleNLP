@@ -29,13 +29,13 @@ PaddleNLP情感分析应用立足真实企业用户对情感分析方面的需�
 
 |  模型 | 权重 | 预测样本数/m |
 |  :---: | :--------: | :--------: |
-| `SKEP` | `skep_ernie_1.0_large_ch` | 538 |
-| `uie` | `uie-senta-base` | 2168 |
+| `SKEP` | `skep_ernie_1.0_large_ch` | 3428 |
+| `uie` | `uie-senta-base` | 1104 |
 
 备注： 当前只有基于UIE的方案支持情感分析结果可视化能力，基于SKEP的方案暂不支持。
 
 ## **3. 快速开始**
 
-- 👉 [基于UIE的情感分析方案](./unified_sentiment_extraction/README)
+- 👉 [基于UIE的情感分析方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction)
 
-- 👉 [基于SKEP的情感分析方案](./ASO_analysis/README)
+- 👉 [基于SKEP的情感分析方案](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/ASO_analysis)

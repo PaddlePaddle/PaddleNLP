@@ -818,6 +818,34 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": True,
         "vocab_size": 40000,
     },
+    "uie-base-answer-extractor": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "max_position_embeddings": 2048,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "task_type_vocab_size": 3,
+        "type_vocab_size": 4,
+        "use_task_id": True,
+        "vocab_size": 40000,
+    },
+    "uie-base-qa-filter": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 768,
+        "initializer_range": 0.02,
+        "max_position_embeddings": 2048,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 12,
+        "task_type_vocab_size": 3,
+        "type_vocab_size": 4,
+        "use_task_id": True,
+        "vocab_size": 40000,
+    },
     "ernie-search-base-dual-encoder-marco-en": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
@@ -889,6 +917,20 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "use_task_id": False,
         "vocab_size": 40000,
     },
+    "ernie-3.0-tiny-mini-v2-en": {
+        "attention_probs_dropout_prob": 0.1,
+        "hidden_act": "gelu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 384,
+        "intermediate_size": 1536,
+        "initializer_range": 0.02,
+        "max_position_embeddings": 514,
+        "num_attention_heads": 12,
+        "num_hidden_layers": 6,
+        "type_vocab_size": 1,
+        "use_task_id": False,
+        "vocab_size": 50265,
+    },
     "ernie-3.0-tiny-micro-v2-zh": {
         "attention_probs_dropout_prob": 0.1,
         "hidden_act": "gelu",
@@ -933,6 +975,29 @@ ERNIE_PRETRAINED_INIT_CONFIGURATION = {
         "type_vocab_size": 4,
         "use_task_id": False,
         "vocab_size": 40000,
+    },
+    "utc-large": {
+        "attention_probs_dropout_prob": 0.1,
+        "dtype": "float32",
+        "enable_recompute": False,
+        "fuse": False,
+        "hidden_act": "relu",
+        "hidden_dropout_prob": 0.1,
+        "hidden_size": 1024,
+        "initializer_range": 0.02,
+        "intermediate_size": 3072,  # it is 3072 instead of 4096
+        "layer_norm_eps": 1e-12,
+        "max_position_embeddings": 512,
+        "model_type": "ernie",
+        "num_attention_heads": 16,
+        "pool_act": "tanh",
+        "num_hidden_layers": 24,
+        "task_type_vocab_size": 3,
+        "use_task_id": True,
+        "task_id": 0,
+        "type_vocab_size": 2,
+        "vocab_size": 17965,
+        "pad_token_id": 0,
     },
 }
 
@@ -995,14 +1060,18 @@ ERNIE_PRETRAINED_RESOURCE_FILES_MAP = {
         "uie-senta-mini": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_senta_mini.pdparams",
         "uie-senta-micro": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_senta_micro.pdparams",
         "uie-senta-nano": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_senta_nano.pdparams",
+        "uie-base-answer-extractor": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_base_answer_extractor.pdparams",
+        "uie-base-qa-filter": "https://bj.bcebos.com/paddlenlp/models/transformers/uie/uie_base_qa_filter.pdparams",
         "ernie-search-base-dual-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_base_dual_encoder_marco_en.pdparams",
         "ernie-search-large-cross-encoder-marco-en": "https://paddlenlp.bj.bcebos.com/models/transformers/ernie_search/ernie_search_large_cross_encoder_marco_en.pdparams",
         "ernie-3.0-tiny-base-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_base_v2.pdparams",
         "ernie-3.0-tiny-medium-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_medium_v2.pdparams",
         "ernie-3.0-tiny-mini-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2.pdparams",
+        "ernie-3.0-tiny-mini-v2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_mini_v2_en.pdparams",
         "ernie-3.0-tiny-micro-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_micro_v2.pdparams",
         "ernie-3.0-tiny-nano-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_nano_v2.pdparams",
         "ernie-3.0-tiny-pico-v2-zh": "https://bj.bcebos.com/paddlenlp/models/transformers/ernie_3.0/ernie_3.0_tiny_pico_v2.pdparams",
+        "utc-large": "https://bj.bcebos.com/paddlenlp/models/transformers/utc/utc_large.pdparams",
     }
 }
 
@@ -1065,7 +1134,7 @@ class ErnieConfig(PretrainedConfig):
     >>> configuration = model.config
     ```"""
     model_type = "ernie"
-    attribute_map: Dict[str, str] = {"num_classes": "num_labels", "dropout": "classifier_dropout"}
+    attribute_map: Dict[str, str] = {"dropout": "classifier_dropout", "num_classes": "num_labels"}
     pretrained_init_configuration = ERNIE_PRETRAINED_INIT_CONFIGURATION
 
     def __init__(

@@ -30,6 +30,8 @@ from dataclasses import dataclass
 
 from paddlenlp.transformers.model_utils import PretrainedModel, register_base_model
 
+from ...utils.converter import StateDictNameMapping
+from ...utils.env import CONFIG_NAME
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
     MaskedLMOutput,
@@ -138,13 +140,102 @@ class BertPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    model_config_file = "config.json"
+    model_config_file = CONFIG_NAME
     config_class = BertConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "bert"
 
     pretrained_init_configuration = BERT_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = BERT_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_name_mappings(cls, config: BertConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["embeddings.word_embeddings.weight", "embeddings.word_embeddings.weight"],
+            ["embeddings.position_embeddings.weight", "embeddings.position_embeddings.weight"],
+            ["embeddings.token_type_embeddings.weight", "embeddings.token_type_embeddings.weight"],
+            ["embeddings.LayerNorm.weight", "embeddings.layer_norm.weight"],
+            ["embeddings.LayerNorm.bias", "embeddings.layer_norm.bias"],
+            ["pooler.dense.weight", "pooler.dense.weight", "transpose"],
+            ["pooler.dense.bias", "pooler.dense.bias"],
+            # for TokenClassification
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.weight",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.query.bias",
+                    f"encoder.layers.{layer_index}.self_attn.q_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.weight",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.key.bias",
+                    f"encoder.layers.{layer_index}.self_attn.k_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.weight",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.self.value.bias",
+                    f"encoder.layers.{layer_index}.self_attn.v_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.weight",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.dense.bias",
+                    f"encoder.layers.{layer_index}.self_attn.out_proj.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.intermediate.dense.weight",
+                    f"encoder.layers.{layer_index}.linear1.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.intermediate.dense.bias", f"encoder.layers.{layer_index}.linear1.bias"],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.weight",
+                    f"encoder.layers.{layer_index}.norm1.weight",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.attention.output.LayerNorm.bias",
+                    f"encoder.layers.{layer_index}.norm1.bias",
+                ],
+                [
+                    f"encoder.layer.{layer_index}.output.dense.weight",
+                    f"encoder.layers.{layer_index}.linear2.weight",
+                    "transpose",
+                ],
+                [f"encoder.layer.{layer_index}.output.dense.bias", f"encoder.layers.{layer_index}.linear2.bias"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.weight", f"encoder.layers.{layer_index}.norm2.weight"],
+                [f"encoder.layer.{layer_index}.output.LayerNorm.bias", f"encoder.layers.{layer_index}.norm2.bias"],
+            ]
+            model_mappings.extend(layer_mappings)
+
+        # base-model prefix "BertModel"
+        if "BertModel" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "bert." + mapping[0]
+                mapping[1] = "bert." + mapping[1]
+
+        # downstream mappings
+        if "BertForQuestionAnswering" in config.architectures:
+            model_mappings.extend([["qa_outputs.weight", "classifier.weight"], ["qa_outputs.bias", "classifier.bias"]])
+
+        mappings = [StateDictNameMapping(*mapping, index=index) for index, mapping in enumerate(model_mappings)]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -155,9 +246,7 @@ class BertPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.config.initializer_range,
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )

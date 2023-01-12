@@ -17,8 +17,9 @@
  Processing saving/loading class for common processors.
 """
 
-import paddlenlp.transformers
 import os
+
+import paddlenlp.transformers
 
 
 class ProcessorMixin(object):
@@ -128,3 +129,8 @@ class ProcessorMixin(object):
             attribute_class = getattr(paddlenlp.transformers, class_name)
             args.append(attribute_class.from_pretrained(pretrained_model_name_or_path, **kwargs))
         return args
+
+    @property
+    def model_input_names(self):
+        first_attribute = getattr(self, self.attributes[0])
+        return getattr(first_attribute, "model_input_names", None)
