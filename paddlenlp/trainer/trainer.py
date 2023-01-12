@@ -51,7 +51,7 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
-from .plugin.npu_funcs import opt_npu_warp
+from .plugins.npu_plugin import npu_accelerate_plugin
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -258,8 +258,6 @@ class Trainer:
         self.compute_metrics = compute_metrics
         self.preprocess_logits_for_metrics = preprocess_logits_for_metrics
         self.optimizer, self.lr_scheduler = optimizers
-        if self.args.device == "npu" and self.args.flatten_param_grads:
-            opt_npu_warp(self.optimizer)
 
         self.state = TrainerState()
         self.control = TrainerControl()
@@ -596,6 +594,9 @@ class Trainer:
         tr_loss = paddle.to_tensor(0.0)
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
+
+        if self.args.device == "npu" and self.args.flatten_param_grads:
+            npu_accelerate_plugin(self.optimizer)
 
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(

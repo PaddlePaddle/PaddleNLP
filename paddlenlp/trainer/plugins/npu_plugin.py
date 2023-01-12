@@ -22,7 +22,14 @@ from paddle.fluid.layer_helper import LayerHelper
 from ...utils.log import logger
 
 
-def opt_npu_warp(optimizer):
+def npu_accelerate_plugin(optimizer):
+    """npu_accelerate_plugin uses the flatten_param_grads method to speed up the performance of the model on NPU devices.
+    flatten_param_grads method will be added to `step` function of optimizer.
+
+    Args:
+        optimizer (`paddle.optimizer.Optimizer`):
+            The Optimizer whose `step` method will be modified.
+    """
     optimizer.step = types.MethodType(_optimizer_step_with_flatten_param_grads, optimizer)
 
 
