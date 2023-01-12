@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import collections
 
@@ -24,6 +25,7 @@ from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -459,6 +461,79 @@ class GPTPretrainedModel(PretrainedModel):
     pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "gpt"
     config_class = GPTConfig
+
+    @classmethod
+    def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["wte.weight", "embeddings.word_embeddings.weight"],
+            ["wpe.weight", "embeddings.position_embeddings.weight"],
+            ["ln_f.weight", "decoder.norm.weight"],
+            ["ln_f.bias", "decoder.norm.bias"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [f"h.{layer_index}.ln_1.weight", f"decoder.layers.{layer_index}.norm1.weight"],
+                [f"h.{layer_index}.ln_1.bias", f"decoder.layers.{layer_index}.norm1.bias"],
+                [f"h.{layer_index}.ln_2.weight", f"decoder.layers.{layer_index}.norm2.weight"],
+                [f"h.{layer_index}.ln_2.bias", f"decoder.layers.{layer_index}.norm2.bias"],
+                [f"h.{layer_index}.mlp.c_fc.weight", f"decoder.layers.{layer_index}.linear1.weight"],
+                [f"h.{layer_index}.mlp.c_fc.bias", f"decoder.layers.{layer_index}.linear1.bias"],
+                [f"h.{layer_index}.mlp.c_proj.weight", f"decoder.layers.{layer_index}.linear2.weight"],
+                [f"h.{layer_index}.mlp.c_proj.bias", f"decoder.layers.{layer_index}.linear2.bias"],
+                [f"h.{layer_index}.attn.c_proj.weight", f"decoder.layers.{layer_index}.self_attn.out_proj.weight"],
+                [f"h.{layer_index}.attn.c_proj.bias", f"decoder.layers.{layer_index}.self_attn.out_proj.bias"],
+                # attention
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "split",
+                    0,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    "split",
+                    0,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "split",
+                    1,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    "split",
+                    1,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "split",
+                    2,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    "split",
+                    2,
+                ],
+            ]
+
+            model_mappings.extend(layer_mappings)
+
+        if "GPT2Model" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "transformer." + mapping[0]
+                mapping[1] = "gpt." + mapping[1]
+
+        if "GPT2LMHeadModel" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.decoder_weight"])
+
+        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""

@@ -13,12 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from __future__ import annotations
+
 import unittest
+
 import paddle
 from parameterized import parameterized_class
 
 from paddlenlp.transformers import (
-    RobertaPretrainedModel,
+    RobertaConfig,
     RobertaForCausalLM,
     RobertaForMaskedLM,
     RobertaForMultipleChoice,
@@ -26,11 +28,11 @@ from paddlenlp.transformers import (
     RobertaForSequenceClassification,
     RobertaForTokenClassification,
     RobertaModel,
-    RobertaConfig,
+    RobertaPretrainedModel,
 )
 
-from ..test_modeling_common import ids_tensor, floats_tensor, random_attention_mask, ModelTesterMixin
 from ...testing_utils import slow
+from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
 
