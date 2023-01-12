@@ -13,28 +13,38 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
 import random
+import shutil
 from collections import defaultdict
+from operator import itemgetter
 
 import matplotlib.pyplot as plt
 import wordcloud
 from utils import load_json_file
 
 from paddlenlp.taskflow.utils import download_file
+from paddlenlp.utils.log import logger
 
 # make sure that the font 'SimHei' is installed in system
 plt.rcParams["font.sans-serif"] = ["SimHei"]
 plt.rcParams["axes.unicode_minus"] = False
-
-logger = logging.getLogger(__file__)
 
 URLS = {
     "SimHei": [
         "https://paddlenlp.bj.bcebos.com/applications/sentiment_analysis/SimHei.ttf",
         "c9c9de86d3fa7c4af0d3f1269bb2dff2",
     ],
+}
+
+PROMPT_ITEMS = {
+    "aspect_prompt": "评价维度",
+    "opinion_prompt": "观点词",
+    "sentiment_prompt_prefix": "情感倾向",
+    "separator": "##",
+    "not_mentioned_option": "未提及",
+    "positive_option": "正向",
+    "negative_option": "负向",
 }
 
 
@@ -413,130 +423,241 @@ class VisualSentiment(object):
                 plt_ylabel=ylabel,
             )
 
+    def plot_sentence_sentiment(self, sentence_sentiment, save_path):
+        """
+        generate image for sentence sentiment, only histogram are supported.
+        this method can help analyze the customers' whole impression for product/service.
 
-class SentimentResult:
+        Args:
+            sentence_sentiment (dict): an sentiment dict with frequency, the key is sentiment polarity and its value is frequency.
+            save_path (str): path that the image is saved to.
+        """
+
+        if not sentence_sentiment:
+            raise ValueError("sentence_sentiment is empty, please check it.")
+
+        title = "The histogram of sentence sentiment"
+        xlabel = "sentiment polarity"
+        ylabel = "frequency"
+
+        self._plot_histogram(
+            sentence_sentiment, save_path, with_line_chart=False, plt_title=title, plt_xlabel=xlabel, plt_ylabel=ylabel
+        )
+
+
+class SentimentResult(object):
     """
     load and analyze result of sentiment analysis.
     """
 
-    def __init__(self, file_path, sentiment_name="情感倾向[正向,负向,未提及]", opinion_name="观点词"):
+    def __init__(self, file_path):
         self.file_path = file_path
-        self.sentiment_name = sentiment_name
-        self.opinion_name = opinion_name
-        self.examples = load_json_file(file_path)
-        self.read_and_count_result(self.examples)
+        self.sentiment_prompt = PROMPT_ITEMS["sentiment_prompt"]
+        self.sentiment_prompt_prefix = PROMPT_ITEMS["sentiment_prompt_prefix"]
+        self.options = PROMPT_ITEMS["options"]
+        self.opinion_prompt = PROMPT_ITEMS["opinion_prompt"]
+        self.aspect_prompt = PROMPT_ITEMS["aspect_prompt"]
+        self.not_mentioned_option = PROMPT_ITEMS["not_mentioned_option"]
+        self.positive_option = PROMPT_ITEMS["positive_option"]
+        self.negative_option = PROMPT_ITEMS["negative_option"]
+        self.prompts = set()
+        # load the result of sentiment analysis
+        self.results = self._load_sentiment_result(file_path)
+        # define the parsing middle result for sentiment analysis
+        self.aspect_frequency = defaultdict(int)
+        self.opinion_frequency = defaultdict(int)
+        self.aspect_sentiment = defaultdict(dict)
+        self.aspect_opinion = defaultdict(dict)
+        self.aspect_opinion_positives = defaultdict(int)
+        self.aspect_opinion_negatives = defaultdict(int)
+        self.descend_aspects = []
+        self.sentence_sentiment = defaultdict(int)
+        # start to parse sentiment result
+        self.parse_sentiment_result(self.results)
 
-    def read_and_count_result(self, examples):
-        sentiment_name = self.sentiment_name
-        opinion_name = self.opinion_name
-        aspect_frequency = defaultdict(int)
-        opinion_frequency = defaultdict(int)
-        aspect_opinion_positives = defaultdict(int)
-        aspect_opinion_negatives = defaultdict(int)
+    def _load_sentiment_result(self, file_path):
+        return load_json_file(file_path)
 
-        aspect_sentiment = defaultdict(dict)
-        aspect_opinion = defaultdict(dict)
-        for example in examples:
-            if not example:
-                continue
-            for aspect in example["评价维度"]:
-                aspect_name = aspect["text"]
-                if "relations" not in aspect:
-                    continue
-                if sentiment_name not in aspect["relations"] or opinion_name not in aspect["relations"]:
-                    continue
-                sentiment = aspect["relations"][sentiment_name][0]
-                if sentiment["text"] == "未提及":
-                    continue
-                aspect_frequency[aspect_name] += 1
-                if sentiment["text"] not in aspect_sentiment[aspect_name]:
-                    aspect_sentiment[aspect_name][sentiment["text"]] = 1
+    def _parse_aspect(self, aspect):
+        aspect_name = aspect["text"]
+        self.aspect_frequency[aspect_name] += 1
+        if "relations" not in aspect:
+            return
+
+        sentiment_name = None
+        if self.sentiment_prompt in aspect["relations"].keys():
+            sentiment = aspect["relations"][self.sentiment_prompt][0]
+            sentiment_name = sentiment["text"]
+            if sentiment_name == self.not_mentioned_option:
+                sentiment_name = None
+                return
+            if sentiment_name not in self.aspect_sentiment[aspect_name]:
+                self.aspect_sentiment[aspect_name][sentiment_name] = 1
+            else:
+                self.aspect_sentiment[aspect_name][sentiment_name] += 1
+
+        if self.opinion_prompt in aspect["relations"].keys():
+            opinions = aspect["relations"][self.opinion_prompt]
+            for opinion in opinions:
+                opinion_name = opinion["text"]
+                self.opinion_frequency[opinion_name] += 1
+                if opinion_name not in self.aspect_opinion[aspect_name]:
+                    self.aspect_opinion[aspect_name][opinion_name] = 1
                 else:
-                    aspect_sentiment[aspect_name][sentiment["text"]] += 1
+                    self.aspect_opinion[aspect_name][opinion_name] += 1
 
-                opinions = aspect["relations"][opinion_name]
-                for opinion in opinions:
-                    opinion_text = opinion["text"]
-                    opinion_frequency[opinion_text] += 1
-                    if opinion_text not in aspect_opinion[aspect_name]:
-                        aspect_opinion[aspect_name][opinion_text] = 1
+                if sentiment_name is not None:
+                    aspect_opinion_name = aspect_name + opinion_name
+                    if sentiment_name == self.positive_option:
+                        self.aspect_opinion_positives[aspect_opinion_name] += 1
                     else:
-                        aspect_opinion[aspect_name][opinion_text] += 1
+                        self.aspect_opinion_negatives[aspect_opinion_name] += 1
 
-                    aspect_opinion_text = aspect_name + opinion_text
-                    if sentiment["text"] == "正向":
-                        aspect_opinion_positives[aspect_opinion_text] += 1
-                    else:
-                        aspect_opinion_negatives[aspect_opinion_text] += 1
+        self.prompts.update(aspect["relations"].keys())
 
-        aspect_freq_items = sorted(aspect_frequency.items(), key=lambda x: x[1], reverse=True)
-        descend_aspects = [item[0] for item in aspect_freq_items]
+    def _parse_opinion(self, opinion):
+        opinion_name = opinion["text"]
+        self.opinion_frequency[opinion_name] += 1
 
-        self.aspect_frequency = aspect_frequency
-        self.opinion_frequency = opinion_frequency
-        self.aspect_sentiment = aspect_sentiment
-        self.aspect_opinion = aspect_opinion
-        self.aspect_opinion_positives = aspect_opinion_positives
-        self.aspect_opinion_negatives = aspect_opinion_negatives
-        self.descend_aspects = descend_aspects
+    def _parse_sentiment_polarity(self, sentiment):
+        sentiment_name = sentiment["text"]
+        self.sentence_sentiment[sentiment_name] += 1
+
+    def parse_one_result(self, result):
+        for key in result.keys():
+            if key == self.aspect_prompt:
+                for aspect in result[self.aspect_prompt]:
+                    self._parse_aspect(aspect)
+            elif key == self.opinion_prompt:
+                for opinion in result[self.opinion_prompt]:
+                    self._parse_opinion(opinion)
+            elif key == self.sentiment_prompt:
+                sentiment = result[self.sentiment_prompt][0]
+                self._parse_sentiment_polarity(sentiment)
+            else:
+                raise ValueError(
+                    "Unknown key {} for sentiment analysis, you can check it as follows: 1. whether the parameter task_type is right; 2. whether the sentiment prompt {} created by the parameter options matches with the prompt {} in the file of sentiment analysis results; 3. whether the aspect_prompt, opinion_prompt or sentiment prompt are right.".format(
+                        key, self.sentiment_prompt, key
+                    )
+                )
+            self.prompts.add(key)
+
+    def parse_sentiment_result(self, results):
+        for result in results:
+            if not result:
+                continue
+            self.parse_one_result(result)
+        # parse descend_aspects
+        descend_aspects_items = sorted(self.aspect_frequency.items(), key=itemgetter(1), reverse=True)
+        self.descend_aspects = [item[0] for item in descend_aspects_items]
+        # check whether sentiment prompt is parsed correctly
+        for prompt in self.prompts:
+            if prompt.startswith(self.sentiment_prompt_prefix) and prompt != self.sentiment_prompt:
+                logger.warning(
+                    "The visual images related to sentiment ploarity cannot be generated. Because the sentiment prompt {} created by the opinions you input cannot be match with the one {} in the file of sentiment analysis result.".format(
+                        self.sentiment_prompt, prompt
+                    )
+                )
+
+
+def default_visual_analysis(args):
+    # checking generating environment
+    if os.path.exists(args.save_dir):
+        shutil.rmtree(args.save_dir)
+    os.makedirs(args.save_dir)
+    # update sentiment prompt according to task type
+    if args.options:
+        PROMPT_ITEMS["options"] = args.options
+    else:
+        if args.task_type == "ext":
+            PROMPT_ITEMS["options"] = [
+                PROMPT_ITEMS["positive_option"],
+                PROMPT_ITEMS["negative_option"],
+                PROMPT_ITEMS["not_mentioned_option"],
+            ]
+        else:
+            PROMPT_ITEMS["options"] = [PROMPT_ITEMS["positive_option"], PROMPT_ITEMS["negative_option"]]
+    PROMPT_ITEMS["sentiment_prompt"] = PROMPT_ITEMS["sentiment_prompt_prefix"] + "[{}]".format(
+        ",".join(PROMPT_ITEMS["options"])
+    )
+
+    # define sr to process the result of sentiment analysis
+    logger.info("Trying to parse sentiment analysis result: {}".format(args.file_path))
+    sr = SentimentResult(args.file_path)
+    # define vs to visualize sentiment result
+    vs = VisualSentiment(font_path=args.font_path)
+    logger.info("Start to generate visual images of sentiment analysis for you.")
+    # visualize aspect with frequency
+    if args.task_type == "ext" and sr.aspect_frequency:
+        save_path = os.path.join(args.save_dir, "aspect_wc.png")
+        vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="wordcloud")
+        save_path = os.path.join(args.save_dir, "aspect_hist.png")
+        vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histogram")
+    # visualize opinion with frequency
+    if args.task_type == "ext" and sr.opinion_frequency:
+        save_path = os.path.join(args.save_dir, "opinion_wc.png")
+        vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="wordcloud")
+        save_path = os.path.join(args.save_dir, "opinion_hist.png")
+        vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="histogram")
+    # visualize aspect and opinion
+    if args.task_type == "ext" and sr.aspect_opinion:
+        save_path = os.path.join(args.save_dir, "aspect_opinion_wc.png")
+        vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="wordcloud", sentiment="all")
+        save_path = os.path.join(args.save_dir, "aspect_opinion_hist.png")
+        vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram", sentiment="all", top_n=8)
+    # visualize positive aspect and opinion
+    if args.task_type == "ext" and sr.aspect_opinion_positives:
+        save_path = os.path.join(args.save_dir, "aspect_opinion_wc_pos.png")
+        vs.plot_aspect_with_opinion(
+            sr.aspect_opinion_positives, save_path, image_type="wordcloud", sentiment="positive"
+        )
+        save_path = os.path.join(args.save_dir, "aspect_opinion_hist_pos.png")
+        vs.plot_aspect_with_opinion(
+            sr.aspect_opinion_positives, save_path, image_type="histogram", sentiment="positive", top_n=8
+        )
+    # visualize negative aspect and opinion
+    if args.task_type == "ext" and sr.aspect_opinion_negatives:
+        save_path = os.path.join(args.save_dir, "aspect_opinion_wc_neg.png")
+        vs.plot_aspect_with_opinion(
+            sr.aspect_opinion_negatives, save_path, image_type="wordcloud", sentiment="negative"
+        )
+        save_path = os.path.join(args.save_dir, "aspect_opinion_hist_neg.png")
+        vs.plot_aspect_with_opinion(
+            sr.aspect_opinion_negatives, save_path, image_type="histogram", sentiment="negative", top_n=8
+        )
+    # visualize aspect and sentiment
+    if args.task_type == "ext" and sr.aspect_sentiment:
+        save_path = os.path.join(args.save_dir, "aspect_sentiment_wc.png")
+        vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="wordcloud")
+        save_path = os.path.join(args.save_dir, "aspect_sentiment_hist.png")
+        vs.plot_aspect_with_sentiment(
+            sr.aspect_sentiment, save_path, image_type="histogram", top_n=15, descend_aspects=sr.descend_aspects
+        )
+    # visualize sentiment polarity for sentence
+    if args.task_type == "cls" and sr.sentence_sentiment:
+        save_path = os.path.join(args.save_dir, "sentence_sentiment.png")
+        vs.plot_sentence_sentiment(sr.sentence_sentiment, save_path)
+
+    if not os.listdir(args.save_dir):
+        logger.info(
+            "Nothing generated for task {}, please check that you input the correct parameter task_type or the result of sentiment analysis.".format(
+                args.task_type
+            )
+        )
+    else:
+        logger.info("Visual images for sentiment analysis has been saved to: {}".format(args.save_dir))
 
 
 if __name__ == "__main__":
     # yapf: disable
     parser = argparse.ArgumentParser()
-    parser.add_argument("--file_path", default="./outputs/test_hotel.json", type=str, help="The result path of sentiment analysis.")
+    parser.add_argument("--file_path", required=True, type=str, help="The result path of sentiment analysis.")
     parser.add_argument("--save_dir", default="./images", type=str, help="The saving path of images.")
     parser.add_argument("--font_path", default=None, type=str, help="The font Path for showing Chinese in wordcloud.")
-    parser.add_argument("--sentiment_name", default="情感倾向[正向,负向,未提及]", type=str, help="The prompt for sentiment polarity prediction in the result of sentiment analysis.")
+    parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Two task types [ext, cls] are supported, ext represents the aspect-based extraction task and cls represents the sentence-level classification task, defaults to ext.")
+    parser.add_argument("--options", type=str, nargs="+", help="Used only for the classification task, the options for classification")
+
     args = parser.parse_args()
     # ypdf: enable
 
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
-    if not args.font_path:
-        args.font_path = None
-
-    sr = SentimentResult(args.file_path, sentiment_name=args.sentiment_name)
-    vs = VisualSentiment(font_path=args.font_path)
-
-    save_path = os.path.join(args.save_dir, "aspect_wc.png")
-    vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="wordcloud")
-    save_path = os.path.join(args.save_dir, "aspect_hist.png")
-    vs.plot_aspect_with_frequency(sr.aspect_frequency, save_path, image_type="histogram")
-
-    save_path = os.path.join(args.save_dir, "opinion_wc.png")
-    vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="wordcloud")
-    save_path = os.path.join(args.save_dir, "opinion_hist.png")
-    vs.plot_opinion_with_frequency(sr.opinion_frequency, save_path, image_type="histogram")
-
-    save_path = os.path.join(args.save_dir, "aspect_opinion_wc.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="wordcloud", sentiment="all")
-    save_path = os.path.join(args.save_dir, "aspect_opinion_hist.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion, save_path, image_type="histogram", sentiment="all", top_n=8)
-    save_path = os.path.join(args.save_dir, "aspect_opinion_wc_pos.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_positives, save_path, image_type="wordcloud", sentiment="positive")
-    save_path = os.path.join(args.save_dir, "aspect_opinion_hist_pos.png")
-    vs.plot_aspect_with_opinion(
-        sr.aspect_opinion_positives, save_path, image_type="histogram", sentiment="positive", top_n=8
-    )
-    save_path = os.path.join(args.save_dir, "aspect_opinion_wc_neg.png")
-    vs.plot_aspect_with_opinion(sr.aspect_opinion_negatives, save_path, image_type="wordcloud", sentiment="negative")
-    save_path = os.path.join(args.save_dir, "aspect_opinion_hist_neg.png")
-    vs.plot_aspect_with_opinion(
-        sr.aspect_opinion_negatives, save_path, image_type="histogram", sentiment="negative", top_n=8
-    )
-
-    save_path = os.path.join(args.save_dir, "aspect_sentiment_wc.png")
-    vs.plot_aspect_with_sentiment(sr.aspect_sentiment, save_path, image_type="wordcloud")
-    save_path = os.path.join(args.save_dir, "aspect_sentiment_hist.png")
-    vs.plot_aspect_with_sentiment(
-        sr.aspect_sentiment, save_path, image_type="histogram", top_n=15, descend_aspects=sr.descend_aspects
-    )
-
-    # aspect = "房间"
-    # save_path = os.path.join(args.save_dir, "opinions_for_aspect_wc.png")
-    # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="wordcloud")
-    # save_path = os.path.join(args.save_dir, "opinions_for_aspect_hist.png")
-    # vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="histogram")
-
-    logger.info("Images has been saved to: {}".format(args.save_dir))
+    default_visual_analysis(args)

@@ -17,13 +17,15 @@ This module defines the itermediate data structure of inputs.
 """
 
 import inspect
-from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
+from paddle import Tensor
 
-from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
+from ..transformers.model_outputs import MaskedLMOutput, SequenceClassifierOutput
+from ..transformers.tokenizer_utils_base import PaddingStrategy, PretrainedTokenizerBase
 
 
 def signature(function):
@@ -83,7 +85,9 @@ class PromptDataCollatorWithPadding:
         max_length = batch["input_ids"].shape[1]
         for key in features[0]:
             if key not in self.default_model_input_names:
-                values = [b[key] for b in features]
+                values = [b[key] for b in features if key in b]
+                if len(values) < len(features):
+                    continue
                 if key == "masked_positions":
                     new_values = []
                     for index, value in enumerate(values):
@@ -91,7 +95,7 @@ class PromptDataCollatorWithPadding:
                         new_values.extend(value.tolist())
                     values = new_values
                 elif key == "attention_mask":
-                    new_values = np.zeros([len(values), 1, max_length, max_length])
+                    new_values = np.ones([len(values), 1, max_length, max_length]) * -1e4
                     for index, value in enumerate(values):
                         length = len(value)
                         new_values[index][0, :length, :length] = value
@@ -99,7 +103,108 @@ class PromptDataCollatorWithPadding:
                 elif key in ("soft_token_ids", "encoder_ids"):
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
-                elif key != "labels":
+                elif key in ("omask_positions"):
+                    max_num_option = max([len(x) for x in values])
+                    for index, value in enumerate(values):
+                        values[index] = value + [0] * (max_num_option - len(value))
+                elif key == "labels":
+                    if isinstance(values[0], list):
+                        max_num_label = max([len(x) for x in values])
+                        for index, value in enumerate(values):
+                            values[index] = value + [-100] * (max_num_label - len(value))
+                elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)
         return batch
+
+
+def sequence_classification_forward_with_past_key_values(
+    self,
+    input_ids: Optional[Tensor] = None,
+    token_type_ids: Optional[Tensor] = None,
+    position_ids: Optional[Tensor] = None,
+    attention_mask: Optional[Tensor] = None,
+    inputs_embeds: Optional[Tensor] = None,
+    labels: Optional[Tensor] = None,
+    output_hidden_states: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+):
+    outputs = self.ernie(
+        input_ids,
+        token_type_ids=token_type_ids,
+        position_ids=position_ids,
+        attention_mask=attention_mask,
+        inputs_embeds=inputs_embeds,
+        past_key_values=past_key_values,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=True,
+    )
+    pooled_output = outputs[1]
+
+    pooled_output = self.dropout(pooled_output)
+    logits = self.classifier(pooled_output)
+
+    loss = None
+    if labels is not None:
+        if self.num_labels == 1:
+            loss_fct = paddle.nn.MSELoss()
+            loss = loss_fct(logits, labels)
+        elif labels.dtype == paddle.int64 or labels.dtype == paddle.int32:
+            loss_fct = paddle.nn.CrossEntropyLoss()
+            loss = loss_fct(logits.reshape((-1, self.num_labels)), labels.reshape((-1,)))
+        else:
+            loss_fct = paddle.nn.BCEWithLogitsLoss()
+            loss = loss_fct(logits, labels)
+
+    return SequenceClassifierOutput(
+        loss=loss,
+        logits=logits,
+        hidden_states=outputs.hidden_states,
+        attentions=outputs.attentions,
+    )
+
+
+def masked_lm_forward_with_past_key_values(
+    self,
+    input_ids: Optional[Tensor] = None,
+    token_type_ids: Optional[Tensor] = None,
+    position_ids: Optional[Tensor] = None,
+    attention_mask: Optional[Tensor] = None,
+    masked_positions: Optional[Tensor] = None,
+    inputs_embeds: Optional[Tensor] = None,
+    labels: Optional[Tensor] = None,
+    output_hidden_states: Optional[bool] = None,
+    output_attentions: Optional[bool] = None,
+    return_dict: Optional[bool] = None,
+    past_key_values: Optional[Tuple[Tuple[Tensor]]] = None,
+):
+    outputs = self.ernie(
+        input_ids,
+        token_type_ids=token_type_ids,
+        position_ids=position_ids,
+        attention_mask=attention_mask,
+        inputs_embeds=inputs_embeds,
+        past_key_values=past_key_values,
+        output_attentions=output_attentions,
+        output_hidden_states=output_hidden_states,
+        return_dict=True,
+    )
+    sequence_output = outputs[0]
+    prediction_scores = self.cls(sequence_output, masked_positions=masked_positions)
+
+    masked_lm_loss = None
+    if labels is not None:
+        loss_fct = paddle.nn.CrossEntropyLoss()
+        masked_lm_loss = loss_fct(
+            prediction_scores.reshape((-1, paddle.shape(prediction_scores)[-1])), labels.reshape((-1,))
+        )
+
+    return MaskedLMOutput(
+        loss=masked_lm_loss,
+        logits=prediction_scores,
+        hidden_states=outputs.hidden_states,
+        attentions=outputs.attentions,
+    )

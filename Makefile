@@ -35,8 +35,9 @@ lint:
 test: unit-test
 
 unit-test:
-	PYTHONPATH=$(shell pwd) pytest \
-		-n auto --cov paddlenlp \
+	PYTHONPATH=$(shell pwd) pytest -v \
+		-n auto \
+		--cov paddlenlp \
 		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -45,6 +46,7 @@ unit-test:
 install:
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
+	pip install -r paddlenlp/experimental/autonlp/requirements.txt
 	pre-commit install
 
 
@@ -64,3 +66,11 @@ deploy-paddlenlp:
 	python3 setup.py sdist bdist_wheel
 	# upload
 	twine upload --skip-existing dist/*
+
+.PHONY: regression-all
+release: 
+	bash ./scripts/regression/run_release.sh 0 0,1 all
+
+.PHONY: regression-key
+key: 
+	bash ./scripts/regression/run_release.sh 0 0,1 p0

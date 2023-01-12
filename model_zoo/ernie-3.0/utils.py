@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -26,12 +25,10 @@ def load_config(config_file_path, task_name, dataset_name, model_args, data_args
     config = yaml.load(open(config_file_path, "r"), Loader=yaml.FullLoader)
     # Set the batch size of trainer setting
 
-    default_args = config["DefaultArgs"]
     config = config[task_name][dataset_name]
-    final_args = copy.deepcopy(default_args)
     for args in (model_args, data_args, training_args):
-        for arg in final_args:
-            if arg in config.keys():
+        for arg in config.keys():
+            if hasattr(args, arg):
                 setattr(args, arg, config[arg])
     return model_args, data_args, training_args
 

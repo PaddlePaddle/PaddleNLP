@@ -109,11 +109,11 @@ class PromptTrainer(Trainer):
 
     @property
     def pretrained_model(self):
-        self._set_model_attributes(self.model, "plm")
+        return self._get_model().plm
 
     @pretrained_model.setter
     def pretrained_model(self, model):
-        self._set_model_attributes(self.model, "plm", model)
+        setattr(self._get_model(), "plm", model)
 
     def _map_dataset(self, dataset: MapDataset):
         if dataset is None:
@@ -136,6 +136,10 @@ class PromptTrainer(Trainer):
             self.template.save(output_dir)
         if self.verbalizer is not None:
             self.verbalizer.save(output_dir)
+        if self.args.save_plm:
+            plm_output_dir = os.path.join(output_dir, "plm")
+            os.makedirs(plm_output_dir, exist_ok=True)
+            self.pretrained_model.save_pretrained(plm_output_dir)
 
     def load_state_dict_from_checkpoint(self, resume_from_checkpoint: os.PathLike = None):
         if resume_from_checkpoint is not None:
@@ -194,15 +198,18 @@ class PromptTrainer(Trainer):
                 else:
                     params = plm_parameters
             else:
-                args = self.init_num_steps(self.args, len(self.train_dataset))
+                if self.args.max_steps > 0:
+                    max_steps = self.args.max_steps
+                else:
+                    raise ValueError("Please use `max_steps` to set the maximum training steps.")
                 warmup = (
-                    args.warmup_steps if args.warmup_steps > 0 else int(args.warmup_ratio * args.num_training_steps)
+                    self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * max_steps)
                 )
                 self.lr_scheduler = get_scheduler(
-                    args.lr_scheduler_type,
+                    self.args.lr_scheduler_type,
                     learning_rate=self.args.ppt_learning_rate,
                     num_warmup_steps=warmup,
-                    num_training_steps=args.num_training_steps,
+                    num_training_steps=max_steps,
                 )
                 lr = self.lr_scheduler
                 params = ppt_parameters
@@ -231,11 +238,12 @@ class PromptTrainer(Trainer):
         if self.criterion is not None:
             # pop labels to move loss computation out of the model
             input_dict.pop("labels")
+            input_dict["return_hidden_states"] = True
             logits, hidden_states = model(**input_dict)
             loss = self.criterion(logits, labels)
 
             if self.args.use_rdrop:
-                loss = self._compute_rdrop_loss(model, input_dict, logits, loss)
+                loss = self._compute_rdrop_loss(model, input_dict, labels, logits, loss)
 
             if self.args.use_rgl:
                 loss += self._compute_rgl_loss(hidden_states, labels)
@@ -246,9 +254,8 @@ class PromptTrainer(Trainer):
 
         return (loss, outputs) if return_outputs else loss
 
-    def _compute_rdrop_loss(self, model, input_dict, outputs, loss):
+    def _compute_rdrop_loss(self, model, input_dict, labels, outputs, loss):
         re_outputs, _ = model(**input_dict)
-        labels = input_dict["labels"]
         ce_loss = (self.criterion(re_outputs, labels) + loss) * 0.5
         kl_loss = self.rdrop_criterion(outputs, re_outputs)
         loss = ce_loss + self.args.alpha_rdrop * kl_loss

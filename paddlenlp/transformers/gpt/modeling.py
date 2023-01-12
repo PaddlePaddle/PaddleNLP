@@ -13,6 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import collections
 
@@ -24,6 +25,7 @@ from paddle.fluid import layers
 from paddle.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 from paddle.nn.layer.transformer import _convert_param_attr_to_list
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
@@ -31,6 +33,11 @@ from ..model_outputs import (
     CausalLMOutputWithCrossAttentions,
     SequenceClassifierOutputWithPast,
     TokenClassifierOutput,
+)
+from .configuration import (
+    GPT_PRETRAINED_INIT_CONFIGURATION,
+    GPT_PRETRAINED_RESOURCE_FILES_MAP,
+    GPTConfig,
 )
 
 __all__ = [
@@ -450,163 +457,86 @@ class GPTPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "gpt-cpm-large-cn": {  # 2.6B
-            "vocab_size": 30000,
-            "hidden_size": 2560,
-            "num_hidden_layers": 32,
-            "num_attention_heads": 32,
-            "intermediate_size": 10240,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 7,
-            "bos_token_id": 0,
-            "eol_token_id": 3,
-        },
-        "gpt-cpm-small-cn-distill": {  # 109M
-            "vocab_size": 30000,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "pad_token_id": 0,
-            "eos_token_id": 7,
-            "bos_token_id": 0,
-            "eol_token_id": 3,
-        },
-        "gpt3-13B-en": {  # 13B
-            "vocab_size": 50304,
-            "hidden_size": 5120,
-            "num_hidden_layers": 40,
-            "num_attention_heads": 128,
-            "intermediate_size": 20480,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt3-1.3B-en": {  # 1.3B
-            "vocab_size": 50304,
-            "hidden_size": 2048,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 8192,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-xl-en": {  # 1558M
-            "vocab_size": 50257,
-            "hidden_size": 1600,
-            "num_hidden_layers": 48,
-            "num_attention_heads": 25,
-            "intermediate_size": 6400,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-large-en": {  # 774M
-            "vocab_size": 50257,
-            "hidden_size": 1280,
-            "num_hidden_layers": 36,
-            "num_attention_heads": 20,
-            "intermediate_size": 5120,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-medium-en": {  # 345M
-            "vocab_size": 50304,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-en": {  # 117M
-            "vocab_size": 50257,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-        "gpt2-small-en": {  # config for CE
-            "vocab_size": 50304,
-            "hidden_size": 1024,
-            "num_hidden_layers": 4,
-            "num_attention_heads": 4,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 1024,
-            "type_vocab_size": 1,  # no use
-            "initializer_range": 0.02,
-            "eos_token_id": 50256,
-            "eol_token_id": 198,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "gpt-cpm-large-cn": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-large-cn.pdparams",
-            "gpt-cpm-small-cn-distill": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt-cpm-small-cn-distill.pdparams",
-            "gpt2-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-en.pdparams",
-            "gpt2-medium-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-medium-en.pdparams",
-            "gpt2-large-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-large-en.pdparams",
-            "gpt2-xl-en": "https://bj.bcebos.com/paddlenlp/models/transformers/gpt/gpt2-xl-en.pdparams",
-        }
-    }
+    pretrained_init_configuration = GPT_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = GPT_PRETRAINED_RESOURCE_FILES_MAP
     base_model_prefix = "gpt"
+    config_class = GPTConfig
+
+    @classmethod
+    def _get_name_mappings(cls, config: GPTConfig) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["wte.weight", "embeddings.word_embeddings.weight"],
+            ["wpe.weight", "embeddings.position_embeddings.weight"],
+            ["ln_f.weight", "decoder.norm.weight"],
+            ["ln_f.bias", "decoder.norm.bias"],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            layer_mappings = [
+                [f"h.{layer_index}.ln_1.weight", f"decoder.layers.{layer_index}.norm1.weight"],
+                [f"h.{layer_index}.ln_1.bias", f"decoder.layers.{layer_index}.norm1.bias"],
+                [f"h.{layer_index}.ln_2.weight", f"decoder.layers.{layer_index}.norm2.weight"],
+                [f"h.{layer_index}.ln_2.bias", f"decoder.layers.{layer_index}.norm2.bias"],
+                [f"h.{layer_index}.mlp.c_fc.weight", f"decoder.layers.{layer_index}.linear1.weight"],
+                [f"h.{layer_index}.mlp.c_fc.bias", f"decoder.layers.{layer_index}.linear1.bias"],
+                [f"h.{layer_index}.mlp.c_proj.weight", f"decoder.layers.{layer_index}.linear2.weight"],
+                [f"h.{layer_index}.mlp.c_proj.bias", f"decoder.layers.{layer_index}.linear2.bias"],
+                [f"h.{layer_index}.attn.c_proj.weight", f"decoder.layers.{layer_index}.self_attn.out_proj.weight"],
+                [f"h.{layer_index}.attn.c_proj.bias", f"decoder.layers.{layer_index}.self_attn.out_proj.bias"],
+                # attention
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.weight",
+                    "split",
+                    0,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.q_proj.bias",
+                    "split",
+                    0,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.weight",
+                    "split",
+                    1,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.k_proj.bias",
+                    "split",
+                    1,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.weight",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.weight",
+                    "split",
+                    2,
+                ],
+                [
+                    f"h.{layer_index}.attn.c_attn.bias",
+                    f"decoder.layers.{layer_index}.self_attn.v_proj.bias",
+                    "split",
+                    2,
+                ],
+            ]
+
+            model_mappings.extend(layer_mappings)
+
+        if "GPT2Model" not in config.architectures:
+            for mapping in model_mappings:
+                mapping[0] = "transformer." + mapping[0]
+                mapping[1] = "gpt." + mapping[1]
+
+        if "GPT2LMHeadModel" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.decoder_weight"])
+
+        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
+        return mappings
 
     def init_weights(self, layer):
         """Initialization hook"""
-        # no hook
-        return
         if isinstance(layer, (nn.Linear, nn.Embedding)):
             # In the dygraph mode, use the `set_value` to reset the parameter directly,
             # and reset the `state_dict` to update parameter in static mode.
@@ -682,68 +612,56 @@ class GPTModel(GPTPretrainedModel):
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        initializer_range=0.02,
-        pad_token_id=0,
-        eos_token_id=7,
-        bos_token_id=0,
-        eol_token_id=3,
-        topo=None,
-    ):
-        super(GPTModel, self).__init__()
+    def __init__(self, config: GPTConfig):
+        super(GPTModel, self).__init__(config)
 
-        self.pad_token_id = pad_token_id
-        self.eos_token_id = eos_token_id
-        self.bos_token_id = bos_token_id
-        self.eol_token_id = eol_token_id
-        self.initializer_range = initializer_range
-        self.topo = topo
-        self.hidden_size = hidden_size
-        self.vocab_size = vocab_size
-        self.bias = paddle.tril(paddle.ones([1, 1, max_position_embeddings, max_position_embeddings], dtype="int64"))
+        self.pad_token_id = config.pad_token_id
+        self.eos_token_id = config.eos_token_id
+        self.bos_token_id = config.bos_token_id
+        self.eol_token_id = config.eol_token_id
+        self.initializer_range = config.initializer_range
+        self.topo = config.topo
+        self.hidden_size = config.hidden_size
+        self.vocab_size = config.vocab_size
+        self.bias = paddle.tril(
+            paddle.ones([1, 1, config.max_position_embeddings, config.max_position_embeddings], dtype="int64")
+        )
 
         self.embeddings = GPTEmbeddings(
-            vocab_size,
-            hidden_size,
-            hidden_dropout_prob,
-            max_position_embeddings,
-            type_vocab_size,
+            config.vocab_size,
+            config.hidden_size,
+            config.hidden_dropout_prob,
+            config.max_position_embeddings,
+            config.type_vocab_size,
             self.initializer_range,
-            topo,
+            config.topo,
         )
 
         decoder_layers = nn.LayerList()
-        for i in range(num_hidden_layers):
+        for i in range(config.num_hidden_layers):
             decoder_layers.append(
                 TransformerDecoderLayer(
-                    d_model=hidden_size,
-                    nhead=num_attention_heads,
-                    dim_feedforward=intermediate_size,
-                    dropout=hidden_dropout_prob,
-                    activation=hidden_act,
-                    attn_dropout=attention_probs_dropout_prob,
-                    act_dropout=hidden_dropout_prob,
+                    d_model=config.hidden_size,
+                    nhead=config.num_attention_heads,
+                    dim_feedforward=config.intermediate_size,
+                    dropout=config.hidden_dropout_prob,
+                    activation=config.hidden_act,
+                    attn_dropout=config.attention_probs_dropout_prob,
+                    act_dropout=config.hidden_dropout_prob,
                     weight_attr=paddle.ParamAttr(
                         initializer=nn.initializer.Normal(mean=0.0, std=self.initializer_range)
                     ),
                     bias_attr=None,
-                    topo=topo,
+                    topo=config.topo,
                 )
             )
 
         self.decoder = TransformerDecoder(
-            decoder_layers, num_hidden_layers, norm="LayerNorm", hidden_size=hidden_size, topo=topo
+            decoder_layers,
+            config.num_hidden_layers,
+            norm="LayerNorm",
+            hidden_size=config.hidden_size,
+            topo=config.topo,
         )
 
         self.apply(self.init_weights)
@@ -913,9 +831,10 @@ class GPTForPretraining(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt):
-        super(GPTForPretraining, self).__init__()
-        self.gpt = gpt
+    def __init__(self, config: GPTConfig):
+        super(GPTForPretraining, self).__init__(config)
+        self.gpt = GPTModel(config)
+
         self.apply(self.init_weights)
 
     def forward(
@@ -1023,11 +942,11 @@ class GPTForGreedyGeneration(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt, max_predict_len, eol_token_id=3):
-        super(GPTForGreedyGeneration, self).__init__()
-        self.gpt = gpt
+    def __init__(self, config: GPTConfig, max_predict_len: int = 32):
+        super(GPTForGreedyGeneration, self).__init__(config)
+        self.gpt = GPTModel(config)
         self.max_predict_len = paddle.to_tensor(max_predict_len, dtype="int32")
-        self.eol_token_id = eol_token_id
+        self.eol_token_id = config.eol_token_id
         self.apply(self.init_weights)
 
     def model(
@@ -1120,9 +1039,10 @@ class GPTLMHeadModel(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt):
-        super(GPTLMHeadModel, self).__init__()
-        self.gpt = gpt
+    def __init__(self, config: GPTConfig):
+        super(GPTLMHeadModel, self).__init__(config)
+        self.gpt = GPTModel(config)
+
         self.lm_head = GPTLMHead(
             self.gpt.config["hidden_size"], self.gpt.config["vocab_size"], self.gpt.embeddings.word_embeddings.weight
         )
@@ -1223,27 +1143,27 @@ class GPTLMHeadModel(GPTPretrainedModel):
             cross_attentions=outputs.cross_attentions,
         )
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterGPT
 
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decode_strategy = kwargs.get("decode_strategy")
         if decode_strategy == "beam_search":
-            raise AttributeError("'beam_search' is not supported yet in the faster version of GPT")
+            raise AttributeError("'beam_search' is not supported yet in the fast version of GPT")
         # Currently, FasterTransformer only support restricted size_per_head.
         size_per_head = self.gpt.config["hidden_size"] // self.gpt.config["num_attention_heads"]
         if size_per_head not in [32, 64, 80, 96, 128]:
             raise AttributeError(
-                "'size_per_head = %d' is not supported yet in the faster version of GPT" % size_per_head
+                "'size_per_head = %d' is not supported yet in the fast version of GPT" % size_per_head
             )
         if kwargs["forced_bos_token_id"] is not None:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the faster version")
+            # not support for min_length yet in the fast version
+            raise AttributeError("'forced_bos_token_id != None' is not supported yet in the fast version")
         if kwargs["min_length"] != 0:
-            # not support for min_length yet in the faster version
-            raise AttributeError("'min_length != 0' is not supported yet in the faster version")
-        self._faster_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
-        return self._faster_entry
+            # not support for min_length yet in the fast version
+            raise AttributeError("'min_length != 0' is not supported yet in the fast version")
+        self._fast_entry = FasterGPT(self, use_fp16_decoding=use_fp16_decoding).forward
+        return self._fast_entry
 
     def prepare_inputs_for_generation(self, input_ids, use_cache=False, cache=None, **kwargs):
         # only last token for inputs_ids if cache is defined in kwargs
@@ -1280,14 +1200,11 @@ class GPTLMHeadModel(GPTPretrainedModel):
     def __getattr__(self, name):
         try:
             return super().__getattr__(name)
-        except AttributeError as e:
+        except AttributeError:
             try:
                 return getattr(getattr(self, self.base_model_prefix), name)
             except AttributeError:
-                try:
-                    return getattr(self, self.base_model_prefix).config[name]
-                except KeyError:
-                    raise e
+                return getattr(self, self.base_model_prefix).config[name]
 
 
 class GPTForTokenClassification(GPTPretrainedModel):
@@ -1306,12 +1223,15 @@ class GPTForTokenClassification(GPTPretrainedModel):
             instance `gpt`. Defaults to None.
     """
 
-    def __init__(self, gpt, num_classes=2, dropout=None):
-        super(GPTForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.gpt = gpt  # allow gpt to be config
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.gpt.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.gpt.config["hidden_size"], num_classes)
+    def __init__(self, config: GPTConfig):
+        super(GPTForTokenClassification, self).__init__(config)
+        self.num_classes = config.num_labels
+
+        self.gpt = GPTModel(config)  # allow gpt to be config
+        dropout_p = config.hidden_dropout_prob if config.classifier_dropout is None else config.classifier_dropout
+        self.dropout = nn.Dropout(dropout_p)
+        self.classifier = nn.Linear(config.hidden_size, config.num_labels)
+
         self.apply(self.init_weights)
 
     def forward(
@@ -1422,12 +1342,11 @@ class GPTForSequenceClassification(GPTPretrainedModel):
 
     """
 
-    def __init__(self, gpt, num_classes=2, problem_type=None):
-        super(GPTForSequenceClassification, self).__init__()
-        self.gpt = gpt  # allow gpt to be config
-        self.num_classes = num_classes
-        self.problem_type = problem_type
-        self.score = nn.Linear(self.gpt.config["hidden_size"], num_classes, bias_attr=False)
+    def __init__(self, config: GPTConfig):
+        super(GPTForSequenceClassification, self).__init__(config)
+
+        self.gpt = GPTModel(config)  # allow gpt to be config
+        self.score = nn.Linear(config.hidden_size, config.num_labels, bias_attr=False)
         self.apply(self.init_weights)
 
     def forward(
@@ -1510,7 +1429,7 @@ class GPTForSequenceClassification(GPTPretrainedModel):
         # logits shape [bs, seq_len, num_class]
         logits = self.score(hidden_states)
         # padding index maybe 0
-        eos_token_id = self.gpt.config.get("eos_token_id", 0)
+        eos_token_id = self.gpt.config.eos_token_id or 0
         # sequence_lengths shape [bs,]
         if input_ids is not None:
             sequence_lengths = (input_ids != eos_token_id).astype("int64").sum(axis=-1) - 1

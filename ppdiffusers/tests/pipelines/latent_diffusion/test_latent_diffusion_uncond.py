@@ -17,14 +17,13 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
-from paddlenlp.transformers import CLIPTextModel
+from paddlenlp.transformers import CLIPTextConfig, CLIPTextModel
 from ppdiffusers import DDIMScheduler, LDMPipeline, UNet2DModel, VQModel
 from ppdiffusers.utils.testing_utils import slow
 
 
-class LDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class LDMPipelineFastTests(unittest.TestCase):
     @property
     def dummy_uncond_unet(self):
         paddle.seed(0)
@@ -61,7 +60,8 @@ class LDMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
             text_layers=5,
             vocab_size=1000,
         )
-        model = CLIPTextModel(**config)
+        config = CLIPTextConfig.from_dict(config)
+        model = CLIPTextModel(config)
         model.eval()
         return model
 

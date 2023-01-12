@@ -27,7 +27,8 @@ extras = {}
 REQUIRED_PACKAGES = read_requirements_file("requirements.txt")
 extras["tests"] = read_requirements_file("tests/requirements.txt")
 extras["docs"] = read_requirements_file("docs/requirements.txt")
-extras["dev"] = extras["tests"] + extras["docs"]
+extras["autonlp"] = read_requirements_file("paddlenlp/experimental/autonlp/requirements.txt")
+extras["dev"] = extras["tests"] + extras["docs"] + extras["autonlp"]
 
 
 def read(*names, **kwargs):
@@ -59,7 +60,7 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version="2.4.8",
+    version="2.4.9",
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
@@ -68,11 +69,11 @@ setuptools.setup(
     url="https://github.com/PaddlePaddle/PaddleNLP",
     packages=setuptools.find_packages(
         where=".",
-        exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "faster_generation*", "model_zoo*"),
+        exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),
     ),
     package_data={
         "paddlenlp.ops": get_package_data_files(
-            "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "faster_transformer", "patches", "optimizer"]
+            "paddlenlp.ops", ["CMakeLists.txt", "README.md", "cmake", "fast_transformer", "patches", "optimizer"]
         ),
         "paddlenlp.transformers.layoutxlm": get_package_data_files(
             "paddlenlp.transformers.layoutxlm", ["visual_backbone.yaml"]

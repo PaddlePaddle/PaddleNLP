@@ -137,10 +137,10 @@ def create_paddle_lite_runtime(model_dir, model_prefix, device="cpu", device_id=
     option = fd.RuntimeOption()
     option.use_lite_backend()
     if device == "huawei_ascend_npu":
-        option.use_cann()
-        option.set_lite_nnadapter_device_names(["huawei_ascend_npu"])
-        option.set_lite_nnadapter_model_cache_dir(os.path.join(model_dir, model_prefix))
-        option.set_lite_nnadapter_context_properties(
+        option.use_ascend()
+        option.set_lite_device_names(["huawei_ascend_npu"])
+        option.set_lite_model_cache_dir(os.path.join(model_dir, model_prefix))
+        option.set_lite_context_properties(
             "HUAWEI_ASCEND_NPU_SELECTED_DEVICE_IDS={};HUAWEI_ASCEND_NPU_PRECISION_MODE=allow_mix_precision".format(
                 device_id
             )
