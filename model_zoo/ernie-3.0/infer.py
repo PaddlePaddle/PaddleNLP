@@ -14,8 +14,6 @@
 
 import argparse
 import distutils.util
-import os
-import sys
 import time
 from functools import partial
 from multiprocessing import cpu_count
@@ -126,7 +124,6 @@ def convert_example(example, tokenizer, label_list, is_test=False, max_seq_lengt
     """convert a glue example into necessary features"""
     if not is_test:
         # `label_list == None` is for regression task
-        label_dtype = "int64" if label_list else "float32"
         # Get the label
         label = np.array(example["label"], dtype="int64")
     # Convert raw text to feature
@@ -189,7 +186,7 @@ class Predictor(object):
                 )
             dynamic_quantize_model = onnx_model
             if args.enable_quantize:
-                from onnxruntime.quantization import QuantizationMode, quantize_dynamic
+                from onnxruntime.quantization import quantize_dynamic
 
                 float_onnx_file = "model.onnx"
                 with open(float_onnx_file, "wb") as f:
@@ -346,7 +343,6 @@ class Predictor(object):
                 metric = ChunkEvaluator(label_list=args.label_list)
                 metric.reset()
                 all_predictions = []
-                batch_num = len(dataset["input_ids"])
                 for batch in batches:
                     batch = batchify_fn(batch)
                     input_ids, segment_ids = batch["input_ids"].numpy(), batch["token_type_ids"].numpy()
@@ -486,7 +482,7 @@ def main():
             )
         else:
             batchify_fn = DataCollatorForTokenClassification(tokenizer)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     elif args.task_name == "cmrc2018":
         dev_example = load_dataset("cmrc2018", split="validation")
         column_names = dev_example.column_names
@@ -506,7 +502,7 @@ def main():
             batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
         else:
             batchify_fn = DataCollatorWithPadding(tokenizer)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args, dev_example)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args, dev_example)
     else:
         dev_ds = ppnlp_load_dataset("clue", args.task_name, splits="dev")
 
@@ -524,7 +520,7 @@ def main():
         else:
             batchify_fn = DataCollatorWithPadding(tokenizer)
 
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
 
 if __name__ == "__main__":
