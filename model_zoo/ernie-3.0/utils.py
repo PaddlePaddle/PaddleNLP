@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from dataclasses import dataclass, field
-from lib2to3.pgen2.token import OP
-from typing import Optional, List
+from typing import List, Optional
 
 import paddle
 import yaml
@@ -43,6 +42,7 @@ def get_dynamic_max_length(examples, default_max_length: int, dynamic_max_length
             max_length = max_length_option
     return max_length
 
+
 def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Optional[List[int]] = None):
     # Tokenize our examples with truncation and maybe padding, but keep the overflows using a stride. This results
     # in one example possible giving several features when a context is long, each of those features having a
@@ -50,21 +50,25 @@ def prepare_train_features(examples, tokenizer, args, dynamic_max_length: Option
     # NOTE: Almost the same functionality as HuggingFace's prepare_train_features function.
     contexts = examples["context"]
     questions = examples["question"]
-    
+
     if dynamic_max_length is not None:
         tokenized_examples = tokenizer(
             questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
         )
         max_length = get_dynamic_max_length(
-            examples=tokenized_examples, 
-            default_max_length=args.max_seq_length, 
-            dynamic_max_length=dynamic_max_length)
+            examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
+        )
         tokenized_examples = tokenizer(
             questions, contexts, stride=args.doc_stride, max_length=max_length, truncation=True
         )
     else:
         tokenized_examples = tokenizer(
-            questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, padding="max_length", truncation=True
+            questions,
+            contexts,
+            stride=args.doc_stride,
+            max_length=args.max_seq_length,
+            padding="max_length",
+            truncation=True,
         )
 
     # Since one example might give us several features if it has a long context, we need a map from a feature to
@@ -140,15 +144,19 @@ def prepare_validation_features(examples, tokenizer, args, dynamic_max_length: O
             questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, truncation=True
         )
         max_length = get_dynamic_max_length(
-            examples=tokenized_examples, 
-            default_max_length=args.max_seq_length, 
-            dynamic_max_length=dynamic_max_length)
+            examples=tokenized_examples, default_max_length=args.max_seq_length, dynamic_max_length=dynamic_max_length
+        )
         tokenized_examples = tokenizer(
             questions, contexts, stride=args.doc_stride, max_length=max_length, truncation=True
         )
     else:
         tokenized_examples = tokenizer(
-            questions, contexts, stride=args.doc_stride, max_length=args.max_seq_length, padding="max_length", truncation=True
+            questions,
+            contexts,
+            stride=args.doc_stride,
+            max_length=args.max_seq_length,
+            padding="max_length",
+            truncation=True,
         )
     # Since one example might give us several features if it has a long context, we need a map from a feature to
     # its corresponding example. This key gives us just that.
@@ -318,9 +326,7 @@ def seq_convert_example(
         if dynamic_max_length is not None:
             temp_example = tokenizer(example["sentence"], max_length=max_seq_length, truncation=True)
             max_length = get_dynamic_max_length(
-                examples=temp_example,
-                default_max_length=max_seq_length,
-                dynamic_max_length=dynamic_max_length
+                examples=temp_example, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
             example = tokenizer(example["sentence"], max_length=max_length, truncation=True)
         else:
@@ -334,9 +340,7 @@ def seq_convert_example(
                 truncation=True,
             )
             max_length = get_dynamic_max_length(
-                examples=temp_example,
-                default_max_length=max_seq_length,
-                dynamic_max_length=dynamic_max_length
+                examples=temp_example, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
             example = tokenizer(
                 example["sentence1"],
@@ -363,7 +367,12 @@ def seq_convert_example(
 
 
 def token_convert_example(
-    example, tokenizer, no_entity_id, max_seq_length=512, return_length=False, dynamic_max_length: Optional[List[int]] = None
+    example,
+    tokenizer,
+    no_entity_id,
+    max_seq_length=512,
+    return_length=False,
+    dynamic_max_length: Optional[List[int]] = None,
 ):
     if "labels" in example:
         labels = example["labels"]
@@ -377,9 +386,7 @@ def token_convert_example(
                 return_length=return_length,
             )
             max_length = get_dynamic_max_length(
-                examples=tokenized_input,
-                default_max_length=max_seq_length,
-                dynamic_max_length=dynamic_max_length
+                examples=tokenized_input, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
             tokenized_input = tokenizer(
                 example,
@@ -422,9 +429,7 @@ def token_convert_example(
                 return_length=return_length,
             )
             max_length = get_dynamic_max_length(
-                examples=tokenized_input,
-                default_max_length=max_seq_length,
-                dynamic_max_length=dynamic_max_length
+                examples=tokenized_input, default_max_length=max_seq_length, dynamic_max_length=dynamic_max_length
             )
             tokenized_input = tokenizer(
                 example["tokens"],

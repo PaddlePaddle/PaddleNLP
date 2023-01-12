@@ -32,10 +32,7 @@ from paddlenlp.trainer import (
     TrainingArguments,
     get_last_checkpoint,
 )
-from paddlenlp.transformers import (
-    ErnieForSequenceClassification,
-    ErnieTokenizer,
-)
+from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
 from paddlenlp.utils.log import logger
 
 
