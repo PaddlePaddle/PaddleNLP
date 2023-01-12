@@ -151,6 +151,10 @@ else:
         FastDeployStableDiffusionInpaintPipelineLegacy,
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
+        FastDeployUPaintingImg2ImgPipeline,
+        FastDeployUPaintingInpaintPipelineLegacy,
+        FastDeployUPaintingMegaPipeline,
+        FastDeployUPaintingPipeline,
     )
 try:
     if not (is_paddle_available() and is_librosa_available()):

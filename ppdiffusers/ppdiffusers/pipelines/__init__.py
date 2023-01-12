@@ -101,6 +101,12 @@ else:
         FastDeployStableDiffusionMegaPipeline,
         FastDeployStableDiffusionPipeline,
     )
+    from .upainting import (
+        FastDeployUPaintingImg2ImgPipeline,
+        FastDeployUPaintingInpaintPipelineLegacy,
+        FastDeployUPaintingMegaPipeline,
+        FastDeployUPaintingPipeline,
+    )
 try:
     if not (is_paddle_available() and is_paddlenlp_available() and is_k_diffusion_available()):
         raise OptionalDependencyNotAvailable()
