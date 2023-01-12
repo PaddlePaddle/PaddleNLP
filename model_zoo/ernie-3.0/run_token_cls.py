@@ -107,6 +107,7 @@ def main():
 
     # Dataset pre-process
     if training_args.do_train:
+        print(type(raw_datasets["train"]))
         train_dataset = raw_datasets["train"].map(trans_fn)
     if training_args.do_eval:
         # The msra_ner dataset do not have the dev dataset, use the test dataset for the evaluation
