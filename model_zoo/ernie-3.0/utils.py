@@ -408,7 +408,7 @@ def token_convert_example(
             )
         else:
             max_length = max_seq_length
-        
+
         tokenized_input = tokenizer(
             example["tokens"],
             max_length=max_length,
