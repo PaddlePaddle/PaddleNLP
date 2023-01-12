@@ -137,13 +137,7 @@ def main():
             )
 
     # Define data collector
-    if training_args.device == "npu":
-        # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
-        data_collator = DataCollatorWithPadding(
-            tokenizer=tokenizer, padding="max_length", max_length=data_args.max_seq_length
-        )
-    else:
-        data_collator = DataCollatorWithPadding(tokenizer)
+    data_collator = DataCollatorWithPadding(tokenizer)
 
     # Post-processing:
     def post_processing_function(examples, features, predictions, stage="eval"):
