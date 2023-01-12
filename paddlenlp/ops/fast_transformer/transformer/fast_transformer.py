@@ -812,7 +812,7 @@ class FasterOPT(OPTPretrainedModel):
 
 class FasterGPT(GPTPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterGPT, self).__init__()
+        super(FasterGPT, self).__init__(model.config)
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(model=model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding)
