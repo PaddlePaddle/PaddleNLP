@@ -2,7 +2,7 @@
 
 在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy Python SDK。
 
-本目录下分别提供`infer_demo.py`快速完成在CPU/GPU的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的Python部署示例，并展示使用FastTokenizer后，端到端预测性能的Benchmark。
+本目录下分别提供`infer_demo.py`快速完成在CPU/GPU的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的Python部署示例，并展示使用 FastTokenizer 后，端到端预测性能的 Benchmark。
 
 
 ## 依赖安装
@@ -62,7 +62,7 @@ python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_d
 
 ```bash
 
-[INFO] fastdeploy/runtime.cc(517)::Init	Runtime initialized with Backend::PDINFER in Device::GPU.
+[INFO] fastdeploy/runtime.cc(517)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
 No. 0 text = 来一首周华健的花心
 {'intent': 'music.play', 'confidence': 0.99706995, 'slot': [{'slot': 'singer', 'entity': '周华健', 'pos': [3, 5]}, {'slot': 'song', 'entity': '花心', 'pos': [7, 8]}]}
 No. 1 text = 播放我们都一样
