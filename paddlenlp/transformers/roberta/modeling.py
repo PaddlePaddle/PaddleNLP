@@ -13,22 +13,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
+    CausalLMOutputWithCrossAttentions,
+    MaskedLMOutput,
+    MultipleChoiceModelOutput,
+    QuestionAnsweringModelOutput,
     SequenceClassifierOutput,
     TokenClassifierOutput,
-    QuestionAnsweringModelOutput,
-    MultipleChoiceModelOutput,
-    MaskedLMOutput,
-    CausalLMOutputWithCrossAttentions,
 )
 from .configuration import PRETRAINED_INIT_CONFIGURATION, RobertaConfig
 

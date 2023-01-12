@@ -89,6 +89,7 @@ TOKENIZER_MAPPING_NAMES = OrderedDict(
         ("ArtistTokenizer", "artist"),
         ("ChineseCLIPTokenizer", "chineseclip"),
         ("ErnieViLTokenizer", "ernie_vil"),
+        ("CMSIMLockTokenizer", "cmsim_lock"),
         ("PegasusChineseTokenizer", "pegasus"),
     ]
 )

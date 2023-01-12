@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import numpy as np
 import paddle
 import paddle.nn as nn
@@ -239,6 +238,7 @@ def compute_neuron_head_importance(
     loss_fct=nn.loss.CrossEntropyLoss(),
     intermediate_name="linear1",
     output_name="linear2",
+    label_names=None,
 ):
     """
     Computes the importance of multi-head attention and feed-forward  neuron in
@@ -287,7 +287,13 @@ def compute_neuron_head_importance(
         neuron_importance.append(np.zeros(shape=[w.shape[1]], dtype="float32"))
 
     for i, batch in enumerate(data_loader):
-        if "labels" in batch:
+        labels = None
+        if label_names is not None:
+            labels = []
+            for label in label_names:
+                labels.append(batch.pop(label))
+            labels = tuple(labels)
+        elif "labels" in batch:
             labels = batch.pop("labels")
             # For token cls tasks
             for key in ("length", "seq_len"):
@@ -295,8 +301,7 @@ def compute_neuron_head_importance(
                     batch.pop(key)
         elif "start_positions" in batch and "end_positions" in batch:
             labels = (batch.pop("start_positions"), batch.pop("end_positions"))
-        else:
-            labels = None
+
         batch["attention_mask"] = [None, head_mask]
         logits = model(**batch)
 

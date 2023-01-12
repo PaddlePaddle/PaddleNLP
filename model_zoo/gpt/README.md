@@ -96,7 +96,7 @@ CUDA_VISIBLE_DEVICES=0 python run_pretrain.py \
   --device gpu \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
-  --per_device_train_batch_size 4 \
+  --mirco_batch_size 4 \
   --eval_steps 100 \
   --do_train true \
   --do_predict true
@@ -129,7 +129,7 @@ python -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" run_pretrain.py \
   --device gpu \
   --warmup_steps 320000 \
   --warmup_ratio 0.01 \
-  --per_device_train_batch_size 4 \
+  --mirco_batch_size 8 \
   --eval_steps 100 \
   --do_train true \
   --do_predict true

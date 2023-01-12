@@ -59,7 +59,7 @@ def do_predict(args):
     model_class, tokenizer_class = MODEL_CLASSES[args.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
     logger.info("Loading the model parameters, please wait...")
-    model = model_class.from_pretrained(args.model_name_or_path, max_predict_len=args.max_out_len)
+    model = model_class.from_pretrained(args.model_name_or_path)
 
     gpt = FasterGPT(model=model, decoding_lib=args.decoding_lib, use_fp16_decoding=args.use_fp16_decoding)
 
