@@ -51,7 +51,6 @@ from ..transformers.tokenizer_utils import PretrainedTokenizer
 from ..utils.batch_sampler import DistributedBatchSampler as NlpDistributedBatchSampler
 from ..utils.log import logger
 from .integrations import get_reporting_integration_callbacks
-from .plugins.npu_plugin import npu_accelerate_plugin
 from .trainer_callback import (
     CallbackHandler,
     DefaultFlowCallback,
@@ -596,6 +595,8 @@ class Trainer:
         self._globalstep_last_logged = self.state.global_step
 
         if self.args.device == "npu" and self.args.flatten_param_grads:
+            from .plugins.npu_plugin import npu_accelerate_plugin
+
             npu_accelerate_plugin(self.optimizer)
 
         for epoch in range(epochs_trained, num_train_epochs):

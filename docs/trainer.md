@@ -555,7 +555,7 @@ Trainer 是一个简单，但功能完整的 Paddle训练和评估模块，并�
                        to metrics.(default:True)
 
   --flatten_param_grads
-                       是否在优化器中使用flatten_param_grads策略，该策略目前仅在NPU设备上生效。（可选，默认为False）
+                       是否在优化器中使用flatten_param_grads策略，该策略将素有参数摊平后输入Optimizer更新。目前该策略仅在NPU设备上生效。（可选，默认为False）
                        Whether use flatten_param_grads method in optimizer,
                        only used on NPU devices.(default:False)
 
