@@ -18,7 +18,7 @@ paddlenlp server server:app --host 0.0.0.0 --port 8189
 ```
 如果是ERNIE-M模型则启动
 ```bash
-paddlenlp server server:app --host 0.0.0.0 --port 8189
+paddlenlp server ernie_m_server:app --host 0.0.0.0 --port 8189
 ```
 #### 启动分类 Client 服务
 ```bash
