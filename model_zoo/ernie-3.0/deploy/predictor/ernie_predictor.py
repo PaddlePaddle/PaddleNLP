@@ -233,7 +233,7 @@ def seq_cls_print_ret(infer_result, input_data):
     ]
     label = infer_result["label"].squeeze().tolist()
     confidence = infer_result["confidence"].squeeze().tolist()
-    for i, ret in enumerate(infer_result):
+    for i in range(len(label)):
         print("input data:", input_data[i])
         print("seq cls result:")
         print("label:", label_list[label[i]], "  confidence:", confidence[i])
