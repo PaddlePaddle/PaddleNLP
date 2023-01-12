@@ -180,13 +180,10 @@ class UPaintingPipeline(DiffusionPipeline):
         self.freeze_vae()
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
+        self.vae_enable_gradient_checkpointing = False
         self.cond_with_uncond_embeddings = True
-        self.enable_gradient_checkpointing = True
         self.fp16 = True
         self.amp_level = "O2"
-        if self.enable_gradient_checkpointing:
-            self.unet.enable_gradient_checkpointing()
-            logger.info("Unet enable_gradient_checkpointing!")
 
     def add_clip_models(self, model_names_or_model_lists=None):
         if model_names_or_model_lists is not None:
@@ -316,7 +313,9 @@ class UPaintingPipeline(DiffusionPipeline):
         text_embeddings=None,
     ):
         # not cond_with_uncond_embeddings
-        if not self.cond_with_uncond_embeddings:
+        if self.cond_with_uncond_embeddings:
+            noise_pred = noise_pred_original
+        else:
             assert text_embeddings is not None
             latents = latents.detach()
             latents.stop_gradient = False
@@ -325,9 +324,6 @@ class UPaintingPipeline(DiffusionPipeline):
             # step 1: predict the noise residual
             with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
                 noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
-        else:
-            # step 1: predict the noise residual
-            noise_pred = noise_pred_original
 
         # step 2: predict the sample
         if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
@@ -346,7 +342,7 @@ class UPaintingPipeline(DiffusionPipeline):
         sample = 1 / 0.18215 * sample
         orig_dtype = sample.dtype
         with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
-            if self.enable_gradient_checkpointing:
+            if self.vae_enable_gradient_checkpointing:
 
                 def create_custom_forward(module, return_dict=False):
                     def custom_forward(*inputs):
@@ -736,6 +732,13 @@ class UPaintingPipeline(DiffusionPipeline):
         # 0. Check use_clip_guidance.
         if len(self.clip_models) == 0 or cond_weight <= 0:
             use_clip_guidance = False
+
+        if use_clip_guidance:
+            self.unet.enable_gradient_checkpointing()
+            self.vae_enable_gradient_checkpointing = True
+        else:
+            self.unet.disable_gradient_checkpointing()
+            self.vae_enable_gradient_checkpointing = False
 
         # 1. Check inputs. Raise error if not correct
         self.check_inputs(prompt, height, width, callback_steps, en_prompt, use_clip_guidance)
