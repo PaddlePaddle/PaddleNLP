@@ -1,8 +1,8 @@
-# FastDeploy ERNIE 3.0 Tiny 模型C++部署示例
+# FastDeploy ERNIE 3.0 Tiny 模型 C++ 部署示例
 
 在部署前，参考 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md) 安装 FastDeploy C++ SDK。
 
-本目录下分别提供`infer_demo.cc`快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的C++部署示例。
+本目录下分别提供 `infer_demo.cc` 快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的 C++ 部署示例。
 
 ## 依赖安装
 
@@ -18,7 +18,7 @@ tar xvf fastdeploy-linux-x64-gpu-x.x.x.tgz
 
 ## 快速开始
 
-以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 Tiny训练文档](../../README.md) 导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
+以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 Tiny 训练文档](../../README.md) 导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
 
 ```bash
 

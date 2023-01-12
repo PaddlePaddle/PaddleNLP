@@ -1,8 +1,8 @@
-# FastDeploy ERNIE 3.0 Tiny 模型Python部署示例
+# FastDeploy ERNIE 3.0 Tiny 模型 Python 部署示例
 
-在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy Python SDK。
+在部署前，参考 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md) 安装 FastDeploy Python SDK。
 
-本目录下分别提供`infer_demo.py`快速完成在CPU/GPU的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的Python部署示例，并展示使用 FastTokenizer 后，端到端预测性能的 Benchmark。
+本目录下分别提供 `infer_demo.py` 快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的 Python 部署示例，并展示使用 FastTokenizer 后，端到端预测性能的 Benchmark。
 
 
 ## 依赖安装
@@ -189,7 +189,7 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
 
 ## 性能 Benchmark
 
-在 Python 端上，以往会使用纯 Python 实现的 Tokenizer 进行分词，在处理大规模文本下往往会显得十分低效。为了解决这个问题，我们使用 PaddleNLP 的 FastTokenizer 工具，该工具使用 C++ 实现，并集成了 Google 提出的 [Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf) 快速分词算法，可以大大提升分词阶段性能。开发者可以使用 PaddleNLP 提供的 `AutoTokenizer` ，通过传入 `use_fast=True` 的参数，即可使用 FastTokenizer。下面对比使用 FastTokenizer 前后，FP32 模型与量化 INT8 模型在 GPU 上使用 Paddle Inference 以及 Paddle TensorRT 后端预测的预测性能。
+在 Python 端上，以往会使用纯 Python 实现的 Tokenizer 进行分词，在处理大规模文本下往往会显得十分低效。为了解决这个问题，我们使用 PaddleNLP 的 FastTokenizer 工具，该工具使用 C++ 实现，并集成了 Google 提出的 [Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf) 快速分词算法，可以大大提升分词阶段性能。开发者安装 FastTokenizer 后，可以使用 PaddleNLP 提供的 `AutoTokenizer.from_pretrained` 加载 Tokenizer，并通过传入 `use_fast=True` 的参数使用 FastTokenizer。下面对比使用 FastTokenizer 前后，FP32 模型与量化 INT8 模型在 GPU 上使用 Paddle Inference 以及 Paddle TensorRT 后端预测的预测性能。
 
 ### 实验环境
 
