@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from dataclasses import dataclass
-from typing import Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 import paddle
@@ -594,7 +594,7 @@ class AutoencoderKL(ModelMixin, ConfigMixin):
         sample: paddle.Tensor,
         sample_posterior: bool = False,
         return_dict: bool = True,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
     ) -> Union[DecoderOutput, paddle.Tensor]:
         r"""
         Args:

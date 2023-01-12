@@ -14,7 +14,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
 from uvicorn.config import LOGGING_CONFIG
 
@@ -33,7 +33,6 @@ import shutil
 
 import typer
 
-from paddlenlp.cli.converter import convert_from_local_dir
 from paddlenlp.cli.download import load_community_models
 from paddlenlp.cli.install import install_package_from_bos
 from paddlenlp.cli.server import start_backend
@@ -162,21 +161,6 @@ def search(
     print_example_code()
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
-
-
-@app.command(help="convert pytorch models to paddle model")
-def convert(input: Optional[str] = None, output: Optional[str] = None):
-    logger.info("starting to convert models ...")
-
-    if not os.path.isdir(input):
-        logger.warning(
-            f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file now. "
-            "We will support online-converting<AutoModel.from_pretrained('huggingface-model-name')> feature "
-            "as soon as possible. Please keep eyes on the latest version of paddlenlp."
-        )
-        return
-
-    convert_from_local_dir(pretrained_dir=input, output=output)
 
 
 @app.command(help="Start the PaddleNLP SimpleServer.")

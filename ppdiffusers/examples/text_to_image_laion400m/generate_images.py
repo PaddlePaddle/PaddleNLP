@@ -101,10 +101,10 @@ def generate_images(
         i = 0
         for batch_prompt in tqdm(batchify(all_prompt, batch_size=batch_size)):
             sd = random.randint(0, 2**32)
+            paddle.seed(sd)
             images = pipe(
                 batch_prompt,
                 guidance_scale=float(cfg),
-                seed=sd,
                 eta=eta,
                 height=height,
                 width=width,

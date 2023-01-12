@@ -17,14 +17,13 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import DDPMPipeline, DDPMScheduler, UNet2DModel
 from ppdiffusers.utils import deprecate
 from ppdiffusers.utils.testing_utils import slow
 
 
-class DDPMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class DDPMPipelineFastTests(unittest.TestCase):
     @property
     def dummy_uncond_unet(self):
         paddle.seed(0)
@@ -73,7 +72,7 @@ class DDPMPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
         assert np.abs(image_from_tuple_slice.flatten() - expected_slice).max() < 1e-2
 
     def test_inference_deprecated_predict_epsilon(self):
-        deprecate("remove this test", "0.10.0", "remove")
+        deprecate("remove this test", "0.13.0", "remove")
         unet = self.dummy_uncond_unet
         scheduler = DDPMScheduler(predict_epsilon=False)
 

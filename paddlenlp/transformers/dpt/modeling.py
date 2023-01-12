@@ -45,7 +45,7 @@ from ..model_utils import PretrainedModel
 from .configuration import DPTConfig
 
 __all__ = [
-    "DPTPreTrainedModel",
+    "DPTPretrainedModel",
     "DPTModel",
     "DPTForDepthEstimation",
     "DPTForSemanticSegmentation",
@@ -760,7 +760,7 @@ class DPTFeatureFusionLayer(nn.Layer):
         return hidden_state
 
 
-class DPTPreTrainedModel(PretrainedModel):
+class DPTPretrainedModel(PretrainedModel):
     """
     An abstract class to handle weights initialization and a simple interface for downloading and loading pretrained
     models.
@@ -809,7 +809,7 @@ class DPTPreTrainedModel(PretrainedModel):
             self.apply(partial(self._set_gradient_checkpointing, value=False))
 
 
-class DPTModel(DPTPreTrainedModel):
+class DPTModel(DPTPretrainedModel):
     """
     The bare DPT Model transformer outputting raw hidden-states without any specific head on top.
 
@@ -1003,7 +1003,7 @@ class DPTDepthEstimationHead(nn.Layer):
         return predicted_depth
 
 
-class DPTForDepthEstimation(DPTPreTrainedModel):
+class DPTForDepthEstimation(DPTPretrainedModel):
     """
     DPT Model with a depth estimation head on top (consisting of 3 convolutional layers) e.g. for KITTI, NYUv2.
 
@@ -1195,7 +1195,7 @@ class DPTAuxiliaryHead(nn.Layer):
         return logits
 
 
-class DPTForSemanticSegmentation(DPTPreTrainedModel):
+class DPTForSemanticSegmentation(DPTPretrainedModel):
     """
     DPT Model with a semantic segmentation head on top e.g. for ADE20k, CityScapes.
 

@@ -263,6 +263,8 @@ class TrainingArguments:
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        flatten_param_grads (`bool`, *optional*):
+            Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
     """
 
     output_dir: str = field(
@@ -496,6 +498,10 @@ class TrainingArguments:
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
     )
+    flatten_param_grads: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether use flatten_param_grads method in optimizer, only used on NPU devices."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
@@ -623,6 +629,9 @@ class TrainingArguments:
             logger.info(
                 "Both warmup_ratio and warmup_steps given, warmup_steps will override any effect of warmup_ratio during training"
             )
+
+        if self.flatten_param_grads and self.device != "npu":
+            raise ValueError("flatten_param_grads can only be used on npu devices in temporary.")
 
     def __str__(self):
         self_as_dict = asdict(self)

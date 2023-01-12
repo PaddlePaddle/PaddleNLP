@@ -13,13 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from paddle.utils import try_import
+import json
 import os
 import shutil
-from .. import PretrainedTokenizer, AddedToken, BasicTokenizer
-from ...utils.log import logger
 from functools import lru_cache
-import json
+
+from paddle.utils import try_import
+
+from ...utils.log import logger
+from .. import AddedToken, BasicTokenizer, PretrainedTokenizer
 
 __all__ = ["CLIPTokenizer"]
 
@@ -118,26 +120,11 @@ class CLIPTokenizer(PretrainedTokenizer):
     """
     # merges and vocab same as GPT2
     resource_files_names = {"vocab_file": "vocab.json", "merges_file": "merges.txt"}
-    pretrained_resource_files_map = {
-        "vocab_file": {
-            "openai/clip-vit-base-patch32": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/vocab.json",
-            "openai/clip-rn50": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/vocab.json",
-            "openai/clip-rn101": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/vocab.json",
-            "openai/clip-vit-large-patch14": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/vocab.json",
-        },
-        "merges_file": {
-            "openai/clip-vit-base-patch32": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-base-patch32/merges.txt",
-            "openai/clip-rn50": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn50/merges.txt",
-            "openai/clip-rn101": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-rn101/merges.txt",
-            "openai/clip-vit-large-patch14": "http://bj.bcebos.com/paddlenlp/models/community/openai/clip-vit-large-patch14/merges.txt",
-        },
-    }
-    pretrained_init_configuration = {
-        "openai/clip-vit-base-patch32": {"max_len": 77},
-        "openai/clip-rn50": {"max_len": 77},
-        "openai/clip-rn101": {"max_len": 77},
-        "openai/clip-vit-large-patch14": {"max_len": 77},
-    }
+    pretrained_resource_files_map = {"vocab_file": {}, "merges_file": {}}
+    pretrained_init_configuration = {}
+    model_input_names = [
+        "input_ids",
+    ]
 
     def __init__(
         self,
@@ -346,49 +333,3 @@ class CLIPTokenizer(PretrainedTokenizer):
             save_path = os.path.join(save_directory, file_name)
             if os.path.abspath(source_path) != os.path.abspath(save_path):
                 shutil.copyfile(source_path, save_path)
-
-    def __call__(
-        self,
-        text,
-        text_pair=None,
-        max_length=None,
-        stride=0,
-        is_split_into_words=False,
-        padding=False,
-        truncation=False,
-        return_position_ids=False,
-        return_token_type_ids=False,  # don't return token_type_ids
-        return_attention_mask=False,
-        return_length=False,
-        return_overflowing_tokens=False,
-        return_special_tokens_mask=False,
-        return_dict=True,
-        return_offsets_mapping=False,
-        add_special_tokens=True,
-        pad_to_multiple_of=None,
-        return_tensors=None,
-        verbose: bool = True,
-        **kwargs
-    ):
-        return super().__call__(
-            text,
-            text_pair,
-            max_length,
-            stride,
-            is_split_into_words,
-            padding,
-            truncation,
-            return_position_ids,
-            return_token_type_ids,
-            return_attention_mask,
-            return_length,
-            return_overflowing_tokens,
-            return_special_tokens_mask,
-            return_dict,
-            return_offsets_mapping,
-            add_special_tokens,
-            pad_to_multiple_of,
-            return_tensors,
-            verbose,
-            **kwargs,
-        )
