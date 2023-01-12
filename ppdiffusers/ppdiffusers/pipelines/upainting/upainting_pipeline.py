@@ -180,6 +180,7 @@ class UPaintingPipeline(DiffusionPipeline):
         self.freeze_vae()
         self.vae_scale_factor = 2 ** (len(self.vae.config.block_out_channels) - 1)
 
+        self.cond_with_uncond_embeddings = True
         self.enable_gradient_checkpointing = True
         self.fp16 = True
         self.amp_level = "O2"
@@ -187,12 +188,12 @@ class UPaintingPipeline(DiffusionPipeline):
             self.unet.enable_gradient_checkpointing()
             logger.info("Unet enable_gradient_checkpointing!")
 
-    def add_clip_models(self, model_names_or_models=None):
-        if model_names_or_models is not None:
-            if isinstance(model_names_or_models[0], str):
-                model_list = build_models(model_names_or_models)
-            elif isinstance(model_names_or_models[0], dict) and "model" in model_names_or_models[0]:
-                model_list = model_names_or_models
+    def add_clip_models(self, model_names_or_model_lists=None):
+        if model_names_or_model_lists is not None:
+            if isinstance(model_names_or_model_lists[0], str):
+                model_list = build_models(model_names_or_model_lists)
+            elif isinstance(model_names_or_model_lists[0], dict) and "model" in model_names_or_model_lists[0]:
+                model_list = model_names_or_model_lists
             self.clip_models.extend(model_list)
             self.freeze_clip_models()
 
@@ -259,23 +260,25 @@ class UPaintingPipeline(DiffusionPipeline):
         model_stat["weights"] /= model_stat["weights"].sum().abs()
         return model_stat
 
-    def get_clip_guided_losses(self, x_in, t, model_stat, args):
+    def get_clip_guided_losses(
+        self, x_in, t, model_stat, cut_overview, cut_innercut, cut_icgray_p, skip_augs, animation_mode, cut_ic_pow
+    ):
         """
         Calculate CLIP guided losses
         """
         t_int = max(int(t.item()), 1)
         input_resolution = model_stat["resolution"]
         feature_extraction = model_stat["feature_extraction"]
-        cut_overview = eval(args["cut_overview"])
-        cut_innercut = eval(args["cut_innercut"])
-        cut_icgray_p = eval(args["cut_icgray_p"])
+        cut_overview = eval(cut_overview)
+        cut_innercut = eval(cut_innercut)
+        cut_icgray_p = eval(cut_icgray_p)
         cuts = MakeCutoutsDango(
             input_resolution,
-            skip_augs=args["skip_augs"],
-            animation_mode=args["animation_mode"],
+            skip_augs=skip_augs,
+            animation_mode=animation_mode,
             Overview=cut_overview[1000 - t_int],
             InnerCrop=cut_innercut[1000 - t_int],
-            IC_Size_Pow=args["cut_ic_pow"],
+            IC_Size_Pow=cut_ic_pow,
             IC_Grey_P=cut_icgray_p[1000 - t_int],
         )
         normalize = transforms.Normalize(mean=feature_extraction.image_mean, std=feature_extraction.image_std)
@@ -294,7 +297,6 @@ class UPaintingPipeline(DiffusionPipeline):
         latents,
         timestep,
         index,
-        text_embeddings,
         noise_pred_original,
         model_stats,
         cut_overview,
@@ -311,30 +313,21 @@ class UPaintingPipeline(DiffusionPipeline):
         clamp_grad,
         clamp_max,
         cond_weight,
+        text_embeddings=None,
     ):
-        args = dict(
-            cut_overview=cut_overview,
-            cut_innercut=cut_innercut,
-            cut_icgray_p=cut_icgray_p,
-            skip_augs=skip_augs,
-            animation_mode=animation_mode,
-            cut_ic_pow=cut_ic_pow,
-            cutn_batches=cutn_batches,
-            clip_guidance_scale=clip_guidance_scale,
-            tv_scale=tv_scale,
-            range_scale=range_scale,
-            sat_scale=sat_scale,
-            clamp_grad=clamp_grad,
-            clamp_max=clamp_max,
-            cond_weight=cond_weight,
-        )
-        latents = latents.detach()
-        latents.stop_gradient = False
-        latent_model_input = self.scheduler.scale_model_input(latents, timestep)
+        # not cond_with_uncond_embeddings
+        if not self.cond_with_uncond_embeddings:
+            assert text_embeddings is not None
+            latents = latents.detach()
+            latents.stop_gradient = False
+            latent_model_input = self.scheduler.scale_model_input(latents, timestep)
 
-        # step 1: predict the noise residual
-        with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
-            noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
+            # step 1: predict the noise residual
+            with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
+                noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
+        else:
+            # step 1: predict the noise residual
+            noise_pred = noise_pred_original
 
         # step 2: predict the sample
         if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
@@ -372,17 +365,25 @@ class UPaintingPipeline(DiffusionPipeline):
 
             # 2. compute clip x_in_grad
             for model_stat in model_stats:
-                for _ in range(args["cutn_batches"]):
-                    losses = self.get_clip_guided_losses(x_in, timestep, model_stat, args)
-                    x_in_grad += (
-                        paddle.grad(losses.sum() * args["clip_guidance_scale"], x_in)[0] / args["cutn_batches"]
+                for _ in range(cutn_batches):
+                    losses = self.get_clip_guided_losses(
+                        x_in,
+                        timestep,
+                        model_stat,
+                        cut_overview,
+                        cut_innercut,
+                        cut_icgray_p,
+                        skip_augs,
+                        animation_mode,
+                        cut_ic_pow,
                     )
+                    x_in_grad += paddle.grad(losses.sum() * clip_guidance_scale, x_in)[0] / cutn_batches
 
             # 3. compute tv_loss + range_loss + sat_losses
-            tv_losses = tv_loss(x_in).sum() if args["tv_scale"] > 0 else 0.0
-            range_losses = range_loss(x_in).sum() if args["range_scale"] > 0 else 0.0
-            sat_losses = sat_loss(x_in).sum() if args["sat_scale"] > 0 else 0.0
-            loss = tv_losses * args["tv_scale"] + range_losses * args["range_scale"] + sat_losses * args["sat_scale"]
+            tv_losses = tv_loss(x_in).sum() if tv_scale > 0 else 0.0
+            range_losses = range_loss(x_in).sum() if range_scale > 0 else 0.0
+            sat_losses = sat_loss(x_in).sum() if sat_scale > 0 else 0.0
+            loss = tv_losses * tv_scale + range_losses * range_scale + sat_losses * sat_scale
 
             x_in_grad += paddle.grad(loss, x_in)[0]
 
@@ -397,9 +398,9 @@ class UPaintingPipeline(DiffusionPipeline):
                 grads = paddle.zeros_like(x)
 
             # 4. clip grad
-            if args["clamp_grad"] and not isnan:
+            if clamp_grad and not isnan:
                 magnitude = grads.square().mean().sqrt()
-                return grads * magnitude.clip(max=args["clamp_max"]) / magnitude
+                return grads * magnitude.clip(max=clamp_max) / magnitude
             return grads
 
         # step 4: compute grads score
@@ -407,10 +408,10 @@ class UPaintingPipeline(DiffusionPipeline):
 
         # step 5: update noise_pred_original
         if isinstance(self.scheduler, LMSDiscreteScheduler):
-            latents = latents.detach() + args["cond_weight"] * grads * (sigma**2)
+            latents = latents.detach() + cond_weight * grads * (sigma**2)
             noise_pred = noise_pred_original
         else:
-            noise_pred = noise_pred_original - args["cond_weight"] * beta_prod_t.sqrt() * grads
+            noise_pred = noise_pred_original - cond_weight * beta_prod_t.sqrt() * grads
         return noise_pred, latents
 
     def _encode_prompt(self, prompt, do_classifier_free_guidance, negative_prompt):
@@ -520,7 +521,7 @@ class UPaintingPipeline(DiffusionPipeline):
             raise ValueError(f"`prompt` has to be of type `str` or `list` but is {type(prompt)}")
 
         if use_clip_guidance:
-            if any(model.config.model_type in ["clip"] for model in self.clip_models):
+            if any(model["model"].config.model_type in ["clip"] for model in self.clip_models):
                 if not isinstance(en_prompt, str) and not isinstance(en_prompt, list):
                     raise ValueError("`en_prompt` has to be of type `str` or `list` when we use but english clip.")
 
@@ -559,6 +560,41 @@ class UPaintingPipeline(DiffusionPipeline):
         # scale the initial noise by the standard deviation required by the scheduler
         latents = latents * self.scheduler.init_noise_sigma
         return latents
+
+    def denoising_step(self, latents, t, text_embeddings, do_classifier_free_guidance, guidance_scale):
+        # expand the latents if we are doing classifier free guidance
+        latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
+        latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+
+        with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
+            # predict the noise residual
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
+
+        # perform classifier free guidance
+        if do_classifier_free_guidance:
+            noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+        return noise_pred
+
+    def denoising_step_twice(self, latents, t, text_embeddings, do_classifier_free_guidance, guidance_scale):
+        latent_model_input = self.scheduler.scale_model_input(latents, t)
+
+        if do_classifier_free_guidance:
+            text_embeddings_for_guidance, text_embeddings_uncond = text_embeddings.chunk(2)
+        else:
+            text_embeddings_for_guidance = text_embeddings
+            text_embeddings_uncond = None
+
+        with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
+            noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings_for_guidance).sample
+
+        if do_classifier_free_guidance:
+            with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
+                noise_pred_uncond = self.unet(
+                    latent_model_input, t, encoder_hidden_states=text_embeddings_uncond
+                ).sample
+            noise_pred = noise_pred_uncond + guidance_scale * (noise_pred - noise_pred_uncond)
+        return noise_pred
 
     @paddle.no_grad()
     def __call__(
@@ -742,29 +778,42 @@ class UPaintingPipeline(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                # expand the latents if we are doing classifier free guidance
-                latent_model_input = paddle.concat([latents] * 2) if do_classifier_free_guidance else latents
-                latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
+                with_cond = use_clip_guidance and (i + 1) > clip_guidance_skip_steps
+                if with_cond and self.cond_with_uncond_embeddings:
+                    latents = latents.detach()
+                    latents.stop_gradient = False
 
-                with paddle.amp.auto_cast(self.fp16, level=self.amp_level):
-                    # predict the noise residual
-                    noise_pred = self.unet(latent_model_input, t, encoder_hidden_states=text_embeddings).sample
-
-                # perform classifier free guidance
-                if do_classifier_free_guidance:
-                    noise_pred_uncond, noise_pred_text = noise_pred.chunk(2)
-                    noise_pred = noise_pred_uncond + guidance_scale * (noise_pred_text - noise_pred_uncond)
+                # perform denoising_step
+                if self.cond_with_uncond_embeddings:
+                    # [0 ~ clip_guidance_skip_steps - 1] no grad, [clip_guidance_skip_steps, num_inference_steps - 1] with grad
+                    with paddle.set_grad_enabled(with_cond):
+                        if with_cond:
+                            # do denoising_step_twice to save gpu memory
+                            noise_pred = self.denoising_step_twice(
+                                latents, t, text_embeddings, do_classifier_free_guidance, guidance_scale
+                            )
+                        else:
+                            noise_pred = self.denoising_step(
+                                latents, t, text_embeddings, do_classifier_free_guidance, guidance_scale
+                            )
+                else:
+                    # no grad, we will do noise_pred without_uncond_embeddings in cond_fn
+                    noise_pred = self.denoising_step(
+                        latents, t, text_embeddings, do_classifier_free_guidance, guidance_scale
+                    )
 
                 # perform clip guidance
-                if use_clip_guidance and (i + 1) > clip_guidance_skip_steps:
-                    text_embeddings_for_guidance = (
-                        text_embeddings.chunk(2)[1] if do_classifier_free_guidance else text_embeddings
-                    )
+                if with_cond:
+                    if self.cond_with_uncond_embeddings:
+                        text_embeddings_for_guidance = None
+                    else:
+                        text_embeddings_for_guidance = (
+                            text_embeddings.chunk(2)[1] if do_classifier_free_guidance else text_embeddings
+                        )
                     noise_pred, latents = self.cond_fn(
                         latents,
                         t,
                         i,
-                        text_embeddings_for_guidance,
                         noise_pred,
                         model_stats,
                         cut_overview=cut_overview,
@@ -781,6 +830,7 @@ class UPaintingPipeline(DiffusionPipeline):
                         clamp_grad=clamp_grad,
                         clamp_max=clamp_max,
                         cond_weight=cond_weight,
+                        text_embeddings=text_embeddings_for_guidance,
                     )
 
                 # compute the previous noisy sample x_t -> x_t-1
