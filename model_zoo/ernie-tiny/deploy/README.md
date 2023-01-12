@@ -12,7 +12,7 @@
 
 **⚡️FastDeploy**是一款**全场景**、**易用灵活**、**极致高效**的AI推理部署工具，满足开发者**多硬件、多平台**的产业部署需求。开发者可以基于FastDeploy将训练好的预测模型在不同的硬件、不同的操作系统以及不同的推理引擎后端上进行部署。目前FastDeploy提供多种编程语言的SDK，包括C++、Python以及Java SDK。
 
-目前 ERNIE 3.0 Tiny 模型已提供基于FastDeploy的云边端的部署示例，在服务端上的GPU硬件上，支持`PaddleInference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU上支持`PaddleInference`、`ONNX Runtime`以及`OpenVINO`后端；在移动端上支持`Paddle Lite`后端。多硬件、多推理引擎后端的支持可以满足开发者不同的部署需求。
+目前 ERNIE 3.0 Tiny 模型已提供基于FastDeploy的云边端的部署示例，在服务端上的GPU硬件上，支持`Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU上支持`Paddle Inference`、`ONNX Runtime`以及`OpenVINO`后端；在移动端上支持`Paddle Lite`后端。多硬件、多推理引擎后端的支持可以满足开发者不同的部署需求。
 
 为了提供 ERNIE 3.0 Tiny 高性能端到端部署能力，我们使用 [FastTokenizer](../../../fast_tokenizer/README.md) 工具完成高效分词，大大提升端到端预测性能。针对 ERNIE 3.0 Tiny 模型，FastTokenizer集成了Google提出的[Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf)快速分词算法，我们在[Python部署](python/README.md)文档展示使用FastTokenizer的加速能力。
 
