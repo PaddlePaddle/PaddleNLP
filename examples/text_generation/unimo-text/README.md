@@ -137,6 +137,6 @@ python run_gen.py \
 
 Finetuned baseline的模型在各任务验证集上有如下结果(指标为BLEU-4)：
 
-|       model_name        | LCSTS_new | DuReaderQG |    AdvertiseGen    |
+|       model_name        | LCSTS_new | DuLeMon |    AdvertiseGen    |
 | :-----------------------------: | :---: | :-----------: | :-------------------: |
-|   finetuned unimo-text-1.0    | 18.82 | 39.78 |     10.03     |
+|   finetuned unimo-text-1.0    | 18.82 | 5.52 |     10.03     |
