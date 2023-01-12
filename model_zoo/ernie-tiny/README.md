@@ -644,9 +644,15 @@ python run_train.py \
 
 ## ⚡️FastDeplopy 部署
 
-FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。在移动端和服务端上提供了一整套完整的部署 Pipeline，开发者可以基于 FastDeploy 在不同的硬件设备上完成多种场景的高效部署。
+FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。
 
-本项目基于 FastDeploy 工具，提供了 ERNIE 3.0 Tiny 移动端和服务端的高效部署示例，并支持在不同的硬件、不同的推理引擎后端上部署。 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在华为 nova 7 Pro （麒麟 985 芯片）上测试 FastTokenizer，**单条文本的分词延时低于 0.5 毫秒**。通过结合 FastTokenizer，FastDeploy 提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在移动端以及服务端上开发各种常见的NLP模型任务，如文本分类、序列标注、信息抽取等。
+本项目基于 FastDeploy 工具，提供了 ERNIE 3.0 Tiny 移动端和服务端的高效部署示例。为了支持多种场景的部署， FastDeploy 提供了一整套完整的部署 Pipeline：
+
+- 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在华为 nova 7 Pro （麒麟 985 芯片）上测试 FastTokenizer，**单条文本的分词延时低于 0.1 毫秒**。
+- 在Runtime阶段，FastDeploy 集成多款硬件以及推理引擎后端，开发者可以通过几行代码设置 `fastdeploy::RuntimeOption` 结构，完成在不同硬件以及使用不同的推理引擎进行部署。
+- 在后处理阶段，FastDeploy 提供了一系列张量级别的 [functions](https://github.com/PaddlePaddle/FastDeploy/tree/release/1.0.2/fastdeploy/function)， 基于functions可以快速完成各类任务的后处理计算，如文本分类任务的 Softmax 等数值计算。
+
+通过结合 FastTokenizer，FastDeploy 提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在移动端以及服务端上开发各种常见的NLP模型任务，如文本分类、序列标注、信息抽取等。
 
 以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
