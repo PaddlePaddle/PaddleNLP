@@ -217,10 +217,11 @@ class T5Config(PretrainedConfig):
 
     """
     model_type = "t5"
-    standard_config_map: Dict[str, str] = {
+    attribute_map: Dict[str, str] = {
         "hidden_size": "d_model",
         "num_attention_heads": "num_heads",
         "num_hidden_layers": "num_layers",
+        "num_classes": "num_labels",
     }
     pretrained_init_configuration = T5_PRETRAINED_INIT_CONFIGURATION
 

@@ -150,7 +150,7 @@ class StandardConfigMappingTest(unittest.TestCase):
         config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
         hidden_size = config.hidden_size
 
-        FakeBertConfig.standard_config_map = {"fake_field": "hidden_size"}
+        FakeBertConfig.attribute_map = {"fake_field": "hidden_size"}
 
         loaded_config = FakeBertConfig.from_pretrained("__internal_testing__/bert")
         fake_field = loaded_config.fake_field
@@ -181,7 +181,7 @@ class StandardConfigMappingTest(unittest.TestCase):
             # rename `config.json` -> `model_config.json`
             shutil.move(os.path.join(tempdir, CONFIG_NAME), os.path.join(tempdir, LEGACY_CONFIG_NAME))
 
-            FakeBertConfig.standard_config_map = {"fake_field": "hidden_size"}
+            FakeBertConfig.attribute_map = {"fake_field": "hidden_size"}
 
             loaded_config = FakeBertConfig.from_pretrained(tempdir)
             self.assertEqual(loaded_config.fake_field, config.hidden_size)
