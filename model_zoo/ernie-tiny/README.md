@@ -646,7 +646,7 @@ python run_train.py \
 
 FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。在移动端和服务端上提供了一整套完整的部署 Pipeline，开发者可以基于 FastDeploy 在不同的硬件设备上完成多种场景的高效部署。
 
-本项目基于 FastDeploy 工具，提供了 ERNIE 3.0 Tiny 移动端和服务端的高效部署示例，并支持在不同的硬件、不同的推理引擎后端上部署。 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，在华为 nova 7 Pro （麒麟 985 芯片）上测试，单条文本的分词延时低于**0.5** ms。通过结合 FastTokenizer，FastDeploy 提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在移动端以及服务端上开发各种常见的NLP模型任务，如文本分类、序列标注、信息抽取等。
+本项目基于 FastDeploy 工具，提供了 ERNIE 3.0 Tiny 移动端和服务端的高效部署示例，并支持在不同的硬件、不同的推理引擎后端上部署。 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在华为 nova 7 Pro （麒麟 985 芯片）上测试 FastTokenizer，**单条文本的分词延时低于 0.5 毫秒**。通过结合 FastTokenizer，FastDeploy 提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在移动端以及服务端上开发各种常见的NLP模型任务，如文本分类、序列标注、信息抽取等。
 
 以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
