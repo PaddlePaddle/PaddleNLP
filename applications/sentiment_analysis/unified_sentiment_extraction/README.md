@@ -511,7 +511,7 @@ python label_studio.py \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
     --options "正向" "负向" \
-    --is_shuffle \
+    --is_shuffle True \
     --seed 1000
 ```
 
@@ -521,7 +521,7 @@ python label_studio.py \
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
 - ``options``: 情感极性分类任务的选项设置。对于语句级情感分类任务，默认支持2分类：``正向`` 和 ``负向``；对于属性级情感分析任务，默认支持3分类：``正向``, ``负向``和 ``未提及``，其中``未提及``表示要分析的属性在原文本评论中未提及，因此无法分析情感极性。如果业务需要其他情感极性选项，可以通过``options``字段进行设置，需要注意的是，如果定制了``options``，参数``label_studio_file``指定的文件需要包含针对新设置的选项的标注数据。
-- ``is_shuffle``: 是否对数据集进行随机打散。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
 - ``seed``: 随机种子，默认为1000.
 
 **备注**：参数``options``可以不进行手动指定，如果这么做，则采用默认的设置。针对语句级情感分类任务，其默认将被设置为：``"正向" "负向"``；对于属性级情感分析任务，默认将被设置为：``"正向" "负向" "未提及"``。
@@ -540,7 +540,7 @@ python label_studio.py \
     --splits 0.8 0.1 0.1 \
     --options "正向" "负向" "未提及" \
     --negative_ratio 5 \
-    --is_shuffle \
+    --is_shuffle True \
     --seed 1000
 ```
 
@@ -587,7 +587,7 @@ python label_studio.py \
     --splits 0.8 0.1 0.1 \
     --options "正向" "负向" "未提及" \
     --negative_ratio 5 \
-    --is_shuffle \
+    --is_shuffle True \
     --seed 1000
 ```
 
@@ -621,7 +621,7 @@ python label_studio.py \
     --splits 0.8 0.1 0.1 \
     --options "正向" "负向" "未提及" \
     --negative_ratio 5 \
-    --is_shuffle \
+    --is_shuffle True \
     --seed 1000
 ```
 
