@@ -15,7 +15,7 @@
 
 import os
 
-from paddlenlp.utils.downloader import get_path_from_url
+from paddlenlp.utils.downloader import get_path_from_url_with_filelock
 from paddlenlp.utils.log import logger
 
 from .utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE
@@ -40,5 +40,5 @@ def ppdiffusers_bos_download(pretrained_model_name_or_path, filename=None, subfo
     if os.path.exists(file_path):
         logger.info("Already cached %s" % file_path)
     else:
-        file_path = get_path_from_url(url, cache_dir)
+        file_path = get_path_from_url_with_filelock(url, cache_dir)
     return file_path

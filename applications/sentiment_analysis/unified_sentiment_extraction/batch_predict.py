@@ -28,8 +28,9 @@ def main(args):
     """
     start_time = time.time()
     # read file
+    logger.info("Trying to load dataset: {}".format(args.file_path))
     if not os.path.exists(args.file_path):
-        raise ValueError("something with wrong for your file_path, it may be not exists.")
+        raise ValueError("something with wrong for your file_path, it may not exist.")
     examples = load_txt(args.file_path)
 
     # define Taskflow for sentiment analysis
@@ -55,6 +56,7 @@ def main(args):
         )
 
     # predict with Taskflow
+    logger.info("Start to perform sentiment analysis for your dataset, this may take some time.")
     results = senta(examples)
 
     # save results

@@ -1300,6 +1300,25 @@ class DataCollatorGP:
         return batch
 
 
+@dataclass
+class DataCollatorForErnieCtm:
+    tokenizer: PretrainedTokenizerBase
+    padding: Union[bool, str, PaddingStrategy] = True
+    model: Optional[str] = "wordtag"
+
+    def __call__(self, features: List[Dict[str, Union[List[int], paddle.Tensor]]]) -> Dict[str, paddle.Tensor]:
+        no_pad = "seq_len" if self.model == "wordtag" else "label_indices"
+        new_features = [{k: v for k, v in f.items() if k != no_pad} for f in features]
+        batch = self.tokenizer.pad(
+            new_features,
+            padding=self.padding,
+        )
+
+        batch = [paddle.to_tensor(batch[k]) for k in batch.keys()]
+        batch.append(paddle.to_tensor([f[no_pad] for f in features]))
+        return batch
+
+
 def gp_decode(batch_outputs, offset_mappings, texts, label_maps, task_type="relation_extraction"):
     if task_type == "entity_extraction":
         batch_ent_results = []
