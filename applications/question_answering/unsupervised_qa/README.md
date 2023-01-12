@@ -60,7 +60,7 @@
 本项目的流程图如下，对于给定的非结构化文本，我们首先通过答案抽取、问题生成、以及往返过滤模块，得到大量语料相关的问答对。针对这些得到的问答对，用户可以通过可以人工筛查和删除的方式来调整生成的问答对，也可以进一步添加人工标注的问答对。随后开发者就可以通过语义索引模块，来构建向量索引库。在构造完索引库之后，我们就可以通过召回模块和排序模块对问答对进行查询，得到最终的查询结果。
 
 <div align="center">
-    <img width="700" alt="image" src="https://user-images.githubusercontent.com/20476674/208813932-b39d0853-8b18-454a-978f-4350d65f30c2.jpg">
+    <img width="700" alt="image" src="https://user-images.githubusercontent.com/20476674/211868709-2ac0932d-c48b-4f87-b1cf-1f2665e5a64e.png">
 </div>
 
 ### 技术方案
