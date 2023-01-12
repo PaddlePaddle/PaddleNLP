@@ -1,4 +1,4 @@
-# ERNIE 3.0 Tiny
+# ERNIE 3.0 Tiny: Frustratingly Simple Method to Improve Task-Agnostic Distillation Generalization
 
  **目录**
    * [ERNIE 3.0 Tiny 介绍](#模型介绍)
