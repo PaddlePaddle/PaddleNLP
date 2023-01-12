@@ -644,13 +644,14 @@ python run_train.py \
 
 ## ⚡️FastDeplopy 部署
 
-FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目提供了对 ERNIE 3.0 Tiny 使用 FastDeploy 云边端部署的示例代码和文档，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。
+FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的云边端部署体验。本项目基于 FastDeploy 工具，并结合[FastTokenizer高性能分词工具](../../fast_tokenizer/README.md)，提供了 ERNIE 3.0 Tiny 多硬件、多推理引擎以及云边端体验一致的高性能部署示例。用户可以通过选择合适的推理引擎后端，并使用FastTokenizer工具加速分词阶段，在具体实际场景下端到端性能可提升数倍，更多详情请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。
 
 以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
 </p>
+
 
 想要更多了解 FastDeploy 可以参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。目前，FastDeploy 已支持多种后端：
 
