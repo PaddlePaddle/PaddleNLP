@@ -569,7 +569,7 @@ python run_eval.py  \
 
 尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至移动端还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
 
-为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能，模型压缩API主要是依赖于[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)模型压缩能力，PaddleSlim是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
+为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能，模型压缩API主要是基于[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)模型压缩能力，PaddleSlim是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
 
 端上模型压缩流程如下图所示：
 
