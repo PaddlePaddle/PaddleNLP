@@ -12,36 +12,40 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from genericpath import isdir
 import os
-import json
 from pathlib import Path
-from typing import Type, List, Tuple, Optional
+from typing import List, Tuple, Type
+
 from uvicorn.config import LOGGING_CONFIG
-from uvicorn.main import LEVEL_CHOICES
-from typing import Type, List, Tuple, Optional
+
 from paddlenlp.utils.import_utils import is_package_available
 
 # check whether the package is avaliable and give friendly description.
 if not is_package_available("typer"):
     raise ModuleNotFoundError(
-        f"paddlenlp-cli tools is not installed correctly, you can use the following command"
+        "paddlenlp-cli tools is not installed correctly, you can use the following command"
         " to install paddlenlp cli tool: >>> pip install paddlenlp[cli]"
     )
 
-import typer
-from typer import Typer
+import importlib
+import inspect
 import shutil
-import importlib, inspect
-from paddlenlp import __version__
-from paddlenlp.transformers import AutoModel, AutoTokenizer, PretrainedModel, PretrainedTokenizer
-from paddlenlp.utils.log import logger
-from paddlenlp.utils.downloader import is_url
-from paddlenlp.cli.converter import convert_from_local_dir
-from paddlenlp.cli.utils.tabulate import tabulate, print_example_code
-from paddlenlp.transformers.utils import find_transformer_model_type
+
+import typer
+
 from paddlenlp.cli.download import load_community_models
+from paddlenlp.cli.install import install_package_from_bos
 from paddlenlp.cli.server import start_backend
+from paddlenlp.cli.utils.tabulate import print_example_code, tabulate
+from paddlenlp.transformers import (
+    AutoModel,
+    AutoTokenizer,
+    PretrainedModel,
+    PretrainedTokenizer,
+)
+from paddlenlp.transformers.utils import find_transformer_model_type
+from paddlenlp.utils.downloader import is_url
+from paddlenlp.utils.log import logger
 
 
 def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
@@ -89,7 +93,7 @@ def load_all_models(include_community: bool = False) -> List[Tuple[str, str]]:
     return model_names
 
 
-app = Typer()
+app = typer.Typer()
 
 
 @app.command()
@@ -159,21 +163,6 @@ def search(
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
 
 
-@app.command(help="convert pytorch models to paddle model")
-def convert(input: Optional[str] = None, output: Optional[str] = None):
-    logger.info("starting to convert models ...")
-
-    if not os.path.isdir(input):
-        logger.warning(
-            f"receive input<{input}> which is not a local dir, so we can't convert it paddle related file now. "
-            "We will support online-converting<AutoModel.from_pretrained('huggingface-model-name')> feature "
-            "as soon as possible. Please keep eyes on the latest version of paddlenlp."
-        )
-        return
-
-    convert_from_local_dir(pretrained_dir=input, output=output)
-
-
 @app.command(help="Start the PaddleNLP SimpleServer.")
 def server(
     app: str,
@@ -216,6 +205,39 @@ def server(
         "reload": reload,
     }
     start_backend(app, **backend_kwargs)
+
+
+@app.command(
+    help="install the target version of paddlenlp, eg: paddlenlp install / paddlenlp install paddlepaddle==latest"
+)
+def install(
+    package: str = typer.Argument(default="paddlenlp==latest", help="install the target version of paddlenlp")
+):
+    """The main function for the staring the SimpleServer"""
+    package = package.replace(" ", "").strip()
+
+    if not package:
+        raise ValueError("please assign the package name")
+
+    # 1. parse the version of paddlenlp
+    splits = [item for item in package.split("==")]
+    if len(splits) == 0 or len(splits) > 2:
+        raise ValueError(
+            "please set the valid package: <package-name>==<version>, eg: paddlenlp==latest, paddlenlp==3099, "
+            f"but received: {package}"
+        )
+
+    tag = "latest"
+    package_name = splits[0]
+
+    # TODO(wj-Mcat): will support `pipelines`, `ppdiffusers` later.
+    assert package_name in ["paddlenlp"], "we only support paddlenlp"
+
+    if len(splits) == 2:
+        tag = splits[1]
+
+    # 2. download & install package from bos server
+    install_package_from_bos(package_name=package_name, tag=tag)
 
 
 def main():

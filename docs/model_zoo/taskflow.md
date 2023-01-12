@@ -37,7 +37,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [『解语』-知识标注](#解语知识标注) | `Taskflow("knowledge_mining")`     | ✅        | ✅        | ✅        | ✅          | ✅          | 覆盖所有中文词汇的知识标注工具                         |
 | [文本纠错](#文本纠错)              | `Taskflow("text_correction")`    | ✅        | ✅        | ✅        | ✅          | ✅          | 融合拼音特征的端到端文本纠错模型ERNIE-CSC              |
 | [文本相似度](#文本相似度)          | `Taskflow("text_similarity")`    | ✅        | ✅        | ✅        |            |            | 基于百万量级Dureader Retrieval数据集训练RocketQA并达到前沿文本相似效果|
-| [情感倾向分析](#情感倾向分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 基于情感知识增强预训练模型SKEP达到业界SOTA             |
+| [情感分析](#情感分析)      | `Taskflow("sentiment_analysis")`  | ✅        | ✅        | ✅        |            | ✅          | 集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务             |
 | [生成式问答](#生成式问答)          | `Taskflow("question_answering")` | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成问答                        |
 | [智能写诗](#智能写诗)              | `Taskflow("poetry_generation")`  | ✅        | ✅        | ✅        |            |            | 使用最大中文开源CPM模型完成写诗                        |
 | [开放域对话](#开放域对话)          | `Taskflow("dialogue")`           | ✅        | ✅        | ✅        |            |            | 十亿级语料训练最强中文闲聊模型PLATO-Mini，支持多轮对话 |
@@ -46,6 +46,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
+| [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
 
 ## QuickStart
 
@@ -1240,8 +1241,8 @@ from paddlenlp import Taskflow
 * `task_path`：自定义任务路径，默认为None。
 </div></details>
 
-### 情感倾向分析
-<details><summary>&emsp;基于情感知识增强预训练模型SKEP达到业界SOTA </summary><div>
+### 情感分析
+<details><summary>&emsp;集成BiLSTM、SKEP、UIE等模型，支持评论维度、观点抽取、情感极性分类等情感分析任务 </summary><div>
 
 #### 支持不同模型，速度快和精度高两种模式
 
@@ -1256,18 +1257,41 @@ from paddlenlp import Taskflow
 >>> senta = Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")
 >>> senta("作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。")
 [{'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间。', 'label': 'positive', 'score': 0.984320878982544}]
+
+# 使用UIE模型进行情感分析，具有较强的样本迁移能力
+# 1. 语句级情感分析
+>>> schema = ['情感倾向[正向，负向]']
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta('蛋糕味道不错，店家服务也很好')
+[{'情感倾向[正向,负向]': [{'text': '正向', 'probability': 0.996646058824652}]}]
+
+# 2. 评价维度级情感分析
+>>> # Aspect Term Extraction
+>>> # schema =  ["评价维度"]
+>>> # Aspect - Opinion Extraction
+>>> # schema =  [{"评价维度":["观点词"]}]
+>>> # Aspect - Sentiment Extraction
+>>> # schema =  [{"评价维度":["情感倾向[正向,负向,未提及]"]}]
+>>> # Aspect - Sentiment - Opinion Extraction
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
+
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta('蛋糕味道不错，店家服务也很热情')
+[{'评价维度': [{'text': '服务', 'start': 9, 'end': 11, 'probability': 0.9709093024793489, 'relations': { '观点词': [{'text': '热情', 'start': 13, 'end': 15, 'probability': 0.9897222206316556}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9999327669598301}]}}, {'text': '味道', 'start': 2, 'end': 4, 'probability': 0.9105472387838915, 'relations': {'观点词': [{'text': '不错', 'start': 4, 'end': 6, 'probability': 0.9946981266891619}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9998829392709467}]}}]}]
 ```
 
 #### 批量样本输入，平均速度更快
 ```python
 >>> from paddlenlp import Taskflow
->>> senta(["这个产品用起来真的很流畅，我非常喜欢", "作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间"])
-[{'text': '这个产品用起来真的很流畅，我非常喜欢', 'label': 'positive', 'score': 0.9938690066337585}, {'text': '作为老的四星酒店，房间依然很整洁，相当不错。机场接机服务很好，可以在车上办理入住手续，节省时间', 'label': 'positive', 'score': 0.985750675201416}]
+>>> schema =  [{"评价维度":["观点词", "情感倾向[正向,负向,未提及]"]}]
+>>> senta = Taskflow("sentiment_analysis", model="uie-senta-base", schema=schema)
+>>> senta(["房间不大，很干净", "老板服务热情，价格也便宜"])
+[{'评价维度': [{'text': '房间', 'start': 0, 'end': 2, 'probability': 0.998526653966298, 'relations': {'观点词': [{'text': '干净', 'start': 6, 'end': 8, 'probability': 0.9899580841973474}, {'text': '不大', 'start': 2, 'end': 4, 'probability': 0.9945525066163512}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.6077412795680956}]}}]}, {'评价维度': [{'text': '服务', 'start': 2, 'end': 4, 'probability': 0.9913965811617516, 'relations': {'观点词': [{'text': '热情', 'start': 4, 'end': 6, 'probability': 0.9995530034336753}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9956709542206106}]}}, {'text': '价格', 'start': 7, 'end': 9, 'probability': 0.9970075537913772, 'relations': {'观点词': [{'text': '便宜', 'start': 10, 'end': 12, 'probability': 0.9991568497876635}], '情感倾向[正向,负向,未提及]': [{'text': '正向', 'probability': 0.9943191048602245}]}}]}]
 ```
 
 #### 可配置参数说明
 * `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
-* `model`：选择任务使用的模型，可选有`bilstm`和`skep_ernie_1.0_large_ch`。
+* `model`：选择任务使用的模型，可选有`bilstm`,`skep_ernie_1.0_large_ch`,`uie-senta-base`,`uie-senta-medium`,`uie-senta-mini`,`uie-senta-micro`,`uie-senta-nano`。
 * `task_path`：自定义任务路径，默认为None。
 </div></details>
 
@@ -1408,7 +1432,7 @@ from paddlenlp import Taskflow
 #  'top_p': 1.0,
 #  'condition_scale': 10.0,
 #  'num_return_images': 2,
-#  'use_faster': False,
+#  'use_fast': False,
 #  'use_fp16_decoding': False,
 #  'image_index_in_returned_images': 0}
 #
@@ -1447,7 +1471,7 @@ from paddlenlp import Taskflow
 ##### Disco Diffusion模型
 ```python
 # 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
->>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh")
+>>> text_to_image = Taskflow("text_to_image", model="PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh")
 >>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
 >>> for batch_index, batch_image in enumerate(image_list):
 >>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
@@ -1517,7 +1541,7 @@ from paddlenlp import Taskflow
 <p align="center">
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh"]`。
 * `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
 
 </div></details>
@@ -1666,10 +1690,71 @@ from paddlenlp import Taskflow
 * `length_penalty`：解码长度控制值，默认为1.2。
 * `num_return_sequences`：解码返回序列数，默认为1。
 * `repetition_penalty`：解码重复惩罚值，默认为1。
-* `use_faster`：表示是否开启基于FasterTransformer的高性能预测，注意FasterTransformer的高性能预测仅支持gpu，默认为False。
+* `use_fast`：表示是否开启基于FastGeneration的高性能预测，注意FastGeneration的高性能预测仅支持gpu，默认为False。
 * `use_fp16_decoding`: 表示在开启高性能预测的时候是否使用fp16来完成预测过程，若不使用则使用fp32，默认为False。
 
 </div></details>
+
+### 零样本文本分类
+<details><summary>&emsp; 适配多场景的零样本通用文本分类工具 </summary><div>
+
+通用文本分类主要思想是利用单一模型支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务。用户可以自定义任意标签组合，在不限定领域、不设定 prompt 的情况下进行文本分类。
+
+
+#### 情感分析
+
+```
+>>> cls = Taskflow("zero_shot_text_classification", schema=["这是一条好评", "这是一条差评"])
+>>> cls("房间干净明亮，非常不错")
+[{'predictions': [{'label': '这是一条好评', 'score': 0.9695149765679986}], 'text_a': '房间干净明亮，非常不错'}]
+>>> cls("东西还可以，但是快递非常慢，下次不会再买这家了。")
+[{'predictions': [{'label': '这是一条差评', 'score': 0.903727367612172}], 'text_a': '东西还可以，但是快递非常慢，下次不会再买这家了。'}]
+```
+
+#### 意图识别
+
+```
+>>> from paddlenlp import Taskflow
+>>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
+>>> cls("先天性厚甲症去哪里治")
+[{'predictions': [{'label': '就医建议', 'score': 0.9628814210597645}], 'text_a': '先天性厚甲症去哪里治'}]
+>>> cls("男性小腹疼痛是什么原因？")
+[{'predictions': [{'label': '病因分析', 'score': 0.9925820373324141}], 'text_a': '男性小腹疼痛是什么原因？'}]
+```
+
+#### 语义相似度计算
+
+```
+>>> from paddlenlp import Taskflow
+>>> cls = Taskflow("zero_shot_text_classification", schema=["不同", "相同"])
+>>> cls([["怎么查看合同", "从哪里可以看到合同"]])
+[{'predictions': [{'label': '相同', 'score': 0.9775065319076257}], 'text_a': '怎么查看合同', 'text_b': '从哪里可以看到合同'}]
+>>> cls([["为什么一直没有电话来确认借款信息", "为何我还款了，今天却接到客服电话通知"]])
+[{'predictions': [{'label': '不同', 'score': 0.9918983379165037}], 'text_a': '为什么一直没有电话来确认借款信息', 'text_b': '为何我还款了，今天却接到客服电话通知'}]
+```
+
+#### 蕴含推理
+
+```
+>>> from paddlenlp import Taskflow
+>>> cls = Taskflow("zero_shot_text_classification", schema=["中立", "蕴含", "矛盾"])
+>>> cls([["一个骑自行车的人正沿着一条城市街道朝一座有时钟的塔走去。", "骑自行车的人正朝钟楼走去。"]])
+[{'predictions': [{'label': '蕴含', 'score': 0.9944843058584897}], 'text_a': '一个骑自行车的人正沿着一条城市街道朝一座有时钟的塔走去。', 'text_b': '骑自行车的人正朝钟楼走去。'}]
+>>> cls([["一个留着长发和胡须的怪人，在地铁里穿着一件颜色鲜艳的衬衫。", "这件衬衫是新的。"]])
+[{'predictions': [{'label': '中立', 'score': 0.6659998351201399}], 'text_a': '一个留着长发和胡须的怪人，在地铁里穿着一件颜色鲜艳的衬衫。', 'text_b': '这件衬衫是新的。'}]
+>>> cls([["一个穿着绿色衬衫的妈妈和一个穿全黑衣服的男人在跳舞。", "两人都穿着白色裤子。"]])
+[{'predictions': [{'label': '矛盾', 'score': 0.9270557883904931}], 'text_a': '一个穿着绿色衬衫的妈妈和一个穿全黑衣服的男人在跳舞。', 'text_b': '两人都穿着白色裤子。'}]
+```
+
+#### 可配置参数说明
+
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `task_path`：自定义任务路径，默认为None。
+* `schema`：定义任务标签候选集合。
+* `model`：选择任务使用的模型，默认为`utc-large`, 目前只支持`utc-large`。
+* `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
+* `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
 
 ## PART Ⅱ &emsp; 定制化训练
 
@@ -1693,6 +1778,7 @@ from paddlenlp import Taskflow
 | `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
 |       `Taskflow("knowledge_mining", model="wordtag")`        |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
 |        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
+|        `Taskflow("zero_shot_text_classification", model="utc-large")`         |      `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-large`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification) |
 
 </div></details>
 
@@ -1748,11 +1834,13 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td>名词短语标注：NPTag <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag"> 训练详情 <td> 百度自建数据集
   <tr><td>文本纠错<td>ERNIE-CSC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_correction/ernie-csc"> 训练详情 <td> SIGHAN简体版数据集及 <a href="https://github.com/wdimmy/Automatic-Corpus-Generation/blob/master/corpus/train.sgml"> Automatic Corpus Generation生成的中文纠错数据集
   <tr><td>文本相似度<td>SimBERT<td> - <td> 收集百度知道2200万对相似句组
-  <tr><td rowspan="2">情感倾向分析<td> BiLSTM <td> - <td> 百度自建数据集
+  <tr><td rowspan="3">情感分析<td> BiLSTM <td> - <td> 百度自建数据集
   <tr><td> SKEP <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep"> 训练详情 <td> 百度自建数据集
+  <tr><td> UIE <td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/sentiment_analysis/unified_sentiment_extraction"> 训练详情 <td> 百度自建数据集
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
+  <tr><td>零样本文本分类<td>UTC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification"> 训练详情  <td> 百度自建数据集
 </table>
 
 </div></details>

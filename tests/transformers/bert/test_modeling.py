@@ -19,6 +19,7 @@ import tempfile
 import unittest
 from typing import List
 
+import numpy as np
 import paddle
 from parameterized import parameterized_class
 
@@ -34,15 +35,19 @@ from paddlenlp.transformers import (
     BertForSequenceClassification,
     BertForTokenClassification,
     BertModel,
-    BertPretrainedModel,
 )
 from paddlenlp.transformers.bert.configuration import BertConfig
 from paddlenlp.transformers.model_utils import PretrainedModel
 from paddlenlp.utils import install_package, uninstall_package
 
-from ...testing_utils import slow
+from ...testing_utils import require_package, slow
 from ..test_configuration_common import ConfigTester
-from ..test_modeling_common import ModelTesterMixin, ModelTesterPretrainedMixin, ids_tensor, random_attention_mask
+from ..test_modeling_common import (
+    ModelTesterMixin,
+    ModelTesterPretrainedMixin,
+    ids_tensor,
+    random_attention_mask,
+)
 
 
 class BertModelTester:
@@ -582,11 +587,85 @@ class BertCompatibilityTest(unittest.TestCase):
         model = AutoModelForQuestionAnswering.from_pretrained("bert-base-uncased", dropout=0.3)
         self.assertEqual(model.dropout.p, 0.3)
 
+    @require_package("transformers", "torch")
+    def test_bert_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel
+
+            paddle_model = BertModel.from_pretrained(
+                "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, cache_dir=tempdir
+            )
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import BertModel
+
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel", cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
+
+    @require_package("transformers", "torch")
+    def test_bert_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import BertModel
+
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel")
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                BertModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_bert_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import BertModel
+
+            torch_model = BertModel.from_pretrained("hf-internal-testing/tiny-random-BertModel")
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import BertModel
+
+            paddle_model = BertModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
+
 
 class BertModelIntegrationTest(ModelTesterPretrainedMixin, unittest.TestCase):
     base_model_class = BertModel
-    hf_remote_test_model_path = "PaddlePaddle/ci-test-bert-model"
-    paddlehub_remote_test_model_path = "__internal_testing__/bert"
+    hf_remote_test_model_path = "PaddleCI/tiny-random-bert"
+    paddlehub_remote_test_model_path = "__internal_testing__/tiny-random-bert"
 
     @slow
     def test_inference_no_attention(self):

@@ -11,19 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 import argparse
 import random
 import time
 from functools import partial
 from pprint import pprint
+
 import numpy as np
 import paddle
 from paddle.io import BatchSampler, DataLoader
+from utils import compute_metrics, convert_example
+
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Tuple, Stack, Pad
 from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
-from utils import convert_example, compute_metrics
 
 
 # yapf: disable
@@ -33,27 +34,21 @@ def parse_args():
     parser.add_argument("--model_name_or_path", default="t5-base", type=str, required=True, help="Path to pre-trained model. ")
     parser.add_argument("--dataset_name", default="squad", type=str, required=True, help="The name of the dataset to use. Selected in the list: " + "squad")
     parser.add_argument('--output_path', type=str, default='generate.txt', help='The file path where the infer result will be saved.')
-    parser.add_argument("--max_source_length", default=1024, type=int, help=
-        "The maximum total input sequence length after tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",)
+    parser.add_argument("--max_source_length", default=1024, type=int, help="The maximum total input sequence length after tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",)
     parser.add_argument("--min_target_length", default=0, type=int, help="The minimum total sequence length for target text when generating. ")
-    parser.add_argument("--max_target_length", default=142, type=int,help=
-        "The maximum total sequence length for target text after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded during ``evaluate`` and ``predict``.",)
+    parser.add_argument("--max_target_length", default=142, type=int, help="The maximum total sequence length for target text after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded during ``evaluate`` and ``predict``.",)
     parser.add_argument('--decode_strategy', default='greedy_search', type=str, help='The decode strategy in generation.')
-    parser.add_argument('--top_k', default=2, type=int,help=
-        'The number of highest probability vocabulary tokens to keep for top-k sampling.')
-    parser.add_argument('--top_p', default=1.0, type=float,help=
-        'The cumulative probability for top-p sampling.')
+    parser.add_argument('--top_k', default=2, type=int, help='The number of highest probability vocabulary tokens to keep for top-k sampling.')
+    parser.add_argument('--top_p', default=1.0, type=float, help='The cumulative probability for top-p sampling.')
     parser.add_argument('--num_beams', default=1, type=int, help='The number of beams for beam search.')
     parser.add_argument('--length_penalty', default=0.6, type=float, help='The exponential penalty to the sequence length for beam search.')
-    parser.add_argument('--early_stopping', default=False, type=eval, help=
-        'Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
+    parser.add_argument('--early_stopping', default=False, type=eval, help='Whether to stop the beam search when at least `num_beams` sentences are finished per batch or not.')
     parser.add_argument("--diversity_rate", default=0.0, type=float, help="The diversity of beam search. ")
-    parser.add_argument('--faster', action='store_true', help='Whether to process inference using faster transformer. ')
-    parser.add_argument('--use_fp16_decoding', action='store_true',help=
-        'Whether to use fp16 when using faster transformer. Only works when using faster transformer. ')
+    parser.add_argument('--faster', action='store_true', help='Whether to process inference using FastGeneration. ')
+    parser.add_argument('--use_fp16_decoding', action='store_true', help='Whether to use fp16 when using FastGeneration. Only works when using FastGeneration. ')
     parser.add_argument("--batch_size", default=64, type=int, help="Batch size per GPU/CPU for testing or evaluation.")
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
-    parser.add_argument( "--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
+    parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
     parser.add_argument("--is_debug", action='store_true', help="Whether to debug.")
     parser.add_argument("--ignore_pad_token_for_loss", action='store_true', help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.")
@@ -89,15 +84,17 @@ def generate(args):
         ignore_pad_token_for_loss=args.ignore_pad_token_for_loss,
         is_train=False)
 
-    batchify_fn = lambda samples, fn=Tuple(
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # attention_mask
-        Pad(axis=0, pad_val=-100, dtype="int64"),  # mem_seq_lens
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
-            ),  # decoder_input_ids
-        Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # labels
-    ): fn(samples)
+    def batchify_fn(samples, tokenizer):
+        fn = Tuple(
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # attention_mask
+            Pad(axis=0, pad_val=-100, dtype="int64"),  # mem_seq_lens
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"
+                ),  # decoder_input_ids
+            Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # labels
+        )
+        return fn(samples)
 
     dataset = dataset.map(trans_func, lazy=True)
 
@@ -133,7 +130,7 @@ def generate(args):
                                   length_penalty=args.length_penalty,
                                   early_stopping=args.early_stopping,
                                   diversity_rate=args.diversity_rate,
-                                  use_faster=args.faster)
+                                  use_fast=args.faster)
         total_time += (time.time() - start_time)
         if step % args.logging_steps == 0:
             print('step %d - %.3fs/step' %
@@ -154,8 +151,7 @@ def generate(args):
               encoding='utf-8') as fout:
         for decoded_label in decoded_labels:
             fout.write(' '.join(decoded_label) + '\n')
-    print('Save referenced labels into: %s' % args.output_path +
-          '.reference.txt')
+    print('Save referenced labels into: {}.reference.txt'.format(args.output_path))
 
 
 if __name__ == '__main__':

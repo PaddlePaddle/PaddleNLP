@@ -1,9 +1,8 @@
-paddlepaddle>=2.3.0,<2.4.0
+paddlepaddle>=2.4.1
 pre-commit
 pytest
-isort
-pylint
-flake8
-black
-yapf
 parameterized
+pytest-cov
+regex
+pytest-xdist
+fast_tokenizer_python

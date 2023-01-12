@@ -14,8 +14,8 @@
 
 from dataclasses import dataclass, field
 
-from ..utils.log import logger
 from ..trainer import TrainingArguments
+from ..utils.log import logger
 
 __all__ = ["PromptTuningArguments"]
 
@@ -36,6 +36,7 @@ class PromptTuningArguments(TrainingArguments):
             "help": "If True, pretrained parameters won't be updated " "during tuning and the dropout is disabled."
         },
     )
+    save_plm: bool = field(default=False, metadata={"help": "Whether to save pretrained model."})
     use_rdrop: bool = field(
         default=False,
         metadata={

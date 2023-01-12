@@ -42,7 +42,8 @@ python text_to_img_infer.py --model_dir stable-diffusion-v1-5/ --scheduler "eule
 |----------|--------------|
 | --model_dir | 导出后模型的目录。 |
 | --model_format | 模型格式。默认为`'paddle'`，可选列表：`['paddle', 'onnx']`。 |
-| --backend | 推理引擎后端。默认为`paddle`，可选列表：`['onnx_runtime', 'paddle']`，当模型格式为`onnx`时，可选列表为`['onnx_runtime']`。 |
+| --backend | 推理引擎后端。默认为`paddle`，可选列表：`['onnx_runtime', 'paddle', 'paddlelite']`，当模型格式为`onnx`时，可选列表为`['onnx_runtime']`。 |
+| --device | 运行设备。默认为`gpu`，可选列表：`['cpu', 'gpu', 'huawei_ascend_npu', 'kunlunxin_xpu']`。 |
 | --scheduler | StableDiffusion 模型的scheduler。默认为`'pndm'`。可选列表：`['pndm', 'euler_ancestral']`，StableDiffusio模型对应的scheduler可参考[ppdiffuser模型列表](https://github.com/PaddlePaddle/PaddleNLP/tree/main/ppdiffusers#ppdiffusers%E6%A8%A1%E5%9E%8B%E6%94%AF%E6%8C%81%E7%9A%84%E6%9D%83%E9%87%8D)。|
 | --unet_model_prefix | UNet模型前缀。默认为`unet`。 |
 | --vae_model_prefix | VAE模型前缀。默认为`vae_decoder`。 |

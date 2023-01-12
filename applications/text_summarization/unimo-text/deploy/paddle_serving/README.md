@@ -49,7 +49,7 @@ pip install paddle-serving-server-gpu==0.8.3.post112 # -i https://pypi.tuna.tsin
 
 使用Paddle Serving做服务化部署时，需要将保存的inference模型转换为serving易于部署的模型。
 
-用已安装的paddle_serving_client将静态图参数模型转换成serving格式。关于如何使用将训练后的动态图模型转为静态图模型详见[FasterGeneration加速及模型静态图导出](../../README.md)。
+用已安装的paddle_serving_client将静态图参数模型转换成serving格式。关于如何使用将训练后的动态图模型转为静态图模型详见[FastGeneration加速及模型静态图导出](../../README.md)。
 
 模型转换命令如下：
 ```shell

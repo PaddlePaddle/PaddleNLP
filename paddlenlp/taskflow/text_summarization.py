@@ -213,7 +213,7 @@ class TextSummarizationTask(Task):
                 repetition_penalty=self._repetition_penalty,
                 bos_token_id=None if self._model_type != "unimo-text" else self._tokenizer.cls_token_id,
                 eos_token_id=None if self._model_type != "unimo-text" else self._tokenizer.mask_token_id,
-                use_faster=self._use_faster,
+                use_fast=self._use_faster,
                 use_fp16_decoding=self._use_fp16_decoding,
             )
             all_ids.extend(ids)

@@ -12,12 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import paddle
+import os
 from pprint import pprint
-from paddlenlp.transformers import PegasusChineseTokenizer, PegasusForConditionalGeneration
+
+import paddle
+
 from paddlenlp.ops import FasterPegasus
+from paddlenlp.transformers import (
+    PegasusChineseTokenizer,
+    PegasusForConditionalGeneration,
+)
 from paddlenlp.utils.log import logger
 
 
@@ -30,10 +35,7 @@ def parse_args():
         help="The model name to specify the Pegasus to use. ",
     )
     parser.add_argument(
-        "--inference_model_dir",
-        default="./inference_model",
-        type=str,
-        help="Path to save inference model of Pegasus. ",
+        "--export_output_dir", default="./inference_model", type=str, help="Path to save inference model of Pegasus. "
     )
     parser.add_argument("--topk", default=4, type=int, help="The number of candidate to procedure top_k sampling. ")
     parser.add_argument(
@@ -122,8 +124,8 @@ def do_predict(args):
     )
 
     # Save converted static graph model
-    paddle.jit.save(pegasus, os.path.join(args.inference_model_dir, "pegasus"))
-    logger.info("PEGASUS has been saved to {}.".format(args.inference_model_dir))
+    paddle.jit.save(pegasus, os.path.join(args.export_output_dir, "pegasus"))
+    logger.info("PEGASUS has been saved to {}.".format(args.export_output_dir))
 
 
 if __name__ == "__main__":

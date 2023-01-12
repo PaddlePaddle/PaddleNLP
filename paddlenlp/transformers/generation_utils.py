@@ -13,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import List
 import inspect
 from abc import ABC
+from typing import List
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.common_ops_import import convert_dtype
 from paddle.fluid.layers.utils import map_structure
+
 from paddlenlp.utils.log import logger
 
 __all__ = ["GenerationMixin"]
@@ -306,6 +307,7 @@ class GenerationMixin(object):
         num_beam_groups=1,
         diversity_rate=0.0,
         repetition_penalty=None,
+        no_repeat_ngram_size=None,
         logits_processors=None,
     ):
         processors = LogitsProcessorList()
@@ -320,6 +322,8 @@ class GenerationMixin(object):
             )
         if repetition_penalty is not None and repetition_penalty != 1.0:
             processors.append(RepetitionPenaltyLogitsProcessor(penalty=repetition_penalty))
+        if no_repeat_ngram_size is not None and no_repeat_ngram_size > 0:
+            processors.append(NoRepeatNGramLogitsProcessor(no_repeat_ngram_size))
         if forced_bos_token_id is not None:
             processors.append(ForcedBOSTokenLogitsProcessor(forced_bos_token_id))
         if forced_eos_token_id is not None:
@@ -438,7 +442,9 @@ class GenerationMixin(object):
             encoder_kwargs = {
                 argument: value
                 for argument, value in model_kwargs.items()
-                if not (argument.startswith("decoder_") or argument.startswith("cross_attn"))
+                if not (
+                    argument.startswith("decoder_") or argument.startswith("cross_attn") or argument == "use_cache"
+                )
             }
 
             model_kwargs["encoder_output"] = encoder(input_ids, **encoder_kwargs)
@@ -491,24 +497,24 @@ class GenerationMixin(object):
 
         return logits
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         return False
 
-    def _convert_to_faster(self, kwargs):
+    def _convert_to_fast(self, kwargs):
         # try general convert
         pass
 
-    def _build_faster(self, kwargs):
-        self._faster_entry = False
+    def _build_fast(self, kwargs):
+        self._fast_entry = False
         if kwargs["num_beam_groups"] != 1:
-            # not support for group_beam_search yet in the faster version
-            raise AttributeError("'num_beam_groups != 1' is not supported yet in the faster version")
-        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] == False:
+            # not support for group_beam_search yet in the fast version
+            raise AttributeError("'num_beam_groups != 1' is not supported yet in the fast version")
+        if paddle.get_default_dtype() == "float16" and kwargs["use_fp16_decoding"] is False:
             logger.info(
                 "Since the default dtype is float16, float16 would be used " "though 'use_fp16_decoding=False'."
             )
             kwargs["use_fp16_decoding"] = True
-        self.prepare_faster_entry(kwargs)
+        self.prepare_fast_entry(kwargs)
 
     @paddle.no_grad()
     def generate(
@@ -531,10 +537,11 @@ class GenerationMixin(object):
         decoder_start_token_id=None,
         forced_bos_token_id=None,
         forced_eos_token_id=None,
+        no_repeat_ngram_size=None,
         num_return_sequences=1,
         diversity_rate=0.0,
         use_cache=True,
-        use_faster=False,
+        use_fast=False,
         use_fp16_decoding=False,
         **model_kwargs
     ):
@@ -604,10 +611,10 @@ class GenerationMixin(object):
                 If not, this is the diversity_rate for DIVERSE BEAM SEARCH.
             use_cache: (bool, optional): Whether to use the model cache to
                 speed up decoding. Default to True.
-            use_faster: (bool, optional): Whether to use faster entry of model
-                for FasterGeneration. Default to False.
+            use_fast: (bool, optional): Whether to use fast entry of model
+                for FastGeneration. Default to False.
             use_fp16_decoding: (bool, optional): Whether to use fp16 for decoding.
-                Only works when faster entry is avalible. Default to False.
+                Only works when fast entry is avalible. Default to False.
             model_kwargs (dict): It can be used to specify additional kwargs
                 passed to the model.
 
@@ -715,6 +722,16 @@ class GenerationMixin(object):
             decode_strategy
         )
 
+        if getattr(self, "deprecated_warnings", None) is None:
+            self.deprecated_warnings = {}
+
+        if "use_faster" in model_kwargs:
+            use_fast = model_kwargs.pop("use_faster")
+            if not self.deprecated_warnings.get("use_faster", False):
+                logger.warning("`use_faster` will be deprecated in near future. Please use `use_fast` instead. ")
+                self.deprecated_warnings["use_faster"] = True
+
+        # TODO: change from model.attribute to model.config.attribute when all models are integrated with PretrainedConfig
         bos_token_id = bos_token_id if bos_token_id is not None else getattr(self, "bos_token_id", None)
         eos_token_id = eos_token_id if eos_token_id is not None else getattr(self, "eos_token_id", None)
         pad_token_id = pad_token_id if pad_token_id is not None else getattr(self, "pad_token_id", None)
@@ -729,23 +746,26 @@ class GenerationMixin(object):
             if decoder_start_token_id is not None
             else getattr(self, "decoder_start_token_id", None)
         )
+        no_repeat_ngram_size = (
+            no_repeat_ngram_size if no_repeat_ngram_size is not None else getattr(self, "no_repeat_ngram_size", None)
+        )
 
-        if getattr(self, "_faster_entry", None) is not False and use_faster:
+        if getattr(self, "_fast_entry", None) is not False and use_fast:
             args = locals()
             args.pop("self")
             args.pop("__class__", None)
             model_kwargs = args.pop("model_kwargs")
             args.update(model_kwargs)
             try:
-                if not hasattr(self, "_faster_entry"):
-                    self._build_faster(args)
-                if self._faster_entry:
-                    output = self._faster_entry(**args)
+                if getattr(self, "_fast_entry", None) is None:
+                    self._build_fast(args)
+                if self._fast_entry:
+                    output = self._fast_entry(**args)
                     if isinstance(output, tuple):
                         output_ids, dummy_srore = output
                     else:
                         output_ids = output
-                        # make result and faster result oneconsistent
+                        # make result and fast result oneconsistent
                         dummy_srore = None
                     if decode_strategy == "beam_search":
                         output_ids = output_ids.transpose([1, 2, 0])
@@ -759,10 +779,10 @@ class GenerationMixin(object):
             except Exception as e:
                 args["model_kwargs"] = model_kwargs
                 # TODO
-                # Prevent self._convert_to_faster to throw Exception
-                self._convert_to_faster(args)
+                # Prevent self._convert_to_fast to throw Exception
+                self._convert_to_fast(args)
                 logger.warning(e)
-                logger.warning("FasterGeneration is not available, " "and the original version would be used instead.")
+                logger.warning("FastGeneration is not available, " "and the original version would be used instead.")
 
         # params check
         if input_ids is None:
@@ -775,7 +795,9 @@ class GenerationMixin(object):
             model_kwargs["attention_mask"] = self.prepare_attention_mask_for_generation(
                 input_ids, pad_token_id, eos_token_id
             )
-        self.is_encoder_decoder = hasattr(self, "encoder") and hasattr(self, "decoder")
+        self.is_encoder_decoder = (
+            getattr(self, "encoder", None) is not None and getattr(self, "decoder", None) is not None
+        )
         if self.is_encoder_decoder:
             model_kwargs = self.prepare_encoder_decoder_kwargs_for_generation(input_ids, model_kwargs)
             # set input_ids as decoder_input_ids
@@ -804,6 +826,7 @@ class GenerationMixin(object):
             num_beam_groups=num_beam_groups,
             diversity_rate=diversity_rate,
             repetition_penalty=repetition_penalty,
+            no_repeat_ngram_size=no_repeat_ngram_size,
             logits_processors=model_kwargs["logits_processors"]
             if "logits_processors" in model_kwargs
             and isinstance(model_kwargs["logits_processors"], LogitsProcessorList)
@@ -1335,6 +1358,64 @@ class RepetitionPenaltyLogitsProcessor(LogitsProcessor):
         input_ids = input_ids + paddle.arange(logits.shape[0]).unsqueeze(-1) * logits.shape[-1]
         outputs = paddle.scatter(logits.flatten(), input_ids.flatten(), score.flatten()).reshape(logits.shape)
         return outputs
+
+
+def _get_ngrams(ngram_size, prev_input_ids, num_hypos):
+    generated_ngrams = [{} for _ in range(num_hypos)]
+    for idx in range(num_hypos):
+        gen_tokens = prev_input_ids[idx].tolist()
+        generated_ngram = generated_ngrams[idx]
+        for ngram in zip(*[gen_tokens[i:] for i in range(ngram_size)]):
+            prev_ngram_tuple = tuple(ngram[:-1])
+            generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
+    return generated_ngrams
+
+
+def _get_generated_ngrams(banned_ngrams, prev_input_ids, ngram_size, cur_len):
+    # Before decoding the next token, prevent decoding of ngrams that have already appeared
+    start_idx = cur_len + 1 - ngram_size
+    ngram_idx = tuple(prev_input_ids[start_idx:cur_len].tolist())
+    return banned_ngrams.get(ngram_idx, [])
+
+
+def _calc_banned_ngram_tokens(ngram_size, prev_input_ids, num_hypos, cur_len):
+    """Copied from fairseq for no_repeat_ngram in beam_search"""
+    if cur_len + 1 < ngram_size:
+        # return no banned tokens if we haven't generated no_repeat_ngram_size tokens yet
+        return [[] for _ in range(num_hypos)]
+
+    generated_ngrams = _get_ngrams(ngram_size, prev_input_ids, num_hypos)
+
+    banned_tokens = [
+        _get_generated_ngrams(generated_ngrams[hypo_idx], prev_input_ids[hypo_idx], ngram_size, cur_len)
+        for hypo_idx in range(num_hypos)
+    ]
+    return banned_tokens
+
+
+class NoRepeatNGramLogitsProcessor(LogitsProcessor):
+    r"""
+    [`LogitsProcessor`] that enforces no repetition of n-grams. See
+    [Fairseq](https://github.com/pytorch/fairseq/blob/a07cb6f40480928c9e0548b737aadd36ee66ac76/fairseq/sequence_generator.py#L345).
+    Args:
+        ngram_size (`int`):
+            All ngrams of size `ngram_size` can only occur once.
+    """
+
+    def __init__(self, ngram_size):
+        if not isinstance(ngram_size, int) or ngram_size <= 0:
+            raise ValueError(f"`ngram_size` has to be a strictly positive integer, but is {ngram_size}")
+        self.ngram_size = ngram_size
+
+    def __call__(self, input_ids, scores):
+        num_batch_hypotheses = scores.shape[0]
+        cur_len = input_ids.shape[-1]
+        banned_batch_tokens = _calc_banned_ngram_tokens(self.ngram_size, input_ids, num_batch_hypotheses, cur_len)
+
+        for i, banned_tokens in enumerate(banned_batch_tokens):
+            scores[i, banned_tokens] = -float("inf")
+
+        return scores
 
 
 class HammingDiversityLogitsProcessor(LogitsProcessor):

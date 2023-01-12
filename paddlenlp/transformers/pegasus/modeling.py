@@ -13,15 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import math
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
-import paddle.tensor as tensor
-from paddle.nn import Layer, Embedding
+from paddle.nn import Embedding
 
 from .. import PretrainedModel, register_base_model
 
@@ -45,7 +42,9 @@ def shift_tokens_right(input_ids, pad_token_id, decoder_start_token_id):
     if pad_token_id is None:
         raise ValueError("self.model.config.pad_token_id has to be defined.")
 
-    shifted_input_ids = paddle.where(shifted_input_ids == -100, pad_token_id, shifted_input_ids)
+    shifted_input_ids = paddle.where(
+        shifted_input_ids == -100, paddle.full_like(shifted_input_ids, pad_token_id), shifted_input_ids
+    )
     return shifted_input_ids
 
 
@@ -579,28 +578,28 @@ class PegasusForConditionalGeneration(PegasusPretrainedModel):
     def get_decoder(self):
         return self.pegasus.get_decoder()
 
-    def prepare_faster_entry(self, kwargs):
+    def prepare_fast_entry(self, kwargs):
         from paddlenlp.ops import FasterPegasus
 
         decode_strategy = kwargs.get("decode_strategy")
         use_fp16_decoding = kwargs.get("use_fp16_decoding", False)
         decoding_lib = kwargs.get("decoding_lib", None)
-        enable_faster_encoder = kwargs.get("enable_faster_encoder", True)
+        enable_fast_encoder = kwargs.get("enable_fast_encoder", True)
         if decode_strategy == "sampling" and kwargs.get("top_k") != 0 and kwargs.get("top_p") != 1:
             raise AttributeError(
                 "Only topk sampling or topp sampling are supported. "
-                "Topk sampling and topp sampling cannot be both applied in the faster version."
+                "Topk sampling and topp sampling cannot be both applied in the fast version."
             )
         if kwargs["repetition_penalty"] != 1.0:
-            # not support for repetition_penalty yet in the faster version
-            raise AttributeError("'repetition_penalty != 1' is not supported yet in the faster version")
-        self._faster_entry = FasterPegasus(
+            # not support for repetition_penalty yet in the fast version
+            raise AttributeError("'repetition_penalty != 1' is not supported yet in the fast version")
+        self._fast_entry = FasterPegasus(
             self,
             use_fp16_decoding=use_fp16_decoding,
             decoding_lib=decoding_lib,
-            enable_faster_encoder=enable_faster_encoder,
+            enable_fast_encoder=enable_fast_encoder,
         ).forward
-        return self._faster_entry
+        return self._fast_entry
 
     def forward(
         self,

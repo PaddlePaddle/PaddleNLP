@@ -23,6 +23,7 @@ import traceback
 from abc import abstractmethod
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 from paddle import Tensor
@@ -32,7 +33,7 @@ from paddlenlp.utils.log import logger
 
 from .prompt_tokenizer import MLMPromptTokenizer
 
-__all__ = ["Template", "ManualTemplate", "SoftTemplate", "PrefixTemplate", "AutoTemplate"]
+__all__ = ["Template", "ManualTemplate", "SoftTemplate", "PrefixTemplate", "AutoTemplate", "UTCTemplate"]
 
 # Template used to be saved in a file.
 TEMPLATE_CONFIG_FILE = "template_config.json"
@@ -348,10 +349,6 @@ class Template(nn.Layer):
                     part["length"] = len(labels)
                 elif "length" not in "options":
                     part["length"] = DEFAULT_MAX_OPTIONS
-                    logger.warning(
-                        "[options]: The maximum number of options not defined,"
-                        " set as {} by default.".format(DEFAULT_MAX_OPTIONS)
-                    )
             if "length" in part:
                 assert part["length"] > 0
                 if "hard" in part:
@@ -778,6 +775,7 @@ class AutoTemplate(object):
         max_length: int = 512,
         model: PretrainedModel = None,
         soft_embeddings: Tensor = None,
+        prefix_dropout: float = 0.1,
     ):
         # Default template if not defined.
         if prompt is None:
@@ -795,12 +793,20 @@ class AutoTemplate(object):
 
         # Choose Template according to template keywords.
         if "prefix" in template_keywords:
-            return PrefixTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model)
+            return PrefixTemplate(
+                prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model, prefix_dropout=prefix_dropout
+            )
         elif "soft" in template_keywords or "soft_id" in template_keywords:
             word_embeddings = model.get_input_embeddings()
             return SoftTemplate(
-                prompt=prompt, tokenizer=tokenizer, max_length=max_length, word_embeddings=word_embeddings
+                prompt=prompt,
+                tokenizer=tokenizer,
+                max_length=max_length,
+                word_embeddings=word_embeddings,
+                soft_embeddings=soft_embeddings,
             )
+        elif "options" in template_keywords:
+            return UTCTemplate(tokenizer=tokenizer, max_length=max_length)
         else:
             return ManualTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length)
 
@@ -819,3 +825,66 @@ class AutoTemplate(object):
         if os.path.isfile(template_param_file):
             template.set_state_dict(paddle.load(template_param_file))
         return template
+
+
+class UTCTemplate(Template):
+    """
+    Template for Unified Tag Classification.
+    """
+
+    template_special_tokens = ["text", "hard", "sep", "cls", "options"]
+
+    def __init__(self, tokenizer: PretrainedTokenizer, max_length: int):
+        prompt = (
+            "{'options': 'choices', 'add_omask': True, 'position': 0, 'token_type': 1}"
+            "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+        )
+        super(UTCTemplate, self).__init__(prompt, tokenizer, max_length)
+        self.max_position_id = self.tokenizer.model_max_length - 1
+        self.max_length = max_length
+        if not self._has_options():
+            raise ValueError(
+                "Expected `options` and `add_omask` are in defined prompt, but got {}".format(self.prompt)
+            )
+
+    def _has_options(self):
+        for part in self.prompt:
+            if "options" in part and "add_omask" in part:
+                return True
+        return False
+
+    def build_inputs_with_prompt(
+        self, example: Dict[str, Any], prompt: Optional[List[Dict[str, Any]]] = None
+    ) -> List[str]:
+        inputs = super(UTCTemplate, self).build_inputs_with_prompt(example, prompt)
+        for index, part in enumerate(inputs):
+            if "cls" in part:
+                inputs[index] = self.tokenizer.cls_token
+        return inputs
+
+    def encode(self, example: Dict[str, Any], use_mask: bool = False):
+        input_dict = super(UTCTemplate, self).encode(example)
+
+        # Set OMASK and MASK positions and labels for options.
+        omask_token_id = self.tokenizer.convert_tokens_to_ids("[O-MASK]")
+        input_dict["omask_positions"] = (
+            np.where(np.array(input_dict["input_ids"]) == omask_token_id)[0].squeeze().tolist()
+        )
+
+        sep_positions = (
+            np.where(np.array(input_dict["input_ids"]) == self.tokenizer.sep_token_id)[0].squeeze().tolist()
+        )
+        input_dict["cls_positions"] = sep_positions[0]
+
+        # Limit the maximum position ids.
+        position_ids = np.array(input_dict["position_ids"])
+        position_ids[position_ids > self.max_position_id] = self.max_position_id
+        input_dict["position_ids"] = position_ids.tolist()
+
+        return input_dict
+
+    def create_prompt_parameters(self):
+        return None
+
+    def process_batch(self, input_dict):
+        return input_dict

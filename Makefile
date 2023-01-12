@@ -6,7 +6,7 @@
 
 .PHONY: all
 all : lint test
-
+check_dirs := applications examples model_zoo paddlenlp pipelines ppdiffusers scripts tests 
 # # # # # # # # # # # # # # # Format Block # # # # # # # # # # # # # # # 
 
 format:
@@ -19,7 +19,13 @@ format:
 
 .PHONY: lint
 lint:
-	pre-commit run
+	$(eval modified_py_files := $(shell python scripts/get_modified_files.py $(check_dirs)))
+	@if test -n "$(modified_py_files)"; then \
+		echo ${modified_py_files}; \
+		pre-commit run --files ${modified_py_files}; \
+	else \
+		echo "No library .py files were modified"; \
+	fi	
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -29,10 +35,10 @@ lint:
 test: unit-test
 
 unit-test:
-	# only enable bert-test: there are many failed tests
-	PYTHONPATH=$(shell pwd) pytest tests/transformers/bert \
-		tests/prompt \
-		tests/transformers/test_configuration_utils.py
+	PYTHONPATH=$(shell pwd) pytest -v \
+		-n auto \
+		--cov paddlenlp \
+		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
@@ -40,22 +46,31 @@ unit-test:
 install:
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
+	pip install -r paddlenlp/experimental/autonlp/requirements.txt
 	pre-commit install
 
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	cd ppdiffusers && make
-
-.PHONY: install-ppdiffusers
-install-ppdiffusers:
-	cd ppdiffusers && make install
+	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	cd pipelines && make
+	cd pipelines && make install && make
 
-.PHONY: install-paddle-pipelines
-install-paddle-pipelines:
-	cd pipelines && make install
+.PHONY: deploy-paddlenlp
+deploy-paddlenlp:
+	# install related package
+	make install
+	# build
+	python3 setup.py sdist bdist_wheel
+	# upload
+	twine upload --skip-existing dist/*
 
+.PHONY: regression-all
+release: 
+	bash ./scripts/regression/run_release.sh 0 0,1 all
+
+.PHONY: regression-key
+key: 
+	bash ./scripts/regression/run_release.sh 0 0,1 p0

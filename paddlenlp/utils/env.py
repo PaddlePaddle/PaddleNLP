@@ -45,14 +45,30 @@ def _get_sub_home(directory, parent_home=_get_ppnlp_home()):
     return home
 
 
+def _get_bool_env(env_key: str, default_value: str) -> bool:
+    """get boolean environment variable, which can be "true", "True", "1"
+
+    Args:
+        env_key (str): key of env variable
+    """
+    value = os.getenv(env_key, default_value).lower()
+    return value in ["true", "1"]
+
+
 USER_HOME = _get_user_home()
 PPNLP_HOME = _get_ppnlp_home()
 MODEL_HOME = _get_sub_home("models")
 HF_CACHE_HOME = os.environ.get("HUGGINGFACE_HUB_CACHE", MODEL_HOME)
 DATA_HOME = _get_sub_home("datasets")
+PACKAGE_HOME = _get_sub_home("packages")
 DOWNLOAD_SERVER = "http://paddlepaddle.org.cn/paddlehub"
 FAILED_STATUS = -1
 SUCCESS_STATUS = 0
 
 LEGACY_CONFIG_NAME = "model_config.json"
 CONFIG_NAME = "config.json"
+PYTORCH_WEIGHT_FILE_NAME = "pytorch_model.bin"
+PADDLE_WEIGHT_FILE_NAME = "model_state.pdparams"
+
+# for conversion
+ENABLE_TORCH_CHECKPOINT = _get_bool_env("ENABLE_TORCH_CHECKPOINT", "true")

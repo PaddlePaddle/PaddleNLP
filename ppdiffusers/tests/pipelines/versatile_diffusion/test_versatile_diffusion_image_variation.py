@@ -17,13 +17,12 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import VersatileDiffusionImageVariationPipeline
 from ppdiffusers.utils.testing_utils import load_image, slow
 
 
-class VersatileDiffusionImageVariationPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class VersatileDiffusionImageVariationPipelineFastTests(unittest.TestCase):
     pass
 
 
@@ -59,5 +58,4 @@ class VersatileDiffusionImageVariationPipelineIntegrationTests(unittest.TestCase
                 0.10928627848625183,
             ]
         )
-        print(image_slice.flatten().tolist())
         assert np.abs(image_slice.flatten() - expected_slice).max() < 1e-2

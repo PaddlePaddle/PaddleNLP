@@ -21,12 +21,19 @@ from collections import OrderedDict
 from huggingface_hub import hf_hub_download
 
 from paddlenlp import __version__
-from paddlenlp.transformers import *
-from paddlenlp.utils.downloader import COMMUNITY_MODEL_PREFIX, get_path_from_url
-from paddlenlp.utils.env import MODEL_HOME
+from paddlenlp.transformers import *  # noqa
+from paddlenlp.transformers.configuration_utils import is_standard_config
+from paddlenlp.utils.downloader import (
+    COMMUNITY_MODEL_PREFIX,
+    get_path_from_url,
+    hf_file_exists,
+    url_file_exists,
+)
+from paddlenlp.utils.env import HF_CACHE_HOME, MODEL_HOME
 from paddlenlp.utils.log import logger
 
 __all__ = [
+    "AutoBackbone",
     "AutoModel",
     "AutoModelForPretraining",
     "AutoModelForSequenceClassification",
@@ -50,12 +57,15 @@ MAPPING_NAMES = OrderedDict(
         ("BigBird", "bigbird"),
         ("BlenderbotSmall", "blenderbot_small"),
         ("Blenderbot", "blenderbot"),
+        ("ChineseCLIP", "chineseclip"),
+        ("CMSIMLock", "cmsim_lock"),
         ("ChineseBert", "chinesebert"),
         ("ConvBert", "convbert"),
         ("CTRL", "ctrl"),
         ("DistilBert", "distilbert"),
         ("DalleBart", "dallebart"),
         ("Electra", "electra"),
+        ("ErnieViL", "ernie_vil"),
         ("ErnieCtm", "ernie_ctm"),
         ("ErnieDoc", "ernie_doc"),
         ("ErnieGen", "ernie_gen"),
@@ -99,13 +109,15 @@ MAPPING_NAMES = OrderedDict(
         ("CLIP", "clip"),
         ("Artist", "artist"),
         ("OPT", "opt"),
-        ("ErnieViL", "ernie_vil"),
         ("Pegasus", "pegasus"),
+        ("DPT", "dpt"),
+        ("Bit", "bit"),
     ]
 )
 
 MAPPING_TASKS = OrderedDict(
     [
+        ("Backbone", "AutoBackbone"),
         ("Model", "AutoModel"),
         ("ForPretraining", "AutoModelForPretraining"),
         ("ForSequenceClassification", "AutoModelForSequenceClassification"),
@@ -126,7 +138,7 @@ MAPPING_TASKS = OrderedDict(
 
 def get_name_mapping(task="Model"):
     """
-    Task can be 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
+    Task can be 'Backbone', 'Model', 'ForPretraining', 'ForSequenceClassification', 'ForTokenClassification',
     'ForQuestionAnswering', 'ForMultipleChoice', 'ForMaskedLM', 'ForCausalLM', 'Encoder', 'Decoder',
     'Generator', 'Discriminator', 'ForConditionalGeneration', 'ForImageGeneration'.
     """
@@ -166,7 +178,8 @@ class _BaseAutoModelClass:
     _pretrained_model_dict = None
     _name_mapping = None
     _task_choice = False
-    model_config_file = "model_config.json"
+    model_config_file = "config.json"
+    legacy_model_config_file = "model_config.json"
 
     def __init__(self, *args, **kwargs):
         raise EnvironmentError(
@@ -174,13 +187,18 @@ class _BaseAutoModelClass:
             f"using the `{self.__class__.__name__}.from_pretrained(pretrained_model_name_or_path).`"
         )
 
-    # TODO: same logic also used in paddlenlp cli. We can potential refactor as a common method
+    # TODO: Refactor into AutoConfig when available
     @classmethod
     def _get_model_class_from_config(cls, pretrained_model_name_or_path, config_file_path):
         with io.open(config_file_path, encoding="utf-8") as f:
-            init_kwargs = json.load(f)
-        # class name corresponds to this configuration
-        init_class = init_kwargs.pop("init_class", None)
+            config = json.load(f)
+
+        # Get class name corresponds to this configuration
+        if is_standard_config(config):
+            architectures = config["architectures"]
+            init_class = architectures.pop() if len(architectures) > 0 else None
+        else:
+            init_class = config.pop("init_class", None)
         init_class = init_class[:-5] if init_class.endswith("Model") else init_class
         if init_class:
             for model_flag, name in MAPPING_NAMES.items():
@@ -227,16 +245,26 @@ class _BaseAutoModelClass:
 
         # From HF
         if from_hf_hub:
-            config_file = hf_hub_download(
-                repo_id=pretrained_model_name_or_path,
-                filename=cls.model_config_file,
-                cache_dir=MODEL_HOME,
-                library_name="PaddleNLP",
-                library_version=__version__,
-            )
+            if hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.model_config_file):
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.model_config_file,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
+            elif hf_file_exists(repo_id=pretrained_model_name_or_path, filename=cls.legacy_model_config_file):
+                logger.info("Standard config do not exist, loading from legacy config")
+                config_file = hf_hub_download(
+                    repo_id=pretrained_model_name_or_path,
+                    filename=cls.legacy_model_config_file,
+                    cache_dir=HF_CACHE_HOME,
+                    library_name="PaddleNLP",
+                    library_version=__version__,
+                )
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
-                logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(
                     pretrained_model_name_or_path, from_hf_hub=from_hf_hub, *model_args, **kwargs
                 )
@@ -265,27 +293,40 @@ class _BaseAutoModelClass:
                                 + " or ".join(task + ".from_pretrained" for task in all_tasks)
                                 + f" to load '{pretrained_model_name_or_path}'\n"
                             )
-                        logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
+                        logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                         return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
         # From local dir path
         elif os.path.isdir(pretrained_model_name_or_path):
             config_file = os.path.join(pretrained_model_name_or_path, cls.model_config_file)
+            legacy_config_file = os.path.join(pretrained_model_name_or_path, cls.legacy_model_config_file)
             if os.path.exists(config_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, config_file)
-                logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
+                return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
+            elif os.path.exists(legacy_config_file):
+                logger.info("Standard config do not exist, loading from legacy config")
+                model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, legacy_config_file)
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{config_file}  is not a valid path to a model config file")
         # Assuming from community-contributed pretrained models
         else:
-            community_config_path = "/".join(
+            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
+            standard_community_url = "/".join(
                 [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.model_config_file]
             )
-
-            default_root = os.path.join(MODEL_HOME, pretrained_model_name_or_path)
-
+            legacy_community_url = "/".join(
+                [COMMUNITY_MODEL_PREFIX, pretrained_model_name_or_path, cls.legacy_model_config_file]
+            )
             try:
-                resolved_vocab_file = get_path_from_url(community_config_path, default_root)
+                if url_file_exists(standard_community_url):
+                    resolved_vocab_file = get_path_from_url(standard_community_url, default_root)
+                elif url_file_exists(legacy_community_url):
+                    logger.info("Standard config do not exist, loading from legacy config")
+                    resolved_vocab_file = get_path_from_url(legacy_community_url, default_root)
+                else:
+                    raise RuntimeError("Neither 'config.json' nro 'model_config.json' exists")
             except RuntimeError as err:
                 logger.error(err)
                 raise RuntimeError(
@@ -298,10 +339,53 @@ class _BaseAutoModelClass:
 
             if os.path.exists(resolved_vocab_file):
                 model_class = cls._get_model_class_from_config(pretrained_model_name_or_path, resolved_vocab_file)
-                logger.info("We are using %s to load '%s'." % (model_class, pretrained_model_name_or_path))
+                logger.info(f"We are using {model_class} to load '{pretrained_model_name_or_path}'.")
                 return model_class.from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
             else:
                 logger.warning(f"{resolved_vocab_file}  is not a valid path to a model config file")
+
+
+class AutoBackbone(_BaseAutoModelClass):
+    """
+    AutoBackbone.
+    """
+
+    CONFIGURATION_MODEL_MAPPING = get_init_configurations()
+    _pretrained_model_dict = CONFIGURATION_MODEL_MAPPING
+    _name_mapping = get_name_mapping("Backbone")
+
+    @classmethod
+    def from_pretrained(cls, pretrained_model_name_or_path, *model_args, **kwargs):
+        """
+        Creates an instance of `AutoBackbone`. Model weights are loaded
+        by specifying name of a built-in pretrained model, or a community contributed model,
+        or a local file directory path.
+
+        Args:
+            pretrained_model_name_or_path (str): See :class:`AutoModel`.
+            *args (tuple): See :class:`AutoModel`.
+            **kwargs (dict): See :class:`AutoModel`.
+
+        Returns:
+            PretrainedModel: An instance of `AutoBackbone`.
+
+        Example:
+            .. code-block::
+
+                from paddlenlp.transformers import AutoBackbone
+
+                # Name of built-in pretrained model
+                model = AutoBackbone.from_pretrained("google/bit-50")
+                print(type(model))
+                # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
+
+
+                # Load from local directory path
+                model = AutoBackbone.from_pretrained("./bit-50")
+                print(type(model))
+                # <class 'paddlenlp.transformers.bit.modeling.BitBackbone'>
+        """
+        return cls._from_pretrained(pretrained_model_name_or_path, *model_args, **kwargs)
 
 
 class AutoModel(_BaseAutoModelClass):

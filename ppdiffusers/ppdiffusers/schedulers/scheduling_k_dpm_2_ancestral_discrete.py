@@ -197,7 +197,7 @@ class KDPM2AncestralDiscreteScheduler(SchedulerMixin, ConfigMixin):
         model_output: Union[paddle.Tensor, np.ndarray],
         timestep: Union[float, paddle.Tensor],
         sample: Union[paddle.Tensor, np.ndarray],
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         return_dict: bool = True,
     ) -> Union[SchedulerOutput, Tuple]:
         """

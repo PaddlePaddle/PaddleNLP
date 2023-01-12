@@ -11,14 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-import unittest
-import paddle
-import os
-import inspect
-from distutils.util import strtobool
-from collections.abc import Mapping
+from __future__ import annotations
+
 import gc
+import inspect
+import os
+import unittest
+from collections.abc import Mapping
+from distutils.util import strtobool
+
+import numpy as np
+import paddle
+
+from paddlenlp.utils.import_utils import is_package_available
 
 __all__ = ["get_vocab_list", "stable_softmax", "cross_entropy"]
 
@@ -262,3 +267,19 @@ def nested_simplify(obj, decimals=3):
         return nested_simplify(obj.item(), decimals)
     else:
         raise Exception(f"Not supported: {type(obj)}")
+
+
+def require_package(*package_names):
+    """decorator which can detect that it will require the specific package
+
+    Args:
+        package_name (str): the name of package
+    """
+
+    def decorator(func):
+        for package_name in package_names:
+            if not is_package_available(package_name):
+                return unittest.skip(f"package<{package_name}> not found, so to skip this test")(func)
+        return func
+
+    return decorator

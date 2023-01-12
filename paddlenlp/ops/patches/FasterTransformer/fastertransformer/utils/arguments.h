@@ -22,6 +22,7 @@
 
 #include <cuda_runtime.h>
 #include <stdlib.h>
+
 #include "fastertransformer/utils/common.h"
 #include "fastertransformer/utils/common_structure.h"
 #include "fastertransformer/utils/nccl_utils.h"
@@ -56,15 +57,16 @@ public:
   const T *type_table = nullptr;
 
   // For PLATO embedding.
-  const int* latent_id = nullptr;
-  const T* latent_embedding_table = nullptr;
-  const int* role_id = nullptr;
-  const int* decoder_role_id = nullptr;
-  const T* role_embedding_table = nullptr;
+  const int *latent_id = nullptr;
+  const T *latent_embedding_table = nullptr;
+  const int *role_id = nullptr;
+  const int *decoder_role_id = nullptr;
+  const T *role_embedding_table = nullptr;
   // Custom position.
-  const int* position_ids = nullptr;
-  const int* decoder_position_ids = nullptr;
+  const int *position_ids = nullptr;
+  const int *decoder_position_ids = nullptr;
 
+  LayerNormWeight<T> pre_layernorm;
   LayerNormWeight<T> layernorm;
   LayerNormWeight<T> lm_layernorm;
   LayerNormWeight<T> mbart_layernorm;
@@ -74,20 +76,23 @@ public:
   int *output_ids = nullptr;
   int *parent_ids = nullptr;
   int *sequence_length = nullptr;
-  float* output_scores = nullptr;
+  float *output_scores = nullptr;
 
   cublasHandle_t cublas_handle;
   cublasLtHandle_t cublaslt_handle;
   cudaStream_t stream;
 
+  // T5
+  const T *self_relative_attention_bias_weight = nullptr;
+
   // For GPT model
-  int request_batch_size;
-  int request_input_len;
+  int request_batch_size = 0;
+  int request_input_len = 0;
   int request_output_len = 0;
-  int max_input_len;
-  int *d_start_ids;
-  const int *d_start_lengths;
-  const T *d_attn_mask;
+  int max_input_len = 0;
+  int *d_start_ids = nullptr;
+  const int *d_start_lengths = nullptr;
+  const T *d_attn_mask = nullptr;
 
   virtual ~DecodingInitParam() {}
 };
@@ -123,9 +128,11 @@ struct DecodingSamplingArguments : public DecodingArguments {
   float temperature_{1.0};
   float repeat_penalty_{1.0};
   bool prefix_lm_{false};
-  bool is_mbart_{false};
   // For tensor parallel usage currently.
   int seed_{-1};
+
+  bool is_mbart_{false};
+  bool is_miro_{false};
 };
 
 struct DecodingBeamsearchArguments : public DecodingArguments {
@@ -142,7 +149,21 @@ struct DecodingBeamsearchArguments : public DecodingArguments {
   bool prefix_lm_{false};
   int finished_candidate_num_{-1};
   bool early_stopping_{false};
+
   bool is_mbart_{false};
+  bool is_miro_{false};
+};
+
+struct T5SamplingArguments : public DecodingSamplingArguments {
+  int num_bucket_{-1};
+  int max_distance_{128};
+  bool tie_word_embeddings_{true};
+};
+
+struct T5BeamsearchArguments : public DecodingBeamsearchArguments {
+  int num_bucket_{-1};
+  int max_distance_{128};
+  bool tie_word_embeddings_{true};
 };
 
 struct GptArguments : public DecodingSamplingArguments {

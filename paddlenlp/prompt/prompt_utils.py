@@ -17,13 +17,13 @@ This module defines the itermediate data structure of inputs.
 """
 
 import inspect
-from typing import Any, Dict, List, Union, Optional
 from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import paddle
 
-from ..transformers.tokenizer_utils_base import PretrainedTokenizerBase, PaddingStrategy
+from ..transformers.tokenizer_utils_base import PaddingStrategy, PretrainedTokenizerBase
 
 
 def signature(function):
@@ -83,7 +83,9 @@ class PromptDataCollatorWithPadding:
         max_length = batch["input_ids"].shape[1]
         for key in features[0]:
             if key not in self.default_model_input_names:
-                values = [b[key] for b in features]
+                values = [b[key] for b in features if key in b]
+                if len(values) < len(features):
+                    continue
                 if key == "masked_positions":
                     new_values = []
                     for index, value in enumerate(values):
@@ -91,7 +93,7 @@ class PromptDataCollatorWithPadding:
                         new_values.extend(value.tolist())
                     values = new_values
                 elif key == "attention_mask":
-                    new_values = np.zeros([len(values), 1, max_length, max_length])
+                    new_values = np.ones([len(values), 1, max_length, max_length]) * -1e4
                     for index, value in enumerate(values):
                         length = len(value)
                         new_values[index][0, :length, :length] = value
@@ -99,7 +101,16 @@ class PromptDataCollatorWithPadding:
                 elif key in ("soft_token_ids", "encoder_ids"):
                     for index, value in enumerate(values):
                         values[index] = value + [0] * (max_length - len(value))
-                elif key != "labels":
+                elif key in ("omask_positions"):
+                    max_num_option = max([len(x) for x in values])
+                    for index, value in enumerate(values):
+                        values[index] = value + [0] * (max_num_option - len(value))
+                elif key == "labels":
+                    if isinstance(values[0], list):
+                        max_num_label = max([len(x) for x in values])
+                        for index, value in enumerate(values):
+                            values[index] = value + [-100] * (max_num_label - len(value))
+                elif key != "cls_positions":
                     continue
                 batch[key] = self._convert_to_tensors(values)
         return batch

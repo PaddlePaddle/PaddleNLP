@@ -113,6 +113,13 @@ try:
 except importlib_metadata.PackageNotFoundError:
     _scipy_available = False
 
+_librosa_available = importlib.util.find_spec("librosa") is not None
+try:
+    _librosa_version = importlib_metadata.version("librosa")
+    logger.debug(f"Successfully imported librosa version {_librosa_version}")
+except importlib_metadata.PackageNotFoundError:
+    _librosa_available = False
+
 _fastdeploy_available = importlib.util.find_spec("fastdeploy") is not None
 if _fastdeploy_available:
     candidates = ("fastdeploy_gpu_python", "fastdeploy_python")
@@ -127,6 +134,14 @@ if _fastdeploy_available:
     _fastdeploy_available = _fastdeploy_version is not None
     if _fastdeploy_available:
         logger.debug(f"Successfully imported fastdeploy version {_fastdeploy_version}")
+
+
+_k_diffusion_available = importlib.util.find_spec("k_diffusion") is not None
+try:
+    _k_diffusion_version = importlib_metadata.version("k_diffusion")
+    logger.debug(f"Successfully imported k-diffusion version {_k_diffusion_version}")
+except importlib_metadata.PackageNotFoundError:
+    _k_diffusion_available = True
 
 
 def is_paddle_available():
@@ -157,8 +172,16 @@ def is_scipy_available():
     return _scipy_available
 
 
+def is_librosa_available():
+    return _librosa_available
+
+
 def is_fastdeploy_available():
     return _fastdeploy_available
+
+
+def is_k_diffusion_available():
+    return _k_diffusion_available
 
 
 # docstyle-ignore
@@ -177,6 +200,12 @@ inflect`
 PADDLE_IMPORT_ERROR = """
 {0} requires the Paddle library but it was not found in your environment. Checkout the instructions on the
 installation page: https://www.paddlepaddle.org.cn/install/quick and follow the ones that match your environment.
+"""
+
+# docstyle-ignore
+LIBROSA_IMPORT_ERROR = """
+{0} requires the librosa library but it was not found in your environment.  Checkout the instructions on the
+installation page: https://librosa.org/doc/latest/install.html and follow the ones that match your environment.
 """
 
 # docstyle-ignore
@@ -203,6 +232,12 @@ UNIDECODE_IMPORT_ERROR = """
 Unidecode`
 """
 
+# docstyle-ignore
+K_DIFFUSION_IMPORT_ERROR = """
+{0} requires the k-diffusion library but it was not found in your environment. You can install it with pip: `pip
+install k-diffusion`
+"""
+
 BACKENDS_MAPPING = OrderedDict(
     [
         ("fastdeploy", (is_fastdeploy_available, FASTDEPLOY_IMPORT_ERROR)),
@@ -212,6 +247,8 @@ BACKENDS_MAPPING = OrderedDict(
         ("paddle", (is_paddle_available, PADDLE_IMPORT_ERROR)),
         ("paddlenlp", (is_paddlenlp_available, PADDLENLP_IMPORT_ERROR)),
         ("unidecode", (is_unidecode_available, UNIDECODE_IMPORT_ERROR)),
+        ("librosa", (is_librosa_available, LIBROSA_IMPORT_ERROR)),
+        ("k_diffusion", (is_k_diffusion_available, K_DIFFUSION_IMPORT_ERROR)),
     ]
 )
 
@@ -270,3 +307,7 @@ def is_paddle_version(operation: str, version: str):
             A string version of Paddle
     """
     return compare_versions(parse(_paddle_version), operation, version)
+
+
+class OptionalDependencyNotAvailable(BaseException):
+    """An error indicating that an optional dependency of Diffusers was not found in the environment."""
