@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import annotations
 
 import io
@@ -209,7 +208,7 @@ def load_torch(path: str, **pickle_load_args):
     result_stage1 = unpickler_stage1.load()
 
     # 2. get the metadata of weight file
-    metadata = []
+    metadata = {}
 
     def extract_maybe_dict(result):
         if isinstance(result, dict):
@@ -219,11 +218,12 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            if result not in metadata:
-                metadata.append(result)
+            metadata[result.key] = result
 
     extract_maybe_dict(result_stage1)
+    metadata = list(metadata.values())
     metadata = sorted(metadata, key=lambda x: x.key)
+
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
     content_size = os.stat(path).st_size

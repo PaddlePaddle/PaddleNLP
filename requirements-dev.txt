@@ -1,4 +1,4 @@
-paddlepaddle==2.4.0rc0
+paddlepaddle>=2.4.1
 pre-commit
 pytest
 parameterized
