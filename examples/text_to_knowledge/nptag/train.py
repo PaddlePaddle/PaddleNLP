@@ -12,22 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import time
+import os
 import random
+import time
 from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import ErnieCtmNptagModel, ErnieCtmTokenizer, LinearDecayWithWarmup
-from paddlenlp.data import Pad, Stack, Tuple
-from paddlenlp.datasets import load_dataset
-
 from data import convert_example, create_dataloader, read_custom_data
 from metric import NPTagAccuracy
+
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import (
+    ErnieCtmNptagModel,
+    ErnieCtmTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -68,7 +72,8 @@ def evaluate(model, metric, criterion, data_loader, vocab_size):
     losses = []
     for batch in data_loader():
         input_ids, token_type_ids, labels = batch
-        logits = model(input_ids, token_type_ids)
+        outputs = model(input_ids, token_type_ids)
+        logits = outputs[0]
         loss = criterion(logits.reshape([-1, vocab_size]), labels.reshape([-1]))
         losses.append(loss.numpy())
         probs = F.softmax(logits, axis=-1)
@@ -100,7 +105,7 @@ def do_train(args):
 
     trans_func = partial(convert_example, tokenzier=tokenizer, max_seq_len=args.max_seq_len)
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # input_ids
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # token_type_ids
         Pad(axis=0, pad_val=-100, dtype="int64"),  # labels
@@ -144,7 +149,8 @@ def do_train(args):
         for step, batch in enumerate(train_data_loader):
             global_step += 1
             input_ids, token_type_ids, labels = batch
-            logits = model(input_ids, token_type_ids)
+            outputs = model(input_ids, token_type_ids)
+            logits = outputs[0]
             loss = criterion(logits.reshape([-1, vocab_size]), labels.reshape([-1]))
 
             loss.backward()

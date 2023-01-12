@@ -19,13 +19,12 @@ import unittest
 
 import numpy as np
 import paddle
-from test_pipelines_common import PipelineTesterMixin
 
 from ppdiffusers import VersatileDiffusionDualGuidedPipeline
 from ppdiffusers.utils.testing_utils import load_image, slow
 
 
-class VersatileDiffusionDualGuidedPipelineFastTests(PipelineTesterMixin, unittest.TestCase):
+class VersatileDiffusionDualGuidedPipelineFastTests(unittest.TestCase):
     pass
 
 

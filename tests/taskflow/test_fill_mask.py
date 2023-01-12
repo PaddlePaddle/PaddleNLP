@@ -27,7 +27,7 @@ class TestFillMaskTask(unittest.TestCase):
     def setUp(self):
         self.temp_dir = TemporaryDirectory()
         self.model_path = os.path.join(self.temp_dir.name, "model")
-        model = ErnieForMaskedLM.from_pretrained("__internal_testing__/ernie")
+        model = ErnieForMaskedLM.from_pretrained("__internal_testing__/tiny-random-ernie")
         tokenizer = AutoTokenizer.from_pretrained("__internal_testing__/tiny-random-ernie")
         model.save_pretrained(self.model_path)
         tokenizer.save_pretrained(self.model_path)
