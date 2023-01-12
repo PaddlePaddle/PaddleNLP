@@ -17,7 +17,7 @@ from .cls_post_handler import (
     MultiClassificationPostHandler,
     MultiLabelClassificationPostHandler,
 )
-from .custom_model_handler import CustomModelHandler
+from .custom_model_handler import CustomModelHandler, CustomModelHandlerForERNIEM
 from .qa_model_handler import QAModelHandler
 from .taskflow_handler import TaskflowHandler
 from .token_model_handler import TokenClsModelHandler
