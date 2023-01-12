@@ -41,7 +41,7 @@ class BaseAugment(object):
             Maximum number of augmented words in sequences.
     """
 
-    def __init__(self, create_n=1, aug_n=None, aug_percent=0.1, aug_min=1, aug_max=10):
+    def __init__(self, create_n=1, aug_n=None, aug_percent=0.1, aug_min=1, aug_max=10, vocab="vocab"):
         self._DATA = {
             "stop_words": (
                 "stopwords.txt",
@@ -52,6 +52,11 @@ class BaseAugment(object):
                 "baidu_encyclopedia_w2v_vocab.json",
                 "25c2d41aec5a6d328a65c1995d4e4c2e",
                 "https://bj.bcebos.com/paddlenlp/data/baidu_encyclopedia_w2v_vocab.json",
+            ),
+            "test_vocab": (
+                "test_vocab.json",
+                "1d2fce1c80a4a0ec2e90a136f339ab88",
+                "https://bj.bcebos.com/paddlenlp/data/test_vocab.json",
             ),
             "word_synonym": (
                 "word_synonym.json",
@@ -90,7 +95,7 @@ class BaseAugment(object):
         self.aug_min = aug_min
         self.aug_max = aug_max
         self.create_n = create_n
-        self.vocab = Vocab.from_json(self._load_file("vocab"))
+        self.vocab = Vocab.from_json(self._load_file(vocab))
         self.tokenizer = JiebaTokenizer(self.vocab)
         self.loop = 5
 

@@ -57,14 +57,18 @@ class TestCharAug(unittest.TestCase):
     def test_char_substitute(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = CharSubstitute("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
+                aug = CharSubstitute(
+                    "mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab"
+                )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue
             elif t == "custom":
-                aug = CharSubstitute("custom", create_n=create_n, custom_file_path=self.custom_file_path)
+                aug = CharSubstitute(
+                    "custom", create_n=create_n, custom_file_path=self.custom_file_path, vocab="test_vocab"
+                )
             else:
-                aug = CharSubstitute(t, create_n=create_n)
+                aug = CharSubstitute(t, create_n=create_n, vocab="test_vocab")
 
             augmented = aug.augment(self.sequences)
             self.assertEqual(len(self.sequences), len(augmented))
@@ -75,14 +79,16 @@ class TestCharAug(unittest.TestCase):
     def test_char_insert(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = CharInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
+                aug = CharInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab")
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue
             elif t == "custom":
-                aug = CharInsert("custom", create_n=create_n, custom_file_path=self.custom_file_path)
+                aug = CharInsert(
+                    "custom", create_n=create_n, custom_file_path=self.custom_file_path, vocab="test_vocab"
+                )
             else:
-                aug = CharInsert(t, create_n=create_n)
+                aug = CharInsert(t, create_n=create_n, vocab="test_vocab")
 
             augmented = aug.augment(self.sequences)
             self.assertEqual(len(self.sequences), len(augmented))
@@ -91,7 +97,7 @@ class TestCharAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_char_delete(self, create_n):
-        aug = CharDelete(create_n=create_n)
+        aug = CharDelete(create_n=create_n, vocab="test_vocab")
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(create_n, len(augmented[0]))
@@ -99,7 +105,7 @@ class TestCharAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_char_swap(self, create_n):
-        aug = CharSwap(create_n=create_n)
+        aug = CharSwap(create_n=create_n, vocab="test_vocab")
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(create_n, len(augmented[0]))

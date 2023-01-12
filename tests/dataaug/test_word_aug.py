@@ -50,14 +50,18 @@ class TestWordAug(unittest.TestCase):
     def test_word_substitute(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = WordSubstitute("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
+                aug = WordSubstitute(
+                    "mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab"
+                )
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue
             elif t == "custom":
-                aug = WordSubstitute("custom", create_n=create_n, custom_file_path=self.custom_file_path)
+                aug = WordSubstitute(
+                    "custom", create_n=create_n, custom_file_path=self.custom_file_path, vocab="test_vocab"
+                )
             else:
-                aug = WordSubstitute(t, create_n=create_n)
+                aug = WordSubstitute(t, create_n=create_n, vocab="test_vocab")
 
             augmented = aug.augment(self.sequences)
             self.assertEqual(len(self.sequences), len(augmented))
@@ -68,14 +72,16 @@ class TestWordAug(unittest.TestCase):
     def test_word_insert(self, create_n):
         for t in self.types:
             if t == "mlm":
-                aug = WordInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie")
+                aug = WordInsert("mlm", create_n=create_n, model_name="__internal_testing__/ernie", vocab="test_vocab")
                 augmented = aug.augment(self.sequences)
                 self.assertEqual(len(self.sequences), len(augmented))
                 continue
             elif t == "custom":
-                aug = WordInsert("custom", create_n=create_n, custom_file_path=self.custom_file_path)
+                aug = WordInsert(
+                    "custom", create_n=create_n, custom_file_path=self.custom_file_path, vocab="test_vocab"
+                )
             else:
-                aug = WordInsert(t, create_n=create_n)
+                aug = WordInsert(t, create_n=create_n, vocab="test_vocab")
 
             augmented = aug.augment(self.sequences)
             self.assertEqual(len(self.sequences), len(augmented))
@@ -84,7 +90,7 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_word_delete(self, create_n):
-        aug = WordDelete(create_n=create_n)
+        aug = WordDelete(create_n=create_n, vocab="test_vocab")
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(create_n, len(augmented[0]))
@@ -92,7 +98,7 @@ class TestWordAug(unittest.TestCase):
 
     @parameterized.expand([(1,)])
     def test_word_swap(self, create_n):
-        aug = WordSwap(create_n=create_n)
+        aug = WordSwap(create_n=create_n, vocab="test_vocab")
         augmented = aug.augment(self.sequences)
         self.assertEqual(len(self.sequences), len(augmented))
         self.assertEqual(create_n, len(augmented[0]))

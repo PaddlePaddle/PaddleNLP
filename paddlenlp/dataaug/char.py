@@ -63,8 +63,11 @@ class CharSubstitute(BaseAugment):
         aug_min=1,
         aug_max=10,
         model_name="ernie-1.0-large-zh-cw",
+        vocab="vocab",
     ):
-        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
+        super().__init__(
+            create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max, vocab=vocab
+        )
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
@@ -275,8 +278,11 @@ class CharInsert(BaseAugment):
         aug_min=1,
         aug_max=10,
         model_name="ernie-1.0-large-zh-cw",
+        vocab="vocab",
     ):
-        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
+        super().__init__(
+            create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max, vocab=vocab
+        )
 
         self.custom_file_path = custom_file_path
         self.delete_file_path = delete_file_path
@@ -457,8 +463,10 @@ class CharSwap(BaseAugment):
             Maximum number of augmented characters in sequences.
     """
 
-    def __init__(self, create_n=1, aug_n=None, aug_percent=None, aug_min=1, aug_max=10):
-        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=0.1, aug_min=aug_min, aug_max=aug_max)
+    def __init__(self, create_n=1, aug_n=None, aug_percent=None, aug_min=1, aug_max=10, vocab="vocab"):
+        super().__init__(
+            create_n=create_n, aug_n=aug_n, aug_percent=0.1, aug_min=aug_min, aug_max=aug_max, vocab=vocab
+        )
 
     def _augment(self, sequence):
 
@@ -521,8 +529,10 @@ class CharDelete(BaseAugment):
             Maximum number of augmented characters in sequences.
     """
 
-    def __init__(self, create_n=1, aug_n=None, aug_percent=0.1, aug_min=1, aug_max=10):
-        super().__init__(create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max)
+    def __init__(self, create_n=1, aug_n=None, aug_percent=0.1, aug_min=1, aug_max=10, vocab="vocab"):
+        super().__init__(
+            create_n=create_n, aug_n=aug_n, aug_percent=aug_percent, aug_min=aug_min, aug_max=aug_max, vocab=vocab
+        )
 
     def _augment(self, sequence):
 
