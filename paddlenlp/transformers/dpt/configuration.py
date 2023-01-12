@@ -148,6 +148,7 @@ class DPTConfig(PretrainedConfig):
         backbone_config=None,
         **kwargs
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
 
         self.hidden_size = hidden_size

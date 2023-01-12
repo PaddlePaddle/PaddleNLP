@@ -96,6 +96,7 @@ class BitConfig(PretrainedConfig):
         out_features=None,
         **kwargs
     ):
+        kwargs["return_dict"] = kwargs.pop("return_dict", True)
         super().__init__(**kwargs)
         if layer_type not in self.layer_types:
             raise ValueError(f"layer_type={layer_type} is not one of {','.join(self.layer_types)}")

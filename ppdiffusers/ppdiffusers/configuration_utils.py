@@ -26,9 +26,9 @@ from typing import Any, Dict, Tuple, Union
 import numpy as np
 from requests import HTTPError
 
-from . import __version__
 from .download_utils import ppdiffusers_bos_download
 from .utils import DOWNLOAD_SERVER, PPDIFFUSERS_CACHE, DummyObject, deprecate, logging
+from .version import VERSION as __version__
 
 logger = logging.get_logger(__name__)
 
