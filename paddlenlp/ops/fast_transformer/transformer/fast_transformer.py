@@ -812,7 +812,7 @@ class FasterOPT(OPTPretrainedModel):
 
 class FasterGPT(GPTPretrainedModel):
     def __init__(self, model, decoding_lib=None, use_fp16_decoding=False):
-        super(FasterGPT, self).__init__()
+        super(FasterGPT, self).__init__(model.config)
         self._model = model
         self.use_fp16_decoding = use_fp16_decoding
         self.decoding = InferGptDecoding(model=model, decoding_lib=decoding_lib, use_fp16_decoding=use_fp16_decoding)
@@ -1923,9 +1923,9 @@ class FasterT5(T5PretrainedModel):
         self.use_fp16_decoding = use_fp16_decoding
         self._model = model
         if use_fp16_decoding:
-            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(model.mbart.encoder.embed_tokens.weight))
-            model.mbart.encoder.embed_tokens = nn.Embedding(
-                *model.mbart.encoder.embed_tokens.weight.shape, weight_attr=weight_attr
+            weight_attr = paddle.ParamAttr(initializer=nn.initializer.Assign(model.encoder.embed_tokens.weight))
+            model.encoder.embed_tokens = nn.Embedding(
+                *model.encoder.embed_tokens.weight.shape, weight_attr=weight_attr
             )
         self.encoder = model.t5.get_encoder()
         self.decoder = model.t5.get_decoder()
