@@ -13,16 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from paddlenlp import SimpleServer
-from paddlenlp.server import (
-    CustomModelHandlerForERNIEM,
-    MultiLabelClassificationPostHandler,
-)
+from paddlenlp.server import ERNIEMHandler, MultiLabelClassificationPostHandler
 
 app = SimpleServer()
 app.register(
     "models/cls_hierarchical",
     model_path="../../export",
     tokenizer_name="ernie-m-base",
-    model_handler=CustomModelHandlerForERNIEM,
+    model_handler=ERNIEMHandler,
     post_handler=MultiLabelClassificationPostHandler,
 )
