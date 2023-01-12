@@ -198,7 +198,10 @@ class PromptTrainer(Trainer):
                 else:
                     params = plm_parameters
             else:
-                max_steps = self.state.max_steps
+                if self.args.max_steps > 0:
+                    max_steps = self.args.max_steps
+                else:
+                    raise ValueError("Please use `max_steps` to set the maximum training steps.")
                 warmup = (
                     self.args.warmup_steps if self.args.warmup_steps > 0 else int(self.args.warmup_ratio * max_steps)
                 )
