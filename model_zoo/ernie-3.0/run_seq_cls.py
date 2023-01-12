@@ -95,12 +95,13 @@ def main():
     data_collator = DataCollatorWithPadding(tokenizer)
 
     # Dataset pre-process
+    logger.info("Data Preprocessing...")
     if training_args.do_train:
-        train_dataset = raw_datasets["train"].map(trans_fn)
+        train_dataset = raw_datasets["train"].map(trans_fn, lazy=False)
     if training_args.do_eval:
-        eval_dataset = raw_datasets["dev"].map(trans_fn)
+        eval_dataset = raw_datasets["dev"].map(trans_fn, lazy=False)
     if training_args.do_predict:
-        test_dataset = raw_datasets["test"].map(trans_fn)
+        test_dataset = raw_datasets["test"].map(trans_fn, lazy=False)
 
     # Define the metrics of tasks.
     def compute_metrics(p):

@@ -109,6 +109,7 @@ def main():
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on train dataset",
+                lazy=False,
             )
 
     if training_args.do_eval:
@@ -121,6 +122,7 @@ def main():
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on validation dataset",
+                lazy=False,
             )
     if training_args.do_predict:
         predict_examples = raw_datasets["validation"]
@@ -134,6 +136,7 @@ def main():
                 remove_columns=column_names,
                 load_from_cache_file=not data_args.overwrite_cache,
                 desc="Running tokenizer on prediction dataset",
+                lazy=False,
             )
 
     # Define data collector

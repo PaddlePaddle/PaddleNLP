@@ -106,14 +106,14 @@ def main():
     data_collator = DataCollatorForTokenClassification(tokenizer, label_pad_token_id=data_args.ignore_label)
 
     # Dataset pre-process
+    logger.info("Data Preprocessing...")
     if training_args.do_train:
-        print(type(raw_datasets["train"]))
-        train_dataset = raw_datasets["train"].map(trans_fn)
+        train_dataset = raw_datasets["train"].map(trans_fn, lazy=False)
     if training_args.do_eval:
         # The msra_ner dataset do not have the dev dataset, use the test dataset for the evaluation
-        eval_dataset = raw_datasets["test"].map(trans_fn)
+        eval_dataset = raw_datasets["test"].map(trans_fn, lazy=False)
     if training_args.do_predict:
-        test_dataset = raw_datasets["test"].map(trans_fn)
+        test_dataset = raw_datasets["test"].map(trans_fn, lazy=False)
 
     # Define the metrics of tasks.
     # Metrics
