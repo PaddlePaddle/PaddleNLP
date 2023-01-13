@@ -48,8 +48,11 @@ unit-test:
 
 fast_tokenizer_cpp_compile:
 	cd fast_tokenizer
+	mkdir build_cpp
+	cd build_cpp
 	cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
 	make -j4
+	cd ..
 
 
 
