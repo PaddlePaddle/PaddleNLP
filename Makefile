@@ -47,7 +47,6 @@ unit-test:
 .PHONY: fast_tokenizer_cpp_compile
 
 fast_tokenizer_cpp_compile:
-  echo `pwd`
 	cd fast_tokenizer
 	echo `pwd`
 	mkdir build_cpp
