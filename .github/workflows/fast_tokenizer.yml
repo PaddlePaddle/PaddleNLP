@@ -18,3 +18,5 @@ jobs:
           python-version: 3.8
       - name: run cpp compile
         run: make fast_tokenizer_cpp_compile
+      - name: run python compile
+        run: make fast_tokenizer_python_compile
