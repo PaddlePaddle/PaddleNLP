@@ -53,7 +53,7 @@ fast_tokenizer_cpp_compile:
 
 fast_tokenizer_cpp_test:
 	cd fast_tokenizer/build_cpp/fast_tokenizer/test && \
-		sh ../../../run_fast_tokenizer_cpp_test.sh
+		/bin/bash ../../../run_fast_tokenizer_cpp_test.sh
 
 fast_tokenizer_python_compile:
 	pip install numpy wheel
