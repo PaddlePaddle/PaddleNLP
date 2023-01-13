@@ -42,6 +42,19 @@ unit-test:
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
+# # # # # # # # # # # # # # # FastTokenizer Block # # # # # # # # # # #
+
+.PHONY: fast_tokenizer_cpp_compile
+
+fast_tokenizer_cpp_compile:
+	cd fast_tokenizer
+	cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
+	make -j4
+
+
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 .PHONY: install
 install:
 	pip install -r requirements-dev.txt

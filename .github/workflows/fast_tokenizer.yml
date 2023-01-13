@@ -1,0 +1,20 @@
+name: FastTokenizer
+
+on: [push, pull_request]
+
+jobs:
+  FastTokenizer:
+    name: FastTokenizer
+    runs-on: ubuntu-20.04
+    permissions:
+      pull-requests: write
+      contents: read
+      id-token: write
+      
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+      - name: run cpp compile
+        run: make fast_tokenizer_cpp_compile
