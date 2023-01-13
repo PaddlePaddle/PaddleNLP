@@ -1,8 +1,8 @@
-# FastDeploy ERNIE 3.0 Tiny 模型Python部署示例
+# FastDeploy ERNIE 3.0 Tiny 模型 Python 部署示例
 
-在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy Python SDK。
+在部署前，参考 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md) 安装 FastDeploy Python SDK。
 
-本目录下分别提供`infer_demo.py`快速完成在CPU/GPU的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的Python部署示例。
+本目录下分别提供 `infer_demo.py` 快速完成在 CPU/GPU 的车载语音场景下的口语理解（Spoken Language Understanding，SLU）任务的 Python 部署示例，并展示使用 FastTokenizer 后，端到端预测性能的 Benchmark。
 
 
 ## 依赖安装
@@ -18,7 +18,7 @@ pip install fast-tokenizer-python fastdeploy-gpu-python -f https://www.paddlepad
 
 ## 快速开始
 
-以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照[ERNIE 3.0 Tiny训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
+以下示例可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照[ERNIE 3.0 Tiny 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-tiny/output/BS64_LR5e-5_20EPOCHS_WD0.01_WR0.1/`（用户可按实际情况设置）。
 
 ```bash
 
@@ -46,7 +46,7 @@ No. 2 text = 到信阳市汽车配件城
 
 ### 量化模型部署
 
-该示例支持部署Paddle INT8新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在GPU上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照[ERNIE 3.0 Tiny训练文档](../../README.md)压缩量化后导出得到的量化模型。
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 Tiny 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
 
 ```bash
 
@@ -62,7 +62,7 @@ python infer_demo.py --device cpu --backend paddle --model_prefix int8 --model_d
 
 ```bash
 
-[INFO] fastdeploy/runtime.cc(517)::Init	Runtime initialized with Backend::PDINFER in Device::GPU.
+[INFO] fastdeploy/runtime.cc(517)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
 No. 0 text = 来一首周华健的花心
 {'intent': 'music.play', 'confidence': 0.99706995, 'slot': [{'slot': 'singer', 'entity': '周华健', 'pos': [3, 5]}, {'slot': 'song', 'entity': '花心', 'pos': [7, 8]}]}
 No. 1 text = 播放我们都一样
@@ -80,18 +80,18 @@ No. 2 text = 到信阳市汽车配件城
 |----------|--------------|
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
-|--model_dir | 指定部署模型的目录。支持传入Paddle INT8新格式量化模型。 |
-|--slot_label_path| 指定的slot label文件路径 |
-|--intent_label_path| 指定的intent label文件路径 |
+|--model_dir | 指定部署模型的目录。支持传入 Paddle INT8 新格式量化模型。 |
+|--slot_label_path| 指定的 slot label 文件路径 |
+|--intent_label_path| 指定的 intent label 文件路径 |
 |--batch_size |最大可测的 batch size，默认为 1|
 |--max_length |最大序列长度，默认为 128|
-|--use_trt_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
-|--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
+|--use_trt_fp16 | 是否使用 FP16 模式进行推理。使用 TensorRT 和 Paddle TensorRT 后端时可开启，默认为 False |
+|--use_fast| 是否使用 FastTokenizer 加速分词阶段。默认为 True|
 |--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'infer_model'|
 
 ## FastDeploy 高阶用法
 
-FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fastdeploy.RuntimeOption.use_xxx_backend()`接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署ERNIE 3.0 Tiny模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署ERNIE 3.0 Tiny模型。
+FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 ERNIE 3.0 Tiny 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE 3.0 Tiny模型。
 
 符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
 
@@ -101,8 +101,8 @@ FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fas
         <td align=center> 硬件对应的接口</td>
         <td align=center> 可用的推理引擎  </td>
         <td align=center> 推理引擎对应的接口 </td>
-        <td align=center> 是否支持ERNIE 3.0 Tiny模型 </td>
-        <td align=center> 是否支持Paddle新格式量化模型 </td>
+        <td align=center> 是否支持 ERNIE 3.0 Tiny 模型 </td>
+        <td align=center> 是否支持 Paddle 新格式量化模型 </td>
         <td align=center> 是否支持FP16模式 </td>
     </tr>
     <tr>
@@ -165,7 +165,7 @@ FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fas
         <td align=center> use_paddle_lite_backend() </td>
         <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
-        <td align=center>  N/A </td>
+        <td align=center>  ✅  </td>
     </tr>
     <tr>
         <td align=center> 华为 昇腾 </td>
@@ -186,6 +186,97 @@ FastDeploy在Python端上，提供`fastdeploy.RuntimeOption.use_xxx()`以及`fas
         <td align=center> N/A </td>
     </tr>
 </table>
+
+## 性能 Benchmark
+
+在 Python 端上，以往会使用纯 Python 实现的 Tokenizer 进行分词，在处理大规模文本下往往会显得十分低效。为了解决这个问题，我们使用 PaddleNLP 的 FastTokenizer 工具，该工具使用 C++ 实现，并集成了 Google 提出的 [Fast WordPiece Tokenization](https://arxiv.org/pdf/2012.15524.pdf) 快速分词算法，可以大大提升分词阶段性能。开发者安装 FastTokenizer 后，可以使用 PaddleNLP 提供的 `AutoTokenizer.from_pretrained` 加载 Tokenizer，并通过传入 `use_fast=True` 的参数使用 FastTokenizer。下面对比使用 FastTokenizer 前后，FP32 模型与量化 INT8 模型在 GPU 上使用 Paddle Inference 以及 Paddle TensorRT 后端预测的预测性能。
+
+### 实验环境
+
+<table>
+    <tr>
+        <td align=center> GPU型号 </td>
+        <td align=center> A10 </td>
+    </tr>
+    <tr>
+        <td align=center> CUDA版本 </td>
+        <td align=center> 11.6 </td>
+    </tr>
+    <tr>
+        <td align=center> cuDNN版本 </td>
+        <td align=center> 8.4.0 </td>
+    </tr>
+    <tr>
+        <td align=center> CPU型号 </td>
+        <td align=center> Intel(R) Xeon(R) Gold 6271C CPU @ 2.60GHz </td>
+    </tr>
+</table>
+
+### 参数设置
+
+batch size = 32，max length = 16。
+
+测试文本长度15。
+
+### 性能对比
+
+#### FP32 模型
+
+**使用 Paddle Inference 后端预测**。
+
+<table>
+  <tr>
+    <td align=center> 切词方式 </td>
+    <td align=center> 端到端延时（ms） </td>
+    <td align=center> Runtime延时（ms） </td>
+    <td align=center> Tokenizer延时（ms） </td>
+    <td align=center> PostProcess延时（ms） </td>
+  </tr>
+  <tr>
+    <td align=center> FastTokenizer </td>
+    <td align=center> 2.5047 </td>
+    <td align=center> 0.9702 </td>
+    <td align=center> 1.1807 </td>
+    <td align=center> 0.3538 </td>
+  </tr>
+  <tr>
+    <td align=center> Python Tokenizer </td>
+    <td align=center> 8.9028 </td>
+    <td align=center> 0.9987 </td>
+    <td align=center> 7.5499 </td>
+    <td align=center> 0.3541 </td>
+  </tr>
+</table>
+
+#### INT8 模型
+
+**使用 Paddle TensorRT 后端预测**。
+
+<table>
+  <tr>
+    <td align=center> 切词方式 </td>
+    <td align=center> 端到端延时（ms） </td>
+    <td align=center> Runtime延时（ms） </td>
+    <td align=center> Tokenizer延时（ms） </td>
+    <td align=center> PostProcess延时（ms） </td>
+  </tr>
+  <tr>
+    <td align=center> FastTokenizer </td>
+    <td align=center> 2.5707 </td>
+    <td align=center> 1.0858 </td>
+    <td align=center> 1.1233 </td>
+    <td align=center> 0.3616 </td>
+  </tr>
+  <tr>
+    <td align=center> Python Tokenizer </td>
+    <td align=center> 9.2509 </td>
+    <td align=center> 1.0543 </td>
+    <td align=center> 7.8407 </td>
+    <td align=center> 0.3559 </td>
+  </tr>
+</table>
+
+**结论**：在此 ERNIE 3.0 Tiny 模型部署场景下，使用 FastTokenizer 可以大大加速分词阶段，分词阶段性能加速比为 `6.39x~6.98x`，端到端性能加速比为 `3.56x~3.59x` 。
 
 ## 相关文档
 
