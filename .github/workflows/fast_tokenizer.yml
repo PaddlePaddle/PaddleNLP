@@ -1,6 +1,12 @@
 name: FastTokenizer
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - 'fast_tokenizer/**'
+  pull_request:
+    paths:
+      - 'fast_tokenizer/**'
 
 jobs:
   FastTokenizerCppLib:
