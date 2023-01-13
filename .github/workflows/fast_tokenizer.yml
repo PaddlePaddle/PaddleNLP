@@ -20,6 +20,8 @@ jobs:
       - uses: actions/checkout@v3
       - name: run cpp compile
         run: make fast_tokenizer_cpp_compile
+      - name: run cpp test
+        run: make fast_tokenizer_cpp_test
   FastTokenizerPython38:
       name: FastTokenizerPython38
       runs-on: ubuntu-22.04
@@ -34,3 +36,4 @@ jobs:
             python-version: 3.8
         - name: run python compile
           run: make fast_tokenizer_python_compile
+  
