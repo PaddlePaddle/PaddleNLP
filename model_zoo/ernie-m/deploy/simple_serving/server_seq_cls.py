@@ -13,13 +13,13 @@
 # limitations under the License.
 
 from paddlenlp import SimpleServer
-from paddlenlp.server import MultiClassificationPostHandler, SingleInputModelHandler
+from paddlenlp.server import ERNIEMHandler, MultiClassificationPostHandler
 
 app = SimpleServer()
 app.register(
     "models/ernie_m_cls",
     model_path="../../finetuned_models/export",
     tokenizer_name="ernie-m-base",
-    model_handler=SingleInputModelHandler,
+    model_handler=ERNIEMHandler,
     post_handler=MultiClassificationPostHandler,
 )

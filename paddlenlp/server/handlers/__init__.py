@@ -19,6 +19,5 @@ from .cls_post_handler import (
 )
 from .custom_model_handler import CustomModelHandler, ERNIEMHandler
 from .qa_model_handler import QAModelHandler
-from .single_input_model_handler import SingleInputModelHandler
 from .taskflow_handler import TaskflowHandler
 from .token_model_handler import TokenClsModelHandler

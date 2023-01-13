@@ -298,7 +298,7 @@ def do_train():
         json.dump(out_dict, out_file)
 
     # Export inference model
-    if training_args.do_export:
+    if training_args.do_export and paddle.distributed.get_rank() == 0:
         # You can also load from certain checkpoint
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         model_to_save = trainer.model

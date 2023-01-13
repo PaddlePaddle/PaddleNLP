@@ -6,7 +6,9 @@
 - [其他参数设置](#其他参数设置)
 
 ## 环境准备
-使用有SimpleServing功能的PaddleNLP版本
+
+paddlenlp >= 2.5.0
+
 
 ## Server服务启动
 ### 文本分类任务启动
