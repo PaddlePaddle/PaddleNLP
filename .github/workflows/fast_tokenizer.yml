@@ -16,6 +16,11 @@ jobs:
         run: make fast_tokenizer_cpp_compile
   FastTokenizerPython38:
       name: FastTokenizerPython38
+      runs-on: ubuntu-20.04
+      permissions:
+        pull-requests: write
+        contents: read
+        id-token: write
       steps:
         - uses: actions/checkout@v3
         - uses: actions/setup-python@v1
