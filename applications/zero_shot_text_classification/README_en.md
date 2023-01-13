@@ -17,13 +17,17 @@
 
 This project provides an end-to-end application solution for universal text classification based on Universal Task Classification (UTC) finetuning and goes through the full lifecycle of **data labeling, model training and model deployment**. We hope this guide can help you apply Text Classification techniques with zero-shot ability in your own products or models.
 
+<div align="center">
+    <img width="700" alt="UTC模型结构图" src="https://user-images.githubusercontent.com/25607475/212268807-66181bcb-d3f9-4086-9d4a-de4d1d0933c2.png">
+</div>
+
 Text Classification refers to assigning a set of categories to given input text. Despite the advantages of tuning, applying text classification techniques in practice remains a challenge due to domain adaption and lack of labeled data, etc. This PaddleNLP Zero-shot Text Classification Guide builds on our UTC from the Unified Semantic Matching (USM) model series and provides an industrial-level solution that supports universal text classification tasks, including but not limited to **semantic analysis, semantic matching, intention recognition and event detection**, allowing you accomplish multiple tasks with a single model. Besides, our method brings good generation performance through multi-task pretraining.
 
 **Highlights:**
 
 - **Comprehensive Coverage**🎓: Covers various mainstream tasks of text classification,  including but not limited to semantic analysis, semantic matching, intention recognition and event detection.
 
-- **State-of-the-Art Performance**🏃:  Strong performance from the UTC model. with good zero-shot performance and practicable few-shot ability.
+- **State-of-the-Art Performance**🏃:  Strong performance from the UTC model. with good zero-shot and few-shot performance.
 
 - **Easy to use**⚡: Three lines of code to use our Taskflow for out-of-box Zero-shot Text Classification capability. One line of command to model training and model deployment.
 

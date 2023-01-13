@@ -36,7 +36,7 @@ Open [http://localhost:8080/](http://127.0.0.1:8080/) in the browser, enter the 
 
 <a name="2"></a>
 
-2. Text Classification Task Annotation
+## 2. Text Classification Task Annotation
 
 <a name="21"></a>
 
