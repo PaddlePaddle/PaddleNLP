@@ -97,11 +97,11 @@ def main():
     # Dataset pre-process
     logger.info("Data Preprocessing...")
     if training_args.do_train:
-        train_dataset = raw_datasets["train"].map(trans_fn, lazy=False)
+        train_dataset = raw_datasets["train"].map(trans_fn, lazy=training_args.lazy_data_processing)
     if training_args.do_eval:
-        eval_dataset = raw_datasets["dev"].map(trans_fn, lazy=False)
+        eval_dataset = raw_datasets["dev"].map(trans_fn, lazy=training_args.lazy_data_processing)
     if training_args.do_predict:
-        test_dataset = raw_datasets["test"].map(trans_fn, lazy=False)
+        test_dataset = raw_datasets["test"].map(trans_fn, lazy=training_args.lazy_data_processing)
 
     # Define the metrics of tasks.
     def compute_metrics(p):

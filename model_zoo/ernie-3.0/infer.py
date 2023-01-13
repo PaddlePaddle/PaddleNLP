@@ -115,6 +115,12 @@ def parse_args():
         type=str,
         help="Onnx ExecutionProvider with DNNL or without DNNL",
     )
+    parser.add_argument(
+        "--lazy_data_processing",
+        default=True,
+        type=bool,
+        help="Whether use lazy data processing",
+    )
 
     args = parser.parse_args()
     return args
@@ -513,7 +519,7 @@ def main():
             max_seq_length=args.max_seq_length,
             is_test=False,
         )
-        dev_ds = dev_ds.map(trans_func, lazy=False)
+        dev_ds = dev_ds.map(trans_func, lazy=args.lazy_data_processing)
         if args.device == "npu":
             # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
             batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)

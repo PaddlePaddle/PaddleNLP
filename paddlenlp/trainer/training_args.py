@@ -502,6 +502,10 @@ class TrainingArguments:
         default=False,
         metadata={"help": "Whether use flatten_param_grads method in optimizer, only used on NPU devices."},
     )
+    lazy_data_processing: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether use lazy data processing."},
+    )
 
     def __post_init__(self):
         env_local_rank = int(os.environ.get("PADDLE_RANK_IN_NODE", -1))
