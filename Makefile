@@ -49,13 +49,13 @@ unit-test:
 fast_tokenizer_cpp_compile:
 	cd fast_tokenizer && mkdir -p build_cpp && cd build_cpp && \
 		cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=ON -DCMAKE_BUILD_TYPE=Release && \
-		make && cd ../..
+		make -j4 && cd ../..
 
 fast_tokenizer_python_compile:
 	pip install numpy wheel
 	cd fast_tokenizer && mkdir -p build_py && cd build_py && \
 		cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=ON -DCMAKE_BUILD_TYPE=Release && \
-		make && cd ../..
+		make -j4 && cd ../..
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 

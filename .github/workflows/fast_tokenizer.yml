@@ -11,7 +11,7 @@ on:
 jobs:
   FastTokenizerCppLib:
     name: FastTokenizerCppLib
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     permissions:
       pull-requests: write
       contents: read
@@ -22,7 +22,7 @@ jobs:
         run: make fast_tokenizer_cpp_compile
   FastTokenizerPython38:
       name: FastTokenizerPython38
-      runs-on: ubuntu-20.04
+      runs-on: ubuntu-22.04
       permissions:
         pull-requests: write
         contents: read
