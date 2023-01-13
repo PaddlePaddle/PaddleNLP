@@ -3,8 +3,8 @@ name: FastTokenizer
 on: [push, pull_request]
 
 jobs:
-  FastTokenizer:
-    name: FastTokenizer
+  FastTokenizerCppLib:
+    name: FastTokenizerCppLib
     runs-on: ubuntu-20.04
     permissions:
       pull-requests: write
@@ -13,10 +13,14 @@ jobs:
       
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v1
-        with:
-          python-version: 3.8
       - name: run cpp compile
         run: make fast_tokenizer_cpp_compile
-      - name: run python compile
-        run: make fast_tokenizer_python_compile
+
+  FastTokenizerPython38:
+      name: FastTokenizerPy
+      steps:
+        - uses: actions/setup-python@v1
+          with:
+            python-version: 3.8
+        - name: run python compile
+          run: make fast_tokenizer_python_compile
