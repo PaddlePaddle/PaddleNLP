@@ -47,9 +47,12 @@ unit-test:
 .PHONY: fast_tokenizer_cpp_compile
 
 fast_tokenizer_cpp_compile:
+  echo `pwd`
 	cd fast_tokenizer
+	echo `pwd
 	mkdir build_cpp
 	cd build_cpp
+	echo `pwd
 	cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release
 	make -j4
 	cd ..
