@@ -220,9 +220,9 @@ if [[ ${#P0case_list[*]} -ne 0 ]] || [[ ${#APIcase_list[*]} -ne 0 ]];then
     if [ ! -f ./dist/p****.whl ];then
         install_paddle
         echo "install_nlp_develop"
-        python -m pip install --upgrade --force --ignore-installed paddlenlp
+        python -m pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
     else
-        echo "instal_nlp_latest"
+        echo "instal_nlp_pr"
         python -m pip install  dist/p****.whl
     fi
     pip list

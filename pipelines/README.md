@@ -215,6 +215,7 @@ Pipelines可以服务化，通过HTTP接口的形式供其他程序进行调用�
 - Tutorial 2 - 语义检索 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442670) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/semantic-search/semantic_search_example.py)
 - Tutorial 3 - 智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4442857) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/question-answering/dense_qa_example.py)
 - Tutorial 4 - FAQ智能问答 Pipeline: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/4465498) | [Python](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/pipelines/examples/FAQ/dense_faq_example.py)
+- Tutorial 5 - Pipelines 快速上手二次开发教程: [AIStudio notebook](https://aistudio.baidu.com/aistudio/projectdetail/5011119)
 ## :vulcan_salute: 社区交流
 微信扫描二维码并填写问卷之后，加入交流群与来自各行各业的小伙伴交流学习吧~
   <div align="center">

@@ -49,8 +49,8 @@
   - 10G重磅NLP学习大礼包！
 
   <div align="center">
-  <img src="https://user-images.githubusercontent.com/11793384/200770385-a2c02093-0e1d-4189-b324-8b0251cba316.jpg" width="150" height="150" />
-</div>
+  <img src="https://user-images.githubusercontent.com/11793384/212060369-4642d16e-f0ad-4359-aa57-b8303042f9c1.jpg" width="150" height="150" />
+  </div>
 
 ## 特性
 
