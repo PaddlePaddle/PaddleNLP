@@ -256,8 +256,7 @@ def get_unweighted_text_embeddings(
             text_input_chunk[:, 0] = text_input[0, 0]
             text_input_chunk[:, -1] = text_input[0, -1]
 
-            attention_mask = paddle.ones_like(text_input_chunk)
-            text_embedding = pipe.text_encoder(text_input_chunk, attention_mask=attention_mask)[0]
+            text_embedding = pipe.text_encoder(text_input_chunk)[0]
 
             if no_boseos_middle:
                 if i == 0:
@@ -273,8 +272,7 @@ def get_unweighted_text_embeddings(
             text_embeddings.append(text_embedding)
         text_embeddings = paddle.concat(text_embeddings, axis=1)
     else:
-        attention_mask = paddle.ones_like(text_input)
-        text_embeddings = pipe.text_encoder(text_input, attention_mask=attention_mask)[0]
+        text_embeddings = pipe.text_encoder(text_input)[0]
     return text_embeddings
 
 

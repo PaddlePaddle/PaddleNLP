@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import gc
 import inspect
 from typing import Callable, List, Optional, Union
 
@@ -21,7 +22,12 @@ from paddle.vision import transforms
 
 from ...models import AutoencoderKL, UNet2DConditionModel
 from ...pipeline_utils import DiffusionPipeline, ImagePipelineOutput
-from ...schedulers import DDIMScheduler, LMSDiscreteScheduler, PNDMScheduler
+from ...schedulers import (
+    DDIMScheduler,
+    EulerAncestralDiscreteScheduler,
+    EulerDiscreteScheduler,
+    PNDMScheduler,
+)
 from ...utils import logging
 from .disco_diffusion.functions import (
     MakeCutoutsDango,
@@ -153,7 +159,7 @@ class UPaintingPipeline(DiffusionPipeline):
             Conditional U-Net architecture to denoise the encoded image latents.
         scheduler ([`SchedulerMixin`]):
             A scheduler to be used in combination with `unet` to denoise the encoded image latents. Can be one of
-            [`DDIMScheduler`], [`PNDMScheduler`] or [`LMSDiscreteScheduler`].
+            [`DDIMScheduler`], [`PNDMScheduler`], [`EulerDiscreteScheduler`] or [`EulerAncestralDiscreteScheduler`].
     """
 
     def __init__(
@@ -162,7 +168,7 @@ class UPaintingPipeline(DiffusionPipeline):
         text_encoder: LDMBertModel,
         tokenizer: BertTokenizer,
         unet: UNet2DConditionModel,
-        scheduler: Union[DDIMScheduler, PNDMScheduler, LMSDiscreteScheduler],
+        scheduler: Union[DDIMScheduler, PNDMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler],
     ):
         super().__init__()
         self.register_modules(
@@ -193,6 +199,10 @@ class UPaintingPipeline(DiffusionPipeline):
                 model_list = model_names_or_model_lists
             self.clip_models.extend(model_list)
             self.freeze_clip_models()
+
+    def remove_clip_models(self):
+        self.clip_models = []
+        gc.collect()
 
     def freeze_clip_models(self):
         for model_dict in self.clip_models:
@@ -293,7 +303,6 @@ class UPaintingPipeline(DiffusionPipeline):
         self,
         latents,
         timestep,
-        index,
         noise_pred_original,
         model_stats,
         cut_overview,
@@ -311,6 +320,7 @@ class UPaintingPipeline(DiffusionPipeline):
         clamp_max,
         cond_weight,
         text_embeddings=None,
+        extra_step_kwargs={},
     ):
         # not cond_with_uncond_embeddings
         if self.cond_with_uncond_embeddings:
@@ -326,15 +336,19 @@ class UPaintingPipeline(DiffusionPipeline):
                 noise_pred = self.unet(latent_model_input, timestep, encoder_hidden_states=text_embeddings).sample
 
         # step 2: predict the sample
-        if isinstance(self.scheduler, (PNDMScheduler, DDIMScheduler)):
+        if isinstance(
+            self.scheduler, (PNDMScheduler, DDIMScheduler, EulerDiscreteScheduler, EulerAncestralDiscreteScheduler)
+        ):
             alpha_prod_t = self.scheduler.alphas_cumprod[timestep]
             beta_prod_t = 1 - alpha_prod_t
-            pred_original_sample = (latents - beta_prod_t ** (0.5) * noise_pred) / alpha_prod_t ** (0.5)
+            if isinstance(self.scheduler, (EulerDiscreteScheduler, EulerAncestralDiscreteScheduler)):
+                pred_original_sample = self.scheduler.step(
+                    noise_pred, timestep, latents, **extra_step_kwargs
+                ).pred_original_sample
+            else:
+                pred_original_sample = (latents - beta_prod_t ** (0.5) * noise_pred) / alpha_prod_t ** (0.5)
             fac = paddle.sqrt(beta_prod_t)
             sample = pred_original_sample * (fac) + latents * (1 - fac)
-        elif isinstance(self.scheduler, LMSDiscreteScheduler):
-            sigma = self.scheduler.sigmas[index]
-            sample = latents - sigma * noise_pred
         else:
             raise ValueError(f"scheduler type {type(self.scheduler)} not supported")
 
@@ -402,13 +416,9 @@ class UPaintingPipeline(DiffusionPipeline):
         # step 4: compute grads score
         grads = grads_wrt_x(latents, image)
 
-        # step 5: update noise_pred_original
-        if isinstance(self.scheduler, LMSDiscreteScheduler):
-            latents = latents.detach() + cond_weight * grads * (sigma**2)
-            noise_pred = noise_pred_original
-        else:
-            noise_pred = noise_pred_original - cond_weight * beta_prod_t.sqrt() * grads
-        return noise_pred, latents
+        # step 5: update noise_pred
+        noise_pred = noise_pred_original - cond_weight * beta_prod_t.sqrt() * grads
+        return noise_pred
 
     def _encode_prompt(self, prompt, do_classifier_free_guidance, negative_prompt):
         batch_size = len(prompt) if isinstance(prompt, list) else 1
@@ -781,7 +791,8 @@ class UPaintingPipeline(DiffusionPipeline):
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
-                with_cond = use_clip_guidance and (i + 1) > clip_guidance_skip_steps
+                with_cond = use_clip_guidance and (i + 1) > (clip_guidance_skip_steps + num_warmup_steps)
+
                 if with_cond and self.cond_with_uncond_embeddings:
                     latents = latents.detach()
                     latents.stop_gradient = False
@@ -813,10 +824,9 @@ class UPaintingPipeline(DiffusionPipeline):
                         text_embeddings_for_guidance = (
                             text_embeddings.chunk(2)[1] if do_classifier_free_guidance else text_embeddings
                         )
-                    noise_pred, latents = self.cond_fn(
+                    noise_pred = self.cond_fn(
                         latents,
                         t,
-                        i,
                         noise_pred,
                         model_stats,
                         cut_overview=cut_overview,
@@ -834,6 +844,7 @@ class UPaintingPipeline(DiffusionPipeline):
                         clamp_max=clamp_max,
                         cond_weight=cond_weight,
                         text_embeddings=text_embeddings_for_guidance,
+                        extra_step_kwargs=extra_step_kwargs,
                     )
 
                 # compute the previous noisy sample x_t -> x_t-1
