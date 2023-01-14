@@ -60,7 +60,7 @@ fast_tokenizer_cpp_test:
 .PHONY: fast_tokenizer_python_compile
 
 fast_tokenizer_python_compile:
-	python setup.py sdist bdist_wheel && \
+	python3 setup.py sdist bdist_wheel && \
 	pip install dist/*whl && \
 	pip install numpy wheel && \
 	cd fast_tokenizer && mkdir -p build_py && cd build_py && \
