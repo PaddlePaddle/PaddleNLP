@@ -60,9 +60,9 @@ fast_tokenizer_cpp_test:
 .PHONY: fast_tokenizer_python_compile
 
 fast_tokenizer_python_compile:
+	pip install numpy wheel && \
 	python3 setup.py sdist bdist_wheel && \
 	pip install dist/*whl && \
-	pip install numpy wheel && \
 	cd fast_tokenizer && mkdir -p build_py && cd build_py && \
 	cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release && \
 	make -j4 && pip install dist/*whl && cd ../..
