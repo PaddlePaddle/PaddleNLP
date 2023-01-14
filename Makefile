@@ -51,9 +51,13 @@ fast_tokenizer_cpp_compile:
 	cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=ON -DCMAKE_BUILD_TYPE=Release && \
 	make -j4 && cd ../..
 
+.PHONY: fast_tokenizer_cpp_test
+
 fast_tokenizer_cpp_test:
 	cd fast_tokenizer/build_cpp/fast_tokenizer/test && \
 	bash ../../../run_fast_tokenizer_cpp_test.sh
+
+.PHONY: fast_tokenizer_python_compile
 
 fast_tokenizer_python_compile:
 	pip install numpy wheel && \
