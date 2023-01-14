@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import os
 import unittest
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer
+
+from fast_tokenizer import ErnieFastTokenizer
 from paddlenlp.datasets import load_dataset
-from fast_tokenizer import ErnieFastTokenizer, models
+from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.log import logger
 
 logger.logger.setLevel("ERROR")
 
@@ -30,7 +29,7 @@ class TestWordpiece(unittest.TestCase):
 
     def setUp(self):
         self.max_seq_length = 128
-        self.wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0")
+        self.wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0", use_fast=True)
         ernie_vocab = self.wordpiece_tokenizer.vocab.token_to_idx
         self.set_flag()
         self.fast_wordpiece_tokenizer = ErnieFastTokenizer(
