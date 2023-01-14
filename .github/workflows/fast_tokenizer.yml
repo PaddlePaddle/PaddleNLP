@@ -3,10 +3,18 @@ name: FastTokenizer
 on:
   push:
     paths:
-      - 'fast_tokenizer/**'
+      - 'fast_tokenizer/**.h'
+      - 'fast_tokenizer/**.cc'
+      - 'fast_tokenizer/**.py'
+      - 'fast_tokenizer/**.cmake'
+      - 'fast_tokenizer/**CMakeLists.txt'
   pull_request:
     paths:
-      - 'fast_tokenizer/**'
+      - 'fast_tokenizer/**.h'
+      - 'fast_tokenizer/**.cc'
+      - 'fast_tokenizer/**.py'
+      - 'fast_tokenizer/**.cmake'
+      - 'fast_tokenizer/**CMakeLists.txt'
 
 jobs:
   FastTokenizerCppLib:
@@ -35,5 +43,5 @@ jobs:
           with:
             python-version: 3.8
         - name: run python compile
-          run: make fast_tokenizer_python_compile
+          run: make fast_tokenizer_python
   
