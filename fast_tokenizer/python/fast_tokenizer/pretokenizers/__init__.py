@@ -12,13 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple, Union, Tuple, List, Dict
-
 from abc import ABC
+from typing import Dict, List, Tuple, Union
 
-from .. import C
+from .. import C, OffsetType, Token
 from ..normalizers import NormalizedString
-from .. import Token, OffsetType
 
 
 class StringSplit:
@@ -56,10 +54,10 @@ class PreTokenizedString:
     def get_original_text(self):
         return self._pretokenized.get_original_text()
 
-    def get_splits(self, offset_referential: bool, offset_type: str):
+    def get_splits(self, offset_referential: str = "original", offset_type: str = "char"):
         """
         param offset_referential: "original" or "normalized"
-        param offset_type
+        param offset_type: "char" or "byte"
         """
         return self._pretokenized.get_splits(offset_referential, offset_type)
 
