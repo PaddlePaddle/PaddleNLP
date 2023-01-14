@@ -30,7 +30,7 @@ class TestWordpiece(unittest.TestCase):
     def setUp(self):
         self.max_seq_length = 128
         self.wordpiece_tokenizer = AutoTokenizer.from_pretrained("ernie-1.0", use_fast=True)
-        ernie_vocab = self.wordpiece_tokenizer.vocab.token_to_idx
+        ernie_vocab = self.wordpiece_tokenizer.vocab
         self.set_flag()
         self.fast_wordpiece_tokenizer = ErnieFastTokenizer(
             ernie_vocab,
