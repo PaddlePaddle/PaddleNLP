@@ -31,12 +31,15 @@
 
 ## News 📢
 
-* 🔥 **近期新增**
-  * 📃 发布兼具文本及文档抽取能力、多语言、开放域信息抽取模型 UIE-X，小样本迁移能力强；新增[信息抽取全流程应用方案](./applications/information_extraction)。
-  * ❣️发布[基于 UIE 的观点抽取与情感分析应用方案](./applications/sentiment_analysis/unified_sentiment_extraction)，小样本能力强悍。支持句子级与属性级情感极性分类、属性抽取、观点抽取，解决属性聚合和隐性观点抽取难题。
+* **2023.1.12 发布 [PaddleNLP v2.5](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.5.0)**
+  * 🔨 NLP工具：发布 [PPDiffusers](./ppdiffusers) 国产化的扩散模型工具箱，集成多种 Diffusion 模型参数和模型组件，提供了扩散模型的完整训练流程，同时支持扩散模型的高性能  FastDeploy 推理加速
+  * 💎 产业应用：产业应用升级，发布文档信息抽取 [UIE-x](./applications/information_extraction/document) 、统一文本分类 [UTC](./applications/zero_shot_text_classification) 、统一情感分析 [UIE-Senta](./applications/sentiment_analysis/unified_sentiment_extraction) 、[无监督问答应用](./applications/question_answering/unsupervised_qa)；同时发布[ERNIE 3.0 Tiny v2](./model_zoo/ernie-tiny) 系列模型 和 端到端的语义理解加速方案，降低预训练模型部署难度
+  * 💪 框架升级：正式支持 [PretrainedConfig](./paddlenlp/transformers/configuration_utils.py) 进行预训练模型参数灵活配置化；[Trainer API](./docs/trainer.md) 支持混合精度O1、O2 两种模式 BF16 训练、Recompute 重计算、Sharding 训练 等多项分布式能力；[模型压缩 API](./docs/compression.md) 支持量化训练、词表压缩等功能，新增支持7种预训练模型压缩；[数据增强API](./docs/dataaug.md) 新增支持字和句子级别数据增强策略
+  * 🤝 生态联合：HuggingFace hub 正式兼容 PadleNLP 预训练模型，支持所有PaddleNLP Model 和 Tokenizer 直接从 HuggingFace hub 下载和上传，欢迎大家 [体验](https://huggingface.co/PaddlePaddle) PaddleNLP 预训练模型效果
+ 
 * **2022.9.6 发布 [PaddleNLP v2.4](https://github.com/PaddlePaddle/PaddleNLP/releases/tag/v2.4.0)**
-  * 💎 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
-  * 🔨 产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持小样本学习和 TrustAI 可信计算模型训练与调优。
+  * 🔨 NLP工具：[NLP 流水线系统 Pipelines](./pipelines) 发布，支持快速搭建搜索引擎、问答系统，可扩展支持各类NLP系统，让解决 NLP 任务像搭积木一样便捷、灵活、高效！
+  * 💎 产业应用：新增 [文本分类全流程应用方案](./applications/text_classification) ，覆盖多分类、多标签、层次分类各类场景，支持小样本学习和 TrustAI 可信计算模型训练与调优。
   * 🍭 AIGC ：新增代码生成 SOTA 模型[CodeGen](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/examples/code_generation/codegen)，支持多种编程语言代码生成；集成[文图生成潮流模型](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/docs/model_zoo/taskflow.md#文图生成) DALL·E Mini、Disco Diffusion、Stable Diffusion，更多趣玩模型等你来玩；
   * 💪 框架升级：[模型自动压缩 API](./docs/compression.md) 发布，自动对模型进行裁减和量化，大幅降低模型压缩技术使用门槛；[小样本 Prompt](./applications/text_classification/multi_class/few-shot)能力发布，集成 PET、P-Tuning、RGL 等经典算法。
 
