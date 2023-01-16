@@ -343,6 +343,11 @@ def do_hapi(args):
 
     model = benchmark_model.build_model(args)
 
+    if args.to_static:
+        input_spec = benchmark_model.create_input_specs()
+        model = paddle.jit.to_static(model, input_spec=input_spec)
+        logger.info("Successfully to apply @to_static with specs: {}".format(input_spec))
+
     optimizer = benchmark_optimizer.build_optimizer(args, lr, model)
 
     benchmark_model.forward(model, args, optimizer=optimizer, train_loader=train_loader, eval_loader=eval_loader)
@@ -355,7 +360,7 @@ if __name__ == "__main__":
 
     if args.generated_inputs:
         do_generated_inputs(args)
-    if getattr(args, "use_hapi", False):
+    elif getattr(args, "use_hapi", False):
         do_hapi(args)
     else:
         do_train(args)
