@@ -1,15 +1,15 @@
-# FastDeploy ERNIE 3.0 模型C++部署示例
+# FastDeploy ERNIE 3.0 模型 C++ 部署示例
 
-在部署前，参考[FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装FastDeploy C++ SDK。
+在部署前，参考 [FastDeploy SDK 安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)安装 FastDeploy C++ SDK。
 
-本目录下分别提供`seq_cls_infer.cc`以及`token_cls_infer.cc`快速完成在CPU/GPU的文本分类任务以及序列标注任务的C++部署示例。
+本目录下分别提供 `seq_cls_infer.cc` 以及 `token_cls_infer.cc` 快速完成在 CPU/GPU 的文本分类任务以及序列标注任务的 C++ 部署示例。
 
 
 ## 文本分类任务
 
 ### 快速开始
 
-以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark 的[AFQMC数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务的C++预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。示例中的模型是ERNIE 3.0在`AFQMC数据集`微调后导出得到的部署模型。
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的 [AFQMC 数据集](https://github.com/CLUEbenchmark/CLUE)上进行文本分类任务的 C++ 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。示例中的模型是 ERNIE 3.0 在 `AFQMC 数据集`微调后导出得到的部署模型。
 
 ```bash
 mkdir build
@@ -21,10 +21,10 @@ cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
 # CPU 推理
-./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --vocab_path ../../../best_models/afqmc/vocab.txt --device cpu --backend paddle
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --device cpu --backend paddle
 
 # GPU 推理
-./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --vocab_path ../../../best_models/afqmc/vocab.txt --device gpu --backend paddle
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/export/ --device gpu --backend paddle
 
 ```
 
@@ -60,7 +60,7 @@ label: news_entertainment confidence:0.9522
 
 ### 快速开始
 
-以下示例展示如何基于FastDeploy库完成ERNIE 3.0 Medium模型在CLUE Benchmark 的[MSRA_NER数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的C++预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的 [MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的 C++ 预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端。
 
 ```bash
 mkdir build
@@ -117,6 +117,104 @@ entity: 姚明, label: PER, pos: [10, 11]
 |--device | 运行的设备，可选范围: ['cpu', 'gpu']，默认为'cpu' |
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
+
+## FastDeploy 高阶用法
+
+FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 `fastdeploy::RuntimeOption::UseXXXBackend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 ERNIE 3.0 Tiny 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE 3.0 模型。
+
+符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
+
+<table>
+    <tr>
+        <td align=center> 硬件</td>
+        <td align=center> 硬件对应的接口</td>
+        <td align=center> 可用的推理引擎  </td>
+        <td align=center> 推理引擎对应的接口 </td>
+        <td align=center> 是否支持 ERNIE 3.0 Tiny 模型 </td>
+        <td align=center> 是否支持 Paddle 新格式量化模型 </td>
+        <td align=center> 是否支持 FP16 模式 </td>
+    </tr>
+    <tr>
+        <td rowspan=3 align=center> CPU </td>
+        <td rowspan=3 align=center> UseCpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> UsePaddleInferBackend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> UseOrtBackend() </td>
+      <td align=center> ✅ </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> OpenVINO </td>
+      <td align=center> UseOpenvinoBackend() </td>
+      <td align=center> ✅ </td>
+      <td align=center> ❔ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+        <td rowspan=4 align=center> GPU </td>
+        <td rowspan=4 align=center> UseGpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> UsePaddleInferBackend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center> UseOrtBackend() </td>
+      <td align=center> ✅ </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  ❔ </td>
+    </tr>
+    <tr>
+      <td align=center> Paddle TensorRT </td>
+      <td align=center> UseTrtBackend() + EnablePaddleToTrt() </td>
+      <td align=center> ✅  </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> TensorRT </td>
+      <td align=center> UseTrtBackend() </td>
+      <td align=center> ✅  </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 昆仑芯 XPU </td>
+        <td align=center> UseKunlunXin() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> UsePaddleLiteBackend() </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+        <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 华为 昇腾 </td>
+        <td align=center> UseAscend() </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> UsePaddleLiteBackend() </td>
+        <td align=center> ✅ </td>
+        <td align=center> ❔ </td>
+        <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> Graphcore IPU </td>
+        <td align=center> UseIpu() </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> UsePaddleInferBackend() </td>
+        <td align=center> ❔ </td>
+        <td align=center> ❔ </td>
+        <td align=center> N/A </td>
+    </tr>
+</table>
 
 ## 相关文档
 

@@ -26,6 +26,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
     parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
+    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -62,7 +63,7 @@ def batchfy_text(texts, batch_size):
     return batch_texts
 
 
-class ErnieForSequenceClassificationPredictor(object):
+class Predictor(object):
     def __init__(self, args):
         self.tokenizer = AutoTokenizer.from_pretrained(args.model_dir, use_fast=args.use_fast)
         self.runtime = self.create_fd_runtime(args)
@@ -71,8 +72,8 @@ class ErnieForSequenceClassificationPredictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, "infer.pdmodel")
-        params_path = os.path.join(args.model_dir, "infer.pdiparams")
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
@@ -89,7 +90,7 @@ class ErnieForSequenceClassificationPredictor(object):
             if args.backend == "paddle_tensorrt":
                 option.enable_paddle_to_trt()
                 option.enable_paddle_trt_collect_shape()
-            trt_file = os.path.join(args.model_dir, "infer.trt")
+            trt_file = os.path.join(args.model_dir, "model.trt")
             option.set_trt_input_shape(
                 "input_ids",
                 min_shape=[1, 1],
@@ -108,8 +109,8 @@ class ErnieForSequenceClassificationPredictor(object):
             option.set_trt_cache_file(trt_file)
         return fd.Runtime(option)
 
-    def preprocess(self, data):
-        data = self.tokenizer(data, max_length=self.max_length, padding=True, truncation=True)
+    def preprocess(self, text, text_pair):
+        data = self.tokenizer(text, text_pair, max_length=self.max_length, padding=True, truncation=True)
         input_ids_name = self.runtime.get_input_info(0).name
         token_type_ids_name = self.runtime.get_input_info(1).name
         input_map = {
@@ -130,8 +131,8 @@ class ErnieForSequenceClassificationPredictor(object):
         out_dict = {"label": probs.argmax(axis=-1), "confidence": probs.max(axis=-1)}
         return out_dict
 
-    def predict(self, data):
-        input_map = self.preprocess(data)
+    def predict(self, texts, texts_pair=None):
+        input_map = self.preprocess(texts, texts_pair)
         infer_result = self.infer(input_map)
         output = self.postprocess(infer_result)
         return output
@@ -166,9 +167,15 @@ def seq_cls_print_ret(infer_result, input_data):
 
 if __name__ == "__main__":
     args = parse_arguments()
-    predictor = ErnieForSequenceClassificationPredictor(args)
-    data = ["未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？", "黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤"]
-    batch_data = batchfy_text(data, args.batch_size)
-    for data in batch_data:
-        outputs = predictor.predict(data)
-        seq_cls_print_ret(outputs, data)
+    predictor = Predictor(args)
+    texts_ds = ["花呗收款额度限制", "花呗支持高铁票支付吗"]
+    texts_pair_ds = ["收钱码，对花呗支付的金额有限制吗", "为什么友付宝不支持花呗付款"]
+    batch_texts = batchfy_text(texts_ds, args.batch_size)
+    batch_texts_pair = batchfy_text(texts_pair_ds, args.batch_size)
+
+    for bs, (texts, texts_pair) in enumerate(zip(batch_texts, batch_texts_pair)):
+        outputs = predictor.predict(texts, texts_pair)
+        for i, (sentence1, sentence2) in enumerate(zip(texts, texts_pair)):
+            print(
+                f"Batch id:{bs}, example id:{i}, sentence1:{sentence1}, sentence2:{sentence2}, label:{outputs['label'][i]}, similarity:{outputs['confidence'][i]:.4f}"
+            )
