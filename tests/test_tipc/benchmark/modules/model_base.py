@@ -32,6 +32,9 @@ class BenchmarkBase(object):
     def generate_inputs_for_model(self, args, **kwargs):
         raise NotImplementedError
 
+    def create_input_specs(self):
+        return None
+
     def forward(self, model, args, input_data=None, **kwargs):
         raise NotImplementedError
 

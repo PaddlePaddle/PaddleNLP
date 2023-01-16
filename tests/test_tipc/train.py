@@ -59,6 +59,12 @@ def do_generated_inputs(args):
 
     # Define model
     model = benchmark_model.build_model(args)
+
+    if args.to_static:
+        input_spec = benchmark_model.create_input_specs()
+        model = paddle.jit.to_static(model, input_spec=input_spec)
+        logger.info("Successfully to apply @to_static with specs: {}".format(input_spec))
+
     # Define data loader
     example_inputs = benchmark_model.generate_inputs_for_model(args, model)
 
