@@ -707,22 +707,15 @@ class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 class T5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_t5_converter(self):
-        model_id = "google/t5-v1_1-small"  # doesn't work
-        # model_id = "ClueAI/PromptCLUE-base" # doesn't work
-        # model_id = "t5-small" # works
-        # model_id = "hf-internal-testing/tiny-random-t5" # works
-        # model_id = "hf-internal-testing/tiny-random-t5-v1.1" # works
-        # model_id = "hf-internal-testing/tiny-random-T5Model" # works
-
         with tempfile.TemporaryDirectory() as tempdir:
-
+            model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
             input_ids = np.array([[i for i in range(10)]])
 
             # 2. forward the paddle model
-            from paddlenlp.transformers import T5Model as PaddleT5Model
+            from paddlenlp.transformers import T5Model
 
-            paddle_model = PaddleT5Model.from_pretrained(model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model = T5Model.from_pretrained(model_id, from_hf_hub=True, cache_dir=tempdir)
             paddle_model.eval()
             paddle_logit = paddle_model(
                 input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
@@ -730,9 +723,9 @@ class T5CompatibilityTest(unittest.TestCase):
 
             # 3. forward the torch  model
             import torch
-            from transformers import T5Model as TorchT5Model
+            from transformers import T5Model
 
-            torch_model = TorchT5Model.from_pretrained(model_id, cache_dir=tempdir)
+            torch_model = T5Model.from_pretrained(model_id, cache_dir=tempdir)
             torch_model.eval()
             torch_logit = torch_model(
                 input_ids=torch.tensor(input_ids), decoder_input_ids=torch.tensor(input_ids), return_dict=False
@@ -746,11 +739,11 @@ class T5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_t5_converter_from_local_dir_with_enable_torch(self):
         with tempfile.TemporaryDirectory() as tempdir:
-
-            # 2. forward the torch  model
+            model_id = "hf-internal-testing/tiny-random-T5Model"
+            # 1. forward the torch  model
             from transformers import T5Model
 
-            torch_model = T5Model.from_pretrained("hf-internal-testing/tiny-random-T5Model")
+            torch_model = T5Model.from_pretrained(model_id)
             torch_model.save_pretrained(tempdir)
 
             # 2. forward the paddle model
@@ -766,7 +759,7 @@ class T5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_t5_converter_from_local_dir(self):
         with tempfile.TemporaryDirectory() as tempdir:
-
+            model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
             input_ids = np.array([[i for i in range(10)]])
 
@@ -774,7 +767,7 @@ class T5CompatibilityTest(unittest.TestCase):
             import torch
             from transformers import T5Model
 
-            torch_model = T5Model.from_pretrained("hf-internal-testing/tiny-random-T5Model")
+            torch_model = T5Model.from_pretrained(model_id)
             torch_model.eval()
             torch_model.save_pretrained(tempdir)
             torch_logit = torch_model(
@@ -799,7 +792,7 @@ class T5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_t5_for_conditional_generation(self):
         with tempfile.TemporaryDirectory() as tempdir:
-
+            model_id = "hf-internal-testing/tiny-random-T5Model"
             # 1. create commmon input
             input_ids = np.array([[i for i in range(10)]])
 
@@ -807,7 +800,7 @@ class T5CompatibilityTest(unittest.TestCase):
             import torch
             from transformers import T5ForConditionalGeneration
 
-            torch_model = T5ForConditionalGeneration.from_pretrained("hf-internal-testing/tiny-random-T5Model")
+            torch_model = T5ForConditionalGeneration.from_pretrained(model_id)
             torch_model.eval()
             torch_model.save_pretrained(tempdir)
             torch_logit = torch_model(

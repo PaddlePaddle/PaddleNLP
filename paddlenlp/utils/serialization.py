@@ -226,7 +226,6 @@ def load_torch(path: str, **pickle_load_args):
     extract_maybe_dict(result_stage1)
     metadata = list(metadata.values())
     metadata = sorted(metadata, key=lambda x: x.key)
-    print(metadata)
 
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
@@ -249,7 +248,8 @@ def load_torch(path: str, **pickle_load_args):
             if (
                 tensor_meta.stride is not None
                 and len(tensor_meta.stride) > 1
-                and tensor_meta.stride[1] > tensor_meta.stride[0]
+                and tensor_meta.stride[0] == 1
+                and tensor_meta.stride[1] > 1
             ):
                 order = "F"
             else:
