@@ -233,7 +233,10 @@ def _download(url, path, md5sum=None):
                 for chunk in req.iter_content(chunk_size=1024):
                     if chunk:
                         f.write(chunk)
-        shutil.move(tmp_fullname, fullname)
+        try:
+            shutil.move(tmp_fullname, fullname)
+        except FileNotFoundError:
+            pass
 
     return fullname
 

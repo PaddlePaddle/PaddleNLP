@@ -1011,7 +1011,10 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
-                shutil.move(weight_file_path, new_weight_file_path)
+                try:
+                    shutil.move(weight_file_path, new_weight_file_path)
+                except FileNotFoundError:
+                    pass
 
                 weight_file_path = new_weight_file_path
 
