@@ -156,7 +156,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td rowspan=4 align=center> GPU </td>
-        <td rowspan=4 align=center> use_gpu() </td>
+        <td rowspan=4 align=center> UseGpu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center>  ✅ </td>
@@ -186,7 +186,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> 昆仑芯 XPU </td>
-        <td align=center> use_kunlunxin() </td>
+        <td align=center> UseKunlunXin() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
         <td align=center>  ✅ </td>
@@ -195,7 +195,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> 华为 昇腾 </td>
-        <td align=center> use_ascend() </td>
+        <td align=center> UseAscend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
         <td align=center> ✅ </td>
@@ -204,7 +204,7 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
     </tr>
     <tr>
         <td align=center> Graphcore IPU </td>
-        <td align=center> use_ipu() </td>
+        <td align=center> UseIpu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center> ❔ </td>
