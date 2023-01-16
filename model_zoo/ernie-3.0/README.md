@@ -1567,6 +1567,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 <a name="部署"></a>
 
 ## 部署
+
 我们为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
 <p align="center">
         <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
