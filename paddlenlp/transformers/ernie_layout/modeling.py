@@ -19,6 +19,7 @@ import math
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
+from paddle.distributed.fleet.utils import recompute
 from paddle.nn import Layer
 
 from paddlenlp.utils.log import logger
@@ -422,17 +423,39 @@ class ErnieLayoutEncoder(nn.Layer):
             # gradient_checkpointing is set as False here so we remove some codes here
             hidden_save["input_attention_mask"] = attention_mask
             hidden_save["input_layer_head_mask"] = layer_head_mask
-            layer_outputs = layer_module(
-                hidden_states,
-                attention_mask,
-                layer_head_mask,
-                encoder_hidden_states,
-                encoder_attention_mask,
-                past_key_values,
-                output_attentions,
-                rel_pos=rel_pos,
-                rel_2d_pos=rel_2d_pos,
-            )
+
+            if self.config.enable_recompute and self.training:
+
+                def create_custom_forward(module):
+                    def custom_forward(*inputs):
+                        return tuple(module(*inputs))
+
+                    return custom_forward
+
+                layer_outputs = recompute(
+                    create_custom_forward(layer_module),
+                    hidden_states,
+                    attention_mask,
+                    layer_head_mask,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    past_key_values,
+                    output_attentions,
+                    rel_pos,
+                    rel_2d_pos,
+                )
+            else:
+                layer_outputs = layer_module(
+                    hidden_states,
+                    attention_mask,
+                    layer_head_mask,
+                    encoder_hidden_states,
+                    encoder_attention_mask,
+                    past_key_values,
+                    output_attentions,
+                    rel_pos=rel_pos,
+                    rel_2d_pos=rel_2d_pos,
+                )
 
             hidden_states = layer_outputs[0]
 

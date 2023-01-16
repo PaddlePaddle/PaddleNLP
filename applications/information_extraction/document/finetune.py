@@ -103,7 +103,7 @@ def main():
             )
 
     # Define model and tokenizer
-    model = UIEX.from_pretrained(model_args.model_name_or_path)
+    model = UIEX.from_pretrained(model_args.model_name_or_path, enable_recompute=training_args.enable_recompute)
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)
 
     # Load and preprocess dataset
