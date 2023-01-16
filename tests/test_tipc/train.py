@@ -206,6 +206,11 @@ def do_train(args):
     # Define model
     model = benchmark_model.build_model(args)
 
+    if args.to_static:
+        input_spec = benchmark_model.create_input_specs()
+        model = paddle.jit.to_static(model, input_spec=input_spec)
+        logger.info("Successfully to apply @to_static with specs: {}".format(input_spec))
+
     if args.lr_scheduler is not None:
         benchmark_lr_scheduler = LR_SCHEDULER_REGISTRY[args.lr_scheduler]()
         lr = benchmark_lr_scheduler.build_scheculer(args)
