@@ -707,11 +707,12 @@ class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 class T5CompatibilityTest(unittest.TestCase):
     @require_package("transformers", "torch")
     def test_t5_converter(self):
-        # model_id = "google/t5-v1_1-small"
-        model_id = "ClueAI/PromptCLUE-base"
-        # model_id = "t5-small"
-        # model_id = "hf-internal-testing/tiny-random-t5-v1.1"
-        # model_id = "hf-internal-testing/tiny-random-T5Model"
+        model_id = "google/t5-v1_1-small"  # doesn't work
+        # model_id = "ClueAI/PromptCLUE-base" # doesn't work
+        # model_id = "t5-small" # works
+        # model_id = "hf-internal-testing/tiny-random-t5" # works
+        # model_id = "hf-internal-testing/tiny-random-t5-v1.1" # works
+        # model_id = "hf-internal-testing/tiny-random-T5Model" # works
 
         with tempfile.TemporaryDirectory() as tempdir:
 
