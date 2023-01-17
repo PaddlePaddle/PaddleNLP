@@ -286,11 +286,6 @@ if [ ! -f 'test.py' ];then
     sed -i "s/python3/python/g" Makefile
     sed -i "s/python-config/python3.7m-config/g" Makefile
     cd ${nlp_dir}/model_zoo/gpt/
-    mkdir pre_data
-    cd ./pre_data
-    wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_ids.npy
-    wget -q https://bj.bcebos.com/paddlenlp/models/transformers/gpt/data/gpt_en_dataset_300m_idx.npz
-    cd ../
     # pretrain
     python -m paddle.distributed.launch run_pretrain.py \
     --model_name_or_path "__internal_testing__/gpt" \
@@ -302,8 +297,10 @@ if [ ! -f 'test.py' ];then
     --device gpu \
     --warmup_steps 320000 \
     --warmup_ratio 0.01 \
-    --per_device_train_batch_size 4 \
+    --micro_batch_size 8 \
     --eval_steps 100 \
+    --overwrite_output_dir true \
+    --dataloader_drop_last true \
     --do_train true \
     --do_predict true >${log_path}/gpt_pretrain >>${log_path}/gpt_pretrain 2>&1
     print_info $? gpt_pretrain
@@ -325,8 +322,10 @@ else
     pytest ${nlp_dir}/model_zoo/gpt/ >${log_path}/gpt >>${log_path}/gpt 2>&1
     print_info $? gpt
 fi
-
 fast_gpt
+cd ${nlp_dir}/fast_generation/samples
+python gpt_sample.py >${log_path}/fast_generation_gpt >>${log_path}/fast_generation_gpt 2>&1
+print_info $? fast_generation_gpt
 }
 # 9 ernie-1.0
 ernie-1.0 (){
