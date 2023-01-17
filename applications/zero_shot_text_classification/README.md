@@ -116,7 +116,8 @@ python run_train.py  \
     --disable_tqdm True \
     --metric_for_best_model macro_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1
+    --save_total_limit 1 \
+    --save_plm
 ```
 
 如果在GPU环境中使用，可以指定gpus参数进行多卡训练：
@@ -145,7 +146,8 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
     --disable_tqdm True \
     --metric_for_best_model macro_f1 \
     --load_best_model_at_end  True \
-    --save_total_limit 1
+    --save_total_limit 1 \
+    --save_plm
 ```
 
 该示例代码中由于设置了参数 `--do_eval`，因此在训练完会自动进行评估。
@@ -208,7 +210,7 @@ python run_eval.py \
 >>> from pprint import pprint
 >>> from paddlenlp import Taskflow
 >>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
->>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best', precision="fp16")
+>>> my_cls = Taskflow("zero_shot_text_classification", schema=schema, task_path='./checkpoint/model_best/plm', precision="fp16")
 >>> pprint(my_cls("中性粒细胞比率偏低"))
 ```
 
@@ -225,7 +227,7 @@ from paddlenlp import SimpleServer, Taskflow
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议"]
 utc = Taskflow("zero_shot_text_classification",
                schema=schema,
-               task_path="../../checkpoint/model_best/",
+               task_path="../../checkpoint/model_best/plm",
                precision="fp32")
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
