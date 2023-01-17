@@ -18,7 +18,8 @@ from functools import partial
 from typing import Any, Optional, Tuple, Union
 
 import paddle
-import paddle.distributed as dist
+
+# import paddle.distributed as dist
 import paddle.nn as nn
 import paddle.nn.functional as F
 
@@ -557,13 +558,13 @@ class ErnieViLModel(ErnieViLPretrainedModel):
         image_embeds = F.normalize(image_embeds)
         text_embeds = F.normalize(text_embeds)
 
-        if dist.get_world_size() > 1:
-            feature_list_img = []
-            feature_list_txt = []
-            dist.all_gather(feature_list_img, image_embeds)
-            dist.all_gather(feature_list_txt, text_embeds)
-            image_embeds = paddle.concat(x=feature_list_img, axis=0)
-            text_embeds = paddle.concat(x=feature_list_txt, axis=0)
+        # if dist.get_world_size() > 1:
+        #     feature_list_img = []
+        #     feature_list_txt = []
+        #     dist.all_gather(feature_list_img, image_embeds)
+        #     dist.all_gather(feature_list_txt, text_embeds)
+        #     image_embeds = paddle.concat(x=feature_list_img, axis=0)
+        #     text_embeds = paddle.concat(x=feature_list_txt, axis=0)
 
         # cosine similarity as logits
         logit_scale = self.temperature.exp()
