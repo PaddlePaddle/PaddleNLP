@@ -42,6 +42,35 @@ label: Similar confidence: 0.986198
 -----------------------------
 ```
 
+### 量化模型部署
+
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
+
+```bash
+
+# 在GPU上使用paddle_tensorrt后端运行量化模型，模型目录可按照实际模型路径设置
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend paddle_tensorrt --model_prefix int8
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+
+```
+
+运行完成后返回的结果如下：
+
+```bash
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/seq_cls_infer.cc(67)::CreateRuntimeOption    model_path = ../../../best_models/afqmc/width_mult_0.75/mse16_1/int8.pdmodel, param_path = ../../../best_models/afqmc/width_mult_0.75/mse16_1/int8.pdmodel
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+input data: 花呗收款额度限制, 收钱码，对花呗支付的金额有限制吗
+seq cls result:
+label: Similar confidence: 0.5259
+-----------------------------
+input data: 花呗支持高铁票支付吗, 为什么友付宝不支持花呗付款
+seq cls result:
+label: Similar confidence: 0.985738
+-----------------------------
+```
+
 ### 参数说明
 
 `seq_cls_infer_demo` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
