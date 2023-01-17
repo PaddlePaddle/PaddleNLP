@@ -198,7 +198,6 @@ def load_torch(path: str, **pickle_load_args):
     def persistent_load_stage1(saved_id):
         assert isinstance(saved_id, tuple)
         data = saved_id[1:]
-
         storage_type, key, _, numel = data
         dtype = storage_type.dtype
         n_bytes = numel * _element_size(dtype)
