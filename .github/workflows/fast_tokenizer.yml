@@ -18,10 +18,11 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
-      - run: cd fast_tokenizer
       - name: compile
+        working-directory: ./fast_tokenizer
         run: make fast_tokenizer_cpp_compile
       - name: test
+        working-directory: ./fast_tokenizer
         run: make fast_tokenizer_cpp_test
   fast_tokenizer_python38:
       name: fast_tokenizer_python38
@@ -35,11 +36,13 @@ jobs:
         - uses: actions/setup-python@v1
           with:
             python-version: 3.8
-        - run: cd fast_tokenizer
         - name: install
+          working-directory: ./fast_tokenizer
           run: make fast_tokenizer_python_install
         - name: compile
+          working-directory: ./fast_tokenizer
           run: make fast_tokenizer_python_compile
         - name: test
+          working-directory: ./fast_tokenizer
           run: make fast_tokenizer_python_test
   
