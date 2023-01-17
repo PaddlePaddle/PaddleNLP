@@ -35,4 +35,4 @@ fast_tokenizer_python_compile:
 .PHONY: fast_tokenizer_python_test
 
 fast_tokenizer_python_test:
-	pip install dist/*whl && pytest python/tests
+	pip install build_py/dist/*whl && pytest build_py/python/tests
