@@ -38,6 +38,11 @@ class GPTForSequenceClassificationBenchmark(BenchmarkBase):
             "gpt_for_sequence_classification's DataLoader is not implemented. Please use --generated_inputs. "
         )
 
+    def create_input_specs(self):
+        input_ids = paddle.static.InputSpec(name="input_ids", shape=[-1, -1], dtype="int64")
+        labels = paddle.static.InputSpec(name="labels", shape=[-1], dtype="int64")
+        return [input_ids, None, None, None, labels]
+
     def generate_inputs_for_model(self, args, model, **kwargs):
         input_ids = rand_int_tensor(0, model.config.vocab_size, [args.batch_size, args.max_seq_len])
         labels = rand_int_tensor(0, model.config.num_classes - 1, [args.batch_size])

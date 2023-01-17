@@ -61,9 +61,29 @@ class BertForQuestionAnsweringBenchmark(BenchmarkBase):
         return model
 
     def forward(self, model, args, input_data=None, **kwargs):
-        res = model(**input_data)
+        start_positions = input_data.pop("start_positions")
+        end_positions = input_data.pop("end_positions")
+        start_logits, end_logits = model(**input_data)
+
+        total_loss = None
+        if start_positions is not None and end_positions is not None:
+            # If we are on multi-GPU, split add a dimension
+            if start_positions.ndim > 1:
+                start_positions = start_positions.squeeze(-1)
+            if start_positions.ndim > 1:
+                end_positions = end_positions.squeeze(-1)
+            # sometimes the start/end positions are outside our model inputs, we ignore these terms
+            ignored_index = paddle.shape(start_logits)[1]
+            start_positions = start_positions.clip(0, ignored_index)
+            end_positions = end_positions.clip(0, ignored_index)
+
+            loss_fct = paddle.nn.CrossEntropyLoss(ignore_index=ignored_index)
+            start_loss = loss_fct(start_logits, start_positions)
+            end_loss = loss_fct(end_logits, end_positions)
+            total_loss = (start_loss + end_loss) / 2
+
         return (
-            res[0],
+            total_loss,
             paddle.sum((input_data["input_ids"] != model.config.pad_token_id)).numpy().astype("int64").item(),
         )
 

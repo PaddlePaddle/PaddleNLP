@@ -22,6 +22,7 @@ import numpy as np
 import paddle
 import paddle.distributed as dist
 from benchmark import options
+from benchmark.modules.benchmark_utils import clone_inputs
 from benchmark.options import LR_SCHEDULER_REGISTRY, MODEL_REGISTRY, OPTIMIZER_REGISTRY
 from benchmark.utils.record import AverageStatistical
 
@@ -99,12 +100,13 @@ def do_generated_inputs(args):
         batch_start = time.time()
         for batch_id in range(args.max_steps):
             train_reader_cost = time.time() - batch_start
+            cloned_inputs = clone_inputs(example_inputs)
 
             if args.use_amp:
                 with paddle.amp.auto_cast(
                     custom_black_list=args.custom_black_list if args.amp_level == "O2" else {}, level=args.amp_level
                 ):
-                    loss, sample_per_cards = benchmark_model.forward(model, args, example_inputs)
+                    loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
 
                 scaled = scaler.scale(loss)
                 scaled.backward()
@@ -115,7 +117,7 @@ def do_generated_inputs(args):
                 else:
                     optimizer.clear_grad()
             else:
-                loss, sample_per_cards = benchmark_model.forward(model, args, example_inputs)
+                loss, sample_per_cards = benchmark_model.forward(model, args, cloned_inputs)
 
                 loss.backward()
 
