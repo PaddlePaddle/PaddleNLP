@@ -1,3 +1,5 @@
+简体中文 | [English](label_studio_text_en.md)
+
 # 文本分类任务Label Studio使用指南
 
  **目录**

@@ -1,3 +1,5 @@
+[简体中文](label_studio_text.md) | English
+
 # Label Studio User Guide - Text Classification
 
 **Table of contents**
@@ -16,7 +18,7 @@
 
 ## 1. Installation
 
-**Environmental configuration used in the following annotation examples:**
+** Dependencies used in the following annotation examples:**
 
 - Python 3.8+
 - label-studio == 1.6.0
