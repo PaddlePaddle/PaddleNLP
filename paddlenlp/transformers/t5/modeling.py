@@ -685,6 +685,7 @@ class T5PretrainedModel(PretrainedModel):
 
         if config.architectures is not None and "T5ForConditionalGeneration" in config.architectures:
             model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
         mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
         return mappings
 
