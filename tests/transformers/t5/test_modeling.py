@@ -14,6 +14,7 @@
 # limitations under the License.
 
 import random
+import tempfile
 import unittest
 
 import numpy as np
@@ -28,7 +29,7 @@ from paddlenlp.transformers import (
 )
 from paddlenlp.transformers.t5.configuration import T5Config
 from paddlenlp.transformers.t5.modeling import T5_PRETRAINED_MODEL_ARCHIVE_LIST
-from tests.testing_utils import slow
+from tests.testing_utils import require_package, slow
 
 from ..test_generation_utils import GenerationTesterMixin
 from ..test_modeling_common import ModelTesterMixin, ids_tensor
@@ -701,6 +702,125 @@ class T5EncoderOnlyModelTest(ModelTesterMixin, unittest.TestCase):
 
     def test_model_name_list(self):
         pass
+
+
+class T5CompatibilityTest(unittest.TestCase):
+    @require_package("transformers", "torch")
+    def test_t5_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_id = "hf-internal-testing/tiny-random-T5Model"
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import T5Model
+
+            paddle_model = T5Model.from_pretrained(model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(
+                input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
+            )[0][0]
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import T5Model
+
+            torch_model = T5Model.from_pretrained(model_id, cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(
+                input_ids=torch.tensor(input_ids), decoder_input_ids=torch.tensor(input_ids), return_dict=False
+            )[0][0]
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_t5_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_id = "hf-internal-testing/tiny-random-T5Model"
+            # 1. forward the torch  model
+            from transformers import T5Model
+
+            torch_model = T5Model.from_pretrained(model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import T5Model, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                T5Model.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_t5_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_id = "hf-internal-testing/tiny-random-T5Model"
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import T5Model
+
+            torch_model = T5Model.from_pretrained(model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(
+                input_ids=torch.tensor(input_ids), decoder_input_ids=torch.tensor(input_ids), return_dict=False
+            )[0][0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import T5Model
+
+            paddle_model = T5Model.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(
+                input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
+            )[0][0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_t5_for_conditional_generation(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+            model_id = "hf-internal-testing/tiny-random-T5Model"
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import T5ForConditionalGeneration
+
+            torch_model = T5ForConditionalGeneration.from_pretrained(model_id)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(
+                input_ids=torch.tensor(input_ids), decoder_input_ids=torch.tensor(input_ids), return_dict=False
+            )[0][0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import T5ForConditionalGeneration
+
+            paddle_model = T5ForConditionalGeneration.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(
+                input_ids=paddle.to_tensor(input_ids), decoder_input_ids=paddle.to_tensor(input_ids)
+            )[0][0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                )
+            )
 
 
 class T5ModelIntegrationTests(unittest.TestCase):
