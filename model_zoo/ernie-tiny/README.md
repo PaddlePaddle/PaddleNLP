@@ -13,13 +13,14 @@
    * [端上模型压缩方案🔥](#模型压缩)
        * [压缩效果](#压缩效果)
    * [⚡️ FastDeploy 部署](#FastDeploy部署)
+       * [性能结论](#压缩结论)
    * [参考文献](#参考文献)
 
 本项目开源了 **ERNIE 3.0 Tiny** 预训练模型及 **端上语义理解压缩方案**。
 
 - **ERNIE 3.0 Tiny** 百度 ERNIE 使用 ERNIE-Tiny 系列的知识蒸馏技术，将 ERNIE 3.0 Titan 大模型的能力传递给小模型，产出并开源了易于部署的 ERNIE 3.0 Tiny 系列预训练模型，刷新了中文小模型的 SOTA 成绩。在这些较少参数量的 ERNIE 3.0 Tiny 系列模型中，有一部分可以直接部署在 CPU 上。
 
-- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱移动端**。经过模型压缩并使用 [FastTokenizer](../../fast_tokenizer/README.md) 加速分词阶段，单条文本的分词延时低于 **0.1 毫秒**，端到端的推理性能也有显著 🚀加速。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
+- **端上语义理解压缩方案** 在语义理解任务中使用 ERNIE 3.0 Tiny 微调的基础上，我们建议进一步使用包含模型裁剪、量化训练、Embedding 量化等策略的压缩方案，在保持模型精度不降的情况下，可将模型体积减小为原来的 7.8%，达到 5.4 MB，内存占用也随之大幅减小。再经过 [⚡️FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 部署工具和 [FastTokenizer](../../fast_tokenizer/README.md) 对分词阶段的加速，**端到端推理性能**也有显著提升，从而将 ERNIE 3.0 Tiny 模型成功部署至 **📱移动端**。由于移动端部署对内存占用的要求比服务端更高，因此该方案也同样适用于 🖥服务端部署。
 
 <a name="模型介绍"></a>
 
@@ -77,7 +78,7 @@ ERNIE 3.0 Tiny 模型可以用于文本分类、文本推理、实体抽取、�
         <td>Model</td>
         <td colspan=11 align=center> In-domain </td>
         <td colspan=3 align=center> Out-domain </td>
-        <td colspan=3 align=center> Low-resourced</td>
+        <td colspan=4 align=center> Low-resourced</td>
     </tr>
     <tr>
         <td>-</td>
@@ -408,7 +409,7 @@ SLU 任务主要将用户的自然语言表达解析为结构化信息。结构�
     - 槽位填充任务：来一首<singer>周华健</singer>的<song>花心</song>
 ```
 
-在本项目中，意图识别和槽位填充任务分别被建模为文本分类和序列标注任务，二者共用一个 ERNIE Tiny 模型，只有最后的任务层是独立的。
+在本项目中，意图识别和槽位填充任务分别被建模为文本分类和序列标注任务，二者共用一个 ERNIE 3.0 Tiny 模型，只有最后的任务层是独立的。
 
 - 评价方法：单句意图和槽位被完全正确分类的准确率（Accuracy）。
 
@@ -427,7 +428,7 @@ SLU 任务主要将用户的自然语言表达解析为结构化信息。结构�
 ```shell
 cd data
 
-shuf corpus.train.txt > corpus.train.shuf.txt
+shuf corpus.train.txt > corpus.train.txt.shuf
 num_lines=$(wc -l corpus.train.txt|awk '{print $1}')
 head -n $[num_lines/5] corpus.train.txt.shuf > dev.txt
 tail -n $[num_lines-num_lines/5] corpus.train.txt.shuf > train.txt
@@ -569,7 +570,7 @@ python run_eval.py  \
 
 尽管 ERNIE 3.0 Tiny 已提供了效果不错的轻量级模型可以微调后直接使用，但在本项目中，微调后的模型体积是 69.0 MB，内存占用达到 115.72MB，部署至移动端还是存在一定困难。因此当模型有部署上线的需求，想要进一步压缩模型体积，降低推理时延，可使用本项目的 **端上语义理解压缩方案** 对上一步微调后的模型进行压缩。
 
-为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能，模型压缩API主要是基于[PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim)模型压缩能力，PaddleSlim是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
+为了方便实现，[PaddleNLP 模型压缩 API](../../docs/compression.md) 已提供了以下压缩功能，模型压缩 API 主要是基于 [PaddleSlim](https://github.com/PaddlePaddle/PaddleSlim) 模型压缩能力，PaddleSlim 是一个专注于深度学习模型压缩的工具库，提供低比特量化、知识蒸馏、稀疏化和模型结构搜索等模型压缩策略，帮助开发者快速实现模型的小型化，欢迎大家使用。
 
 端上模型压缩流程如下图所示：
 
@@ -624,49 +625,53 @@ python run_train.py \
 
 ### 压缩效果
 
-使用 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 将压缩后的模型部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端进行测试，得到模型精度、端到端时延（包括前后处理）、内存占用的数据如下：
+| 模型                                | 模型精度(acc.)   | 模型体积(MB)     |
+|-----------------------------------|--------------|--------------|
+| 原模型                               | 82.34        | 69.0         |
+| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | 64.0(-7.2%)  |
+| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21(-0.13) | 11.0(-84.1%) |
+| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding） | 82.21(-0.13) | 5.4(-92.2%)  |
 
-
-| 模型                                | 模型精度(acc.)   | 推理精度      | 端到端时延(ms)    | 内存占用 Pss (MB)  | 模型体积(MB)     |
-|-----------------------------------|--------------|-----------|--------------|----------------|--------------|
-| 原模型                               | 82.34        | FP32      | 9.77        | 115.72         | 69.0         |
-| 原模型                               | 82.34(-0.00) | FP16      | 5.91(1.65x) | 106.24(-8.2%)  | 69.0(-0.0%)  |
-| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP32      | 7.42(1.31x) | 59.49(-48.59%) | 64.0(-7.2%)  |
-| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP16      | 4.54(2.15x) | 52.23(-54.87%) | 64.0(-7.2%)  |
-| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21(-0.13) | FP32+INT8 | 4.45(2.19x) | 49.17(-57.51%) | 11.0(-84.1%) |
-|**原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）** | 82.21(-0.13) | FP32+INT8 |**4.51(2.16x)**|**43.77(-62.18%)**| **5.4(-92.2%)**  |
-
-**测试条件**：max_seq_length=16，batch_size=1，thread_num=1
-
-由此可见，模型经过压缩后，精度基本无损，体积减小了 92.2%。在以上测试条件下，端到端推理（包括前后处理）速度达到原来的 2.16 倍，内存占用（包括加载 FastTokenizer 库）减小了 62.18%。
+模型经过压缩后，精度基本无损，体积减小了 92.2%，仅有 5.4 MB。到此，算法侧的工作基本完成。
 
 <a name="FastDeploy部署"></a>
 
 ## ⚡️FastDeplopy 部署
+能够将深度学习模型部署到性能较低的移动端本身是比较困难的工作，因此在前面我们对小模型做了大量的优化，在精度不降的情况下将 69 MB 的模型压缩至 5.4 MB，但是如果想更好地满足业务上线要求，还需要有部署工具对性能有更多优化。在这里，PaddlePadde 提供了易用高效的云边端推理部署工具 ⚡️FastDeploy，它的 [Paddle Lite](https://github.com/PaddlePaddle/Paddle-Lite) 后端基于算子融合和常量折叠进行了深度模型优化，使得模型推理速度可有大幅度提升；它所集成的 FastTokenizer 库能够对分词阶段进行加速，在麒麟 985 芯片上单条文本的分词的推理时延低于 0.1 毫秒；
 
-FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。
-
-本项目基于 FastDeploy 工具，提供了 ERNIE 3.0 Tiny 移动端和服务端的高效部署示例。为了支持多种场景的部署， FastDeploy 提供了一整套完整的部署 Pipeline：
-
-- 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在华为 nova 7 Pro （麒麟 985 芯片）上测试 FastTokenizer，**单条文本的分词延时低于 0.1 毫秒**。
-- 在Runtime阶段，FastDeploy 集成多款硬件以及推理引擎后端，开发者可以通过几行代码设置 `fastdeploy::RuntimeOption` 结构，完成在不同硬件以及使用不同的推理引擎进行部署。
-- 在后处理阶段，FastDeploy 提供了张量级别的 [数值运算模块](https://baidu-paddle.github.io/fastdeploy-api/cpp/html/namespacefastdeploy_1_1function.html)， 基于该模块可以快速完成各类任务的后处理计算，如文本分类任务的 Softmax 等数值计算。
-
-通过结合 FastTokenizer，FastDeploy 提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在移动端以及服务端上开发各种常见的NLP模型任务，如文本分类、序列标注、信息抽取等。
-
-以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
+因此，本项目基于 FastDeploy 部署工具，完成了 ERNIE 3.0 Tiny 移动端和服务端的高效部署，请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。以下动图是 ERNIE 3.0 Tiny 意图识别、槽位填充联合模型使用 FastDeploy 部署在 Android App 上推理的效果展示：
 
 <p align="center">
         <img width="200" alt="image" src="https://user-images.githubusercontent.com/26483581/210997849-9d3b7f7f-9363-4a3d-87c9-b29496a6b5b0.gif" title="compression plan">
 </p>
 
-除了支持移动端设备上部署，本项目还提供了服务端部署示例，并使用 FastTokenizer 加速文本预处理阶段。在 GPU 硬件上，Python 端部署时，可以使用 FastTokenizer 工具加速分词阶段，在车载语音口语理解任务场景下端到端性能可提升 **3.56倍** ，更多详情请参考 [ERNIE 3.0 Tiny 部署文档](deploy/README.md)。
+想要更多了解 FastDeploy 可参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。FastDeploy 是一款全场景、易用灵活、极致高效的 AI 推理部署工具，提供开箱即用的部署体验。它为 NLP 任务提供了一整套完整的部署 Pipeline，提供 ERNIE 3.0 Tiny 模型从文本预处理、推理引擎 Runtime 以及后处理三个阶段所需要的接口模块，开发者可以基于这些接口模块在云、边、端上部署各类常见的 NLP 任务，如文本分类、序列标注、信息抽取等：
+- 在文本预处理阶段，FastDeploy 使用 PaddleNLP 提供的简单易用的高效分词工具 [FastTokenizer](../../fast_tokenizer/README.md) 完成文本预处理，开发者只需调用几行代码就能完成分词阶段开发。在麒麟 985 芯片上单条文本的分词延时低于 0.1 毫秒，将本项目模型部署在 GPU 上时，使用 FastTokenizer 工具可使端到端性能提升 **3.56倍**；
+- 在 Runtime 阶段，FastDeploy 集成多款硬件以及推理引擎后端，开发者可以设置 `fastdeploy::RuntimeOption` 以完成在不同硬件以及使用不同的推理引擎进行部署。目前，FastDeploy 支持的后端引擎有：
+    - 移动端： `Paddle Lite`；
+    - 服务端 GPU： `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及 `TensorRT`；
+    - 服务端 CPU：`Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO`。
+- 在后处理阶段，FastDeploy 提供了张量级别的 [数值运算模块](https://baidu-paddle.github.io/fastdeploy-api/cpp/html/namespacefastdeploy_1_1function.html)， 基于该模块可以快速完成各类任务的后处理计算，如文本分类任务的 Softmax 等数值计算。
 
-想要更多了解 FastDeploy 可以参考 [FastDeploy 仓库](https://github.com/PaddlePaddle/FastDeploy)。目前，FastDeploy 已支持多种后端：
+<a name="性能结论"></a>
 
-- 在移动端上支持 `Paddle Lite` 后端；
+### 性能结论
 
-- 在服务端的 GPU 硬件上，支持 `Paddle Inference`、`ONNX Runtime`、`Paddle TensorRT` 以及`TensorRT` 后端；在服务端的 CPU 硬件上支持 `Paddle Inference`、`ONNX Runtime` 以及 `OpenVINO` 后端。
+使用 FastDeploy 将压缩后的模型部署在华为 nova 7 Pro （麒麟 985 芯片）上，选用 Paddle Lite 作为后端进行测试，得到不同推理精度下的模型效果、端到端时延（包括前后处理）、内存占用（包括加载 FastTokenizer 库）的数据如下：
+
+| 模型                                | 模型精度(acc.)   | 推理精度      | 端到端时延(ms)   | 内存占用 Pss (MB)  | 模型体积(MB)     |
+|-----------------------------------|--------------|-----------|-------------|----------------|--------------|
+| 原模型                               | 82.34        | FP32      | 9.90        | 115.72         | 69.0         |
+| 原模型                               | 82.34(-0.00) | FP16      | 6.03(1.64x) | 106.24(-8.2%)  | 69.0(-0.0%)  |
+| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP32      | 7.55(1.31x) | 59.49(-48.59%) | 64.0(-7.2%)  |
+| 原模型+裁剪（词表+模型宽度）                   | 82.11(-0.23) | FP16      | 4.68(2.12x) | 52.23(-54.87%) | 64.0(-7.2%)  |
+| 原模型+裁剪（词表+模型宽度）+量化（矩阵乘）           | 82.21(-0.13) | FP32+INT8 | 4.57(2.17x) | 49.17(-57.51%) | 11.0(-84.1%) |
+| **原模型+裁剪（词表+模型宽度）+量化（矩阵乘+Embedding）** | 82.21(-0.13) | FP32+INT8 | **4.64(2.13x)** | **43.77(-62.18%)** | **5.4(-92.2%)**  |
+
+
+**测试条件**：max_seq_length=16，batch_size=1，thread_num=1
+
+模型经过压缩后，精度基本无损，体积减小了 92.2%。在以上测试条件下，端到端推理速度达到原来的 2.13 倍，内存占用减小了 62.18%。
 
 <a name="参考文献"></a>
 
