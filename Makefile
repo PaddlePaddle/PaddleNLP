@@ -42,34 +42,6 @@ unit-test:
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# # # # # # # # # # # # # # # FastTokenizer Block # # # # # # # # # # #
-
-.PHONY: fast_tokenizer_cpp_compile
-
-fast_tokenizer_cpp_compile:
-	cd fast_tokenizer && mkdir -p build_cpp && cd build_cpp && \
-	cmake .. -DWITH_PYTHON=OFF -DWITH_TESTING=ON -DCMAKE_BUILD_TYPE=Release && \
-	make -j4 && cd ../..
-
-.PHONY: fast_tokenizer_cpp_test
-
-fast_tokenizer_cpp_test:
-	cd fast_tokenizer/build_cpp/fast_tokenizer/test && \
-	bash ../../../run_fast_tokenizer_cpp_test.sh
-
-.PHONY: fast_tokenizer_python
-
-fast_tokenizer_python:
-	pip install numpy wheel paddlepaddle
-	python3 setup.py sdist bdist_wheel
-	pip install dist/*whl
-	cd fast_tokenizer && mkdir -p build_py && cd build_py && \
-	cmake .. -DWITH_PYTHON=ON -DWITH_TESTING=OFF -DCMAKE_BUILD_TYPE=Release && \
-	make -j4 && pip install dist/*whl && cd python/tests/ && \
-	python3 -m unittest test_*
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
 .PHONY: install
 install:
 	pip install -r requirements-dev.txt

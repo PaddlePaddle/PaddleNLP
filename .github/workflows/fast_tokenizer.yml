@@ -3,22 +3,14 @@ name: FastTokenizer
 on:
   push:
     paths:
-      - 'fast_tokenizer/**.h'
-      - 'fast_tokenizer/**.cc'
-      - 'fast_tokenizer/**.py'
-      - 'fast_tokenizer/**.cmake'
-      - 'fast_tokenizer/**CMakeLists.txt'
+      - 'fast_tokenizer/*'
   pull_request:
     paths:
-      - 'fast_tokenizer/**.h'
-      - 'fast_tokenizer/**.cc'
-      - 'fast_tokenizer/**.py'
-      - 'fast_tokenizer/**.cmake'
-      - 'fast_tokenizer/**CMakeLists.txt'
+      - 'fast_tokenizer/*'
 
 jobs:
-  FastTokenizerCppLib:
-    name: FastTokenizerCppLib
+  fast_tokenizer_cpp:
+    name: fast_tokenizer_cpp
     runs-on: ubuntu-22.04
     permissions:
       pull-requests: write
@@ -26,12 +18,13 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
-      - name: run cpp compile
+      - run: cd fast_tokenizer
+      - name: compile
         run: make fast_tokenizer_cpp_compile
-      - name: run cpp test
+      - name: test
         run: make fast_tokenizer_cpp_test
-  FastTokenizerPython38:
-      name: FastTokenizerPython38
+  fast_tokenizer_python38:
+      name: fast_tokenizer_python38
       runs-on: ubuntu-22.04
       permissions:
         pull-requests: write
@@ -42,6 +35,11 @@ jobs:
         - uses: actions/setup-python@v1
           with:
             python-version: 3.8
-        - name: run python compile
-          run: make fast_tokenizer_python
+        - run: cd fast_tokenizer
+        - name: install
+          run: make fast_tokenizer_python_install
+        - name: compile
+          run: make fast_tokenizer_python_compile
+        - name: test
+          run: make fast_tokenizer_python_test
   
