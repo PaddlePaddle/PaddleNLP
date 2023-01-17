@@ -125,7 +125,7 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         resnet_pre_temb_non_linearity=True
     ):
         super().__init__()
-
+        self.resnet_pre_temb_non_linearity=resnet_pre_temb_non_linearity
         self.sample_size = sample_size
         time_embed_dim = block_out_channels[0] * 4
 
@@ -161,12 +161,13 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         # down
 
         if act_fn == "swish":
-            self.down_resnet_temb_nonlinearity = lambda x: F.silu(x)
+            self.resnet_temb_nonlinearity = lambda x: F.silu(x)
         elif act_fn == "mish":
-            self.down_resnet_temb_nonlinearity = Mish()
+            self.resnet_temb_nonlinearity = Mish()
         elif act_fn == "silu":
-            self.down_resnet_temb_nonlinearity = nn.Silu()
-
+            self.resnet_temb_nonlinearity = nn.Silu()
+        if resnet_pre_temb_non_linearity == False:
+            self.resnet_temb_nonlinearity = nn.Identity()
         output_channel = block_out_channels[0]
         for i, down_block_type in enumerate(down_block_types):
             input_channel = output_channel
@@ -444,9 +445,8 @@ class UNet2DConditionModel(ModelMixin, ConfigMixin):
         sample = self.conv_in(sample)
 
         # 3. down
-        down_block_res_samples = (sample,)
-        down_nonlinear_temb=self.down_resnet_temb_nonlinearity(emb)
-
+        down_block_res_samples = (sample, )
+        down_nonlinear_temb=self.resnet_temb_nonlinearity(emb)
         for downsample_block in self.down_blocks:
             if hasattr(downsample_block, "has_cross_attention") and downsample_block.has_cross_attention:
                 sample, res_samples = downsample_block(
