@@ -60,10 +60,21 @@ void PrintUsage() {
 }
 
 bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
+  std::string model_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdmodel";
+  std::string param_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdiparams";
+  fastdeploy::FDINFO << "model_path = " << model_path
+                     << ", param_path = " << param_path << std::endl;
+  option->SetModelPath(model_path, param_path);
+
   if (FLAGS_device == "gpu") {
     option->UseGpu();
   } else if (FLAGS_device == "cpu") {
     option->UseCpu();
+  } else if (FLAGS_device == "kunlunxin") {
+    option->UseKunlunXin();
+    return true;
   } else {
     fastdeploy::FDERROR << "The avilable device should be one of the list "
                            "['cpu', 'gpu']. But receive '"
@@ -105,13 +116,6 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
     return false;
   }
 
-  std::string model_path =
-      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdmodel";
-  std::string param_path =
-      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdiparams";
-  fastdeploy::FDINFO << "model_path = " << model_path
-                     << ", param_path = " << param_path << std::endl;
-  option->SetModelPath(model_path, param_path);
   return true;
 }
 
