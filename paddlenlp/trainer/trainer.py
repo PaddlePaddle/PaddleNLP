@@ -594,6 +594,11 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
+        if self.args.device == "npu" and self.args.flatten_param_grads:
+            from .plugins.npu_plugin import npu_accelerate_plugin
+
+            npu_accelerate_plugin(self.optimizer)
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler

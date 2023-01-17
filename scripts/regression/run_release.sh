@@ -30,7 +30,7 @@ set -x
 python -c "import paddle; print('paddle version:',paddle.__version__,'\npaddle commit:',paddle.version.commit)";
 nlp1_build (){
     echo -e "\033[35m ---- only install paddlenlp \033[0m"
-    python -m pip install --force-reinstall paddlenlp
+    python -m pip install paddlenlp -f https://www.paddlepaddle.org.cn/whl/paddlenlp.html
 }
 nlp2_build (){
     echo -e "\033[35m ---- build and install paddlenlp  \033[0m"
@@ -54,7 +54,7 @@ export all_P0case_time=0
 declare -A all_P0case_dic
 get_diff_TO_P0case(){
 if [[ ${Testcase} =~ "all" ]];then
-    P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
+    P0case_list=(waybill_ie msra_ner glue bert skep bigbird electra gpt ernie-1.0 xlnet ofa  squad tinybert lexical_analysis seq2seq \
      word_embedding ernie-ctm distilbert stacl transformer simbert ernie-doc transformer-xl pointer_summarizer question_matching ernie-csc \
     nptag ernie-m clue taskflow transformers fast_generation ernie-3.0)
 elif [[ ${Testcase} =~ "p0" ]];then
@@ -75,7 +75,19 @@ get_diff_TO_P0case
         let case_num++
     done
     echo -e "\033[35m ---- end run P0case  \033[0m"
-cd ${nlp_dir}/model_logs/
+cd ${nlp_dir}
+upload(){
+if [ -f '/ssd1/paddlenlp/bos/upload.py' ];then
+    cp -r /ssd1/paddlenlp/bos/* ./
+    tar -zcvf model_logs.tar model_logs/
+    mkdir upload && mv model_logs.tar upload
+    python upload.py upload 'paddle-qa/paddlenlp'
+else
+    echo 'No upload script found'
+fi
+}
+upload
+cd model_logs/
 FF=`ls *_FAIL*|wc -l`
 if [ "${FF}" -gt "0" ];then
     P0case_EXCODE=1
