@@ -29,7 +29,7 @@ Text Classification refers to assigning a set of categories to given input text.
 
 - **Comprehensive Coverage**🎓: Covers various mainstream tasks of text classification,  including but not limited to semantic analysis, semantic matching, intention recognition and event detection.
 
-- **State-of-the-Art Performance**🏃:  Strong performance from the UTC model. which ranks first on ZeroCLUE/FewCLUE as of 01/11/2023.
+- **State-of-the-Art Performance**🏃:  Strong performance from the UTC model, which ranks first on [ZeroCLUE](https://www.cluebenchmarks.com/zeroclue.html)/[FewCLUE](https://www.cluebenchmarks.com/fewclue.html) as of 01/11/2023.
 
 - **Easy to use**⚡: Three lines of code to use our Taskflow for out-of-box Zero-shot Text Classification capability. One line of command to model training and model deployment.
 
