@@ -303,7 +303,9 @@ def do_train():
         # trainer.load_state_dict_from_checkpoint("/path/to/checkpoint/")
         model_to_save = trainer.model
         model_to_save = model_to_save._layers if isinstance(model_to_save, paddle.DataParallel) else model_to_save
-        input_spec = [paddle.static.InputSpec(shape=[None, None], dtype="int64")]
+        input_spec = [
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
+        ]
         model_args.export_model_dir = os.path.join(model_args.export_model_dir, "export")
         paddlenlp.transformers.export_model(
             model=model_to_save, input_spec=input_spec, path=model_args.export_model_dir

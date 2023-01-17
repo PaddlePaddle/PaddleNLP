@@ -33,17 +33,17 @@ python infer_cpu.py --task_name seq_cls --model_path ../../finetuned_models/expo
 ```
 输出打印如下:
 ```
-input data: ['对成人和儿童来说很有趣。', '只有孩子才会开心。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '我从来没有被告知任何与任何人会面。']
 seq cls result:
-label: entailment   confidence: 0.8088128566741943
+label: contradiction   confidence: 0.9331414103507996
 -----------------------------
-input data: ['下一个证人是玛丽·卡文迪什。', '还有另外一个证人。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '我被告知将有一个人被叫进来与我见面。']
 seq cls result:
-label: entailment   confidence: 0.9145026206970215
+label: entailment   confidence: 0.9928839206695557
 -----------------------------
-input data: ['过去20年的研究改变了生命的科学观点。', '过去5年的研究有更大的影响力。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '那个人来得有点晚。']
 seq cls result:
-label: entailment   confidence: 0.9125779271125793
+label: neutral   confidence: 0.9880155920982361
 -----------------------------
 ```
 infer_cpu.py 脚本中的参数说明：
@@ -63,19 +63,18 @@ python infer_gpu.py --task_name seq_cls --model_path ../../finetuned_models/expo
 ```
 输出打印如下:
 ```
-input data: ['对成人和儿童来说很有趣。', '只有孩子才会开心。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '我从来没有被告知任何与任何人会面。']
 seq cls result:
-label: entailment   confidence: 0.9821083545684814
+label: contradiction   confidence: 0.932432234287262
 -----------------------------
-input data: ['下一个证人是玛丽·卡文迪什。', '还有另外一个证人。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '我被告知将有一个人被叫进来与我见面。']
 seq cls result:
-label: entailment   confidence: 0.9955698847770691
+label: entailment   confidence: 0.9928724765777588
 -----------------------------
-input data: ['过去20年的研究改变了生命的科学观点。', '过去5年的研究有更大的影响力。']
+input data: ['他们告诉我，呃，我最后会被叫到一个人那里去见面。', '那个人来得有点晚。']
 seq cls result:
-label: entailment   confidence: 0.8629468679428101
+label: neutral   confidence: 0.9880901575088501
 -----------------------------
-{'label': array([0, 0, 0]), 'confidence': array([0.98210835, 0.9955699 , 0.86294687], dtype=float32)}
 ```
 如果需要 FP16 进行加速，可以设置 precision_mode 为 fp16，具体命令为
 ```

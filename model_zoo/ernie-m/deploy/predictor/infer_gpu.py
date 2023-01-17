@@ -52,6 +52,17 @@ def parse_args():
         "than this will be truncated, sequences shorter will be padded.",
     )
     parser.add_argument(
+        "--set_dynamic_shape",
+        action="store_true",
+        help="Whether to automatically set dynamic shape.",
+    )
+    parser.add_argument(
+        "--shape_info_file",
+        default="shape_info.txt",
+        type=str,
+        help="The collected dynamic shape info file.",
+    )
+    parser.add_argument(
         "--precision_mode",
         type=str,
         default="fp32",
@@ -70,9 +81,9 @@ def main():
 
     if args.task_name == "seq_cls":
         text = [
-            ["对成人和儿童来说很有趣。", "只有孩子才会开心。"],
-            ["下一个证人是玛丽·卡文迪什。", "还有另外一个证人。"],
-            ["过去20年的研究改变了生命的科学观点。", "过去5年的研究有更大的影响力。"],
+            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "我从来没有被告知任何与任何人会面。"],
+            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "我被告知将有一个人被叫进来与我见面。"],
+            ["他们告诉我，呃，我最后会被叫到一个人那里去见面。", "那个人来得有点晚。"],
         ]
 
     outputs = predictor.predict(text)

@@ -158,7 +158,7 @@ python run_classifier.py \
     --do_predict \
     --task_type cross-lingual-transfer \
     --model_name_or_path ./finetuned_models \
-    --output_dir ./finetuned_models/
+    --output_dir ./finetuned_models
 ```
 
 预测结果（label）和预测的置信度（confidence）将写入`./finetuned_models/test_results.json`文件。

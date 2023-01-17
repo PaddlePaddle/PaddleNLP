@@ -259,26 +259,17 @@ class ErnieMPredictor(object):
             exit(0)
 
     def seq_cls_preprocess(self, input_data: List[List[str]]):
-        data = [text_pair[0] for text_pair in input_data]
-        text_pair = [text_pair[1] for text_pair in input_data]
         # tokenizer + pad
-        data = self.tokenizer(
-            data,
-            text_pair=text_pair,
+        data = self.tokenizer.batch_encode(
+            input_data,
             max_length=self.max_seq_length,
             padding=True,
             truncation=True,
-            return_position_ids=True,
-            return_attention_mask=True,
             return_token_type_ids=False,
         )
         input_ids = data["input_ids"]
-        # position_ids = data["position_ids"]
-        # attention_mask = data["attention_mask"]
         return {
             "input_ids": np.array(input_ids, dtype="int64"),
-            # "position_ids": np.array(position_ids, dtype="int64"),
-            # "attention_mask": np.array(attention_mask, dtype="int64"),
         }
 
     def seq_cls_postprocess(self, infer_data, input_data):
