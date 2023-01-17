@@ -105,7 +105,7 @@ class ZeroShotTextClassificationTask(Task):
         if self.from_hf_hub:
             model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         else:
-            model_instance = UTC.from_pretrained(model)
+            model_instance = UTC.from_pretrained(self._task_path)
         self._model = model_instance
         self._model.eval()
 
