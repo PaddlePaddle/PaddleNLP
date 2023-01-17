@@ -35,15 +35,9 @@ python seq_cls_infer.py --model_dir ../../best_models/afqmc/export --device gpu 
 
 ```bash
 
-[INFO] fastdeploy/runtime.cc(517)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
-seq cls result:
-label: news_car   confidence: 0.5968493223190308
------------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
-seq cls result:
-label: news_entertainment   confidence: 0.9521995782852173
------------------------------
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
+Batch id:0, example id:0, sentence1:花呗收款额度限制, sentence2:收钱码，对花呗支付的金额有限制吗, label:0, similarity:0.5099
+Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:为什么友付宝不支持花呗付款, label:0, similarity:0.9862
 
 ```
 
@@ -65,7 +59,7 @@ label: news_entertainment   confidence: 0.9521995782852173
 
 ### 快速开始
 
-以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的[ MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的Python预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-3.0/best_models/afqmc/export`（用户可按实际情况设置）。
+以下示例展示如何基于 FastDeploy 库完成 ERNIE 3.0 Medium 模型在 CLUE Benchmark 的[ MSRA_NER 数据集](https://github.com/lemonhu/NER-BERT-pytorch/tree/master/data/msra)上进行序列标注任务的Python预测部署，可通过命令行参数`--device`以及`--backend`指定运行在不同的硬件以及推理引擎后端，并使用`--model_dir`参数指定运行的模型，具体参数设置可查看下面[参数说明](#参数说明)。示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md)导出得到的部署模型，其模型目录为`model_zoo/ernie-3.0/best_models/msra_ner/export`（用户可按实际情况设置）。
 
 
 ```bash

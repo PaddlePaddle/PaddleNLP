@@ -11,16 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include <array>
+#include <iostream>
+#include <sstream>
+#include <vector>
+
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/tokenizers/ernie_fast_tokenizer.h"
 #include "fastdeploy/function/functions.h"
 #include "fastdeploy/runtime.h"
 #include "fastdeploy/utils/path.h"
 #include "gflags/gflags.h"
-#include <array>
-#include <iostream>
-#include <sstream>
-#include <vector>
 
 using namespace paddlenlp;
 using namespace fast_tokenizer::tokenizers_impl;
@@ -32,9 +33,12 @@ const char sep = '/';
 
 DEFINE_string(model_dir, "", "Directory of the inference model.");
 DEFINE_string(vocab_path, "", "Path of the vocab file.");
-DEFINE_string(device, "cpu",
+DEFINE_string(model_prefix, "model", "The model and params file prefix.");
+DEFINE_string(device,
+              "cpu",
               "Type of inference device, support 'cpu' or 'gpu'.");
-DEFINE_string(backend, "paddle",
+DEFINE_string(backend,
+              "paddle",
               "The inference runtime backend, support: ['onnx_runtime', "
               "'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']");
 DEFINE_int32(batch_size, 1, "The batch size of data.");
@@ -81,10 +85,12 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
       option->EnablePaddleTrtCollectShape();
     }
     std::string trt_file = FLAGS_model_dir + sep + "infer.trt";
-    option->SetTrtInputShape("input_ids", {1, 1},
+    option->SetTrtInputShape("input_ids",
+                             {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
-    option->SetTrtInputShape("token_type_ids", {1, 1},
+    option->SetTrtInputShape("token_type_ids",
+                             {1, 1},
                              {FLAGS_batch_size, FLAGS_max_length},
                              {FLAGS_batch_size, FLAGS_max_length});
     if (FLAGS_use_fp16) {
@@ -98,15 +104,19 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
                         << FLAGS_backend << "'" << std::endl;
     return false;
   }
-  std::string model_path = FLAGS_model_dir + sep + "infer.pdmodel";
-  std::string param_path = FLAGS_model_dir + sep + "infer.pdiparams";
+
+  std::string model_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdmodel";
+  std::string param_path =
+      FLAGS_model_dir + sep + FLAGS_model_prefix + ".pdiparams";
   fastdeploy::FDINFO << "model_path = " << model_path
                      << ", param_path = " << param_path << std::endl;
   option->SetModelPath(model_path, param_path);
   return true;
 }
 
-bool BatchFyTexts(const std::vector<std::string>& texts, int batch_size,
+bool BatchFyTexts(const std::vector<std::string>& texts,
+                  int batch_size,
                   std::vector<std::vector<std::string>>* batch_texts) {
   for (int idx = 0; idx < texts.size(); idx += batch_size) {
     int rest = texts.size() - idx;
@@ -193,10 +203,10 @@ struct ErnieForTokenClassificationPredictor {
     for (int i = 0; i < encodings.size(); ++i) {
       auto&& curr_input_ids = encodings[i].GetIds();
       auto&& curr_type_ids = encodings[i].GetTypeIds();
-      std::copy(curr_input_ids.begin(), curr_input_ids.end(),
-                input_ids_ptr + start);
-      std::copy(curr_type_ids.begin(), curr_type_ids.end(),
-                type_ids_ptr + start);
+      std::copy(
+          curr_input_ids.begin(), curr_input_ids.end(), input_ids_ptr + start);
+      std::copy(
+          curr_type_ids.begin(), curr_type_ids.end(), type_ids_ptr + start);
       start += seq_len;
     }
     return true;
@@ -289,11 +299,13 @@ int main(int argc, char* argv[]) {
   uint32_t max_length = FLAGS_max_length;
   ErnieFastTokenizer tokenizer(vocab_path);
   tokenizer.EnableTruncMethod(
-      max_length, 0, fast_tokenizer::core::Direction::RIGHT,
+      max_length,
+      0,
+      fast_tokenizer::core::Direction::RIGHT,
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
 
-  std::vector<std::string> label_list = {"O",     "B-PER", "I-PER", "B-ORG",
-                                         "I-ORG", "B-LOC", "I-LOC"};
+  std::vector<std::string> label_list = {
+      "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"};
   ErnieForTokenClassificationPredictor predictor(option, tokenizer, label_list);
   std::vector<TokenClsResult> token_cls_results;
   std::vector<std::string> texts_ds = {

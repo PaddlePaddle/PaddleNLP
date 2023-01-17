@@ -30,15 +30,15 @@ make -j
 
 运行完成后返回的结果如下：
 ```bash
-[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/seq_cls_infer.cc(103)::CreateRuntimeOption    model_path = ernie-3.0-medium-zh-tnews/infer.pdmodel, param_path = ernie-3.0-medium-zh-tnews/infer.pdiparams
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/seq_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/afqmc/export/model.pdmodel, param_path = ../../../best_models/afqmc/export/model.pdiparams
 [INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
-input data: 未来自动驾驶真的会让酒驾和疲劳驾驶成历史吗？
+input data: 花呗收款额度限制, 收钱码，对花呗支付的金额有限制吗
 seq cls result:
-label: news_car confidence:0.596849
+label: Similar confidence: 0.509855
 -----------------------------
-input data: 黄磊接受华少快问快答，不光智商逆天，情商也不逊黄渤
+input data: 花呗支持高铁票支付吗, 为什么友付宝不支持花呗付款
 seq cls result:
-label: news_entertainment confidence:0.9522
+label: Similar confidence: 0.986198
 -----------------------------
 ```
 
@@ -72,15 +72,11 @@ tar xvf fastdeploy-linux-x64-x.x.x.tgz
 cmake .. -DFASTDEPLOY_INSTALL_DIR=${PWD}/fastdeploy-linux-x64-x.x.x
 make -j
 
-# 下载AFQMC数据集的微调后的ERNIE 3.0模型以及词表
-wget https://bj.bcebos.com/fastdeploy/models/ernie-3.0/ernie-3.0-medium-zh-msra.tgz
-tar xvfz ernie-3.0-medium-zh-msra.tgz
-
 # CPU 推理
-./token_cls_infer_demo --model_dir ernie-3.0-medium-zh-msra --device cpu --backend paddle
+./token_cls_infer_demo --model_dir ../../../best_models/msra/export --device cpu --backend paddle
 
 # GPU 推理
-./token_cls_infer_demo --model_dir ernie-3.0-medium-zh-msra --device gpu --backend paddle
+./token_cls_infer_demo --model_dir ../../../best_models/msra/export --device gpu --backend paddle
 
 ```
 
@@ -88,7 +84,7 @@ tar xvfz ernie-3.0-medium-zh-msra.tgz
 
 ```bash
 
-[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ernie-3.0-medium-zh-msra/infer.pdmodel, param_path = ernie-3.0-medium-zh-msra/infer.pdiparams
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra/export/model.pdmodel, param_path = ../../../best_models/msra/export/model.pdiparams
 [INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
 input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
 The model detects all entities:
