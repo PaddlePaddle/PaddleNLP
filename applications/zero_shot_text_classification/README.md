@@ -1,3 +1,5 @@
+简体中文 | [English](README_en.md)
+
 # 零样本文本分类
 
 **目录**
@@ -27,7 +29,7 @@
 **零样本文本分类应用亮点：**
 
 - **覆盖场景全面🎓：**  覆盖文本分类各类主流任务，支持多任务训练，满足开发者多样文本分类落地需求。
-- **效果领先🏃：**  具有突出分类效果的UTC模型作为训练基座，提供良好的零样本和小样本学习能力。
+- **效果领先🏃：**  具有突出分类效果的UTC模型作为训练基座，提供良好的零样本和小样本学习能力。该模型在[ZeroCLUE](https://www.cluebenchmarks.com/zeroclue.html)和[FewCLUE](https://www.cluebenchmarks.com/fewclue.html)均取得榜首（截止2023年1月11日）。
 - **简单易用：** 通过Taskflow实现三行代码可实现无标注数据的情况下进行快速调用，一行命令即可开启文本分类，轻松完成部署上线，降低多任务文本分类落地门槛。
 - **高效调优✊：** 开发者无需机器学习背景知识，即可轻松上手数据标注及模型训练流程。
 
@@ -156,7 +158,9 @@ python -u -m paddle.distributed.launch --gpus "0,1" run_train.py \
 * `seed`：全局随机种子，默认为 42。
 * `model_name_or_path`：进行 few shot 训练使用的预训练模型。默认为 "utc-large"。
 * `output_dir`：必须，模型训练或压缩后保存的模型目录；默认为 `None` 。
-* `dev_path`：开发集路径；默认为 `None` 。
+* `dataset_path`：数据集文件所在目录；默认为 `./data/` 。
+* `train_file`：训练集后缀；默认为 `train.txt` 。
+* `dev_file`：开发集后缀；默认为 `dev.txt` 。
 * `max_seq_len`：文本最大切分长度，包括标签的输入超过最大长度时会对输入文本进行自动切分，标签部分不可切分，默认为512。
 * `per_device_train_batch_size`:用于训练的每个 GPU 核心/CPU 的batch大小，默认为8。
 * `per_device_eval_batch_size`:用于评估的每个 GPU 核心/CPU 的batch大小，默认为8。
