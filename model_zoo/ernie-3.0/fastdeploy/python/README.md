@@ -71,10 +71,10 @@ label: news_entertainment   confidence: 0.9521995782852173
 ```bash
 
 # CPU 推理
-python token_cls_infer.py --model_dir ../../best_models/afqmc/export --device cpu --backend paddle
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/export/ --device cpu --backend paddle
 
 # GPU 推理
-python token_cls_infer.py --model_dir ../../best_models/afqmc/export --device gpu --backend paddle
+python token_cls_infer.py --model_dir ../../best_models/msra_ner/export/ --device gpu --backend paddle
 
 ```
 
@@ -112,6 +112,8 @@ entity: 姚明   label: PER   pos: [10, 11]
 |--backend | 支持的推理后端，可选范围: ['onnx_runtime', 'paddle', 'openvino', 'tensorrt', 'paddle_tensorrt']，默认为'paddle' |
 |--use_fp16 | 是否使用FP16模式进行推理。使用tensorrt和paddle_tensorrt后端时可开启，默认为False |
 |--use_fast| 是否使用FastTokenizer加速分词阶段。默认为True|
+|--model_prefix| 模型文件前缀。前缀会分别与'.pdmodel'和'.pdiparams'拼接得到模型文件名和参数文件名。默认为 'model'|
+
 
 ## FastDeploy 高阶用法
 

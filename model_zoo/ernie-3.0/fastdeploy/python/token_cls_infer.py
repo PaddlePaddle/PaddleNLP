@@ -26,6 +26,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", required=True, help="The directory of model.")
     parser.add_argument("--vocab_path", type=str, default="", help="The path of tokenizer vocab.")
+    parser.add_argument("--model_prefix", type=str, default="model", help="The model and params file prefix.")
     parser.add_argument(
         "--device",
         type=str,
@@ -72,8 +73,8 @@ class ErnieForTokenClassificationPredictor(object):
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
-        model_path = os.path.join(args.model_dir, "infer.pdmodel")
-        params_path = os.path.join(args.model_dir, "infer.pdiparams")
+        model_path = os.path.join(args.model_dir, args.model_prefix + ".pdmodel")
+        params_path = os.path.join(args.model_dir, args.model_prefix + ".pdiparams")
         option.set_model_path(model_path, params_path)
         if args.device == "cpu":
             option.use_cpu()
