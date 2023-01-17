@@ -43,6 +43,6 @@ jobs:
           working-directory: ./fast_tokenizer
           run: make fast_tokenizer_python_compile
         - name: test
-          working-directory: ./fast_tokenizer
+          working-directory: ./fast_tokenizer/build_py
           run: make fast_tokenizer_python_test
   

@@ -16,15 +16,14 @@ fast_tokenizer_cpp_compile:
 .PHONY: fast_tokenizer_cpp_test
 
 fast_tokenizer_cpp_test:
-	cd build_cpp/fast_tokenizer/test && \
-	bash ../../../run_fast_tokenizer_cpp_test.sh
+	bash run_fast_tokenizer_cpp_test.sh build_cpp/fast_tokenizer/test
 
 # Compile and test for fast_tokenizer python library
 
 .PHONY: fast_tokenizer_python_install
 
 fast_tokenizer_python_install:
-	pip install numpy wheel paddlepaddle ..
+	pip install numpy wheel pytest paddlepaddle ..
 
 .PHONY: fast_tokenizer_python_compile
 
@@ -36,4 +35,4 @@ fast_tokenizer_python_compile:
 .PHONY: fast_tokenizer_python_test
 
 fast_tokenizer_python_test:
-	pip install dist/*whl && cd python/tests/ && python3 -m unittest test_*
+	pip install dist/*whl && pytest python/tests

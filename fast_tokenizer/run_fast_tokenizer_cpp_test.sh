@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
- for testcase in `ls ${PWD}`; do
-     if [[ "${testcase}" == "test"* ]]; then
-         ${PWD}/${testcase}
-         if [ $? -ne 0 ]; then
-             exit -1
-         fi
-     fi
- done
+cd ${PWD}/$1
+
+for testcase in `ls ${TEST_DIR}`; do
+    if [[ "${testcase}" == "test"* ]]; then
+        ${PWD}/${testcase}
+        if [ $? -ne 0 ]; then
+            exit -1
+        fi
+    fi
+done
