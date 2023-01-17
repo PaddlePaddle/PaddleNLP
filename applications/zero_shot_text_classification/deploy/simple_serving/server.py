@@ -17,7 +17,7 @@ from paddlenlp import SimpleServer, Taskflow
 # The schema changed to your defined schema
 schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
 # The task path changed to your best model path
-utc = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/", schema=schema)
+utc = Taskflow("zero_shot_text_classification", task_path="../../checkpoint/model_best/plm", schema=schema)
 # If you want to define the finetuned utc service
 app = SimpleServer()
 app.register_taskflow("taskflow/utc", utc)
