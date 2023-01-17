@@ -77,7 +77,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
     return true;
   } else {
     fastdeploy::FDERROR << "The avilable device should be one of the list "
-                           "['cpu', 'gpu']. But receive '"
+                           "['cpu', 'gpu', 'kunlunxin']. But receive '"
                         << FLAGS_device << "'" << std::endl;
     return false;
   }
@@ -253,14 +253,6 @@ struct ErnieForTokenClassificationPredictor {
           label_name = curr_label.substr(2);
         }
       }
-      if (start >= 0) {
-        convertor.convert({start, seq_len}, &curr_offset);
-        items.emplace_back(typename TokenClsResult::TokenResult{
-            "",
-            texts[i].substr(curr_offset.first,
-                            curr_offset.second - curr_offset.first),
-            {start, seq_len - 1}});
-      }
       (*results)[i].token_results = std::move(items);
     }
     return true;
@@ -309,7 +301,7 @@ int main(int argc, char* argv[]) {
       fast_tokenizer::core::TruncStrategy::LONGEST_FIRST);
 
   std::vector<std::string> label_list = {
-      "O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"};
+      "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "O"};
   ErnieForTokenClassificationPredictor predictor(option, tokenizer, label_list);
   std::vector<TokenClsResult> token_cls_results;
   std::vector<std::string> texts_ds = {

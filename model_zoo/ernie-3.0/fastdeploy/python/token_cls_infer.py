@@ -69,7 +69,7 @@ class ErnieForTokenClassificationPredictor(object):
         self.runtime = self.create_fd_runtime(args)
         self.batch_size = args.batch_size
         self.max_length = args.max_length
-        self.label_names = ["O", "B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC"]
+        self.label_names = ["B-PER", "I-PER", "B-ORG", "I-ORG", "B-LOC", "I-LOC", "O"]
 
     def create_fd_runtime(self, args):
         option = fd.RuntimeOption()
@@ -153,14 +153,6 @@ class ErnieForTokenClassificationPredictor(object):
                 if "B-" in self.label_names[label]:
                     start = i - 1
                     label_name = self.label_names[label][2:]
-            if start >= 0:
-                items.append(
-                    {
-                        "pos": [start, len(token_label) - 1],
-                        "entity": input_data[batch][start : len(token_label) - 1],
-                        "label": "",
-                    }
-                )
             value.append(items)
 
         out_dict = {"value": value, "tokens_label": tokens_label}

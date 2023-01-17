@@ -76,7 +76,7 @@ bool CreateRuntimeOption(fastdeploy::RuntimeOption* option) {
     option->UseCpu();
   } else {
     fastdeploy::FDERROR << "The avilable device should be one of the list "
-                           "['cpu', 'gpu']. But receive '"
+                           "['cpu', 'gpu', 'kunlunxin']. But receive '"
                         << FLAGS_device << "'" << std::endl;
     return false;
   }
