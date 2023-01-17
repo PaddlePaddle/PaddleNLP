@@ -13,6 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
+import os
 from typing import Any, Dict, List, Union
 
 import numpy as np
@@ -21,6 +23,7 @@ from paddle.static import InputSpec
 from paddlenlp.prompt import PromptDataCollatorWithPadding, UTCTemplate
 from paddlenlp.transformers import UTC, AutoTokenizer
 
+from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from .task import Task
 from .utils import static_mode_guard
 
@@ -54,6 +57,30 @@ class ZeroShotTextClassificationTask(Task):
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json",
     }
+    resource_files_urls = {
+        "utc-large": {
+            "model_state": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_shot_text_classification/utc-large/model_state.pdparams",
+                "71eb9a732c743a513b84ca048dc4945b",
+            ],
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_shot_text_classification/utc-large/config.json",
+                "9496be2cc99f7e6adf29280320274142",
+            ],
+            "vocab_file": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/vocab.txt",
+                "afc01b5680a53525df5afd7518b42b48",
+            ],
+            "special_tokens_map": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/special_tokens_map.json",
+                "2458e2131219fc1f84a6e4843ae07008",
+            ],
+            "tokenizer_config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/zero_text_classification/utc-large/tokenizer_config.json",
+                "dcb0f3257830c0eb1f2de47f2d86f89a",
+            ],
+        },
+    }
 
     def __init__(self, task: str, model: str = "utc-large", schema: list = None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
@@ -63,6 +90,17 @@ class ZeroShotTextClassificationTask(Task):
         self._batch_size = kwargs.get("batch_size", 1)
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
         self._num_workers = kwargs.get("num_workers", 0)
+
+        if os.path.exists(os.path.join(self._task_path, LEGACY_CONFIG_NAME)):
+            if "config" in self.resource_files_names.keys():
+                del self.resource_files_names["config"]
+            with open(os.path.join(self._task_path, LEGACY_CONFIG_NAME)) as f:
+                self._init_class = json.load(f)["init_class"]
+            self._check_task_files()
+        else:
+            self._check_task_files()
+            with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
+                self._init_class = json.load(f)["architectures"].pop()
 
         self._construct_tokenizer()
         self._check_predictor_type()
