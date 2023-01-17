@@ -24,9 +24,7 @@ fast_tokenizer_cpp_test:
 .PHONY: fast_tokenizer_python_install
 
 fast_tokenizer_python_install:
-	pip install numpy wheel paddlepaddle
-	python3 setup.py sdist bdist_wheel
-	pip install dist/*whl
+	pip install numpy wheel paddlepaddle ..
 
 .PHONY: fast_tokenizer_python_compile
 
