@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
-import os
 from typing import Any, Dict, List, Union
 
 import numpy as np
@@ -23,7 +21,6 @@ from paddle.static import InputSpec
 from paddlenlp.prompt import PromptDataCollatorWithPadding, UTCTemplate
 from paddlenlp.transformers import UTC, AutoTokenizer
 
-from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from .task import Task
 from .utils import static_mode_guard
 
@@ -91,17 +88,7 @@ class ZeroShotTextClassificationTask(Task):
         self._pred_threshold = kwargs.get("pred_threshold", 0.5)
         self._num_workers = kwargs.get("num_workers", 0)
 
-        if os.path.exists(os.path.join(self._task_path, LEGACY_CONFIG_NAME)):
-            if "config" in self.resource_files_names.keys():
-                del self.resource_files_names["config"]
-            with open(os.path.join(self._task_path, LEGACY_CONFIG_NAME)) as f:
-                self._init_class = json.load(f)["init_class"]
-            self._check_task_files()
-        else:
-            self._check_task_files()
-            with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
-                self._init_class = json.load(f)["architectures"].pop()
-
+        self._check_task_files()
         self._construct_tokenizer()
         self._check_predictor_type()
         self._get_inference_model()
@@ -140,10 +127,7 @@ class ZeroShotTextClassificationTask(Task):
         """
         Construct the inference model for the predictor.
         """
-        if self.from_hf_hub:
-            model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
-        else:
-            model_instance = UTC.from_pretrained(self._task_path)
+        model_instance = UTC.from_pretrained(self._task_path, from_hf_hub=self.from_hf_hub)
         self._model = model_instance
         self._model.eval()
 
