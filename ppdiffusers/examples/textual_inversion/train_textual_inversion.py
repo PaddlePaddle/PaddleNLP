@@ -14,63 +14,106 @@
 # limitations under the License.
 
 import argparse
+import contextlib
 import glob
-import itertools
 import math
 import os
 import random
+import sys
 from pathlib import Path
 
 import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
-import PIL
+from paddle.distributed.fleet.utils.hybrid_parallel_util import (
+    fused_allreduce_gradients,
+)
 from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
+from paddle.optimizer import AdamW
+from paddle.vision.transforms import RandomHorizontalFlip
 from PIL import Image
+from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
-from paddlenlp.utils.tools import compare_version
 from ppdiffusers import (
     AutoencoderKL,
     DDPMScheduler,
-    StableDiffusionPipeline,
+    DiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unwrap_model
+from ppdiffusers.modeling_utils import freeze_params, unfreeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
-
-if compare_version(PIL.__version__, "9.1.0") >= 0:
-    Resampling = PIL.Image.Resampling
-else:
-    Resampling = PIL.Image
-from paddle.optimizer import AdamW
-from paddle.vision.transforms import RandomHorizontalFlip
-from tqdm.auto import tqdm
-
-from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from ppdiffusers.utils import PIL_INTERPOLATION
 
 
-def get_writer(args):
-    if args.writer_type == "visualdl":
+def url_or_path_join(*path_list):
+    return os.path.join(*path_list) if os.path.isdir(os.path.join(*path_list)) else "/".join(path_list)
+
+
+def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: str):
+    pipeline_config = DiffusionPipeline.load_config(pretrained_model_name_or_path)
+    model_class = pipeline_config.get("text_encoder", pipeline_config.get("bert"))[-1]
+
+    if model_class == "CLIPTextModel":
+        from paddlenlp.transformers import CLIPTextModel
+
+        return CLIPTextModel
+    elif model_class == "RobertaSeriesModelWithTransformation":
+        from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
+            RobertaSeriesModelWithTransformation,
+        )
+
+        return RobertaSeriesModelWithTransformation
+    elif model_class == "LDMBertModel":
+        from ppdiffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import (
+            LDMBertModel,
+        )
+
+        return LDMBertModel
+    elif model_class == "BertModel":
+        from paddlenlp.transformers import BertModel
+
+        return BertModel
+    else:
+        raise ValueError(f"{model_class} is not supported.")
+
+
+def set_recompute(model, value=False):
+    def fn(layer):
+        # ldmbert
+        if hasattr(layer, "enable_recompute"):
+            layer.enable_recompute = value
+            print("Set", layer.__class__, "recompute", layer.enable_recompute)
+        # unet
+        if hasattr(layer, "gradient_checkpointing"):
+            layer.gradient_checkpointing = value
+            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+
+    model.apply(fn)
+
+
+def get_report_to(args):
+    if args.report_to == "visualdl":
         from visualdl import LogWriter
 
         writer = LogWriter(logdir=args.logging_dir)
-    elif args.writer_type == "tensorboard":
+    elif args.report_to == "tensorboard":
         from tensorboardX import SummaryWriter
 
         writer = SummaryWriter(logdir=args.logging_dir)
     else:
-        raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
+        raise ValueError("report_to must be in ['visualdl', 'tensorboard']")
     return writer
 
 
-def save_progress(text_encoder, placeholder_token_id, args):
+def save_progress(text_encoder, placeholder_token_id, args, save_path):
     logger.info("Saving embeddings")
     learned_embeds = unwrap_model(text_encoder).get_input_embeddings().weight[placeholder_token_id]
-    learned_embeds_dict = {args.placeholder_token: learned_embeds.detach().cpu()}
-    paddle.save(learned_embeds_dict, os.path.join(args.output_dir, "learned_embeds.pdparams"))
+    learned_embeds_dict = {args.placeholder_token: learned_embeds.detach()}
+    paddle.save(learned_embeds_dict, save_path)
 
 
 def parse_args():
@@ -82,9 +125,15 @@ def parse_args():
         help="Save learned_embeds.pdparams every X updates steps.",
     )
     parser.add_argument(
+        "--only_save_embeds",
+        action="store_true",
+        default=False,
+        help="Save only the embeddings for the new concept.",
+    )
+    parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="CompVis/stable-diffusion-v1-4",
+        default=None,
         required=True,
         help="Path to pretrained model or model identifier from local models.",
     )
@@ -154,6 +203,11 @@ def parse_args():
         help="Number of updates steps to accumulate before performing a backward/update pass.",
     )
     parser.add_argument(
+        "--gradient_checkpointing",
+        action="store_true",
+        help="Whether or not to use gradient checkpointing to save memory at the expense of slower backward pass.",
+    )
+    parser.add_argument(
         "--learning_rate",
         type=float,
         default=1e-4,
@@ -162,7 +216,7 @@ def parse_args():
     parser.add_argument(
         "--scale_lr",
         action="store_true",
-        default=True,
+        default=False,
         help="Scale the learning rate by the number of GPUs, gradient accumulation steps, and batch size.",
     )
     parser.add_argument(
@@ -177,11 +231,18 @@ def parse_args():
     parser.add_argument(
         "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
     )
+    parser.add_argument(
+        "--lr_num_cycles",
+        type=int,
+        default=1,
+        help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
+    )
+    parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
     parser.add_argument("--adam_epsilon", type=float, default=1e-08, help="Epsilon value for the Adam optimizer")
-    parser.add_argument("--max_grad_norm", default=None, type=float, help="Max gradient norm.")
+    parser.add_argument("--max_grad_norm", default=-1, type=float, help="Max gradient norm.")
 
     parser.add_argument(
         "--logging_dir",
@@ -193,7 +254,13 @@ def parse_args():
         ),
     )
     parser.add_argument(
-        "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
+        "--report_to",
+        type=str,
+        default="visualdl",
+        help=(
+            'The integration to report the results and logs to. Supported platforms are `"visualdl"`'
+            ' (default), `"tensorboard"`.'
+        ),
     )
     parser.add_argument("--language", default="en", choices=["en", "zh", "zh_en"], help="Model language.")
 
@@ -346,10 +413,10 @@ class TextualInversionDataset(Dataset):
             self._length = self.num_images * repeats
 
         self.interpolation = {
-            "linear": Resampling.BILINEAR,
-            "bilinear": Resampling.BILINEAR,
-            "bicubic": Resampling.BICUBIC,
-            "lanczos": Resampling.LANCZOS,
+            "linear": PIL_INTERPOLATION["linear"],
+            "bilinear": PIL_INTERPOLATION["bilinear"],
+            "bicubic": PIL_INTERPOLATION["bicubic"],
+            "lanczos": PIL_INTERPOLATION["lanczos"],
         }[interpolation]
 
         self.templates = []
@@ -381,9 +448,10 @@ class TextualInversionDataset(Dataset):
 
         example["input_ids"] = self.tokenizer(
             text,
-            padding="do_not_pad",
+            padding="max_length",
             truncation=True,
             max_length=self.tokenizer.model_max_length,
+            return_attention_mask=False,
         ).input_ids
 
         # default to score-sde preprocessing
@@ -411,6 +479,7 @@ class TextualInversionDataset(Dataset):
 def main():
     args = parse_args()
     rank = paddle.distributed.get_rank()
+    is_main_process = rank == 0
     num_processes = paddle.distributed.get_world_size()
     if num_processes > 1:
         paddle.distributed.init_parallel_env()
@@ -420,14 +489,18 @@ def main():
         seed = args.seed + rank
         set_seed(seed)
 
-    if args.output_dir is not None:
-        os.makedirs(args.output_dir, exist_ok=True)
+    if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
 
-    # Load the tokenizer and add the placeholder token as a additional special token
+    # Load tokenizer
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
+        # support windows "\"
+        tokenizer = AutoTokenizer.from_pretrained(url_or_path_join(args.pretrained_model_name_or_path, "tokenizer"))
+    # Load scheduler and models
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
 
     # Add the placeholder token in tokenizer
     num_added_tokens = tokenizer.add_tokens(args.placeholder_token)
@@ -438,20 +511,22 @@ def main():
         )
 
     # Convert the initializer_token, placeholder_token to ids
-    token_ids = tokenizer.encode(args.initializer_token, add_special_tokens=False)["input_ids"]
-    # Check if initializer_token is a single token or a sequence of tokens
-    if len(token_ids) > 1:
-        raise ValueError("The initializer token must be a single token.")
+    initializer_token_ids = tokenizer.encode(args.initializer_token, add_special_tokens=False)["input_ids"]
+    if len(initializer_token_ids) < 1:
+        raise ValueError("The initializer token must be a greater equal than one.")
 
-    initializer_token_id = token_ids[0]
     placeholder_token_id = tokenizer.convert_tokens_to_ids(args.placeholder_token)
 
-    # Load models and create wrapper for stable diffusion
-    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
-        model_cls = BertModel
+    text_encoder_cls = import_model_class_from_model_name_or_path(args.pretrained_model_name_or_path)
+
+    text_encoder = text_encoder_cls.from_pretrained(
+        url_or_path_join(args.pretrained_model_name_or_path, "text_encoder")
+    )
+    text_config = text_encoder.config if isinstance(text_encoder.config, dict) else text_encoder.config.to_dict()
+    if text_config.get("use_attention_mask", None) is not None and text_config["use_attention_mask"]:
+        use_attention_mask = True
     else:
-        model_cls = CLIPTextModel
-    text_encoder = model_cls.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
+        use_attention_mask = False
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae")
     unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
 
@@ -461,60 +536,48 @@ def main():
     # Initialise the newly added placeholder token with the embeddings of the initializer token
     with paddle.no_grad():
         token_embeds = text_encoder.get_input_embeddings()
-        token_embeds.weight[placeholder_token_id] = token_embeds.weight[initializer_token_id]
+        # we will compute mean
+        token_embeds.weight[placeholder_token_id] = paddle.stack(
+            [token_embeds.weight[each] for each in initializer_token_ids]
+        ).mean(0)
 
     # Freeze vae and unet
     freeze_params(vae.parameters())
     freeze_params(unet.parameters())
-
     # Freeze all parameters except for the token embeddings in text encoder
-    if isinstance(text_encoder, BertModel):
-        # bert text_encoder
-        params_to_freeze = itertools.chain(
-            text_encoder.encoder.parameters(),
-            text_encoder.pooler.parameters(),
-            text_encoder.embeddings.position_embeddings.parameters(),
-            text_encoder.embeddings.token_type_embeddings.parameters(),
-            text_encoder.embeddings.layer_norm.parameters(),
-        )
-    else:
-        # clip text_encoder
-        params_to_freeze = itertools.chain(
-            text_encoder.text_model.transformer.parameters(),
-            text_encoder.text_model.ln_final.parameters(),
-            text_encoder.text_model.positional_embedding.parameters(),
-        )
-    freeze_params(params_to_freeze)
+    freeze_params(text_encoder.parameters())
+    unfreeze_params(text_encoder.get_input_embeddings().parameters())
+
+    if args.gradient_checkpointing:
+        unet.enable_gradient_checkpointing()
+        set_recompute(text_encoder, True)
 
     if args.scale_lr:
         args.learning_rate = (
             args.learning_rate * args.gradient_accumulation_steps * args.train_batch_size * num_processes
         )
-
+    # Initialize the lr_scheduler
     lr_scheduler = get_scheduler(
         args.lr_scheduler,
         learning_rate=args.learning_rate,
         num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
         num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
+        num_cycles=args.lr_num_cycles,
+        power=args.lr_power,
     )
-
-    if num_processes > 1:
-        text_encoder = paddle.DataParallel(text_encoder)
-
     # Initialize the optimizer
     optimizer = AdamW(
         learning_rate=lr_scheduler,
-        parameters=unwrap_model(text_encoder).get_input_embeddings().parameters(),
+        parameters=text_encoder.get_input_embeddings().parameters(),  # only optimize the embeddings
         beta1=args.adam_beta1,
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
         epsilon=args.adam_epsilon,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm is not None else None,
+        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
 
-    noise_scheduler = DDPMScheduler(
-        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
-    )
+    if num_processes > 1:
+        text_encoder = paddle.DataParallel(text_encoder)
 
     train_dataset = TextualInversionDataset(
         data_root=args.train_data_dir,
@@ -527,6 +590,7 @@ def main():
         center_crop=args.center_crop,
         set="train",
         language=args.language,
+        interpolation="bicubic",
     )
 
     def collate_fn(examples):
@@ -562,15 +626,15 @@ def main():
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if rank == 0:
+    if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
         for arg, value in sorted(vars(args).items()):
             logger.info("%s: %s" % (arg, value))
         logger.info("------------------------------------------------")
-        writer = get_writer(args)
+        writer = get_report_to(args)
 
     # Train!
-    total_batch_size = args.train_batch_size * args.gradient_accumulation_steps
+    total_batch_size = args.train_batch_size * num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -579,16 +643,18 @@ def main():
     logger.info(f"  Total train batch size (w. parallel, distributed & accumulation) = {total_batch_size}")
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
+
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(range(args.max_train_steps), disable=rank > 0)
     progress_bar.set_description("Train Steps")
     global_step = 0
 
-    text_encoder_embedding_clone = unwrap_model(text_encoder).get_input_embeddings().weight.clone()
+    # keep original embeddings as reference
+    orig_embeds_params = unwrap_model(text_encoder).get_input_embeddings().weight.clone()
 
     # Keep vae and unet in eval model as we don't train these
     vae.eval()
-    unet.eval()
+    unet.train()
     text_encoder.train()
 
     for epoch in range(args.num_train_epochs):
@@ -601,71 +667,98 @@ def main():
             noise = paddle.randn(latents.shape)
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
-            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).astype("int64")
+            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
 
             # Add noise to the latents according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
             noisy_latents = noise_scheduler.add_noise(latents, noise, timesteps)
 
-            # Get the text embedding for conditioning
-            attention_mask = paddle.ones_like(batch["input_ids"])
-            encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
-            # Predict the noise residual
-            noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
-
-            loss = F.mse_loss(noise_pred, noise, reduction="none").mean([1, 2, 3]).mean()
-            if args.gradient_accumulation_steps > 1:
-                loss = loss / args.gradient_accumulation_steps
-            loss.backward()
-
-            with paddle.no_grad():
-                # Get the index for tokens that we want to zero the grads for
-                index_grads_to_zero = (
-                    (paddle.arange(len(tokenizer)) == placeholder_token_id).astype("float32").unsqueeze(-1)
+            if num_processes > 1 and (
+                args.gradient_checkpointing or ((step + 1) % args.gradient_accumulation_steps != 0)
+            ):
+                # grad acc, no_sync when (step + 1) % args.gradient_accumulation_steps != 0:
+                # gradient_checkpointing, no_sync every where
+                # gradient_checkpointing + grad_acc, no_sync every where
+                unet_ctx_manager = unet.no_sync()
+                text_encoder_ctx_manager = text_encoder.no_sync()
+            else:
+                unet_ctx_manager = contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
+                text_encoder_ctx_manager = (
+                    contextlib.nullcontext() if sys.version_info >= (3, 7) else contextlib.suppress()
                 )
-                unwrap_model(text_encoder).get_input_embeddings().weight.grad = (
-                    unwrap_model(text_encoder).get_input_embeddings().weight.grad * index_grads_to_zero
-                )
+
+            with text_encoder_ctx_manager:
+                # Get the text embedding for conditioning
+                if use_attention_mask:
+                    attention_mask = (batch["input_ids"] != tokenizer.pad_token_id).cast("int64")
+                else:
+                    attention_mask = None
+                encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
+
+                with unet_ctx_manager:
+                    # Predict the noise or sample
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                    # Get the target for loss depending on the prediction type
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        target = noise
+                    elif noise_scheduler.config.prediction_type == "v_prediction":
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
+                    loss = F.mse_loss(model_pred, target, reduction="mean")
+
+                    if args.gradient_accumulation_steps > 1:
+                        loss = loss / args.gradient_accumulation_steps
+                    loss.backward()
 
             if (step + 1) % args.gradient_accumulation_steps == 0:
+                if num_processes > 1 and args.gradient_checkpointing:
+                    fused_allreduce_gradients(unet.parameters(), None)
                 optimizer.step()
-                with paddle.no_grad():
-                    unwrap_model(text_encoder).get_input_embeddings().weight[:-1] = text_encoder_embedding_clone[:-1]
-
                 lr_scheduler.step()
                 optimizer.clear_grad()
+                # Let's make sure we don't update any embedding weights besides the newly added token
+                with paddle.no_grad():
+                    index_no_updates = paddle.arange(len(tokenizer)) != placeholder_token_id
+                    unwrap_model(text_encoder).get_input_embeddings().weight[index_no_updates] = orig_embeds_params[
+                        index_no_updates
+                    ]
+
                 progress_bar.update(1)
                 global_step += 1
+                step_loss = loss.item() * args.gradient_accumulation_steps
                 logs = {
                     "epoch": str(epoch).zfill(4),
-                    "step_loss": round(loss.item() * args.gradient_accumulation_steps, 10),
+                    "step_loss": round(step_loss, 10),
                     "lr": lr_scheduler.get_lr(),
                 }
                 progress_bar.set_postfix(**logs)
-                if rank == 0:
+                if is_main_process:
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
                         writer.add_scalar(f"train/{name}", val, step=global_step)
 
                     if global_step % args.save_steps == 0:
-                        save_progress(text_encoder, placeholder_token_id, args)
+                        save_path = os.path.join(args.output_dir, f"learned_embeds-steps-{global_step}.pdparams")
+                        save_progress(text_encoder, placeholder_token_id, args, save_path)
 
             if global_step >= args.max_train_steps:
                 break
 
-    if rank == 0:
+    if is_main_process:
         writer.close()
-        # Create the pipeline using using the trained modules and save it.
-        pipeline = StableDiffusionPipeline.from_pretrained(
-            args.pretrained_model_name_or_path,
-            text_encoder=unwrap_model(text_encoder),
-            safety_checker=None,
-            tokenizer=tokenizer,
-        )
-        pipeline.save_pretrained(args.output_dir)
-        # Also save the newly trained embeddings
-        save_progress(text_encoder, placeholder_token_id, args)
+        if not args.only_save_embeds:
+            pipeline = DiffusionPipeline.from_pretrained(
+                args.pretrained_model_name_or_path,
+                text_encoder=unwrap_model(text_encoder),
+                tokenizer=tokenizer,
+            )
+            pipeline.save_pretrained(args.output_dir)
+        # Save the newly trained embeddings
+        save_path = os.path.join(args.output_dir, "learned_embeds.pdparams")
+        save_progress(text_encoder, placeholder_token_id, args, save_path)
 
 
 if __name__ == "__main__":

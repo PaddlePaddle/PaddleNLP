@@ -20,6 +20,7 @@ import itertools
 import math
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import paddle
@@ -35,16 +36,62 @@ from PIL import Image
 from tqdm.auto import tqdm
 
 from paddlenlp.trainer import set_seed
-from paddlenlp.transformers import AutoTokenizer, BertModel, CLIPTextModel
+from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
 from ppdiffusers import (
     AutoencoderKL,
     DDPMScheduler,
-    StableDiffusionPipeline,
+    DiffusionPipeline,
     UNet2DConditionModel,
 )
 from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
+
+
+def url_or_path_join(*path_list):
+    return os.path.join(*path_list) if os.path.isdir(os.path.join(*path_list)) else "/".join(path_list)
+
+
+def import_model_class_from_model_name_or_path(pretrained_model_name_or_path: str):
+    pipeline_config = DiffusionPipeline.load_config(pretrained_model_name_or_path)
+    model_class = pipeline_config.get("text_encoder", pipeline_config.get("bert"))[-1]
+
+    if model_class == "CLIPTextModel":
+        from paddlenlp.transformers import CLIPTextModel
+
+        return CLIPTextModel
+    elif model_class == "RobertaSeriesModelWithTransformation":
+        from ppdiffusers.pipelines.alt_diffusion.modeling_roberta_series import (
+            RobertaSeriesModelWithTransformation,
+        )
+
+        return RobertaSeriesModelWithTransformation
+    elif model_class == "LDMBertModel":
+        from ppdiffusers.pipelines.latent_diffusion.pipeline_latent_diffusion import (
+            LDMBertModel,
+        )
+
+        return LDMBertModel
+    elif model_class == "BertModel":
+        from paddlenlp.transformers import BertModel
+
+        return BertModel
+    else:
+        raise ValueError(f"{model_class} is not supported.")
+
+
+def set_recompute(model, value=False):
+    def fn(layer):
+        # ldmbert
+        if hasattr(layer, "enable_recompute"):
+            layer.enable_recompute = value
+            print("Set", layer.__class__, "recompute", layer.enable_recompute)
+        # unet
+        if hasattr(layer, "gradient_checkpointing"):
+            layer.gradient_checkpointing = value
+            print("Set", layer.__class__, "recompute", layer.gradient_checkpointing)
+
+    model.apply(fn)
 
 
 def parse_args(input_args=None):
@@ -58,7 +105,7 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--pretrained_model_name_or_path",
         type=str,
-        default="CompVis/stable-diffusion-v1-4",
+        default=None,
         required=True,
         help="Path to pretrained model or model identifier from huggingface.co/models.",
     )
@@ -86,6 +133,7 @@ def parse_args(input_args=None):
         "--instance_prompt",
         type=str,
         default=None,
+        required=True,
         help="The prompt with identifier specifying the instance",
     )
     parser.add_argument(
@@ -106,8 +154,8 @@ def parse_args(input_args=None):
         type=int,
         default=100,
         help=(
-            "Minimal class images for prior preservation loss. If not have enough images, additional images will be"
-            " sampled with class_prompt."
+            "Minimal class images for prior preservation loss. If there are not enough images already present in"
+            " class_data_dir, additional images will be sampled with class_prompt."
         ),
     )
     parser.add_argument(
@@ -138,12 +186,16 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--center_crop", action="store_true", help="Whether to center crop images before resizing to resolution"
     )
-    parser.add_argument("--train_text_encoder", action="store_true", help="Whether to train the text encoder")
+    parser.add_argument(
+        "--train_text_encoder",
+        action="store_true",
+        help="Whether to train the text encoder. If set, the text encoder should be float32 precision.",
+    )
     parser.add_argument(
         "--train_batch_size", type=int, default=4, help="Batch size (per device) for the training dataloader."
     )
     parser.add_argument(
-        "--sample_batch_size", type=int, default=1, help="Batch size (per device) for sampling images."
+        "--sample_batch_size", type=int, default=4, help="Batch size (per device) for sampling images."
     )
     parser.add_argument("--num_train_epochs", type=int, default=1)
     parser.add_argument(
@@ -187,6 +239,13 @@ def parse_args(input_args=None):
     parser.add_argument(
         "--lr_warmup_steps", type=int, default=500, help="Number of steps for the warmup in the lr scheduler."
     )
+    parser.add_argument(
+        "--lr_num_cycles",
+        type=int,
+        default=1,
+        help="Number of hard resets of the lr in cosine_with_restarts scheduler.",
+    )
+    parser.add_argument("--lr_power", type=float, default=1.0, help="Power factor of the polynomial scheduler.")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
@@ -203,7 +262,7 @@ def parse_args(input_args=None):
         ),
     )
     parser.add_argument(
-        "--writer_type", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
+        "--report_to", type=str, default="visualdl", choices=["tensorboard", "visualdl"], help="Log writer type."
     )
 
     if input_args is not None:
@@ -219,8 +278,14 @@ def parse_args(input_args=None):
             raise ValueError("You must specify a data directory for class images.")
         if args.class_prompt is None:
             raise ValueError("You must specify prompt for class images.")
-    args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
+    else:
+        # logger is not available yet
+        if args.class_data_dir is not None:
+            warnings.warn("You need not use --class_data_dir without --with_prior_preservation.")
+        if args.class_prompt is not None:
+            warnings.warn("You need not use --class_prompt without --with_prior_preservation.")
 
+    args.logging_dir = os.path.join(args.output_dir, args.logging_dir)
     return args
 
 
@@ -240,6 +305,7 @@ class DreamBoothDataset(Dataset):
         height=512,
         width=512,
         center_crop=False,
+        interpolation="bilinear",
     ):
         self.height = height
         self.width = width
@@ -273,7 +339,7 @@ class DreamBoothDataset(Dataset):
 
         self.image_transforms = transforms.Compose(
             [
-                transforms.Resize((height, width), interpolation="bilinear"),
+                transforms.Resize((height, width), interpolation=interpolation),
                 transforms.CenterCrop((height, width)) if center_crop else transforms.RandomCrop((height, width)),
                 transforms.ToTensor(),
                 transforms.Normalize([0.5], [0.5]),
@@ -294,6 +360,7 @@ class DreamBoothDataset(Dataset):
             padding="do_not_pad",
             truncation=True,
             max_length=self.tokenizer.model_max_length,
+            return_attention_mask=False,
         ).input_ids
 
         if self.class_data_root:
@@ -306,6 +373,7 @@ class DreamBoothDataset(Dataset):
                 padding="do_not_pad",
                 truncation=True,
                 max_length=self.tokenizer.model_max_length,
+                return_attention_mask=False,
             ).input_ids
 
         return example
@@ -328,22 +396,24 @@ class PromptDataset(Dataset):
         return example
 
 
-def get_writer(args):
-    if args.writer_type == "visualdl":
+def get_report_to(args):
+    if args.report_to == "visualdl":
         from visualdl import LogWriter
 
         writer = LogWriter(logdir=args.logging_dir)
-    elif args.writer_type == "tensorboard":
+    elif args.report_to == "tensorboard":
         from tensorboardX import SummaryWriter
 
         writer = SummaryWriter(logdir=args.logging_dir)
     else:
-        raise ValueError("writer_type must be in ['visualdl', 'tensorboard']")
+        raise ValueError("report_to must be in ['visualdl', 'tensorboard']")
     return writer
 
 
-def main(args):
+def main():
+    args = parse_args()
     rank = paddle.distributed.get_rank()
+    is_main_process = rank == 0
     num_processes = paddle.distributed.get_world_size()
     if num_processes > 1:
         paddle.distributed.init_parallel_env()
@@ -354,65 +424,72 @@ def main(args):
         set_seed(seed)
 
     if args.with_prior_preservation:
-        if rank == 0:
-            class_images_dir = Path(args.class_data_dir)
-            if not class_images_dir.exists():
-                class_images_dir.mkdir(parents=True)
-            cur_class_images = len(list(class_images_dir.iterdir()))
+        class_images_dir = Path(args.class_data_dir)
+        if not class_images_dir.exists():
+            class_images_dir.mkdir(parents=True)
+        cur_class_images = len(list(class_images_dir.iterdir()))
 
-            if cur_class_images < args.num_class_images:
-                pipeline = StableDiffusionPipeline.from_pretrained(
-                    args.pretrained_model_name_or_path, safety_checker=None
-                )
-                pipeline.set_progress_bar_config(disable=True)
+        if cur_class_images < args.num_class_images:
+            pipeline = DiffusionPipeline.from_pretrained(
+                args.pretrained_model_name_or_path,
+            )
+            pipeline.safety_checker = None
+            pipeline.set_progress_bar_config(disable=True)
 
-                num_new_images = args.num_class_images - cur_class_images
-                logger.info(f"Number of class images to sample: {num_new_images}.")
+            num_new_images = args.num_class_images - cur_class_images
+            logger.info(f"Number of class images to sample: {num_new_images}.")
 
-                sample_dataset = PromptDataset(args.class_prompt, num_new_images)
-                sample_dataloader = DataLoader(sample_dataset, batch_size=args.sample_batch_size)
+            sample_dataset = PromptDataset(args.class_prompt, num_new_images)
+            batch_sampler = (
+                DistributedBatchSampler(sample_dataset, batch_size=args.sample_batch_size, shuffle=False)
+                if num_processes > 1
+                else BatchSampler(sample_dataset, batch_size=args.sample_batch_size, shuffle=False)
+            )
+            sample_dataloader = DataLoader(sample_dataset, batch_sampler=batch_sampler)
 
-                for example in tqdm(
-                    sample_dataloader,
-                    desc="Generating class images",
-                ):
-                    images = pipeline(example["prompt"]).images
+            for example in tqdm(sample_dataloader, desc="Generating class images", disable=not is_main_process):
+                images = pipeline(example["prompt"]).images
 
-                    for i, image in enumerate(images):
-                        hash_image = hashlib.sha1(image.tobytes()).hexdigest()
-                        image_filename = (
-                            class_images_dir / f"{example['index'][i] + cur_class_images}-{hash_image}.jpg"
-                        )
-                        image.save(image_filename)
+                for i, image in enumerate(images):
+                    hash_image = hashlib.sha1(image.tobytes()).hexdigest()
+                    image_filename = class_images_dir / f"{example['index'][i] + cur_class_images}-{hash_image}.jpg"
+                    image.save(image_filename)
 
-                del pipeline
-                # donot use paddle.device.cuda.empty_cache
-                # if paddle.device.is_compiled_with_cuda():
-                #     paddle.device.cuda.empty_cache()
+            del pipeline
+            import gc
 
-    if args.output_dir is not None:
-        os.makedirs(args.output_dir, exist_ok=True)
+            gc.collect()
+
+    if is_main_process:
+        if args.output_dir is not None:
+            os.makedirs(args.output_dir, exist_ok=True)
 
     # Load the tokenizer
     if args.tokenizer_name:
         tokenizer = AutoTokenizer.from_pretrained(args.tokenizer_name)
     elif args.pretrained_model_name_or_path:
-        tokenizer = AutoTokenizer.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "tokenizer"))
-
-    # Load models and create wrapper for stable diffusion
-    if "Taiyi-Stable-Diffusion-1B-Chinese-v0.1" in args.pretrained_model_name_or_path:
-        model_cls = BertModel
+        # support windows "\"
+        tokenizer = AutoTokenizer.from_pretrained(url_or_path_join(args.pretrained_model_name_or_path, "tokenizer"))
+    # Load scheduler and models
+    noise_scheduler = DDPMScheduler.from_pretrained(args.pretrained_model_name_or_path, subfolder="scheduler")
+    text_encoder_cls = import_model_class_from_model_name_or_path(args.pretrained_model_name_or_path)
+    text_encoder = text_encoder_cls.from_pretrained(
+        url_or_path_join(args.pretrained_model_name_or_path, "text_encoder")
+    )
+    text_config = text_encoder.config if isinstance(text_encoder.config, dict) else text_encoder.config.to_dict()
+    if text_config.get("use_attention_mask", None) is not None and text_config["use_attention_mask"]:
+        use_attention_mask = True
     else:
-        model_cls = CLIPTextModel
-    text_encoder = model_cls.from_pretrained(os.path.join(args.pretrained_model_name_or_path, "text_encoder"))
+        use_attention_mask = False
     vae = AutoencoderKL.from_pretrained(args.pretrained_model_name_or_path, subfolder="vae")
+    unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
     freeze_params(vae.parameters())
     if not args.train_text_encoder:
         freeze_params(text_encoder.parameters())
-    unet = UNet2DConditionModel.from_pretrained(args.pretrained_model_name_or_path, subfolder="unet")
-
     if args.gradient_checkpointing:
         unet.enable_gradient_checkpointing()
+        if args.train_text_encoder:
+            set_recompute(text_encoder, True)
 
     if args.scale_lr:
         args.learning_rate = (
@@ -424,7 +501,10 @@ def main(args):
         learning_rate=args.learning_rate,
         num_warmup_steps=args.lr_warmup_steps * args.gradient_accumulation_steps,
         num_training_steps=args.max_train_steps * args.gradient_accumulation_steps,
+        num_cycles=args.lr_num_cycles,
+        power=args.lr_power,
     )
+
     if num_processes > 1:
         unet = paddle.DataParallel(unet)
         if args.train_text_encoder:
@@ -441,13 +521,10 @@ def main(args):
         beta2=args.adam_beta2,
         weight_decay=args.adam_weight_decay,
         epsilon=args.adam_epsilon,
-        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm is not None else None,
+        grad_clip=nn.ClipGradByGlobalNorm(args.max_grad_norm) if args.max_grad_norm > 0 else None,
     )
 
-    noise_scheduler = DDPMScheduler(
-        beta_start=0.00085, beta_end=0.012, beta_schedule="scaled_linear", num_train_timesteps=1000
-    )
-
+    # Dataset and DataLoaders creation:
     train_dataset = DreamBoothDataset(
         instance_data_root=args.instance_data_dir,
         instance_prompt=args.instance_prompt,
@@ -457,6 +534,7 @@ def main(args):
         height=args.height,
         width=args.width,
         center_crop=args.center_crop,
+        interpolation="bilinear",
     )
 
     def collate_fn(examples):
@@ -502,15 +580,15 @@ def main(args):
     # Afterwards we recalculate our number of training epochs
     args.num_train_epochs = math.ceil(args.max_train_steps / num_update_steps_per_epoch)
 
-    if rank == 0:
+    if is_main_process:
         logger.info("-----------  Configuration Arguments -----------")
         for arg, value in sorted(vars(args).items()):
             logger.info("%s: %s" % (arg, value))
         logger.info("------------------------------------------------")
-        writer = get_writer(args)
+        writer = get_report_to(args)
 
     # Train!
-    total_batch_size = args.train_batch_size * args.gradient_accumulation_steps
+    total_batch_size = args.train_batch_size * num_processes * args.gradient_accumulation_steps
 
     logger.info("***** Running training *****")
     logger.info(f"  Num examples = {len(train_dataset)}")
@@ -521,7 +599,7 @@ def main(args):
     logger.info(f"  Gradient Accumulation steps = {args.gradient_accumulation_steps}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
     # Only show the progress bar once on each machine.
-    progress_bar = tqdm(range(args.max_train_steps), disable=rank > 0)
+    progress_bar = tqdm(range(args.max_train_steps), disable=not is_main_process)
     progress_bar.set_description("Train Steps")
     global_step = 0
 
@@ -543,7 +621,7 @@ def main(args):
             noise = paddle.randn(latents.shape)
             batch_size = latents.shape[0]
             # Sample a random timestep for each image
-            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).astype("int64")
+            timesteps = paddle.randint(0, noise_scheduler.config.num_train_timesteps, (batch_size,)).cast("int64")
 
             # Add noise to the latents according to the noise magnitude at each timestep
             # (this is the forward diffusion process)
@@ -570,28 +648,39 @@ def main(args):
 
             with text_encoder_ctx_manager:
                 # Get the text embedding for conditioning
-                attention_mask = paddle.ones_like(batch["input_ids"])
+                if use_attention_mask:
+                    attention_mask = (batch["input_ids"] != tokenizer.pad_token_id).cast("int64")
+                else:
+                    attention_mask = None
                 encoder_hidden_states = text_encoder(batch["input_ids"], attention_mask=attention_mask)[0]
 
                 with unet_ctx_manager:
-                    # Predict the noise residual
-                    noise_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+                    # Predict the noise residual / sample
+                    model_pred = unet(noisy_latents, timesteps, encoder_hidden_states).sample
+
+                    # Get the target for loss depending on the prediction type
+                    if noise_scheduler.config.prediction_type == "epsilon":
+                        target = noise
+                    elif noise_scheduler.config.prediction_type == "v_prediction":
+                        target = noise_scheduler.get_velocity(latents, noise, timesteps)
+                    else:
+                        raise ValueError(f"Unknown prediction type {noise_scheduler.config.prediction_type}")
 
                     if args.with_prior_preservation:
-                        # Chunk the noise and noise_pred into two parts and compute the loss on each part separately.
-                        noise_pred, noise_pred_prior = noise_pred.chunk(2, axis=0)
-                        noise, noise_prior = noise.chunk(2, axis=0)
+                        # Chunk the noise and model_pred into two parts and compute the loss on each part separately.
+                        model_pred, model_pred_prior = model_pred.chunk(2, axis=0)
+                        target, target_prior = target.chunk(2, axis=0)
 
                         # Compute instance loss
-                        loss = F.mse_loss(noise_pred, noise, reduction="none").mean([1, 2, 3]).mean()
+                        loss = F.mse_loss(model_pred, target, reduction="mean")
 
                         # Compute prior loss
-                        prior_loss = F.mse_loss(noise_pred_prior, noise_prior, reduction="none").mean([1, 2, 3]).mean()
+                        prior_loss = F.mse_loss(model_pred_prior, target_prior, reduction="mean")
 
                         # Add the prior loss to the instance loss.
                         loss = loss + args.prior_loss_weight * prior_loss
                     else:
-                        loss = F.mse_loss(noise_pred, noise, reduction="none").mean([1, 2, 3]).mean()
+                        loss = F.mse_loss(model_pred, target, reduction="mean")
 
                     if args.gradient_accumulation_steps > 1:
                         loss = loss / args.gradient_accumulation_steps
@@ -605,13 +694,14 @@ def main(args):
                 optimizer.clear_grad()
                 progress_bar.update(1)
                 global_step += 1
+                step_loss = loss.item() * args.gradient_accumulation_steps
                 logs = {
                     "epoch": str(epoch).zfill(4),
-                    "step_loss": round(loss.item() * args.gradient_accumulation_steps, 10),
+                    "step_loss": round(step_loss, 10),
                     "lr": lr_scheduler.get_lr(),
                 }
                 progress_bar.set_postfix(**logs)
-                if rank == 0:
+                if is_main_process:
                     for name, val in logs.items():
                         if name == "epoch":
                             continue
@@ -619,31 +709,28 @@ def main(args):
 
                     if global_step % args.save_steps == 0:
                         # Create the pipeline using using the trained modules and save it.
-                        pipeline = StableDiffusionPipeline.from_pretrained(
+                        pipeline = DiffusionPipeline.from_pretrained(
                             args.pretrained_model_name_or_path,
                             unet=unwrap_model(unet),
                             text_encoder=unwrap_model(text_encoder),
-                            safety_checker=None,
-                            tokenizer=tokenizer,
                         )
-                        pipeline.save_pretrained(args.output_dir)
+                        output_dir = os.path.join(args.output_dir, f"ckpt-{global_step}")
+                        os.makedirs(output_dir, exist_ok=True)
+                        pipeline.save_pretrained(output_dir)
 
             if global_step >= args.max_train_steps:
                 break
 
-    if rank == 0:
+    if is_main_process:
         writer.close()
         # Create the pipeline using using the trained modules and save it.
-        pipeline = StableDiffusionPipeline.from_pretrained(
+        pipeline = DiffusionPipeline.from_pretrained(
             args.pretrained_model_name_or_path,
             unet=unwrap_model(unet),
             text_encoder=unwrap_model(text_encoder),
-            safety_checker=None,
-            tokenizer=tokenizer,
         )
         pipeline.save_pretrained(args.output_dir)
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    main(args)
+    main()

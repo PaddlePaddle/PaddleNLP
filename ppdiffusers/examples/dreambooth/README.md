@@ -97,9 +97,9 @@ bash run_single.sh
 > * `--adam_beta2`: AdamW 优化器时的 beta2 超参数。默认为 `0.999`。
 > * `--adam_weight_decay`: AdamW 优化器时的 weight_decay 超参数。 默认为`0.02`。
 > * `--adam_weight_decay`: AdamW 优化器时的 epsilon 超参数。默认为 1e-8。
-> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `None`表示不使用。
+> * `--max_grad_norm`: 最大梯度范数（用于梯度裁剪）。默认为 `-1`表示不使用。
 > * `--logging_dir`: Tensorboard 或 VisualDL 记录日志的地址，注意：该地址会与输出目录进行拼接，即，最终的日志地址为`<output_dir>/<logging_dir>`。
-> * `--writer_type`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
+> * `--report_to`: 用于记录日志的工具，可选`["tensorboard", "visualdl"]`，默认为`visualdl`，如果选用`tensorboard`，请使用命令安装`pip install tensorboardX`。
 
 
 #### 1.2.3 单机多卡训练
