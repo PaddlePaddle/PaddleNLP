@@ -41,6 +41,29 @@ Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:�
 
 ```
 
+### 量化模型部署
+
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
+
+```bash
+
+# 在GPU上使用paddle_tensorrt后端，模型目录可按照实际模型路径设置
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend paddle_tensorrt --model_prefix int8
+
+# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+
+```
+
+运行完成后返回的结果如下：
+
+```bash
+[INFO] fastdeploy/runtime/runtime.cc(101)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+Batch id:0, example id:0, sentence1:花呗收款额度限制, sentence2:收钱码，对花呗支付的金额有限制吗, label:0, similarity:0.5224
+Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:为什么友付宝不支持花呗付款, label:0, similarity:0.9856
+```
+
+
 ### 参数说明
 
 `seq_cls_infer.py` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
