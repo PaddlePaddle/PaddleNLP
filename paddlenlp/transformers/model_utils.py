@@ -25,6 +25,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 import paddle
+import paddle.distributed as dist
 import paddle.nn as nn
 import six
 from huggingface_hub import (
@@ -1011,11 +1012,8 @@ class PretrainedModel(Layer, GenerationMixin, ConversionMixin):
 
                 # move the `model-name.pdparams` to `model_state.pdparams`
                 # get more details from: https://github.com/PaddlePaddle/PaddleNLP/pull/3843
-                try:
+                if dist.ParallelEnv().local_rank % 8 == 0 and os.path.exists(weight_file_path):
                     shutil.move(weight_file_path, new_weight_file_path)
-                except FileNotFoundError:
-                    pass
-
                 weight_file_path = new_weight_file_path
 
             # find the weight file with the above two branch: `bert-base-uncased.pdparams`, `model_state.pdparams`
