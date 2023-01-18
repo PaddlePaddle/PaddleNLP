@@ -42,6 +42,7 @@ from .text_to_image import (
     TextToImageGenerationTask,
     TextToImageStableDiffusionTask,
 )
+from .vision_language_embedding import VisionLanguageTask
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
 from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
@@ -485,6 +486,15 @@ TASKS = {
             },
         },
         "default": {"model": "utc-large"},
+    },
+    "vision_language": {
+        "models": {
+            "PaddlePaddle/ernie_vil-2.0-base-zh": {
+                "task_class": VisionLanguageTask,
+                "task_flag": "vision_language_embeddings-2.0-base-zh",
+            },
+        },
+        "default": {"model": "PaddlePaddle/ernie_vil-2.0-base-zh"},
     },
 }
 
