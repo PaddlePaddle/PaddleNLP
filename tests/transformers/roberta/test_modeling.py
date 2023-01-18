@@ -404,6 +404,7 @@ class RobertaCompatibilityTest(unittest.TestCase):
     test_model_id = "hf-internal-testing/tiny-random-RobertaModel"
 
     @classmethod
+    @require_package("transformers", "torch")
     def setUpClass(cls) -> None:
         from transformers import RobertaModel
 
