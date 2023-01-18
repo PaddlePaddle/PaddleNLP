@@ -459,8 +459,8 @@ class RobertaCompatibilityTest(unittest.TestCase):
 
     @parameterized.expand(
         [
-            # ("RobertaForCausalLM",),
-            # ("RobertaForMaskedLM",),
+            # ("RobertaForCausalLM",),  TODO: need to tie weights
+            # ("RobertaForMaskedLM",),  TODO: need to tie weights
             ("RobertaModel",),
             ("RobertaForSequenceClassification",),
             ("RobertaForTokenClassification",),
