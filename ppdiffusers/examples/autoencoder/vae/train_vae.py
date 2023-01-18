@@ -83,7 +83,7 @@ def parse_args():
         default="autoencoder_outputs",
         help="The output directory where the model predictions and checkpoints will be written.",
     )
-    parser.add_argument("--seed", type=int, default=None, help="A seed for reproducible training.")
+    parser.add_argument("--seed", type=int, default=23, help="A seed for reproducible training.")
     parser.add_argument(
         "--batch_size",
         type=int,
@@ -378,7 +378,12 @@ def main():
     logger.info(f"  Instantaneous batch size per device = {args.batch_size}")
     logger.info(f"  Total train batch size (w. parallel, distributed) = {total_batch_size}")
     logger.info(f"  Total optimization steps = {args.max_train_steps}")
-
+    logger.info(
+        f"  Number of trainable parameters = {sum(p.numel().item() for p in vae.parameters() if not p.stop_gradient) }"
+    )
+    logger.info(
+        f"  Number of non-trainable parameters = {sum(p.numel().item() for p in vae.parameters() if p.stop_gradient) }"
+    )
     # Only show the progress bar once on each machine.
     progress_bar = tqdm(range(args.max_train_steps), disable=rank > 0)
     progress_bar.set_description("Steps")
@@ -395,13 +400,12 @@ def main():
                 loss, log_dict = unwrap_model(vae).training_step(
                     batch["image"], optimizer_idx=optimizer_idx, global_step=global_step
                 )
+                optimizers[optimizer_idx].clear_grad()
                 loss.backward()
                 optimizers[optimizer_idx].step()
                 # pytorch_lightning use this `untoggle_optimizer` method
                 # ref: https://github.com/Lightning-AI/lightning/blob/a58639ce7e864dd70484e7d34c37730ae204183c/src/pytorch_lightning/core/module.py#L1449-L1464
                 unwrap_model(vae).untoggle_optimizer(optimizers, optimizer_idx)
-
-                optimizers[optimizer_idx].clear_grad()
                 logs.update(log_dict)
 
             progress_bar.update(1)

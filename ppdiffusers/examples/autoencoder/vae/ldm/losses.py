@@ -22,7 +22,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle.utils.download import get_weights_path_from_url
 
-from ppdiffusers.initializer import constant_, normal_
+from ppdiffusers.initializer import constant_, normal_, reset_initialized_parameter
 
 model_urls = {
     "vgg16": (
@@ -129,10 +129,10 @@ def vanilla_d_loss(logits_real, logits_fake):
 def weights_init(m):
     classname = m.__class__.__name__
     if classname.find("Conv") != -1:
-        m.weight = normal_(m.weight, 0.0, 0.02)
+        normal_(m.weight, 0.0, 0.02)
     elif classname.find("BatchNorm") != -1:
-        m.weight = normal_(m.weight, 1.0, 0.02)
-        m.bias = constant_(m.bias, 0.0)
+        normal_(m.weight, 1.0, 0.02)
+        constant_(m.bias, 0.0)
 
 
 class NLayerDiscriminator(nn.Layer):
@@ -195,7 +195,7 @@ class NLayerDiscriminator(nn.Layer):
                 bias_attr=use_bias,
             ),
             norm_layer(ndf * nf_mult),
-            nn.LeakyReLU(0.2, True),
+            nn.LeakyReLU(0.2),
         ]
 
         sequence += [
@@ -437,6 +437,7 @@ class LPIPSWithDiscriminator(nn.Layer):
         self.discriminator = NLayerDiscriminator(
             input_nc=disc_in_channels, n_layers=disc_num_layers, use_actnorm=use_actnorm
         )
+        reset_initialized_parameter(self.discriminator)
         self.discriminator.apply(weights_init)
 
         # output log variance

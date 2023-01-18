@@ -100,6 +100,7 @@ def parse_line(line, filename):
             img_b64, caption = vec[:2]
         elif data_source == "laion400m":
             _, caption, _, img_b64 = vec[:4]
+            # caption, _, img_b64 = vec[:3]
         elif data_source == "yfcc":
             caption, _, _, _, img_b64 = vec[:5]
         elif data_source == "img1024_cc15m_laion400m":

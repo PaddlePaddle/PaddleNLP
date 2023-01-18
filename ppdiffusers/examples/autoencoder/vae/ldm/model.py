@@ -19,6 +19,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 
 from ppdiffusers.configuration_utils import ConfigMixin, register_to_config
+from ppdiffusers.initializer import reset_initialized_parameter
 from ppdiffusers.modeling_utils import ModelMixin
 from ppdiffusers.models.vae import (
     AutoencoderKLOutput,
@@ -129,6 +130,13 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             disc_loss=disc_loss,
         )
         count_params(self)
+        self.init_weights()
+
+    def init_weights(self):
+        reset_initialized_parameter(self.encoder)
+        reset_initialized_parameter(self.decoder)
+        reset_initialized_parameter(self.quant_conv)
+        reset_initialized_parameter(self.post_quant_conv)
 
     def forward(
         self,
