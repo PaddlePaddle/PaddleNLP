@@ -138,7 +138,6 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 | Deltaadams/Hentai-Diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | None| [地址](https://huggingface.co/Deltaadams/Hentai-Diffusion) |
 | ringhyacinth/nail-set-diffuser    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 美甲领域的扩散模型，训练数据使用了 [Weekend](https://weibo.com/u/5982308498)| [地址](https://huggingface.co/ringhyacinth/nail-set-diffuser) |
 | Linaqruf/anything-v3.0    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 该模型可通过输入几个文本提示词就能生成**高质量、高度详细的动漫风格图片**，该模型支持使用 **danbooru 标签文本** 生成图像。| [地址](https://huggingface.co/Linaqruf/anything-v3.0) |
-| MoososCap/NOVEL-MODEL    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 动漫领域的扩散模型，能生成**高质量、高度详细的动漫风格图片**。| [地址](https://huggingface.co/MoososCap/NOVEL-MODEL) |
 
 </details>
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（中文和多语言） </summary>
