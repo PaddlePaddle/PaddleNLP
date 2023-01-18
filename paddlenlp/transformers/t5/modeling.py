@@ -25,7 +25,9 @@ import paddle.nn.functional as F
 from paddle import Tensor
 from paddle.distributed.fleet.utils import recompute
 
+from ...utils.converter import StateDictNameMapping
 from ...utils.log import logger
+from ..activations import ACT2FN
 from ..model_outputs import (
     BaseModelOutput,
     BaseModelOutputWithPastAndCrossAttentions,
@@ -34,7 +36,6 @@ from ..model_outputs import (
     convert_encoder_output,
 )
 from ..model_utils import PretrainedModel, register_base_model
-from ..nezha.modeling import ACT2FN
 from .configuration import (
     T5_PRETRAINED_INIT_CONFIGURATION,
     T5_PRETRAINED_RESOURCE_FILES_MAP,
@@ -570,6 +571,123 @@ class T5PretrainedModel(PretrainedModel):
 
     pretrained_init_configuration = T5_PRETRAINED_INIT_CONFIGURATION
     pretrained_resource_files_map = T5_PRETRAINED_RESOURCE_FILES_MAP
+
+    @classmethod
+    def _get_name_mappings(cls, config: T5Config) -> list[StateDictNameMapping]:
+        mappings: list[StateDictNameMapping] = []
+        model_mappings = [
+            ["shared.weight", "shared.weight"],
+            ["encoder.embed_tokens.weight", "encoder.embed_tokens.weight"],
+            ["encoder.final_layer_norm.weight", "encoder.final_layer_norm.weight"],
+            ["decoder.embed_tokens.weight", "decoder.embed_tokens.weight"],
+            ["decoder.final_layer_norm.weight", "decoder.final_layer_norm.weight"],
+            [
+                "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+                "encoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+            ],
+            [
+                "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+                "decoder.block.0.layer.0.SelfAttention.relative_attention_bias.weight",
+            ],
+        ]
+        for layer_index in range(config.num_hidden_layers):
+            for att_head in ["q", "k", "v", "o"]:
+                model_mappings.extend(
+                    [
+                        [
+                            f"encoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            f"encoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            f"decoder.block.{layer_index}.layer.0.SelfAttention.{att_head}.weight",
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.1.EncDecAttention.{att_head}.weight",
+                            f"decoder.block.{layer_index}.layer.1.EncDecAttention.{att_head}.weight",
+                            "transpose",
+                        ],
+                    ]
+                )
+
+            layer_mappings = [
+                [
+                    f"encoder.block.{layer_index}.layer.1.DenseReluDense.wo.weight",
+                    f"encoder.block.{layer_index}.layer.1.DenseReluDense.wo.weight",
+                    "transpose",
+                ],
+                [
+                    f"decoder.block.{layer_index}.layer.2.DenseReluDense.wo.weight",
+                    f"decoder.block.{layer_index}.layer.2.DenseReluDense.wo.weight",
+                    "transpose",
+                ],
+                [
+                    f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
+                    f"encoder.block.{layer_index}.layer.0.layer_norm.weight",
+                ],
+                [
+                    f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
+                    f"encoder.block.{layer_index}.layer.1.layer_norm.weight",
+                ],
+                [
+                    f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
+                    f"decoder.block.{layer_index}.layer.0.layer_norm.weight",
+                ],
+                [
+                    f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
+                    f"decoder.block.{layer_index}.layer.1.layer_norm.weight",
+                ],
+                [
+                    f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
+                    f"decoder.block.{layer_index}.layer.2.layer_norm.weight",
+                ],
+            ]
+
+            if config.feed_forward_proj == "relu":
+                layer_mappings.extend(
+                    [
+                        [
+                            f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi.weight",
+                            f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi.weight",
+                            "transpose",
+                        ],
+                        [
+                            f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi.weight",
+                            f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi.weight",
+                            "transpose",
+                        ],
+                    ]
+                )
+            elif config.feed_forward_proj == "gated-gelu":
+                for i in range(2):
+                    layer_mappings.extend(
+                        [
+                            [
+                                f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi_{i}.weight",
+                                f"encoder.block.{layer_index}.layer.1.DenseReluDense.wi_{i}.weight",
+                                "transpose",
+                            ],
+                            [
+                                f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi_{i}.weight",
+                                f"decoder.block.{layer_index}.layer.2.DenseReluDense.wi_{i}.weight",
+                                "transpose",
+                            ],
+                        ]
+                    )
+
+            model_mappings.extend(layer_mappings)
+
+        if cls.__name__ != "T5Model":
+            for mapping in model_mappings:
+                mapping[1] = "t5." + mapping[1]
+
+        if config.architectures is not None and "T5ForConditionalGeneration" in config.architectures:
+            model_mappings.append(["lm_head.weight", "lm_head.weight", "transpose"])
+
+        mappings = [StateDictNameMapping(*mapping) for mapping in model_mappings]
+        return mappings
 
     @property
     def dummy_inputs(self):
