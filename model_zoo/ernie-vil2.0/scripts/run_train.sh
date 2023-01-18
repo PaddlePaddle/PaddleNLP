@@ -42,7 +42,7 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
                 --per_device_train_batch_size 128 \
                 --dataloader_num_workers 8 \
                 --save_steps 50 \
-                --num_train_epochs 5 \
+                --num_train_epochs 32 \
                 --weight_decay 0.001 \
                 --save_total_limit 50 \
                 --seed 1 \

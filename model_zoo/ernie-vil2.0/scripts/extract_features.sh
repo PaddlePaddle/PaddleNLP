@@ -23,7 +23,7 @@ python -u extract_features.py \
     --extract-text-feats \
     --image-data="${DATAPATH}/datasets/Flickr30k-CN/lmdb/${split}/imgs" \
     --text-data="${DATAPATH}/datasets/Flickr30k-CN/${split}_texts.jsonl" \
-    --resume output_pd/checkpoint-600 \
+    --resume output_pd/checkpoint-4500 \
     --img-batch-size=32 \
     --text-batch-size=32 \
     --context-length=52 
