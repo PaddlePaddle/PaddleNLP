@@ -13,16 +13,10 @@
 # limitations under the License.
 
 import argparse
-import logging
 import os
-from pprint import pprint
 
-import paddle
 from pipelines.nodes import AnswerExtractor, QAFilter, QuestionGenerator
-from pipelines.nodes import ErnieRanker, DensePassageRetriever
-from pipelines.document_stores import FAISSDocumentStore
-from pipelines.utils import convert_files_to_dicts, fetch_archive_from_http, print_documents
-from pipelines.pipelines import QAGenerationPipeline, SemanticSearchPipeline
+from pipelines.pipelines import QAGenerationPipeline
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -36,19 +30,19 @@ args = parser.parse_args()
 
 def offline_qa_generation():
     answer_extractor = AnswerExtractor(
-        model="uie-base-answer-extractor-v1",
+        model="uie-base-answer-extractor",
         device=args.device,
         schema=["答案"],
         position_prob=0.01,
     )
 
     question_generator = QuestionGenerator(
-        model="unimo-text-1.0-question-generator-v1",
+        model="unimo-text-1.0-question-generator",
         device=args.device,
     )
 
     qa_filter = QAFilter(
-        model="uie-base-qa-filter-v1",
+        model="uie-base-qa-filter",
         device=args.device,
         schema=["答案"],
         position_prob=0.1,
