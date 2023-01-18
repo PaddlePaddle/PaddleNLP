@@ -1194,7 +1194,6 @@ class RobertaForCausalLM(RobertaPretrainedModel):
         self.roberta = RobertaModel(config, add_pooling_layer=False)
         self.lm_head = RobertaLMHead(config)
         self.apply(self.init_weights)
-        self.tie_weights()
 
     def get_output_embeddings(self):
         return self.lm_head.decoder
