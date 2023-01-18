@@ -64,7 +64,7 @@ fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-dif
 
 ### 环境依赖
 - paddlepaddle-gpu>=2.4.0
-- paddlenlp>=2.4.4
+- paddlenlp>=2.5.0
 - ftfy
 - regex
 - Pillow
