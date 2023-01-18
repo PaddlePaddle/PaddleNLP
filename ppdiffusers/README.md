@@ -1,8 +1,18 @@
 # PPDiffusers: Diffusers toolbox implemented based on PaddlePaddle
 
-**PPDiffusers**是一款支持**跨模态**（如图像与语音）训练和推理的**扩散模型**（Diffusion Model）工具箱，我们借鉴了🤗 Huggingface团队的 [**Diffusers**](https://github.com/huggingface/diffusers) 的优秀设计，并且依托 [**PaddlePaddle**](https://www.paddlepaddle.org.cn/) 框架和 [**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP) 自然语言处理库，打造了一款国产化的工具箱。
+**PPDiffusers**是一款支持多种模态（如文本图像跨模态、图像、语音）扩散模型（Diffusion Model）训练和推理的国产化工具箱，依托于[**PaddlePaddle**](https://www.paddlepaddle.org.cn/)框架和[**PaddleNLP**](https://github.com/PaddlePaddle/PaddleNLP)自然语言处理开发库，具体来说，PPDiffusers具有以下特性：
+#### <a href=#sota扩散模型pipelines集合> 📦 SOTA扩散模型Pipelines集合 </a>
+
+#### <a href=#提供丰富的noise-scheduler> 🔊 提供丰富的Noise Scheduler </a>
+
+#### <a href=#提供多种扩散模型组件> 🎛️ 提供多种扩散模型组件 </a>
+
+#### <a href=#提供丰富的训练和推理教程> 📖 提供丰富的训练和推理教程 </a>
+
+#### <a href=#支持FastDeploy高性能部署> 🚀 支持FastDeploy高性能部署 </a>
 
 ## News 📢
+* 🔥 **2022.01.18 发布 0.11.0 版本，新增Heun和Single step DPM-Solver噪声调度器，支持Karlo UnCLIP、Paint-by-example、Depth-Guided Stable Diffusion等图像生成扩散模型， 支持Audio Diffusion音频生成扩散模型；**
 
 * 🔥 **2022.12.06 发布 0.9.0 版本，支持 [StableDiffusion2.0](https://github.com/Stability-AI/stablediffusion) 的文生图、图生图、图像编辑及图像超分等功能；**
 
@@ -21,71 +31,34 @@
 </h4>
 
 ## 特性
-
-
-#### <a href=#sota扩散模型pipelines集合> 📦 SOTA扩散模型Pipelines集合 </a>
-
-#### <a href=#提供丰富的noise-scheduler> 🤗 提供丰富的Noise Scheduler </a>
-
-#### <a href=#提供多种diffusion模型组件> 🎛️ 提供多种Diffusion模型组件 </a>
-
-#### <a href=#提供丰富的训练和推理教程> 🚀 提供丰富的训练和推理教程 </a>
-
-
 ### SOTA扩散模型Pipelines集合
-**最先进（State-of-the-art）** 的 扩散模型（Diffusion Model）管道（Pipelines）集合。
-当前**PPDiffusers**已经集成了**33+Pipelines**，不仅支持 Stable Diffusion [文生图Pipeline](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion/pipeline_stable_diffusion.py)，还支持基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)的[🔥高性能文生图Pipeline](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion/pipeline_fastdeploy_stable_diffusion.py)。
-如果想要了解当前所支持的所有 **Pipelines** 以及对应的论文信息，我们可以阅读[🔥这里](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/README.md)的文档。
+我们提供**SOTA（State-of-the-Art）** 的扩散模型Pipelines集合。
+目前**PPDiffusers**已经集成了**33+Pipelines**，支持文图生成（Text-to-Image Generation）、文本引导的图像编辑（Text-Guided Image Inpainting）、文本指导的图像变换（Image-to-Image Text-Guided Generation）、超分（Super Superresolution）在内的10+任务，覆盖文本图像跨模态、图像、音频等多种模态。
+如果想要了解当前支持的所有**Pipelines**以及对应的来源信息，可以阅读[🔥 PPDiffusers Pipelines](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/README.md)文档。
+
+
+### 提供丰富的Noise Scheduler
+我们提供了丰富的**噪声调度器（Noise Scheduler）**，可以对**速度**与**质量**进行权衡，用户可在推理时根据需求快速切换使用。
+当前**PPDiffusers**已经集成了**14+Scheduler**，不仅支持 [DDPM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddpm.py)、[DDIM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddim.py) 和 [PNDM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_pndm.py)，还支持最新的 [🔥 DPMSolver](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_dpmsolver_multistep.py)！
+
+
+
+### 提供多种扩散模型组件
+我们提供了**多种扩散模型**组件，如[UNet1DModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_1d.py)、[UNet2DModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d.py)、[UNet2DConditionModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d_condition.py)、[VQModel](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/vae.py)、[AutoencoderKL](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/vae.py)等。
+
+
+### 提供丰富的训练和推理教程
+我们提供了丰富的训练教程，不仅支持扩散模型的二次开发微调，如基于[Textual Inversion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/textual_inversion)和[DreamBooth](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)使用3-5张图定制化训练生成图像的风格或物体，还支持使用[Laion400M](https://laion.ai/blog/laion-400-open-dataset)数据集[🔥 从零训练Latent Diffusion Model](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/text_to_image_laion400m) 模型！
+此外，我们还提供了丰富的[🔥 Pipelines推理脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference)。
+
+### 支持FastDeploy高性能部署
+我们提供基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)的[🔥 高性能Stable Diffusion Pipeline](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion/pipeline_fastdeploy_stable_diffusion.py)，更多有关FastDeploy进行多推理引擎后端高性能部署的信息请参考[🔥 高性能FastDeploy推理教程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/deploy)。
 ```python
 from ppdiffusers import StableDiffusionPipeline, FastDeployStableDiffusionPipeline
 
 orig_pipe = StableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5")
 fd_pipe = FastDeployStableDiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5@fastdeploy")
 ```
-
-### 提供丰富的Noise Scheduler
-我们提供了丰富的**噪声调度器（Noise Scheduler）**，我们可以权衡**速度**与**质量**，在推理过程中根据需求快速切换使用。
-当前**PPDiffusers**已经集成了**14+Scheduler**，不仅支持 [DDPM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddpm.py)、[DDIM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_ddim.py) 和 [PNDM](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_pndm.py)，还支持最新的 [🔥DPMSolver](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/schedulers/scheduling_dpmsolver_multistep.py)！
-
-```python
-from ppdiffusers import DDIMScheduler, DDPMScheduler, DPMSolverMultistepScheduler
-
-ddpm_scheduler = DDPMScheduler(
-    beta_start=0.00085,
-    beta_end=0.012,
-    beta_schedule="scaled_linear",
-    num_train_timesteps=1000,
-    steps_offset=1,
-)
-ddim_scheduler = DDIMScheduler(
-    beta_start=0.00085,
-    beta_end=0.012,
-    beta_schedule="scaled_linear",
-    num_train_timesteps=1000,
-    clip_sample=False,
-    set_alpha_to_one=False,
-    steps_offset=1,
-)
-dpmsolver_scheduler = DPMSolverMultistepScheduler(
-    beta_start=0.00085,
-    beta_end=0.012,
-    beta_schedule="scaled_linear",
-    num_train_timesteps=1000,
-    thresholding=False,
-    algorithm_type="dpmsolver++",
-    solver_type="midpoint",
-    lower_order_final=True,
-)
-```
-
-### 提供多种Diffusion模型组件
-我们提供了**多种 Diffusion 模型**组件，如[UNet1d](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_1d.py)、[UNet2d](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d.py)、[UNet2d Conditional](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/ppdiffusers/models/unet_2d_condition.py)。
-
-
-### 提供丰富的训练和推理教程
-我们提供了丰富的训练教程，不仅支持扩散模型的二次开发，如 [Textual Inversion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/textual_inversion) 和 [DreamBooth](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/dreambooth)  使用 3-5 张图定制化训练自己的风格或物体。还支持使用 [Laion400M](https://laion.ai/blog/laion-400-open-dataset) 数据集 [🔥从零训练Latent Diffusion Model](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/text_to_image_laion400m) 模型！
-此外，我们还提供了 [使用Paddle动态图推理的教程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference) 以及 [🔥高性能FastDeploy推理教程](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/deploy)。
-
 
 ## 安装
 
@@ -117,7 +90,7 @@ python setup.py install
 
 为了快速上手使用该项目, 我们可以先阅读🤗 Huggingface团队提供的两个Notebook教程 [Getting started with Diffusers](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/diffusers_intro.ipynb) 和 [Training a diffusers model](https://colab.research.google.com/github/huggingface/notebooks/blob/main/diffusers/training_example.ipynb)。（Tips：国内用户可能无法正常打开）
 
-**Stable Diffusion 1.x** 是一个**文本到图像（text-to-image）**的**潜在扩散模型(Latent Diffusion Model, LDM)**, 该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为 **512x512** 分辨率的 [LAION-5B](https://laion.ai/blog/laion-5b/) 数据集子集进行训练。该模型使用了 **Openai** 开源的 **CLIP ViT-L/14** 文本编码器（约**123M**参数）来编码提示（prompt）文本（注意该部分权重不进行训练）。该模型还使用了**UNet2d Conditional**模型（约**860M**参数）来建模扩散过程。
+**Stable Diffusion 1.x** 是一个**文本到图像（text-to-image）**的**潜在扩散模型(Latent Diffusion Model, LDM)**, 该模型是由来自 [CompVis](https://github.com/CompVis), [Stability AI](https://stability.ai/), [LAION](https://laion.ai/) 的工程师以及 [RunwayML](https://runwayml.com/)一起开发而完成的。该模型使用了大小为 **512x512** 分辨率的 [LAION-5B](https://laion.ai/blog/laion-5b/) 数据集子集进行训练。该模型使用了 **Openai** 开源的 **CLIP ViT-L/14** 文本编码器（约**123M**参数）来编码提示（prompt）文本（注意该部分权重不进行训练）。该模型还使用了**UNet2DCondition**模型（约**860M**参数）来建模扩散过程。
 
 **Stable Diffusion 2.0** 由 [LAION](https://laion.ai/) 在 [Stability AI](https://stability.ai/) 的支持下开发完成的，它与早期的 **V1** 版本相比，大大改善了生成图像的质量。该版本中的文生图模型不仅可以生成默认分辨率为 **512x512** 像素还可以生成 **768x768** 分辨率的图像。该模型作为 **Stable Diffusion 1.x** 的升级版, 使用了全新的 [OpenCLIP-ViT/H](https://huggingface.co/laion/CLIP-ViT-H-14-laion2B-s32B-b79K) 中的文本编码器（注意：该文本编码器一共**24层**，实际只使用**23层**）。LAION 团队首先使用 **V1 版的策略**在 **512x512** 像素的图片上进行训练得到了一个基础版模型 [stabilityai/stable-diffusion-2-base](https://huggingface.co/stabilityai/stable-diffusion-2-base)，然后他们还使用了 [v-objective](https://arxiv.org/abs/2202.00512) 策略，在基础模型之上进一步使用 **768x768** 分辨率的图片进行训练，得到了一个最终版的模型 [stabilityai/stable-diffusion-2](https://huggingface.co/stabilityai/stable-diffusion-2)。
 
@@ -126,7 +99,7 @@ ___为了方便国内用户下载使用及快速体验Stable Diffusion模型，�
 ___Stable Diffusion是基于以下的License:
 The CreativeML OpenRAIL M license is an Open RAIL M license, adapted from the work that BigScience and the RAIL Initiative are jointly carrying in the area of responsible AI licensing. See also the article about the BLOOM Open RAIL license on which this license is based.___
 
-下面将以最近较为火热的 **🔥Stable Diffusion** 模型为例，来说明如何快速使用 **ppdiffusers**，在开始之前我们可以点开下面的折叠按钮，查看当前 Stable Diffusion 模型所支持的权重！
+下面将以最近较为火热的 **🔥Stable Diffusion** 模型为例，来说明如何快速使用 **PPDiffusers**，在开始之前我们可以点开下面的折叠按钮，查看当前 Stable Diffusion 模型所支持的权重！
 
 ### PPDiffusers模型支持的权重
 
@@ -146,7 +119,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 # pipe_mega.inpaint_legacy() 等于 pipe_inpaint_legacy()
 ```
 
-| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
+| PPDiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
 | :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | CompVis/stable-diffusion-v1-4           | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | Stable-Diffusion-v1-4 使用 Stable-Diffusion-v1-2 的权重进行初始化。随后在"laion-aesthetics v2 5+"数据集上以 **512x512** 分辨率微调了 **225k** 步数，对文本使用了 **10%** 的dropout（即：训练过程中文图对中的文本有 10% 的概率会变成空文本）。模型使用了[CLIP ViT-L/14](https://huggingface.co/openai/clip-vit-large-patch14)作为文本编码器。| [地址](https://huggingface.co/CompVis/stable-diffusion-v1-4) |
 | CompVis/ldm-text2im-large-256               | LDMTextToImagePipeline | [LDM论文](https://arxiv.org/pdf/2112.10752.pdf) LDM-KL-8-G* 权重。| [地址](https://huggingface.co/CompVis/ldm-text2im-large-256) |
@@ -165,13 +138,12 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 | Deltaadams/Hentai-Diffusion    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | None| [地址](https://huggingface.co/Deltaadams/Hentai-Diffusion) |
 | ringhyacinth/nail-set-diffuser    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 美甲领域的扩散模型，训练数据使用了 [Weekend](https://weibo.com/u/5982308498)| [地址](https://huggingface.co/ringhyacinth/nail-set-diffuser) |
 | Linaqruf/anything-v3.0    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 该模型可通过输入几个文本提示词就能生成**高质量、高度详细的动漫风格图片**，该模型支持使用 **danbooru 标签文本** 生成图像。| [地址](https://huggingface.co/Linaqruf/anything-v3.0) |
-| MoososCap/NOVEL-MODEL    | StableDiffusionPipeline、StableDiffusionImg2ImgPipeline、StableDiffusionInpaintPipelineLegacy、StableDiffusionMegaPipeline、StableDiffusionPipelineAllinOne | 动漫领域的扩散模型，能生成**高质量、高度详细的动漫风格图片**。| [地址](https://huggingface.co/MoososCap/NOVEL-MODEL) |
 
 </details>
 <details><summary>&emsp; Stable Diffusion 模型支持的权重（中文和多语言） </summary>
 
 
-| ppdiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
+| PPDiffusers支持的模型名称                     | 支持加载的Pipeline                                    | 备注 | huggingface.co地址 |
 | :-------------------------------------------: | :--------------------------------------------------------------------: | --- | :-----------------------------------------: |
 | BAAI/AltDiffusion                           | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline | 该模型使用 [AltCLIP](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，在 Stable Diffusion 基础上训练了**双语Diffusion模型**，其中训练数据来自 [WuDao数据集](https://data.baai.ac.cn/details/WuDaoCorporaText) 和 [LAION](https://huggingface.co/datasets/ChristophSchuhmann/improved_aesthetics_6plus) 。| [地址](https://huggingface.co/BAAI/AltDiffusion) |
 | BAAI/AltDiffusion-m9                        | AltDiffusionPipeline、AltDiffusionImg2ImgPipeline |该模型使用9种语言的 [AltCLIP-m9](https://github.com/FlagAI-Open/FlagAI/tree/master/examples/AltCLIP/README.md) 作为文本编码器，其他同上。| [地址](https://huggingface.co/BAAI/AltDiffusion-m9) |
@@ -180,7 +152,7 @@ pipe_mega = StableDiffusionMegaPipeline.from_pretrained("xxxx")
 </details>
 
 
-### 文生图 （Text-to-Image Generation）
+### 文图生成 （Text-to-Image Generation）
 
 ```python
 import paddle
@@ -206,7 +178,7 @@ image.save("shiba_dog_with_a_red_cap.png")
 <img width="500" alt="image" src="https://user-images.githubusercontent.com/50394665/204796701-d7911f76-8670-47d5-8d1b-8368b046c5e4.png">
 </div>
 
-### 基于文本引导的图生图（Image-to-Image Text-Guided Generation）
+### 文本引导的图像变换（Image-to-Image Text-Guided Generation）
 
 <details><summary>&emsp;Image-to-Image Text-Guided Generation Demo </summary>
 
@@ -240,7 +212,7 @@ image.save("image_Kurisu_img2img.png")
 </div>
 </details>
 
-### 基于文本引导的图像编辑（Text-Guided Image Inpainting）
+### 文本引导的图像编辑（Text-Guided Image Inpainting）
 
 注意！当前有两种版本的图像编辑代码，一个是Legacy版本，一个是正式版本，下面将分别介绍两种代码如何使用！
 
@@ -310,7 +282,7 @@ image.save("a_yellow_cat.png")
 </div>
 </details>
 
-### 基于文本引导的图像放大 & 图像超分（Text-Guided Image Upscaling & Super Superresolution）
+### 文本引导的图像放大 & 超分（Text-Guided Image Upscaling & Super Superresolution）
 
 <details><summary>&emsp;Text-Guided Image Upscaling Demo</summary>
 
@@ -362,7 +334,7 @@ image.save("ldm-super-resolution-image.png")
 </details>
 
 ## 模型部署
-StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在 [FastDeploy](https://github.com/PaddlePaddle/FastDeploy) 上的 **StableDiffusion** 模型文生图、图生图、图像编辑等任务的部署示例，用户可以按照我们提供 [StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md) 将模型导出 或者使用 [一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py) 导出模型，然后使用我们提供的`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
+StableDiffusion模型除了**支持Paddle动态图**运行，还支持将模型导出并使用推理引擎运行。我们提供在基于[FastDeploy](https://github.com/PaddlePaddle/FastDeploy)上的**StableDiffusion**模型部署示例，包括文生图、图生图、图像编辑等任务，用户可以按照我们提供[StableDiffusion模型导出教程](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/deploy/export.md)将模型导出，或者使用[一键导出脚本](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/scripts/convert_diffusers_model/convert_ppdiffusers_stable_diffusion_to_fastdeploy.py)导出模型，然后使用`FastDeployStableDiffusionMegaPipeline`进行高性能推理部署！
 
 <details><summary>&emsp; 已预先导出的FastDeploy版Stable Diffusion权重 </summary>
 
@@ -439,8 +411,19 @@ image_inpaint_legacy.save("image_inpaint_legacy.png")
 <img width="900" alt="image" src="https://user-images.githubusercontent.com/50394665/205297240-46b80992-34af-40cd-91a6-ae76589d0e21.png">
 </div>
 
-## Credits
 
+
+## License
+PPDiffusers 遵循 [Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
+
+Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license)。
+> The CreativeML OpenRAIL M is an [Open RAIL M license](https://www.licenses.ai/blog/2022/8/18/naming-convention-of-responsible-ai-licenses), adapted from the work that [BigScience](https://bigscience.huggingface.co/) and [the RAIL Initiative](https://www.licenses.ai/) are jointly carrying in the area of responsible AI licensing. See also [the article about the BLOOM Open RAIL license](https://bigscience.huggingface.co/blog/the-bigscience-rail-license) on which this license is based.
+
+## Acknowledge
+我们借鉴了🤗 Hugging Face的[Diffusers](https://github.com/huggingface/diffusers)关于预训练扩散模型使用的优秀设计，在此对Hugging Face作者及其开源社区表示感谢。
+
+
+## Credits
 This library concretizes previous work by many different authors and would not have been possible without their great research and implementations. We'd like to thank, in particular, the following implementations which have helped us in our development and without which the API could not have been as polished today:
 - @huggingface' diffusers library, available [here](https://github.com/huggingface/diffusers)
 - @CompVis' latent diffusion models library, available [here](https://github.com/CompVis/latent-diffusion)
@@ -462,10 +445,3 @@ We also want to thank @heejkoo for the very helpful overview of papers, code and
   howpublished = {\url{https://github.com/huggingface/diffusers}}
 }
 ```
-
-## License
-
-PPDiffusers 遵循 [Apache-2.0开源协议](https://github.com/PaddlePaddle/PaddleNLP/blob/develop/ppdiffusers/LICENSE)。
-
-Stable Diffusion 遵循 [The CreativeML OpenRAIL M 开源协议](https://huggingface.co/spaces/CompVis/stable-diffusion-license).
-> The CreativeML OpenRAIL M is an [Open RAIL M license](https://www.licenses.ai/blog/2022/8/18/naming-convention-of-responsible-ai-licenses), adapted from the work that [BigScience](https://bigscience.huggingface.co/) and [the RAIL Initiative](https://www.licenses.ai/) are jointly carrying in the area of responsible AI licensing. See also [the article about the BLOOM Open RAIL license](https://bigscience.huggingface.co/blog/the-bigscience-rail-license) on which this license is based.
