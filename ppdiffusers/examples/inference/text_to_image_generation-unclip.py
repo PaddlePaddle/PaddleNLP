@@ -1,5 +1,4 @@
 # Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
-# Copyright 2021 The HuggingFace Inc. team. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,21 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Feature extractor class for CMSIMLock."""
+from ppdiffusers import UnCLIPPipeline
 
-__all__ = ["CMSIMLockFeatureExtractor"]
+# 加载模型和scheduler
+pipe = UnCLIPPipeline.from_pretrained("kakaobrain/karlo-v1-alpha")
 
+# 执行pipeline进行推理
+prompt = "a high-resolution photograph of a big red frog on a green leaf."
+image = pipe([prompt]).images[0]
 
-import warnings
-
-from .image_processing import CMSIMLockImageProcessor
-
-
-class CMSIMLockFeatureExtractor(CMSIMLockImageProcessor):
-    def __init__(self, *args, **kwargs) -> None:
-        warnings.warn(
-            "The class CMSIMLockFeatureExtractor is deprecated and will be removed in version 5 of PaddleNLP. Please"
-            " use CMSIMLockImageProcessor instead.",
-            FutureWarning,
-        )
-        super().__init__(*args, **kwargs)
+# 保存图片
+image.save("./frog.png")
