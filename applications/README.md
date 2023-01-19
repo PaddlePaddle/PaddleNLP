@@ -40,7 +40,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 | **通用信息抽取** | 暂无 | [通用信息抽取](./information_extraction) | [UIE快速体验](https://aistudio.baidu.com/aistudio/projectdetail/3914778)<br>[UIE微调实体抽取](https://aistudio.baidu.com/aistudio/projectdetail/4038499)<br>[UIE微调关系抽取](https://aistudio.baidu.com/aistudio/projectdetail/4371345)<br>[UIE-X快速体验](https://aistudio.baidu.com/aistudio/projectdetail/5017442)<br>[UIE-X微调](https://aistudio.baidu.com/aistudio/projectdetail/5261592) |
 | **情感分析**  | [情感分析](../pipelines/examples/sentiment_analysis)  | [情感分析](./sentiment_analysis) |  [情感分析](https://aistudio.baidu.com/aistudio/projectdetail/5318177)|
 | **文档智能**  | [文档抽取问答](../pipelines/examples/document-intelligence) |  [跨模态文档问答](./document_intelligence/doc_vqa)| [文档抽取问答](https://aistudio.baidu.com/aistudio/projectdetail/4881278)<br>[汽车说明书问答](https://aistudio.baidu.com/aistudio/projectdetail/4049663)  |
-| **文生图**  | [文生图系统](../pipelines/examples/text_to_image)  | 可参考[PPDiffusers]() |   |
+| **文生图**  | [文生图系统](../pipelines/examples/text_to_image)  | 可参考[PPDiffusers](../ppdiffusers) |   |
 | **语音指令解析**  | 暂无 | [语音指令解析](./speech_cmd_analysis) | [语音指令解析](https://aistudio.baidu.com/aistudio/projectdetail/4399703) |
 | **文本摘要**  | 暂无 | [文本摘要](./text_summarization) | [文本摘要](https://aistudio.baidu.com/aistudio/projectdetail/4903667) |
 
