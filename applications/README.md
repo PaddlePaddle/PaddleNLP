@@ -46,6 +46,17 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 ## 3、典型范例介绍
 
+#### 📄 通用信息抽取系统
+
+- 首个产业级通用信息抽取方案 UIE，面向纯文本，实现多任务统一建模，提供强大的零样本抽取和少样本快速迁移能力；
+- 首个兼具文本及文档抽取能力、多语言、开放域的信息抽取方案 UIE-X，基于 [ERNIE-Layout](../model_zoo/ernie-layout) 跨模态布局增强预训练模型，集成 [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) 的 PP-OCR、PP-Structure 版面分析能力，小样本文档信息抽取效果领先。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/11793384/213365046-69967745-b4a8-4435-98fb-c34f68cd22e9.png" width="60%" length="60%">
+</div>
+详细使用说明请参考[信息抽取系统](./information_extraction)。
+更多：[UIE 解读](https://mp.weixin.qq.com/s/-hHz8knHIKKqKCBTke7i5A)、[UIE-X 解读](https://zhuanlan.zhihu.com/p/592422623)。
+
 #### 🔍 语义检索系统
 
 - 前沿算法———基于 SimCSE、In-batch Negatives、ERNIE Pair-wise、RocketQA Poinet-Wise 等提供针对无监督、有监督等多种数据情况的多样化方案；
@@ -67,20 +78,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 </div>
 
 
-详细使用说明请参考[智能问答系统](./question_answering)与[文档智能问答](./document_intelligence/doc_vqa)
-
-#### 💌 评论观点抽取与情感分析
-
-- 经典方案：基于情感知识增强预训练模型SKEP，两阶段式抽取和分类，首先通过序列标注的方式定位属性词和观点词，然后进行属性集情感分类；
-- 前沿方案：基于UIE的情感分析方案采用 Prompt Learning 的方式进行情感信息抽取，精度更高。支持语句级和属性级情感分析，解决同义属性聚合、隐性观点抽取难点，并提供可视化分析能力。
-
-<div align="center">
-    <img src="https://user-images.githubusercontent.com/35913314/200259473-434888f7-c0ac-4253-ab23-ede1628e6ba2.png" width="60%" length="60%">
-</div>
-<br>
-
-详细使用说明请参考[情感分析](./sentiment_analysis)。
-更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)
+详细使用说明请参考[智能问答系统](./question_answering)与[文档智能问答](./document_intelligence/doc_vqa)。
 
 #### 📚 通用文本分类
 
@@ -89,6 +87,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/213347595-e9c08bd1-3d32-4519-9a52-31fb69b841e8.png" width="60%" length="60%">
 </div>
+
 <br>
 
 详细使用说明请参考[通用文本分类](./zero_shot_text_classification)。
@@ -103,10 +102,24 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/63761690/186378697-630d3590-4e67-49a0-8d5f-7cabd9daa894.png" width="60%" length="60%">
 </div>
+
 <br>
 
 详细使用说明请参考[文本分类](./text_classification)。
 更多：[文章解读](https://mp.weixin.qq.com/s/tas7yM8vapxwtlJt-MRZdg)。
+
+#### 💌 评论观点抽取与情感分析
+
+- 经典方案：基于情感知识增强预训练模型SKEP，两阶段式抽取和分类，首先通过序列标注的方式定位属性词和观点词，然后进行属性集情感分类；
+- 前沿方案：基于UIE的情感分析方案采用 Prompt Learning 的方式进行情感信息抽取，精度更高。支持语句级和属性级情感分析，解决同义属性聚合、隐性观点抽取难点，并提供可视化分析能力。
+
+<div align="center">
+    <img src="https://user-images.githubusercontent.com/35913314/200259473-434888f7-c0ac-4253-ab23-ede1628e6ba2.png" width="60%" length="60%">
+</div>
+<br>
+
+详细使用说明请参考[情感分析](./sentiment_analysis)。
+更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)
 
 #### 🎙️ 智能语音指令解析
 
