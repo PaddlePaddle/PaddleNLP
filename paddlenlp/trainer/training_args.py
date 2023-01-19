@@ -454,7 +454,7 @@ class TrainingArguments:
 
     run_name: Optional[str] = field(default=None, metadata={"help": "An optional descriptor for the run."})
 
-    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
+    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu, npu devices."})
 
     disable_tqdm: Optional[bool] = field(
         default=None, metadata={"help": "Whether or not to disable the tqdm progress bars."}
@@ -501,6 +501,10 @@ class TrainingArguments:
     flatten_param_grads: Optional[bool] = field(
         default=False,
         metadata={"help": "Whether use flatten_param_grads method in optimizer, only used on NPU devices."},
+    )
+    lazy_data_processing: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether use lazy data processing."},
     )
 
     def __post_init__(self):
