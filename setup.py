@@ -64,9 +64,10 @@ setuptools.setup(
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
-    long_description=read("README_en.md"),
+    long_description=read(".github/README_en.md"),
     long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PaddleNLP",
+    license_files=("LICENSE",),
     packages=setuptools.find_packages(
         where=".",
         exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),

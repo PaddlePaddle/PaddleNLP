@@ -1,3 +1,4 @@
+[简体中文🀄](./CODE_OF_CONDUCT.md) |  **English**🌎
 
 # Contributor Covenant Code of Conduct
 
