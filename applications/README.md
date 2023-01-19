@@ -48,7 +48,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 #### 🔍 语义检索系统
 
-- 前沿算法———基于 SimCSE、In-batch Negatives、ERNIE Pair-wise、RocketQA Poinet-Wise 等提供针对无监督、有监督等多种数据情况的多样化方案；
+- 前沿算法———基于 SimCSE、In-batch Negatives、ERNIE Pairwise、RocketQA Pointwise 等提供针对无监督、有监督等多种数据情况的多样化方案；
 - 全流程———覆盖召回、排序环节，集成主流 ANN 引擎，同时兼容 ElasticSearch 字面检索模式，提供多路召回方案。打通训练、调优、高效向量检索引擎建库和查询全流程。
 
 <div align="center">
