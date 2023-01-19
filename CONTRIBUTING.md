@@ -4,9 +4,11 @@ We highly welcome and value your contributions to `PaddleNLP`. The first step to
 
 This document explains our workflow and work style:
 
-## Workflow
+## Finding out what to work on Workflow
 
-PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
+## Development Workflow
+
+PaddleNLP uses the [Git branching model](http://nvie.com/posts/a-successful-git-branching-model/).  The following steps guide usual contributions.
 
 #### 1. Fork
 
@@ -109,7 +111,7 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
    [Google][http://google.com/] or [StackOverflow](https://stackoverflow.com/) are great tools to help you understand the code style errors.
    Don't worry if you still can't figure it out. You can commit with `git commit -m "style error" --no-verify` and we are happy to help you once you create a Pull Request.
 
-7. Keep pulling
+#### 7. Keep pulling
 
    An experienced Git user pulls from the official repo often -- daily or even hourly, so they notice conflicts with others work early, and it's easier to resolve smaller conflicts.
 
@@ -118,7 +120,7 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
    git pull upstream develop
    ```
 
-8. Push and file a pull request
+#### 8. Push and file a pull request
 
    You can "push" your local work into your forked repo:
 
@@ -130,7 +132,7 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
 
    To create a pull request, please follow [these steps](https://help.github.com/articles/creating-a-pull-request/).
 
-9. Delete local and remote branches
+#### 9. Delete local and remote branches
 
    To keep your local workspace and your fork clean, you might want to remove merged branches:
 
@@ -141,9 +143,9 @@ PaddlePaddle uses the [Git branching model](http://nvie.com/posts/a-successful-g
    git branch -d my-cool-stuff
    ```
 
-### Code Review
+## Code Review
 
--  Please feel free to ping your reviewers by sending them the URL of your pull request via IM or email.  Please do this after your pull request passes the CI.
+-  Please feel free to ping your reviewers by @-mentioning the in the Pull Request.  Please do this after your pull request passes the CI.
 
 - Please answer reviewers' every comment.  If you are to follow the comment, please write "Done"; Otherwise, please start a discussion under the comment.
 
