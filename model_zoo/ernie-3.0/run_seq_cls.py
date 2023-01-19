@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import json
 import os
@@ -83,19 +84,24 @@ def main():
 
     # Define dataset pre-process function
     trans_fn = partial(
-        seq_convert_example, tokenizer=tokenizer, label_list=data_args.label_list, max_seq_len=data_args.max_seq_length
+        seq_convert_example,
+        tokenizer=tokenizer,
+        label_list=data_args.label_list,
+        max_seq_len=data_args.max_seq_length,
+        dynamic_max_length=data_args.dynamic_max_length,
     )
 
-    # Define data collector
+    # Define data collator
     data_collator = DataCollatorWithPadding(tokenizer)
 
     # Dataset pre-process
+    logger.info("Data Preprocessing...")
     if training_args.do_train:
-        train_dataset = raw_datasets["train"].map(trans_fn)
+        train_dataset = raw_datasets["train"].map(trans_fn, lazy=training_args.lazy_data_processing)
     if training_args.do_eval:
-        eval_dataset = raw_datasets["dev"].map(trans_fn)
+        eval_dataset = raw_datasets["dev"].map(trans_fn, lazy=training_args.lazy_data_processing)
     if training_args.do_predict:
-        test_dataset = raw_datasets["test"].map(trans_fn)
+        test_dataset = raw_datasets["test"].map(trans_fn, lazy=training_args.lazy_data_processing)
 
     # Define the metrics of tasks.
     def compute_metrics(p):
