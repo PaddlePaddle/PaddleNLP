@@ -14,39 +14,28 @@
 
 import os
 import sys
-import yaml
 from functools import partial
-import distutils.util
-import os.path as osp
-from typing import Optional
 
-from datasets import load_metric
 import numpy as np
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
+from datasets import load_metric
+
 import paddlenlp
-from paddlenlp.datasets import load_dataset
 from paddlenlp.data import DataCollatorForTokenClassification
+from paddlenlp.datasets import load_dataset
 from paddlenlp.trainer import (
     PdArgumentParser,
-    TrainingArguments,
     Trainer,
+    TrainingArguments,
+    get_last_checkpoint,
 )
-from paddlenlp.trainer import get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForTokenClassification,
-)
+from paddlenlp.transformers import AutoModelForTokenClassification, AutoTokenizer
 from paddlenlp.utils.log import logger
 
 sys.path.insert(0, os.path.abspath("."))
-from token_classification import ner_trans_fn
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from token_classification import ner_trans_fn  # noqa: E402
+from utils import ALL_DATASETS, DataArguments, ModelArguments  # noqa: E402
 
 
 def main():
@@ -106,7 +95,7 @@ def main():
     data_args.ignore_label = -100
     data_args.no_entity_id = len(data_args.label_list) - 1
 
-    num_classes = 1 if raw_datasets["train"].label_list == None else len(raw_datasets["train"].label_list)
+    num_classes = 1 if raw_datasets["train"].label_list is None else len(raw_datasets["train"].label_list)
 
     # Define tokenizer, model, loss function.
     tokenizer = AutoTokenizer.from_pretrained(model_args.model_name_or_path)

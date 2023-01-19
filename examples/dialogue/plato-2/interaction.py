@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
+
 import argparse
 from collections import namedtuple
-from termcolor import colored, cprint
 
 import paddle
-
-from utils.args import parse_args, str2bool
-from utils import gen_inputs
+from model import Plato2InferModel
 from readers.nsp_reader import NSPReader
 from readers.plato_reader import PlatoReader
-from model import Plato2InferModel
+from termcolor import colored, cprint
+from utils import gen_inputs
+from utils.args import parse_args
+
+from paddlenlp.trainer.argparser import strtobool
 
 
 def setup_args():
@@ -36,7 +37,7 @@ def setup_args():
     group.add_argument("--num_layers", type=int, default=24)
 
     group = parser.add_argument_group("Task")
-    group.add_argument("--is_cn", type=str2bool, default=False)
+    group.add_argument("--is_cn", type=strtobool, default=False)
 
     args, _ = parser.parse_known_args()
     NSPReader.add_cmdline_args(parser)

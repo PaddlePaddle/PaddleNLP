@@ -23,8 +23,9 @@ from decimal import Decimal
 
 import numpy as np
 import paddle
-from utils import load_txt, str2bool
+from utils import load_txt
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.log import logger
 
 
@@ -727,7 +728,7 @@ if __name__ == "__main__":
     parser.add_argument("--splits", default=[0.8, 0.1, 0.1], type=float, nargs="*", help="The ratio of samples in datasets. [0.6, 0.2, 0.2] means 60% samples used for training, 20% for evaluation and 20% for test.")
     parser.add_argument("--task_type", choices=['ext', 'cls'], default="ext", type=str, help="Two task types [ext, cls] are supported, ext represents the aspect-based extraction task and cls represents the sentence-level classification task, defaults to ext.")
     parser.add_argument("--options", type=str, nargs="+", help="Used only for the classification task, the options for classification")
-    parser.add_argument("--is_shuffle", type=str2bool, default="True", help="Whether to shuffle the labeled dataset, defaults to True.")
+    parser.add_argument("--is_shuffle", type=strtobool, default="True", help="Whether to shuffle the labeled dataset, defaults to True.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization")
 
     args = parser.parse_args()

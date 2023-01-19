@@ -16,11 +16,11 @@
 from collections import namedtuple
 
 import numpy as np
-
 from readers.dialog_reader import DialogReader
 from utils import pad_batch_data
-from utils.args import str2bool
 from utils.masking import mask
+
+from paddlenlp.trainer.argparser import strtobool
 
 
 class NSPReader(DialogReader):
@@ -33,7 +33,7 @@ class NSPReader(DialogReader):
         group.add_argument(
             "--attention_style", type=str, default="bidirectional", choices=["bidirectional", "unidirectional"]
         )
-        group.add_argument("--mix_negative_sample", type=str2bool, default=False)
+        group.add_argument("--mix_negative_sample", type=strtobool, default=False)
         return group
 
     def __init__(self, args):

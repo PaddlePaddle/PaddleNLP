@@ -20,7 +20,6 @@ import random
 import re
 import unittest
 import urllib.parse
-from distutils.util import strtobool
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Union
@@ -29,6 +28,8 @@ import numpy as np
 import PIL.Image
 import PIL.ImageOps
 import requests
+
+from paddlenlp.trainer.argparser import strtobool
 
 from .import_utils import is_fastdeploy_available, is_paddle_available
 

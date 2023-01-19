@@ -14,24 +14,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import time
-import random
 import argparse
-import numpy as np
-import json
-import distutils.util
-from functools import partial
 import contextlib
+import json
+import os
+import random
+import time
+from functools import partial
 
+import numpy as np
 import paddle
-import paddle.nn as nn
-
-from paddlenlp.data import Stack, Dict, Pad, Tuple
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import AutoModelForMultipleChoice, AutoTokenizer
-from paddlenlp.utils.log import logger
 from datasets import load_dataset
+
+from paddlenlp.data import Dict, Pad, Stack
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    AutoModelForMultipleChoice,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
+from paddlenlp.utils.log import logger
 
 
 def parse_args():
@@ -53,13 +55,11 @@ def parse_args():
         help="Max number of processes when generating cache. Already cached shards are loaded sequentially.",
     )
     parser.add_argument("--output_dir", default="best_c3_model", type=str, help="The path of the checkpoints .")
-    parser.add_argument(
-        "--save_best_model", default=True, type=distutils.util.strtobool, help="Whether to save best model."
-    )
+    parser.add_argument("--save_best_model", default=True, type=strtobool, help="Whether to save best model.")
     parser.add_argument(
         "--overwrite_cache",
         default=False,
-        type=distutils.util.strtobool,
+        type=strtobool,
         help="Whether to overwrite cache for dataset.",
     )
     parser.add_argument("--num_train_epochs", default=8, type=int, help="Total number of training epochs to perform.")
@@ -119,10 +119,9 @@ def set_seed(args):
 def evaluate(model, loss_fct, dev_data_loader, metric):
     metric.reset()
     model.eval()
-    for step, batch in enumerate(dev_data_loader):
+    for _, batch in enumerate(dev_data_loader):
         input_ids, segment_ids, label_id = batch
         logits = model(input_ids=input_ids, token_type_ids=segment_ids)
-        loss = loss_fct(logits, label_id)
         correct = metric.compute(logits, label_id)
         metric.update(correct)
     acc = metric.accumulate()
@@ -255,7 +254,7 @@ def run(args):
                 desc="Running tokenizer on train dataset",
             )
 
-        batchify_fn = lambda samples, fn=Dict(
+        batchify_fn = lambda samples, fn=Dict(  # noqa: E731
             {
                 "input_ids": Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
                 "token_type_ids": Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment
@@ -371,7 +370,7 @@ def run(args):
         # Serveral samples have more than four choices.
         test_batch_sampler = paddle.io.BatchSampler(test_ds, batch_size=1, shuffle=False)
 
-        batchify_fn = lambda samples, fn=Dict(
+        batchify_fn = lambda samples, fn=Dict(  # noqa: E731
             {
                 "input_ids": Pad(axis=1, pad_val=tokenizer.pad_token_id),  # input
                 "token_type_ids": Pad(axis=1, pad_val=tokenizer.pad_token_type_id),  # segment

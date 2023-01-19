@@ -12,23 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import six
-import sys
-import os
-import time
 import argparse
+import os
+import sys
 from functools import partial
-import distutils.util
 
 import paddle
 import paddleslim
 
-from paddlenlp.data import Stack, Tuple, Pad, Dict
+from paddlenlp.data import Pad
 from paddlenlp.datasets import load_dataset
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import PPMiniLMTokenizer
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from data import convert_example  # noqa: E402
 
 parser = argparse.ArgumentParser()
 
@@ -71,7 +69,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--use_faster_tokenizer",
-    type=distutils.util.strtobool,
+    type=strtobool,
     default=True,
     help="Whether to use FasterTokenizer to accelerate training or further inference.",
 )

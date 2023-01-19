@@ -12,22 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from functools import partial
 import argparse
 import os
 import random
 import time
-import distutils.util
+from functools import partial
 
 import numpy as np
 import paddle
 import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
+from data import convert_example, create_dataloader, read_data
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoTokenizer, AutoModel, AutoModelForSequenceClassification
-from paddlenlp.transformers import PolyDecayWithWarmup
-from paddle.distributed.fleet.utils.hybrid_parallel_util import fused_allreduce_gradients
-from data import convert_example, read_data, create_dataloader
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -35,8 +34,7 @@ parser.add_argument("--save_dir", default='./checkpoint', type=str, help="The ou
 parser.add_argument("--train_set", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--test_file", type=str, required=True, help="The full path of test file")
 
-parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. "
-    "Sequences longer than this will be truncated, sequences shorter will be padded.")
+parser.add_argument("--max_seq_length", default=128, type=int, help="The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded.")
 parser.add_argument("--batch_size", default=32, type=int, help="Batch size per GPU/CPU for training.")
 parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
@@ -48,7 +46,7 @@ parser.add_argument("--logging_steps", default=10, type=int, help="The interval 
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")
 parser.add_argument('--device', choices=['cpu', 'gpu', 'xpu', 'npu'], default="gpu", help="Select which device to train model, defaults to gpu.")
-parser.add_argument("--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training.")
+parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
 parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
 parser.add_argument('--model_name_or_path', default="rocketqa-base-cross-encoder", help="The pretrained model used for training")
 parser.add_argument("--eval_step", default=200, type=int, help="Step interval for evaluation.")
@@ -149,8 +147,6 @@ def do_train():
 
     criterion = paddle.nn.loss.CrossEntropyLoss()
     metric = paddle.metric.Auc()
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
     global_step = 0
     tic_train = time.time()
     for epoch in range(1, args.epochs + 1):

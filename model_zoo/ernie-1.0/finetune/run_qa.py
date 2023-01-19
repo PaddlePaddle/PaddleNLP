@@ -14,44 +14,31 @@
 
 import os
 import sys
-import yaml
 from functools import partial
-import distutils.util
-import os.path as osp
-from typing import Optional
 
-import numpy as np
 import paddle
-import paddle.nn as nn
-import paddle.nn.functional as F
+from datasets import load_dataset
+
 import paddlenlp
 from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics.squad import compute_prediction, squad_evaluate
 from paddlenlp.trainer import (
+    EvalPrediction,
     PdArgumentParser,
     TrainingArguments,
-    Trainer,
+    get_last_checkpoint,
 )
-from paddlenlp.trainer import EvalPrediction, get_last_checkpoint
-from paddlenlp.transformers import (
-    AutoTokenizer,
-    AutoModelForQuestionAnswering,
-)
+from paddlenlp.transformers import AutoModelForQuestionAnswering, AutoTokenizer
 from paddlenlp.utils.log import logger
-from datasets import load_metric, load_dataset
 
 sys.path.insert(0, os.path.abspath("."))
-from question_answering import (
-    QuestionAnsweringTrainer,
+from question_answering import (  # noqa: E402
     CrossEntropyLossForSQuAD,
+    QuestionAnsweringTrainer,
     prepare_train_features,
     prepare_validation_features,
 )
-from utils import (
-    ALL_DATASETS,
-    DataArguments,
-    ModelArguments,
-)
+from utils import ALL_DATASETS, DataArguments, ModelArguments  # noqa: E402
 
 
 def main():

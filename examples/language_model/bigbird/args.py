@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import argparse
-import distutils.util
+
+from paddlenlp.trainer.argparser import strtobool
 
 
 def parse_args():
@@ -89,9 +90,7 @@ def parse_args():
         "--use_nsp", default=False, type=bool, help="Whether or not add the nsp loss to the total loss."
     )
 
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
 
     parser.add_argument(
         "--task_name",

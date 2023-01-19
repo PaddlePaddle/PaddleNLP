@@ -14,26 +14,25 @@
 
 import argparse
 import logging
-import os
-import sys
-import random
-import time
 import math
-import distutils.util
+import os
+import random
+import sys
+import time
 from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
 import paddle.nn as nn
-from paddle.metric import Accuracy
+from paddle.io import DataLoader
 
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad, Dict
-from paddlenlp.transformers import LinearDecayWithWarmup, PPMiniLMForSequenceClassification
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import LinearDecayWithWarmup
 
 sys.path.append("../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from data import METRIC_CLASSES, MODEL_CLASSES, convert_example  # noqa: E402
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -107,8 +106,8 @@ def parse_args():
         "--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps."
     )
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--do_train", type=distutils.util.strtobool, default=True, help="Whether do train.")
-    parser.add_argument("--do_eval", type=distutils.util.strtobool, default=False, help="Whether do train.")
+    parser.add_argument("--do_train", type=strtobool, default=True, help="Whether do train.")
+    parser.add_argument("--do_eval", type=strtobool, default=False, help="Whether do train.")
     parser.add_argument(
         "--max_steps",
         default=-1,
@@ -182,16 +181,13 @@ def do_eval(args):
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
 
-    num_classes = 1 if dev_ds.label_list == None else len(dev_ds.label_list)
+    num_classes = 1 if dev_ds.label_list is None else len(dev_ds.label_list)
 
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
     metric = metric_class()
-    best_acc = 0.0
-    global_step = 0
-    tic_train = time.time()
     model.eval()
     metric.reset()
     for batch in dev_data_loader:
@@ -242,7 +238,7 @@ def do_train(args):
         dataset=dev_ds, batch_sampler=dev_batch_sampler, collate_fn=batchify_fn, num_workers=0, return_list=True
     )
 
-    num_classes = 1 if train_ds.label_list == None else len(train_ds.label_list)
+    num_classes = 1 if train_ds.label_list is None else len(train_ds.label_list)
     model = model_class.from_pretrained(args.model_name_or_path, num_classes=num_classes)
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)

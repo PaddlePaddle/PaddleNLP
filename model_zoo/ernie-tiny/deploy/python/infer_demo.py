@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import distutils.util
 import os
 
 import fastdeploy as fd
 import numpy as np
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import AutoTokenizer
 
 
@@ -46,10 +46,10 @@ def parse_arguments():
     parser.add_argument("--batch_size", type=int, default=1, help="The batch size of data.")
     parser.add_argument("--max_length", type=int, default=16, help="The max length of sequence.")
     parser.add_argument("--cpu_num_threads", type=int, default=1, help="The number of threads when inferring on cpu.")
-    parser.add_argument("--use_trt_fp16", type=distutils.util.strtobool, default=False, help="Wheter to use FP16 mode")
+    parser.add_argument("--use_trt_fp16", type=strtobool, default=False, help="Wheter to use FP16 mode")
     parser.add_argument(
         "--use_fast",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=True,
         help="Whether to use fast_tokenizer to accelarate the tokenization.",
     )

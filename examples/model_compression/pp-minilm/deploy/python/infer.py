@@ -13,20 +13,19 @@
 # limitations under the License.
 
 import argparse
-import os
-import time
 import sys
+import time
 from functools import partial
-import distutils.util
-import numpy as np
 
 import paddle
 from paddle import inference
+
+from paddlenlp.data import Pad, Stack, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Stack, Tuple, Pad
+from paddlenlp.trainer.argparser import strtobool
 
 sys.path.append("../../")
-from data import convert_example, METRIC_CLASSES, MODEL_CLASSES
+from data import METRIC_CLASSES, MODEL_CLASSES, convert_example  # noqa: E402
 
 
 def parse_args():
@@ -100,7 +99,7 @@ def parse_args():
     )
     parser.add_argument(
         "--use_faster_tokenizer",
-        type=distutils.util.strtobool,
+        type=strtobool,
         default=True,
         help="Whether to use FasterTokenizer to accelerate training or further inference.",
     )
@@ -321,7 +320,7 @@ def main():
 
     predictor = Predictor.create_predictor(args)
 
-    model_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    _, tokenizer_class = MODEL_CLASSES[args.model_type]
 
     dev_ds = load_dataset("clue", args.task_name, splits="dev")
 
@@ -336,9 +335,9 @@ def main():
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
             Stack(dtype="int64" if dev_ds.label_list else "float32"),  # label
         ): fn(samples)
-        outputs = predictor.predict(dev_ds, tokenizer, batchify_fn, args)
+        predictor.predict(dev_ds, tokenizer, batchify_fn, args)
     else:
-        outputs = predictor.faster_predict(dev_ds, args=args)
+        predictor.faster_predict(dev_ds, args=args)
 
 
 if __name__ == "__main__":

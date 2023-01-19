@@ -16,24 +16,25 @@ import argparse
 import os
 import random
 import time
-from functools import partial
 from concurrent.futures import ThreadPoolExecutor
-import distutils.util
-import math
 
 import numpy as np
 import paddle
 from paddle.io import DataLoader
-import paddle.nn.functional as F
-from paddle import tensor
 
+from paddlenlp.data import Pad, Tuple
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    PPMiniLMForSequenceClassification,
+    PPMiniLMModel,
+    PPMiniLMTokenizer,
+    RobertaModel,
+    RobertaTokenizer,
+)
+from paddlenlp.transformers.distill_utils import calc_multi_relation_loss, to_distill
 from paddlenlp.utils.log import logger
-from paddlenlp.data import Tuple, Pad
 from paddlenlp.utils.tools import TimeCostAverage
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.transformers import RobertaModel, RobertaTokenizer
-from paddlenlp.transformers import PPMiniLMModel, PPMiniLMForSequenceClassification, PPMiniLMTokenizer
-from paddlenlp.transformers.distill_utils import to_distill, calc_multi_relation_loss
 
 MODEL_CLASSES = {
     "roberta": (RobertaModel, RobertaTokenizer),
@@ -157,9 +158,7 @@ def parse_args():
     parser.add_argument(
         "--device", default="gpu", type=str, help="The device to select to train the model, is must be cpu/gpu/xpu."
     )
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
@@ -303,7 +302,6 @@ def do_train(args):
     student = to_distill(student, return_qkv=True, layer_index=args.student_layer_index)
 
     global_step = 0
-    tic_train = time.time()
     for epoch in range(args.num_train_epochs):
         files = [
             os.path.join(args.input_dir, f)
@@ -333,8 +331,6 @@ def do_train(args):
                 (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
             ]
 
-        previous_file = data_file
-
         train_data_loader, _ = create_pretraining_dataset(data_file, shared_file_list, args, worker_init, tokenizer)
 
         # TODO(guosheng): better way to process single file
@@ -352,7 +348,6 @@ def do_train(args):
                 data_file = files[
                     (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
                 ]
-            previous_file = data_file
             dataset_future = pool.submit(
                 create_pretraining_dataset, data_file, shared_file_list, args, worker_init, tokenizer
             )

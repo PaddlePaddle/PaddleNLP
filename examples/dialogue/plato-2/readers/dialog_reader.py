@@ -14,16 +14,16 @@
 """Dialogue Reader."""
 
 import csv
+import gzip
 from collections import namedtuple
 from contextlib import contextmanager
-import gzip
 
 import numpy as np
-
-from utils import pad_batch_data
-from utils.args import str2bool
-from utils.masking import mask
 import utils.tokenization as tokenization
+from utils import pad_batch_data
+from utils.masking import mask
+
+from paddlenlp.trainer.argparser import strtobool
 
 
 class DialogReader(object):
@@ -35,12 +35,12 @@ class DialogReader(object):
         group = parser.add_argument_group("Reader")
         group.add_argument("--max_src_len", type=int, default=128)
         group.add_argument("--max_tgt_len", type=int, default=128)
-        group.add_argument("--truncate_first_turn", type=str2bool, default=False)
+        group.add_argument("--truncate_first_turn", type=strtobool, default=False)
         group.add_argument("--file_format", type=str, default="file", choices=["file", "filelist"])
         group.add_argument("--data_format", type=str, default="raw", choices=["raw", "tokenized", "numerical"])
-        group.add_argument("--in_tokens", type=str2bool, default=False)
+        group.add_argument("--in_tokens", type=strtobool, default=False)
         group.add_argument("--batch_size", type=int, default=16)
-        group.add_argument("--continuous_position", type=str2bool, default=True)
+        group.add_argument("--continuous_position", type=strtobool, default=True)
         group.add_argument("--random_seed", type=int, default=11)
         group.add_argument("--sort_pool_size", type=int, default=2**16)
 
@@ -389,7 +389,6 @@ class DialogReader(object):
         """
         Padding batch records and construct model's inputs.
         """
-        batch_size = len(batch_records)
         batch = {}
         batch_token_ids = [record.token_ids for record in batch_records]
         batch_type_ids = [record.type_ids for record in batch_records]

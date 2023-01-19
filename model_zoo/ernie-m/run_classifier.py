@@ -12,25 +12,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import argparse
-import random
 import math
+import os
+import random
 import time
-import distutils.util
 from functools import partial
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle.io import Dataset, BatchSampler, DistributedBatchSampler, DataLoader
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
 from datasets import load_dataset
+from paddle.io import BatchSampler, DataLoader, Dataset, DistributedBatchSampler
 from paddle.metric import Accuracy
-from paddlenlp.ops.optimizer import layerwise_lr_decay
 from paddle.optimizer import AdamW
+
 from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.ops.optimizer import layerwise_lr_decay
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    AutoModelForSequenceClassification,
+    AutoTokenizer,
+    LinearDecayWithWarmup,
+)
 
 all_languages = ["ar", "bg", "de", "el", "en", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
 
@@ -107,9 +111,7 @@ def parse_args():
         help="The device to select to train the model, is must be cpu/gpu/xpu.",
     )
     parser.add_argument("--overwrite_cache", action="store_true", help="Whether to overwrite cache for dataset.")
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args

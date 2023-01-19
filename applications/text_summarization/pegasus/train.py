@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import argparse
-import distutils.util
 import math
 import os
 import random
@@ -29,6 +28,7 @@ from tqdm import tqdm
 from utils import compute_metrics, convert_example, main_process_first
 
 from paddlenlp.data import DataCollatorForSeq2Seq
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.transformers import (
     LinearDecayWithWarmup,
     PegasusChineseTokenizer,
@@ -122,9 +122,7 @@ def parse_args():
         choices=["cpu", "gpu", "xpu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu.",
     )
-    parser.add_argument(
-        "--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", default=False, type=strtobool, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args

@@ -15,6 +15,8 @@
 import argparse
 
 import paddle
+
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.log import logger
 
 
@@ -38,15 +40,6 @@ def process_batch_size(args):
     else:
         args.global_batch_size = args.local_batch_size * args.dp_degree * args.sharding_degree
     assert args.local_batch_size % args.micro_batch_size == 0
-
-
-def str2bool(v):
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def parse_args(MODEL_CLASSES):
@@ -177,12 +170,12 @@ def parse_args(MODEL_CLASSES):
         help="Pipeline Parallelism degree.  Spliting the model layers to different parts.",
     )
     parser.add_argument(
-        "--use_recompute", type=str2bool, nargs="?", const=False, help="Using the recompute to save the memory."
+        "--use_recompute", type=strtobool, nargs="?", const=False, help="Using the recompute to save the memory."
     )
 
     parser.add_argument(
         "--recompute_partition",
-        type=str2bool,
+        type=strtobool,
         nargs="?",
         const=False,
         help="use recompute_partition to support mp partition when use_recompute is True .",
@@ -190,7 +183,7 @@ def parse_args(MODEL_CLASSES):
 
     parser.add_argument(
         "--recompute_offload",
-        type=str2bool,
+        type=strtobool,
         nargs="?",
         const=False,
         help="use recompute_offload to save the memory by offload when use_recompute is True .",
@@ -206,7 +199,7 @@ def parse_args(MODEL_CLASSES):
 
     # Pure FP16 config
     parser.add_argument(
-        "--use_pure_fp16", type=str2bool, nargs="?", const=False, help="Enable pure fp16 precision training."
+        "--use_pure_fp16", type=strtobool, nargs="?", const=False, help="Enable pure fp16 precision training."
     )
 
     parser.add_argument(
@@ -217,7 +210,7 @@ def parse_args(MODEL_CLASSES):
     )
 
     parser.add_argument(
-        "--sharding_offload", type=str2bool, nargs="?", const=False, help="use sharding stage2 cpu offload strategy."
+        "--sharding_offload", type=strtobool, nargs="?", const=False, help="use sharding stage2 cpu offload strategy."
     )
 
     parser.add_argument("--hidden_dropout_prob", type=float, default=0.1, help="The hidden dropout prob.")
@@ -231,7 +224,7 @@ def parse_args(MODEL_CLASSES):
 
     parser.add_argument("--top_k", type=int, default=2, help="top_k for moe gate")
 
-    parser.add_argument("--expert_mode", type=str2bool, nargs="?", const=False, help="Enable Moe mode.")
+    parser.add_argument("--expert_mode", type=strtobool, nargs="?", const=False, help="Enable Moe mode.")
 
     parser.add_argument(
         "--balance_loss_weight",
@@ -251,7 +244,7 @@ def parse_args(MODEL_CLASSES):
     # Other config
     parser.add_argument("--seed", type=int, default=1234, help="Random seed for initialization")
     parser.add_argument(
-        "--check_accuracy", type=str2bool, nargs="?", const=False, help="Check accuracy for training process."
+        "--check_accuracy", type=strtobool, nargs="?", const=False, help="Check accuracy for training process."
     )
     parser.add_argument(
         "--device", type=str, default="gpu", choices=["cpu", "gpu", "xpu"], help="select cpu, gpu, xpu devices."

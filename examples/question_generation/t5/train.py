@@ -11,25 +11,28 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import argparse
+import os
 import random
 import time
-import distutils.util
-from pprint import pprint
 from functools import partial
-from tqdm import tqdm
-import numpy as np
+from pprint import pprint
 
+import numpy as np
 import paddle
-import paddle.nn as nn
-from paddle.io import BatchSampler, DistributedBatchSampler, DataLoader
-from paddlenlp.transformers import T5ForConditionalGeneration, T5Tokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+from tqdm import tqdm
+from utils import compute_metrics, convert_example
+
+from paddlenlp.data import Pad, Tuple
 from paddlenlp.datasets import load_dataset
-from paddlenlp.data import Tuple, Stack, Pad
-from utils import convert_example, compute_metrics
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    LinearDecayWithWarmup,
+    T5ForConditionalGeneration,
+    T5Tokenizer,
+)
+from paddlenlp.utils.log import logger
 
 
 # yapf: disable
@@ -38,31 +41,26 @@ def parse_args():
     # Required parameters
     parser.add_argument("--model_name_or_path", default="t5-base", type=str, required=True, help="Path to pre-trained model. ")
     parser.add_argument("--dataset_name", default="squad", type=str, required=True, help="The name of the dataset to use. Selected in the list: " + "squad")
-    parser.add_argument("--output_dir", default="output", type=str, required=True, help=
-        "The output directory where the model predictions and checkpoints will be written.",)
-    parser.add_argument("--max_source_length", default=1024, type=int, help="The maximum total input sequence length after "
-        "tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",)
+    parser.add_argument("--output_dir", default="output", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written.",)
+    parser.add_argument("--max_source_length", default=1024, type=int, help="The maximum total input sequence length after tokenization.Sequences longer than this will be truncated, sequences shorter will be padded.",)
     parser.add_argument("--min_target_length", default=0, type=int, help="The minimum total sequence length for target text when generating. ")
-    parser.add_argument("--max_target_length", default=142, type=int, help="The maximum total sequence length for target text after "
-        "tokenization. Sequences longer than this will be truncated, sequences shorter will be padded. during ``evaluate`` and ``predict``.",)
+    parser.add_argument("--max_target_length", default=142, type=int, help="The maximum total sequence length for target text after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded. during ``evaluate`` and ``predict``.",)
     parser.add_argument("--learning_rate", default=1e-4, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.",)
+    parser.add_argument("--num_train_epochs", default=3, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--logging_steps", type=int, default=100, help="Log every X updates steps.")
     parser.add_argument("--save_steps", type=int, default=100, help="Save checkpoint every X updates steps.")
-    parser.add_argument("--train_batch_size", default=20, type=int, help="Batch size per GPU/CPU for training.",)
-    parser.add_argument("--eval_batch_size", default=12, type=int, help="Batch size per GPU/CPU for evaluation.",)
+    parser.add_argument("--train_batch_size", default=20, type=int, help="Batch size per GPU/CPU for training.")
+    parser.add_argument("--eval_batch_size", default=12, type=int, help="Batch size per GPU/CPU for evaluation.")
     parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--warmup_steps", default=0, type=int,help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
+    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps. If > 0: Override warmup_proportion")
     parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over total steps.")
     parser.add_argument("--adam_epsilon", default=1e-6, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_steps", default=-1, type=int, help=
-        "If > 0: set total number of training steps to perform. Override num_train_epochs.",)
+    parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.")
     parser.add_argument("--seed", default=42, type=int, help="random seed for initialization")
     parser.add_argument("--device", default="gpu", type=str, choices=["cpu", "gpu", "xpu"], help="The device to select to train the model, is must be cpu/gpu/xpu.")
-    parser.add_argument("--use_amp", default=False, type=distutils.util.strtobool, help="Enable mixed precision training.")
+    parser.add_argument("--use_amp", default=False, type=strtobool, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", default=2**15, type=float, help="The value of scale_loss for fp16.")
     parser.add_argument("--ignore_pad_token_for_loss", action='store_true', help="Whether to ignore the tokens corresponding to padded labels in the loss computation or not.")
-
 
     args = parser.parse_args()
     return args

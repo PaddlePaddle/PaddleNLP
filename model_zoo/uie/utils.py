@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import json
 import math
 import random
@@ -29,16 +28,6 @@ def set_seed(seed):
     paddle.seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-
-
-def str2bool(v):
-    """Support bool type for argparse."""
-    if v.lower() in ("yes", "true", "t", "y", "1"):
-        return True
-    elif v.lower() in ("no", "false", "f", "n", "0"):
-        return False
-    else:
-        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):

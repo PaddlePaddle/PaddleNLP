@@ -31,11 +31,12 @@ DataClassType = NewType("DataClassType", Any)
 
 __all__ = [
     "PdArgumentParser",
+    "strtobool",
 ]
 
 
 # From https://stackoverflow.com/questions/15008758/parsing-boolean-values-with-argparse
-def string_to_bool(v):
+def strtobool(v):
     if isinstance(v, bool):
         return v
     if v.lower() in ("yes", "true", "t", "y", "1"):
@@ -116,7 +117,7 @@ class PdArgumentParser(ArgumentParser):
             bool_kwargs = copy(kwargs)
 
             # Hack because type=bool in argparse does not behave as we want.
-            kwargs["type"] = string_to_bool
+            kwargs["type"] = strtobool
             if field.type is bool or (field.default is not None and field.default is not dataclasses.MISSING):
                 # Default value is False if we have no default when of type bool.
                 default = False if field.default is dataclasses.MISSING else field.default

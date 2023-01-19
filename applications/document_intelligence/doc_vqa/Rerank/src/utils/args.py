@@ -12,19 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Arguments for configuration."""
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function, unicode_literals
 
-import six
+import logging
 import os
 import sys
-import argparse
-import logging
 
 import paddle.fluid as fluid
+import six
+
+from paddlenlp.trainer.argparser import strtobool
 
 log = logging.getLogger(__name__)
 
@@ -42,19 +39,13 @@ def prepare_logger(logger, debug=False, save_to_file=None):
     logger.propagate = False
 
 
-def str2bool(v):
-    # because argparse does not support to parse "true, False" as python
-    # boolean directly
-    return v.lower() in ("true", "t", "1")
-
-
 class ArgumentGroup(object):
     def __init__(self, parser, title, des):
         self._group = parser.add_argument_group(title=title, description=des)
 
     def add_arg(self, name, type, default, help, positional_arg=False, **kwargs):
         prefix = "" if positional_arg else "--"
-        type = str2bool if type == bool else type
+        type = strtobool if type == bool else type
         self._group.add_argument(
             prefix + name, default=default, type=type, help=help + " Default: %(default)s.", **kwargs
         )
@@ -73,8 +64,8 @@ def check_cuda(
     Please: 1. Install paddlepaddle-gpu to run your models on GPU or 2. Set use_cuda = False to run models on CPU.\n",
 ):
     try:
-        if use_cuda == True and fluid.is_compiled_with_cuda() == False:
+        if use_cuda is True and fluid.is_compiled_with_cuda() is False:
             log.error(err)
             sys.exit(1)
-    except Exception as e:
+    except Exception:
         pass

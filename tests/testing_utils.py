@@ -18,11 +18,11 @@ import inspect
 import os
 import unittest
 from collections.abc import Mapping
-from distutils.util import strtobool
 
 import numpy as np
 import paddle
 
+from paddlenlp.trainer.argparser import strtobool
 from paddlenlp.utils.import_utils import is_package_available
 
 __all__ = ["get_vocab_list", "stable_softmax", "cross_entropy"]

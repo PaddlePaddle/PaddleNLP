@@ -14,27 +14,25 @@
 
 import argparse
 import os
-import sys
 import random
 import time
-import math
-import distutils.util
-from functools import partial
 
 import numpy as np
 import paddle
-from paddle.io import DataLoader
-from paddle.metric import Metric, Accuracy, Precision, Recall
-import paddlenlp
-
 from datasets import load_dataset
-from paddlenlp.data import default_data_collator, DataCollatorWithPadding
-from paddlenlp.data.sampler import SamplerHelper
-from paddlenlp.transformers import BertForSequenceClassification, BertTokenizer
-from paddlenlp.transformers import ElectraForSequenceClassification, ElectraTokenizer
-from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
-from paddlenlp.transformers import LinearDecayWithWarmup
+from paddle.io import DataLoader
+from paddle.metric import Accuracy
+
+from paddlenlp.data import DataCollatorWithPadding
 from paddlenlp.metrics import AccuracyAndF1, Mcc, PearsonAndSpearman
+from paddlenlp.trainer.argparser import strtobool
+from paddlenlp.transformers import (
+    BertForSequenceClassification,
+    BertTokenizer,
+    ErnieForSequenceClassification,
+    ErnieTokenizer,
+    LinearDecayWithWarmup,
+)
 
 METRIC_CLASSES = {
     "cola": Mcc,
@@ -147,9 +145,7 @@ def parse_args():
         choices=["cpu", "gpu", "xpu", "npu"],
         help="The device to select to train the model, is must be cpu/gpu/xpu/npu.",
     )
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
+    parser.add_argument("--use_amp", type=strtobool, default=False, help="Enable mixed precision training.")
     parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
     args = parser.parse_args()
     return args
