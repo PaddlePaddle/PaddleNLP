@@ -28,7 +28,7 @@ ERNIE-ViL 2.0提出了一种基于多视角对比学习的预训练框架，通�
 使用 PaddleNLP 只需要一行代码就可以下载并获取 ERNIE-ViL 2.0 预训练模型，之后可以用自己的下游数据下进行微调。
 
 ```python
-
+import paddle
 import requests
 import paddle.nn.functional as F
 from PIL import Image
@@ -45,8 +45,8 @@ inputs = processor(text=["一只猫的照片", "一条狗的照片"],
                 images=image,
                 padding=True,
                 return_tensors="pd")
-
-outputs = model(**inputs)
+with paddle.no_grad():
+    outputs = model(**inputs)
 
 logits_per_image = outputs[0]
 probs = F.softmax(logits_per_image, axis=1)
@@ -143,7 +143,7 @@ print(probs)
 
 ### 任务介绍
 
-本项目是使用 ERNIE-ViL 2.0 的跨模态检索方案，任务背景搜索场景下图文互搜的任务。本项目包括微调流程。
+本项目是使用 ERNIE-ViL 2.0 的跨模态检索方案，任务背景是实现搜索场景下图文互搜的任务，包括微调流程。
 
 
 ### 环境要求
@@ -243,16 +243,16 @@ python -u -m paddle.distributed.launch --gpus "0,1,2,3,4,5,6,7" \
 
 可配置参数说明：
 * `do_train` 是否进行微调训练，设置该参数表示进行微调训练。
-* `train_data` 必须，训练集路径
-* `val_data` 必须，验证集路径
-* `learning_rate` 训练的学习率
-* `warmup_steps` warmup的step数
-* `logging_steps` 训练过程中日志打印的间隔 steps 数
+* `train_data` 必须，训练集路径。
+* `val_data` 必须，验证集路径。
+* `learning_rate` 训练的学习率。
+* `warmup_steps` warmup的step数。
+* `logging_steps` 训练过程中日志打印的间隔 steps 数。
 * `per_device_train_batch_size` 训练集训练过程批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为128。
-* `dataloader_num_workers` Dataloader的num_worker的数目
+* `dataloader_num_workers` Dataloader的num_worker的数目。
 * `save_steps` 训练过程中保存模型 checkpoint 的间隔 steps 数，默认50。
 * `num_train_epochs` 训练的epoch数目。
-* `weight_decay` 除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0；
+* `weight_decay` 除了所有 bias 和 LayerNorm 权重之外，应用于所有层的权重衰减数值。可选；默认为 0.0。
 * `save_total_limit` 保存checkpoints的数目，默认-1，表示不设限制。
 * `seed` 随机种子，用于固定模型训练的随机因素。
 * `label_names`训练集中标签对应的的 key 名称。如果不传入，在训练时 Trainer 可能由于无法区分输入数据和标签造成错误。
@@ -283,12 +283,12 @@ python -u extract_features.py \
 可配置参数说明：
 * `extract-image-feats` 是否进行图像特征提取。
 * `extract-image-feats` 是否进行文本特征提取。
-* `image-data` 图像数据的地址
-* `text-data` 文本数据的地址
-* `resume` checkpoints的加载地址
-* `img-batch-size` 图像特征提取的batch size
-* `text-batch-size` 文本特征提取的batch size
-* `context-length` 文本序列的最大长度
+* `image-data` 图像数据的地址。
+* `text-data` 文本数据的地址。
+* `resume` checkpoints的加载地址。
+* `img-batch-size` 图像特征提取的batch size。
+* `text-batch-size` 文本特征提取的batch size。
+* `context-length` 文本序列的最大长度。
 
 ### 以文搜图评估
 
@@ -393,3 +393,4 @@ Label probs: Tensor(shape=[1, 2], dtype=float32, place=Place(gpu:0), stop_gradie
 
 ## 参考文献
 * Bin Shan, Weichong Yin, Yu Sun, Hao Tian, Hua Wu, Haifeng Wang: ERNIE-ViL 2.0: Multi-view Contrastive Learning for Image-Text Pre-training. CoRR abs/2209.15270 (2022)
+* An Yang, Junshu Pan, Junyang Lin, Rui Men, Yichang Zhang, Jingren Zhou, Chang Zhou: Chinese CLIP: Contrastive Vision-Language Pretraining in Chinese. CoRR abs/2211.01335 (2022)

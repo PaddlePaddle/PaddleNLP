@@ -29,19 +29,14 @@ args = parser.parse_args()
 
 def main():
 
-    tokenizer = ErnieViLTokenizer.from_pretrained("ernie_vil-2.0-base-zh")
+    tokenizer = ErnieViLTokenizer.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
+    processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
     if args.resume is not None:
         # Loading finetuned model
         model = ErnieViLModel.from_pretrained(args.resume)
-        processor = ErnieViLProcessor.from_pretrained(
-            "PaddlePaddle/ernie_vil-2.0-base-zh",
-            image_mean=[0.48145466, 0.4578275, 0.40821073],
-            image_std=[0.26862954, 0.26130258, 0.27577711],
-        )
         print("Loading parameters from " + args.resume)
     else:
         model = ErnieViLModel.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
-        processor = ErnieViLProcessor.from_pretrained("PaddlePaddle/ernie_vil-2.0-base-zh")
 
     model.eval()
     image = Image.open("examples/000000039769.jpeg")

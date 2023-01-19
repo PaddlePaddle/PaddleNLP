@@ -17,15 +17,13 @@ import json
 import logging
 import os
 import pickle
-from dataclasses import dataclass
 from io import BytesIO
 from math import ceil
-from pathlib import Path
 
 import lmdb
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset, DistributedBatchSampler
+from paddle.io import Dataset
 from paddle.vision.transforms import (
     Compose,
     Normalize,
@@ -96,7 +94,7 @@ class LMDBDataset(Dataset):
                     RandomHorizontalFlip(0.5),
                     _convert_to_rgb,
                     ToTensor(),
-                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+                    Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ]
             )
         else:
@@ -105,7 +103,7 @@ class LMDBDataset(Dataset):
                     Resize((resolution, resolution), interpolation="bicubic"),
                     _convert_to_rgb,
                     ToTensor(),
-                    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
+                    Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
                 ]
             )
         return transform
@@ -129,12 +127,10 @@ class LMDBDataset(Dataset):
         image_b64 = image_b64.decode(encoding="utf8", errors="ignore")
         image = Image.open(BytesIO(base64.urlsafe_b64decode(image_b64)))  # already resized
         image = self.transform(image)
-        # text = tokenize([_preprocess_text(raw_text)], context_length=self.max_txt_length)[0]
         texts = self.tokenizer([_preprocess_text(raw_text)], max_len=self.max_txt_length, padding="max_length")
         # print(text['input_ids'][0])
         text = texts["input_ids"][0]
-        # text = tokenizer([_preprocess_text(raw_text)], context_length=self.max_txt_length)[0]
-        # eos_index = text.numpy().tolist().index(_tokenizer.vocab['[SEP]'])
+
         eos_index = text.index(self.tokenizer.vocab["[SEP]"])
         eos_index = np.array(eos_index)
         return {"pixel_values": image, "input_ids": text, "index": eos_index}
@@ -144,22 +140,6 @@ def pad_dataset(dataset, global_batch_size):
     # edit dataset.__len__() of the dataset
     dataset.dataset_len = ceil(dataset.dataset_len / global_batch_size) * global_batch_size
     dataset.global_batch_size = global_batch_size
-
-
-def fetch_resolution(vision_model):
-    # fetch the resolution from the vision model config
-    vision_model_config_file = Path(__file__).parent / f"clip/model_configs/{vision_model.replace('/', '-')}.json"
-    with open(vision_model_config_file, "r") as fv:
-        model_info = json.load(fv)
-    return model_info["image_resolution"]
-
-
-@dataclass
-class DataInfo:
-    dataloader: DataLoader
-    sampler: DistributedBatchSampler
-    dataset: LMDBDataset
-    epoch_id: int
 
 
 def get_eval_txt_dataset(args, max_txt_length=24, tokenizer=None):
@@ -192,65 +172,6 @@ def get_train_eval_dataset(args, epoch_id=0, max_txt_length=64, tokenizer=None):
         resolution=224,
     )
     return train_dataset, eval_dataset
-
-
-def get_dataset(args, is_train, max_txt_length=64, epoch_id=0):
-    if is_train:
-        db_path = args.train_data
-    else:
-        db_path = args.val_data
-    assert db_path is not None
-
-    dataset = LMDBDataset(
-        db_path,
-        split="train" if is_train else "val",
-        max_txt_length=max_txt_length,
-        use_augment=args.use_augment if is_train else False,
-        resolution=fetch_resolution(args.vision_model),
-    )
-    print(dataset[0])
-
-    # pad the dataset splits using the beginning samples in the LMDB files
-    # to make the number of samples enough for a full final global batch
-    batch_size = args.batch_size if is_train else args.valid_batch_size
-    # global_batch_size = batch_size * paddle.distributed.get_world_size()
-    global_batch_size = batch_size
-    pad_dataset(dataset, global_batch_size)
-
-    num_samples = dataset.dataset_len
-    # Update in 22.12.11: We have changed the **validation** dataset sampler during finetuning
-    # from sequential to shuffled (in a determistic order between experiments and epochs).
-    # This is to avoid there being one text matching multiple images (or vice versa) in a local batch
-    # which will affect the correctness of computing the validation in-batch accuracy.
-    # sampler = DistributedSampler(dataset, shuffle=True, seed=args.seed)
-    sampler = paddle.io.BatchSampler(dataset, batch_size=batch_size, drop_last=False)
-    # sampler.set_epoch(epoch_id if is_train else 0)
-
-    dataloader = DataLoader(
-        dataset,
-        batch_size=batch_size,
-        # pin_memory=False,
-        num_workers=args.num_workers if is_train else 1,
-        # sampler=sampler,
-    )
-
-    dataloader.num_samples = num_samples
-    assert num_samples % dataset.global_batch_size == 0
-    dataloader.num_batches = num_samples // dataset.global_batch_size
-
-    return DataInfo(dataloader, sampler, dataset, epoch_id)
-
-
-def get_data(args, epoch_id=0, max_txt_length=64):
-    data = {}
-
-    if args.train_data:
-        data["train"] = get_dataset(args, is_train=True, max_txt_length=max_txt_length, epoch_id=epoch_id)
-
-    if args.val_data:
-        data["val"] = get_dataset(args, is_train=False, max_txt_length=max_txt_length, epoch_id=epoch_id)
-
-    return data
 
 
 def create_dataloader(dataset, mode="train", batch_size=1, num_workers=1, batchify_fn=None, trans_fn=None):
@@ -290,7 +211,6 @@ class EvalTxtDataset(Dataset):
 
     def __getitem__(self, idx):
         text_id, text = self.texts[idx]
-        # text = tokenize([_preprocess_text(str(text))], context_length=self.max_txt_length)[0]
         texts = self.tokenizer([_preprocess_text(str(text))], max_len=self.max_txt_length, padding="max_length")
         # print(text['input_ids'][0])
         text = texts["input_ids"][0]
@@ -313,7 +233,7 @@ class EvalImgDataset(Dataset):
         self.transform = self._build_transform(resolution)
 
     def _build_transform(self, resolution):
-        normalize = Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711))
+        normalize = Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         return Compose(
             [
                 Resize((resolution, resolution), interpolation="bicubic"),
