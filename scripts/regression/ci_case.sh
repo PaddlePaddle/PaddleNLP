@@ -1148,7 +1148,7 @@ if [ ! -f 'test.py' ];then
     python run_qa.py --model_name_or_path best_models/cmrc2018/ --dataset cmrc2018  --output_dir ./best_models --do_predict --config=configs/default.yml >${log_path}/ernie-3.0_predict_qa >>${log_path}/ernie-3.0_predict_qa 2>&1
     print_info $? ernie-3.0_predict_qa
     #压缩
-    python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5 --save_steps 5 --algo_list mse --batch_size_list 4 --per_device_train_batch_size 16 >${log_path}/ernie-3.0_compress_seq_cls >>${log_path}/ernie-3.0_compress_seq_cls 2>&1
+    python compress_seq_cls.py  --model_name_or_path best_models/afqmc/  --dataset afqmc --output_dir ./best_models/afqmc --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5 --save_steps 5 --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_seq_cls >>${log_path}/ernie-3.0_compress_seq_cls 2>&1
     print_info $? ernie-3.0_compress_seq_cls
     python compress_token_cls.py  --model_name_or_path best_models/msra_ner/  --dataset msra_ner --output_dir ./best_models/msra_ner --config=configs/default.yml --max_steps 10 --eval_steps 5 --save_steps 5  --algo_list mse --batch_size_list 4 >${log_path}/ernie-3.0_compress_token_cls >>${log_path}/ernie-3.0_compress_token_cls 2>&1
     print_info $? ernie-3.0_compress_token_cls
