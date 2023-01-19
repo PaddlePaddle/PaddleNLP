@@ -57,7 +57,7 @@ def parse_args():
     )
     parser.add_argument("--model_path", type=str, required=True, help="The path prefix of inference model to be used.")
     parser.add_argument(
-        "--device", default="gpu", choices=["gpu", "cpu", "xpu"], help="Device selected for inference."
+        "--device", default="gpu", choices=["gpu", "cpu", "xpu", "npu"], help="Device selected for inference."
     )
     parser.add_argument("--batch_size", default=32, type=int, help="Batch size for predict.")
     parser.add_argument(
@@ -79,6 +79,7 @@ def parse_args():
     )
     parser.add_argument("--shape_file", default="shape_info.txt", type=str, help="Shape info filename.")
     parser.add_argument("--use_trt", action="store_true", help="Whether to use inference engin TensorRT.")
+    parser.add_argument("--use_lite", action="store_true", help="Whether to use inference engin PaddleLite.")
     parser.add_argument("--perf", action="store_true", help="Whether to test performance.")
     parser.add_argument("--collect_shape", action="store_true", help="Whether to collect shape info.")
 
@@ -111,6 +112,12 @@ def parse_args():
         choices=["CPUExecutionProvider", "DnnlExecutionProvider"],
         type=str,
         help="Onnx ExecutionProvider with DNNL or without DNNL",
+    )
+    parser.add_argument(
+        "--lazy_data_processing",
+        default=True,
+        type=bool,
+        help="Whether use lazy data processing",
     )
 
     args = parser.parse_args()
@@ -225,6 +232,12 @@ class Predictor(object):
         elif args.device == "xpu":
             # set XPU configs accordingly
             config.enable_xpu(100)
+        elif args.device == "npu":
+            if args.use_lite:
+                config.enable_lite_engine(paddle.inference.PrecisionType(0), True)
+                config.nnadapter().enable().set_device_names(["huawei_ascend_npu"])
+            else:
+                config.enable_custom_device("npu")
         if args.use_trt:
             precision_map = {
                 "int8": inference.PrecisionType.Int8,
@@ -494,8 +507,12 @@ def main():
             max_seq_length=args.max_seq_length,
             is_test=False,
         )
-        dev_ds = dev_ds.map(trans_func, lazy=False)
-        batchify_fn = DataCollatorWithPadding(tokenizer)
+        dev_ds = dev_ds.map(trans_func, lazy=args.lazy_data_processing)
+        if args.device == "npu":
+            # NOTE: Avoid CANN recompile operators for different shape inputs, which will result in very slow training.
+            batchify_fn = DataCollatorWithPadding(tokenizer, padding="max_length", max_length=args.max_seq_length)
+        else:
+            batchify_fn = DataCollatorWithPadding(tokenizer)
 
         predictor.predict(dev_ds, tokenizer, batchify_fn, args)
 
