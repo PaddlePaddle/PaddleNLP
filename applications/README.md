@@ -59,8 +59,8 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 #### 🔍 语义检索系统
 
-- 前沿算法———基于 SimCSE、In-batch Negatives、ERNIE Pair-wise、RocketQA Poinet-Wise 等提供针对无监督、有监督等多种数据情况的多样化方案；
-- 全流程———覆盖召回、排序环节，集成主流 ANN 引擎，同时兼容 Elasticsearch 字面检索模式，提供多路召回方案。打通训练、调优、高效向量检索引擎建库和查询全流程。
+- 前沿算法———基于 SimCSE、In-batch Negatives、ERNIE Pairwise、RocketQA Pointwise 等提供针对无监督、有监督等多种数据情况的多样化方案；
+- 全流程———覆盖召回、排序环节，集成主流 ANN 引擎，同时兼容 ElasticSearch 字面检索模式，提供多路召回方案。打通训练、调优、高效向量检索引擎建库和查询全流程。
 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/213134465-30cae5fd-4cd1-4e5b-a1cb-fa55c72980a7.gif" width="60%" length="60%">
@@ -96,7 +96,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 #### 🗂 文本分类
 
-- 场景方案全覆盖––––开源预训练模型-微调、提示学习、基于语义索引等多种分类技术方案，满足不同场景需求，涵盖多分类（multi class）、多标签（multi label）、层次分类（hierarchical）三类任务；
+- 场景方案全覆盖––––开源预训练模型-微调、提示学习、基于语义索引等多种分类技术方案，满足不同场景需求，涵盖多分类（multi-class）、多标签（multi-label）、层次分类（hierarchical）三类任务；
 - 模型高效调优––––强强结合数据增强能力与可信增强技术，解决脏数据、标注数据欠缺、数据不平衡等问题，大幅提升模型效果。
 
 <div align="center">
