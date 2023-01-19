@@ -54,8 +54,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/213365046-69967745-b4a8-4435-98fb-c34f68cd22e9.png" width="60%" length="60%">
 </div>
-详细使用说明请参考[信息抽取系统](./information_extraction)。
-更多：[UIE 解读](https://mp.weixin.qq.com/s/-hHz8knHIKKqKCBTke7i5A)、[UIE-X 解读](https://zhuanlan.zhihu.com/p/592422623)。
+详细使用说明请参考[通用信息抽取系统](./information_extraction)，更多：[UIE 解读](https://mp.weixin.qq.com/s/-hHz8knHIKKqKCBTke7i5A)、[UIE-X 解读](https://zhuanlan.zhihu.com/p/592422623)。
 
 #### 🔍 语义检索系统
 
@@ -90,8 +89,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 <br>
 
-详细使用说明请参考[通用文本分类](./zero_shot_text_classification)。
-更多：[文章解读](https://mp.weixin.qq.com/s/VV-nYv4y1r7oipJnURRL5w)。
+详细使用说明请参考[通用文本分类](./zero_shot_text_classification)，更多：[文章解读](https://mp.weixin.qq.com/s/VV-nYv4y1r7oipJnURRL5w)。
 
 
 #### 🗂 文本分类
@@ -105,8 +103,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 
 <br>
 
-详细使用说明请参考[文本分类](./text_classification)。
-更多：[文章解读](https://mp.weixin.qq.com/s/tas7yM8vapxwtlJt-MRZdg)。
+详细使用说明请参考[文本分类](./text_classification)，更多：[文章解读](https://mp.weixin.qq.com/s/tas7yM8vapxwtlJt-MRZdg)。
 
 #### 💌 评论观点抽取与情感分析
 
@@ -118,8 +115,7 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 </div>
 <br>
 
-详细使用说明请参考[情感分析](./sentiment_analysis)。
-更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)
+详细使用说明请参考[情感分析](./sentiment_analysis)，更多：[文章解读](https://mp.weixin.qq.com/s/QAHjIRG9zxpYfM6YPRQ-9w)。
 
 #### 🎙️ 智能语音指令解析
 
