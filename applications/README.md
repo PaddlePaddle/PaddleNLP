@@ -54,6 +54,8 @@ PaddleNLP 从预训练模型库出发，提供了经典预训练模型在主流 
 <div align="center">
     <img src="https://user-images.githubusercontent.com/11793384/213365046-69967745-b4a8-4435-98fb-c34f68cd22e9.png" width="60%" length="60%">
 </div>
+
+
 详细使用说明请参考[通用信息抽取系统](./information_extraction)，更多：[UIE 解读](https://mp.weixin.qq.com/s/-hHz8knHIKKqKCBTke7i5A)、[UIE-X 解读](https://zhuanlan.zhihu.com/p/592422623)。
 
 #### 🔍 语义检索系统
