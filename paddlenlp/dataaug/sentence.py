@@ -48,7 +48,7 @@ class SentenceGenerate:
             The max length of the prediction.
         top_p (float): The cumulative probability for
             top-p-filtering in the "sampling" strategy. The value should
-            satisfy :math:`0 <= top\_p < 1`. Default to 0.95.
+            satisfy 0 <= top_p < 1. Default to 0.95.
     """
 
     def __init__(
@@ -128,7 +128,7 @@ class SentenceSummarize:
             0, which means no effect.
         top_p (float): The cumulative probability for
             top-p-filtering in the "sampling" strategy. The value should
-            satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
+            satisfy 0 <= top_p < 1. Default to 1.0, which means no
             effect.
         temperature (float): The value used to module the next
             token probabilities in the "sampling" strategy. Default to 1.0,
@@ -469,7 +469,7 @@ class SentenceContinue:
             0, which means no effect.
         top_p (float): The cumulative probability for
             top-p-filtering in the "sampling" strategy. The value should
-            satisfy :math:`0 <= top\_p < 1`. Default to 1.0, which means no
+            satisfy 0 <= top_p < 1. Default to 1.0, which means no
             effect.
         temperature (float): The value used to module the next
             token probabilities in the "sampling" strategy. Default to 1.0,
