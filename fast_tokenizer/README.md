@@ -14,13 +14,13 @@
     <a href="https://github.com/PaddlePaddle/PaddleNLP/issues"><img src="https://img.shields.io/github/issues/PaddlePaddle/PaddleNLP?color=9cc"></a>
     <a href="https://github.com/PaddlePaddle/PaddleNLP/stargazers"><img src="https://img.shields.io/github/stars/PaddlePaddle/PaddleNLP?color=ccf"></a>
 </p>
-FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预处理库，集成业界多个常用的 Tokenizer 实现，支持不同NLP场景下的文本预处理功能，如文本分类、阅读理解，序列标注等。结合PaddleNLP Tokenizer 模块，为用户在训练、推理阶段提供高效通用的文本预处理能力。
+FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预处理库，集成业界多个常用的 Tokenizer 实现，支持不同 NLP 场景下的文本预处理功能，如文本分类、阅读理解，序列标注等。结合 PaddleNLP Tokenizer 模块，为用户在训练、推理阶段提供高效通用的文本预处理能力。
 
 ## 特性
 
 - 高性能。由于底层采用 C++ 实现，所以其性能远高于目前常规 Python 实现的 Tokenizer。在文本分类任务上，FastTokenizer 对比 Python 版本 Tokenizer 加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
 - 跨平台。FastTokenizer 可在不同的系统平台上使用，目前已支持 Windows x64，Linux x64 以及 MacOS 10.14+ 平台上使用。
-- 多编程语言支持。FastTokenizer提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
+- 多编程语言支持。FastTokenizer 提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
 - 灵活性强。用户可以通过指定不同的 FastTokenizer 组件定制满足需求的 Tokenizer 。
 
 ## 快速开始
