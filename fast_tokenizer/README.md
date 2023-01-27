@@ -22,6 +22,7 @@ FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预
 - 跨平台。FastTokenizer 可在不同的系统平台上使用，目前已支持 Windows x64，Linux x64 以及 MacOS 10.14+ 平台上使用。
 - 多编程语言支持。FastTokenizer 提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
 - 灵活性强。用户可以通过指定不同的 FastTokenizer 组件定制满足需求的 Tokenizer 。
+- 功能全面。覆盖绝大部分 Transformer 模型的 Tokenizer 所需要的功能，包括特殊 Tokens 的拼接、截断等。
 
 ## 快速开始
 
@@ -61,7 +62,7 @@ from fast_tokenizer import ErnieFastTokenizer, models
 fast_tokenizer.set_thread_num(1)
 # 1. 加载词表
 vocab = models.WordPiece.read_file("ernie_vocab.txt")
-# 2. 实例化ErnieFastTokenizer对象
+# 2. 实例化 ErnieFastTokenizer 对象
 fast_tokenizer = ErnieFastTokenizer(vocab)
 # 3. 切词
 output = fast_tokenizer.encode("我爱中国")
@@ -128,7 +129,7 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 
 ## 相关文档
 
-[FastTokenizer编译指南](docs/compile/README.md)
+[FastTokenizer 编译指南](docs/compile/README.md)
 
 [FastTokenizer C++ 库使用教程](./docs/cpp/README.md)
 
