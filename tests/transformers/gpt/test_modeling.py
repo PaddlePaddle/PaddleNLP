@@ -12,11 +12,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
 import copy
 import datetime
 import math
 import random
+import tempfile
+import unittest
 
 import numpy as np
 import paddle
@@ -30,7 +33,7 @@ from paddlenlp.transformers import (
     GPTModel,
     GPTTokenizer,
 )
-from tests.testing_utils import PaddleNLPModelTest, slow
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
 from tests.transformers.test_generation_utils import GenerationTesterMixin
 from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
@@ -549,6 +552,115 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class GPTCompatibilityTest(unittest.TestCase):
+    @require_package("transformers", "torch")
+    def test_gpt_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTModel
+
+            paddle_model = GPTModel.from_pretrained(
+                "hf-internal-testing/tiny-random-GPT2Model", from_hf_hub=True, cache_dir=tempdir
+            )
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import GPT2Model
+
+            torch_model = GPT2Model.from_pretrained("hf-internal-testing/tiny-random-GPT2Model", cache_dir=tempdir)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0][0]
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_gpt_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import GPT2Model
+
+            torch_model = GPT2Model.from_pretrained("hf-internal-testing/tiny-random-GPT2Model")
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                GPTModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @require_package("transformers", "torch")
+    def test_gpt_converter_from_local_dir(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import GPT2Model
+
+            torch_model = GPT2Model.from_pretrained("hf-internal-testing/tiny-random-GPT2Model")
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0][0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTModel
+
+            paddle_model = GPTModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :4], torch_logit.detach().cpu().numpy()[:4, :4], rtol=1e-4
+                )
+            )
+
+    @require_package("transformers", "torch")
+    def test_gpt_for_lm_head(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.array([[i for i in range(10)]])
+
+            # 2. forward the torch  model
+            import torch
+            from transformers import GPT2LMHeadModel
+
+            torch_model = GPT2LMHeadModel.from_pretrained("hf-internal-testing/tiny-random-GPT2Model")
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0][0]
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTLMHeadModel
+
+            paddle_model = GPTLMHeadModel.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy()[:4, :2], torch_logit.detach().cpu().numpy()[:4, :2], rtol=1e-4
+                )
+            )
 
 
 class GPTModelLanguageGenerationTest(PaddleNLPModelTest):

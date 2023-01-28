@@ -14,7 +14,7 @@
 
 import paddle
 
-from ppdiffusers import DiffusionPipeline
+from ppdiffusers import PaintByExamplePipeline
 from ppdiffusers.utils import load_image
 
 img_url = "https://paddlenlp.bj.bcebos.com/models/community/Fantasy-Studio/data/image_example_1.png"
@@ -25,7 +25,7 @@ init_image = load_image(img_url).resize((512, 512))
 mask_image = load_image(mask_url).resize((512, 512))
 example_image = load_image(example_url).resize((512, 512))
 
-pipe = DiffusionPipeline.from_pretrained("Fantasy-Studio/Paint-by-Example")
+pipe = PaintByExamplePipeline.from_pretrained("Fantasy-Studio/Paint-by-Example")
 
 # 使用fp16加快生成速度
 with paddle.amp.auto_cast(True):
