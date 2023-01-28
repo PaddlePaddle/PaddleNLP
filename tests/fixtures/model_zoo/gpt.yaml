@@ -83,9 +83,13 @@ glue:
 
 generation:
   tiny:
-    model_type: gpt2-cn
+    model_type: gpt2
+    model_name_or_path: hf-internal-testing/tiny-random-GPT2Model
+    from_hf_hub: true
+
   default:
     model_type: gpt2-cn
+    model_name_or_path: gpt-cpm-small-cn-distill
 
 eval:
   default:
