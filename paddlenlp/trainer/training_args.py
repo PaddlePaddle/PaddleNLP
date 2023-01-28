@@ -263,6 +263,8 @@ class TrainingArguments:
             The path to a folder with a valid checkpoint for your model. This argument is not directly used by
             [`Trainer`], it's intended to be used by your training/evaluation scripts instead. See the [example
             scripts](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples) for more details.
+        flatten_param_grads (`bool`, *optional*):
+            Whether use flatten_param_grads method in optimizer, only used on NPU devices. Default is `False`.
     """
 
     output_dir: str = field(
@@ -452,7 +454,7 @@ class TrainingArguments:
 
     run_name: Optional[str] = field(default=None, metadata={"help": "An optional descriptor for the run."})
 
-    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu devices."})
+    device: Optional[str] = field(default="gpu", metadata={"help": "select cpu, gpu, xpu, npu devices."})
 
     disable_tqdm: Optional[bool] = field(
         default=None, metadata={"help": "Whether or not to disable the tqdm progress bars."}
@@ -495,6 +497,14 @@ class TrainingArguments:
     )
     skip_memory_metrics: bool = field(
         default=True, metadata={"help": "Whether or not to skip adding of memory profiler reports to metrics."}
+    )
+    flatten_param_grads: Optional[bool] = field(
+        default=False,
+        metadata={"help": "Whether use flatten_param_grads method in optimizer, only used on NPU devices."},
+    )
+    lazy_data_processing: Optional[bool] = field(
+        default=True,
+        metadata={"help": "Whether use lazy data processing."},
     )
 
     def __post_init__(self):
@@ -623,6 +633,9 @@ class TrainingArguments:
             logger.info(
                 "Both warmup_ratio and warmup_steps given, warmup_steps will override any effect of warmup_ratio during training"
             )
+
+        if self.flatten_param_grads and self.device != "npu":
+            raise ValueError("flatten_param_grads can only be used on npu devices in temporary.")
 
     def __str__(self):
         self_as_dict = asdict(self)
