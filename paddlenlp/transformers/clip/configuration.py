@@ -97,7 +97,7 @@ class Old2NewPretrainedConfig(PretrainedConfig):
         # We remove them so they don't appear in `return_unused_kwargs`.
         # convert local config to legacy config
         # do standard config map: there are some old-school pretrained-config not refactored.
-        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
+        config_dict = convert_to_legacy_config(cls.attribute_map, config_dict)
         config_dict = flatten_model_config(config_dict)
 
         # check old_config?

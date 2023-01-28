@@ -180,23 +180,27 @@ def attribute_map(config: PretrainedConfig, kwargs: Dict[str, Any]) -> Dict[str,
     return kwargs
 
 
-def convert_to_legacy_config(standard_config_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
+def convert_to_legacy_config(attribute_map: Dict[str, str], config: Dict[str, Any]) -> Dict[str, Any]:
     """
     works when there are different fields between huggingface and paddle
     Args:
-        standard_config_map (Dict[str, str]): mapping of between standard config and paddle config
+        attribute_map (Dict[str, str]): mapping of between standard config and paddle config
         config (Dict[str, Any]): config of huggingface transformers models
     Returns: the config which can be mapped into config of paddle model
     """
     if "init_args" in config:
         args = []
         for init_arg in config["init_args"]:
-            init_arg = convert_to_legacy_config(standard_config_map, init_arg)
+            init_arg = convert_to_legacy_config(attribute_map, init_arg)
             args.append(init_arg)
         config["init_args"] = args
 
-    for standard_field, paddle_field in standard_config_map.items():
-        config[paddle_field] = config.pop(standard_field, None) or config.pop(paddle_field, None)
+    # TODO(wj-Mcat): to improve compatibility for: old local config and new PretrainedConfig, eg:
+    # { "init_args": [], "init_class": "", "num_classes": 12 }
+    for standard_field, paddle_field in attribute_map.items():
+        value = config.pop(standard_field, None) or config.pop(paddle_field, None)
+        if value is not None:
+            config[paddle_field] = value
     return config
 
 
@@ -467,25 +471,17 @@ class PretrainedConfig:
     # global attribute mapping
     attribute_map: Dict[str, str] = {"num_classes": "num_labels"}
 
-    # model-specific attribute map from hf attribute to paddle attribute
-    # { "paddle_field": "standard_field", ... }
-    standard_config_map: Dict[str, str] = {}
-
     _auto_class: Optional[str] = None
 
     def __setattr__(self, key, value):
         if key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
-        elif key in super().__getattribute__("standard_config_map"):
-            key = super().__getattribute__("standard_config_map")[key]
         super().__setattr__(key, value)
         assert hasattr(self, key)
 
     def __getattribute__(self, key):
         if key != "attribute_map" and key in super().__getattribute__("attribute_map"):
             key = super().__getattribute__("attribute_map")[key]
-        elif key != "standard_config_map" and key in super().__getattribute__("standard_config_map"):
-            key = super().__getattribute__("standard_config_map")[key]
         return super().__getattribute__(key)
 
     def __getitem__(self, key):
@@ -558,7 +554,8 @@ class PretrainedConfig:
             self.id2label = dict((int(key), value) for key, value in self.id2label.items())
             # Keys are always strings in JSON so convert ids to int here.
         else:
-            self.num_labels = kwargs.pop("num_labels", 2)
+            num_labels = kwargs.pop("num_labels", 2)
+            self.num_labels = num_labels if num_labels is not None else 2
 
         self.classifier_dropout = kwargs.pop("classifier_dropout", None)
 
@@ -736,16 +733,6 @@ class PretrainedConfig:
 
         config_dict, kwargs = cls.get_config_dict(pretrained_model_name_or_path, **kwargs)
 
-        # do standard config map: there are some old-school pretrained-config not refactored.
-        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
-
-        config_dict = flatten_model_config(config_dict)
-        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
-            logger.warning(
-                f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
-                f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
-            )
-
         return cls.from_dict(config_dict, **kwargs)
 
     @classmethod
@@ -866,11 +853,17 @@ class PretrainedConfig:
             [`PretrainedConfig`]: The configuration object instantiated from those parameters.
         """
         return_unused_kwargs = kwargs.pop("return_unused_kwargs", False)
-        # Those arguments may be passed along for our internal telemetry.
-        # We remove them so they don't appear in `return_unused_kwargs`.
 
-        # convert local config to legacy config
-        config_dict = convert_to_legacy_config(cls.standard_config_map, config_dict)
+        # do standard config map: there are some old-school pretrained-config not refactored.
+        config_dict = convert_to_legacy_config(cls.attribute_map, config_dict)
+
+        config_dict = flatten_model_config(config_dict)
+
+        if "model_type" in config_dict and hasattr(cls, "model_type") and config_dict["model_type"] != cls.model_type:
+            logger.warning(
+                f"You are using a model of type {config_dict['model_type']} to instantiate a model of type "
+                f"{cls.model_type}. This is not supported for all configurations of models and can yield errors."
+            )
 
         config = cls(**config_dict)
 

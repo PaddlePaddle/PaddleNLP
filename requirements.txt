@@ -11,6 +11,7 @@ sentencepiece
 huggingface_hub>=0.11.1
 paddle2onnx
 protobuf>=3.1.0, <=3.20.0
+Flask-Babel < 3.0.0  # visualdl depends on Flask-Babel, but high version breaks read-the-docs
 visualdl
 fastapi
 uvicorn
