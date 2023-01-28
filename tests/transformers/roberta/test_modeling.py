@@ -410,7 +410,6 @@ class RobertaCompatibilityTest(unittest.TestCase):
 
         cls.torch_model_path = tempfile.TemporaryDirectory().name
         model = RobertaModel.from_pretrained(cls.test_model_id)
-        print(model.state_dict().keys())
         model.save_pretrained(cls.torch_model_path)
 
     @require_package("transformers", "torch")
