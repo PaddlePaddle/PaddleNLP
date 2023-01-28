@@ -299,7 +299,7 @@ def load_argv(config_file: str, key: str):
 
     sub_key = "tiny"
     if os.getenv("RUN_SLOW_TEST", None):
-        sub_key = "gpu"
+        sub_key = "default"
 
     config = config[sub_key]
 

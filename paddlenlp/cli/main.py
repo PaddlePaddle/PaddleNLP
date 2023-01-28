@@ -14,7 +14,7 @@
 
 import os
 from pathlib import Path
-from typing import List, Optional, Tuple, Type
+from typing import List, Tuple, Type
 
 from uvicorn.config import LOGGING_CONFIG
 
@@ -161,13 +161,6 @@ def search(
     print_example_code()
 
     logger.info(f"the retrieved number of models results is {len(tables)} ...")
-
-
-@app.command(help="convert pytorch models to paddle model")
-def convert(input: Optional[str] = None, output: Optional[str] = None):
-    """
-    this method will be implemented in: https://github.com/PaddlePaddle/PaddleNLP/pull/4367
-    """
 
 
 @app.command(help="Start the PaddleNLP SimpleServer.")

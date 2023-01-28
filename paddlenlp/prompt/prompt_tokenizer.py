@@ -83,10 +83,6 @@ class MLMPromptTokenizer(object):
 
             # Record the length of options if exists.
             if self.omask_token in part["text"]:
-                if option_length is not None:
-                    raise ValueError(
-                        "There are more than one sequence of options, which " "will cause wrong attention masks."
-                    )
                 option_length = len(input_ids)
 
         encoded_inputs.pop("do_truncate")
@@ -105,7 +101,7 @@ class MLMPromptTokenizer(object):
         Create position ids from prompt for each part.
         """
         part_length = len(input_ids)
-        if "positions" in part and part["positions"] > 0:
+        if "positions" in part and part["positions"] >= 0:
             last_position = part["positions"]
         if self.omask_token in part["text"]:
             omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
@@ -177,17 +173,27 @@ class MLMPromptTokenizer(object):
             return None
         omask_id = self.tokenizer.convert_tokens_to_ids(self.omask_token)
         input_ids = np.array(input_ids)
-        attention_mask = np.zeros([len(input_ids), len(input_ids)])
-        pad_index = np.where(input_ids == self.tokenizer.pad_token_id)[0]
-        attention_mask[:, pad_index] = 1
-        attention_mask[pad_index, :] = 1
+        attention_mask = np.ones([len(input_ids), len(input_ids)])
         omask_index = np.where(input_ids == omask_id)[0].tolist()
-        opt_begin, opt_end = omask_index[0], omask_index[0] + option_length
-        attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 1
+        cls_indices = np.where(input_ids == self.tokenizer.cls_token_id)[0]
+        sep_indices = np.where(input_ids == self.tokenizer.sep_token_id)[0]
+        cls_index = len(input_ids)
+        for idx in cls_indices:
+            if idx > omask_index[-1]:
+                cls_index = idx
+                break
+        sep_index = len(input_ids)
+        for idx in sep_indices:
+            if idx > omask_index[-1]:
+                sep_index = idx
+                break
+        opt_begin = omask_index[0]
+        opt_end = min(cls_index, sep_index)
+        attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 0
         omask_index.append(opt_end)
         for opt_begin, opt_end in zip(omask_index[:-1], omask_index[1:]):
-            attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 0
-        attention_mask = attention_mask * -1e4
+            attention_mask[opt_begin:opt_end, opt_begin:opt_end] = 1
+        attention_mask = (attention_mask - 1) * 1e4
         return attention_mask
 
     def _create_masked_positions(self, input_ids: List[int], soft_token_ids: List[int]):

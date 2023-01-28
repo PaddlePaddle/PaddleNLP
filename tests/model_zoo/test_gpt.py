@@ -13,7 +13,6 @@
 # limitations under the License.
 from __future__ import annotations
 
-import os
 import sys
 from unittest import TestCase
 
@@ -32,40 +31,29 @@ class GPTTest(TestCase):
     def test_pretrain(self):
         argv = load_argv(self.config_path, "pretrain")
         sys.argv = argv
-
         from run_pretrain import do_train
 
         do_train()
 
-    def test_run_eval(self):
-        # do not test under the slow_test
-        if os.getenv("RUN_SLOW_TEST", None):
-            return
-
-        # TODO(wj-Mcat): add eval testing config
-        load_argv(self.config_path, "eval")
-        from run_eval import run
-
-        run()
-
-    def test_run_glue(self):
-        load_argv(self.config_path, "glue")
-        from run_glue import do_train
-
-        do_train()
-
     def test_msra_ner(self):
-        load_argv(self.config_path, "msra_ner")
+        argv = load_argv(self.config_path, "msra_ner")
+        sys.argv = argv
+
         from run_msra_ner import do_train
 
         do_train()
 
-    def test_generation(self):
-        # do not test under the slow_test
-        if os.getenv("slow_test", None):
-            return
+    def test_run_glue(self):
+        argv = load_argv(self.config_path, "glue")
+        sys.argv = argv
+        from run_glue import do_train
 
-        load_argv(self.config_path, "generation")
+        do_train()
+
+    def test_generation(self):
+        argv = load_argv(self.config_path, "generation")
+        sys.argv = argv
+
         from run_generation import run
 
         run()

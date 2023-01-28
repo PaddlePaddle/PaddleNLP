@@ -14,25 +14,18 @@ pretrain:
     do_train: true
     do_predict: true
   
-  gpu:
-    model_name_or_path: gpt2-en
-    input_dir: ./data
-    output_dir: ./output_dir/pretrain
-    weight_decay: 0.01
-    max_steps: 500000
-    save_steps: 100000
-    device: gpu
-    lr_decay_style: none
+  default:
     warmup_steps: 320000
     warmup_ratio: 0.01
     per_device_train_batch_size: 4
+    device: cpu
     eval_steps: 100
     do_train: true
-    do_predict: true 
+    do_predict: true
 
 
 msra_ner:
-  test:
+  tiny:
     model_name_or_path: __internal_testing__/gpt_cn
     max_seq_length: 32
     per_device_eval_batch_size: 4
@@ -73,7 +66,7 @@ glue:
     device: cpu
     do_train: true
   
-  gpu:
+  default:
     model_name_or_path: gpt2-medium-en
     task_name: SST-2
     max_seq_length: 128
@@ -89,9 +82,11 @@ glue:
   
 
 generation:
+  tiny:
+    model_type: gpt2-cn
   default:
     model_type: gpt2-cn
-    model_name_or_path: gpt-cpm-small-cn-distill
 
 eval:
   default:
+    model_name_or_path: gpt-cpm-small-cn-distill
