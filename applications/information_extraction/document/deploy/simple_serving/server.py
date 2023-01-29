@@ -22,6 +22,6 @@ uie = Taskflow(
     schema=schema,
     task_path="../../checkpoint/model_best",
 )
-# If you want to define the finetuned uie service
+# If you want to define the fine-tuned uie service
 app = SimpleServer()
 app.register_taskflow("taskflow/uie", uie)
