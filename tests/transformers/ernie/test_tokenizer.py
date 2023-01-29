@@ -318,3 +318,17 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
         )
         self.assertEqual(len(encoding["input_ids"]), 10)
         self.assertEqual(len(encoding["offset_mapping"]), 10)
+
+        text = "好👌👌👌👌👌👌🏻"
+        prompt = "评价维度"
+        encoding = tokenizer(
+            text=text,
+            text_pair=prompt,
+            runcation=True,
+            pad_to_max_seq_len=True,
+            return_attention_mask=True,
+            return_position_ids=True,
+            return_offsets_mapping=True,
+        )
+        self.assertEqual(len(encoding["input_ids"]), 15)
+        self.assertEqual(len(encoding["offset_mapping"]), 15)
