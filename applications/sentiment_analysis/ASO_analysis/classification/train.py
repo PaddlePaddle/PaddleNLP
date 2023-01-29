@@ -120,7 +120,7 @@ def train():
                     best_f1 = f1
                     paddle.save(model.state_dict(), f"{args.checkpoints}/best.pdparams")
                 print(
-                    f"evalution result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}"
+                    f"evaluation result: accuracy:{accuracy:.5f} precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}"
                 )
 
             global_step += 1
@@ -140,7 +140,7 @@ if __name__ == "__main__":
     parser.add_argument("--learning_rate", type=float, default=5e-5, help="The initial learning rate for optimizer.")
     parser.add_argument("--weight_decay", type=float, default=0.01, help="Weight decay rate for L2 regularizer.")
     parser.add_argument("--max_grad_norm", type=float, default=1.0, help="Max grad norm to clip gradient.")
-    parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Linear warmup proption over the training process.")
+    parser.add_argument("--warmup_proportion", type=float, default=0.1, help="Linear warmup proportion over the training process.")
     parser.add_argument("--log_steps", type=int, default=50, help="Frequency of printing log.")
     parser.add_argument("--eval_steps", type=int, default=500, help="Frequency of performing evaluation.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
