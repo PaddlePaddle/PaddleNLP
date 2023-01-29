@@ -93,12 +93,12 @@ def gen_pair(dataset, pool_size=100):
 
     Args:
         dataset: A `MapDataset` or `IterDataset` or a tuple of those.
-            Each example is composed of 2 texts: exampe["query"], example["title"]
+            Each example is composed of 2 texts: example["query"], example["title"]
         pool_size: the number of example to sample negative example randomly
 
     Return:
         dataset: A `MapDataset` or `IterDataset` or a tuple of those.
-        Each example is composed of 2 texts: exampe["query"], example["pos_title"]、example["neg_title"]
+        Each example is composed of 3 texts: example["query"], example["pos_title"]、example["neg_title"]
     """
 
     if len(dataset) < pool_size:
