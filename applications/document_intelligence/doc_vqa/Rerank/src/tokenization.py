@@ -20,7 +20,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import six
 import collections
 import unicodedata
 from io import open
