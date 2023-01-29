@@ -20,18 +20,15 @@ import paddle
 import paddle.nn.functional as F
 from functools import partial
 
-from paddlenlp.utils.log import logger
 from paddlenlp.data import Tuple, Pad
 from paddlenlp.datasets import load_dataset, MapDataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
 from paddlenlp.transformers import LinearDecayWithWarmup
 
-from base_model import SemanticIndexBase
 from batch_negative.model import SemanticIndexBatchNeg, SemanticIndexCacheNeg
 from data import read_text_pair, convert_example, create_dataloader, gen_id2corpus, gen_text_file
 from ann_util import build_index
 
-# yapf: disable
 parser = argparse.ArgumentParser()
 parser.add_argument("--save_dir", default='./checkpoint', type=str,
                     help="The output directory where the model checkpoints will be written.")
@@ -93,16 +90,11 @@ parser.add_argument("--evaluate_result", type=str, default='evaluate_result.txt'
 parser.add_argument('--evaluate', action='store_true',
                     help='whether evaluate while training')
 parser.add_argument("--use_amp", action="store_true", help="Whether to use AMP.")
-parser.add_argument("--amp_loss_scale", default=32768, type=float,help="The value of scale_loss for fp16. This is only used for AMP training.")
-parser.add_argument("--use_recompute",
-                        action='store_true',
-                        help="Using the recompute to scale up the batch size and save the memory.")
-parser.add_argument("--use_gradient_cache",
-                        action='store_true',
-                        help="Using the gradient cache to scale up the batch size and save the memory.")
-parser.add_argument("--chunk_numbers",type=int,default=50,help="The number of the chunks for model")
+parser.add_argument("--amp_loss_scale", default=32768, type=float, help="The value of scale_loss for fp16. This is only used for AMP training.")
+parser.add_argument("--use_recompute", action='store_true', help="Using the recompute to scale up the batch size and save the memory.")
+parser.add_argument("--use_gradient_cache", action='store_true', help="Using the gradient cache to scale up the batch size and save the memory.")
+parser.add_argument("--chunk_numbers", type=int, default=50, help="The number of the chunks for model")
 args = parser.parse_args()
-# yapf: enable
 
 
 def set_seed(seed):
@@ -373,7 +365,7 @@ def do_train():
 
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=args.max_seq_length)
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
@@ -399,7 +391,7 @@ def do_train():
 
     model = paddle.DataParallel(model)
 
-    batchify_fn_dev = lambda samples, fn=Tuple(
+    batchify_fn_dev = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # text_segment
     ): [data for data in fn(samples)]
