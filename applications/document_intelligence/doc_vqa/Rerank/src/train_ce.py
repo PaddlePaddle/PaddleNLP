@@ -294,7 +294,7 @@ def main(args):
     if args.do_test:
         predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars)
 
-    # final eval on dianostic, hack for glue-ax
+    # final eval on diagnostic, hack for glue-ax
     if args.diagnostic:
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(args.diagnostic, batch_size=args.batch_size, epoch=1, dev_count=1, shuffle=False)
