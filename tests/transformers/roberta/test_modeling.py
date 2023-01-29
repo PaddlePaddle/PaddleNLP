@@ -14,10 +14,12 @@
 # limitations under the License.
 from __future__ import annotations
 
+import tempfile
 import unittest
 
+import numpy as np
 import paddle
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import (
     RobertaConfig,
@@ -31,7 +33,7 @@ from paddlenlp.transformers import (
     RobertaPretrainedModel,
 )
 
-from ...testing_utils import slow
+from ...testing_utils import require_package, slow
 from ..test_modeling_common import ModelTesterMixin, ids_tensor, random_attention_mask
 
 ROBERTA_TINY = "sshleifer/tiny-distilroberta-base"
@@ -396,6 +398,104 @@ class RobertaModelTest(ModelTesterMixin, unittest.TestCase):
         for model_name in list(RobertaPretrainedModel.pretrained_init_configuration.keys())[:1]:
             model = RobertaModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class RobertaCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-RobertaModel"
+
+    @classmethod
+    @require_package("transformers", "torch")
+    def setUpClass(cls) -> None:
+        from transformers import RobertaModel
+
+        cls.torch_model_path = tempfile.TemporaryDirectory().name
+        model = RobertaModel.from_pretrained(cls.test_model_id)
+        model.save_pretrained(cls.torch_model_path)
+
+    @require_package("transformers", "torch")
+    def test_roberta_model_converter(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import RobertaModel
+
+            paddle_model = RobertaModel.from_pretrained(self.test_model_id, from_hf_hub=True, cache_dir=tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            # 3. forward the torch  model
+            import torch
+            from transformers import RobertaModel
+
+            torch_model = RobertaModel.from_pretrained(self.torch_model_path)
+            torch_model.eval()
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
+
+    @require_package("transformers", "torch")
+    def test_roberta_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import RobertaModel
+
+            torch_model = RobertaModel.from_pretrained(self.torch_model_path)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import RobertaModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                RobertaModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @parameterized.expand(
+        [
+            # ("RobertaForCausalLM",),  TODO: need to tie weights
+            # ("RobertaForMaskedLM",),  TODO: need to tie weights
+            ("RobertaModel",),
+            ("RobertaForSequenceClassification",),
+            ("RobertaForTokenClassification",),
+            ("RobertaForQuestionAnswering",),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_roberta_classes_from_local_dir(self, class_name):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, class_name)
+            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
+            torch_model.eval()
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 2. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+            print(paddle_logit.detach().cpu().numpy())
+            print(torch_logit.detach().cpu().numpy())
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
 
 
 class RobertaModelIntegrationTest(unittest.TestCase):
