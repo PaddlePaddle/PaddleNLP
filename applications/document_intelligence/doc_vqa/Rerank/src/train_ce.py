@@ -342,7 +342,7 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, epo
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         else:
-            log.warning("save dir exsits: %s, will skip saving" % save_dir)
+            log.warning("save dir exists: %s, will skip saving" % save_dir)
 
         with open(save_path, "w") as f:
             for p in probs:
