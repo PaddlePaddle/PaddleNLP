@@ -556,7 +556,6 @@ class ModelTesterMixin:
             model = self._make_model_instance(config, model_class)
 
             all_maps: dict = copy.deepcopy(model_class.config_class.attribute_map)
-            all_maps.update(model_class.config_class.standard_config_map)
 
             for old_attribute, new_attribute in all_maps.items():
                 old_value = getattr(model, old_attribute)

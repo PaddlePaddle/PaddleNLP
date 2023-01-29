@@ -17,16 +17,17 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 1. 可以加载官方发布的权重，并根据相应的论文复现出与原始实现相同的输出
 2. 提供一个简单的用户界面来推理运行扩散模型系统，参见[Pipelines API](#pipelines-api)部分
 3. 提供易于理解的代码实现，可以与官方文档一起阅读，参见[Pipelines汇总](#Pipelines汇总)部分
-4. 可以很容易地由社区贡献
+4. 支持多种模态下的10+种任务，参见[任务展示](#任务展示)部分
+5. 可以很容易地与社区建立联系
 
 **【注意】** Pipelines不（也不应该）提供任何训练功能。
 如果您正在寻找训练的相关示例，请查看[examples](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples).
 
 ## Pipelines汇总
 
-下表总结了所有支持的Pipelines，以及相应的论文、任务、推理脚本。
+下表总结了所有支持的Pipelines，以及相应的来源、任务、推理脚本。
 
-| Pipeline                                                                                                                      | 源链接                                                                                                                       | 任务 | 推理
+| Pipeline                                                                                                                      | 源链接                                                                                                                       | 任务 | 推理脚本
 |-------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------|:---:|:---:|
 | [alt_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/alt_diffusion)                 | [**Alt Diffusion**](https://arxiv.org/abs/2211.06679)   | *Text-to-Image Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-alt_diffusion.py)
 | [alt_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/alt_diffusion)                 | [**Alt Diffusion**](https://arxiv.org/abs/2211.06679)   | *Image-to-Image Text-Guided Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_to_image_text_guided_generation-alt_diffusion.py)
@@ -41,7 +42,6 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 | [pndm](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/pndm)                                       | [**Pseudo Numerical Methods for Diffusion Models on Manifolds**](https://arxiv.org/abs/2202.09778)                           | *Unconditional Image Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/unconditional_image_generation-pndm.py)
 | [repaint](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/repaint)                 | [**Repaint**](https://arxiv.org/abs/2201.09865)                                                      | *Image Inpainting* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_inpainting-repaint.py)
 | [score_sde_ve](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/score_sde_ve)                       | [**Score-Based Generative Modeling through Stochastic Differential Equations**](https://openreview.net/forum?id=PxTIG12RRHS) | *Unconditional Image Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/unconditional_image_generation-score_sde_ve.py)
-| [score_sde_vp](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/score_sde_vp)                       | [**Score-Based Generative Modeling through Stochastic Differential Equations**](https://openreview.net/forum?id=PxTIG12RRHS) | *Unconditional Image Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/unconditional_image_generation-score_sde_vp.py)
 | [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Text-to-Image Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-stable_diffusion.py)
 | [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)               | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Image-to-Image Text-Guided Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_to_image_text_guided_generation-stable_diffusion.py)
 | [stable_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                 | [**Stable Diffusion**](https://stability.ai/blog/stable-diffusion-public-release)                                            | *Text-Guided Image Inpainting* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_guided_image_inpainting-stable_diffusion.py)
@@ -49,8 +49,10 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 | [stable_diffusion_2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)               | [**Stable Diffusion 2**](https://stability.ai/blog/stable-diffusion-v2-release)                                            | *Image-to-Image Text-Guided Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_to_image_text_guided_generation-stable_diffusion_2.py)
 | [stable_diffusion_2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                 | [**Stable Diffusion 2**](https://stability.ai/blog/stable-diffusion-v2-release)                                            | *Text-Guided Image Inpainting* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_guided_image_inpainting-stable_diffusion_2.py)
 | [stable_diffusion_2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                 | [**Stable Diffusion 2**](https://stability.ai/blog/stable-diffusion-v2-release)                                            | *Text-Guided Image Upscaling* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_guided_image_upscaling-stable_diffusion_2.py)
+| [stable_diffusion_2](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion)                 | [**Stable Diffusion 2**](https://stability.ai/blog/stable-diffusion-v2-release)                                            | *Text-Guided Image Upscaling* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_guided_image_upscaling-stable_diffusion_2.py)
 | [stable_diffusion_safe](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stable_diffusion_safe)                 | [**Safe Stable Diffusion**](https://arxiv.org/abs/2211.05105)                                                      | *Text-to-Image Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-stable_diffusion_safe.py)
 | [stochastic_karras_ve](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/stochastic_karras_ve)       | [**Elucidating the Design Space of Diffusion-Based Generative Models**](https://arxiv.org/abs/2206.00364)                    | *Unconditional Image Generation* | [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/unconditional_image_generation-stochastic_karras_ve.py)
+| [unclip](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/unclip)                 | [**UnCLIP**](https://arxiv.org/abs/2204.06125)                                                      | *Text-to-Image Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-unclip.py)
 | [versatile_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/versatile_diffusion)                 | [**Versatile Diffusion**](https://arxiv.org/abs/2211.08332)                                                      | *Text-to-Image Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/text_to_image_generation-versatile_diffusion.py)
 | [versatile_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/versatile_diffusion)                 | [**Versatile Diffusion**](https://arxiv.org/abs/2211.08332)                                                      | *Image Variation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/image_variation-versatile_diffusion.py)
 | [versatile_diffusion](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/ppdiffusers/pipelines/versatile_diffusion)                 | [**Versatile Diffusion**](https://arxiv.org/abs/2211.08332)                                                      | *Dual Text and Image Guided Generation* |  [link](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/ppdiffusers/examples/inference/dual_text_and_image_guided_generation-versatile_diffusion.py)
@@ -74,7 +76,7 @@ Pipelines提供了一种对各种SOTA扩散模型进行各种下游任务推理�
 
 
 ## 任务展示
-### 文图多模态
+### 文本图像多模态
 <details><summary>&emsp;文图生成（Text-to-Image Generation）</summary>
 
 - stable_diffusion
@@ -149,7 +151,7 @@ upscaled_image.save("upsampled_cat_sd2.png")
 </details>
 
 
-<details><summary>&emsp;文本指导的图像变换（Image-to-Image Text-Guided Generation）</summary>
+<details><summary>&emsp;文本引导的图像变换（Image-to-Image Text-Guided Generation）</summary>
 
 - stable_diffusion
 ```python

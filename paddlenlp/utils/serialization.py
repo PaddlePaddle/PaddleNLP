@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import annotations
 
 import io
@@ -35,9 +34,10 @@ class TensorMeta:
         self.nbytes = n_bytes
         self.dtype = dtype
         self.size = None
+        self.stride = None
 
     def __repr__(self):
-        return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}"
+        return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}, stride: {self.stride}"
 
 
 class SerializationError(Exception):
@@ -99,7 +99,7 @@ class UnpicklerWrapperStage(pickle.Unpickler):
             return _rebuild_tensor_stage
 
         # pytorch_lightning tensor builder
-        if mod_name == "pytorch_lightning":
+        if "pytorch_lightning" in mod_name:
             return dumpy
         return super().find_class(mod_name, name)
 
@@ -124,6 +124,7 @@ def get_data_iostream(file: str, file_name="data.pkl"):
 def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, backward_hooks):
     if isinstance(storage, TensorMeta):
         storage.size = size
+        storage.stride = stride
     return storage
 
 
@@ -209,7 +210,7 @@ def load_torch(path: str, **pickle_load_args):
     result_stage1 = unpickler_stage1.load()
 
     # 2. get the metadata of weight file
-    metadata = []
+    metadata = {}
 
     def extract_maybe_dict(result):
         if isinstance(result, dict):
@@ -219,31 +220,40 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            metadata.append(result)
+            metadata[result.key] = result
 
     extract_maybe_dict(result_stage1)
+    metadata = list(metadata.values())
     metadata = sorted(metadata, key=lambda x: x.key)
+
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
     content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
-        prefix_key = read_prefix_key(file_handler, content_size).decode("latin")
         file_handler.seek(pre_offset)
-
         for tensor_meta in metadata:
             key = tensor_meta.key
-            # eg: archive/data/1FB
-            filename = f"{prefix_key}/data/{key}"
-            seek_by_string(file_handler, filename, content_size)
-            file_handler.seek(2, 1)
+            seek_by_string(file_handler, "FB", content_size)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
             file_handler.seek(padding_offset, 1)
 
             # save the tensor info in result to re-use memory
-            stage1_key_to_tensor[key] = np.frombuffer(
-                file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype
-            ).reshape(tensor_meta.size)
+            np_buffer = np.frombuffer(file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype)
+
+            # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
+            # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
+            # defautls to C-style
+            if (
+                tensor_meta.stride is not None
+                and len(tensor_meta.stride) > 1
+                and tensor_meta.stride[0] == 1
+                and tensor_meta.stride[1] > 1
+            ):
+                order = "F"
+            else:
+                order = "C"
+            stage1_key_to_tensor[key] = np_buffer.reshape(tensor_meta.size, order=order)
 
     def persistent_load_stage2(saved_id):
         assert isinstance(saved_id, tuple)

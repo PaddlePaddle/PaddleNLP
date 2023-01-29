@@ -313,7 +313,7 @@ python3 -m pip install wordcloud==1.8.2.2
 <a name="4.2.1"></a>
 
 #### **4.2.1 数据描述**
-输入数据如下方式进行组织，每行表示一个文本评论。可以点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/test_hotel.txt)下载酒店场景的测试数据进行分析。
+输入数据如下方式进行组织，每行表示一个文本评论。可以点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/test_hotel.tar.gz)下载酒店场景的测试数据进行分析。
 
 ```
 非常好的酒店 不枉我们爬了近一个小时的山，另外 大厨手艺非常棒 竹筒饭 竹筒鸡推荐入住的客人必须要点，
@@ -345,7 +345,6 @@ python batch_predict.py \
 - ``model``: 进行情感分析的模型名称，可以在这些模型中进行选择：['uie-senta-base', 'uie-senta-medium', 'uie-senta-mini', 'uie-senta-micro', 'uie-senta-nano']。
 - ``load_from_dir``: 指定需要加载的离线模型目录，比如训练后保存的模型，如果不进行指定，则默认根据 `model` 指定的模型名称自动下载相应模型。
 - ``schema``: 基于UIE模型进行信息抽取的Schema描述。
-- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
 - ``batch_size``: 预测过程中的批处理大小，请结合显存情况进行调整，若出现显存不足，请适当调低这一参数；默认为 16。
 - ``max_seq_len``: 模型支持处理的最大序列长度，默认为512。
 - ``aspects``: 预先给定的属性，如果设置，模型将只针对这些属性进行情感分析，比如分析这些属性的观点词。
@@ -362,21 +361,22 @@ python batch_predict.py \
 
 **4.2.3.1 一键生成情感分析结果**
 
-基于以上生成的情感分析结果，可以使用`visual_analysis.py`脚本对情感分析结果进行可视化，最终可视化结果将会被保存在 `save_dir` 指定的目录下，示例如下：
+基于以上生成的情感分析结果，可以使用`visual_analysis.py`脚本对情感分析结果进行可视化，最终可视化结果将会被保存在 `save_dir` 指定的目录下。 使用时需要指定情感分析可视化的结果的任务类型，若是语句级的情感分类，则将task_type指定为``cls``，若是属性级的情感分析，则将task_type指定为``ext``，示例如下：
 
 ```
 python visual_analysis.py \
     --file_path "./outputs/test_hotel.json" \
-    --save_dir "./outputs/images"
+    --save_dir "./outputs/images" \
+    --task_type "ext"
 ```
 
 可配置参数说明：
 - ``file_path``: 指定情感分析结果的保存路径。
 - ``save_dir``: 指定图片的保存目录。
+- ``task_type``: 指定任务类型，语句级情感分类请指定为``cls``，属性级情感分析请指定为``ext``，默认为``ext``。
 - ``font_path``: 指定字体文件的路径，用以在生成的wordcloud图片中辅助显示中文，如果为空，则会自动下载黑体字，用以展示中文字体。
-- ``aspect_prompt``: 属性的Prompt文本，默认为`评价维度`。
-- ``opinion_prompt``: 观点词的Prompt文本，默认为`观点词`。
-- ``sentiment_prompt``: 情感分类的Prompt文本，当对属性进行情感分类时，应设置为`情感倾向[正向,负向,未提及]`, 当进行语句级情感分类时，应该设置为`情感倾向[正向,负向]`。
+
+**备注**：在`visual_analysis.py`脚本启动时，默认会删除当前已经存在的`save_dir`目录以及其中文件，然后在该目录下重新生成相应的可视化图片。
 
 下图展示了对酒店场景数据分析后的部分图片：
 
@@ -495,14 +495,14 @@ vs.plot_opinion_with_aspect(aspect, sr.aspect_opinion, save_path, image_type="hi
     <img src=https://user-images.githubusercontent.com/35913314/203001847-8e41709b-0f5a-4673-8aca-5c4fb7705d4a.png  />
 </div>
 
-为方便用户使用，本项目提供了300+条酒店场景的标注数据，可点击[label_studio.json](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.json)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
+为方便用户使用，本项目提供了300+条酒店场景的标注数据，可点击[这里](https://paddlenlp.bj.bcebos.com/datasets/sentiment_analysis/hotel/label_studio.tar.gz)进行下载，请注意该数据仅适合用于 `抽取` 类型的任务。
 
 
 <a name="5.1.1"></a>
 
 #### **5.1.1 样本构建：语句级情感分类任务**
 
-对于语句级情感分类任务，可以配置参数`prompt_prefix`和`options`，通过以下命令构造相关训练数据。
+对于语句级情感分类任务，默认支持2分类：``正向`` 和 ``负向``，可以通过如下命令构造相关训练数据。
 
 ```shell
 python label_studio.py \
@@ -510,23 +510,27 @@ python label_studio.py \
     --task_type cls \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    --prompt_prefix "情感倾向" \
-    --options "正向" "负向"
+    --options "正向" "负向" \
+    --is_shuffle True \
+    --seed 1000
 ```
 
 参数介绍：
-- ``label_studio_file``: 从label studio导出的数据标注文件。
-- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
+- ``label_studio_file``: 从label studio导出的语句级情感分类的数据标注文件。
+- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务，其中前者需要设置为``ext``，后者需要设置为``cls``。由于此处为语句级情感分类任务，因此需要设置为``cls``。
 - ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
 - ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
-- ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。这里需要配置为["正向", "负向"]。
+- ``options``: 情感极性分类任务的选项设置。对于语句级情感分类任务，默认支持2分类：``正向`` 和 ``负向``；对于属性级情感分析任务，默认支持3分类：``正向``, ``负向``和 ``未提及``，其中``未提及``表示要分析的属性在原文本评论中未提及，因此无法分析情感极性。如果业务需要其他情感极性选项，可以通过``options``字段进行设置，需要注意的是，如果定制了``options``，参数``label_studio_file``指定的文件需要包含针对新设置的选项的标注数据。
+- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
+- ``seed``: 随机种子，默认为1000.
+
+**备注**：参数``options``可以不进行手动指定，如果这么做，则采用默认的设置。针对语句级情感分类任务，其默认将被设置为：``"正向" "负向"``；对于属性级情感分析任务，默认将被设置为：``"正向" "负向" "未提及"``。
 
 <a name="5.1.2"></a>
 
 #### **5.1.2 样本构建：属性抽取相关任务**
 
-针对抽取式的任务，比如属性抽取、观点抽取、属性分类任务等，可以使用如下命令将label-studio导出数据转换为模型训练数据：
+针对抽取式的任务，比如属性-观点抽取、属性-情感极性-观点词抽取、属性分类任务等，可以使用如下命令将label-studio导出数据转换为模型训练数据。
 
 ```shell
 python label_studio.py \
@@ -534,25 +538,17 @@ python label_studio.py \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    --prompt_prefix "情感倾向" \
     --options "正向" "负向" "未提及" \
-    --separator "##" \
     --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```
 
-参数介绍：
-- ``label_studio_file``: 从label studio导出的数据标注文件。
-- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务。
-- ``save_dir``: 训练数据的保存目录，默认存储在``data``目录下。
-- ``splits``: 划分数据集时训练集、验证集所占的比例。默认为[0.8, 0.1, 0.1]表示按照``8:1:1``的比例将数据划分为训练集、验证集和测试集。
-- ``prompt_prefix``: 声明分类任务的prompt前缀信息，该参数只对分类类型任务有效。默认为"情感倾向"。
-- ``options``: 指定分类任务的类别标签，该参数只对分类类型任务有效。默认为["正向", "负向", "未提及"]。
-- ``separator``: 实体类别/属性与分类标签的分隔符，该参数只对实体/属性分类任务有效。默认为"##"。
-- ``negative_ratio``: 最大负例比例，该参数只对抽取类型任务有效，适当构造负例可提升模型效果。负例数量和实际的标签数量有关，最大负例数量 = negative_ratio * 正例数量。该参数只对训练集有效，默认为5。为了保证评估指标的准确性，验证集和测试集默认构造全负例。
-- ``is_shuffle``: 是否对数据集进行随机打散，默认为True。
-- ``seed``: 随机种子，默认为1000.
+重点参数介绍：
+- ``label_studio_file``: 从label studio导出的属性抽取相关的数据标注文件。
+- ``task_type``: 选择任务类型，可选有抽取和分类两种类型的任务，其中前者需要设置为``ext``，后者需要设置为``cls``。由于此处为属性抽取相关任务，因此需要设置为``ext``。
+- ``negative_ratio``表示对于一个样本，为每个子任务（属性级的观点抽取，属性级的情感分类）最多生成``negative_ratio``个负样本。如果额外提供了属性同义词标或隐性观点抽取词表，将结合两者信息生成更多的负样本，以增强属性聚合和隐性观点抽取能力。
+其他参数解释同上，这里不再赘述。
 
 <a name="5.1.3"></a>
 
@@ -585,14 +581,12 @@ python label_studio.py \
 ```shell
 python label_studio.py \
     --label_studio_file ./data/label_studio.json \
-    --synonym_file ./data/synonyms.json \
+    --synonym_file ./data/synonyms.txt \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    --prompt_prefix "情感倾向" \
     --options "正向" "负向" "未提及" \
-    --separator "##" \
-    -- negative_ratio 5 \
+    --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```
@@ -621,14 +615,12 @@ python label_studio.py \
 ```shell
 python label_studio.py \
     --label_studio_file ./data/label_studio.json \
-    --implicit_file ./data/implicit_opinions.json \
+    --implicit_file ./data/implicit_opinions.txt \
     --task_type ext \
     --save_dir ./data \
     --splits 0.8 0.1 0.1 \
-    --prompt_prefix "情感倾向" \
     --options "正向" "负向" "未提及" \
-    --separator "##" \
-    -- negative_ratio 5 \
+    --negative_ratio 5 \
     --is_shuffle True \
     --seed 1000
 ```

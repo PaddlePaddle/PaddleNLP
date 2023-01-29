@@ -46,6 +46,7 @@ PaddleNLP提供**开箱即用**的产业级NLP预置任务能力，无需训练�
 | [文本摘要](#文本摘要)          | `Taskflow("text_summarization")`        | ✅        | ✅        | ✅        | ✅          |            | 文本摘要大模型 |
 | [文档智能](#文档智能)          | `Taskflow("document_intelligence")`        | ✅        | ✅        | ✅        | ✅          |            | 以多语言跨模态布局增强文档预训练模型ERNIE-Layout为核心底座 |
 | [问题生成](#问题生成)          | `Taskflow("question_generation")`        | ✅        | ✅        | ✅        | ✅          |            | 问题生成大模型 |
+| [零样本文本分类](#零样本文本分类)      | `Taskflow("zero_shot_text_classification")`  | ✅        | ✅        | ✅        |            | ✅          | 集成多场景的通用文本分类工具       |
 
 ## QuickStart
 
@@ -1204,19 +1205,41 @@ from paddlenlp import Taskflow
 
 #### 单条输入
 
++ Query-Query的相似度匹配
+
 ```python
 >>> from paddlenlp import Taskflow
 >>> similarity = Taskflow("text_similarity")
 >>> similarity([["春天适合种什么花？", "春天适合种什么菜？"]])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.83402544}]
 ```
+
++ Query-Passage的相似度匹配
+
+```python
+>>> similarity = Taskflow("text_similarity", model='rocketqa-base-cross-encoder')
+>>> similarity([["国家法定节假日共多少天?", "现在法定假日是元旦1天，春节3天，清明节1天，五一劳动节1天，端午节1天，国庆节3天，中秋节1天，共计11天。法定休息日每年52个周末总共104天。合到一起总计115天。"]])
+[{'text1': '国家法定节假日共多少天?', 'text2': '现在法定假日是元旦1天，春节3天，清明节1天，五一劳动节1天，端午节1天，国庆节3天，中秋节1天，共计11天。法定休息日每年52个周末总共104天。合到一起总计115天。', 'similarity': 0.7174624800682068}]
+```
+
 #### 批量样本输入，平均速度更快
+
++ Query-Query的相似度匹配
 
 ```python
 >>> from paddlenlp import Taskflow
 >>> similarity = Taskflow("text_similarity")
 >>> similarity([['春天适合种什么花？','春天适合种什么菜？'],['谁有狂三这张高清的','这张高清图，谁有']])
-[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.0048632388934493065}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.7050786018371582}]
+[{'text1': '春天适合种什么花？', 'text2': '春天适合种什么菜？', 'similarity': 0.83402544}, {'text1': '谁有狂三这张高清的', 'text2': '这张高清图，谁有', 'similarity': 0.6540646}]
+```
+
++ Query-Passage的相似度匹配
+
+```python
+>>> similarity = Taskflow("text_similarity", model='rocketqa-base-cross-encoder')
+>>> similarity([["国家法定节假日共多少天?", "现在法定假日是元旦1天，春节3天，清明节1天，五一劳动节1天，端午节1天，国庆节3天，中秋节1天，共计11天。法定休息日每年52个周末总共104天。合到一起总计115天。"],["衡量酒水的价格的因素有哪些?", "衡量酒水的价格的因素很多的，酒水的血统(也就是那里产的，采用什么工艺等）；存储的时间等等，酒水是一件很难标准化得商品，只要你敢要价，有买的那就值那个钱。"]])
+[{'text1': '国家法定节假日共多少天?', 'text2': '现在法定假日是元旦1天，春节3天，清明节1天，五一劳动节1天，端午节1天，国庆节3天，中秋节1天，共计11天。法定休息日每年52个周末总共104天。合到一起总计115天。', 'similarity': 0.7174624800682068}, {'text1': '衡量酒水的价格的因素有哪些?', 'text2': '衡量酒水的价格的因素很多的，酒水的血统(也就是那里产的，采用什么工艺等）；存储的时间等等，酒水是一件很难标准化得商品，只要你敢要价，有买的那就值那个钱。', 'similarity': 0.9069755673408508}]
+
 ```
 
 #### 模型选择
@@ -1470,7 +1493,7 @@ from paddlenlp import Taskflow
 ##### Disco Diffusion模型
 ```python
 # 注意，该模型生成速度较慢，在32G的V100上需要10分钟才能生成图片，因此默认返回1张图片。
->>> text_to_image = Taskflow("text_to_image", model="disco_diffusion_ernie_vil-2.0-base-zh")
+>>> text_to_image = Taskflow("text_to_image", model="PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh")
 >>> image_list = text_to_image("一幅美丽的睡莲池塘的画，由Adam Paquette在artstation上所做。")
 >>> for batch_index, batch_image in enumerate(image_list):
 >>>     for image_index_in_returned_images, each_image in enumerate(batch_image):
@@ -1540,7 +1563,7 @@ from paddlenlp import Taskflow
 <p align="center">
 
 #### 可配置参数说明
-* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "disco_diffusion_ernie_vil-2.0-base-zh"]`。
+* `model`：可选模型，默认为`pai-painter-painting-base-zh`，支持的模型有`["dalle-mini", "dalle-mega", "dalle-mega-v16", "pai-painter-painting-base-zh", "pai-painter-scenery-base-zh", "pai-painter-commercial-base-zh", "CompVis/stable-diffusion-v1-4", "openai/disco-diffusion-clip-vit-base-patch32", "openai/disco-diffusion-clip-rn50", "openai/disco-diffusion-clip-rn101", "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh"]`。
 * `num_return_images`：返回图片的数量，默认为2。特例：disco_diffusion模型由于生成速度太慢，因此该模型默认值为1。
 
 </div></details>
@@ -1694,6 +1717,67 @@ from paddlenlp import Taskflow
 
 </div></details>
 
+### 零样本文本分类
+<details><summary>&emsp; 适配多场景的零样本通用文本分类工具 </summary><div>
+
+通用文本分类主要思想是利用单一模型支持通用分类、评论情感分析、语义相似度计算、蕴含推理、多项式阅读理解等众多“泛分类”任务。用户可以自定义任意标签组合，在不限定领域、不设定 prompt 的情况下进行文本分类。
+
+
+#### 情感分析
+
+```
+>>> cls = Taskflow("zero_shot_text_classification", schema=["这是一条好评", "这是一条差评"])
+>>> cls("房间干净明亮，非常不错")
+[{'predictions': [{'label': '这是一条好评', 'score': 0.9695149765679986}], 'text_a': '房间干净明亮，非常不错'}]
+>>> cls("东西还可以，但是快递非常慢，下次不会再买这家了。")
+[{'predictions': [{'label': '这是一条差评', 'score': 0.903727367612172}], 'text_a': '东西还可以，但是快递非常慢，下次不会再买这家了。'}]
+```
+
+#### 意图识别
+
+```
+>>> from paddlenlp import Taskflow
+>>> schema = ["病情诊断", "治疗方案", "病因分析", "指标解读", "就医建议", "疾病表述", "后果表述", "注意事项", "功效作用", "医疗费用", "其他"]
+>>> cls("先天性厚甲症去哪里治")
+[{'predictions': [{'label': '就医建议', 'score': 0.9628814210597645}], 'text_a': '先天性厚甲症去哪里治'}]
+>>> cls("男性小腹疼痛是什么原因？")
+[{'predictions': [{'label': '病因分析', 'score': 0.9925820373324141}], 'text_a': '男性小腹疼痛是什么原因？'}]
+```
+
+#### 语义相似度计算
+
+```
+>>> from paddlenlp import Taskflow
+>>> cls = Taskflow("zero_shot_text_classification", schema=["不同", "相同"])
+>>> cls([["怎么查看合同", "从哪里可以看到合同"]])
+[{'predictions': [{'label': '相同', 'score': 0.9775065319076257}], 'text_a': '怎么查看合同', 'text_b': '从哪里可以看到合同'}]
+>>> cls([["为什么一直没有电话来确认借款信息", "为何我还款了，今天却接到客服电话通知"]])
+[{'predictions': [{'label': '不同', 'score': 0.9918983379165037}], 'text_a': '为什么一直没有电话来确认借款信息', 'text_b': '为何我还款了，今天却接到客服电话通知'}]
+```
+
+#### 蕴含推理
+
+```
+>>> from paddlenlp import Taskflow
+>>> cls = Taskflow("zero_shot_text_classification", schema=["中立", "蕴含", "矛盾"])
+>>> cls([["一个骑自行车的人正沿着一条城市街道朝一座有时钟的塔走去。", "骑自行车的人正朝钟楼走去。"]])
+[{'predictions': [{'label': '蕴含', 'score': 0.9944843058584897}], 'text_a': '一个骑自行车的人正沿着一条城市街道朝一座有时钟的塔走去。', 'text_b': '骑自行车的人正朝钟楼走去。'}]
+>>> cls([["一个留着长发和胡须的怪人，在地铁里穿着一件颜色鲜艳的衬衫。", "这件衬衫是新的。"]])
+[{'predictions': [{'label': '中立', 'score': 0.6659998351201399}], 'text_a': '一个留着长发和胡须的怪人，在地铁里穿着一件颜色鲜艳的衬衫。', 'text_b': '这件衬衫是新的。'}]
+>>> cls([["一个穿着绿色衬衫的妈妈和一个穿全黑衣服的男人在跳舞。", "两人都穿着白色裤子。"]])
+[{'predictions': [{'label': '矛盾', 'score': 0.9270557883904931}], 'text_a': '一个穿着绿色衬衫的妈妈和一个穿全黑衣服的男人在跳舞。', 'text_b': '两人都穿着白色裤子。'}]
+```
+
+#### 可配置参数说明
+
+* `batch_size`：批处理大小，请结合机器情况进行调整，默认为1。
+* `task_path`：自定义任务路径，默认为None。
+* `schema`：定义任务标签候选集合。
+* `model`：选择任务使用的模型，默认为`utc-large`, 目前只支持`utc-large`。
+* `max_seq_len`：最长输入长度，包括所有标签的长度，默认为512。
+* `pred_threshold`：模型对标签预测的概率在0～1之间，返回结果去掉小于这个阈值的结果，默认为0.5。
+* `precision`：选择模型精度，默认为`fp32`，可选有`fp16`和`fp32`。`fp16`推理速度更快。如果选择`fp16`，请先确保机器正确安装NVIDIA相关驱动和基础软件，**确保CUDA>=11.2，cuDNN>=8.1.1**，初次使用需按照提示安装相关依赖。其次，需要确保GPU设备的CUDA计算能力（CUDA Compute Capability）大于7.0，典型的设备包括V100、T4、A10、A100、GTX 20系列和30系列显卡等。更多关于CUDA Compute Capability和精度支持情况请参考NVIDIA文档：[GPU硬件与支持精度对照表](https://docs.nvidia.com/deeplearning/tensorrt/archives/tensorrt-840-ea/support-matrix/index.html#hardware-precision-matrix)。
+
 ## PART Ⅱ &emsp; 定制化训练
 
 <details><summary>适配任务列表</summary><div>
@@ -1716,6 +1800,7 @@ from paddlenlp import Taskflow
 | `Taskflow("sentiment_analysis", model="skep_ernie_1.0_large_ch")` | `$HOME/.paddlenlp/taskflow/sentiment_analysis/skep_ernie_1.0_large_ch` | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/sentiment_analysis/skep) |
 |       `Taskflow("knowledge_mining", model="wordtag")`        |             `$HOME/.paddlenlp/taskflow/wordtag`              | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/ernie-ctm) |
 |        `Taskflow("knowledge_mining", model="nptag")`         |      `$HOME/.paddlenlp/taskflow/knowledge_mining/nptag`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/examples/text_to_knowledge/nptag) |
+|        `Taskflow("zero_shot_text_classification", model="utc-large")`         |      `$HOME/.paddlenlp/taskflow/zero_shot_text_classification/utc-large`      | [示例](https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification) |
 
 </div></details>
 
@@ -1777,6 +1862,7 @@ my_ner = Taskflow("ner", mode="accurate", task_path="./custom_task_path/")
   <tr><td>生成式问答<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>智能写诗<td>CPM<td> - <td> 100GB级别中文数据
   <tr><td>开放域对话<td>PLATO-Mini<td> - <td> 十亿级别中文对话数据
+  <tr><td>零样本文本分类<td>UTC<td> <a href="https://github.com/PaddlePaddle/PaddleNLP/tree/develop/applications/zero_shot_text_classification"> 训练详情  <td> 百度自建数据集
 </table>
 
 </div></details>

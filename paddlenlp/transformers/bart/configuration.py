@@ -130,9 +130,10 @@ class BartConfig(PretrainedConfig):
     """
     model_type = "bart"
     keys_to_ignore_at_inference = ["past_key_values"]
-    standard_config_map: Dict[str, str] = {
+    attribute_map: Dict[str, str] = {
         "num_encoder_layers": "encoder_layers",
         "num_decoder_layers": "decoder_layers",
+        "num_classes": "num_labels",
     }
     pretrained_init_configuration = BART_PRETRAINED_INIT_CONFIGURATION
 
