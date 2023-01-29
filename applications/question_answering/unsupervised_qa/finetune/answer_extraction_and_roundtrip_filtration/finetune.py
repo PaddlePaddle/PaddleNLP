@@ -39,9 +39,9 @@ def do_train():
     model = UIE.from_pretrained(args.model)
 
     train_ds = load_dataset(reader, data_path=args.train_path, max_seq_len=args.max_seq_len, lazy=False)
-    print("train data loaded successfually.")
+    print("train data loaded successfully.")
     dev_ds = load_dataset(reader, data_path=args.dev_path, max_seq_len=args.max_seq_len, lazy=False)
-    print("dev data loaded successfually.")
+    print("dev data loaded successfully.")
 
     train_ds = train_ds.map(partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))
     dev_ds = dev_ds.map(partial(convert_example, tokenizer=tokenizer, max_seq_len=args.max_seq_len))

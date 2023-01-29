@@ -30,7 +30,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_path", type=str, default=None, help="The path of model that you want to load.")
     parser.add_argument("--save_path", type=str, default=None, help="The path of the exported static model.")
     args = parser.parse_args()
-    # yapf: enbale
+    # yapf: enable
 
     # load model with saved state_dict
     if args.model_type == "extraction":
