@@ -22,7 +22,7 @@ FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预
 
 ## 特性
 
-- 高性能。底层采用 C++ 实现，其性能远高于常规 Python 实现的 Tokenizer。在文本分类任务上，FastTokenizer 对比 Python 版本 Tokenizer 加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
+- 高性能。底层采用 C++ 实现，并且集成高性能分词算法 `FastWordPiece` [1]，其性能远高于常规 Python 实现的 Tokenizer。在文本分类任务上，FastTokenizer 对比 Python 版本 Tokenizer 加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
 - 跨平台。FastTokenizer 可在不同的系统平台上使用，目前已支持 Windows x64，Linux x64 以及 MacOS 10.14+ 平台上使用。
 - 支持多编程语言。FastTokenizer 提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
 - 可拓展性强。用户可以通过指定不同的 `Normalizer`, `PreTokenizer`, `Model` 以及 `PostProcessor` 组件自定义 Tokenizer。可在 [FastTokenizer Pipeline](docs/pipeline/README.md) 文档了解更多关于组件的介绍以及使用方式。
@@ -131,6 +131,10 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
   2. 文本的批大小较大。若批大小比较小，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议批大小大于4的时候再考虑开启多线程分词。
 
   3. 文本长度较长。若文本长度较短，开启多线程可能不会得到任何加速效果，并且可能会因为线程调度导致延时增长。建议文本平均长度大于16的时候再考虑开启多线程分词。
+
+## 参考文献
+
+- [1] Xinying Song, Alex Salcianuet al. "Fast WordPiece Tokenization", EMNLP, 2021
 
 ## 相关文档
 
