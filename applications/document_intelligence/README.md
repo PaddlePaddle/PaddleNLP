@@ -131,7 +131,7 @@
       <img src=https://user-images.githubusercontent.com/40840292/194748579-f9e8aa86-7f65-4827-bfae-824c037228b3.png height=800 hspace='20'/>
   </div>
 
-  ```python
+  ```shell
   >>> from pprint import pprint
   >>> from paddlenlp import Taskflow
 
@@ -151,7 +151,7 @@
       <img src=https://user-images.githubusercontent.com/40840292/194748592-e20b2a5f-d36b-46fb-8057-86755d188af0.jpg height=400 hspace='10'/>
   </div>
 
-  ```python
+  ```shell
   >>> from pprint import pprint
   >>> from paddlenlp import Taskflow
 
