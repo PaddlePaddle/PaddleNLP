@@ -106,7 +106,7 @@ def gen_pair(dataset, pool_size=100):
 
     new_examples = []
     pool = []
-    tmp_exmaples = []
+    tmp_examples = []
 
     for example in dataset:
         label = example["label"]
@@ -115,15 +115,15 @@ def gen_pair(dataset, pool_size=100):
         if label == 0:
             continue
 
-        tmp_exmaples.append(example)
+        tmp_examples.append(example)
         pool.append(example["title"])
 
         if len(pool) >= pool_size:
             np.random.shuffle(pool)
-            for idx, example in enumerate(tmp_exmaples):
+            for idx, example in enumerate(tmp_examples):
                 example["neg_title"] = pool[idx]
                 new_examples.append(example)
-            tmp_exmaples = []
+            tmp_examples = []
             pool = []
         else:
             continue
