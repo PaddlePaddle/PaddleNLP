@@ -21,13 +21,15 @@ namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTTOKENIZER_DECL WhitespaceSplitPreTokenizer : public PreTokenizer {
+struct FASTTOKENIZER_DECL WhitespaceAndPunctuationPreTokenizer
+    : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
   friend void to_json(
       nlohmann::json& j,
-      const WhitespaceSplitPreTokenizer& whitespace_pretokenizer);
-  friend void from_json(const nlohmann::json& j,
-                        WhitespaceSplitPreTokenizer& whitespace_pretokenizer);
+      const WhitespaceAndPunctuationPreTokenizer& whitespace_pretokenizer);
+  friend void from_json(
+      const nlohmann::json& j,
+      WhitespaceAndPunctuationPreTokenizer& whitespace_pretokenizer);
 };
 
 }  // namespace pretokenizers

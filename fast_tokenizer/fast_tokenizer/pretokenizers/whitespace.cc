@@ -33,15 +33,6 @@ void WhitespacePreTokenizer::operator()(
       string_splits->push_back(StringSplit(normalize));
     }
   });
-  pretokenized->Split([&](int idx,
-                          normalizers::NormalizedString* normalized,
-                          std::vector<StringSplit>* string_splits) {
-    std::vector<normalizers::NormalizedString> normalized_splits;
-    normalized->Split("\\w+", core::SplitMode::ISOLATED, &normalized_splits);
-    for (auto& normalize : normalized_splits) {
-      string_splits->push_back(StringSplit(normalize));
-    }
-  });
 }
 
 void to_json(nlohmann::json& j,

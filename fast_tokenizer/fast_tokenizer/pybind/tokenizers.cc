@@ -146,9 +146,11 @@ static int TokenizerPropertiesSetPreTokenizer(TokenizerObject* self,
         py_obj.cast<const pretokenizers::WhitespacePreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (pybind11::type::of(py_obj).is(
-                 py::type::of<pretokenizers::WhitespaceSplitPreTokenizer>())) {
+                 py::type::of<
+                     pretokenizers::WhitespaceAndPunctuationPreTokenizer>())) {
     const auto& pretokenizer =
-        py_obj.cast<const pretokenizers::WhitespaceSplitPreTokenizer&>();
+        py_obj
+            .cast<const pretokenizers::WhitespaceAndPunctuationPreTokenizer&>();
     self->tokenizer.SetPreTokenizer(pretokenizer);
   } else if (pybind11::type::of(py_obj).is(
                  py::type::of<pretokenizers::MetaSpacePreTokenizer>())) {
@@ -471,7 +473,9 @@ static PyObject* AddSpecialTokens(TokenizerObject* self,
         } else {
           py::handle py_obj(obj);
           if (!py::type::of(py_obj).is(py::type::of<core::AddedToken>())) {
-            throw std::runtime_error("The argument of tokens should be List[Union[str, AddedToken]]");
+            throw std::runtime_error(
+                "The argument of tokens should be List[Union[str, "
+                "AddedToken]]");
           }
           auto added_token = py_obj.cast<core::AddedToken>();
           added_tokens.push_back(added_token);
@@ -516,7 +520,9 @@ static PyObject* AddTokens(TokenizerObject* self,
         } else {
           py::handle py_obj(obj);
           if (!py::type::of(py_obj).is(py::type::of<core::AddedToken>())) {
-            throw std::runtime_error("The argument of tokens should be List[Union[str, AddedToken]]");
+            throw std::runtime_error(
+                "The argument of tokens should be List[Union[str, "
+                "AddedToken]]");
           }
           auto added_token = py_obj.cast<core::AddedToken>();
           added_tokens.push_back(added_token);

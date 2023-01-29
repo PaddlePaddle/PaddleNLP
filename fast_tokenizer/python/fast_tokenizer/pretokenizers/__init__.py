@@ -82,9 +82,9 @@ class WhitespacePreTokenizer(PreTokenizer):
         self._pretokenizer = C.pretokenizers.WhitespacePreTokenizer()
 
 
-class WhitespaceSplitPreTokenizer(PreTokenizer):
+class WhitespaceAndPunctuationPreTokenizer(PreTokenizer):
     def __init__(self):
-        self._pretokenizer = C.pretokenizers.WhitespaceSplitPreTokenizer()
+        self._pretokenizer = C.pretokenizers.WhitespaceAndPunctuationPreTokenizer()
 
 
 class BertPreTokenizer(PreTokenizer):
