@@ -97,7 +97,7 @@ Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一�
 
 ## PostProcessor
 
-PostProcess 组件为后处理，主要执行 Transformer 类模型的文本序列的处理，比如添加 [SEP] 等特殊 Token。
+PostProcess 组件主要执行 Transformer 类模型的文本序列的后处理逻辑，比如添加 [SEP] 等特殊 Token，并且会将前面分词得到的结果转为一个 `Encoding` 的结构体，包含 token_ids, type_ids, offset, position_ids 等模型所需要的信息。FastTokenizer 所有 PostProcessor 类都继承自 `normalizers.PostProcessor`，命名方式均为 `normalizers.*PostProcessor`。
 
 ## 参考文献
 
