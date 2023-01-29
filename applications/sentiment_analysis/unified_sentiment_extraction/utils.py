@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import argparse
 import json
 import random
 import re
@@ -48,6 +49,16 @@ def write_json_file(examples, save_path):
         for example in examples:
             line = json.dumps(example, ensure_ascii=False)
             f.write(line + "\n")
+
+
+def str2bool(v):
+    """Support bool type for argparse."""
+    if v.lower() in ("yes", "true", "t", "y", "1"):
+        return True
+    elif v.lower() in ("no", "false", "f", "n", "0"):
+        return False
+    else:
+        raise argparse.ArgumentTypeError("Unsupported value encountered.")
 
 
 def create_data_loader(dataset, mode="train", batch_size=1, trans_fn=None):

@@ -255,7 +255,7 @@ class StateDictNameMapping:
         """check that wether merge last two dim"""
         return self.action == "merge_last_two_dim"
 
-    def run(self, tensor: ndarray) -> ndarray:
+    def run(self, state_dict: dict[str, ndarray], name: str) -> ndarray:
         """run some custom operation on ndarray, eg: transpose, merge_last_two_dim
 
         Args:
@@ -264,12 +264,21 @@ class StateDictNameMapping:
         Returns:
             ndarray: the final tensor
         """
+        tensor = state_dict.pop(name)
         if self.action == "transpose":
             return transpose(tensor, [1, 0])
         if self.action == "merge_last_two_dim":
             shape = tensor.shape
             assert len(shape) == 3
             return np.reshape(tensor, [shape[0], -1])
+        if self.action == "split":
+            assert self.index is not None, "when action is `split`, index field is required."
+
+            if self.index < 2:
+                state_dict[name] = tensor
+            # qkv is stored in same tensor, so it should be split into 3 arr
+            tensors = np.split(tensor, 3, axis=-1)
+            return tensors[self.index]
         return tensor
 
     def matched(self, text: str) -> bool:
@@ -490,6 +499,9 @@ class LogitComparer:
     config_fields_to_be_removed: List[str] = ["transformers_version"]
     architectures: Dict[str, Type[PretrainedModel]] = {}
 
+    def __init__(self, input_dir: str) -> None:
+        self.input_dir = input_dir
+
     def get_paddle_pytorch_model_classes(self) -> Tuple[object, object]:
         """return the [PaddleModelClass, PytorchModelClass] to
             1. generate paddle model automatically
@@ -574,13 +586,15 @@ class LogitComparer:
         for name_mapping in name_mappings:
             model_state_saver.add(name_mapping.target_name, "pytorch_key", name_mapping.source_name)
 
-            paddle_numpy = paddle_state_dict.pop(name_mapping.target_name)
-            model_state_saver.add(name_mapping.target_name, "paddle", paddle_numpy)
-            model_state_saver.add(name_mapping.target_name, "paddle-shape", str(paddle_numpy.shape))
+            if name_mapping.target_name in paddle_state_dict:
+                paddle_numpy = paddle_state_dict.pop(name_mapping.target_name)
+                model_state_saver.add(name_mapping.target_name, "paddle", paddle_numpy)
+                model_state_saver.add(name_mapping.target_name, "paddle-shape", str(paddle_numpy.shape))
 
-            pytorch_numpy = pytorch_state_dict.pop(name_mapping.source_name)
-            model_state_saver.add(name_mapping.target_name, "pytorch", pytorch_numpy)
-            model_state_saver.add(name_mapping.target_name, "pytorch-shape", str(pytorch_numpy.shape))
+            if name_mapping.source_name in pytorch_state_dict:
+                pytorch_numpy = pytorch_state_dict.pop(name_mapping.source_name)
+                model_state_saver.add(name_mapping.target_name, "pytorch", pytorch_numpy)
+                model_state_saver.add(name_mapping.target_name, "pytorch-shape", str(pytorch_numpy.shape))
 
         model_state_saver.summary()
 
@@ -594,8 +608,7 @@ class LogitComparer:
         paddle_model = PaddleModel.from_pretrained(self.input_dir)
 
         # 0. init the name_mapping & tensor_info_saver & logit_hooker
-        num_layers = self.get_num_layer(list(paddle_model.state_dict().keys()))
-        name_mappings = self.get_name_mapping(num_layers, paddle_model.config["architectures"])
+        name_mappings = self.get_name_mapping(paddle_model.config)
         tensor_info_saver = TensorInfoSaver()
 
         logit_hooker = LogitHooker(name_mappings, tensor_info_saver)
@@ -707,8 +720,9 @@ class ConversionMixin:
                 logger.warning(f"key<{name_mapping.source_name}> not in the pytorch weight file.")
                 continue
 
-            state_dict[name_mapping.target_name] = name_mapping.run(state_dict.pop(name_mapping.source_name))
-            all_layer_names.remove(name_mapping.source_name)
+            state_dict[name_mapping.target_name] = name_mapping.run(state_dict, name_mapping.source_name)
+            if name_mapping.source_name in all_layer_names:
+                all_layer_names.remove(name_mapping.source_name)
 
         if all_layer_names:
             logger.warning(f"there are {len(all_layer_names)} tensors not initialized:")

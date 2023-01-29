@@ -61,7 +61,7 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_predictions_per_seq 20 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
     --learning_rate 1e-4 \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
@@ -73,7 +73,8 @@ python -m paddle.distributed.launch --gpus "0" run_pretrain.py \
     --save_steps 20000 \
     --max_steps 1000000 \
     --device gpu \
-    --use_amp False
+    --use_amp False \
+    --do_train
 ```
 
 #### XPU训练
@@ -83,7 +84,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
     --model_type bert \
     --model_name_or_path bert-base-uncased \
     --max_predictions_per_seq 20 \
-    --batch_size 32   \
+    --per_device_train_batch_size 32   \
     --learning_rate 1e-4 \
     --weight_decay 1e-2 \
     --adam_epsilon 1e-6 \
@@ -96,12 +97,13 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
     --max_steps 1000000 \
     --device xpu \
     --use_amp False
+    --do_train
 ```
 其中参数释义如下：
 - `model_type` 指示了模型类型，使用BERT模型时设置为bert即可。
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。
 - `max_predictions_per_seq` 表示每个句子中会被mask的token的最大数目，与创建预训练数据时的设置一致。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示用于训练的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `weight_decay` 表示AdamW优化器中使用的weight_decay的系数。
 - `adam_epsilon` 表示AdamW优化器中使用的epsilon值。
@@ -114,6 +116,7 @@ python -m paddle.distributed.launch --xpus "0" run_pretrain.py \
 - `max_steps` 表示最大训练步数。若训练`num_train_epochs`轮包含的训练步数大于该值，则达到`max_steps`后就提前结束。
 - `device` 表示训练使用的设备, 'gpu'表示使用GPU, 'xpu'表示使用百度昆仑卡, 'cpu'表示使用CPU。
 - `use_amp` 指示是否启用自动混合精度训练。
+- `do_train` 是否进行训练任务。(`bool`, 可选, 默认为 `False`)
 
 **NOTICE**: 预训练时data目录存放的是经过 `create_pretraining_data.py` 处理后的数据，因此需要通过该数据处理脚本预先处理，否则预训练将会出现报错。
 
@@ -145,7 +148,8 @@ python -m paddle.distributed.launch --gpus "0" run_glue.py \
 - `model_name_or_path` 指示了某种特定配置的模型，对应有其预训练模型和预训练时使用的 tokenizer。若模型相关内容保存在本地，这里也可以提供相应目录地址。注：`bert-base-uncased`等对应使用的预训练模型转自[huggingface/transformers](https://github.com/huggingface/transformers)，具体可参考当前目录下converter中的内容。
 - `task_name` 表示Fine-tuning的任务。
 - `max_seq_length` 表示最大句子长度，超过该长度将被截断。
-- `batch_size` 表示每次迭代**每张卡**上的样本数目。
+- `per_device_train_batch_size` 表示用于训练的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
+- `per_device_eval_batch_size` 表示用于评估的每个 GPU 核心/CPU 的batch大小.（`int`，可选，默认为 8）
 - `learning_rate` 表示基础学习率大小，将于learning rate scheduler产生的值相乘作为当前学习率。
 - `num_train_epochs` 表示训练轮数。
 - `logging_steps` 表示日志打印间隔。

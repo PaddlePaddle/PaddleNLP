@@ -594,6 +594,11 @@ class Trainer:
         self._total_loss_scalar = 0.0
         self._globalstep_last_logged = self.state.global_step
 
+        if self.args.device == "npu" and self.args.flatten_param_grads:
+            from .plugins.npu_plugin import npu_accelerate_plugin
+
+            npu_accelerate_plugin(self.optimizer)
+
         for epoch in range(epochs_trained, num_train_epochs):
             if isinstance(train_dataloader, paddle.io.DataLoader) and isinstance(
                 train_dataloader.batch_sampler, DistributedBatchSampler
@@ -1255,15 +1260,20 @@ class Trainer:
         How the loss is computed by Trainer. By default, all models return the loss in the first element.
         Subclass and override for custom behavior.
         """
-        if self.criterion is not None and "labels" in inputs:
-            labels = inputs.pop("labels")
-        elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
-            labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
-        elif self.criterion is not None and "generator_labels" in inputs:
-            labels = inputs["generator_labels"]
+        if self.criterion is not None:
+            if "labels" in inputs:
+                labels = inputs.pop("labels")
+            elif "start_positions" in inputs and "end_positions" in inputs:
+                labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+            elif self.label_names is not None:
+                labels = []
+                for label in self.label_names:
+                    labels.append(inputs.pop(label))
+                labels = tuple(labels)
+            elif "generator_labels" in inputs:
+                labels = inputs["generator_labels"]
         else:
             labels = None
-        # TODO: label_names pop
 
         outputs = model(**inputs)
 
@@ -1342,7 +1352,8 @@ class Trainer:
 
         if self.sharding is not None:
             dist.barrier()
-            if self.dp_group.rank == 0:
+            # If only one dp_group, the rank is -1 by default.
+            if self.dp_group.rank <= 0:
                 paddle.save(
                     self.optimizer.state_dict(),
                     os.path.join(output_dir, OPTIMIZER_NAME + f"_shard{self.sharding_group.rank}"),

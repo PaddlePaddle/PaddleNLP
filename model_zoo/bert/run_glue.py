@@ -144,6 +144,7 @@ def do_train():
 
     train_ds = train_ds.map(preprocess_function, batched=True, remove_columns=columns)
     data_collator = DataCollatorWithPadding(tokenizer)
+
     if model_args.task_name == "mnli":
         dev_ds_matched, dev_ds_mismatched = load_dataset(
             "glue", model_args.task_name, split=["validation_matched", "validation_mismatched"]
@@ -203,7 +204,9 @@ def do_train():
         args=training_args,
         data_collator=data_collator,
         train_dataset=train_ds if training_args.do_train else None,
-        eval_dataset=dev_ds if (training_args.do_eval and model_args.task_name != "mnli") else None,
+        eval_dataset=dev_ds
+        if (training_args.do_eval and model_args.task_name != "mnli")
+        else (dev_ds_matched if model_args.task_name == "mnli" else None),
         tokenizer=tokenizer,
         compute_metrics=compute_metrics,
         optimizers=[optimizer, lr_scheduler],

@@ -12,20 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import distutils.util
 import logging
 import os
 import random
-import time
-from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass, field
 
 import h5py
 import numpy as np
 import paddle
-from paddle.io import DataLoader, Dataset
+from paddle.io import Dataset
+from paddle.metric import Accuracy
 
 from paddlenlp.data import Stack
+from paddlenlp.trainer import PdArgumentParser, Trainer, TrainingArguments
 from paddlenlp.transformers import (
     BertForPretraining,
     BertModel,
@@ -37,8 +37,6 @@ from paddlenlp.transformers import (
     ErnieTokenizer,
     LinearDecayWithWarmup,
 )
-from paddlenlp.utils import profiler
-from paddlenlp.utils.tools import TimeCostAverage
 
 FORMAT = "%(asctime)s-%(levelname)s: %(message)s"
 logging.basicConfig(level=logging.INFO, format=FORMAT)
@@ -50,110 +48,85 @@ MODEL_CLASSES = {
 }
 
 
-def parse_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--model_type",
-        default=None,
-        type=str,
-        required=True,
-        help="Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys()),
+@dataclass
+class DataArguments:
+    input_dir: str = field(default=None, metadata={"help": "The input directory where the data will be read from."})
+
+
+@dataclass
+class ModelArguments:
+    model_type: str = field(
+        default=None, metadata={"help": "Model type selected in the list: " + ", ".join(MODEL_CLASSES.keys())}
     )
-    parser.add_argument(
-        "--model_name_or_path",
+    model_name_or_path: str = field(
         default=None,
-        type=str,
-        required=True,
-        help="Path to pre-trained model or shortcut name selected in the list: "
-        + ", ".join(
-            sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
-        ),
+        metadata={
+            "help": "Path to pre-trained model or shortcut name selected in the list: "
+            + ", ".join(
+                sum([list(classes[-1].pretrained_init_configuration.keys()) for classes in MODEL_CLASSES.values()], [])
+            )
+        },
     )
-    parser.add_argument(
-        "--input_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The input directory where the data will be read from.",
-    )
-    parser.add_argument(
-        "--output_dir",
-        default=None,
-        type=str,
-        required=True,
-        help="The output directory where the model predictions and checkpoints will be written.",
+    max_predictions_per_seq: int = field(
+        default=80, metadata={"help": "The maximum total of masked tokens in input sequence"}
     )
 
-    parser.add_argument(
-        "--max_predictions_per_seq", default=80, type=int, help="The maximum total of masked tokens in input sequence"
-    )
-
-    parser.add_argument(
-        "--batch_size",
-        default=8,
-        type=int,
-        help="Batch size per GPU/CPU for training.",
-    )
-    parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initial learning rate for Adam.")
-    parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-    parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
-    parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
-    parser.add_argument(
-        "--num_train_epochs",
-        default=3,
-        type=int,
-        help="Total number of training epochs to perform.",
-    )
-    parser.add_argument(
-        "--max_steps",
-        default=-1,
-        type=int,
-        help="If > 0: set total number of training steps to perform. Override num_train_epochs.",
-    )
-    parser.add_argument("--warmup_steps", default=0, type=int, help="Linear warmup over warmup_steps.")
-
-    parser.add_argument("--logging_steps", type=int, default=500, help="Log every X updates steps.")
-    parser.add_argument("--save_steps", type=int, default=500, help="Save checkpoint every X updates steps.")
-    parser.add_argument("--seed", type=int, default=42, help="random seed for initialization")
-    parser.add_argument(
-        "--device",
-        type=str,
-        default="gpu",
-        choices=["cpu", "gpu", "xpu", "npu"],
-        help="Device for selecting for the training.",
-    )
-    parser.add_argument(
-        "--use_amp", type=distutils.util.strtobool, default=False, help="Enable mixed precision training."
-    )
-    parser.add_argument(
-        "--amp_level", type=str, default="O2", choices=["O1", "O2"], help="select O1 or O2 of amp level."
-    )
-    parser.add_argument("--scale_loss", type=float, default=2**15, help="The value of scale_loss for fp16.")
-    parser.add_argument(
-        "--to_static", type=distutils.util.strtobool, default=False, help="Enable training under @to_static."
-    )
-
-    # For benchmark.
-    parser.add_argument(
-        "--profiler_options",
-        type=str,
+    use_amp: distutils.util.strtobool = field(default=False, metadata={"help": "Enable mixed precision training."})
+    amp_level: str = field(default="O2", metadata={"help": "select O1 or O2 of amp level."})
+    to_static: distutils.util.strtobool = field(default=False, metadata={"help": "Enable training under @to_static."})
+    profiler_options: str = field(
         default=None,
-        help='The option of profiler, which should be in format "key1=value1;key2=value2;key3=value3".',
+        metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
     )
-    parser.add_argument(
-        "--fuse_transformer",
-        type=distutils.util.strtobool,
+    fuse_transformer: distutils.util.strtobool = field(
         default=False,
-        help="Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not.",
+        metadata={"help": "Whether to use FusedTransformerEncoderLayer to replace a TransformerEncoderLayer or not."},
     )
-    args = parser.parse_args()
-    return args
 
 
-def set_seed(args):
-    random.seed(args.seed + paddle.distributed.get_rank())
-    np.random.seed(args.seed + paddle.distributed.get_rank())
-    paddle.seed(args.seed + paddle.distributed.get_rank())
+def get_train_data_file(data_args):
+    files = [
+        os.path.join(data_args.input_dir, f)
+        for f in os.listdir(data_args.input_dir)
+        if os.path.isfile(os.path.join(data_args.input_dir, f)) and "train" in f
+    ]
+    files.sort()
+    num_files = len(files)
+    # random.Random(training_args.seed + epoch).shuffle(files)
+    f_start_id = 0
+
+    if paddle.distributed.get_world_size() > num_files:
+        remainder = paddle.distributed.get_world_size() % num_files
+        data_file = files[
+            (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank() + remainder * f_start_id)
+            % num_files
+        ]
+    else:
+        data_file = files[
+            (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
+        ]
+
+    # TODO(guosheng): better way to process single file
+    single_file = True if f_start_id + 1 == len(files) else False
+
+    for f_id in range(f_start_id, len(files)):
+        if not single_file and f_id == f_start_id:
+            continue
+        if paddle.distributed.get_world_size() > num_files:
+            data_file = files[
+                (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank() + remainder * f_id)
+                % num_files
+            ]
+        else:
+            data_file = files[(f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files]
+
+    return data_file
+
+
+def set_seed(seed):
+    random.seed(seed + paddle.distributed.get_rank())
+    np.random.seed(seed + paddle.distributed.get_rank())
+    paddle.seed(seed + paddle.distributed.get_rank())
 
 
 class WorkerInitObj(object):
@@ -165,50 +138,39 @@ class WorkerInitObj(object):
         random.seed(self.seed + id)
 
 
-def create_pretraining_dataset(input_file, max_pred_length, shared_list, args, worker_init):
-    train_data = PretrainingDataset(input_file=input_file, max_pred_length=max_pred_length)
-    # files have been sharded, no need to dispatch again
-    train_batch_sampler = paddle.io.BatchSampler(train_data, batch_size=args.batch_size, shuffle=True)
-
-    # DataLoader cannot be pickled because of its place.
-    # If it can be pickled, use global function instead of lambda and use
-    # ProcessPoolExecutor instead of ThreadPoolExecutor to prefetch.
-    def _collate_data(data, stack_fn=Stack()):
-        num_fields = len(data[0])
-        out = [None] * num_fields
-        # input_ids, segment_ids, input_mask, masked_lm_positions,
-        # masked_lm_labels, next_sentence_labels, mask_token_num
-        for i in (0, 1, 2, 5):
-            out[i] = stack_fn([x[i] for x in data])
-        batch_size, seq_length = out[0].shape  # noqa: F841
-        size = num_mask = sum(len(x[3]) for x in data)  # noqa: F841
-        # Padding for divisibility by 8 for fp16 or int8 usage
-        if size % 8 != 0:
-            size += 8 - (size % 8)
-        # masked_lm_positions
-        # Organize as a 1D tensor for gather or use gather_nd
-        out[3] = np.full(size, 0, dtype=np.int32)
-        # masked_lm_labels
-        out[4] = np.full([size, 1], -1, dtype=np.int64)
-        mask_token_num = 0
-        for i, x in enumerate(data):
-            for j, pos in enumerate(x[3]):
-                out[3][mask_token_num] = i * seq_length + pos
-                out[4][mask_token_num] = x[4][j]
-                mask_token_num += 1
-        # mask_token_num
-        out.append(np.asarray([mask_token_num], dtype=np.float32))
-        return out
-
-    train_data_loader = DataLoader(
-        dataset=train_data,
-        batch_sampler=train_batch_sampler,
-        collate_fn=_collate_data,
-        num_workers=0,
-        worker_init_fn=worker_init,
-        return_list=True,
-    )
-    return train_data_loader, input_file
+def data_collator(data, stack_fn=Stack()):
+    num_fields = len(data[0])
+    out = [None] * num_fields
+    # input_ids, segment_ids, input_mask, masked_lm_positions,
+    # masked_lm_labels, next_sentence_labels, mask_token_num
+    for i in (0, 1, 2, 5):
+        out[i] = stack_fn([x[i] for x in data])
+    _, seq_length = out[0].shape
+    size = _ = sum(len(x[3]) for x in data)
+    # Padding for divisibility by 8 for fp16 or int8 usage
+    if size % 8 != 0:
+        size += 8 - (size % 8)
+    # masked_lm_positions
+    # Organize as a 1D tensor for gather or use gather_nd
+    out[3] = np.full(size, 0, dtype=np.int32)
+    # masked_lm_labels
+    out[4] = np.full([size, 1], -1, dtype=np.int64)
+    mask_token_num = 0
+    for i, x in enumerate(data):
+        for j, pos in enumerate(x[3]):
+            out[3][mask_token_num] = i * seq_length + pos
+            out[4][mask_token_num] = x[4][j]
+            mask_token_num += 1
+    # mask_token_num
+    out.append(np.asarray([mask_token_num], dtype=np.float32))
+    return {
+        "input_ids": out[0],
+        "token_type_ids": out[1],
+        "attention_mask": out[2],
+        "masked_positions": out[3],
+        "labels": (out[4], out[5]),
+        "masked_lm_scale": out[6],
+    }
 
 
 def create_input_specs():
@@ -256,10 +218,8 @@ class PretrainingDataset(Dataset):
         padded_mask_indices = (masked_lm_positions == 0).nonzero()[0]
         if len(padded_mask_indices) != 0:
             index = padded_mask_indices[0].item()
-            mask_token_num = index
         else:
             index = self.max_pred_length
-            mask_token_num = self.max_pred_length  # noqa: F841
         # masked_lm_labels = np.full(input_ids.shape, -1, dtype=np.int64)
         # masked_lm_labels[masked_lm_positions[:index]] = masked_lm_ids[:index]
         masked_lm_labels = masked_lm_ids[:index]
@@ -271,213 +231,172 @@ class PretrainingDataset(Dataset):
         return [input_ids, segment_ids, input_mask, masked_lm_positions, masked_lm_labels, next_sentence_labels]
 
 
-def do_train(args):
-    paddle.set_device(args.device)
+class PretrainingTrainer(Trainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def compute_loss(self, model, inputs, return_outputs=False):
+        """
+        How the loss is computed by Trainer. By default, all models return the loss in the first element.
+        Subclass and override for custom behavior.
+        """
+        if self.criterion is not None and "labels" in inputs:
+            labels = inputs.pop("labels")
+        elif self.criterion is not None and "start_positions" in inputs and "end_positions" in inputs:
+            labels = (inputs.pop("start_positions"), inputs.pop("end_positions"))
+        elif self.criterion is not None and "generator_labels" in inputs:
+            labels = inputs["generator_labels"]
+        else:
+            labels = None
+        # TODO: label_names pop
+
+        masked_lm_scale = inputs.pop("masked_lm_scale")
+        outputs = model(**inputs)
+
+        if self.criterion is not None:
+            loss = self.criterion(outputs, labels, masked_lm_scale)
+            outputs = (loss, outputs)
+
+        # Save past state if it exists
+        # TODO: this needs to be fixed and made cleaner later.
+        if self.args.past_index >= 0:
+            self._past = outputs[self.args.past_index]
+
+        # We don't use .loss here since the model may return tuples instead of ModelOutput.
+        loss = outputs["loss"] if isinstance(outputs, dict) else outputs[0]
+
+        return (loss, outputs) if return_outputs else loss
+
+
+def do_train():
+    data_args, training_args, model_args = PdArgumentParser(
+        [DataArguments, TrainingArguments, ModelArguments]
+    ).parse_args_into_dataclasses()
+    training_args: TrainingArguments = training_args
+    model_args: ModelArguments = model_args
+    data_args: DataArguments = data_args
+
+    training_args.print_config(data_args, "Data")
+    training_args.print_config(model_args, "Model")
+    training_args.print_config(model_args, "Training")
+
+    paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
         paddle.distributed.init_parallel_env()
 
-    set_seed(args)
-    worker_init = WorkerInitObj(args.seed + paddle.distributed.get_rank())
+    set_seed(training_args.seed)
 
-    args.model_type = args.model_type.lower()
-    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[args.model_type]
+    model_args.model_type = model_args.model_type.lower()
+    base_class, model_class, criterion_class, tokenizer_class = MODEL_CLASSES[model_args.model_type]
 
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    tokenizer = tokenizer_class.from_pretrained(model_args.model_name_or_path)
 
     pretrained_models_list = list(model_class.pretrained_init_configuration.keys())
-    if args.model_name_or_path in pretrained_models_list:
-        config = model_class.config_class.from_pretrained(args.model_name_or_path)
-        config.fuse = args.fuse_transformer
+    if model_args.model_name_or_path in pretrained_models_list:
+        config = model_class.config_class.from_pretrained(model_args.model_name_or_path)
+        config.fuse = model_args.fuse_transformer
         model = model_class(config)
     else:
-        model = model_class.from_pretrained(args.model_name_or_path)
-    criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
+        model = model_class.from_pretrained(model_args.model_name_or_path)
+
+    data_file = get_train_data_file(data_args)
+    train_dataset = PretrainingDataset(input_file=data_file, max_pred_length=model_args.max_predictions_per_seq)
+
+    class CriterionWrapper(paddle.nn.Layer):
+        def __init__(self):
+            """CriterionWrapper"""
+            super(CriterionWrapper, self).__init__()
+            self.criterion = criterion_class(getattr(model, model_class.base_model_prefix).config.vocab_size)
+
+        def forward(self, output, labels, masked_lm_scale):
+            # input_ids, segment_ids, input_mask, masked_lm_positions,
+            # masked_lm_labels, next_sentence_labels, mask_token_num
+            masked_lm_labels, next_sentence_labels = labels
+            prediction_scores, seq_relationship_score = output
+            loss = self.criterion(
+                prediction_scores,
+                seq_relationship_score,
+                masked_lm_labels,
+                next_sentence_labels,
+                masked_lm_scale,
+            )
+            return loss
+
     # decorate @to_static for benchmark, skip it by default.
-    if args.to_static:
+    if model_args.to_static:
         specs = create_input_specs()
         model = paddle.jit.to_static(model, input_spec=specs)
         logger.info("Successfully to apply @to_static with specs: {}".format(specs))
 
     # If use default last_epoch, lr of the first iteration is 0.
     # Use `last_epoch = 0` to be consistent with nv bert.
-    # num_training_steps = (
-    #     args.max_steps if args.max_steps > 0 else len(train_data_loader) * args.num_train_epochs
-    # )
+    num_training_steps = (
+        training_args.max_steps
+        if training_args.max_steps > 0
+        else (len(train_dataset) // training_args.per_device_train_batch_size) * training_args.num_train_epochs
+    )
 
-    num_training_steps = args.max_steps
-
-    lr_scheduler = LinearDecayWithWarmup(args.learning_rate, num_training_steps, args.warmup_steps, last_epoch=0)
+    lr_scheduler = LinearDecayWithWarmup(
+        training_args.learning_rate, num_training_steps, training_args.warmup_steps, last_epoch=0
+    )
 
     # Generate parameter names needed to perform weight decay.
     # All bias and LayerNorm parameters are excluded.
     decay_params = [p.name for n, p in model.named_parameters() if not any(nd in n for nd in ["bias", "norm"])]
     optimizer = paddle.optimizer.AdamW(
         learning_rate=lr_scheduler,
-        epsilon=args.adam_epsilon,
+        epsilon=training_args.adam_epsilon,
         parameters=model.parameters(),
-        weight_decay=args.weight_decay,
+        weight_decay=training_args.weight_decay,
         apply_decay_param_fun=lambda x: x in decay_params,
     )
 
-    if args.use_amp:
-        scaler = paddle.amp.GradScaler(init_loss_scaling=args.scale_loss)
-        model = paddle.amp.decorate(models=model, level=args.amp_level, save_dtype="float32")
+    if model_args.use_amp:
+        model = paddle.amp.decorate(models=model, level=model_args.amp_level, save_dtype="float32")
 
     if paddle.distributed.get_world_size() > 1:
         model = paddle.DataParallel(model)
 
-    pool = ThreadPoolExecutor(1)
-    global_step = 0
-    tic_train = time.time()  # noqa: F841
-    for epoch in range(args.num_train_epochs):
-        files = [
-            os.path.join(args.input_dir, f)
-            for f in os.listdir(args.input_dir)
-            if os.path.isfile(os.path.join(args.input_dir, f)) and "train" in f
-        ]
-        files.sort()
-        num_files = len(files)
-        random.Random(args.seed + epoch).shuffle(files)
-        f_start_id = 0
+    # Define the metrics of tasks.
+    def compute_metrics(p):
+        preds = p.predictions[0] if isinstance(p.predictions, tuple) else p.predictions
 
-        shared_file_list = {}
+        preds = paddle.to_tensor(preds)
+        label = paddle.to_tensor(p.label_ids)
 
-        if paddle.distributed.get_world_size() > num_files:
-            remainder = paddle.distributed.get_world_size() % num_files
-            data_file = files[
-                (
-                    f_start_id * paddle.distributed.get_world_size()
-                    + paddle.distributed.get_rank()
-                    + remainder * f_start_id
-                )
-                % num_files
-            ]
-        else:
-            data_file = files[
-                (f_start_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
-            ]
+        metric = Accuracy()
+        metric.reset()
+        result = metric.compute(preds, label)
+        metric.update(result)
+        accu = metric.accumulate()
+        metric.reset()
+        return {"accuracy": accu}
 
-        previous_file = data_file
+    trainer = PretrainingTrainer(
+        model=model,
+        criterion=CriterionWrapper(),
+        args=training_args,
+        data_collator=data_collator,
+        train_dataset=train_dataset if training_args.do_train else None,
+        eval_dataset=None,
+        tokenizer=tokenizer,
+        optimizers=[optimizer, lr_scheduler],
+        compute_metrics=compute_metrics,
+    )
+    # training
+    if training_args.do_train:
+        train_result = trainer.train()
+        metrics = train_result.metrics
+        trainer.save_model()
+        trainer.log_metrics("train", metrics)
+        trainer.save_metrics("train", metrics)
+        trainer.save_state()
 
-        train_data_loader, _ = create_pretraining_dataset(
-            data_file, args.max_predictions_per_seq, shared_file_list, args, worker_init
-        )
-
-        # TODO(guosheng): better way to process single file
-        single_file = True if f_start_id + 1 == len(files) else False
-
-        for f_id in range(f_start_id, len(files)):
-            if not single_file and f_id == f_start_id:
-                continue
-            if paddle.distributed.get_world_size() > num_files:
-                data_file = files[
-                    (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank() + remainder * f_id)
-                    % num_files
-                ]
-            else:
-                data_file = files[
-                    (f_id * paddle.distributed.get_world_size() + paddle.distributed.get_rank()) % num_files
-                ]
-
-            previous_file = data_file  # noqa: F841
-            dataset_future = pool.submit(
-                create_pretraining_dataset,
-                data_file,
-                args.max_predictions_per_seq,
-                shared_file_list,
-                args,
-                worker_init,
-            )
-            train_cost_avg = TimeCostAverage()
-            reader_cost_avg = TimeCostAverage()
-            total_samples = 0
-            batch_start = time.time()
-            for step, batch in enumerate(train_data_loader):
-                train_reader_cost = time.time() - batch_start
-                reader_cost_avg.record(train_reader_cost)
-                global_step += 1
-                (
-                    input_ids,
-                    segment_ids,
-                    input_mask,
-                    masked_lm_positions,
-                    masked_lm_labels,
-                    next_sentence_labels,
-                    masked_lm_scale,
-                ) = batch
-                with paddle.amp.auto_cast(
-                    args.use_amp,
-                    custom_white_list=["layer_norm", "softmax", "gelu", "fused_attention", "fused_feedforward"],
-                    level=args.amp_level,
-                ):
-                    prediction_scores, seq_relationship_score = model(
-                        input_ids=input_ids,
-                        token_type_ids=segment_ids,
-                        attention_mask=input_mask,
-                        masked_positions=masked_lm_positions,
-                    )
-                    loss = criterion(
-                        prediction_scores,
-                        seq_relationship_score,
-                        masked_lm_labels,
-                        next_sentence_labels,
-                        masked_lm_scale,
-                    )
-                if args.use_amp:
-                    scaler.scale(loss).backward()
-                    scaler.minimize(optimizer, loss)
-                else:
-                    loss.backward()
-                    optimizer.step()
-                lr_scheduler.step()
-                optimizer.clear_grad()
-                total_samples += args.batch_size
-                train_run_cost = time.time() - batch_start
-                train_cost_avg.record(train_run_cost)
-
-                # Profile for model benchmark
-                if args.profiler_options is not None:
-                    profiler.add_profiler_step(args.profiler_options)
-
-                if global_step % args.logging_steps == 0:
-                    if paddle.distributed.get_rank() == 0:
-                        logger.info(
-                            "global step: %d, epoch: %d, batch: %d, loss: %f, "
-                            "avg_reader_cost: %.5f sec, avg_batch_cost: %.5f sec, avg_samples: %.5f, ips: %.5f sequences/sec"
-                            % (
-                                global_step,
-                                epoch,
-                                step,
-                                loss,
-                                reader_cost_avg.get_average(),
-                                train_cost_avg.get_average(),
-                                total_samples / args.logging_steps,
-                                total_samples / (args.logging_steps * train_cost_avg.get_average()),
-                            )
-                        )
-                    total_samples = 0
-                    train_cost_avg.reset()
-                    reader_cost_avg.reset()
-                if global_step % args.save_steps == 0 or global_step >= args.max_steps:
-                    if paddle.distributed.get_rank() == 0:
-                        output_dir = os.path.join(args.output_dir, "model_%d" % global_step)
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        # need better way to get inner model of DataParallel
-                        model_to_save = model._layers if isinstance(model, paddle.DataParallel) else model
-                        model_to_save.save_pretrained(output_dir)
-                        tokenizer.save_pretrained(output_dir)
-                        paddle.save(optimizer.state_dict(), os.path.join(output_dir, "model_state.pdopt"))
-                if global_step >= args.max_steps:
-                    del train_data_loader
-                    return
-                batch_start = time.time()
-
-            del train_data_loader
-            train_data_loader, data_file = dataset_future.result(timeout=None)
+    if training_args.do_eval:
+        eval_metrics = trainer.evaluate()
+        trainer.log_metrics("eval", eval_metrics)
+        trainer.save_metrics("eval", eval_metrics)
 
 
 if __name__ == "__main__":
-    args = parse_args()
-    print(args)
-    do_train(args)
+    do_train()
