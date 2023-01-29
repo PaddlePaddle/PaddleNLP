@@ -123,7 +123,7 @@ ELSE(WIN32)
       ELSE()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Os")
       ENDIF()
-    ENDIF()    
+    ENDIF()
     set (PUBLIC_DEPEND_LIBS ${CMAKE_DL_LIBS})
 ENDIF(WIN32)
 
@@ -182,7 +182,7 @@ file(COPY ${PROJECT_SOURCE_DIR}/fast_tokenizer/ DESTINATION ${CPP_PACKAGE_DIR}/i
 
 add_custom_target(copy_third_party_headers ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR}
+    ${GFLAGS_INCLUDE_DIR} ${ICU_INCLUDE_DIR} ${DART_INCLUDE_DIR}
     ${GLOG_INCLUDE_DIR} ${JSON_INCLUDE_DIR} ${RE2_INCLUDE_DIR}
     ${CPP_PACKAGE_DIR}/third_party/include
     DEPENDS build_cpp_package_dir)
