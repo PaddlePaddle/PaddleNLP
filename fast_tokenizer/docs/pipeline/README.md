@@ -4,7 +4,42 @@
 
 ## Normalizer
 
-Normalizer 组件主要用于将原始字符串标准化，输出标准化的字符串，常见的标准化字符串操作有大小写转换、半角全角转换等。
+Normalizer 组件主要用于将原始字符串标准化，输出标准化的字符串，常见的标准化字符串操作有大小写转换、半角全角转换等。 FastTokenizer 所有 Normalizer 类都继承自 `normalizers.Normalizer`，命名方式均为 `normalizers.*Normalizer`。 FastTokenizer 还支持将现有 Normalizer 类进行组合得到一个 Normalizer 序列，用户可以通过调用 `normalizers.SequenceNormalizer` 使用已有的 Normalizer 自定义新的 Normalizer。下面将分别展示 Python 以及 C++ 上使用示例。
+
+### Python 示例
+
+```python
+import fast_tokenizer
+from fast_tokenizer.normalizers import LowercaseNormalizer, SequenceNormalizer, NFDNormalizer, StripAccentsNormalizer
+
+normalizer = SequenceNormalizer([NFDNormalizer(), StripAccentsNormalizer() LowercaseNormalizer()])
+print(normalizer.normalize_str("Héllò hôw are ü?"))
+# hello how are u?
+```
+
+### C++ 示例
+
+```c++
+
+#include <iostream>
+#include "fast_tokenizer/normalizers/normalizers.h"
+using namespace paddlenlp::fast_tokenizer;
+
+int main() {
+  normalizers::NFDNormalizer n1;
+  normalizers::StripAccentsNormalizer n2;
+  normalizers::LowercaseNormalizer n3;
+  normalizers::SequenceNormalizer normalizer({&n1, &n2, &n3});
+  normalizers::NormalizedString normalized("Héllò hôw are ü?");
+  normalizer(&normalized);
+  // Expected output
+  // normalized string: hello how are u?
+  // original string: Héllò hôw are ü?
+  std::cout << "normalized string: " << normalized.GetStr() << std::endl;
+  std::cout << "original string: " << normalized.GetOrignalStr() << std::endl;
+}
+
+```
 
 ## PreTokenizer
 
