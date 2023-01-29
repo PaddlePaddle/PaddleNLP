@@ -34,6 +34,7 @@ def convert_to_unicode(text):
     else:
         raise ValueError("Unsupported string type: %s" % (type(text)))
 
+
 def printable_text(text):
     """Returns text encoded in a way suitable for print or `tf.logging`."""
     if isinstance(text, str):
@@ -42,6 +43,7 @@ def printable_text(text):
         return text.decode("utf-8", "ignore")
     else:
         raise ValueError("Unsupported string type: %s" % (type(text)))
+
 
 def load_vocab(vocab_file):
     """Loads a vocabulary file into a dictionary."""
