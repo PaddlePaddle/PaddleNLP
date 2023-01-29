@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "fast_tokenizer/pretokenizers/whitespace.h"
+#include "fast_tokenizer/pretokenizers/whitespace_split.h"
 
 #include "fast_tokenizer/normalizers/normalizer.h"
 #include "re2/re2.h"
@@ -22,7 +22,7 @@ namespace fast_tokenizer {
 namespace pretokenizers {
 static re2::RE2 pattern("[\\s\\p{Zs}]+");
 
-void WhitespacePreTokenizer::operator()(
+void WhitespaceSplitPreTokenizer::operator()(
     PreTokenizedString* pretokenized) const {
   pretokenized->Split([&](int idx,
                           normalizers::NormalizedString* normalized,
@@ -33,26 +33,17 @@ void WhitespacePreTokenizer::operator()(
       string_splits->push_back(StringSplit(normalize));
     }
   });
-  pretokenized->Split([&](int idx,
-                          normalizers::NormalizedString* normalized,
-                          std::vector<StringSplit>* string_splits) {
-    std::vector<normalizers::NormalizedString> normalized_splits;
-    normalized->Split("\\w+", core::SplitMode::ISOLATED, &normalized_splits);
-    for (auto& normalize : normalized_splits) {
-      string_splits->push_back(StringSplit(normalize));
-    }
-  });
 }
 
 void to_json(nlohmann::json& j,
-             const WhitespacePreTokenizer& whitespace_pretokenizer) {
+             const WhitespaceSplitPreTokenizer& whitespace_pretokenizer) {
   j = {
-      {"type", "WhitespacePreTokenizer"},
+      {"type", "WhitespaceSplitPreTokenizer"},
   };
 }
 
 void from_json(const nlohmann::json& j,
-               WhitespacePreTokenizer& whitespace_pretokenizer) {}
+               WhitespaceSplitPreTokenizer& whitespace_pretokenizer) {}
 
 }  // namespace pretokenizers
 }  // namespace fast_tokenizer

@@ -133,6 +133,8 @@ A：可以通过调用 `fast_tokenizer.set_thread_num(xxx)` 使用多线程进�
 
 ## 相关文档
 
+[FastTokenizer Pipeline](docs/pipeline/README.md)
+
 [FastTokenizer 编译指南](docs/compile/README.md)
 
 [FastTokenizer C++ 库使用教程](./docs/cpp/README.md)

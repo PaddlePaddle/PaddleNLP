@@ -240,7 +240,7 @@ class ErnieMConverter(SpmConverter):
     def pretokenizer(self, replacement, add_prefix_space):
         return pretokenizers.SequencePreTokenizer(
             [
-                pretokenizers.WhitespacePreTokenizer(),
+                pretokenizers.WhitespaceSplitPreTokenizer(),
                 pretokenizers.MetaSpacePreTokenizer(replacement=replacement, add_prefix_space=add_prefix_space),
             ]
         )

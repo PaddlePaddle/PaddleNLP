@@ -44,6 +44,16 @@ public:
   }
 };
 
+class PyWhitespaceSplitPreTokenizer : public pretokenizers::WhitespaceSplitPreTokenizer {
+public:
+  using WhitespaceSplitPreTokenizer::WhitespaceSplitPreTokenizer;
+  virtual void operator()(
+      pretokenizers::PreTokenizedString* pretokenized) const override {
+    PYBIND11_OVERLOAD_NAME(
+        void, WhitespaceSplitPreTokenizer, "__call__", operator(), pretokenized);
+  }
+};
+
 class PyBertPreTokenizer : public pretokenizers::BertPreTokenizer {
 public:
   using BertPreTokenizer::BertPreTokenizer;
@@ -151,6 +161,10 @@ void BindPreTokenizers(pybind11::module* m) {
       sub_module, "WhitespacePreTokenizer")
       .def(py::init<>())
       .def("__call__", &pretokenizers::WhitespacePreTokenizer::operator());
+  py::class_<pretokenizers::WhitespaceSplitPreTokenizer, PyWhitespaceSplitPreTokenizer>(
+      sub_module, "WhitespaceSplitPreTokenizer")
+      .def(py::init<>())
+      .def("__call__", &pretokenizers::WhitespaceSplitPreTokenizer::operator());
   py::class_<pretokenizers::BertPreTokenizer, PyBertPreTokenizer>(
       sub_module, "BertPreTokenizer")
       .def(py::init<>())
@@ -191,6 +205,12 @@ void BindPreTokenizers(pybind11::module* m) {
                          .cast<pretokenizers::WhitespacePreTokenizer*>();
                } else if (pybind11::type::of(py_pretokenizer)
                               .is(py::type::of<
+                                  pretokenizers::WhitespaceSplitPreTokenizer>())) {
+                 pretokenizer_ptr =
+                     py_pretokenizer
+                         .cast<pretokenizers::WhitespaceSplitPreTokenizer*>();
+               } else if (pybind11::type::of(py_pretokenizer)
+                              .is(py::type::of<
                                   pretokenizers::ByteLevelPreTokenizer>())) {
                  pretokenizer_ptr =
                      py_pretokenizer
@@ -204,8 +224,8 @@ void BindPreTokenizers(pybind11::module* m) {
                  throw py::value_error(
                      "Type of normalizers should be one of `BertPreTokenizer`,"
                      " `MetaSpacePreTokenizer`, `SequencePreTokenizer`,"
-                     " `WhitespacePreTokenizer`, `ByteLevelPreTokenizer`, "
-                     "`SplitPreTokenizer`");
+                     " `WhitespacePreTokenizer`, `ByteLevelPreTokenizer`,"
+                     " `WhitespaceSplitPreTokenizer`, `SplitPreTokenizer`");
                }
                pretokenizers.push_back(pretokenizer_ptr);
              }

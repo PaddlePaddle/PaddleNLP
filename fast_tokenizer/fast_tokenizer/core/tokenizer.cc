@@ -567,6 +567,11 @@ void to_json(nlohmann::json& j, const Tokenizer& tokenizer) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::WhitespacePreTokenizer*>(
           tokenizer.pretokenizer_.get());
     } else if (typeid(*tokenizer.pretokenizer_.get()) ==
+               typeid(pretokenizers::WhitespaceSplitPreTokenizer)) {
+      j["pretokenizer"] =
+          *dynamic_cast<pretokenizers::WhitespaceSplitPreTokenizer*>(
+              tokenizer.pretokenizer_.get());
+    } else if (typeid(*tokenizer.pretokenizer_.get()) ==
                typeid(pretokenizers::SequencePreTokenizer)) {
       j["pretokenizer"] = *dynamic_cast<pretokenizers::SequencePreTokenizer*>(
           tokenizer.pretokenizer_.get());
@@ -702,6 +707,9 @@ void from_json(const nlohmann::json& j, Tokenizer& tokenizer) {
       } else if (pretokenizer.at("type") == "WhitespacePreTokenizer") {
         pretokenizers::WhitespacePreTokenizer whitespace_pretokenizer;
         tokenizer.SetPreTokenizer(whitespace_pretokenizer);
+      } else if (pretokenizer.at("type") == "WhitespaceSplitPreTokenizer") {
+        pretokenizers::WhitespaceSplitPreTokenizer whitespace_pretokenizer;
+        tokenizer.SetPreTokenizer(whitespace_pretokenizer);
       } else if (pretokenizer.at("type") == "SequencePreTokenizer") {
         pretokenizers::SequencePreTokenizer sequence_pretokenizer;
         pretokenizer.get_to(sequence_pretokenizer);
@@ -828,6 +836,8 @@ template void Tokenizer::SetPreTokenizer(
     const pretokenizers::BertPreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::WhitespacePreTokenizer&);
+template void Tokenizer::SetPreTokenizer(
+    const pretokenizers::WhitespaceSplitPreTokenizer&);
 template void Tokenizer::SetPreTokenizer(
     const pretokenizers::MetaSpacePreTokenizer&);
 template void Tokenizer::SetPreTokenizer(

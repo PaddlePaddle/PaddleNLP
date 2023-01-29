@@ -45,6 +45,11 @@ void SequencePreTokenizer::AppendPreTokenizer(PreTokenizer* pretokenizer) {
         dynamic_cast<WhitespacePreTokenizer*>(pretokenizer);
     pretokenizer_ptr =
         std::make_shared<WhitespacePreTokenizer>(*cast_pretokenizer);
+  } else if (typeid(*pretokenizer) == typeid(WhitespaceSplitPreTokenizer)) {
+    auto cast_pretokenizer =
+        dynamic_cast<WhitespaceSplitPreTokenizer*>(pretokenizer);
+    pretokenizer_ptr =
+        std::make_shared<WhitespaceSplitPreTokenizer>(*cast_pretokenizer);
   } else if (typeid(*pretokenizer) == typeid(SplitPreTokenizer)) {
     auto cast_pretokenizer = dynamic_cast<SplitPreTokenizer*>(pretokenizer);
     pretokenizer_ptr = std::make_shared<SplitPreTokenizer>(*cast_pretokenizer);
@@ -77,6 +82,8 @@ void to_json(nlohmann::json& j,
       jitem = *dynamic_cast<MetaSpacePreTokenizer*>(ptr.get());
     } else if (typeid(*ptr) == typeid(WhitespacePreTokenizer)) {
       jitem = *dynamic_cast<WhitespacePreTokenizer*>(ptr.get());
+    } else if (typeid(*ptr) == typeid(WhitespaceSplitPreTokenizer)) {
+      jitem = *dynamic_cast<WhitespaceSplitPreTokenizer*>(ptr.get());
     } else if (typeid(*ptr) == typeid(SplitPreTokenizer)) {
       jitem = *dynamic_cast<SplitPreTokenizer*>(ptr.get());
     } else if (typeid(*ptr) == typeid(ByteLevelPreTokenizer)) {
@@ -100,6 +107,7 @@ void from_json(const nlohmann::json& j,
     pretokenizer_json.at("type").get_to(pretokenizer_type);
     TRY_APPEND_PRETOKENIZER(SequencePreTokenizer);
     TRY_APPEND_PRETOKENIZER(WhitespacePreTokenizer);
+    TRY_APPEND_PRETOKENIZER(WhitespaceSplitPreTokenizer);
     TRY_APPEND_PRETOKENIZER(MetaSpacePreTokenizer);
     TRY_APPEND_PRETOKENIZER(BertPreTokenizer);
     TRY_APPEND_PRETOKENIZER(ByteLevelPreTokenizer);
