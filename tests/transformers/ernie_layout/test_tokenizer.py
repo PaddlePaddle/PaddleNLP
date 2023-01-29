@@ -52,63 +52,13 @@ class ErnieLayoutEnglishTokenizationTest(TokenizerTesterMixin, unittest.TestCase
 
         tokens = tokenizer.tokenize("I was born in 92000, and this is falsé.")
         self.assertListEqual(
-            tokens,
-            [
-                "▁I",
-                "▁was",
-                "▁b",
-                "or",
-                "n",
-                "▁in",
-                "▁",
-                "9",
-                "2",
-                "0",
-                "0",
-                "0",
-                ",",
-                "▁and",
-                "▁this",
-                "▁is",
-                "▁f",
-                "al",
-                "s",
-                "é",
-                ".",
-            ],
+            tokens, ["▁I", "▁was", "▁born", "▁in", "▁9", "2000", ",", "▁and", "▁this", "▁is", "▁fals", "é", "."]
         )
         ids = tokenizer.convert_tokens_to_ids(tokens)
-        self.assertListEqual(
-            ids, [17, 53, 13, 28, 937, 40, 932, 3, 999, 993, 993, 993, 954, 33, 120, 98, 21, 82, 940, 3, 952]
-        )
+        self.assertListEqual(ids, [87, 509, 103122, 23, 483, 13821, 4, 136, 903, 83, 84047, 446, 5])
 
         back_tokens = tokenizer.convert_ids_to_tokens(ids)
-        self.assertListEqual(
-            back_tokens,
-            [
-                "▁I",
-                "▁was",
-                "▁b",
-                "or",
-                "n",
-                "▁in",
-                "▁",
-                "[UNK]",
-                "2",
-                "0",
-                "0",
-                "0",
-                ",",
-                "▁and",
-                "▁this",
-                "▁is",
-                "▁f",
-                "al",
-                "s",
-                "[UNK]",
-                ".",
-            ],
-        )
+        self.assertListEqual(back_tokens, tokens)
 
     def test_clean_text(self):
         tokenizer = self.get_tokenizer()
