@@ -93,8 +93,12 @@ int main() {
 
 ## Model
 
-Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一定的算法进行切分，得到细粒度的 Token（word piece），目前支持的切词算法包括 FastWordPiece、WordPiece、BPE 以及 Unigram。
+Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一定的算法进行切分，得到细粒度的 Token（word piece）及其对应的在词表中的 id，目前支持的切词算法包括 FastWordPiece[1]、WordPiece、BPE 以及 Unigram。其中，`FastWordPiece` 是 "Fast WordPiece Tokenization" 提出的基于`MinMaxMatch`匹配算法的一种分词算法。原有 `WordPiece` 算法的时间复杂度与序列长度为二次方关系，在对长文本进行分词操作时，时间开销比较大。而 `FastWordPiece` 算法通过 `Aho–Corasick` 算法避免 Token 失配时从头匹配，将 `WordPiece` 算法的时间复杂度降低为与序列长度的线性关系，大大提升了分词效率。
 
 ## PostProcessor
 
 PostProcess 组件为后处理，主要执行 Transformer 类模型的文本序列的处理，比如添加 [SEP] 等特殊 Token。
+
+## 参考文献
+
+- [1] Xinying Song, Alex Salcianuet al. "Fast WordPiece Tokenization", EMNLP, 2021
