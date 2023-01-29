@@ -38,7 +38,7 @@ def multi_head_attention(
 ):
     """
     Multi-Head Attention. Note that attn_bias is added to the logit before
-    computing softmax activiation to mask certain selected positions so that
+    computing softmax activation to mask certain selected positions so that
     they will not considered in attention weights.
     """
     keys = queries if keys is None else keys
