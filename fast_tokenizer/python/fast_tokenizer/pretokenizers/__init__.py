@@ -69,10 +69,22 @@ class PreTokenizer(ABC):
     def __call__(self, pretokenized: PreTokenizedString):
         return self._pretokenizer(pretokenized._pretokenized)
 
+    def pretokenize_str(self, pretokenized_str: str):
+        pretokenized = PreTokenizedString(pretokenized_str)
+        self(pretokenized)
+        splits = pretokenized.get_splits()
+        result = [(s, offset) for s, offset, tokens in splits]
+        return result
+
 
 class WhitespacePreTokenizer(PreTokenizer):
     def __init__(self):
         self._pretokenizer = C.pretokenizers.WhitespacePreTokenizer()
+
+
+class WhitespaceAndPunctuationPreTokenizer(PreTokenizer):
+    def __init__(self):
+        self._pretokenizer = C.pretokenizers.WhitespaceAndPunctuationPreTokenizer()
 
 
 class BertPreTokenizer(PreTokenizer):
