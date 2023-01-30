@@ -79,6 +79,6 @@ if __name__ == "__main__":
 
     metric = ChunkEvaluator(label2id.keys())
 
-    # evalute on dev data
+    # evaluate on dev data
     precision, recall, f1 = evaluate(model, test_loader, metric)
     print(f'evalution result: precision: {precision:.5f}, recall: {recall:.5f},  F1: {f1:.5f}')

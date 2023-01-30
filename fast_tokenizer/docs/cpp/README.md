@@ -2,7 +2,7 @@
 
 ## 1. 快速安装
 
-当前版本FastTokenizer C++库支持不同的操作系统以及硬件平台，并为以下平台提供预编译包：
+当前版本 FastTokenizer C++ 库支持不同的操作系统以及硬件平台，并为以下平台提供预编译包：
 |系统|下载地址|
 |---|---|
 |Linux-x64| [fast_tokenizer-linux-x64-1.0.0.tgz](https://bj.bcebos.com/paddlenlp/fast_tokenizer/fast_tokenizer-linux-x64-1.0.0.tgz) |
@@ -21,13 +21,13 @@
 |MacOS| 11.4+|
 
 
-#### Linux，Mac编译环境要求
+#### Linux，Mac 编译环境要求
 |依赖|版本|
 |---|---|
 |cmake|>=16.0|
 |gcc|>=8.2.0|
 
-#### Windows编译环境要求
+#### Windows 编译环境要求
 |依赖|版本|
 |---|---|
 |cmake|>=16.0|
@@ -55,13 +55,13 @@ fast_tokenizer
 
 ```
 
-推荐用户直接使用cmake方式引入FastTokenizer库。在CMake引入FastTokenizer时，只需添加一行 `include(FastTokenizer.cmake)`，即可获取FastTokenizer的预定义的CMake变量`FAST_TOKENIZER_INCS`和`FAST_TOKENIZER_LIBS`，分别指定FastTokenizer的头文件目录以及动态链接库目录。
+推荐用户直接使用 cmake 方式引入 FastTokenizer 库。在 CMake 引入 FastTokenizer 时，只需添加一行 `include(FastTokenizer.cmake)`，即可获取 FastTokenizer 的预定义的 CMake 变量 `FAST_TOKENIZER_INCS` 和 `FAST_TOKENIZER_LIBS`，分别指定 FastTokenizer 的头文件目录以及动态链接库目录。
 
 
 ## 2. 快速开始
 
-目前FastTokenizer提供了以下C++使用示例。
+目前 FastTokenizer 提供了以下 C++ 使用示例。
 
-[ErnieFastTokenizer C++示例](../../examples/ernie/)
+[ErnieFastTokenizer C++示例](../../examples/ernie/README.md)
 
-[ClipFastTokenizer C++示例](../../examples/clip/)
+[ClipFastTokenizer C++示例](../../examples/clip/README.md)

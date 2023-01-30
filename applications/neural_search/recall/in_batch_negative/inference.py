@@ -13,25 +13,15 @@
 # limitations under the License.
 
 from functools import partial
-import argparse
 import os
-import sys
-import random
-import time
 
-import numpy as np
 import paddle
-import paddle.nn.functional as F
-from paddlenlp.data import Stack, Tuple, Pad
-from paddlenlp.datasets import load_dataset, MapDataset
+from paddlenlp.data import Tuple, Pad
+from paddlenlp.datasets import MapDataset
 from paddlenlp.transformers import AutoModel, AutoTokenizer
-from paddlenlp.utils.log import logger
 
 from base_model import SemanticIndexBaseStatic
 from data import convert_example, create_dataloader
-from data import gen_id2corpus, gen_text_file
-from ann_util import build_index
-from tqdm import tqdm
 
 if __name__ == "__main__":
     device = "gpu"
@@ -46,7 +36,7 @@ if __name__ == "__main__":
     tokenizer = AutoTokenizer.from_pretrained(model_name_or_path)
     trans_func = partial(convert_example, tokenizer=tokenizer, max_seq_length=max_seq_length)
 
-    batchify_fn = lambda samples, fn=Tuple(
+    batchify_fn = lambda samples, fn=Tuple(  # noqa: E731
         Pad(axis=0, pad_val=tokenizer.pad_token_id),  # text_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # text_segment
     ): [data for data in fn(samples)]
@@ -63,7 +53,7 @@ if __name__ == "__main__":
     else:
         raise ValueError("Please set --params_path with correct pretrained model file")
 
-    # conver_example function's input must be dict
+    # convert_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
 
