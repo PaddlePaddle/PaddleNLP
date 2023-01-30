@@ -1,6 +1,6 @@
 # FastTokenizer Pipeline
 
-当我们使用 Tokenizer 的`Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方法进行分词时，会经历如下四个阶段：Normalize、PreTokenize、 Model 以及 PostProcess。针对这四个阶段，FastTokenizer 提供 Normalizer、PreTokenizer、Model以及PostProcessor四个组件分别完成四个阶段所需要的工作。下面将详细介绍四大组件具体负责的工作。
+当我们使用 Tokenizer 的 `Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方法进行分词时，会经历如下四个阶段：Normalize、PreTokenize、 Model 以及 PostProcess。针对这四个阶段，FastTokenizer 提供 Normalizer、PreTokenizer、Model 以及 PostProcessor 四个组件分别完成四个阶段所需要的工作。下面将详细介绍四大组件具体负责的工作。
 
 ## Normalizer
 
@@ -93,11 +93,57 @@ int main() {
 
 ## Model
 
-Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一定的算法进行切分，得到细粒度的 Token（word piece）及其对应的在词表中的 id，目前支持的切词算法包括 FastWordPiece[1]、WordPiece、BPE 以及 Unigram。其中，`FastWordPiece` 是 "Fast WordPiece Tokenization" 提出的基于`MinMaxMatch`匹配算法的一种分词算法。原有 `WordPiece` 算法的时间复杂度与序列长度为二次方关系，在对长文本进行分词操作时，时间开销比较大。而 `FastWordPiece` 算法通过 `Aho–Corasick` 算法避免 Token 失配时从头匹配，将 `WordPiece` 算法的时间复杂度降低为与序列长度的线性关系，大大提升了分词效率。
+Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一定的算法进行切分，得到细粒度的 Token（word piece）及其对应的在词表中的 id，目前支持的切词算法包括 FastWordPiece[1]、WordPiece、BPE 以及 Unigram。其中，`FastWordPiece` 是 "Fast WordPiece Tokenization" 提出的基于`MinMaxMatch`匹配算法的一种分词算法。原有 `WordPiece` 算法的时间复杂度与序列长度为二次方关系，在对长文本进行分词操作时，时间开销比较大。而 `FastWordPiece` 算法通过 `Aho–Corasick` 算法避免 Token 失配时从头匹配，将 `WordPiece` 算法的时间复杂度降低为与序列长度的线性关系，大大提升了分词效率。下面是 `FastWordPiece` 类的初始化示例。
+
+### Python 示例
+
+```python
+import fast_tokenizer
+from fast_tokenizer.models import FastWordPiece
+
+# Get the vocab from ernie 3.0 vocab
+model = FastWordPiece.from_file("ernie-3.0-medium-vocab.txt", with_pretokenization=True)
+print(model.tokenize("我爱中国!"))
+# [id: 75	value:我	offset: (0, 3), id: 329	value:爱	offset: (3, 6), id: 12	value:中	offset: (6, 9), id: 20	value:国	offset: (9, 12), id: 12046	value:!	offset: (12, 13)]
+```
+
+### C++ 示例
+
+```c++
+
+#include <iostream>
+#include <vector>
+
+#include "fast_tokenizer/models/models.h"
+
+using namespace paddlenlp::fast_tokenizer;
+
+int main() {
+  std::string text = "我爱中国！";
+  auto model = models::FastWordPiece::GetFastWordPieceFromFile(
+      "ernie_vocab.txt", "[UNK]", 100, "##", true);
+  std::vector<core::Token> results = model.Tokenize(text);
+  for (const core::Token& token : results) {
+    std::cout << "id: " << token.id_ << ", value: " << token.value_
+              << ", offset: (" << token.offset_.first << ", "
+              << token.offset_.second << ")." << std::endl;
+  }
+  return 0;
+}
+
+// id: 75, value: 我, offset: (0, 3).
+// id: 329, value: 爱, offset: (3, 6).
+// id: 12, value: 中, offset: (6, 9).
+// id: 20, value: 国, offset: (9, 12).
+// id: 12044, value: ！, offset: (12, 15).
 
 ## PostProcessor
 
 PostProcess 组件主要执行 Transformer 类模型的文本序列的后处理逻辑，比如添加 [SEP] 等特殊 Token，并且会将前面分词得到的结果转为一个 `Encoding` 的结构体，包含 token_ids, type_ids, offset, position_ids 等模型所需要的信息。FastTokenizer 所有 PostProcessor 类都继承自 `normalizers.PostProcessor`，命名方式均为 `normalizers.*PostProcessor`。
+
+## Tokenizer
+
+
 
 ## 参考文献
 

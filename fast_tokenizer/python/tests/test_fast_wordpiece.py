@@ -15,6 +15,7 @@
 import unittest
 
 from fast_tokenizer import ErnieFastTokenizer
+from fast_tokenizer.models import WordPiece, FastWordPiece
 from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import AutoTokenizer
 from paddlenlp.utils.log import logger
@@ -74,6 +75,17 @@ class TestFastWordpieceWithPretokenization(TestWordpiece):
     def set_flag(self):
         self.use_fast_wordpiece = True
         self.use_fast_wordpiece_with_pretokenization = True
+
+
+class TestFromfile(unittest.TestCase):
+    def setUp(self):
+        self.max_seq_length = 128
+        t = AutoTokenizer.from_pretrained("ernie-1.0", use_fast=True)
+        self.vocab_file = t.init_kwargs["vocab_file"]
+
+    def test(self):
+        WordPiece.from_file(self.vocab_file)
+        FastWordPiece.from_file(self.vocab_file)
 
 
 if __name__ == "__main__":
