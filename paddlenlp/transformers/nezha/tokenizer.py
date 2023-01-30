@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import copy
-import io
-import json
 import os
-import six
-import unicodedata
 
-from paddlenlp.transformers import PretrainedTokenizer, BasicTokenizer, WordpieceTokenizer
+from paddlenlp.transformers import (
+    BasicTokenizer,
+    PretrainedTokenizer,
+    WordpieceTokenizer,
+)
 
 __all__ = ["NeZhaTokenizer"]
 
@@ -298,3 +297,8 @@ class NeZhaTokenizer(PretrainedTokenizer):
         if token_ids_1 is not None:
             return [1] + ([0] * len(token_ids_0)) + [1] + ([0] * len(token_ids_1)) + [1]
         return [1] + ([0] * len(token_ids_0)) + [1]
+
+    def get_vocab(self):
+        vocab = {self.convert_ids_to_tokens(i): i for i in range(self.vocab_size)}
+        vocab.update(self.added_tokens_encoder)
+        return vocab
