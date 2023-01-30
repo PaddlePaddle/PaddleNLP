@@ -1574,7 +1574,13 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 ### FastDeploy 部署
 
-⚡️FastDeploy是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
+⚡️ [FastDeploy](https://github.com/PaddlePaddle/FastDeploy)是一款全场景、易用灵活、极致高效的AI推理部署工具，为开发者提供多硬件、多推理引擎后端的部署能力。开发者只需调用一行代码即可随意切换硬件、推理引擎后端。
+
+<div align="center">
+
+<img src="https://user-images.githubusercontent.com/54695910/213087724-7175953a-0e07-4af8-a4a1-5304163da2e0.png" >
+
+</div>
 
 目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，在GPU端支持`PaddleInference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU端支持`PaddleInference`、`ONNX Runtime`以及`OpenVINO`后端，并支持 C++ 以及 PYthon 部署，可以满足开发者不同的部署需求。
 
