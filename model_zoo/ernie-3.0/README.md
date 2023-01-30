@@ -1568,10 +1568,7 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 ## 部署
 
-我们为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
-<p align="center">
-        <img width="700" alt="image" src="https://user-images.githubusercontent.com/26483581/175260618-610a160c-270c-469a-842c-96871243c4ed.png">
-</p>
+我们基于 FastDeploy 为 ERNIE 3.0 提供了多种部署方案，可以满足不同场景下的部署需求，请根据实际情况进行选择。
 
 <a name="FastDeploy部署"></a>
 
@@ -1580,13 +1577,19 @@ AutoTokenizer.from_pretrained("ernie-3.0-medium-zh", use_fast=True)
 
 目前ERNIE 3.0模型已提供基于FastDeploy的部署示例，在GPU端支持`PaddleInference`、`ONNX Runtime`、`Paddle TensorRT`以及`TensorRT`后端，在CPU端支持`PaddleInference`、`ONNX Runtime`以及`OpenVINO`后端，可以满足开发者不同的部署需求。
 
-详情请参考：[FastDeploy 部署指南](./fastdeploy/README.md)
+详情请参考：[FastDeploy 部署指南](./deploy/README.md)
 
 <a name="Python部署"></a>
 
-### Python 部署
+#### Python 部署
 
-Python部署请参考：[Python 部署指南](./deploy/predictor/README.md)
+Python 部署请参考：[Python 部署指南](./deploy/python/README.md)
+
+<a name="C++部署"></a>
+
+#### C++ 部署
+
+C++ 部署请参考：[C++ 部署指南](./deploy/cpp/README.md)
 
 <a name="服务化部署"></a>
 
