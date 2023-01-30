@@ -1,6 +1,6 @@
 # FastTokenizer Pipeline
 
-当我们使用 Tokenizer 的 `Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方法进行分词时，会经历如下四个阶段：Normalize、PreTokenize、 Model 以及 PostProcess。针对这四个阶段，FastTokenizer 提供 Normalizer、PreTokenizer、Model 以及 PostProcessor 四个组件分别完成四个阶段所需要的工作。下面将详细介绍四大组件具体负责的工作。
+当我们使用 Tokenizer 的 `Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方法进行分词时，会经历如下四个阶段：Normalize、PreTokenize、 Model 以及 PostProcess。针对这四个阶段，FastTokenizer 提供 Normalizer、PreTokenizer、Model 以及 PostProcessor 四个组件分别完成四个阶段所需要的工作。下面将详细介绍四大组件具体负责的工作，并通过示例介绍如何组合四个组件定义一个 Tokenizer。
 
 ## Normalizer
 
@@ -101,10 +101,10 @@ Model 组件是 FastTokenizer 核心模块，用于将粗粒度词组按照一�
 import fast_tokenizer
 from fast_tokenizer.models import FastWordPiece
 
-# Get the vocab from ernie 3.0 vocab
+# Initialize model from ernie 3.0 vocab file
 model = FastWordPiece.from_file("ernie-3.0-medium-vocab.txt", with_pretokenization=True)
 print(model.tokenize("我爱中国!"))
-# [id: 75	value:我	offset: (0, 3), id: 329	value:爱	offset: (3, 6), id: 12	value:中	offset: (6, 9), id: 20	value:国	offset: (9, 12), id: 12046	value:!	offset: (12, 13)]
+# [id: 75    value:我    offset: (0, 3), id: 329    value:爱    offset: (3, 6), id: 12    value:中    offset: (6, 9), id: 20    value:国    offset: (9, 12), id: 12046    value:!    offset: (12, 13)]
 ```
 
 ### C++ 示例
@@ -136,12 +136,57 @@ int main() {
 // id: 12, value: 中, offset: (6, 9).
 // id: 20, value: 国, offset: (9, 12).
 // id: 12044, value: ！, offset: (12, 15).
+```
 
 ## PostProcessor
 
 PostProcess 组件主要执行 Transformer 类模型的文本序列的后处理逻辑，比如添加 [SEP] 等特殊 Token，并且会将前面分词得到的结果转为一个 `Encoding` 的结构体，包含 token_ids, type_ids, offset, position_ids 等模型所需要的信息。FastTokenizer 所有 PostProcessor 类都继承自 `normalizers.PostProcessor`，命名方式均为 `normalizers.*PostProcessor`。
 
 ## Tokenizer
+
+Tokenizer 对象在运行`Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方法进行分词时，通过调用各个阶段组件的回调函数运行不同阶段的处理逻辑。所以我们定义 Tokenizer 对象时，需要设置各个阶段的组件。下面将通过代码示例展示如何定义 ERNIE 模型的 Tokenizer。
+
+### Python 示例
+
+```python
+import fast_tokenizer
+from fast_tokenizer import Tokenizer
+from fast_tokenizer.models import FastWordPiece
+from fast_tokenizer.normalizers import BertNormalizer
+from fast_tokenizer.pretokenizers import BertPreTokenizer
+
+# 1. Initialize model from ernie 3.0 vocab file
+model = FastWordPiece.from_file("ernie-3.0-medium-vocab.txt")
+
+# 2. Use model to initialize a tokenizer object
+tokenizer = Tokenizer(model)
+
+# 3. Set a normalizer
+tokenizer.normalizer = BertNormalizer(
+    clean_text=True,
+    handle_chinese_chars=True,
+    strip_accents=True,
+    lowercase=True,
+)
+
+# 4. Set a pretokenizer
+tokenizer.pretokenizer = BertPreTokenizer()
+
+print(tokenizer.encode("我爱中国!"))
+
+# The Encoding content:
+# ids: 75, 329, 12, 20, 12046
+# type_ids: 0, 0, 0, 0, 0
+# tokens: 我, 爱, 中, 国, !
+# offsets: (0, 1), (1, 2), (2, 3), (3, 4), (4, 5)
+# special_tokens_mask: 0, 0, 0, 0, 0
+# attention_mask: 1, 1, 1, 1, 1
+# sequence_ranges:
+```
+
+针对 ERNIE、BERT 这类常见模型，FastTokenizer 已经定义好这类模型的 Tokenizer，可以通过 `from fast_tokenizer import ErnieFastTokenizer` 直接使用。
+
+### C++ 示例
 
 
 
