@@ -21,6 +21,7 @@ import os
 import re
 import traceback
 from abc import abstractmethod
+from functools import partial
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -32,6 +33,10 @@ from paddlenlp.transformers import PretrainedModel, PretrainedTokenizer
 from paddlenlp.utils.log import logger
 
 from .prompt_tokenizer import MLMPromptTokenizer
+from .prompt_utils import (
+    masked_lm_forward_with_past_key_values,
+    sequence_classification_forward_with_past_key_values,
+)
 
 __all__ = ["Template", "ManualTemplate", "SoftTemplate", "PrefixTemplate", "AutoTemplate", "UTCTemplate"]
 
@@ -263,8 +268,10 @@ class Template(nn.Layer):
         if not os.path.exists(save_path):
             os.makedirs(save_path, exist_ok=True)
         template_config_file = os.path.join(save_path, TEMPLATE_CONFIG_FILE)
+        template_class = self.__class__.__name__
         with open(template_config_file, "w", encoding="utf-8") as fp:
-            fp.write(json.dumps(self._prompt, ensure_ascii=False))
+            fp.write(json.dumps(self._prompt, ensure_ascii=False) + "\n")
+            fp.write(json.dumps({"class": template_class}, ensure_ascii=False) + "\n")
         template_param_file = os.path.join(save_path, TEMPLATE_PARAMETER_FILE)
         template_state_dict = self.state_dict()
         if len(template_state_dict) > 0:
@@ -709,13 +716,38 @@ class PrefixTemplate(SoftTemplate):
                 raise ValueError("Keyword `prefix` should locate at the beginning of template.")
             part["soft"] = part["prefix"]
             part.pop("prefix")
+            if "encoder" not in part:
+                part["encoder"] = "mlp"
             prompt[index] = part
 
         self._prompt = prompt
         return super(PrefixTemplate, self).parse_soft_prompt()
 
+    def process_model(self, model):
+        if model.__class__.__name__.endswith("ForSequenceClassification"):
+            model.forward = partial(sequence_classification_forward_with_past_key_values, self=model)
+        elif model.__class__.__name__.endswith("ForMaskedLM"):
+            model.forward = partial(masked_lm_forward_with_past_key_values, self=model)
+        return model
+
     def process_batch(self, input_dict: Dict[str, Tensor]) -> Dict[str, Tensor]:
         word_embeds = self.word_embeddings(input_dict["input_ids"])
+        batch_size, _ = input_dict["soft_token_ids"].shape
+
+        soft_token_ids = paddle.masked_select(input_dict["soft_token_ids"], input_dict["soft_token_ids"] > 0)
+        soft_token_ids = soft_token_ids.reshape([batch_size, -1])
+        _, soft_len = soft_token_ids.shape
+
+        token_type_ids = paddle.masked_select(input_dict["token_type_ids"], input_dict["soft_token_ids"] == 0)
+        input_dict["token_type_ids"] = token_type_ids.reshape([batch_size, -1])
+        position_ids = paddle.masked_select(input_dict["position_ids"], input_dict["soft_token_ids"] == 0)
+        input_dict["position_ids"] = position_ids.reshape([batch_size, -1])
+        if "masked_position" in input_dict and input_dict["masked_positions"] is not None:
+            input_dict["masked_positions"] = input_dict["masked_positions"] - soft_len
+        input_dict["inputs_embeds"] = paddle.concat(
+            [word_embeds[:, 0, :].unsqueeze(1), word_embeds[:, soft_len + 1 :, :]], axis=1
+        )
+
         if "attention_mask" not in input_dict or input_dict["attention_mask"] is None:
             pad_token_id = self.tokenizer.pad_token_id
             attention_mask = paddle.unsqueeze(
@@ -723,22 +755,15 @@ class PrefixTemplate(SoftTemplate):
             )
             input_dict["attention_mask"] = attention_mask
         input_dict["input_ids"] = None
-
-        batch_size, _ = input_dict["soft_token_ids"].shape
-        soft_token_ids = paddle.masked_select(input_dict["soft_token_ids"], input_dict["soft_token_ids"] > 0)
-        soft_token_ids = soft_token_ids.reshape([batch_size, -1])
-        _, soft_len = soft_token_ids.shape
-
-        input_dict["inputs_embeds"] = word_embeds[:, soft_len:, :]
+        input_dict.pop("soft_token_ids")
+        input_dict.pop("encoder_ids")
 
         soft_embeds = self.soft_embeddings(soft_token_ids)
-        for encoder_id in range(1, len(self.encoder_list)):
-            to_encode = paddle.where(input_dict["encoder_ids"] == encoder_id)
-            encoded = self.encoder_list[encoder_id](to_encode)
-            soft_embeds = paddle.where(input_dict["encoder_ids"] == encoder_id, encoded, soft_embeds)
+        soft_embeds = self.encoder_list[1](soft_embeds)
         soft_embeds = soft_embeds.reshape(
             [batch_size, soft_len, self.n_layer * 2, self.n_heads, self.embed_size // self.n_heads]
         )
+
         soft_embeds = self.dropout(soft_embeds)
         soft_embeds = paddle.transpose(soft_embeds, perm=[2, 0, 3, 1, 4])
         soft_embeds = paddle.split(soft_embeds, num_or_sections=self.n_layer)
@@ -776,6 +801,7 @@ class AutoTemplate(object):
         model: PretrainedModel = None,
         soft_embeddings: Tensor = None,
         prefix_dropout: float = 0.1,
+        template_class: str = None,
     ):
         # Default template if not defined.
         if prompt is None:
@@ -791,12 +817,20 @@ class AutoTemplate(object):
             if "mask" not in template_keywords:
                 prompt = prompt + [{"mask": None}]
 
+        if template_class is None:
+            if "prefix" in template_keywords:
+                template_class = "PrefixTemplate"
+            elif "soft" in template_keywords or "soft_id" in template_keywords:
+                template_class = "SoftTemplate"
+            else:
+                template_class = "ManualTemplate"
+
         # Choose Template according to template keywords.
-        if "prefix" in template_keywords:
+        if template_class == "PrefixTemplate":
             return PrefixTemplate(
                 prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model, prefix_dropout=prefix_dropout
             )
-        elif "soft" in template_keywords or "soft_id" in template_keywords:
+        elif template_class == "SoftTemplate":
             word_embeddings = model.get_input_embeddings()
             return SoftTemplate(
                 prompt=prompt,
@@ -805,10 +839,12 @@ class AutoTemplate(object):
                 word_embeddings=word_embeddings,
                 soft_embeddings=soft_embeddings,
             )
-        elif "options" in template_keywords:
+        elif template_class == "UTCTemplate":
             return UTCTemplate(tokenizer=tokenizer, max_length=max_length)
-        else:
+        elif template_class == "ManualTemplate":
             return ManualTemplate(prompt=prompt, tokenizer=tokenizer, max_length=max_length)
+        else:
+            raise ValueError(f"Unknown template: {template_class}.")
 
     @classmethod
     def load_from(
@@ -818,9 +854,15 @@ class AutoTemplate(object):
         if not os.path.isfile(template_config_file):
             raise ValueError("{} not found under {}".format(TEMPLATE_CONFIG_FILE, data_path))
         with open(template_config_file, "r") as fp:
-            prompt = json.loads(fp.readline().strip())
-        # TODO (Huijuan): Load all configs from data_path.
-        template = cls.create_from(prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model)
+            config = [x.strip() for x in fp]
+            prompt = json.loads(config[0])
+            if len(config) > 1:
+                template_class = json.loads(config[1])
+            else:
+                template_class = None  # Compatible with previous versions
+        template = cls.create_from(
+            prompt=prompt, tokenizer=tokenizer, max_length=max_length, model=model, template_class=template_class
+        )
         template_param_file = os.path.join(data_path, TEMPLATE_PARAMETER_FILE)
         if os.path.isfile(template_param_file):
             template.set_state_dict(paddle.load(template_param_file))
@@ -834,10 +876,14 @@ class UTCTemplate(Template):
 
     template_special_tokens = ["text", "hard", "sep", "cls", "options"]
 
-    def __init__(self, tokenizer: PretrainedTokenizer, max_length: int):
+    def __init__(self, tokenizer: PretrainedTokenizer, max_length: int, prompt: str = None):
         prompt = (
-            "{'options': 'choices', 'add_omask': True, 'position': 0, 'token_type': 1}"
-            "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+            (
+                "{'options': 'choices', 'add_omask': True, 'position': 0, 'token_type': 1}"
+                "{'sep': None, 'token_type': 0, 'position': 0}{'text': 'text_a'}{'sep': None, 'token_type': 1}{'text': 'text_b'}"
+            )
+            if prompt is None
+            else prompt
         )
         super(UTCTemplate, self).__init__(prompt, tokenizer, max_length)
         self.max_position_id = self.tokenizer.model_max_length - 1

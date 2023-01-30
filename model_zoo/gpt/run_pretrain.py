@@ -52,11 +52,7 @@ MODEL_CLASSES = {
 @dataclass
 class TrainingArguments(TrainingArguments):
     min_lr: float = field(default=1e-5, metadata={"help": "The initial min learning rate for Adam."})
-
-    # per_device_train_batch_size
-    @property
-    def micro_batch_size(self):
-        return self.per_device_train_batch_size
+    micro_batch_size: int = field(default=4, metadata={"help": "the batch-size of trainin"})
 
     @property
     def eval_freq(self):
@@ -349,6 +345,7 @@ def do_train():
     ).parse_args_into_dataclasses()
     training_args.eval_iters = 10
     training_args.test_iters = training_args.eval_iters * 10
+    # training_args.per_device_train_batch_size = 2
 
     paddle.set_device(training_args.device)
     if paddle.distributed.get_world_size() > 1:
@@ -454,6 +451,9 @@ def do_train():
             checkpoint = training_args.resume_from_checkpoint
         elif last_checkpoint is not None:
             checkpoint = last_checkpoint
+
+        print("==============================")
+        print(f"last checkpoint : {checkpoint}")
 
         # Training
         if training_args.do_train:

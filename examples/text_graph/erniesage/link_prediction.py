@@ -12,23 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
+import argparse
 import io
+import os
 import random
 import time
-import argparse
 from functools import partial
 
 import numpy as np
-import yaml
 import paddle
 import pgl
+import yaml
+from data import GraphDataLoader, PredictData, TrainData, batch_fn
 from easydict import EasyDict as edict
-from paddlenlp.transformers import ErnieTokenizer, ErnieTinyTokenizer
-from paddlenlp.utils.log import logger
-
 from models import ErnieSageForLinkPrediction
-from data import TrainData, PredictData, GraphDataLoader, batch_fn
+
+from paddlenlp.transformers import ErnieTinyTokenizer, ErnieTokenizer
+from paddlenlp.utils.log import logger
 
 MODEL_CLASSES = {
     "ernie-tiny": (ErnieSageForLinkPrediction, ErnieTinyTokenizer),
@@ -57,14 +57,14 @@ def do_train(config):
     base_graph, term_ids = load_data(config.graph_work_path)
     collate_fn = partial(batch_fn, samples=config.samples, base_graph=base_graph, term_ids=term_ids)
 
-    mode = "train"
+    # mode = "train"
     train_ds = TrainData(config.graph_work_path)
 
     model_class, tokenizer_class = MODEL_CLASSES[config.model_name_or_path]
     tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path)
     config.cls_token_id = tokenizer.cls_token_id
 
-    model = model_class.from_pretrained(config.model_name_or_path, config=config)
+    model = model_class.from_pretrained(config.model_name_or_path, config_file=config)
     model = paddle.DataParallel(model)
 
     train_loader = GraphDataLoader(
@@ -113,7 +113,7 @@ def do_predict(config):
         paddle.distributed.init_parallel_env()
     set_seed(config)
 
-    mode = "predict"
+    # mode = "predict"
     num_nodes = int(np.load(os.path.join(config.graph_work_path, "num_nodes.npy")))
 
     base_graph, term_ids = load_data(config.graph_work_path)
@@ -123,7 +123,7 @@ def do_predict(config):
     tokenizer = tokenizer_class.from_pretrained(config.model_name_or_path)
     config.cls_token_id = tokenizer.cls_token_id
 
-    model = model_class.from_pretrained(config.infer_model, config=config)
+    model = model_class.from_pretrained(config.infer_model, config_file=config)
 
     model = paddle.DataParallel(model)
     predict_ds = PredictData(num_nodes)

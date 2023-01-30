@@ -135,7 +135,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     # yapf: enable
 
-    # set running environnent
+    # set running environment
     paddle.seed(42)
 
     label2id, id2label = load_dict(args.label_path)

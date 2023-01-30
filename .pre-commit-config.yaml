@@ -6,10 +6,13 @@ repos:
     -   id: black
         files: \.(py|pyi)$
         additional_dependencies: [toml]
--   repo: https://github.com/PyCQA/isort
-    rev: 5.10.1
-    hooks:
-    -   id: isort
+# Turning off isort temporary due to https://github.com/PyCQA/isort/issues/2077
+# As of 2023.1.29, bumping isort to 5.12.0 would resolve the error but requires python3.8+
+# Track the issue: https://github.com/PyCQA/isort/issues/2083
+# -   repo: https://github.com/PyCQA/isort
+#     rev: 5.10.1
+#     hooks:
+#     -   id: isort
 -   repo: https://github.com/PyCQA/flake8
     rev: 4.0.1
     hooks:
