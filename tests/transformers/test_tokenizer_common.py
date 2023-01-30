@@ -2167,10 +2167,11 @@ class TokenizerTesterMixin:
     def test_joined_unk_string(self):
         tokenizers = self.get_tokenizers(fast=True, do_lower_case=True)
         for tokenizer in tokenizers:
-            tokens = [tokenizer.unk_token, tokenizer.unk_token]
+            tokens = [tokenizer.unk_token for _ in range(2)]
             string = tokenizer.convert_tokens_to_string(tokens)
             encoding = tokenizer(
                 text=string,
+                runcation=True,
                 return_offsets_mapping=True,
             )
             self.assertEqual(len(encoding["input_ids"]), 4)

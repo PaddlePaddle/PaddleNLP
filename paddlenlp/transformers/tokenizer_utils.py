@@ -1309,7 +1309,7 @@ class PretrainedTokenizer(PretrainedTokenizerBase):
 
                 # try to fix: https://github.com/PaddlePaddle/PaddleNLP/issues/3985
                 if token not in text[offset:]:
-                    # check whether there is many joined unk tokens, eg: ['好', '[UNK]', '[UNK]', 'good']
+                    # check whether there are consecutive UNK tokens, eg: ['好', '[UNK]', '[UNK]', 'good']
                     if index < len(split_tokens) - 1 and split_tokens[index + 1] in self.all_special_tokens:
                         start = offset
                         token = " "  # only contains one char

@@ -16,31 +16,20 @@ limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/utils/utils.h"
-#include "nlohmann/json.hpp"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
 namespace pretokenizers {
 
-struct FASTTOKENIZER_DECL MetaSpacePreTokenizer : public PreTokenizer {
-  // Replaces white space with U+2581 (LOWER ONE EIGHT BLOCK)
-  MetaSpacePreTokenizer(const std::string& replacement = "\xe2\x96\x81",
-                        bool add_prefix_space = true);
-  MetaSpacePreTokenizer(const MetaSpacePreTokenizer&) = default;
+struct FASTTOKENIZER_DECL WhitespaceAndPunctuationPreTokenizer
+    : public PreTokenizer {
   virtual void operator()(PreTokenizedString* pretokenized) const override;
-  std::string GetReplacement() const;
-  void SetReplacement(const std::string&);
-
-private:
-  void UpdateReplacementChar();
-  std::string replacement_;
-  bool add_prefix_space_;
-  char32_t replacement_char_;
-
-  friend void to_json(nlohmann::json& j,
-                      const MetaSpacePreTokenizer& meta_pretokenizer);
-  friend void from_json(const nlohmann::json& j,
-                        MetaSpacePreTokenizer& meta_pretokenizer);
+  friend void to_json(
+      nlohmann::json& j,
+      const WhitespaceAndPunctuationPreTokenizer& whitespace_pretokenizer);
+  friend void from_json(
+      const nlohmann::json& j,
+      WhitespaceAndPunctuationPreTokenizer& whitespace_pretokenizer);
 };
 
 }  // namespace pretokenizers
