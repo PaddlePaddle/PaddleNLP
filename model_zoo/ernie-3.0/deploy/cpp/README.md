@@ -48,10 +48,10 @@ label: Similar confidence: 0.986198
 
 ```bash
 
-# 在GPU上使用paddle_tensorrt后端运行量化模型，模型目录可按照实际模型路径设置
-./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend paddle_tensorrt --model_prefix int8
+# 在 GPU 上使用 tensorrt 后端运行量化模型，模型目录可按照实际模型路径设置
+./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
 
-# 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
+# 在 CPU 上使用paddle_inference后端，模型目录可按照实际模型路径设置
 ./seq_cls_infer_demo --model_dir ../../../best_models/afqmc/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
 
 ```
@@ -60,7 +60,7 @@ label: Similar confidence: 0.986198
 
 ```bash
 [INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/seq_cls_infer.cc(67)::CreateRuntimeOption    model_path = ../../../best_models/afqmc/width_mult_0.75/mse16_1/int8.pdmodel, param_path = ../../../best_models/afqmc/width_mult_0.75/mse16_1/int8.pdmodel
-[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::PDINFER in Device::GPU.
+[INFO] fastdeploy/runtime.cc(596)::Init    Runtime initialized with Backend::TRT in Device::GPU.
 input data: 花呗收款额度限制, 收钱码，对花呗支付的金额有限制吗
 seq cls result:
 label: Similar confidence: 0.5259
@@ -245,7 +245,5 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
 ## 相关文档
 
 [ERNIE 3.0模型详细介绍](../../README.md)
-
-[ERNIE 3.0模型导出方法](../../README.md#模型导出)
 
 [ERNIE 3.0模型Python部署方法](../python/README.md)

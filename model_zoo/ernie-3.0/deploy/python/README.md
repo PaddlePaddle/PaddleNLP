@@ -47,8 +47,8 @@ Batch id:1, example id:0, sentence1:花呗支持高铁票支付吗, sentence2:�
 
 ```bash
 
-# 在GPU上使用paddle_tensorrt后端，模型目录可按照实际模型路径设置
-python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend paddle_tensorrt --model_prefix int8
+# 在GPU上使用 tensorrt 后端，模型目录可按照实际模型路径设置
+python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
 
 # 在CPU上使用paddle_inference后端，模型目录可按照实际模型路径设置
 python seq_cls_infer.py --model_dir ../../best_models/afqmc/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
@@ -233,7 +233,5 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
 ## 相关文档
 
 [ERNIE 3.0模型详细介绍](../../README.md)
-
-[ERNIE 3.0模型导出方法](../../README.md#模型导出)
 
 [ERNIE 3.0模型C++部署方法](../cpp/README.md)
