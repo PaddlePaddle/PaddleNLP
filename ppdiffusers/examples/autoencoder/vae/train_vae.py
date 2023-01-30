@@ -231,6 +231,25 @@ def parse_args():
     return args
 
 
+def check_keys(model, state_dict):
+    cls_name = model.__class__.__name__
+    missing_keys = []
+    mismatched_keys = []
+    for k, v in model.state_dict().items():
+        if k not in state_dict.keys():
+            missing_keys.append(k)
+        if list(v.shape) != list(state_dict[k].shape):
+            mismatched_keys.append(k)
+    if len(missing_keys):
+        missing_keys_str = ", ".join(missing_keys)
+        print(f"{cls_name} Found missing_keys {missing_keys_str}!")
+    if len(mismatched_keys):
+        mismatched_keys_str = ", ".join(mismatched_keys)
+        print(f"{cls_name} Found mismatched_keys {mismatched_keys_str}!")
+    if len(missing_keys) == 0 and len(mismatched_keys) == 0:
+        print(f"{cls_name} All model state_dict are loaded!")
+
+
 def main():
     args = parse_args()
     rank = paddle.distributed.get_rank()
@@ -293,6 +312,7 @@ def main():
     if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
         state_dict = paddle.load(args.init_from_ckpt)
         vae.set_dict(state_dict)
+        check_keys(vae, state_dict)
         del state_dict
 
     if args.scale_lr:
