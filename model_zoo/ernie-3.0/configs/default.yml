@@ -11,8 +11,8 @@ SequenceClassification:
         num_train_epochs: 1
         learning_rate: 0.00003
         max_seq_length: 128
-        per_device_train_batch_size: 64 
-        per_device_eval_batch_size: 64
+        per_device_train_batch_size: 16 
+        per_device_eval_batch_size: 32
     tnews:
         num_train_epochs: 3
         learning_rate: 0.00005
@@ -56,7 +56,7 @@ TokenClassification:
             learning_rate: 0.00005
             max_seq_length: 128 
             num_train_epochs: 1
-            per_device_train_batch_size: 16 
+            per_device_train_batch_size: 8 
             per_device_eval_batch_size: 16
 
 # Datasets which used for question answersing
@@ -65,6 +65,6 @@ QuestionAnswering:
             learning_rate: 0.00005
             max_seq_length: 512 
             num_train_epochs: 1
-            per_device_train_batch_size: 24 
+            per_device_train_batch_size: 8 
             per_device_eval_batch_size: 12
 

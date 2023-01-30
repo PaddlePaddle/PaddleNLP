@@ -27,6 +27,6 @@ include(external/re2)
 include(external/nlohmann_json)
 include(external/dart) # For trie
 if (WITH_PYTHON)
-include(external/python)
-include(external/pybind11)
+    include(external/python)
+    include(external/pybind11)
 endif()

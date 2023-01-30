@@ -24,7 +24,7 @@ from paddlenlp import Taskflow
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
     parser.add_argument('--model_path', type=str, default=None, help='the model path to be loaded for question_generation taskflow')
-    parser.add_argument('--source_file_path', type=str, default=None, help='the souce file path')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the source file path')
     parser.add_argument('--target_file_path', type=str, default=None, help='the target json file path')
     parser.add_argument('--all_sample_num', type=int, default=None, help='the test sample number when convert_json_to_data')
     parser.add_argument('--num_return_sequences', type=int, default=3, help='the number of return sequences for each input sample, it should be less than num_beams')
