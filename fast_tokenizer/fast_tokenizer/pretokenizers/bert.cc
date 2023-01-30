@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/bert.h"
+
 #include "fast_tokenizer/utils/utils.h"
 #include "glog/logging.h"
 #include "re2/re2.h"
@@ -30,9 +31,9 @@ static re2::RE2 punc_pattern("[[:punct:]]|[\\pP]");
 void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
   std::vector<normalizers::NormalizedString> normalized_splits;
   pretokenized->Split([&normalized_splits](
-      int idx,
-      normalizers::NormalizedString* normalized,
-      std::vector<StringSplit>* string_splits) {
+                          int idx,
+                          normalizers::NormalizedString* normalized,
+                          std::vector<StringSplit>* string_splits) {
     // Use single character match instead of regex to improve performance
     normalized->Split([](char32_t ch) -> bool { return u_isUWhiteSpace(ch); },
                       core::SplitMode::REMOVED,
@@ -45,9 +46,9 @@ void BertPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
   });
   normalized_splits.clear();
   pretokenized->Split([&normalized_splits](
-      int idx,
-      normalizers::NormalizedString* normalized,
-      std::vector<StringSplit>* string_splits) {
+                          int idx,
+                          normalizers::NormalizedString* normalized,
+                          std::vector<StringSplit>* string_splits) {
     // Use single character match instead of regex to improve performance
     normalized->Split(
         utils::IsPunctuation, core::SplitMode::ISOLATED, &normalized_splits);

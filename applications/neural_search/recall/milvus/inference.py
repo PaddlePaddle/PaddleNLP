@@ -73,7 +73,7 @@ if __name__ == "__main__":
         print("Loaded parameters from %s" % params_path)
     else:
         raise ValueError("Please set --params_path with correct pretrained model file")
-    # conver_example function's input must be dict
+    # convert_example function's input must be dict
     corpus_list = [{idx: text} for idx, text in id2corpus.items()]
     corpus_ds = MapDataset(corpus_list)
     corpus_data_loader = create_dataloader(

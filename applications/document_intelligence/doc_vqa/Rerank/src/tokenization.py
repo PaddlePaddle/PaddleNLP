@@ -20,7 +20,6 @@ from __future__ import print_function
 from __future__ import unicode_literals
 from __future__ import absolute_import
 
-import six
 import collections
 import unicodedata
 from io import open
@@ -28,45 +27,22 @@ from io import open
 
 def convert_to_unicode(text):
     """Converts `text` to Unicode (if it's not already), assuming utf-8 input."""
-    if six.PY3:
-        if isinstance(text, str):
-            return text
-        elif isinstance(text, bytes):
-            return text.decode("utf-8", "ignore")
-        else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
-    elif six.PY2:
-        if isinstance(text, str):
-            return text.decode("utf-8", "ignore")
-        elif isinstance(text, unicode):
-            return text
-        else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
     else:
-        raise ValueError("Not running on Python2 or Python 3?")
+        raise ValueError("Unsupported string type: %s" % (type(text)))
 
 
 def printable_text(text):
     """Returns text encoded in a way suitable for print or `tf.logging`."""
-
-    # These functions want `str` for both Python2 and Python3, but in one case
-    # it's a Unicode string and in the other it's a byte string.
-    if six.PY3:
-        if isinstance(text, str):
-            return text
-        elif isinstance(text, bytes):
-            return text.decode("utf-8", "ignore")
-        else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
-    elif six.PY2:
-        if isinstance(text, str):
-            return text
-        elif isinstance(text, unicode):
-            return text.encode("utf-8")
-        else:
-            raise ValueError("Unsupported string type: %s" % (type(text)))
+    if isinstance(text, str):
+        return text
+    elif isinstance(text, bytes):
+        return text.decode("utf-8", "ignore")
     else:
-        raise ValueError("Not running on Python2 or Python 3?")
+        raise ValueError("Unsupported string type: %s" % (type(text)))
 
 
 def load_vocab(vocab_file):
@@ -101,7 +77,7 @@ def convert_ids_to_tokens(inv_vocab, ids):
 
 
 def whitespace_tokenize(text):
-    """Runs basic whitespace cleaning and splitting on a peice of text."""
+    """Runs basic whitespace cleaning and splitting on a piece of text."""
     text = text.strip()
     if not text:
         return []
@@ -110,7 +86,7 @@ def whitespace_tokenize(text):
 
 
 class FullTokenizer(object):
-    """Runs end-to-end tokenziation."""
+    """Runs end-to-end tokenization."""
 
     def __init__(self, vocab_file, do_lower_case=True):
         self.vocab = load_vocab(vocab_file)
@@ -134,7 +110,7 @@ class FullTokenizer(object):
 
 
 class CharTokenizer(object):
-    """Runs end-to-end tokenziation."""
+    """Runs end-to-end tokenization."""
 
     def __init__(self, vocab_file, do_lower_case=True):
         self.vocab = load_vocab(vocab_file)
@@ -274,7 +250,7 @@ class BasicTokenizer(object):
 
 
 class WordpieceTokenizer(object):
-    """Runs WordPiece tokenziation."""
+    """Runs WordPiece tokenization."""
 
     def __init__(self, vocab, unk_token="[UNK]", max_input_chars_per_word=100):
         self.vocab = vocab
@@ -337,7 +313,7 @@ class WordpieceTokenizer(object):
 
 def _is_whitespace(char):
     """Checks whether `chars` is a whitespace character."""
-    # \t, \n, and \r are technically contorl characters but we treat them
+    # \t, \n, and \r are technically control characters but we treat them
     # as whitespace since they are generally considered as such.
     if char == " " or char == "\t" or char == "\n" or char == "\r":
         return True

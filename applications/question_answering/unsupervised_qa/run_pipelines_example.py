@@ -34,7 +34,7 @@ parser.add_argument("--index_name", default='faiss_index', type=str, help="The a
 parser.add_argument("--max_seq_len_query", default=64, type=int, help="The maximum total length of query after tokenization.")
 parser.add_argument("--max_seq_len_passage", default=256, type=int, help="The maximum total length of passage after tokenization.")
 parser.add_argument("--retriever_batch_size", default=16, type=int, help="The batch size of retriever to extract passage embedding for building ANN index.")
-parser.add_argument("--doc_dir", default="data/my_data", type=str, help="The question-answer piars file to be loaded when building ANN index.")
+parser.add_argument("--doc_dir", default="data/my_data", type=str, help="The question-answer pairs file to be loaded when building ANN index.")
 parser.add_argument("--source_file", default=None, type=str, help="The source raw texts file to be loaded when creating question-answer pairs.")
 
 args = parser.parse_args()
