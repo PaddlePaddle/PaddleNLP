@@ -11,15 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import numpy as np
-import os
 import unittest
+
+import numpy as np
 import paddle
+
 from paddlenlp.embeddings import TokenEmbedding
 from paddlenlp.utils.log import logger
-from util import get_vocab_list, create_test_data
-
-from common_test import CommonTest
+from tests.common_test import CommonTest
+from tests.testing_utils import create_test_data, get_vocab_list
 
 logger.logger.setLevel("ERROR")
 

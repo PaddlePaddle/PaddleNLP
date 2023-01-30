@@ -11,16 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import os
 import argparse
+import os
+from pprint import pprint
 
 import paddle
 
-from pprint import pprint
-
-from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.ops import FasterUNIMOText
-
+from paddlenlp.transformers import UNIMOLMHeadModel, UNIMOTokenizer
 from paddlenlp.utils.log import logger
 
 
@@ -82,13 +80,13 @@ def do_predict(args):
         unimo_text,
         input_spec=[
             # input_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # token_type_ids
-            paddle.static.InputSpec(shape=[None, None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None, None], dtype="int64"),
             # attention_mask
             paddle.static.InputSpec(shape=[None, 1, None, None], dtype="float32"),
             # seq_len
-            paddle.static.InputSpec(shape=[None], dtype="int32"),
+            paddle.static.InputSpec(shape=[None], dtype="int64"),
             args.max_out_len,
             args.min_out_len,
             args.topk,

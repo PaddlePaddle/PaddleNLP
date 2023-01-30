@@ -12,26 +12,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from __future__ import annotations
 
+import copy
 import datetime
 import math
 import random
+import tempfile
+import unittest
 
 import numpy as np
 import paddle
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from paddlenlp.transformers import (
+    GPTConfig,
     GPTForSequenceClassification,
     GPTForTokenClassification,
     GPTLMHeadModel,
     GPTModel,
     GPTTokenizer,
 )
-from tests.testing_utils import PaddleNLPModelTest, slow
-
-from ..test_generation_utils import GenerationTesterMixin
-from ..test_modeling_common import (
+from tests.testing_utils import PaddleNLPModelTest, require_package, slow
+from tests.transformers.test_generation_utils import GenerationTesterMixin
+from tests.transformers.test_modeling_common import (
     ModelTesterMixin,
     floats_tensor,
     ids_tensor,
@@ -124,22 +128,24 @@ class GPTModelTester:
         )
 
     def get_config(self):
-        return {
-            "vocab_size": self.vocab_size,
-            "hidden_size": self.hidden_size,
-            "num_hidden_layers": self.num_hidden_layers,
-            "num_attention_heads": self.num_attention_heads,
-            "intermediate_size": self.intermediate_size,
-            "hidden_act": self.hidden_act,
-            "hidden_dropout_prob": self.hidden_dropout_prob,
-            "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
-            "max_position_embeddings": self.max_position_embeddings,
-            "type_vocab_size": self.type_vocab_size,
-            "initializer_range": self.initializer_range,
-            "bos_token_id": self.bos_token_id,
-            "eos_token_id": self.eos_token_id,
-            "pad_token_id": self.pad_token_id,
-        }
+        return GPTConfig(
+            **{
+                "vocab_size": self.vocab_size,
+                "hidden_size": self.hidden_size,
+                "num_hidden_layers": self.num_hidden_layers,
+                "num_attention_heads": self.num_attention_heads,
+                "intermediate_size": self.intermediate_size,
+                "hidden_act": self.hidden_act,
+                "hidden_dropout_prob": self.hidden_dropout_prob,
+                "attention_probs_dropout_prob": self.attention_probs_dropout_prob,
+                "max_position_embeddings": self.max_position_embeddings,
+                "type_vocab_size": self.type_vocab_size,
+                "initializer_range": self.initializer_range,
+                "bos_token_id": self.bos_token_id,
+                "eos_token_id": self.eos_token_id,
+                "pad_token_id": self.pad_token_id,
+            }
+        )
 
     def prepare_config_and_inputs_for_decoder(self):
         (
@@ -168,7 +174,7 @@ class GPTModelTester:
         )
 
     def create_and_check_gpt_model(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         result = model(input_ids, use_cache=True, return_dict=self.parent.return_dict)
@@ -179,7 +185,7 @@ class GPTModelTester:
         self.parent.assertEqual(len(result[1]), config["num_hidden_layers"])
 
     def create_and_check_gpt_model_past(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # first forward pass
@@ -211,7 +217,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_gpt_model_attention_mask_past(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # create attention mask
@@ -256,7 +262,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_gpt_model_past_large_inputs(self, config, input_ids, input_mask, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model.eval()
 
         # first forward pass
@@ -295,8 +301,7 @@ class GPTModelTester:
         self.parent.assertTrue(paddle.allclose(output_from_past_slice, output_from_no_past_slice, atol=1e-3))
 
     def create_and_check_lm_head_model(self, config, input_ids, input_mask, *args):
-        base_model = GPTModel(**config)
-        model = GPTLMHeadModel(base_model)
+        model = GPTLMHeadModel(config)
         model.eval()
 
         result = model(
@@ -312,8 +317,7 @@ class GPTModelTester:
             self.parent.assertEqual(result[0].shape, [self.batch_size, self.seq_length, self.vocab_size])
 
     def create_and_check_forward_and_backwards(self, config, input_ids, input_mask, *args):
-        base_model = GPTModel(**config)
-        model = GPTLMHeadModel(base_model)
+        model = GPTLMHeadModel(config)
 
         if self.parent.use_labels:
             loss, logits = model(input_ids, labels=input_ids, return_dict=self.parent.return_dict)
@@ -322,8 +326,8 @@ class GPTModelTester:
             loss.backward()
 
     def create_and_check_gpt_for_sequence_classification(self, config, input_ids, input_mask, sequence_labels, *args):
-        base_model = GPTModel(**config)
-        model = GPTForSequenceClassification(base_model, self.num_labels)
+        config.num_labels = self.num_labels
+        model = GPTForSequenceClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -342,9 +346,8 @@ class GPTModelTester:
     def create_and_check_gpt_for_token_classification(
         self, config, input_ids, input_mask, sequence_labels, token_labels, *args
     ):
-        # config.num_labels = self.num_labels
-        base_model = GPTModel(**config)
-        model = GPTForTokenClassification(base_model, self.num_labels)
+        config.num_labels = self.num_labels
+        model = GPTForTokenClassification(config)
         model.eval()
         result = model(
             input_ids,
@@ -361,7 +364,7 @@ class GPTModelTester:
             self.parent.assertEqual(result.shape, [self.batch_size, self.seq_length, self.num_labels])
 
     def create_and_check_gpt_weight_initialization(self, config, *args):
-        model = GPTModel(**config)
+        model = GPTModel(config)
         model_std = model.config["initializer_range"] / math.sqrt(2 * model.config["num_hidden_layers"])
         for key in model.state_dict().keys():
             if "out_proj" in key and "weight" in key:
@@ -383,6 +386,13 @@ class GPTModelTester:
             "input_ids": input_ids,
         }
 
+        return config, inputs_dict
+
+    def prepare_config_and_inputs_for_gpt(self):
+        config = self.get_config()
+        # excluding eos_token_id which is equal to vocab_size - 1
+        input_ids = ids_tensor([self.batch_size, self.seq_length], self.vocab_size - 1, dtype="int64")
+        inputs_dict = {"input_ids": input_ids}
         return config, inputs_dict
 
 
@@ -450,6 +460,41 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         config_and_inputs = self.model_tester.prepare_config_and_inputs()
         self.model_tester.create_and_check_gpt_weight_initialization(*config_and_inputs)
 
+    def test_inputs_embeds(self):
+        # NOTE: rewrite test inputs embeds for gpt model since couldn't detect eos token id from inputs_embeds
+        # get config for model and inputs_dict for model forward
+        config, inputs_dict = self.model_tester.prepare_config_and_inputs_for_gpt()
+        # test all model classes
+        for model_class in self.all_model_classes:
+            model = self._make_model_instance(config, model_class)
+            model.eval()
+
+            inputs = copy.deepcopy(self._prepare_for_class(inputs_dict, model_class))
+
+            with paddle.no_grad():
+                ids_output = model(**inputs)
+
+            if not self.is_encoder_decoder:
+                input_ids = inputs["input_ids"]
+                del inputs["input_ids"]
+            else:
+                encoder_input_ids = inputs["input_ids"]
+                decoder_input_ids = inputs.get("decoder_input_ids", encoder_input_ids)
+                del inputs["input_ids"]
+                inputs.pop("decoder_input_ids", None)
+
+            wte = model.get_input_embeddings()
+            if not self.is_encoder_decoder:
+                inputs["inputs_embeds"] = wte(input_ids)
+            else:
+                inputs["inputs_embeds"] = wte(encoder_input_ids)
+                inputs["decoder_inputs_embeds"] = wte(decoder_input_ids)
+
+            with paddle.no_grad():
+                embeds_output = model(**inputs)
+
+            self.assertTrue(paddle.allclose(ids_output, embeds_output, rtol=1e-4, atol=1e-4))
+
     @slow
     def test_batch_generation(self):
         model = GPTLMHeadModel.from_pretrained("gpt2-en")
@@ -507,6 +552,84 @@ class GPTModelTest(ModelTesterMixin, GenerationTesterMixin, PaddleNLPModelTest):
         for model_name in GPT2_PRETRAINED_MODEL_ARCHIVE_LIST[:1]:
             model = GPTModel.from_pretrained(model_name)
             self.assertIsNotNone(model)
+
+
+class GPTCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-GPT2Model"
+
+    @classmethod
+    @require_package("transformers", "torch")
+    def setUpClass(cls) -> None:
+        from transformers import GPT2Model
+
+        # when python application is done, `TemporaryDirectory` will be free
+        cls.torch_model_path = tempfile.TemporaryDirectory().name
+        model = GPT2Model.from_pretrained(cls.test_model_id)
+        model.save_pretrained(cls.torch_model_path)
+
+    @require_package("transformers", "torch")
+    def test_gpt_converter_from_local_dir_with_enable_torch(self):
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 2. forward the torch  model
+            from transformers import GPT2Model
+
+            torch_model = GPT2Model.from_pretrained(self.test_model_id)
+            torch_model.save_pretrained(tempdir)
+
+            # 2. forward the paddle model
+            from paddlenlp.transformers import GPTModel, model_utils
+
+            model_utils.ENABLE_TORCH_CHECKPOINT = False
+
+            with self.assertRaises(ValueError) as error:
+                GPTModel.from_pretrained(tempdir)
+                self.assertIn("conversion is been disabled" in str(error.exception))
+            model_utils.ENABLE_TORCH_CHECKPOINT = True
+
+    @parameterized.expand(
+        [
+            ("GPTModel", "GPT2Model"),
+            ("GPTForSequenceClassification", "GPT2ForSequenceClassification"),
+            ("GPTForTokenClassification", "GPT2ForTokenClassification"),
+            ("GPTLMHeadModel", "GPT2LMHeadModel"),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_gpt_classes_from_local_dir(self, paddle_class_name, pytorch_class_name: str | None = None):
+        pytorch_class_name = pytorch_class_name or paddle_class_name
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, pytorch_class_name)
+            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
+            torch_model.eval()
+
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 3. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, paddle_class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
+
+            self.assertTrue(
+                np.allclose(
+                    paddle_logit.detach().cpu().numpy().reshape([-1])[:16],
+                    torch_logit.detach().cpu().numpy().reshape([-1])[:16],
+                    rtol=1e-4,
+                )
+            )
 
 
 class GPTModelLanguageGenerationTest(PaddleNLPModelTest):

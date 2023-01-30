@@ -20,6 +20,7 @@ import paddle.nn as nn
 import paddle.nn.functional as F
 from paddle import Tensor
 
+from ...utils.env import CONFIG_NAME
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -47,6 +48,7 @@ __all__ = [
     "ErnieForMaskedLM",
     "ErnieForMultipleChoice",
     "UIE",
+    "UTC",
 ]
 
 
@@ -148,7 +150,7 @@ class ErniePretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "model_config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "ernie"
@@ -165,9 +167,7 @@ class ErniePretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -634,7 +634,6 @@ class ErnieForTokenClassification(ErniePretrainedModel):
         super(ErnieForTokenClassification, self).__init__(config)
         self.ernie = ErnieModel(config)
         self.num_labels = config.num_labels
-        print(self.num_labels)
         self.dropout = nn.Dropout(
             config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
         )
@@ -1222,16 +1221,15 @@ class UIE(ErniePretrainedModel):
     output to compute `start_prob` and `end_prob`,
     designed for Universal Information Extraction.
     Args:
-        ernie (`ErnieModel`):
-            An instance of `ErnieModel`.
+        config (:class:`ErnieConfig`):
+            An instance of ErnieConfig used to construct ErnieForMultipleChoice
     """
 
-    def __init__(self, ernie):
-        super(UIE, self).__init__()
-        self.ernie = ernie
-        hidden_size = self.ernie.config["hidden_size"]
-        self.linear_start = paddle.nn.Linear(hidden_size, 1)
-        self.linear_end = paddle.nn.Linear(hidden_size, 1)
+    def __init__(self, config: ErnieConfig):
+        super(UIE, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        self.linear_start = paddle.nn.Linear(config.hidden_size, 1)
+        self.linear_end = paddle.nn.Linear(config.hidden_size, 1)
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
@@ -1269,3 +1267,93 @@ class UIE(ErniePretrainedModel):
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
         return start_prob, end_prob
+
+
+class UTC(ErniePretrainedModel):
+    """
+    Ernie Model with two linear layer on the top of the hidden-states output to compute
+    probability of candidate labels, designed for Unified Tag Classification.
+    """
+
+    def __init__(self, config: ErnieConfig):
+        super(UTC, self).__init__(config)
+        self.ernie = ErnieModel(config)
+        self.predict_size = 64
+        self.linear_q = paddle.nn.Linear(config.hidden_size, self.predict_size)
+        self.linear_k = paddle.nn.Linear(config.hidden_size, self.predict_size)
+        self.apply(self.init_weights)
+
+    def forward(
+        self,
+        input_ids,
+        token_type_ids,
+        position_ids,
+        attention_mask,
+        omask_positions,
+        cls_positions,
+        inputs_embeds: Optional[Tensor] = None,
+        output_hidden_states: Optional[bool] = None,
+        output_attentions: Optional[bool] = None,
+        return_dict: Optional[bool] = None,
+    ):
+        r"""
+        Args:
+            input_ids (Tensor):
+                See :class:`ErnieModel`.
+            token_type_ids (Tensor):
+                See :class:`ErnieModel`.
+            position_ids (Tensor):
+                See :class:`ErnieModel`.
+            attention_mask (Tensor):
+                See :class:`ErnieModel`.
+            omask_positions (Tensor of shape `(batch_size, max_option)`):
+                Masked positions of [O-MASK] tokens padded with 0.
+            cls_positions (Tensor of shape `(batch_size)`):
+                Masked positions of the second [CLS] token.
+            labels (Tensor of shape `(num_labels_in_batch,)`, optional):
+                Labels for computing classification loss.
+        """
+        outputs = self.ernie(
+            input_ids,
+            token_type_ids=token_type_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+            inputs_embeds=inputs_embeds,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = outputs[0]
+
+        batch_size, seq_len, hidden_size = sequence_output.shape
+        flat_sequence_output = paddle.reshape(sequence_output, [-1, hidden_size])
+
+        cls_output = paddle.tensor.gather(flat_sequence_output, cls_positions)
+        q = self.linear_q(cls_output)
+
+        flat_length = paddle.arange(batch_size) * seq_len
+        flat_length = flat_length.unsqueeze(axis=1).astype("int64")
+        option_output = paddle.tensor.gather(flat_sequence_output, paddle.reshape(omask_positions + flat_length, [-1]))
+        option_output = paddle.reshape(option_output, [batch_size, -1, hidden_size])
+        k = self.linear_k(option_output)
+
+        option_logits = paddle.matmul(q.unsqueeze(1), k, transpose_y=True).squeeze(1)
+        option_logits = option_logits / self.predict_size**0.5
+        for index, logit in enumerate(option_logits):
+            option_logits[index] -= (1 - (omask_positions[index] > 0).astype("float32")) * 1e12
+
+        loss = None
+        if not return_dict:
+            output = (option_logits,)
+            if output_hidden_states:
+                output = output + (outputs.hidden_states,)
+            if output_attentions:
+                output = output + (output.attentions,)
+            return ((loss,) + output) if loss is not None else (output[0] if len(output) == 1 else output)
+
+        return MultipleChoiceModelOutput(
+            loss=loss,
+            logits=option_logits,
+            hidden_states=outputs.hidden_states,
+            attentions=outputs.attentions,
+        )

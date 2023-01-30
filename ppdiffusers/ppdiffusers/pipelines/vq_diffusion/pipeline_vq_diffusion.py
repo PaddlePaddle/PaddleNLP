@@ -184,7 +184,7 @@ class VQDiffusionPipeline(DiffusionPipeline):
         guidance_scale: float = 5.0,
         truncation_rate: float = 1.0,
         num_images_per_prompt: int = 1,
-        generator: Optional[paddle.Generator] = None,
+        generator: Optional[Union[paddle.Generator, List[paddle.Generator]]] = None,
         latents: Optional[paddle.Tensor] = None,
         output_type: Optional[str] = "pil",
         return_dict: bool = True,
@@ -213,7 +213,7 @@ class VQDiffusionPipeline(DiffusionPipeline):
             num_images_per_prompt (`int`, *optional*, defaults to 1):
                 The number of images to generate per prompt.
             generator (`paddle.Generator`, *optional*):
-                A [paddle generator] to make generation deterministic.
+                One or a list of paddle generator(s) to make generation deterministic.
             latents (`paddle.Tensor` of shape (batch), *optional*):
                 Pre-generated noisy latents to be used as inputs for image generation. Must be valid embedding indices.
                 Can be used to tweak the same generation with different prompts. If not provided, a latents tensor will

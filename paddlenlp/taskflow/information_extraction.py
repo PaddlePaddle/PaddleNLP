@@ -26,7 +26,9 @@ from ..datasets import load_dataset
 from ..layers import GlobalPointerForEntityExtraction, GPLinkerForRelationExtraction
 from ..transformers import UIE, UIEM, UIEX, AutoModel, AutoTokenizer
 from ..utils.doc_parser import DocParser
+from ..utils.env import CONFIG_NAME, LEGACY_CONFIG_NAME
 from ..utils.ie_utils import map_offset, pad_image_data
+from ..utils.log import logger
 from ..utils.tools import get_bool_ids_greater_than, get_span
 from .task import Task
 from .utils import DataCollatorGP, SchemaTree, dbc2sbc, get_id_and_prob, gp_decode
@@ -112,7 +114,7 @@ class UIETask(Task):
 
     resource_files_names = {
         "model_state": "model_state.pdparams",
-        "model_config": "model_config.json",
+        "config": "config.json",
         "vocab_file": "vocab.txt",
         "special_tokens_map": "special_tokens_map.json",
         "tokenizer_config": "tokenizer_config.json",
@@ -124,9 +126,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_v1.1/model_state.pdparams",
                 "47b93cf6a85688791699548210048085",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-                "a36c185bfc17a83b6cfef6f98b29c909",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/config.json",
+                "ad8b5442c758fb2dc18ea53b61e867f7",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -146,9 +148,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.1/model_state.pdparams",
                 "c34475665eb05e25f3c9cd9b020b331a",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
-                "6f1ee399398d4f218450fbbf5f212b15",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/config.json",
+                "7fb22b3e07c5af76371c25ab814f06b8",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -168,9 +170,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini_v1.1/model_state.pdparams",
                 "9a0805762c41b104d590c15fbe9b19fd",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/model_config.json",
-                "9229ce0a9d599de4602c97324747682f",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_mini/config.json",
+                "8ddebbf64c3f32a49e6f9e1c220e7322",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -190,9 +192,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro_v1.1/model_state.pdparams",
                 "da67287bca2906864929e16493f748e4",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/model_config.json",
-                "07ef444420c3ab474f9270a1027f6da5",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_micro/config.json",
+                "544ddc65c758536cd3ba122f55b8709c",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -212,9 +214,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano_v1.1/model_state.pdparams",
                 "48db5206232e89ef16b66467562d90e5",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/model_config.json",
-                "e3a9842edf8329ccdd0cf6039cf0a8f8",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_nano/config.json",
+                "e0e0a2c0d9651ed1a8492be5507590a9",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -235,9 +237,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium_v1.1/model_state.pdparams",
                 "c34475665eb05e25f3c9cd9b020b331a",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/model_config.json",
-                "6f1ee399398d4f218450fbbf5f212b15",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medium/config.json",
+                "7fb22b3e07c5af76371c25ab814f06b8",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -257,9 +259,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_medical_base_v0.2/model_state.pdparams",
                 "7582d3b01f6faf00b7000111ea853796",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/model_config.json",
-                "a36c185bfc17a83b6cfef6f98b29c909",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/config.json",
+                "ad8b5442c758fb2dc18ea53b61e867f7",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base/vocab.txt",
@@ -279,9 +281,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en_v1.2/model_state.pdparams",
                 "8c5d5c8faa76681a0aad58f982cd6141",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/model_config.json",
-                "2ca9fe0eea8ff9418725d1a24fcf5c36",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/config.json",
+                "257b80ea8b7889fd8b83a9ace7a8a220",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_base_en/vocab.txt",
@@ -301,9 +303,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base_v1.1/model_state.pdparams",
                 "eb00c06bd7144e76343d750f5bf36ff6",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/model_config.json",
-                "05c4b9d050e1402a891b207e36d2e501",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/config.json",
+                "f03de3ce1b83c13e7bee18e6f323d33f",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_base/vocab.txt",
@@ -327,9 +329,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large_v1.1/model_state.pdparams",
                 "9db83a67f34a9c2483dbe57d2510b4c2",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/model_config.json",
-                "22ad69618dc3f4c3fe756e3044c3056e",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/config.json",
+                "8f540de05de57ecc66336b41f3a7ffdb",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_m_large/vocab.txt",
@@ -353,9 +355,9 @@ class UIETask(Task):
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base_v1.0/model_state.pdparams",
                 "a953b55f7639ae73d1df6c2c5f7667dd",
             ],
-            "model_config": [
-                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/model_config.json",
-                "50be05e78aec34d37596513870fa050e",
+            "config": [
+                "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/config.json",
+                "6bcd7d4b119717121fa0276c20bd9224",
             ],
             "vocab_file": [
                 "https://bj.bcebos.com/paddlenlp/taskflow/information_extraction/uie_x_base/vocab.txt",
@@ -376,7 +378,7 @@ class UIETask(Task):
         },
     }
 
-    def __init__(self, task, model, schema, **kwargs):
+    def __init__(self, task, model, schema=None, **kwargs):
         super().__init__(task=task, model=model, **kwargs)
 
         self._max_seq_len = kwargs.get("max_seq_len", 512)
@@ -385,7 +387,7 @@ class UIETask(Task):
         self._position_prob = kwargs.get("position_prob", 0.5)
         self._lazy_load = kwargs.get("lazy_load", False)
         self._num_workers = kwargs.get("num_workers", 0)
-        self.use_fast = kwargs.get("use_fast", False)
+        self._use_fast = kwargs.get("use_fast", False)
         self._layout_analysis = kwargs.get("layout_analysis", False)
         self._ocr_lang = kwargs.get("ocr_lang", "ch")
         self._schema_lang = kwargs.get("schema_lang", "ch")
@@ -397,13 +399,21 @@ class UIETask(Task):
         # TODO: temporary solution to support HF Hub due to lack of AutoModel
         # change this logic to use AutoConfig when available
         if self.from_hf_hub:
-            config_file_path = hf_hub_download(repo_id=self._task_path, filename="model_config.json")
+            config_file_path = hf_hub_download(repo_id=self._task_path, filename=CONFIG_NAME)
             with open(config_file_path) as f:
-                self._init_class = json.load(f)["init_class"]
+                self._init_class = json.load(f)["architectures"].pop()
         else:
-            self._check_task_files()
-            with open(os.path.join(self._task_path, "model_config.json")) as f:
-                self._init_class = json.load(f)["init_class"]
+            # Compatible with the model fine-tuned without PretrainedConfig
+            if os.path.exists(os.path.join(self._task_path, LEGACY_CONFIG_NAME)):
+                if "config" in self.resource_files_names.keys():
+                    del self.resource_files_names["config"]
+                with open(os.path.join(self._task_path, LEGACY_CONFIG_NAME)) as f:
+                    self._init_class = json.load(f)["init_class"]
+                self._check_task_files()
+            else:
+                self._check_task_files()
+                with open(os.path.join(self._task_path, CONFIG_NAME)) as f:
+                    self._init_class = json.load(f)["architectures"].pop()
 
         if self._init_class not in ["UIEX", "UIEM"]:
             if "sentencepiece_model_file" in self.resource_files_names.keys():
@@ -415,13 +425,30 @@ class UIETask(Task):
         else:
             self._summary_token_num = 3  # [CLS] prompt [SEP] text [SEP]
 
-        self._doc_parser = None
-        self._schema_tree = None
-        self.set_schema(schema)
+        self._parser_map = {
+            "ch": None,  # OCR-CH
+            "en": None,  # OCR-EN
+            "ch-layout": None,  # Layout-CH
+            "en-layout": None,  # Layout-EN
+        }
+        if not schema:
+            logger.warning(
+                "The schema has not been set yet, please set a schema via set_schema(). "
+                "More details about the setting of schema please refer to https://github.com/PaddlePaddle/PaddleNLP/blob/develop/applications/information_extraction/taskflow_text.md"
+            )
+            self._schema_tree = None
+        else:
+            self.set_schema(schema)
         self._check_predictor_type()
         self._get_inference_model()
         self._usage = usage
         self._construct_tokenizer()
+
+    def set_argument(self, argument: dict):
+        for k, v in argument.items():
+            if k == "input":
+                continue
+            setattr(self, f"_{k}", v)
 
     def set_schema(self, schema):
         if isinstance(schema, dict) or isinstance(schema, str):
@@ -467,7 +494,7 @@ class UIETask(Task):
         Construct the tokenizer for the predictor.
         """
         self._tokenizer = AutoTokenizer.from_pretrained(
-            self._task_path, use_fast=self.use_fast, from_hf_hub=self.from_hf_hub
+            self._task_path, use_fast=self._use_fast, from_hf_hub=self.from_hf_hub
         )
 
     def _preprocess(self, inputs):
@@ -485,6 +512,7 @@ class UIETask(Task):
         """
         Check whether the input meet the requirement.
         """
+        self._ocr_lang_choice = (self._ocr_lang + "-layout") if self._layout_analysis else self._ocr_lang
         inputs = inputs[0]
         if isinstance(inputs, dict) or isinstance(inputs, str):
             inputs = [inputs]
@@ -494,17 +522,17 @@ class UIETask(Task):
                 data = {}
                 if isinstance(example, dict):
                     if "doc" in example.keys():
-                        if not self._doc_parser:
-                            self._doc_parser = DocParser(
+                        if not self._parser_map[self._ocr_lang_choice]:
+                            self._parser_map[self._ocr_lang_choice] = DocParser(
                                 ocr_lang=self._ocr_lang, layout_analysis=self._layout_analysis
                             )
                         if "layout" in example.keys():
-                            data = self._doc_parser.parse(
+                            data = self._parser_map[self._ocr_lang_choice].parse(
                                 {"doc": example["doc"]}, do_ocr=False, expand_to_a4_size=self._expand_to_a4_size
                             )
                             data["layout"] = example["layout"]
                         else:
-                            data = self._doc_parser.parse(
+                            data = self._parser_map[self._ocr_lang_choice].parse(
                                 {"doc": example["doc"]}, expand_to_a4_size=self._expand_to_a4_size
                             )
                     elif "text" in example.keys():
@@ -931,7 +959,7 @@ class UIETask(Task):
                             org_box[2] + offset_x,
                             org_box[3] + offset_y,
                         ]
-                        box = self._doc_parser._normalize_box(box, [img_w, img_h], [1000, 1000])
+                        box = self._parser_map[self._ocr_lang_choice]._normalize_box(box, [img_w, img_h], [1000, 1000])
                         text += segment[1]
                         bbox.extend([box] * len(segment[1]))
                     _inputs.append({"text": text, "bbox": bbox, "image": d["image"], "layout": d["layout"]})

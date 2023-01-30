@@ -18,6 +18,8 @@ import paddle
 import paddle.nn as nn
 from paddle import Tensor
 
+from paddlenlp.utils.env import CONFIG_NAME
+
 from .. import PretrainedModel, register_base_model
 from ..model_outputs import (
     BaseModelOutputWithPoolingAndCrossAttentions,
@@ -114,7 +116,7 @@ class ErnieMPretrainedModel(PretrainedModel):
 
     """
 
-    model_config_file = "config.json"
+    model_config_file = CONFIG_NAME
     config_class = ErnieMConfig
     resource_files_names = {"model_state": "model_state.pdparams"}
 
@@ -131,9 +133,7 @@ class ErnieMPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.ernie_m.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -278,7 +278,7 @@ class ErnieMModel(ErnieMPretrainedModel):
 
         if attention_mask is None:
             attention_mask = paddle.unsqueeze(
-                (input_ids == 0).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
+                (input_ids == self.pad_token_id).astype(self.pooler.dense.weight.dtype) * -1e4, axis=[1, 2]
             )
             if past_key_values is not None:
                 batch_size = past_key_values[0][0].shape[0]
@@ -790,12 +790,14 @@ class UIEM(ErnieMPretrainedModel):
         self.sigmoid = nn.Sigmoid()
         self.apply(self.init_weights)
 
-    def forward(self, input_ids, position_ids=None):
+    def forward(self, input_ids, position_ids=None, attention_mask=None):
         r"""
         Args:
             input_ids (Tensor):
                 See :class:`ErnieMModel`.
             position_ids (Tensor, optional):
+                See :class:`ErnieMModel`.
+            attention_mask (Tensor, optional):
                 See :class:`ErnieMModel`.
 
         Example:
@@ -811,11 +813,16 @@ class UIEM(ErnieMPretrainedModel):
                 inputs = {k:paddle.to_tensor([v]) for (k, v) in inputs.items()}
                 start_prob, end_prob = model(**inputs)
         """
-        sequence_output, _ = self.ernie_m(input_ids=input_ids, position_ids=position_ids)
+        sequence_output, _ = self.ernie_m(
+            input_ids=input_ids,
+            position_ids=position_ids,
+            attention_mask=attention_mask,
+        )
         start_logits = self.linear_start(sequence_output)
         start_logits = paddle.squeeze(start_logits, -1)
         start_prob = self.sigmoid(start_logits)
         end_logits = self.linear_end(sequence_output)
         end_logits = paddle.squeeze(end_logits, -1)
         end_prob = self.sigmoid(end_logits)
+        # TODO: add return dict support
         return start_prob, end_prob

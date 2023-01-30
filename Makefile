@@ -35,8 +35,9 @@ lint:
 test: unit-test
 
 unit-test:
-	PYTHONPATH=$(shell pwd) pytest \
-		-n auto --cov paddlenlp \
+	PYTHONPATH=$(shell pwd) pytest -v \
+		-n auto \
+		--cov paddlenlp \
 		--cov-report xml:coverage.xml
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -45,22 +46,31 @@ unit-test:
 install:
 	pip install -r requirements-dev.txt
 	pip install -r requirements.txt
+	pip install -r paddlenlp/experimental/autonlp/requirements.txt
 	pre-commit install
 
 
 .PHONY: deploy-ppdiffusers
 deploy-ppdiffusers:
-	cd ppdiffusers && make
-
-.PHONY: install-ppdiffusers
-install-ppdiffusers:
-	cd ppdiffusers && make install
+	cd ppdiffusers && make install && make
 
 .PHONY: deploy-paddle-pipelines
 deploy-paddle-pipelines:
-	cd pipelines && make
+	cd pipelines && make install && make
 
-.PHONY: install-paddle-pipelines
-install-paddle-pipelines:
-	cd pipelines && make install
+.PHONY: deploy-paddlenlp
+deploy-paddlenlp:
+	# install related package
+	make install
+	# build
+	python3 setup.py sdist bdist_wheel
+	# upload
+	twine upload --skip-existing dist/*
 
+.PHONY: regression-all
+release: 
+	bash ./scripts/regression/run_release.sh 0 0,1 all
+
+.PHONY: regression-key
+key: 
+	bash ./scripts/regression/run_release.sh 0 0,1 p0

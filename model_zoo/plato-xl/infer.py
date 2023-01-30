@@ -15,13 +15,17 @@
 import argparse
 import os
 import time
-import paddle
-import numpy as np
 from distutils.util import strtobool
 from pprint import pprint
-from paddlenlp.ops import enable_ft_para, get_ft_para_conf
+
+import paddle
+
 from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.transformers import UnifiedTransformerLMHeadModel, UnifiedTransformerTokenizer
+from paddlenlp.ops import enable_ft_para, get_ft_para_conf
+from paddlenlp.transformers import (
+    UnifiedTransformerLMHeadModel,
+    UnifiedTransformerTokenizer,
+)
 
 
 def parse_args():
@@ -92,14 +96,14 @@ def postprocess_response(token_ids, tokenizer):
 
 
 def main(args):
-    # For memory saving when using FasterGeneration:
+    # For memory saving when using FastGeneration:
     # If environment variable `PPFG_QKV_MEM_OPT` is set and the weights of q/k/v
     # is fused, it will try to delete the original unfused weights. Note the
     # rollback to original model would not be guarantee anymore when the faster
     # model failed if the original weights are deleted.
     os.environ["PPFG_QKV_MEM_OPT"] = "1"
     if args.use_fp16:
-        assert args.use_faster, "Only supports FP16 when using FasterGeneration."
+        assert args.use_faster, "Only supports FP16 when using FastGeneration."
         paddle.set_default_dtype("float16")
     enable_ft_para()
     # TODO(guosheng): Maybe device can be set in `enable_ft_para`
@@ -147,7 +151,7 @@ def main(args):
         top_p=args.topp,
         temperature=args.temperature,
         num_return_sequences=args.num_return_sequences,
-        use_faster=args.use_faster,
+        use_fast=args.use_faster,
         use_fp16_decoding=args.use_fp16,
     )
 

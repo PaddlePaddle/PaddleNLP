@@ -12,25 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import re
-import json
-import functools
-import random
-import time
-import os
 import argparse
+import functools
+import os
+import random
 
 import numpy as np
-
 import paddle
-import paddle.nn.functional as F
-from paddle.io import DataLoader, BatchSampler, DistributedBatchSampler
-from paddlenlp.data import DataCollatorWithPadding
-from paddlenlp.datasets import load_dataset
-from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer, LinearDecayWithWarmup
-from paddlenlp.utils.log import logger
-from paddlenlp.dataaug import WordSubstitute, WordInsert, WordDelete, WordSwap
+from paddle.io import BatchSampler, DataLoader
 from trustai.interpretation import FeatureSimilarityModel
+
+from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.dataaug import WordDelete, WordInsert, WordSubstitute, WordSwap
+from paddlenlp.datasets import load_dataset
+from paddlenlp.transformers import AutoModelForSequenceClassification, AutoTokenizer
+from paddlenlp.utils.log import logger
 
 # yapf: disable
 parser = argparse.ArgumentParser()
@@ -126,11 +122,7 @@ def find_sparse_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
@@ -216,11 +208,7 @@ def find_support_data():
     paddle.set_device(args.device)
 
     # Define model & tokenizer
-    if (
-        os.path.exists(os.path.join(args.params_path, "model_state.pdparams"))
-        and os.path.exists(os.path.join(args.params_path, "model_config.json"))
-        and os.path.exists(os.path.join(args.params_path, "tokenizer_config.json"))
-    ):
+    if os.path.exists(args.params_path):
         model = AutoModelForSequenceClassification.from_pretrained(args.params_path)
         tokenizer = AutoTokenizer.from_pretrained(args.params_path)
     else:
@@ -284,6 +272,8 @@ def find_support_data():
             for idx in list(support_indexs):
                 data = candidate_ds.data[idx]
                 augs = aug.augment(data["text"])
+                if not isinstance(augs[0], str):
+                    augs = augs[0]
                 for a in augs:
                     f.write(a + "\t" + data["label"] + "\n")
         f.close()

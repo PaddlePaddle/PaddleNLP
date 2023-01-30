@@ -32,7 +32,7 @@ from .poetry_generation import PoetryGenerationTask
 from .pos_tagging import POSTaggingTask
 from .question_answering import QuestionAnsweringTask
 from .question_generation import QuestionGenerationTask
-from .sentiment_analysis import SentaTask, SkepTask
+from .sentiment_analysis import SentaTask, SkepTask, UIESentaTask
 from .text_classification import TextClassificationTask
 from .text_correction import CSCTask
 from .text_similarity import TextSimilarityTask
@@ -43,6 +43,7 @@ from .text_to_image import (
     TextToImageStableDiffusionTask,
 )
 from .word_segmentation import SegJiebaTask, SegLACTask, SegWordTagTask
+from .zero_shot_text_classification import ZeroShotTextClassificationTask
 
 warnings.simplefilter(action="ignore", category=Warning, lineno=0, append=False)
 
@@ -173,6 +174,26 @@ TASKS = {
             "skep_ernie_1.0_large_ch": {
                 "task_class": SkepTask,
                 "task_flag": "sentiment_analysis-skep_ernie_1.0_large_ch",
+            },
+            "uie-senta-base": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-base",
+            },
+            "uie-senta-medium": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-medium",
+            },
+            "uie-senta-mini": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-mini",
+            },
+            "uie-senta-micro": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-micro",
+            },
+            "uie-senta-nano": {
+                "task_class": UIESentaTask,
+                "task_flag": "sentiment_analysis-uie-senta-nano",
             },
         },
         "default": {"model": "bilstm"},
@@ -411,10 +432,10 @@ TASKS = {
                 "task_flag": "text_to_image-openai/disco-diffusion-clip-rn101",
                 "task_priority_path": "openai/disco-diffusion-clip-rn101",
             },
-            "disco_diffusion_ernie_vil-2.0-base-zh": {
+            "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh": {
                 "task_class": TextToImageDiscoDiffusionTask,
-                "task_flag": "text_to_image-disco_diffusion_ernie_vil-2.0-base-zh",
-                "task_priority_path": "disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_flag": "text_to_image-PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
+                "task_priority_path": "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
             },
             "CompVis/stable-diffusion-v1-4": {
                 "task_class": TextToImageStableDiffusionTask,
@@ -456,6 +477,15 @@ TASKS = {
         },
         "default": {"model": "unimo-text-1.0-dureader_qg"},
     },
+    "zero_shot_text_classification": {
+        "models": {
+            "utc-large": {
+                "task_class": ZeroShotTextClassificationTask,
+                "task_flag": "zero_shot_text_classification-utc-large",
+            },
+        },
+        "default": {"model": "utc-large"},
+    },
 }
 
 support_schema_list = [
@@ -471,6 +501,12 @@ support_schema_list = [
     "uie-m-large",
     "uie-m-base",
     "uie-x-base",
+    "uie-senta-base",
+    "uie-senta-medium",
+    "uie-senta-mini",
+    "uie-senta-micro",
+    "uie-senta-nano",
+    "utc-large",
 ]
 
 support_argument_list = [
@@ -484,7 +520,18 @@ support_argument_list = [
     "openai/disco-diffusion-clip-vit-base-patch32",
     "openai/disco-diffusion-clip-rn50",
     "openai/disco-diffusion-clip-rn101",
-    "disco_diffusion_ernie_vil-2.0-base-zh",
+    "PaddlePaddle/disco_diffusion_ernie_vil-2.0-base-zh",
+    "uie-base",
+    "uie-medium",
+    "uie-mini",
+    "uie-micro",
+    "uie-nano",
+    "uie-tiny",
+    "uie-medical-base",
+    "uie-base-en",
+    "uie-m-large",
+    "uie-m-base",
+    "uie-x-base",
 ]
 
 
@@ -592,11 +639,12 @@ class Taskflow(object):
     def set_schema(self, schema):
         assert (
             self.task_instance.model in support_schema_list
-        ), "This method can only be used by the task with the model of uie or wordtag."
+        ), "This method can only be used by the task based on the model of uie or wordtag."
         self.task_instance.set_schema(schema)
 
     def set_argument(self, argument):
-        assert (
-            self.task_instance.model in support_argument_list
-        ), "This method can only be used by the task with the model of text_to_image generation."
+        assert self.task_instance.model in support_argument_list, (
+            "This method can only be used by the task of text-to-image generation, information extraction "
+            "or zero-text-classification."
+        )
         self.task_instance.set_argument(argument)

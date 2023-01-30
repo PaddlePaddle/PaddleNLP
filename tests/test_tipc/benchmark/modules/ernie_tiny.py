@@ -14,25 +14,27 @@
 
 import os
 import sys
-import paddle.nn as nn
+from functools import partial
 
-from paddlenlp.utils.log import logger
-from paddle.io import DataLoader, DistributedBatchSampler, BatchSampler
+import paddle.nn as nn
+from paddle.io import BatchSampler, DataLoader, DistributedBatchSampler
+
 from paddlenlp.data import DataCollatorWithPadding
+from paddlenlp.datasets import load_dataset
 from paddlenlp.transformers import ErnieForSequenceClassification, ErnieTokenizer
+from paddlenlp.utils.log import logger
 
 from .model_base import BenchmarkBase
 
-from paddlenlp.datasets import load_dataset
-
-sys.path.append(
+sys.path.insert(
+    0,
     os.path.abspath(
         os.path.join(os.path.dirname(__file__), os.pardir, os.pardir, os.pardir, os.pardir, "model_zoo", "ernie-3.0")
-    )
+    ),
 )
 
-from run_seq_cls import convert_example
-from functools import partial
+
+from utils import seq_convert_example  # noqa: E402
 
 
 class ErnieTinyBenchmark(BenchmarkBase):
@@ -59,7 +61,7 @@ class ErnieTinyBenchmark(BenchmarkBase):
         tokenizer = ErnieTokenizer.from_pretrained(args.model_name_or_path)
         train_ds, dev_ds = load_dataset("clue", args.task_name, splits=("train", "dev"))
         trans_func = partial(
-            convert_example, label_list=train_ds.label_list, tokenizer=tokenizer, max_seq_length=args.max_seq_length
+            seq_convert_example, label_list=train_ds.label_list, tokenizer=tokenizer, max_seq_len=args.max_seq_length
         )
 
         train_ds = train_ds.map(trans_func, lazy=True)

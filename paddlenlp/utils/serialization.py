@@ -11,14 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from __future__ import annotations
 
 import io
+import os
 import pickle
 from functools import lru_cache
 
 import numpy as np
+from _io import BufferedReader
 
 MZ_ZIP_LOCAL_DIR_HEADER_SIZE = 30
 
@@ -33,9 +34,16 @@ class TensorMeta:
         self.nbytes = n_bytes
         self.dtype = dtype
         self.size = None
+        self.stride = None
 
     def __repr__(self):
-        return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}"
+        return f"size: {self.size} key: {self.key}, nbytes: {self.nbytes}, dtype: {self.dtype}, stride: {self.stride}"
+
+
+class SerializationError(Exception):
+    """Exception for serialization"""
+
+    pass
 
 
 @lru_cache(maxsize=None)
@@ -91,7 +99,7 @@ class UnpicklerWrapperStage(pickle.Unpickler):
             return _rebuild_tensor_stage
 
         # pytorch_lightning tensor builder
-        if mod_name == "pytorch_lightning":
+        if "pytorch_lightning" in mod_name:
             return dumpy
         return super().find_class(mod_name, name)
 
@@ -116,11 +124,58 @@ def get_data_iostream(file: str, file_name="data.pkl"):
 def _rebuild_tensor_stage(storage, storage_offset, size, stride, requires_grad, backward_hooks):
     if isinstance(storage, TensorMeta):
         storage.size = size
+        storage.stride = stride
     return storage
 
 
 def dumpy(*args, **kwarsg):
     return None
+
+
+def seek_by_string(file_handler: BufferedReader, string: str, file_size: int) -> int:
+    """seek the index of file-handler with target words
+
+    Args:
+        file_handler (BufferedReader): file handler
+        string (str): the specific string in the file
+        file_size (int): size of file
+
+    Returns:
+        int: end index of target string
+    """
+    word_index = 0
+    word_bytes = string.encode("latin")
+    empty_byte = "".encode("latin")
+
+    while word_index < len(string) and file_handler.tell() < file_size:
+        content = file_handler.read(1)
+        if content == empty_byte:
+            break
+
+        if word_bytes[word_index] == content[0]:
+            word_index += 1
+        else:
+            word_index = 0
+
+    if file_handler.tell() >= file_size - 1:
+        raise SerializationError(f"can't find the find the target string<{string}> in the file")
+    return file_handler.tell()
+
+
+def read_prefix_key(file_handler: BufferedReader, file_size: int):
+    """read the prefix key in model weight file, eg: archive/pytorch_model
+
+    Args:
+        file_handler (BufferedReader): file handler
+        fiel_size (_type_): size of file
+
+    Returns:
+        _type_: _description_
+    """
+    end_index = seek_by_string(file_handler, "data.pkl", file_size)
+    file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE)
+    prefix_key = file_handler.read(end_index - MZ_ZIP_LOCAL_DIR_HEADER_SIZE - len("/data.pkl"))
+    return prefix_key
 
 
 def load_torch(path: str, **pickle_load_args):
@@ -142,8 +197,6 @@ def load_torch(path: str, **pickle_load_args):
     # 1. load the structure of pytorch weight file
     def persistent_load_stage1(saved_id):
         assert isinstance(saved_id, tuple)
-        print(saved_id)
-
         data = saved_id[1:]
         storage_type, key, _, numel = data
         dtype = storage_type.dtype
@@ -157,7 +210,7 @@ def load_torch(path: str, **pickle_load_args):
     result_stage1 = unpickler_stage1.load()
 
     # 2. get the metadata of weight file
-    metadata = []
+    metadata = {}
 
     def extract_maybe_dict(result):
         if isinstance(result, dict):
@@ -167,32 +220,40 @@ def load_torch(path: str, **pickle_load_args):
             for res in result:
                 extract_maybe_dict(res)
         elif isinstance(result, TensorMeta):
-            metadata.append(result)
+            metadata[result.key] = result
 
     extract_maybe_dict(result_stage1)
+    metadata = list(metadata.values())
     metadata = sorted(metadata, key=lambda x: x.key)
+
     # 3. parse the tensor of pytorch weight file
     stage1_key_to_tensor = {}
+    content_size = os.stat(path).st_size
     with open(path, "rb") as file_handler:
         file_handler.seek(pre_offset)
         for tensor_meta in metadata:
             key = tensor_meta.key
-            # eg: archive/data/1FB
-            filename_with_fb = len(f"archive/data/{key}") + 2
-
-            # skip the fix position to read tensor data
-            # `MZ_ZIP_LOCAL_DIR_HEADER_SIZE` is from: https://github.com/pytorch/pytorch/blob/master/caffe2/serialize/inline_container.cc#L186
-            # `16` is the fixed characters size from binary file.
-            # `filename_with_fb` is the length of dynamic data key name
-            file_handler.seek(MZ_ZIP_LOCAL_DIR_HEADER_SIZE + 16 + filename_with_fb, 1)
+            seek_by_string(file_handler, "FB", content_size)
 
             padding_offset = np.frombuffer(file_handler.read(2)[:1], dtype=np.uint8)[0]
-            file_handler.read(padding_offset)
+            file_handler.seek(padding_offset, 1)
 
             # save the tensor info in result to re-use memory
-            stage1_key_to_tensor[key] = np.frombuffer(
-                file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype
-            ).reshape(tensor_meta.size)
+            np_buffer = np.frombuffer(file_handler.read(tensor_meta.nbytes), dtype=tensor_meta.dtype)
+
+            # if a tensor has shape [M, N] and stride is [1, N], it's column-wise / fortran-style
+            # if a tensor has shape [M, N] and stride is [M, 1], it's row-wise / C-style
+            # defautls to C-style
+            if (
+                tensor_meta.stride is not None
+                and len(tensor_meta.stride) > 1
+                and tensor_meta.stride[0] == 1
+                and tensor_meta.stride[1] > 1
+            ):
+                order = "F"
+            else:
+                order = "C"
+            stage1_key_to_tensor[key] = np_buffer.reshape(tensor_meta.size, order=order)
 
     def persistent_load_stage2(saved_id):
         assert isinstance(saved_id, tuple)

@@ -24,6 +24,7 @@ from ..configuration_utils import ConfigMixin, register_to_config
 from ..modeling_utils import ModelMixin
 from ..models.embeddings import ImagePositionalEmbeddings
 from ..utils import BaseOutput
+from .cross_attention import CrossAttention
 
 
 @dataclass
@@ -59,8 +60,8 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         in_channels (`int`, *optional*):
             Pass if the input is continuous. The number of channels in the input and output.
         num_layers (`int`, *optional*, defaults to 1): The number of layers of Transformer blocks to use.
-        dropout (`float`, *optional*, defaults to 0.1): The dropout probability to use.
-        cross_attention_dim (`int`, *optional*): The number of context dimensions to use.
+        dropout (`float`, *optional*, defaults to 0.0): The dropout probability to use.
+        cross_attention_dim (`int`, *optional*): The number of encoder_hidden_states dimensions to use.
         sample_size (`int`, *optional*): Pass if the input is discrete. The width of the latent images.
             Note that this is fixed at training time as it is used for learning a number of position embeddings. See
             `ImagePositionalEmbeddings`.
@@ -93,6 +94,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         num_embeds_ada_norm: Optional[int] = None,
         use_linear_projection: bool = False,
         only_cross_attention: bool = False,
+        upcast_attention: bool = False,
     ):
         super().__init__()
         self.use_linear_projection = use_linear_projection
@@ -151,6 +153,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
                     num_embeds_ada_norm=num_embeds_ada_norm,
                     attention_bias=attention_bias,
                     only_cross_attention=only_cross_attention,
+                    upcast_attention=upcast_attention,
                 )
                 for d in range(num_layers)
             ]
@@ -166,17 +169,20 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
             self.norm_out = nn.LayerNorm(inner_dim)
             self.out = nn.Linear(inner_dim, self.num_vector_embeds - 1)
 
-    def _set_attention_slice(self, slice_size):
-        for block in self.transformer_blocks:
-            block._set_attention_slice(slice_size)
-
-    def forward(self, hidden_states, encoder_hidden_states=None, timestep=None, return_dict: bool = True):
+    def forward(
+        self,
+        hidden_states,
+        encoder_hidden_states=None,
+        timestep=None,
+        cross_attention_kwargs=None,
+        return_dict: bool = True,
+    ):
         """
         Args:
             hidden_states ( When discrete, `paddle.Tensor` of shape `(batch size, num latent pixels)`.
                 When continous, `paddle.Tensor` of shape `(batch size, channel, height, width)`): Input
                 hidden_states
-            encoder_hidden_states ( `paddle.Tensor` of shape `(batch size, context dim)`, *optional*):
+            encoder_hidden_states ( `paddle.Tensor` of shape `(batch size, encoder_hidden_states)`, *optional*):
                 Conditional embeddings for cross attention layer. If not given, cross-attention defaults to
                 self-attention.
             timestep ( `paddle.Tensor`, *optional*):
@@ -191,7 +197,7 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
         """
         # 1. Input
         if self.is_input_continuous:
-            _, _, height, weight = hidden_states.shape
+            _, _, height, width = hidden_states.shape
             residual = hidden_states
             hidden_states = self.norm(hidden_states)
             if not self.use_linear_projection:
@@ -199,19 +205,23 @@ class Transformer2DModel(ModelMixin, ConfigMixin):
             hidden_states = hidden_states.transpose([0, 2, 3, 1]).flatten(1, 2)
             if self.use_linear_projection:
                 hidden_states = self.proj_in(hidden_states)
-
         elif self.is_input_vectorized:
             hidden_states = self.latent_image_embedding(hidden_states.cast("int64"))
 
         # 2. Blocks
         for block in self.transformer_blocks:
-            hidden_states = block(hidden_states, context=encoder_hidden_states, timestep=timestep)
+            hidden_states = block(
+                hidden_states,
+                encoder_hidden_states=encoder_hidden_states,
+                timestep=timestep,
+                cross_attention_kwargs=cross_attention_kwargs,
+            )
 
         # 3. Output
         if self.is_input_continuous:
             if self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
-            hidden_states = hidden_states.reshape([-1, height, weight, self.inner_dim]).transpose([0, 3, 1, 2])
+            hidden_states = hidden_states.reshape([-1, height, width, self.inner_dim]).transpose([0, 3, 1, 2])
             if not self.use_linear_projection:
                 hidden_states = self.proj_out(hidden_states)
             output = hidden_states + residual
@@ -325,7 +335,7 @@ class BasicTransformerBlock(nn.Layer):
         num_attention_heads (`int`): The number of heads to use for multi-head attention.
         attention_head_dim (`int`): The number of channels in each head.
         dropout (`float`, *optional*, defaults to 0.0): The dropout probability to use.
-        cross_attention_dim (`int`, *optional*): The size of the context vector for cross attention.
+        cross_attention_dim (`int`, *optional*): The size of the encoder_hidden_states vector for cross attention.
         activation_fn (`str`, *optional*, defaults to `"geglu"`): Activation function to be used in feed-forward.
         num_embeds_ada_norm (:
             obj: `int`, *optional*): The number of diffusion steps used during training. See `Transformer2DModel`.
@@ -344,9 +354,13 @@ class BasicTransformerBlock(nn.Layer):
         num_embeds_ada_norm: Optional[int] = None,
         attention_bias: bool = False,
         only_cross_attention: bool = False,
+        upcast_attention: bool = False,
     ):
         super().__init__()
         self.only_cross_attention = only_cross_attention
+        self.use_ada_layer_norm = num_embeds_ada_norm is not None
+
+        # 1. Self-Attn
         self.attn1 = CrossAttention(
             query_dim=dim,
             heads=num_attention_heads,
@@ -354,165 +368,72 @@ class BasicTransformerBlock(nn.Layer):
             dropout=dropout,
             bias=attention_bias,
             cross_attention_dim=cross_attention_dim if only_cross_attention else None,
-        )  # is a self-attention
-        self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn)
-        self.attn2 = CrossAttention(
-            query_dim=dim,
-            cross_attention_dim=cross_attention_dim,
-            heads=num_attention_heads,
-            dim_head=attention_head_dim,
-            dropout=dropout,
-            bias=attention_bias,
-        )  # is self-attn if context is none
+            upcast_attention=upcast_attention,
+        )
 
-        # layer norms
-        self.use_ada_layer_norm = num_embeds_ada_norm is not None
-        if self.use_ada_layer_norm:
-            self.norm1 = AdaLayerNorm(dim, num_embeds_ada_norm)
-            self.norm2 = AdaLayerNorm(dim, num_embeds_ada_norm)
+        self.ff = FeedForward(dim, dropout=dropout, activation_fn=activation_fn)
+
+        # 2. Cross-Attn
+        if cross_attention_dim is not None:
+            self.attn2 = CrossAttention(
+                query_dim=dim,
+                cross_attention_dim=cross_attention_dim,
+                heads=num_attention_heads,
+                dim_head=attention_head_dim,
+                dropout=dropout,
+                bias=attention_bias,
+                upcast_attention=upcast_attention,
+            )  # is self-attn if encoder_hidden_states is none
         else:
-            self.norm1 = nn.LayerNorm(dim)
-            self.norm2 = nn.LayerNorm(dim)
+            self.attn2 = None
+
+        self.norm1 = AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim)
+
+        if cross_attention_dim is not None:
+            self.norm2 = AdaLayerNorm(dim, num_embeds_ada_norm) if self.use_ada_layer_norm else nn.LayerNorm(dim)
+        else:
+            self.norm2 = None
+
+        # 3. Feed-forward
         self.norm3 = nn.LayerNorm(dim)
 
-    def _set_attention_slice(self, slice_size):
-        self.attn1._slice_size = slice_size
-        self.attn2._slice_size = slice_size
-
-    def forward(self, hidden_states, context=None, timestep=None):
+    def forward(
+        self,
+        hidden_states,
+        encoder_hidden_states=None,
+        timestep=None,
+        attention_mask=None,
+        cross_attention_kwargs=None,
+    ):
         # 1. Self-Attention
         norm_hidden_states = (
             self.norm1(hidden_states, timestep) if self.use_ada_layer_norm else self.norm1(hidden_states)
         )
-        if self.only_cross_attention:
-            hidden_states = self.attn1(norm_hidden_states, context) + hidden_states
-        else:
-            hidden_states = self.attn1(norm_hidden_states) + hidden_states
-
-        # 2. Cross-Attention
-        norm_hidden_states = (
-            self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
+        cross_attention_kwargs = cross_attention_kwargs if cross_attention_kwargs is not None else {}
+        attn_output = self.attn1(
+            norm_hidden_states,
+            encoder_hidden_states=encoder_hidden_states if self.only_cross_attention else None,
+            attention_mask=attention_mask,
+            **cross_attention_kwargs,
         )
-        hidden_states = self.attn2(norm_hidden_states, context=context) + hidden_states
+        hidden_states = attn_output + hidden_states
+
+        if self.attn2 is not None:
+            # 2. Cross-Attention
+            norm_hidden_states = (
+                self.norm2(hidden_states, timestep) if self.use_ada_layer_norm else self.norm2(hidden_states)
+            )
+            attn_output = self.attn2(
+                norm_hidden_states,
+                encoder_hidden_states=encoder_hidden_states,
+                attention_mask=attention_mask,
+                **cross_attention_kwargs,
+            )
+            hidden_states = attn_output + hidden_states
 
         # 3. Feed-forward
         hidden_states = self.ff(self.norm3(hidden_states)) + hidden_states
 
-        return hidden_states
-
-
-class CrossAttention(nn.Layer):
-    r"""
-    A cross attention layer.
-
-    Parameters:
-        query_dim (`int`): The number of channels in the query.
-        cross_attention_dim (`int`, *optional*):
-            The number of channels in the context. If not given, defaults to `query_dim`.
-        heads (`int`,  *optional*, defaults to 8): The number of heads to use for multi-head attention.
-        dim_head (`int`,  *optional*, defaults to 64): The number of channels in each head.
-        dropout (`float`, *optional*, defaults to 0.0): The dropout probability to use.
-        bias (`bool`, *optional*, defaults to False):
-            Set to `True` for the query, key, and value linear layers to contain a bias parameter.
-    """
-
-    def __init__(
-        self,
-        query_dim: int,
-        cross_attention_dim: Optional[int] = None,
-        heads: int = 8,
-        dim_head: int = 64,
-        dropout: float = 0.0,
-        bias=False,
-    ):
-        super().__init__()
-        inner_dim = dim_head * heads
-        cross_attention_dim = cross_attention_dim if cross_attention_dim is not None else query_dim
-
-        self.scale = dim_head**-0.5
-        self.num_heads = heads
-        self.head_dim = inner_dim // heads
-        # for slice_size > 0 the attention score computation
-        # is split across the batch axis to save memory
-        # You can set slice_size with `set_attention_slice`
-        self._slice_size = None
-
-        self.to_q = nn.Linear(query_dim, inner_dim, bias_attr=bias)
-        self.to_k = nn.Linear(cross_attention_dim, inner_dim, bias_attr=bias)
-        self.to_v = nn.Linear(cross_attention_dim, inner_dim, bias_attr=bias)
-
-        self.to_out = nn.LayerList([])
-        self.to_out.append(nn.Linear(inner_dim, query_dim))
-        self.to_out.append(nn.Dropout(dropout))
-
-    def reshape_heads_to_batch_dim(self, tensor):
-        tensor = tensor.reshape([0, 0, self.num_heads, self.head_dim])
-        tensor = tensor.transpose([0, 2, 1, 3])
-        return tensor
-
-    def reshape_batch_dim_to_heads(self, tensor):
-        tensor = tensor.transpose([0, 2, 1, 3])
-        tensor = tensor.reshape([0, 0, tensor.shape[2] * tensor.shape[3]])
-        return tensor
-
-    def forward(self, hidden_states, context=None, mask=None):
-        query = self.to_q(hidden_states)
-        context = context if context is not None else hidden_states
-        key = self.to_k(context)
-        value = self.to_v(context)
-
-        query = self.reshape_heads_to_batch_dim(query)
-        key = self.reshape_heads_to_batch_dim(key)
-        value = self.reshape_heads_to_batch_dim(value)
-
-        # TODO(PVP) - mask is currently never used. Remember to re-implement when used
-
-        if self._slice_size is None:
-            hidden_states = self._attention(query, key, value)
-        else:
-            hidden_states = self._sliced_attention(query, key, value)
-
-        # linear proj
-        hidden_states = self.to_out[0](hidden_states)
-        # dropout
-        hidden_states = self.to_out[1](hidden_states)
-        return hidden_states
-
-    def _attention(self, query, key, value):
-        # TODO: use baddbmm for better performance
-        attention_scores = paddle.matmul(query, key, transpose_y=True) * self.scale
-        attention_probs = F.softmax(attention_scores, axis=-1)
-        # compute attention output
-        hidden_states = paddle.matmul(attention_probs, value)
-        # reshape hidden_states
-        hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
-        return hidden_states
-
-    def _sliced_attention(self, query, key, value):
-        # query, key, value flatten [bs*num_heads, seqlen, head_dim]
-        query = query.flatten(0, 1)
-        key = key.flatten(0, 1)
-        value = value.flatten(0, 1)
-
-        batch_size_attention, sequence_length = query.shape[0], query.shape[1]
-        hidden_states = paddle.zeros((batch_size_attention, sequence_length, self.head_dim), dtype=query.dtype)
-        slice_size = self._slice_size if self._slice_size is not None else batch_size_attention
-
-        for i in range(batch_size_attention // slice_size):
-            start_idx = i * slice_size
-            end_idx = (i + 1) * slice_size
-            attn_slice = (
-                paddle.matmul(query[start_idx:end_idx], key[start_idx:end_idx], transpose_y=True) * self.scale
-            )  # TODO: use baddbmm for better performance
-            attn_slice = F.softmax(attn_slice, axis=-1)
-            attn_slice = paddle.matmul(attn_slice, value[start_idx:end_idx])
-
-            hidden_states[start_idx:end_idx] = attn_slice
-
-        # reshape back to [bs, num_heads, seqlen, head_dim]
-        hidden_states = hidden_states.reshape([-1, self.num_heads, sequence_length, self.head_dim])
-        # reshape hidden_states
-        hidden_states = self.reshape_batch_dim_to_heads(hidden_states)
         return hidden_states
 
 
@@ -540,14 +461,16 @@ class FeedForward(nn.Layer):
         inner_dim = int(dim * mult)
         dim_out = dim_out if dim_out is not None else dim
 
-        if activation_fn == "geglu":
-            geglu = GEGLU(dim, inner_dim)
+        if activation_fn == "gelu":
+            act_fn = GELU(dim, inner_dim)
+        elif activation_fn == "geglu":
+            act_fn = GEGLU(dim, inner_dim)
         elif activation_fn == "geglu-approximate":
-            geglu = ApproximateGELU(dim, inner_dim)
+            act_fn = ApproximateGELU(dim, inner_dim)
 
         self.net = nn.LayerList([])
         # project in
-        self.net.append(geglu)
+        self.net.append(act_fn)
         # project dropout
         self.net.append(nn.Dropout(dropout))
         # project out
@@ -556,6 +479,21 @@ class FeedForward(nn.Layer):
     def forward(self, hidden_states):
         for module in self.net:
             hidden_states = module(hidden_states)
+        return hidden_states
+
+
+class GELU(nn.Layer):
+    r"""
+    GELU activation function
+    """
+
+    def __init__(self, dim_in: int, dim_out: int):
+        super().__init__()
+        self.proj = nn.Linear(dim_in, dim_out)
+
+    def forward(self, hidden_states):
+        hidden_states = self.proj(hidden_states)
+        hidden_states = F.gelu(hidden_states)
         return hidden_states
 
 
@@ -623,7 +561,7 @@ class DualTransformer2DModel(nn.Layer):
             Pass if the input is continuous. The number of channels in the input and output.
         num_layers (`int`, *optional*, defaults to 1): The number of layers of Transformer blocks to use.
         dropout (`float`, *optional*, defaults to 0.1): The dropout probability to use.
-        cross_attention_dim (`int`, *optional*): The number of context dimensions to use.
+        cross_attention_dim (`int`, *optional*): The number of encoder_hidden_states dimensions to use.
         sample_size (`int`, *optional*): Pass if the input is discrete. The width of the latent images.
             Note that this is fixed at training time as it is used for learning a number of position embeddings. See
             `ImagePositionalEmbeddings`.
@@ -653,8 +591,6 @@ class DualTransformer2DModel(nn.Layer):
         num_vector_embeds: Optional[int] = None,
         activation_fn: str = "geglu",
         num_embeds_ada_norm: Optional[int] = None,
-        use_linear_projection: bool = False,
-        only_cross_attention: bool = False,
     ):
         super().__init__()
         self.transformers = nn.LayerList(
@@ -672,8 +608,6 @@ class DualTransformer2DModel(nn.Layer):
                     num_vector_embeds=num_vector_embeds,
                     activation_fn=activation_fn,
                     num_embeds_ada_norm=num_embeds_ada_norm,
-                    use_linear_projection=use_linear_projection,
-                    only_cross_attention=only_cross_attention,
                 )
                 for _ in range(2)
             ]
@@ -692,19 +626,30 @@ class DualTransformer2DModel(nn.Layer):
         # E.g. `(1, 0)` means that we'll use `transformers[1](conditions[0])` and `transformers[0](conditions[1])`
         self.transformer_index_for_condition = [1, 0]
 
-    def forward(self, hidden_states, encoder_hidden_states, timestep=None, return_dict: bool = True):
+    def forward(
+        self,
+        hidden_states,
+        encoder_hidden_states,
+        timestep=None,
+        attention_mask=None,
+        cross_attention_kwargs=None,
+        return_dict: bool = True,
+    ):
         """
         Args:
             hidden_states ( When discrete, `torch.LongTensor` of shape `(batch size, num latent pixels)`.
                 When continuous, `torch.FloatTensor` of shape `(batch size, channel, height, width)`): Input
                 hidden_states
-            encoder_hidden_states ( `torch.LongTensor` of shape `(batch size, context dim)`, *optional*):
+            encoder_hidden_states ( `torch.LongTensor` of shape `(batch size, encoder_hidden_states dim)`, *optional*):
                 Conditional embeddings for cross attention layer. If not given, cross-attention defaults to
                 self-attention.
             timestep ( `torch.long`, *optional*):
                 Optional timestep to be applied as an embedding in AdaLayerNorm's. Used to indicate denoising step.
+            attention_mask (`torch.FloatTensor`, *optional*):
+                Optional attention mask to be applied in CrossAttention
             return_dict (`bool`, *optional*, defaults to `True`):
                 Whether or not to return a [`models.unet_2d_condition.UNet2DConditionOutput`] instead of a plain tuple.
+
         Returns:
             [`~models.attention.Transformer2DModelOutput`] or `tuple`: [`~models.attention.Transformer2DModelOutput`]
             if `return_dict` is True, otherwise a `tuple`. When returning a tuple, the first element is the sample
@@ -714,13 +659,18 @@ class DualTransformer2DModel(nn.Layer):
 
         encoded_states = []
         tokens_start = 0
+        # attention_mask is not used yet
         for i in range(2):
             # for each of the two transformers, pass the corresponding condition tokens
             condition_state = encoder_hidden_states[:, tokens_start : tokens_start + self.condition_lengths[i]]
             transformer_index = self.transformer_index_for_condition[i]
-            encoded_state = self.transformers[transformer_index](input_states, condition_state, timestep, return_dict)[
-                0
-            ]
+            encoded_state = self.transformers[transformer_index](
+                input_states,
+                encoder_hidden_states=condition_state,
+                timestep=timestep,
+                cross_attention_kwargs=cross_attention_kwargs,
+                return_dict=False,
+            )[0]
             encoded_states.append(encoded_state - input_states)
             tokens_start += self.condition_lengths[i]
 
@@ -731,7 +681,3 @@ class DualTransformer2DModel(nn.Layer):
             return (output_states,)
 
         return Transformer2DModelOutput(sample=output_states)
-
-    def _set_attention_slice(self, slice_size):
-        for transformer in self.transformers:
-            transformer._set_attention_slice(slice_size)

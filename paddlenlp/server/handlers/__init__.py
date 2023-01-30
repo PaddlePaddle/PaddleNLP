@@ -1,4 +1,4 @@
-# Copyright (c) 2022 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .taskflow_handler import TaskflowHandler
 from .base_handler import BaseModelHandler, BasePostHandler, BaseTaskflowHandler
-from .cls_post_handler import MultiClassificationPostHandler, MultiLabelClassificationPostHandler
-from .custom_model_handler import CustomModelHandler
+from .cls_post_handler import (
+    MultiClassificationPostHandler,
+    MultiLabelClassificationPostHandler,
+)
+from .custom_model_handler import CustomModelHandler, ERNIEMHandler
+from .qa_model_handler import QAModelHandler
+from .taskflow_handler import TaskflowHandler
 from .token_model_handler import TokenClsModelHandler

@@ -13,9 +13,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
 import paddle
 
-from paddlenlp.transformers import BartForConditionalGeneration, BartTokenizer
+from paddlenlp.transformers import (
+    BartForConditionalGeneration,
+    BartTokenizer,
+    PretrainedConfig,
+)
 from paddlenlp.transformers.generation_utils import (
     BeamSearchScorer,
     ForcedBOSTokenLogitsProcessor,
@@ -64,12 +69,19 @@ class GenerationTesterMixin:
         input_ids = input_ids[:max_batch_size, :sequence_length]
         attention_mask = attention_mask[:max_batch_size, :sequence_length].unsqueeze([1, 2])
 
+        attention_mask = attention_mask * attention_mask.transpose([0, 1, 3, 2])
+
         # generate max 3 tokens
         max_length = 3
 
-        if config.get("eos_token_id", None) is not None and config.get("pad_token_id", None) is None:
+        if config.eos_token_id or config.pad_token_id:
             # hack to allow generate for models such as GPT2 as is done in `generate()`
             config["pad_token_id"] = config["eos_token_id"]
+        # if config.get(
+        #         "eos_token_id",
+        #         None) is not None and config.get("pad_token_id", None) is None:
+        #     # hack to allow generate for models such as GPT2 as is done in `generate()`
+        #     config["pad_token_id"] = config["eos_token_id"]
 
         return config, input_ids, attention_mask, max_length
 
@@ -80,6 +92,7 @@ class GenerationTesterMixin:
         forced_eos_token_id=None,
         max_length=None,
         diversity_rate=None,
+        plus_length=0,
     ):
         process_kwargs = {
             "min_length": 1 if max_length is None else max_length - 1,
@@ -98,7 +111,7 @@ class GenerationTesterMixin:
             )
             + (
                 [
-                    MinLengthLogitsProcessor(process_kwargs["min_length"], eos_token_id),
+                    MinLengthLogitsProcessor(process_kwargs["min_length"] + plus_length, eos_token_id),
                 ]
                 if eos_token_id is not None
                 else []
@@ -111,7 +124,7 @@ class GenerationTesterMixin:
                 else []
             )
             + (
-                [ForcedEOSTokenLogitsProcessor(max_length, forced_eos_token_id)]
+                [ForcedEOSTokenLogitsProcessor(max_length + plus_length, forced_eos_token_id)]
                 if forced_eos_token_id is not None
                 else []
             )
@@ -203,6 +216,7 @@ class GenerationTesterMixin:
             forced_bos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_bos_token_id", None),
             forced_eos_token_id=getattr(getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None),
             max_length=max_length,
+            plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
         )
 
         kwargs = {}
@@ -298,6 +312,7 @@ class GenerationTesterMixin:
         logits_processor,
         logits_process_kwargs,
     ):
+
         with paddle.no_grad():
             output_generate = model.generate(
                 input_ids,
@@ -338,6 +353,7 @@ class GenerationTesterMixin:
                 eos_token_id=getattr(model, model.base_model_prefix).config["eos_token_id"],
                 **kwargs,
             )
+
         return output_generate, output_beam_search
 
     def _group_beam_search_generate(
@@ -398,7 +414,6 @@ class GenerationTesterMixin:
         # check `generate()` and `greedy_search()` are equal
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -413,7 +428,6 @@ class GenerationTesterMixin:
 
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
             paddle.seed(124)
             model = self._make_model_instance(config, model_class)
             model.eval()
@@ -430,6 +444,7 @@ class GenerationTesterMixin:
                     getattr(model, model.base_model_prefix).config, "forced_eos_token_id", None
                 ),
                 max_length=max_length,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
             logits_warper = self._get_warper_and_kwargs()
 
@@ -460,13 +475,11 @@ class GenerationTesterMixin:
             self.assertListEqual(output_sample[0].tolist(), output_generate[0].tolist())
 
     def test_beam_search_generate(self):
-        paddle.seed(100)
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
+            paddle.seed(128)
             model = self._make_model_instance(config, model_class)
             model.eval()
-
             if self.is_encoder_decoder:
                 max_length = 4
 
@@ -475,6 +488,7 @@ class GenerationTesterMixin:
                 getattr(config, "forced_bos_token_id", None),
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
             beam_kwargs, beam_scorer = self._get_beam_scorer_and_kwargs(
                 input_ids.shape[0], max_length + 1 if self.is_encoder_decoder else max_length + input_ids.shape[-1]
@@ -520,11 +534,15 @@ class GenerationTesterMixin:
         config, _, _, max_length = self._get_input_ids_and_config()
 
         # if no bos token id => cannot generate from None
-        if config.get("bos_token_id", None) is None:
+        if config.bos_token_id is None:
             return
 
         for model_class in self.all_generative_model_classes.keys():
-            model = self._make_model_instance(config, model_class)
+            if isinstance(config, PretrainedConfig):
+                model = model_class(config)
+            else:
+                pretrained_model = self.all_generative_model_classes[model_class][0](**config)
+                model = model_class(pretrained_model)
             model.eval()
 
             output_ids_generate = model.generate(
@@ -537,9 +555,7 @@ class GenerationTesterMixin:
     def test_group_beam_search_generate(self):
         for model_class in self.all_generative_model_classes.keys():
             config, input_ids, attention_mask, max_length = self._get_input_ids_and_config()
-
             model = self._make_model_instance(config, model_class)
-
             model.eval()
 
             if self.is_encoder_decoder:
@@ -551,6 +567,7 @@ class GenerationTesterMixin:
                 getattr(config, "forced_eos_token_id", None),
                 max_length,
                 diversity_rate=2.0,
+                plus_length=1 if self.is_encoder_decoder else input_ids.shape[-1],
             )
 
             # check `generate()` and `group_beam_search()` are equal
