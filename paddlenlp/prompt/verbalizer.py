@@ -53,11 +53,11 @@ class Verbalizer(nn.Layer):
         self.token_aggregate_type = kwargs.get("token_aggregate_type", "mean")
         self.word_aggregate_type = kwargs.get("word_aggregate_type", "mean")
         self.mask_aggregate_type = kwargs.get("mask_aggregate_type", "product")
-        self.post_log_softmax = kwargs.get("post_log_sigmoid", True)
+        self.post_log_softmax = kwargs.get("post_log_softmax", True)
         self.label_token_weight = kwargs.get("label_token_weight", None)
+        self.label_words = label_words
         if self.label_token_weight is not None:
             self.label_token_weight = self.normalize(self.project(self.label_token_weight.unsqueeze(0)))
-        self.label_words = label_words
 
     @property
     def labels(self):
@@ -67,8 +67,7 @@ class Verbalizer(nn.Layer):
 
     @labels.setter
     def labels(self, labels):
-        if labels is not None:
-            self._labels = sorted(labels)
+        raise NotImplementedError("Please use `label_words` to change `labels`.")
 
     @property
     def label_words(self):
@@ -80,7 +79,7 @@ class Verbalizer(nn.Layer):
     def label_words(self, label_words: Dict):
         if label_words is None:
             return None
-        self.labels = list(label_words.keys())
+        self._labels = sorted(list(label_words.keys()))
         self.labels_to_ids = {label: idx for idx, label in enumerate(self._labels)}
         self._words = []
         for label in self._labels:
@@ -122,7 +121,7 @@ class Verbalizer(nn.Layer):
                 token_ids[label_id][word_id][: len(tokens)] = tokens
                 token_mask[label_id][word_id][: len(tokens)] = 1
         self.token_ids = paddle.to_tensor(token_ids, dtype="int64", stop_gradient=True)
-        self.word_mask = paddle.to_tensor(word_mask, dtype="float32", stop_gradient=True)
+        self.word_mask = paddle.to_tensor(word_mask, dtype="int64", stop_gradient=True)
         self.token_mask = paddle.to_tensor(token_mask, dtype="int64", stop_gradient=True)
 
     def convert_labels_to_ids(self, label: str):
@@ -161,7 +160,6 @@ class Verbalizer(nn.Layer):
         """
         Aggregate multiple tokens/words for each word/label.
         """
-        mask = mask.unsqueeze(0)
         if atype == "mean":
             outputs = outputs * mask
             outputs = outputs.sum(axis=-1) / (mask.sum(axis=-1) + 1e-15)
@@ -169,7 +167,7 @@ class Verbalizer(nn.Layer):
             outputs = (outputs - 1e4 * (1 - mask)).max(axis=-1)
         elif atype == "first":
             index = paddle.to_tensor([0])
-            outputs = paddle.index_select(outputs, index, axis=-1)
+            outputs = paddle.index_select(outputs, index, axis=-1).squeeze(axis=-1)
         else:
             raise ValueError("Strategy {} is not supported to aggregate multiple " "tokens.".format(atype))
         return outputs
@@ -250,12 +248,12 @@ class ManualVerbalizer(Verbalizer):
             return outputs
         assert outputs.ndim == 3
         if atype == "mean":
-            outputs = outputs.sum(axis=1)
+            outputs = outputs.mean(axis=1)
         elif atype == "max":
             outputs = outputs.max(axis=1)
         elif atype == "first":
             index = paddle.to_tensor([0])
-            outputs = paddle.index_select(outputs, index, axis=1)
+            outputs = paddle.index_select(outputs, index, axis=1).squeeze(1)
         elif atype == "product":
             new_outputs = outputs[:, 0, :]
             for index in range(1, outputs.shape[1]):
