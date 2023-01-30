@@ -1,5 +1,5 @@
 pretrain:
-  tiny:
+  slow:
     model_type: gpt
     model_name_or_path: __internal_testing__/gpt
     input_dir: ./data
@@ -15,7 +15,7 @@ pretrain:
     do_train: true
     do_predict: true
   
-  default:
+default:
     model_type: gpt
     model_name_or_path: gpt2-en
     warmup_steps: 320000
@@ -28,7 +28,7 @@ pretrain:
 
 
 msra_ner:
-  tiny:
+  slow:
     model_name_or_path: __internal_testing__/gpt_cn
     max_seq_length: 32
     per_device_eval_batch_size: 4
@@ -54,7 +54,7 @@ msra_ner:
     do_train: true
   
 glue:
-  tiny:
+  slow:
     model_name_or_path: __internal_testing__/gpt
     task_name: SST-2
     max_seq_length: 128
@@ -85,7 +85,7 @@ glue:
   
 
 generation:
-  tiny:
+  slow:
     model_type: gpt2
     model_name_or_path: hf-internal-testing/tiny-random-GPT2Model
     from_hf_hub: true
