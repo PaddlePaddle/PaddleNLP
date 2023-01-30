@@ -33,6 +33,7 @@ class GPTTest(TestCase):
 
         # 1. run pretrain
         argv, config = load_argv(self.config_path, "pretrain", return_dict=True)
+        device = config["device"]
         sys.argv = argv
         from run_pretrain import do_train
 
@@ -44,7 +45,7 @@ class GPTTest(TestCase):
         config = {
             "model_type": config["model_type"],
             "model_path": config["output_dir"],
-            "output_dir": os.path.join(config["output_dir"], "export_model"),
+            "output_path": os.path.join(config["output_dir"], "export_model"),
         }
         argv = construct_argv(config)
         sys.argv = argv
@@ -53,11 +54,7 @@ class GPTTest(TestCase):
         # 3. infer model
         from deploy.python.inference import main
 
-        config = {
-            "model_type": config["model_type"],
-            "model_path": config["output_dir"],
-            "select_device": config["device"],
-        }
+        config = {"model_type": config["model_type"], "model_path": config["output_path"], "select_device": device}
         argv = construct_argv(config)
         sys.argv = argv
         main()
