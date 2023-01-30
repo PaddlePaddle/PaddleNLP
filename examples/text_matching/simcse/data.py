@@ -95,7 +95,7 @@ def read_text_pair(data_path, is_test=False):
 
 
 def word_repetition(input_ids, token_type_ids, dup_rate=0.32):
-    """Word Reptition strategy."""
+    """Word Repetition strategy."""
     input_ids = input_ids.numpy().tolist()
     token_type_ids = token_type_ids.numpy().tolist()
 

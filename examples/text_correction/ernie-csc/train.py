@@ -45,7 +45,7 @@ parser.add_argument("--epochs", type=int, default=3, help="Number of epoches for
 parser.add_argument("--device", type=str, default="gpu", choices=["cpu", "gpu"], help="Select cpu, gpu devices to train model.")
 parser.add_argument("--seed", type=int, default=1, help="Random seed for initialization.")
 parser.add_argument("--weight_decay", default=0.01, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.1, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform. Override num_train_epochs.",)
 parser.add_argument("--pinyin_vocab_file_path", type=str, default="pinyin_vocab.txt", help="pinyin vocab file path")
 parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")

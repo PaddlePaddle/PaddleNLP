@@ -316,7 +316,7 @@ def do_predict():
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
         Pad(axis=0, pad_val=tokenizer.vocab[tokenizer.pad_token]),
     ): fn(samples)
-    # Seperates data into some batches.
+    # Separates data into some batches.
     batch_encoded_inputs = [
         encoded_inputs_list[i:i + args.batch_size]
         for i in range(0, len(encoded_inputs_list), args.batch_size)

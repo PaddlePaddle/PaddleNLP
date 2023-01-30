@@ -262,7 +262,7 @@ class ErnieMTokenizer(PretrainedTokenizer):
         Args:
             token_ids_0 (List[int]):
                 List of ids of the first sequence.
-            token_ids_1 (List[int], optinal):
+            token_ids_1 (List[int], optional):
                 Optional second list of IDs for sequence pairs.
                 Defaults to `None`.
             already_has_special_tokens (str, optional):

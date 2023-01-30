@@ -57,7 +57,7 @@ parser.add_argument("--learning_rate", default=5e-5, type=float, help="The initi
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
 parser.add_argument(
-    "--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process."
+    "--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process."
 )
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="random seed for initialization")

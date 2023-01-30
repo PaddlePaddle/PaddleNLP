@@ -165,7 +165,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", default=3, type=int, help="Total number of training epochs to perform.")
     parser.add_argument("--eval_step", default=100, type=int, help="Step interval for evaluation.")
     parser.add_argument('--save_step', default=10000, type=int, help="Step interval for saving checkpoint.")
-    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+    parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
     parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
     parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
     parser.add_argument("--max_steps", default=-1, type=int, help="If > 0: set total number of training steps to perform.")

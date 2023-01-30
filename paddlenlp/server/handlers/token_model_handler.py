@@ -81,7 +81,7 @@ class TokenClsModelHandler(BaseModelHandler):
         examples = []
         for input_ids, token_type_ids in zip(tokenizer_result["input_ids"], tokenizer_result["token_type_ids"]):
             examples.append((input_ids, token_type_ids))
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
         batchify_fn = lambda samples, fn=Tuple(

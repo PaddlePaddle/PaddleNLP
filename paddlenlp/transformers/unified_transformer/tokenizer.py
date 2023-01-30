@@ -257,7 +257,7 @@ class UnifiedTransformerTokenizer(PretrainedTokenizer):
         Args:
             tokens (list[str]):
                 A list of string representing tokens to be converted.
-            keep_space (bool, optinal):
+            keep_space (bool, optional):
                 Whether or not to keep the segmentation with space. Defaults to
                 True.
 

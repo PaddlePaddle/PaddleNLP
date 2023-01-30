@@ -48,7 +48,7 @@ def predict(model, data_loader):
 
     Args:
         model (obj:`SemanticIndexBase`): A model to extract text embedding or calculate similarity of text pair.
-        data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
+        data_loader (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """

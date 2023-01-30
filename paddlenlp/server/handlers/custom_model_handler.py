@@ -55,7 +55,7 @@ class CustomModelHandler(BaseModelHandler):
                 result = tokenizer(text=text[idx], max_length=max_seq_len)
             examples.append((result["input_ids"], result["token_type_ids"]))
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
         def batchify_fn(samples):
@@ -126,7 +126,7 @@ class ERNIEMHandler(BaseModelHandler):
                 result = tokenizer(text=text[idx], max_length=max_seq_len)
             examples.append(result["input_ids"])
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[i : i + batch_size] for i in range(0, len(examples), batch_size)]
 
         def batchify_fn(samples):

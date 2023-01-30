@@ -44,7 +44,7 @@ parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embed
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
 parser.add_argument("--epochs", default=1, type=int, help="Total number of training epochs to perform.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 parser.add_argument("--seed", type=int, default=1000, help="Random seed for initialization.")
 parser.add_argument('--device', choices=['cpu', 'gpu'], default="gpu", help="Select which device to train model, defaults to gpu.")
@@ -52,7 +52,7 @@ parser.add_argument('--save_steps', type=int, default=10000, help="Step interval
 parser.add_argument('--eval_steps', type=int, default=10000, help="Step interval for evaluation.")
 parser.add_argument("--train_set_file", type=str, required=True, help="The full path of train_set_file.")
 parser.add_argument("--test_set_file", type=str, required=True, help="The full path of test_set_file.")
-parser.add_argument("--margin", default=0.0, type=float, help="Margin beteween pos_sample and neg_samples.")
+parser.add_argument("--margin", default=0.0, type=float, help="Margin between pos_sample and neg_samples.")
 parser.add_argument("--scale", default=20, type=int, help="Scale for pair-wise margin_rank_loss.")
 parser.add_argument("--dropout", default=0.1, type=float, help="Dropout for pretrained model encoder.")
 parser.add_argument("--infer_with_fc_pooler", action='store_true', help="Whether use fc layer after cls embedding or not for when infer.")
@@ -95,7 +95,7 @@ def do_train():
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # query_input
         Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # query_segment
         Pad(axis=0, pad_val=tokenizer.pad_token_id, dtype="int64"),  # title_input
-        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # tilte_segment
+        Pad(axis=0, pad_val=tokenizer.pad_token_type_id, dtype="int64"),  # title_segment
     ): [data for data in fn(samples)]
 
 

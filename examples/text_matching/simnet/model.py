@@ -44,13 +44,13 @@ class BoWModel(nn.Layer):
     """
     This class implements the Bag of Words Classification Network model to classify texts.
     At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `BoWEncoder`.
+    a word embedding. Then, we encode these representations with a `BoWEncoder`.
     Lastly, we take the output of the encoder to create a final representation,
     which is passed through some feed-forward layers to output a logits (`output_layer`).
     Args:
         vocab_size (obj:`int`): The vocabulary size.
         emb_dim (obj:`int`, optional, defaults to 128):  The embedding dimension.
-        padding_idx (obj:`int`, optinal, defaults to 0) : The pad token index.
+        padding_idx (obj:`int`, optional, defaults to 0) : The pad token index.
         hidden_size (obj:`int`, optional, defaults to 128): The first full-connected layer hidden size.
         fc_hidden_size (obj:`int`, optional, defaults to 96): The second full-connected layer hidden size.
         num_classes (obj:`int`): All the labels that the data has.
@@ -170,7 +170,7 @@ class CNNModel(nn.Layer):
 
      Convolution Neural Network model.
     At a high level, the model starts by embedding the tokens and running them through
-    a word embedding. Then, we encode these epresentations with a `CNNEncoder`.
+    a word embedding. Then, we encode these representations with a `CNNEncoder`.
     The CNN has one convolution layer for each ngram filter size. Each convolution operation gives
     out a vector of size num_filter. The number of times a convolution layer will be used
     is `num_tokens - ngram_size + 1`. The corresponding maxpooling layer aggregates all these
@@ -180,7 +180,7 @@ class CNNModel(nn.Layer):
     Args:
         vocab_size (obj:`int`): The vocabulary size.
         emb_dim (obj:`int`, optional, defaults to 128):  The embedding dimension.
-        padding_idx (obj:`int`, optinal, defaults to 0) : The pad token index.
+        padding_idx (obj:`int`, optional, defaults to 0) : The pad token index.
         num_classes (obj:`int`): All the labels that the data has.
     """
 

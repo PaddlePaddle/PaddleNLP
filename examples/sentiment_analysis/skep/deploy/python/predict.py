@@ -95,7 +95,7 @@ class Predictor(object):
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # segment
         ): fn(samples)
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         results = []

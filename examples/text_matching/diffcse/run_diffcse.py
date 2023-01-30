@@ -43,7 +43,7 @@ parser.add_argument("--output_emb_size", default=0, type=int, help="Output_embed
 parser.add_argument("--train_set_file", type=str, help="The full path of train_set_file.")
 parser.add_argument("--eval_set_file", type=str, help="The full path of eval_set_file.")
 parser.add_argument("--infer_set_file", type=str, help="The full path of infer_set_file.")
-parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded when doing evalution/inference.")
+parser.add_argument("--ckpt_dir", default=None, type=str, help="The ckpt directory where the model checkpoints will be loaded when doing evaluation/inference.")
 parser.add_argument("--save_dir", default="./checkpoints", type=str, help="The directory where the model checkpoints will be written.")
 parser.add_argument("--log_dir", default=None, type=str, help="The directory where log will be written.")
 parser.add_argument("--save_infer_path", default="./infer_result.txt", type=str, help="The save directory where the inference result will be written.")
@@ -54,7 +54,7 @@ parser.add_argument("--batch_size", default=32, type=int, help="Batch size per G
 parser.add_argument("--epochs", default=1, type=int, help="Total number of training epochs to perform.")
 parser.add_argument("--learning_rate", default=1e-5, type=float, help="The initial learning rate for Adam.")
 parser.add_argument("--weight_decay", default=0.0, type=float, help="Weight decay if we apply some.")
-parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proption over the training process.")
+parser.add_argument("--warmup_proportion", default=0.0, type=float, help="Linear warmup proportion over the training process.")
 parser.add_argument("--temp", default=0.05, type=float, help="Temperature for softmax.")
 parser.add_argument("--mlm_probability", default=0.15, type=float, help="The ratio for masked language model.")
 parser.add_argument("--lambda_weight", default=0.15, type=float, help="The weight for RTD loss.")
@@ -251,7 +251,7 @@ if __name__ == "__main__":
         gen_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.generator_name)
         dis_tokenizer = ppnlp.transformers.AutoTokenizer.from_pretrained(args.discriminator_name)
 
-        # intializing DiffCSE model
+        # initializing DiffCSE model
         model = DiffCSE(
             encoder_name=args.encoder_name,
             generator_name=args.generator_name,
@@ -270,7 +270,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
         dev_batchify_fn = lambda samples, fn=Tuple(
@@ -278,7 +278,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
@@ -319,7 +319,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Stack(dtype="int64"),  # labels
         ): [data for data in fn(samples)]
@@ -357,7 +357,7 @@ if __name__ == "__main__":
             Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # query_segment
             Pad(axis=0, pad_val=0),  # attention_mask
             Pad(axis=0, pad_val=tokenizer.pad_token_id),  # key_input
-            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # tilte_segment
+            Pad(axis=0, pad_val=tokenizer.pad_token_type_id),  # title_segment
             Pad(axis=0, pad_val=0),  # attention_mask
         ): [data for data in fn(samples)]
 

@@ -228,7 +228,7 @@ def convert_example(example, tokenizer, label_list, max_seq_length=512, is_test=
 
 
 def do_train(args):
-    # Set the paddle execute enviroment
+    # Set the paddle execute environment
     paddle.enable_static()
     place = paddle.set_device(args.device)
     set_seed(args)

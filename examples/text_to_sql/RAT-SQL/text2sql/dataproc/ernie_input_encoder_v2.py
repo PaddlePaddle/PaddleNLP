@@ -61,7 +61,7 @@ class ErnieInputEncoderV2(BaseInputEncoder):
             }
         else:
             self.tokenizer = ErnieTokenizer.from_pretrained(model_config.pretrain_model)
-            # low frequency token will be used as specail token
+            # low frequency token will be used as special token
             # Other candidate: overchicstoretvhome
             self.special_token_dict = {
                 "table": "blogabstract",

@@ -87,7 +87,7 @@ class CodeGenerationTask(Task):
 
         examples = self._convert_text_to_input(data)["input_ids"]
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)

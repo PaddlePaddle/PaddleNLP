@@ -48,7 +48,7 @@ def predict(model, data_loader):
 
     Args:
         model (obj:`QuestionMatching`): A model to calculate whether the question pair is semantic similar or not.
-        data_loaer (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
+        data_loader (obj:`List(Example)`): The processed data ids of text pair: [query_input_ids, query_token_type_ids, title_input_ids, title_token_type_ids]
     Returns:
         results(obj:`List`): cosine similarity of text pairs.
     """

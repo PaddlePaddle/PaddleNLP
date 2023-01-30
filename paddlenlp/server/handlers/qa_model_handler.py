@@ -63,7 +63,7 @@ class QAModelHandler(BaseModelHandler):
         )
         input_ids = tokenizer_results["input_ids"]
         token_type_ids = tokenizer_results["token_type_ids"]
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [[i, i + batch_size] for i in range(0, len(input_ids), batch_size)]
 
         results = [[] for i in range(0, predictor._output_num)]

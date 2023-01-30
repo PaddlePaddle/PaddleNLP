@@ -82,9 +82,9 @@ def pad_texts_to_max_seq_len(texts, max_seq_len, pad_token_id=0):
     Padded the texts to the max sequence length if the length of text is lower than it.
     Unless it truncates the text.
     Args:
-        texts(obj:`list`): Texts which contrains a sequence of word ids.
+        texts(obj:`list`): Texts which contains a sequence of word ids.
         max_seq_len(obj:`int`): Max sequence length.
-        pad_token_id(obj:`int`, optinal, defaults to 0) : The pad token index.
+        pad_token_id(obj:`int`, optional, defaults to 0) : The pad token index.
     """
     for index, text in enumerate(texts):
         seq_len = len(text)

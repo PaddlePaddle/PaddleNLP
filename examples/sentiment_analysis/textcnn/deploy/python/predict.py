@@ -89,7 +89,7 @@ class Predictor(object):
             input_ids = convert_example(text, tokenizer)
             examples.append(input_ids)
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         batches = [examples[idx : idx + batch_size] for idx in range(0, len(examples), batch_size)]
 
         batchify_fn = lambda samples, fn=Pad(axis=0, pad_val=pad_token_id): fn(samples)  # input

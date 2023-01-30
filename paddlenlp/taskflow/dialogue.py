@@ -188,7 +188,7 @@ class DialogueTask(Task):
         for texts in data:
             examples.append(self._convert_text_to_input(texts, max_seq_len))
 
-        # Seperates data into some batches.
+        # Separates data into some batches.
         one_batch = []
         for example in examples:
             one_batch.append(example)

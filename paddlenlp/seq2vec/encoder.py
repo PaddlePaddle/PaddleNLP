@@ -149,7 +149,7 @@ class CNNEncoder(nn.Layer):
         num_filter(int):
             This is the output dim for each convolutional layer, which is the number of "filters"
             learned by that layer.
-        ngram_filter_sizes(Tuple[int], optinal):
+        ngram_filter_sizes(Tuple[int], optional):
             This specifies both the number of convolutional layers we will create and their sizes.  The
             default of `(2, 3, 4, 5)` will have four convolutional layers, corresponding to encoding
             ngrams of size 2 to 5 with some number of filters.
