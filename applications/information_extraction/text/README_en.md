@@ -153,7 +153,7 @@ Parameters:
 * `per_device_eval_batch_size`: Batch size per GPU core/CPU for evaluation, default is 8.
 * `num_train_epochs`: Training rounds, 100 can be selected when using early stopping method; the default is 10.
 * `learning_rate`: The maximum learning rate for training, UIE-X recommends setting it to 1e-5; the default value is 3e-5.
-* `label_names`: the name of the training data label label, UIE-X is set to 'start_positions' 'end_positions'; the default value is None.
+* `label_names`: the name of the training data label, UIE-X is set to 'start_positions' 'end_positions'; the default value is None.
 * `do_train`: Whether to perform fine-tuning training, setting this parameter means to perform fine-tuning training, and it is not set by default.
 * `do_eval`: Whether to evaluate, setting this parameter means to evaluate, the default is not set.
 * `do_export`: Whether to export, setting this parameter means to export static images, and it is not set by default.

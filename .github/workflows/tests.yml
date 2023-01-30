@@ -12,9 +12,10 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v3
-      - uses: actions/setup-python@v1
+      - uses: actions/setup-python@v4
         with:
           python-version: 3.8
+          cache: 'pip' # caching pip dependencies
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

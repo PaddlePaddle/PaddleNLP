@@ -15,13 +15,14 @@
 from __future__ import annotations
 
 import os
+import random
 import tempfile
 import unittest
 from typing import List
 
 import numpy as np
 import paddle
-from parameterized import parameterized_class
+from parameterized import parameterized, parameterized_class
 
 from paddlenlp import __version__ as current_version
 from paddlenlp.transformers import (
@@ -442,6 +443,18 @@ class BertModelTest(ModelTesterMixin, unittest.TestCase):
 
 
 class BertCompatibilityTest(unittest.TestCase):
+    test_model_id = "hf-internal-testing/tiny-random-BertModel"
+
+    @classmethod
+    @require_package("transformers", "torch")
+    def setUpClass(cls) -> None:
+        from transformers import BertModel
+
+        # when python application is done, `TemporaryDirectory` will be free
+        cls.torch_model_path = tempfile.TemporaryDirectory().name
+        model = BertModel.from_pretrained(cls.test_model_id)
+        model.save_pretrained(cls.torch_model_path)
+
     def test_model_config_mapping(self):
         config = BertConfig(num_labels=22, hidden_dropout_prob=0.99)
         self.assertEqual(config.hidden_dropout_prob, 0.99)
@@ -656,6 +669,60 @@ class BertCompatibilityTest(unittest.TestCase):
             paddle_model = BertModel.from_pretrained(tempdir)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
+
+            self.assertTrue(
+                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+            )
+
+    @parameterized.expand(
+        [
+            ("BertModel",),
+            # ("BertForMaskedLM",),   TODO: need to tie weights
+            # ("BertForPretraining", "BertForPreTraining"),   TODO: need to tie weights
+            ("BertForMultipleChoice",),
+            ("BertForQuestionAnswering",),
+            ("BertForSequenceClassification",),
+            ("BertForTokenClassification",),
+        ]
+    )
+    @require_package("transformers", "torch")
+    def test_bert_classes_from_local_dir(self, class_name, pytorch_class_name: str | None = None):
+        pytorch_class_name = pytorch_class_name or class_name
+        with tempfile.TemporaryDirectory() as tempdir:
+
+            # 1. create commmon input
+            input_ids = np.random.randint(100, 200, [1, 20])
+
+            # 2. forward the torch model
+            import torch
+            import transformers
+
+            torch_model_class = getattr(transformers, pytorch_class_name)
+            torch_model = torch_model_class.from_pretrained(self.torch_model_path)
+            torch_model.eval()
+
+            if "MultipleChoice" in class_name:
+                # construct input for MultipleChoice Model
+                torch_model.config.num_choices = random.randint(2, 10)
+                input_ids = (
+                    paddle.to_tensor(input_ids)
+                    .unsqueeze(1)
+                    .expand([-1, torch_model.config.num_choices, -1])
+                    .cpu()
+                    .numpy()
+                )
+
+            torch_model.save_pretrained(tempdir)
+            torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
+            # 3. forward the paddle model
+            from paddlenlp import transformers
+
+            paddle_model_class = getattr(transformers, class_name)
+            paddle_model = paddle_model_class.from_pretrained(tempdir)
+            paddle_model.eval()
+
+            paddle_logit = paddle_model(paddle.to_tensor(input_ids), return_dict=False)[0]
 
             self.assertTrue(
                 np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)

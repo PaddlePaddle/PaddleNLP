@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/whitespace.h"
+
 #include "fast_tokenizer/normalizers/normalizer.h"
 #include "re2/re2.h"
 

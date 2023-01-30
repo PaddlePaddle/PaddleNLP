@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 import os
 import unittest
-from paddlenlp.utils.log import logger
-from paddlenlp.transformers import AutoTokenizer
+
 import fast_tokenizer
-from fast_tokenizer import ErnieFastTokenizer, models
+from fast_tokenizer import ErnieFastTokenizer
+from paddlenlp.transformers import AutoTokenizer
+from paddlenlp.utils.log import logger
 
 logger.logger.setLevel("ERROR")
 
@@ -77,7 +77,7 @@ class TestNormalizerJson(TestTokenizerJson):
 
     def test_sequence(self):
         lowercase_normalizer = fast_tokenizer.normalizers.LowercaseNormalizer()
-        sequence_normalizer = fast_tokenizer.normalizers.SequenceNormalizer(normalizers=[lowercase_normalizer])
+        sequence_normalizer = fast_tokenizer.normalizers.SequenceNormalizer(normalizer_list=[lowercase_normalizer])
         self.check_normalizer_json(sequence_normalizer)
 
 

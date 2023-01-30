@@ -201,7 +201,7 @@ if __name__ == "__main__":
     parser.add_argument("--ext_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for extraction model.")
     parser.add_argument("--cls_max_seq_len", type=int, default=512, help="The maximum total input sequence length after tokenization for classification model.")
     args = parser.parse_args()
-    # yapf: enbale
+    # yapf: enable
 
     # predict with ext model
     ext_results = predict_ext(args)

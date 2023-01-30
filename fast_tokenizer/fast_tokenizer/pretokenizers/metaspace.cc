@@ -13,6 +13,7 @@ See the License for the specific language governing permissions and
 limitations under the License. */
 
 #include "fast_tokenizer/pretokenizers/metaspace.h"
+
 #include "fast_tokenizer/utils/utf8.h"
 #include "glog/logging.h"
 #include "re2/re2.h"

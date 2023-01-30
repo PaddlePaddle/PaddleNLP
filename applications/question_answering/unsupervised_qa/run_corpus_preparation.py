@@ -20,7 +20,7 @@ import os
 # yapf: disable
 def parse_args():
     parser = argparse.ArgumentParser(__doc__)
-    parser.add_argument('--source_file_path', type=str, default=None, help='the souce json file path')
+    parser.add_argument('--source_file_path', type=str, default=None, help='the source json file path')
     parser.add_argument('--target_dir_path', type=str, default=None, help='the target dir path')
     parser.add_argument('--test_sample_num', type=int, default=0, help='the test sample number when preparing qa system data')
     parser.add_argument('--train_sample_num', type=int, default=0, help='the test sample number when preparing qa system data')

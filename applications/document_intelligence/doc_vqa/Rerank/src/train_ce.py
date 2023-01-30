@@ -30,21 +30,21 @@ import multiprocessing
 # not take any effect.
 os.environ["FLAGS_eager_delete_tensor_gb"] = "0"  # enable gc
 
-import paddle
-import paddle.fluid as fluid
+import paddle  # noqa: E402
+import paddle.fluid as fluid  # noqa: E402
 
 if hasattr(paddle, "enable_static"):
     paddle.enable_static()
-from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy
-import paddle.fluid.incubate.fleet.base.role_maker as role_maker
+from paddle.fluid.incubate.fleet.collective import fleet, DistributedStrategy  # noqa: E402
+import paddle.fluid.incubate.fleet.base.role_maker as role_maker  # noqa: E402
 
-import reader_ce as reader_ce
-from model.ernie import ErnieConfig
-from cross_encoder import create_model, evaluate, predict
-from optimization import optimization
-from utils.args import print_arguments, check_cuda, prepare_logger
-from utils.init import init_pretraining_params, init_checkpoint
-from finetune_args import parser
+import reader_ce as reader_ce  # noqa: E402
+from model.ernie import ErnieConfig  # noqa: E402
+from cross_encoder import create_model, evaluate, predict  # noqa: E402
+from optimization import optimization  # noqa: E402
+from utils.args import print_arguments, check_cuda, prepare_logger  # noqa: E402
+from utils.init import init_pretraining_params, init_checkpoint  # noqa: E402
+from finetune_args import parser  # noqa: E402
 
 warnings.filterwarnings("ignore")
 args = parser.parse_args()
@@ -86,7 +86,7 @@ def main(args):
     if args.random_seed is not None:
         startup_prog.random_seed = args.random_seed
 
-    if args.predict_batch_size == None:
+    if args.predict_batch_size is None:
         args.predict_batch_size = args.batch_size
 
     if args.do_train:
@@ -294,7 +294,7 @@ def main(args):
     if args.do_test:
         predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars)
 
-    # final eval on dianostic, hack for glue-ax
+    # final eval on diagnostic, hack for glue-ax
     if args.diagnostic:
         test_pyreader.decorate_tensor_provider(
             reader.data_generator(args.diagnostic, batch_size=args.batch_size, epoch=1, dev_count=1, shuffle=False)
@@ -342,7 +342,7 @@ def predict_wrapper(args, reader, exe, test_prog, test_pyreader, graph_vars, epo
         if not os.path.exists(save_dir):
             os.makedirs(save_dir)
         else:
-            log.warning("save dir exsits: %s, will skip saving" % save_dir)
+            log.warning("save dir exists: %s, will skip saving" % save_dir)
 
         with open(save_path, "w") as f:
             for p in probs:
