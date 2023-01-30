@@ -17,7 +17,7 @@ import sys
 import os
 from unittest import TestCase
 
-from tests.testing_utils import load_argv, construct_argv
+from tests.testing_utils import load_test_config, argv_context_guard
 
 
 class GPTTest(TestCase):
@@ -32,52 +32,48 @@ class GPTTest(TestCase):
     def test_pretrain(self):
 
         # 1. run pretrain
-        argv, config = load_argv(self.config_path, "pretrain", return_dict=True)
+        config = load_test_config(self.config_path, "pretrain")
         device = config["device"]
-        sys.argv = argv
-        from run_pretrain import do_train
+        with argv_context_guard(config):
+            from run_pretrain import do_train
 
-        do_train()
+            do_train()
 
         # 2. export model
-        from export_model import main
-
         config = {
             "model_type": config["model_type"],
             "model_path": config["output_dir"],
             "output_path": os.path.join(config["output_dir"], "export_model"),
         }
-        argv = construct_argv(config)
-        sys.argv = argv
-        main()
+        with argv_context_guard(config):
+            from export_model import main
+
+            main()
 
         # 3. infer model
-        from deploy.python.inference import main
-
         config = {"model_type": config["model_type"], "model_path": config["output_path"], "select_device": device}
-        argv = construct_argv(config)
-        sys.argv = argv
-        main()
+        with argv_context_guard(config):
+            from deploy.python.inference import main
+
+            main()
 
     def test_msra_ner(self):
-        argv = load_argv(self.config_path, "msra_ner")
-        sys.argv = argv
+        config = load_test_config(self.config_path, "msra_ner")
+        with argv_context_guard(config):
+            from run_msra_ner import do_train
 
-        from run_msra_ner import do_train
-
-        do_train()
+            do_train()
 
     def test_run_glue(self):
-        argv = load_argv(self.config_path, "glue")
-        sys.argv = argv
-        from run_glue import do_train
+        config = load_test_config(self.config_path, "glue")
+        with argv_context_guard(config):
+            from run_glue import do_train
 
-        do_train()
+            do_train()
 
     def test_generation(self):
-        argv = load_argv(self.config_path, "generation")
-        sys.argv = argv
+        config = load_test_config(self.config_path, "generation")
+        with argv_context_guard(config):
+            from run_generation import run
 
-        from run_generation import run
-
-        run()
+            run()

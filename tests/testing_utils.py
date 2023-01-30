@@ -13,12 +13,15 @@
 # limitations under the License.
 from __future__ import annotations
 
+import sys
+import copy
 import gc
 import inspect
 import os
 import unittest
 from collections.abc import Mapping
 from distutils.util import strtobool
+from contextlib import contextmanager
 
 import numpy as np
 import paddle
@@ -286,7 +289,7 @@ def require_package(*package_names):
     return decorator
 
 
-def load_argv(config_file: str, key: str, return_dict: bool = False):
+def load_test_config(config_file: str, key: str) -> dict:
     """parse config file to argv
 
     Args:
@@ -295,19 +298,18 @@ def load_argv(config_file: str, key: str, return_dict: bool = False):
     """
     # 1. load the config with key and test env(default, test)
     with open(config_file, "r", encoding="utf-8") as f:
-        config = yaml.safe_load(f)[key]
+        config = yaml.safe_load(f)
+
+    assert key in config, f"<{key}> should be the top key in configuration file"
+    config = config[key]
 
     sub_key = "tiny"
     if os.getenv("RUN_SLOW_TEST", None):
         sub_key = "default"
 
+    assert sub_key in config, f"<{sub_key}> not found in {key} configuration"
     config = config[sub_key]
-
-    # 2. init argv
-    argv = construct_argv(config)
-    if return_dict:
-        return argv, config
-    return argv
+    return config
 
 
 def construct_argv(config: dict) -> list[str]:
@@ -331,3 +333,17 @@ def construct_argv(config: dict) -> list[str]:
         argv.append(str(value))
 
     return argv
+
+
+@contextmanager
+def argv_context_guard(config: dict):
+    """construct argv by config
+
+    Args:
+        config (dict): the configuration to argv
+    """
+    old_argv = copy.deepcopy(sys.argv)
+    argv = construct_argv(config)
+    sys.argv = argv
+    yield
+    sys.argv = old_argv
