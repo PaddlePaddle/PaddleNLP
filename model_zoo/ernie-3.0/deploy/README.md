@@ -4,18 +4,73 @@
 
 在部署 ERNIE 3.0 模型前，需要安装 FastDeploy SDK，可参考 [FastDeploy SDK安装文档](https://github.com/PaddlePaddle/FastDeploy/blob/develop/docs/cn/build_and_install/download_prebuilt_libraries.md)确认部署环境是否满足 FastDeploy 环境要求，并按照介绍安装相应的 SDK。
 
-## 模型详细说明
-- [ERNIE 3.0模型说明](../README.md)
+目前，ERNIE 3.0 模型支持在如下的硬件以及推理引擎进行部署。
 
-## 支持的模型列表
+符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
 
-| 模型 |  结构  | 语言 |
-| :---: | :--------: | :--------: |
-| **ERNIE 3.0-_Base_** | 12-layers, 768-hidden, 12-heads | 中文 |
-| **ERNIE 3.0-_Medium_** | 6-layers, 768-hidden, 12-heads | 中文 |
-| **ERNIE 3.0-_Mini_** | 6-layers, 384-hidden, 12-heads | 中文 |
-| **ERNIE 3.0-_Micro_** | 4-layers, 384-hidden, 12-heads | 中文 |
-| **ERNIE 3.0-_Nano_** | 4-layers, 312-hidden, 12-heads | 中文 |
+<table>
+    <tr>
+        <td align=center> 硬件</td>
+        <td align=center> 可用的推理引擎  </td>
+        <td align=center> 是否支持 Paddle 新格式量化模型 </td>
+        <td align=center> 是否支持 FP16 模式 </td>
+    </tr>
+    <tr>
+        <td rowspan=3 align=center> CPU </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> OpenVINO </td>
+      <td align=center> ✅ </td>
+      <td align=center>  N/A </td>
+    </tr>
+    <tr>
+        <td rowspan=4 align=center> GPU </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center>  ✅ </td>
+        <td align=center>  N/A </td>
+    </tr>
+    <tr>
+      <td align=center> ONNX Runtime </td>
+      <td align=center>  ✅ </td>
+      <td align=center>  ❔ </td>
+    </tr>
+    <tr>
+      <td align=center> Paddle TensorRT </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+      <td align=center> TensorRT </td>
+      <td align=center> ✅ </td>
+      <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 昆仑芯 XPU </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center>  N/A </td>
+        <td align=center>  ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> 华为 昇腾 </td>
+        <td align=center> Paddle Lite </td>
+        <td align=center> ❔ </td>
+        <td align=center> ✅ </td>
+    </tr>
+    <tr>
+        <td align=center> Graphcore IPU </td>
+        <td align=center> Paddle Inference </td>
+        <td align=center> ❔ </td>
+        <td align=center> N/A </td>
+    </tr>
+</table>
 
 ## 支持的NLP任务列表
 

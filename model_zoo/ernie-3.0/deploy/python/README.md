@@ -134,7 +134,7 @@ entity: 姚明   label: PER   pos: [10, 11]
 
 ## FastDeploy 高阶用法
 
-FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 ERNIE 3.0 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE 3.0 Tiny模型。
+FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以及 `fastdeploy.RuntimeOption.use_xxx_backend()` 接口支持开发者选择不同的硬件、不同的推理引擎进行部署。在不同的硬件上部署 ERNIE 3.0 模型，需要选择硬件所支持的推理引擎进行部署，下表展示如何在不同的硬件上选择可用的推理引擎部署 ERNIE 3.0 模型。
 
 符号说明: (1) ✅: 已经支持; (2) ❔: 正在进行中; (3) N/A: 暂不支持;
 
@@ -144,9 +144,9 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> 硬件对应的接口</td>
         <td align=center> 可用的推理引擎  </td>
         <td align=center> 推理引擎对应的接口 </td>
-        <td align=center> 是否支持 ERNIE 3.0 Tiny 模型 </td>
+        <td align=center> 是否支持 ERNIE 3.0 模型 </td>
         <td align=center> 是否支持 Paddle 新格式量化模型 </td>
-        <td align=center> 是否支持FP16模式 </td>
+        <td align=center> 是否支持 FP16 模式 </td>
     </tr>
     <tr>
         <td rowspan=3 align=center> CPU </td>
