@@ -206,7 +206,6 @@ class ErnieTokenizationTest(TokenizerTesterMixin, unittest.TestCase):
 
         encoded_sentence = tokenizer.build_inputs_with_special_tokens(text)
         encoded_pair = tokenizer.build_inputs_with_special_tokens(text, text_2)
-        print(encoded_sentence)
         assert encoded_sentence == [1] + text + [2]
         assert encoded_pair == [1] + text + [2] + text_2 + [2]
 
