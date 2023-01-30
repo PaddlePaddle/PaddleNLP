@@ -131,6 +131,40 @@ entity: 姚明, label: PER, pos: [10, 11]
 
 ```
 
+### 量化模型部署
+
+该示例支持部署 Paddle INT8 新格式量化模型，仅需在`--model_dir`参数传入量化模型路径，并且在对应硬件上选择可用的推理引擎后端，即可完成量化模型部署。在 GPU 上部署量化模型时，可选后端为`paddle_tensorrt`、`tensorrt`；在CPU上部署量化模型时，可选后端为`paddle`、`onnx_runtime`。下面将展示如何使用该示例完成量化模型部署，示例中的模型是按照 [ERNIE 3.0 训练文档](../../README.md) 压缩量化后导出得到的量化模型。
+
+```bash
+
+# 在 GPU 上使用 tensorrt 后端运行量化模型，模型目录可按照实际模型路径设置
+./token_cls_infer_demo --model_dir ../../../best_models/msra/width_mult_0.75/mse16_1/ --device gpu --backend tensorrt --model_prefix int8
+
+# 在 CPU 上使用paddle_inference后端，模型目录可按照实际模型路径设置
+./token_cls_infer_demo --model_dir ../../../best_models/msra/width_mult_0.75/mse16_1/ --device cpu --backend paddle --model_prefix int8
+
+```
+
+运行完成后返回的结果如下：
+
+```bash
+[INFO] /paddle/PaddleNLP/model_zoo/ernie-3.0/fastdeploy/cpp/token_cls_infer.cc(103)::CreateRuntimeOption    model_path = ../../../best_models/msra/export/model.pdmodel, param_path = ../../../best_models/msra/export/model.pdiparams
+[INFO] fastdeploy/runtime.cc(500)::Init    Runtime initialized with Backend::PDINFER in Device::CPU.
+input data: 北京的涮肉，重庆的火锅，成都的小吃都是极具特色的美食。
+The model detects all entities:
+entity: 北京, label: LOC, pos: [0, 1]
+entity: 重庆, label: LOC, pos: [6, 7]
+entity: 成都, label: LOC, pos: [12, 13]
+-----------------------------
+input data: 乔丹、科比、詹姆斯和姚明都是篮球界的标志性人物。
+The model detects all entities:
+entity: 乔丹, label: PER, pos: [0, 1]
+entity: 科比, label: PER, pos: [3, 4]
+entity: 詹姆斯, label: PER, pos: [6, 8]
+entity: 姚明, label: PER, pos: [10, 11]
+-----------------------------
+```
+
 ### 参数说明
 
 `token_cls_infer_demo` 除了以上示例的命令行参数，还支持更多命令行参数的设置。以下为各命令行参数的说明。
