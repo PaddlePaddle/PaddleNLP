@@ -39,6 +39,11 @@ def freeze_params(params):
         param.stop_gradient = True
 
 
+def unfreeze_params(params):
+    for param in params:
+        param.stop_gradient = True
+
+
 # device
 def get_parameter_device(parameter: nn.Layer):
     try:

@@ -44,9 +44,14 @@ from ppdiffusers import (
     DiffusionPipeline,
     UNet2DConditionModel,
 )
-from ppdiffusers.modeling_utils import freeze_params, unfreeze_params, unwrap_model
+from ppdiffusers.modeling_utils import freeze_params, unwrap_model
 from ppdiffusers.optimization import get_scheduler
 from ppdiffusers.utils import PIL_INTERPOLATION
+
+
+def unfreeze_params(params):
+    for param in params:
+        param.stop_gradient = True
 
 
 def url_or_path_join(*path_list):
