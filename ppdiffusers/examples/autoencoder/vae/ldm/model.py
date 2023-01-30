@@ -138,7 +138,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         reset_initialized_parameter(self.quant_conv)
         reset_initialized_parameter(self.post_quant_conv)
 
-    def forward(
+    def custom_forward(
         self,
         sample: paddle.Tensor,
         sample_posterior: bool = True,
@@ -154,7 +154,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
     def get_last_layer(self):
         return self.decoder.conv_out.weight
 
-    def training_step(self, pixel_values, optimizer_idx=0, global_step=0):
+    def forward(self, pixel_values, optimizer_idx=0, global_step=0):
         # make sure we are in train mode
         self.train()
         if self.input_size is None:
@@ -162,7 +162,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         else:
             encoder_inputs = F.interpolate(pixel_values, size=self.input_size, mode="bilinear")
 
-        reconstructions, posterior = self(encoder_inputs)
+        reconstructions, posterior = self.custom_forward(encoder_inputs)
 
         if optimizer_idx == 0:
             # train encoder+decoder+logvar
@@ -200,7 +200,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
             encoder_inputs = F.interpolate(pixel_values, size=self.input_size, mode="bilinear")
 
         if not only_inputs:
-            xrec, posterior = self(encoder_inputs)
+            xrec, posterior = self.custom_forward(encoder_inputs)
             log["samples"] = self.decode_image(self.decode(paddle.randn(posterior.sample().shape)).sample)
             log["reconstructions"] = self.decode_image(xrec)
         # update
@@ -221,7 +221,7 @@ class AutoencoderKLWithLoss(ModelMixin, ConfigMixin):
         else:
             encoder_inputs = F.interpolate(pixel_values, size=self.input_size, mode="bilinear")
 
-        reconstructions, posterior = self(encoder_inputs)
+        reconstructions, posterior = self.custom_forward(encoder_inputs)
         aeloss, log_dict_ae = self.loss(
             pixel_values,
             reconstructions,

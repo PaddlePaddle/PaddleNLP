@@ -345,17 +345,17 @@ class LPIPS(nn.Layer):
         self.net = net_type(pretrained=not self.pnet_rand, requires_grad=self.pnet_tune)
 
         if lpips:
-            self.lin0 = NetLinLayer(self.chns[0], use_dropout=use_dropout)
-            self.lin1 = NetLinLayer(self.chns[1], use_dropout=use_dropout)
-            self.lin2 = NetLinLayer(self.chns[2], use_dropout=use_dropout)
-            self.lin3 = NetLinLayer(self.chns[3], use_dropout=use_dropout)
-            self.lin4 = NetLinLayer(self.chns[4], use_dropout=use_dropout)
-            self.lins = [self.lin0, self.lin1, self.lin2, self.lin3, self.lin4]
+            lin0 = NetLinLayer(self.chns[0], use_dropout=use_dropout)
+            lin1 = NetLinLayer(self.chns[1], use_dropout=use_dropout)
+            lin2 = NetLinLayer(self.chns[2], use_dropout=use_dropout)
+            lin3 = NetLinLayer(self.chns[3], use_dropout=use_dropout)
+            lin4 = NetLinLayer(self.chns[4], use_dropout=use_dropout)
+            lins = [lin0, lin1, lin2, lin3, lin4]
             if self.pnet_type == "squeeze":  # 7 layers for squeezenet
-                self.lin5 = NetLinLayer(self.chns[5], use_dropout=use_dropout)
-                self.lin6 = NetLinLayer(self.chns[6], use_dropout=use_dropout)
-                self.lins += [self.lin5, self.lin6]
-            self.lins = nn.LayerList(self.lins)
+                lin5 = NetLinLayer(self.chns[5], use_dropout=use_dropout)
+                lin6 = NetLinLayer(self.chns[6], use_dropout=use_dropout)
+                lins += [lin5, lin6]
+            self.lins = nn.LayerList(lins)
 
             if pretrained:
                 if model_path is None:

@@ -12,7 +12,7 @@
 # 安装cuda11.2, python 3.7, develop版本的paddle, commit号为b96a21df4e7a42b2445104426e2be407534705e6.
 wget https://paddlenlp.bj.bcebos.com/models/community/CompVis/paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
 pip install paddlepaddle_gpu-0.0.0.post112-cp37-cp37m-linux_x86_64.whl
-# 注意，当前该部分的训练需要使用最新版的paddlenlp和ppdiffusers，即 ppdiffusers>=0.9.1，paddlenlp>=2.4.5。
+# 注意，当前该部分的训练需要使用最新版的paddlenlp和ppdiffusers，即 ppdiffusers>=0.11.0，paddlenlp>=2.5.0。
 pip install -r requirements.txt
 ```
 
@@ -85,6 +85,7 @@ python -u train_vae.py \
 > * `--disc_weight`: 判别器loss的权重比例。
 > * `--kl_weight`: kl_loss的权重比例。
 > * `--resolution`: 训练时，图像的分辨率。
+> * `--init_from_ckpt`: 是否加载预训练的ckpt权重，注意：如果我们为了严格同步pytorch的参数初始化，我们可以首先进行转换，然后再设置`init_from_ckpt`这个参数，从而加载预训练权重，如：`scripts/ldm_vae_init0_paddle/model_state.pdparams`。
 
 
 #### 1.3.2 单机多卡训练 (多机多卡训练，仅需在 paddle.distributed.launch 后加个 --ips IP1,IP2,IP3,IP4)

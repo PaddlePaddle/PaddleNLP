@@ -1,4 +1,4 @@
-paddlenlp>=2.4.5
+paddlenlp>=2.5.0
 ppdiffusers>=0.9.0
 scipy
 pyyaml

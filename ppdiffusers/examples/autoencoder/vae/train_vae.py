@@ -202,6 +202,7 @@ def parse_args():
         default=5,
         help="The shuffle_every_n_samples of the text_image_pair dataset.",
     )
+    parser.add_argument("--init_from_ckpt", type=str, default=None, help="The path of checkpoint to be loaded.")
 
     # loss fn
     parser.add_argument("--disc_start", type=int, default=50001, help="The number of steps the discriminator started.")
@@ -289,6 +290,11 @@ def main():
             disc_loss=args.disc_loss,
         )
 
+    if args.init_from_ckpt and os.path.isfile(args.init_from_ckpt):
+        state_dict = paddle.load(args.init_from_ckpt)
+        vae.set_dict(state_dict)
+        del state_dict
+
     if args.scale_lr:
         args.learning_rate = num_processes * args.batch_size * args.learning_rate
 
@@ -314,7 +320,7 @@ def main():
     optimizers = [opt_ae, opt_disc]
 
     if num_processes > 1:
-        vae = paddle.DataParallel(vae)
+        vae = paddle.DataParallel(vae, find_unused_parameters=True)
 
     if args.dataset_type == "imagenet":
         from ldm import ImageNetSRTrain, ImageNetSRValidation
@@ -397,9 +403,7 @@ def main():
                 # pytorch_lightning use this `toggle_optimizer` method
                 # ref: https://github.com/Lightning-AI/lightning/blob/a58639ce7e864dd70484e7d34c37730ae204183c/src/pytorch_lightning/core/module.py#L1419-L1447
                 unwrap_model(vae).toggle_optimizer(optimizers, optimizer_idx)
-                loss, log_dict = unwrap_model(vae).training_step(
-                    batch["image"], optimizer_idx=optimizer_idx, global_step=global_step
-                )
+                loss, log_dict = vae(batch["image"], optimizer_idx=optimizer_idx, global_step=global_step)
                 optimizers[optimizer_idx].clear_grad()
                 loss.backward()
                 optimizers[optimizer_idx].step()
@@ -410,7 +414,7 @@ def main():
 
             progress_bar.update(1)
             global_step += 1
-            progress_bar.set_postfix(**logs)
+            # progress_bar.set_postfix(**logs)
 
             if rank == 0:
                 # logging
