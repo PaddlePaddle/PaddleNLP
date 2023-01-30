@@ -72,7 +72,7 @@ class VisualSentiment(object):
         plot wordcloud image.
 
         Args:
-            content_freq (dict): an content dict with frequency, the key is content and its value is frequency.
+            content_freq (dict): a content dict with frequency, the key is content and its value is frequency.
             save_path (str): path that the image is saved to.
         """
 
@@ -92,7 +92,7 @@ class VisualSentiment(object):
         generate histogram image. one aspect corresponds to one bar.
 
         Args:
-            content_freq (dict): an content dict with frequency, the key is content and its value is frequency.
+            content_freq (dict): a content dict with frequency, the key is content and its value is frequency.
             save_path (str): path that the image is saved to.
             with_line_chart (bool): Whether to plot line chart, only work when image_type is set be histogram.
             top_n (int): show top_n of frequency of contents, only work when image_type is set be histogram.
@@ -136,7 +136,7 @@ class VisualSentiment(object):
         two types of images are supported: wordcloud and histogram.
 
         Args:
-            content_freq (dict): an content dict with frequency, the key is content and its value is frequency.
+            content_freq (dict): a content dict with frequency, the key is content and its value is frequency.
             save_path (str): path that the image is saved to.
             image_type (str): Only wordcloud and histogram are supported, that is, you should set be in [wordcloud, histogram].
             with_line_chart (bool): Whether to plot line chart, only work when image_type is set be histogram.
