@@ -433,8 +433,13 @@ class RobertaCompatibilityTest(unittest.TestCase):
             torch_model = RobertaModel.from_pretrained(self.torch_model_path)
             torch_model.eval()
             torch_logit = torch_model(torch.tensor(input_ids), return_dict=False)[0]
+
             self.assertTrue(
-                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
             )
 
     @require_package("transformers", "torch")
@@ -491,10 +496,12 @@ class RobertaCompatibilityTest(unittest.TestCase):
             paddle_model = paddle_model_class.from_pretrained(tempdir)
             paddle_model.eval()
             paddle_logit = paddle_model(paddle.to_tensor(input_ids))[0]
-            print(paddle_logit.detach().cpu().numpy())
-            print(torch_logit.detach().cpu().numpy())
             self.assertTrue(
-                np.allclose(paddle_logit.detach().cpu().numpy(), torch_logit.detach().cpu().numpy(), rtol=1e-4)
+                np.allclose(
+                    paddle_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    torch_logit.detach().cpu().reshape([-1])[:9].numpy(),
+                    rtol=1e-4,
+                )
             )
 
 

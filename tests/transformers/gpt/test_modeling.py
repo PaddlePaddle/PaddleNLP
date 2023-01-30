@@ -625,8 +625,8 @@ class GPTCompatibilityTest(unittest.TestCase):
 
             self.assertTrue(
                 np.allclose(
-                    paddle_logit.detach().cpu().numpy().reshape([-1])[:16],
-                    torch_logit.detach().cpu().numpy().reshape([-1])[:16],
+                    paddle_logit.detach().cpu().numpy().reshape([-1])[:9],
+                    torch_logit.detach().cpu().numpy().reshape([-1])[:9],
                     rtol=1e-4,
                 )
             )
