@@ -62,6 +62,6 @@ fast_tokenizer
 
 目前 FastTokenizer 提供了以下 C++ 使用示例。
 
-[ErnieFastTokenizer C++示例](../../examples/ernie/)
+[ErnieFastTokenizer C++示例](../../examples/ernie/README.md)
 
-[ClipFastTokenizer C++示例](../../examples/clip/)
+[ClipFastTokenizer C++示例](../../examples/clip/README.md)

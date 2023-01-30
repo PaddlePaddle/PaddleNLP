@@ -23,10 +23,9 @@ FastTokenizer 是一款简单易用、功能强大的跨平台高性能文本预
 ## 特性
 
 - 高性能。底层采用 C++ 实现，并且集成高性能分词算法 `FastWordPiece` [1]，其性能远高于常规 Python 实现的 Tokenizer。在文本分类任务上，FastTokenizer 对比 Python 版本 Tokenizer 加速比最高可达20倍。支持多线程加速多文本批处理分词。默认使用单线程分词。
+- 可拓展性强。用户可以通过指定不同的 `Normalizer`, `PreTokenizer`, `Model` 以及 `PostProcessor` 组件自定义 Tokenizer。可在 [FastTokenizer Pipeline](docs/pipeline/README.md) 文档了解更多关于组件的介绍以及使用方式。
 - 跨平台。FastTokenizer 可在不同的系统平台上使用，目前已支持 Windows x64，Linux x64 以及 MacOS 10.14+ 平台上使用。
 - 支持多编程语言。FastTokenizer 提供在 [C++](./docs/cpp/README.md)、[Python](./docs/python/README.md) 语言上开发的能力。
-- 可拓展性强。用户可以通过指定不同的 `Normalizer`, `PreTokenizer`, `Model` 以及 `PostProcessor` 组件自定义 Tokenizer。可在 [FastTokenizer Pipeline](docs/pipeline/README.md) 文档了解更多关于组件的介绍以及使用方式。
-
 - 包含所有预处理。覆盖绝大部分 Transformer 模型的 Tokenizer 所需要的功能，包括特殊 Tokens 的拼接、截断等。输入的原始文本经过 FastTokenizer 处理后得到的结果可直接输入到 Transformer 类模型。
 
 ## 快速开始
