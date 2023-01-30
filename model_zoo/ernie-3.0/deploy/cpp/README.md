@@ -156,7 +156,6 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> 硬件对应的接口</td>
         <td align=center> 可用的推理引擎  </td>
         <td align=center> 推理引擎对应的接口 </td>
-        <td align=center> 是否支持 ERNIE 3.0 模型 </td>
         <td align=center> 是否支持 Paddle 新格式量化模型 </td>
         <td align=center> 是否支持 FP16 模式 </td>
     </tr>
@@ -166,20 +165,17 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center>  ✅ </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> ONNX Runtime </td>
       <td align=center> UseOrtBackend() </td>
-      <td align=center> ✅ </td>
       <td align=center>  ✅ </td>
       <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> OpenVINO </td>
       <td align=center> UseOpenvinoBackend() </td>
-      <td align=center> ✅ </td>
       <td align=center> ❔ </td>
       <td align=center>  N/A </td>
     </tr>
@@ -189,27 +185,23 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
         <td align=center>  ✅ </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> ONNX Runtime </td>
       <td align=center> UseOrtBackend() </td>
-      <td align=center> ✅ </td>
       <td align=center>  ✅ </td>
       <td align=center>  ❔ </td>
     </tr>
     <tr>
       <td align=center> Paddle TensorRT </td>
       <td align=center> UseTrtBackend() + EnablePaddleToTrt() </td>
-      <td align=center> ✅  </td>
       <td align=center> ✅ </td>
       <td align=center> ✅ </td>
     </tr>
     <tr>
       <td align=center> TensorRT </td>
       <td align=center> UseTrtBackend() </td>
-      <td align=center> ✅  </td>
       <td align=center> ✅ </td>
       <td align=center> ✅ </td>
     </tr>
@@ -218,7 +210,6 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> UseKunlunXin() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
         <td align=center>  ✅ </td>
     </tr>
@@ -227,7 +218,6 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> UseAscend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> UsePaddleLiteBackend() </td>
-        <td align=center> ✅ </td>
         <td align=center> ❔ </td>
         <td align=center> ✅ </td>
     </tr>
@@ -236,7 +226,6 @@ FastDeploy 在 C++ 端上，提供 `fastdeploy::RuntimeOption::UseXXX()` 以及 
         <td align=center> UseIpu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> UsePaddleInferBackend() </td>
-        <td align=center> ❔ </td>
         <td align=center> ❔ </td>
         <td align=center> N/A </td>
     </tr>

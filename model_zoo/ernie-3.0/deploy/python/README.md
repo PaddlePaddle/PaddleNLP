@@ -144,7 +144,6 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> 硬件对应的接口</td>
         <td align=center> 可用的推理引擎  </td>
         <td align=center> 推理引擎对应的接口 </td>
-        <td align=center> 是否支持 ERNIE 3.0 模型 </td>
         <td align=center> 是否支持 Paddle 新格式量化模型 </td>
         <td align=center> 是否支持 FP16 模式 </td>
     </tr>
@@ -154,20 +153,17 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> Paddle Inference </td>
         <td align=center> use_paddle_infer_backend() </td>
         <td align=center>  ✅ </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> ONNX Runtime </td>
       <td align=center> use_ort_backend() </td>
-      <td align=center> ✅ </td>
       <td align=center>  ✅ </td>
       <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> OpenVINO </td>
       <td align=center> use_openvino_backend() </td>
-      <td align=center> ✅ </td>
       <td align=center> ❔ </td>
       <td align=center>  N/A </td>
     </tr>
@@ -177,27 +173,23 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> Paddle Inference </td>
         <td align=center> use_paddle_infer_backend() </td>
         <td align=center>  ✅ </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
     </tr>
     <tr>
       <td align=center> ONNX Runtime </td>
       <td align=center> use_ort_backend() </td>
-      <td align=center> ✅ </td>
       <td align=center>  ✅ </td>
       <td align=center>  ❔ </td>
     </tr>
     <tr>
       <td align=center> Paddle TensorRT </td>
       <td align=center> use_trt_backend() + enable_paddle_to_trt() </td>
-      <td align=center> ✅  </td>
       <td align=center> ✅ </td>
       <td align=center> ✅ </td>
     </tr>
     <tr>
       <td align=center> TensorRT </td>
       <td align=center> use_trt_backend() </td>
-      <td align=center> ✅  </td>
       <td align=center> ✅ </td>
       <td align=center> ✅ </td>
     </tr>
@@ -206,7 +198,6 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> use_kunlunxin() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> use_paddle_lite_backend() </td>
-        <td align=center>  ✅ </td>
         <td align=center>  N/A </td>
         <td align=center>  ✅  </td>
     </tr>
@@ -215,7 +206,6 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> use_ascend() </td>
         <td align=center> Paddle Lite </td>
         <td align=center> use_paddle_lite_backend() </td>
-        <td align=center> ✅ </td>
         <td align=center> ❔ </td>
         <td align=center> ✅ </td>
     </tr>
@@ -224,7 +214,6 @@ FastDeploy 在 Python 端上，提供 `fastdeploy.RuntimeOption.use_xxx()` 以�
         <td align=center> use_ipu() </td>
         <td align=center> Paddle Inference </td>
         <td align=center> use_paddle_infer_backend() </td>
-        <td align=center> ❔ </td>
         <td align=center> ❔ </td>
         <td align=center> N/A </td>
     </tr>
