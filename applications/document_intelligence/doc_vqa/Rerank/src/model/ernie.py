@@ -91,7 +91,7 @@ class ErnieModel(object):
         self._task_emb_name = "task_embedding"
         self._emb_dtype = "float32"
 
-        # Initialize all weigths by truncated normal initializer, and all biases
+        # Initialize all weights by truncated normal initializer, and all biases
         # will be initialized by constant zero by default.
         self._param_initializer = fluid.initializer.TruncatedNormal(scale=config["initializer_range"])
 

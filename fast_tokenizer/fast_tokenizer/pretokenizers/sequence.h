@@ -15,9 +15,9 @@ limitations under the License. */
 #pragma once
 #include <memory>
 
-#include "nlohmann/json.hpp"
 #include "fast_tokenizer/pretokenizers/pretokenizer.h"
 #include "fast_tokenizer/utils/utils.h"
+#include "nlohmann/json.hpp"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
