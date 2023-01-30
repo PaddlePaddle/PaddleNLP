@@ -17,20 +17,26 @@
 
 import copy
 import math
-import numpy as np
 
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
 from paddlenlp.transformers import PretrainedModel, register_base_model
 
+from ...utils.env import CONFIG_NAME
+from .configuration import (
+    NEZHA_PRETRAINED_INIT_CONFIGURATION,
+    NEZHA_PRETRAINED_RESOURCE_FILES_MAP,
+    NeZhaConfig,
+)
+
 __all__ = [
     "NeZhaModel",
     "NeZhaPretrainedModel",
     "NeZhaForPretraining",
     "NeZhaForSequenceClassification",
-    "NeZhaPretrainingHeads",
     "NeZhaForTokenClassification",
     "NeZhaForQuestionAnswering",
     "NeZhaForMultipleChoice",
@@ -77,36 +83,28 @@ ACT2FN = {
 
 
 class NeZhaAttention(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_attention_heads=12,
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaAttention, self).__init__()
-        if hidden_size % num_attention_heads != 0:
+        if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
-                "The hidden size (%d) is not a multiple of the number of attention "
-                "heads (%d)" % (hidden_size, num_attention_heads)
+                "The hidden size ({config.hidden_size}) is not a multiple of the number of attention "
+                "heads ({config.num_attention_heads})"
             )
-        self.num_attention_heads = num_attention_heads
-        self.attention_head_size = int(hidden_size / num_attention_heads)
+        self.num_attention_heads = config.num_attention_heads
+        self.attention_head_size = int(config.hidden_size / config.num_attention_heads)
         self.all_head_size = self.num_attention_heads * self.attention_head_size
 
-        self.query = nn.Linear(hidden_size, self.all_head_size)
-        self.key = nn.Linear(hidden_size, self.all_head_size)
-        self.value = nn.Linear(hidden_size, self.all_head_size)
+        self.query = nn.Linear(config.hidden_size, self.all_head_size)
+        self.key = nn.Linear(config.hidden_size, self.all_head_size)
+        self.value = nn.Linear(config.hidden_size, self.all_head_size)
         self.relative_positions_embeddings = self.generate_relative_positions_embeddings(
-            length=512, depth=self.attention_head_size, max_relative_position=max_relative_position
+            length=512, depth=self.attention_head_size, max_relative_position=config.max_relative_position
         )
-        self.attention_dropout = nn.Dropout(attention_probs_dropout_prob)
+        self.attention_dropout = nn.Dropout(config.attention_probs_dropout_prob)
 
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.output_dropout = nn.Dropout(hidden_dropout_prob)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.output_dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def generate_relative_positions_embeddings(self, length, depth, max_relative_position=127):
         vocab_size = max_relative_position * 2 + 1
@@ -201,32 +199,15 @@ class NeZhaAttention(nn.Layer):
 
 
 class NeZhaLayer(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaLayer, self).__init__()
         self.seq_len_dim = 1
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
-        self.attention = NeZhaAttention(
-            hidden_size=hidden_size,
-            num_attention_heads=num_attention_heads,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
-        self.ffn = nn.Linear(hidden_size, intermediate_size)
-        self.ffn_output = nn.Linear(intermediate_size, hidden_size)
-        self.activation = ACT2FN[hidden_act]
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
+        self.attention = NeZhaAttention(config)
+        self.ffn = nn.Linear(config.hidden_size, config.intermediate_size)
+        self.ffn_output = nn.Linear(config.intermediate_size, config.hidden_size)
+        self.activation = ACT2FN[config.hidden_act]
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, hidden_states, attention_mask=None):
         attention_output, layer_att = self.attention(hidden_states, attention_mask)
@@ -242,30 +223,10 @@ class NeZhaLayer(nn.Layer):
 
 
 class NeZhaEncoder(nn.Layer):
-    def __init__(
-        self,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_relative_position=64,
-        layer_norm_eps="1e-12",
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaEncoder, self).__init__()
-        layer = NeZhaLayer(
-            hidden_size=hidden_size,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            hidden_act=hidden_act,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
-        self.layer = nn.LayerList([copy.deepcopy(layer) for _ in range(num_hidden_layers)])
+        layer = NeZhaLayer(config)
+        self.layer = nn.LayerList([copy.deepcopy(layer) for _ in range(config.num_hidden_layers)])
 
     def forward(self, hidden_states, attention_mask):
         all_encoder_layers = []
@@ -279,26 +240,18 @@ class NeZhaEncoder(nn.Layer):
 
 
 class NeZhaEmbeddings(nn.Layer):
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        hidden_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=16,
-        use_relative_position=True,
-    ):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaEmbeddings, self).__init__()
-        self.use_relative_position = use_relative_position
+        self.use_relative_position = config.use_relative_position
 
-        self.word_embeddings = nn.Embedding(vocab_size, hidden_size)
+        self.word_embeddings = nn.Embedding(config.vocab_size, config.hidden_size)
 
-        if not use_relative_position:
-            self.position_embeddings = nn.Embedding(max_position_embeddings, hidden_size)
+        if not self.use_relative_position:
+            self.position_embeddings = nn.Embedding(config.max_position_embeddings, config.hidden_size)
 
-        self.token_type_embeddings = nn.Embedding(type_vocab_size, hidden_size)
-        self.layer_norm = nn.LayerNorm(hidden_size)
-        self.dropout = nn.Dropout(hidden_dropout_prob)
+        self.token_type_embeddings = nn.Embedding(config.type_vocab_size, config.hidden_size)
+        self.layer_norm = nn.LayerNorm(config.hidden_size)
+        self.dropout = nn.Dropout(config.hidden_dropout_prob)
 
     def forward(self, input_ids, token_type_ids=None):
         seq_length = input_ids.shape[1]
@@ -325,9 +278,9 @@ class NeZhaEmbeddings(nn.Layer):
 
 
 class NeZhaPooler(nn.Layer):
-    def __init__(self, hidden_size):
+    def __init__(self, config: NeZhaConfig):
         super(NeZhaPooler, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
         self.activation = nn.Tanh()
 
     def forward(self, hidden_states):
@@ -348,77 +301,13 @@ class NeZhaPretrainedModel(PretrainedModel):
     See :class:`~paddlenlp.transformers.model_utils.PretrainedModel` for more details.
     """
 
-    pretrained_init_configuration = {
-        "nezha-base-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-large-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-base-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 768,
-            "num_hidden_layers": 12,
-            "num_attention_heads": 12,
-            "intermediate_size": 3072,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-        "nezha-large-wwm-chinese": {
-            "vocab_size": 21128,
-            "hidden_size": 1024,
-            "num_hidden_layers": 24,
-            "num_attention_heads": 16,
-            "intermediate_size": 4096,
-            "hidden_act": "gelu",
-            "hidden_dropout_prob": 0.1,
-            "attention_probs_dropout_prob": 0.1,
-            "max_position_embeddings": 512,
-            "max_relative_position": 64,
-            "type_vocab_size": 2,
-            "initializer_range": 0.02,
-            "use_relative_position": True,
-        },
-    }
-    pretrained_resource_files_map = {
-        "model_state": {
-            "nezha-base-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-chinese.pdparams",
-            "nezha-large-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-chinese.pdparams",
-            "nezha-base-wwm-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-base-wwm-chinese.pdparams",
-            "nezha-large-wwm-chinese": "https://bj.bcebos.com/paddlenlp/models/transformers/nezha/nezha-large-wwm-chinese.pdparams",
-        }
-    }
+    model_config_file = CONFIG_NAME
+    config_class = NeZhaConfig
+    resource_files_names = {"model_state": "model_state.pdparams"}
     base_model_prefix = "nezha"
+
+    pretrained_init_configuration = NEZHA_PRETRAINED_INIT_CONFIGURATION
+    pretrained_resource_files_map = NEZHA_PRETRAINED_RESOURCE_FILES_MAP
 
     def init_weights(self, layer):
         """Initialization hook"""
@@ -429,9 +318,7 @@ class NeZhaPretrainedModel(PretrainedModel):
                 layer.weight.set_value(
                     paddle.tensor.normal(
                         mean=0.0,
-                        std=self.initializer_range
-                        if hasattr(self, "initializer_range")
-                        else self.nezha.config["initializer_range"],
+                        std=self.config.initializer_range,
                         shape=layer.weight.shape,
                     )
                 )
@@ -503,48 +390,15 @@ class NeZhaModel(NeZhaPretrainedModel):
 
     """
 
-    def __init__(
-        self,
-        vocab_size,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        max_relative_position=64,
-        layer_norm_eps=1e-12,
-        use_relative_position=True,
-    ):
-        super(NeZhaModel, self).__init__()
-        self.initializer_range = initializer_range
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaModel, self).__init__(config)
+        self.initializer_range = config.initializer_range
 
-        self.embeddings = NeZhaEmbeddings(
-            vocab_size=vocab_size,
-            hidden_size=hidden_size,
-            hidden_dropout_prob=hidden_dropout_prob,
-            max_position_embeddings=max_position_embeddings,
-            type_vocab_size=type_vocab_size,
-            use_relative_position=use_relative_position,
-        )
+        self.embeddings = NeZhaEmbeddings(config)
 
-        self.encoder = NeZhaEncoder(
-            hidden_size=hidden_size,
-            num_hidden_layers=num_hidden_layers,
-            num_attention_heads=num_attention_heads,
-            intermediate_size=intermediate_size,
-            hidden_act=hidden_act,
-            hidden_dropout_prob=hidden_dropout_prob,
-            attention_probs_dropout_prob=attention_probs_dropout_prob,
-            max_relative_position=max_relative_position,
-            layer_norm_eps=layer_norm_eps,
-        )
+        self.encoder = NeZhaEncoder(config)
 
-        self.pooler = NeZhaPooler(hidden_size)
+        self.pooler = NeZhaPooler(config)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -627,14 +481,16 @@ class NeZhaModel(NeZhaPretrainedModel):
 
 
 class NeZhaLMPredictionHead(nn.Layer):
-    def __init__(self, hidden_size, vocab_size, hidden_act, embedding_weights=None, layer_norm_eps=1e-12):
+    def __init__(self, config: NeZhaConfig, embedding_weights=None):
         super(NeZhaLMPredictionHead, self).__init__()
-        self.dense = nn.Linear(hidden_size, hidden_size)
-        self.activation = ACT2FN[hidden_act]
-        self.layer_norm = nn.LayerNorm(hidden_size, epsilon=layer_norm_eps)
+        self.dense = nn.Linear(config.hidden_size, config.hidden_size)
+        self.activation = ACT2FN[config.hidden_act]
+        self.layer_norm = nn.LayerNorm(config.hidden_size, epsilon=config.layer_norm_eps)
 
         self.decoder_weight = embedding_weights
-        self.decoder_bias = self.create_parameter(shape=[vocab_size], dtype=self.decoder_weight.dtype, is_bias=True)
+        self.decoder_bias = self.create_parameter(
+            shape=[config.vocab_size], dtype=self.decoder_weight.dtype, is_bias=True
+        )
 
     def forward(self, hidden_states):
         hidden_states = self.dense(hidden_states)
@@ -664,10 +520,10 @@ class NeZhaPretrainingHeads(nn.Layer):
 
     """
 
-    def __init__(self, hidden_size, vocab_size, hidden_act, embedding_weights=None):
+    def __init__(self, config: NeZhaConfig, embedding_weights=None):
         super(NeZhaPretrainingHeads, self).__init__()
-        self.predictions = NeZhaLMPredictionHead(hidden_size, vocab_size, hidden_act, embedding_weights)
-        self.seq_relationship = nn.Linear(hidden_size, 2)
+        self.predictions = NeZhaLMPredictionHead(config=config, embedding_weights=embedding_weights)
+        self.seq_relationship = nn.Linear(config.hidden_size, 2)
 
     def forward(self, sequence_output, pooled_output):
         """
@@ -710,13 +566,11 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
 
     """
 
-    def __init__(self, nezha):
-        super(NeZhaForPretraining, self).__init__()
-        self.nezha = nezha
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForPretraining, self).__init__(config)
+        self.nezha = NeZhaModel(config)
         self.cls = NeZhaPretrainingHeads(
-            self.nezha.config["hidden_size"],
-            self.nezha.config["vocab_size"],
-            self.nezha.config["hidden_act"],
+            config,
             self.nezha.embeddings.word_embeddings.weight,
         )
 
@@ -766,7 +620,7 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
         if masked_lm_labels is not None and next_sentence_label is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, self.nezha.config["vocab_size"])), masked_lm_labels.reshape((-1,))
+                prediction_scores.reshape((-1, self.nezha.config.vocab_size)), masked_lm_labels.reshape((-1,))
             )
             next_sentence_loss = loss_fct(seq_relationship_score.reshape((-1, 2)), next_sentence_label.reshape((-1,)))
             total_loss = masked_lm_loss + next_sentence_loss
@@ -774,7 +628,7 @@ class NeZhaForPretraining(NeZhaPretrainedModel):
         elif masked_lm_labels is not None:
             loss_fct = nn.CrossEntropyLoss(ignore_index=-1)
             masked_lm_loss = loss_fct(
-                prediction_scores.reshape((-1, self.nezha.config["vocab_size"])), masked_lm_labels.reshape((-1,))
+                prediction_scores.reshape((-1, self.nezha.config.vocab_size)), masked_lm_labels.reshape((-1,))
             )
             total_loss = masked_lm_loss
             return total_loss
@@ -788,18 +642,14 @@ class NeZhaForQuestionAnswering(NeZhaPretrainedModel):
     and `span_end_logits`, designed for question-answering tasks like SQuAD.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForSequenceClassification.
     """
 
-    def __init__(self, nezha, dropout=None):
-        super(NeZhaForQuestionAnswering, self).__init__()
-        self.nezha = nezha
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], 2)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForQuestionAnswering, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.classifier = nn.Linear(config.hidden_size, 2)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -860,22 +710,18 @@ class NeZhaForSequenceClassification(NeZhaPretrainedModel):
     sequence classification/regression tasks like GLUE tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to None.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForSequenceClassification.
     """
 
-    def __init__(self, nezha, num_classes=2, dropout=None):
-        super(NeZhaForSequenceClassification, self).__init__()
-        self.num_classes = num_classes
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], num_classes)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForSequenceClassification, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -925,22 +771,18 @@ class NeZhaForTokenClassification(NeZhaPretrainedModel):
     designed for token classification tasks like NER tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_classes (int, optional):
-            The number of classes. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`NeZhaConfig`):
+            An instance of NeZhaConfig used to construct NeZhaForSequenceClassification.
     """
 
-    def __init__(self, nezha, num_classes=2, dropout=None):
-        super(NeZhaForTokenClassification, self).__init__()
-        self.num_classes = num_classes
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], num_classes)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForTokenClassification, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_labels = config.num_labels
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, self.num_labels)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -989,22 +831,18 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
     designed for multiple choice tasks like RocStories/SWAG tasks.
 
     Args:
-        nezha (:class:`NeZhaModel`):
-            An instance of NeZhaModel.
-        num_choices (int, optional):
-            The number of choices. Defaults to `2`.
-        dropout (float, optional):
-            The dropout probability for output of NeZha.
-            If None, use the same value as `hidden_dropout_prob` of `NeZhaModel`
-            instance `nezha`. Defaults to `None`.
+        config (:class:`BertConfig`):
+            An instance of BertConfig used to construct BertForMultipleChoice.
     """
 
-    def __init__(self, nezha, num_choices=2, dropout=None):
-        super(NeZhaForMultipleChoice, self).__init__()
-        self.num_choices = num_choices
-        self.nezha = nezha
-        self.dropout = nn.Dropout(dropout if dropout is not None else self.nezha.config["hidden_dropout_prob"])
-        self.classifier = nn.Linear(self.nezha.config["hidden_size"], 1)
+    def __init__(self, config: NeZhaConfig):
+        super(NeZhaForMultipleChoice, self).__init__(config)
+        self.nezha = NeZhaModel(config)
+        self.num_choices = config.num_choices
+        self.dropout = nn.Dropout(
+            config.classifier_dropout if config.classifier_dropout is not None else config.hidden_dropout_prob
+        )
+        self.classifier = nn.Linear(config.hidden_size, 1)
         self.apply(self.init_weights)
 
     def forward(self, input_ids, token_type_ids=None, attention_mask=None):
@@ -1027,9 +865,9 @@ class NeZhaForMultipleChoice(NeZhaPretrainedModel):
         # input_ids: [bs, num_choice, seq_l]
         input_ids = input_ids.reshape((-1, input_ids.shape[-1]))  # flat_input_ids: [bs*num_choice,seq_l]
 
-        if token_type_ids:
+        if token_type_ids is not None:
             token_type_ids = token_type_ids.reshape((-1, token_type_ids.shape[-1]))
-        if attention_mask:
+        if attention_mask is not None:
             attention_mask = attention_mask.reshape((-1, attention_mask.shape[-1]))
 
         _, pooled_output = self.nezha(input_ids, token_type_ids, attention_mask)
