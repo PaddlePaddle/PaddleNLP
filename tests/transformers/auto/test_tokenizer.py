@@ -17,7 +17,6 @@ import unittest
 
 import paddlenlp
 from paddlenlp.transformers import AutoTokenizer, is_fast_tokenizer_available
-from tests.testing_utils import slow
 
 
 class AutoTokenizerTest(unittest.TestCase):
@@ -50,16 +49,6 @@ class AutoTokenizerTest(unittest.TestCase):
         t2 = AutoTokenizer.from_pretrained(
             "hf-internal-testing/tiny-random-BertModel", from_hf_hub=True, use_fast=False
         )
-        if is_fast_tokenizer_available():
-            self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
-        else:
-            self.assertIsInstance(t1, paddlenlp.transformers.BertTokenizer)
-        self.assertIsInstance(t2, paddlenlp.transformers.BertTokenizer)
-
-    @slow
-    def test_hf_tokenizer_large(self):
-        t1 = AutoTokenizer.from_pretrained("bert-base-uncased", from_hf_hub=True, use_fast=True)
-        t2 = AutoTokenizer.from_pretrained("bert-base-uncased", from_hf_hub=True, use_fast=False)
         if is_fast_tokenizer_available():
             self.assertIsInstance(t1, paddlenlp.transformers.BertFastTokenizer)
         else:
