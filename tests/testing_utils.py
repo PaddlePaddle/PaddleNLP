@@ -286,7 +286,7 @@ def require_package(*package_names):
     return decorator
 
 
-def load_argv(config_file: str, key: str):
+def load_argv(config_file: str, key: str, return_dict: bool = False):
     """parse config file to argv
 
     Args:
@@ -304,6 +304,21 @@ def load_argv(config_file: str, key: str):
     config = config[sub_key]
 
     # 2. init argv
+    argv = construct_argv(config)
+    if return_dict:
+        return argv, config
+    return argv
+
+
+def construct_argv(config: dict) -> list[str]:
+    """construct argv by configs
+
+    Args:
+        config (dict): the config data
+
+    Returns:
+        list[str]: the argvs
+    """
     # get current test
     # refer to: https://docs.pytest.org/en/latest/example/simple.html#pytest-current-test-environment-variable
     current_test = "tests/__init__.py"

@@ -14,9 +14,10 @@
 from __future__ import annotations
 
 import sys
+import os
 from unittest import TestCase
 
-from tests.testing_utils import load_argv
+from tests.testing_utils import load_argv, construct_argv
 
 
 class GPTTest(TestCase):
@@ -29,11 +30,37 @@ class GPTTest(TestCase):
         sys.path.remove(self.path)
 
     def test_pretrain(self):
-        argv = load_argv(self.config_path, "pretrain")
+
+        # 1. run pretrain
+        argv, config = load_argv(self.config_path, "pretrain", return_dict=True)
         sys.argv = argv
         from run_pretrain import do_train
 
         do_train()
+
+        # 2. export model
+        from export_model import main
+
+        config = {
+            "model_type": config["model_type"],
+            "model_path": config["output_dir"],
+            "output_dir": os.path.join(config["output_dir"], "export_model"),
+        }
+        argv = construct_argv(config)
+        sys.argv = argv
+        main()
+
+        # 3. infer model
+        from deploy.python.inference import main
+
+        config = {
+            "model_type": config["model_type"],
+            "model_path": config["output_dir"],
+            "select_device": config["device"],
+        }
+        argv = construct_argv(config)
+        sys.argv = argv
+        main()
 
     def test_msra_ner(self):
         argv = load_argv(self.config_path, "msra_ner")
