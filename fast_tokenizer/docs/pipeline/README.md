@@ -149,6 +149,7 @@ Tokenizer 对象在运行`Tokenizer.encode` 或者 `Tokenizer.encode_batch` 方�
 ### Python 示例
 
 ```python
+
 import fast_tokenizer
 from fast_tokenizer import Tokenizer
 from fast_tokenizer.models import FastWordPiece
@@ -184,10 +185,68 @@ print(tokenizer.encode("我爱中国!"))
 # sequence_ranges:
 ```
 
-针对 ERNIE、BERT 这类常见模型，FastTokenizer 已经定义好这类模型的 Tokenizer，可以通过 `from fast_tokenizer import ErnieFastTokenizer` 直接使用。
+针对 ERNIE、BERT 这类常见模型，FastTokenizer Python 库 已经定义好这类模型的 Tokenizer，可以通过 `from fast_tokenizer import ErnieFastTokenizer` 直接使用。
 
 ### C++ 示例
 
+```c++
+
+#include <iostream>
+#include <vector>
+
+#include "fast_tokenizer/core/tokenizer.h"
+#include "fast_tokenizer/models/models.h"
+#include "fast_tokenizer/normalizers/normalizers.h"
+#include "fast_tokenizer/postprocessors/postprocessors.h"
+#include "fast_tokenizer/pretokenizers/pretokenizers.h"
+
+using namespace paddlenlp::fast_tokenizer;
+
+int main() {
+  std::vector<std::string> texts{"我爱中国！"};
+  core::Tokenizer tokenizer;
+
+  // 1. Set model
+  auto model = models::FastWordPiece::GetFastWordPieceFromFile(
+      "ernie_vocab.txt", "[UNK]", 100, "##", true);
+  tokenizer.SetModel(model);
+
+  // 2. Set Normalizer
+  normalizers::BertNormalizer normalizer(
+      /* clean_text = */ true,
+      /* handle_chinese_chars = */ true,
+      /* strip_accents= */ true,
+      /* lowercase = */ true);
+  tokenizer.SetNormalizer(normalizer);
+
+  // 3. Set Pretokenizer
+  pretokenizers::BertPreTokenizer pretokenizer;
+  tokenizer.SetPreTokenizer(pretokenizer);
+
+  // 4. Set PostProcessor
+  postprocessors::BertPostProcessor postprocessor;
+  tokenizer.SetPostProcessor(postprocessor);
+
+  std::vector<core::Encoding> encodings;
+  tokenizer.EncodeBatchStrings(texts, &encodings);
+
+  for (auto encoding : encodings) {
+    std::cout << encoding.DebugString() << std::endl;
+  }
+  return 0;
+}
+
+// The Encoding content:
+// ids: 101, 75, 329, 12, 20, 12044, 102
+// type_ids: 0, 0, 0, 0, 0, 0, 0
+// tokens: [CLS], 我, 爱, 中, 国, ！, [SEP]
+// offsets: (0, 0), (0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (0, 0)
+// special_tokens_mask: 1, 0, 0, 0, 0, 0, 1
+// attention_mask: 1, 1, 1, 1, 1, 1, 1
+// sequence_ranges: {0 : (1, 6) },
+```
+
+针对 ERNIE、BERT 这类常见模型，FastTokenizer C++ 库 已经定义好这类模型的 Tokenizer，可以通过 `paddlenlp::fast_tokenizer::tokenizers_impl::ErnieFastTokenizer` 直接使用。
 
 
 ## 参考文献
