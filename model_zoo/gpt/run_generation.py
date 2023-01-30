@@ -40,6 +40,7 @@ def parse_args():
         type=str,
         help="The path or shortcut name of the pre-trained model.",
     )
+    parser.add_argument("--from_hf_hub", type=bool, default=False, help="Whether load model from hf hub")
     parser.add_argument(
         "--decode_strategy", type=str, default="greedy_search", help="The decode strategy in generation."
     )
@@ -112,8 +113,8 @@ def main(args, input_text):
             )
         )
 
-    model = model_class.from_pretrained(args.model_name_or_path)
-    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path)
+    model = model_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
+    tokenizer = tokenizer_class.from_pretrained(args.model_name_or_path, from_hf_hub=args.from_hf_hub)
     model.eval()
 
     args.max_dec_len = adjust_length_to_model(args.max_dec_len, model.max_position_embeddings)

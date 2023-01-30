@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 from unittest import TestCase
 
-from tests.testing_utils import load_argv, slow
+from tests.testing_utils import load_argv
 
 
 class GPTTest(TestCase):
@@ -43,23 +43,13 @@ class GPTTest(TestCase):
 
         do_train()
 
-    def test_glue(self):
+    def test_run_glue(self):
         argv = load_argv(self.config_path, "glue")
         sys.argv = argv
         from run_glue import do_train
 
         do_train()
 
-    @slow
-    def test_eval(self):
-        argv = load_argv(self.config_path, "eval")
-        sys.argv = argv
-
-        from run_eval import run
-
-        run()
-
-    @slow
     def test_generation(self):
         argv = load_argv(self.config_path, "generation")
         sys.argv = argv

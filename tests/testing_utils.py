@@ -297,7 +297,7 @@ def load_argv(config_file: str, key: str):
     with open(config_file, "r", encoding="utf-8") as f:
         config = yaml.safe_load(f)[key]
 
-    sub_key = "test"
+    sub_key = "tiny"
     if os.getenv("RUN_SLOW_TEST", None):
         sub_key = "default"
 

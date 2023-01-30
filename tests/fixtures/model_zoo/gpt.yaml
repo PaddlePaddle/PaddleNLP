@@ -1,11 +1,20 @@
 pretrain:
-  test:
+  tiny:
     model_name_or_path: __internal_testing__/gpt
     input_dir: ./data
     output_dir: ./output_dir/pretrain
     weight_decay: 0.01
     max_steps: 2
     save_steps: 10
+    warmup_steps: 10
+    warmup_ratio: 0.01
+    per_device_train_batch_size: 4
+    device: cpu
+    eval_steps: 10
+    do_train: true
+    do_predict: true
+  
+  default:
     warmup_steps: 320000
     warmup_ratio: 0.01
     per_device_train_batch_size: 4
@@ -13,26 +22,10 @@ pretrain:
     eval_steps: 100
     do_train: true
     do_predict: true
-  
-  default:
-    model_name_or_path: gpt2-en
-    input_dir: ./data
-    output_dir: ./output_dir/pretrain
-    weight_decay: 0.01
-    max_steps: 500000
-    save_steps: 100000
-    device: gpu
-    lr_decay_style: none
-    warmup_steps: 320000
-    warmup_ratio: 0.01
-    per_device_train_batch_size: 4
-    eval_steps: 100
-    do_train: true
-    do_predict: true 
 
 
 msra_ner:
-  test:
+  tiny:
     model_name_or_path: __internal_testing__/gpt_cn
     max_seq_length: 32
     per_device_eval_batch_size: 4
@@ -58,7 +51,7 @@ msra_ner:
     do_train: true
   
 glue:
-  test:
+  tiny:
     model_name_or_path: __internal_testing__/gpt
     task_name: SST-2
     max_seq_length: 128
@@ -89,6 +82,15 @@ glue:
   
 
 generation:
+  tiny:
+    model_type: gpt2
+    model_name_or_path: hf-internal-testing/tiny-random-GPT2Model
+    from_hf_hub: true
+
   default:
     model_type: gpt2-cn
+    model_name_or_path: gpt-cpm-small-cn-distill
+
+eval:
+  default:
     model_name_or_path: gpt-cpm-small-cn-distill
