@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import os
-import sys
 import functools
 
 import paddle
@@ -41,7 +40,7 @@ class DataArguments:
     """
 
     dataset_dir: str = field(default=None, metadata={"help": "Local dataset directory should include train.txt, dev.txt and label.txt."})
-    max_seq_length: int = field(default=128,metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
+    max_seq_length: int = field(default=128, metadata={"help": "The maximum total input sequence length after tokenization. Sequences longer than this will be truncated, sequences shorter will be padded."})
 
 
 @dataclass
@@ -49,12 +48,12 @@ class ModelArguments:
     """
     Arguments pertaining to which model/config/tokenizer we are going to fine-tune from.
     """
-    params_dir: str = field(default='./checkpoint/',metadata={"help":"The output directory where the model checkpoints are written."})
+    params_dir: str = field(default='./checkpoint/', metadata={"help": "The output directory where the model checkpoints are written."})
 # yapf: enable
 
 
 @paddle.no_grad()
-def dynabert_evaluate(model, data_loader):
+def custom_evaluate(self, model, data_loader):
     metric = MetricReport()
     model.eval()
     metric.reset()
@@ -117,7 +116,7 @@ def main():
 
     compression_args.print_config()
 
-    trainer.compress(custom_dynabert_evaluate=dynabert_evaluate)
+    trainer.compress(custom_evaluate=custom_evaluate)
 
 
 if __name__ == "__main__":
