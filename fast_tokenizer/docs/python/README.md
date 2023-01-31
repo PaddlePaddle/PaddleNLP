@@ -1,4 +1,4 @@
-# FastTokenizer Python库 使用教程
+# FastTokenizer Python 库使用教程
 
 ## 1. 快速安装
 

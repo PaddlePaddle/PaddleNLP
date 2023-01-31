@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
 from typing import List
+
+import numpy as np
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 import paddle.nn.initializer as I
-
-from dataset import load_vocab, create_batches
+from dataset import create_batches, load_vocab
 
 
 def reverse_sequence(x, sequence_lengths):
@@ -179,7 +179,9 @@ class ELMoCharacterEncoderLayer(nn.Layer):
         self._char_embedding_layer = nn.Embedding(
             num_embeddings=char_vocab_size, embedding_dim=char_embed_dim, weight_attr=paramAttr
         )
-        self._char_embedding_layer.weight[0, :] = 0
+
+        with paddle.no_grad():
+            self._char_embedding_layer.weight[0, :] = 0
 
         self._convolution_layers = []
         for i, (width, num) in enumerate(cnn_filters):

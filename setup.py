@@ -67,6 +67,7 @@ setuptools.setup(
     long_description=read("README_en.md"),
     long_description_content_type="text/markdown",
     url="https://github.com/PaddlePaddle/PaddleNLP",
+    license_files=("LICENSE",),
     packages=setuptools.find_packages(
         where=".",
         exclude=("examples*", "tests*", "applications*", "fast_tokenizer*", "fast_generation*", "model_zoo*"),

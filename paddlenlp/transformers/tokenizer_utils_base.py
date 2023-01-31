@@ -1562,7 +1562,6 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # use pretrained_init_configuration as `init_kwargs` to init which
             # does not include the vocab file in it, thus add vocab file into
             # args.
-
             if args_name not in init_kwargs:
                 init_kwargs[args_name] = file_path
             # when `pretrained_model_name_or_path` is a pretrained model dir,
@@ -1572,6 +1571,11 @@ class PretrainedTokenizerBase(SpecialTokensMixin):
             # it still work, use the vocab file under this dir.
             elif not os.path.isfile(init_kwargs[args_name] or "") and os.path.isfile(file_path):
                 init_kwargs[args_name] = file_path
+
+        # TODO(zhoushunjie): It's not supportted to load tokenizer.json of hf so far.
+        if from_hf_hub and "tokenizer_file" in init_kwargs:
+            init_kwargs.pop("tokenizer_file")
+
         # TODO(guosheng): avoid reduplication of position args and key word args
         tokenizer = cls(*init_args, **init_kwargs)
         special_tokens_map_file = resolved_vocab_files.pop("special_tokens_map_file", None)

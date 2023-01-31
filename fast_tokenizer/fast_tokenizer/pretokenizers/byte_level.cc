@@ -13,8 +13,10 @@
 // limitations under the License.
 
 #include "fast_tokenizer/pretokenizers/byte_level.h"
+
 #include <codecvt>
 #include <locale>
+
 #include "fast_tokenizer/utils/utf8.h"
 #include "fast_tokenizer/utils/utils.h"
 #include "glog/logging.h"
@@ -41,9 +43,9 @@ ByteLevelPreTokenizer::ByteLevelPreTokenizer(bool add_prefix_space,
 void ByteLevelPreTokenizer::operator()(PreTokenizedString* pretokenized) const {
   std::vector<normalizers::NormalizedString> normalized_splits;
   pretokenized->Split([&normalized_splits, this](
-      int idx,
-      normalizers::NormalizedString* normalized,
-      std::vector<StringSplit>* string_splits) {
+                          int idx,
+                          normalizers::NormalizedString* normalized,
+                          std::vector<StringSplit>* string_splits) {
     if (this->add_prefix_space_ && normalized->GetStr().find(' ') != 0) {
       normalized->Prepend(" ");
     }
@@ -100,8 +102,8 @@ void from_json(const nlohmann::json& j,
 }
 
 void ProcessOffsets(core::Encoding* encoding, bool add_prefix_space) {
-  auto process_token_fn = [&](
-      uint32_t i, const std::string& token, core::Offset* offset) -> void {
+  auto process_token_fn =
+      [&](uint32_t i, const std::string& token, core::Offset* offset) -> void {
     uint32_t leading_spaces = 0;
     uint32_t trailing_spaces = 0;
 

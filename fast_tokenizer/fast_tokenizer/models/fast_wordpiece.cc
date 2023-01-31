@@ -13,20 +13,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "fast_tokenizer/models/fast_wordpiece.h"
+
 #include <algorithm>
 #include <codecvt>
 #include <fstream>
 #include <locale>
 #include <map>
 
-#include "glog/logging.h"
-#include "unicode/uchar.h"
-
-#include "fast_tokenizer/models/fast_wordpiece.h"
 #include "fast_tokenizer/models/wordpiece.h"
 #include "fast_tokenizer/utils/path.h"
 #include "fast_tokenizer/utils/utf8.h"
 #include "fast_tokenizer/utils/utils.h"
+#include "glog/logging.h"
+#include "unicode/uchar.h"
 
 namespace paddlenlp {
 namespace fast_tokenizer {
@@ -45,14 +45,13 @@ void FastWordPiece::InitFailureAndTrie() {
   PrecomputeEncodeValueForSubwordPrefix();
 }
 
-FastWordPiece::FastWordPiece()
-    : WordPiece(), with_pretokenization_(false) {}
+FastWordPiece::FastWordPiece() : WordPiece(), with_pretokenization_(false) {}
 
 FastWordPiece::FastWordPiece(const core::Vocab& vocab,
-                                 const std::string& unk_token,
-                                 size_t max_input_chars_per_word,
-                                 const std::string& continuing_subword_prefix,
-                                 bool with_pretokenization)
+                             const std::string& unk_token,
+                             size_t max_input_chars_per_word,
+                             const std::string& continuing_subword_prefix,
+                             bool with_pretokenization)
     : WordPiece(vocab,
                 unk_token,
                 max_input_chars_per_word,
@@ -383,12 +382,25 @@ std::vector<core::Token> FastWordPiece::TokenizeWithPreTokenize(
   return all_tokens;
 }
 
-std::vector<core::Token> FastWordPiece::Tokenize(
-    const std::string& sequence) {
+std::vector<core::Token> FastWordPiece::Tokenize(const std::string& sequence) {
   if (!with_pretokenization_) {
     return TokenizeWithoutPreTokenize(sequence);
   }
   return TokenizeWithPreTokenize(sequence);
+}
+
+FastWordPiece FastWordPiece::GetFastWordPieceFromFile(
+    const std::string& file,
+    const std::string& unk_token,
+    size_t max_input_chars_per_word,
+    const std::string& continuing_subword_prefix,
+    bool with_pretokenization) {
+  auto vocab = GetVocabFromFile(file);
+  return FastWordPiece(vocab,
+                       unk_token,
+                       max_input_chars_per_word,
+                       continuing_subword_prefix,
+                       with_pretokenization);
 }
 
 void to_json(nlohmann::json& j, const FastWordPiece& model) {
