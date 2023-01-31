@@ -19,7 +19,7 @@ import paddle.nn.functional as F
 from paddle.nn import Layer
 
 from .. import PretrainedModel, register_base_model
-from ..nezha.modeling import ACT2FN
+from ..activations import ACT2FN
 
 __all__ = [
     "GPTJModel",
