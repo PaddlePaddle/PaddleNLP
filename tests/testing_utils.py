@@ -345,15 +345,12 @@ def construct_argv(config: dict) -> list[str]:
 
 
 @contextmanager
-def argv_context_guard(config: dict | None):
+def argv_context_guard(config: dict):
     """construct argv by config
 
     Args:
         config (dict): the configuration to argv
     """
-    if config is None:
-        return
-
     old_argv = copy.deepcopy(sys.argv)
     argv = construct_argv(config)
     sys.argv = argv
