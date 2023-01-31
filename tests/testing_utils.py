@@ -303,9 +303,9 @@ def load_test_config(config_file: str, key: str) -> dict:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "slow"
+    sub_key = "default"
     if os.getenv("RUN_SLOW_TEST", None):
-        sub_key = "default"
+        sub_key = "slow"
 
     assert sub_key in config, f"<{sub_key}> not found in {key} configuration"
     config = config[sub_key]
