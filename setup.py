@@ -17,10 +17,18 @@ import os
 import setuptools
 
 
+PADDLENLP_NIGHTLY_VERSION = "PADDLENLP_NIGHTLY_VERSION"
+
+
 def read_requirements_file(filepath):
     with open(filepath) as fin:
         requirements = fin.read()
     return requirements
+
+
+__version__ = "2.5.0"
+if os.getenv(PADDLENLP_NIGHTLY_VERSION):
+    __version__ = f"{__version__}.dev"
 
 
 extras = {}
@@ -60,7 +68,7 @@ def get_package_data_files(package, data, package_dir=None):
 
 setuptools.setup(
     name="paddlenlp",
-    version="2.5.0",
+    version=version,
     author="PaddleNLP Team",
     author_email="paddlenlp@baidu.com",
     description="Easy-to-use and powerful NLP library with Awesome model zoo, supporting wide-range of NLP tasks from research to industrial applications, including Neural Search, Question Answering, Information Extraction and Sentiment Analysis end-to-end system.",
