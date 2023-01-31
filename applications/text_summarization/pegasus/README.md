@@ -304,3 +304,5 @@ inference_model/
   //International Conference on Machine Learning. PMLR, 2020: 11328-11339.
 - Wang J, Zhang Y, Zhang L, et al. Fengshenbang 1.0: Being the Foundation of Chinese Cognitive Intelligence[J]. arXiv
   preprint arXiv:2209.02970, 2022.
+- Xie S, Lv A, Xia Y, et al. Target-side input augmentation for sequence to sequence generation[C]
+  //International Conference on Learning Representations. 2022.
