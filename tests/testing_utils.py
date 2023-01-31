@@ -312,9 +312,7 @@ def load_test_config(config_file: str, key: str) -> dict | None:
     assert key in config, f"<{key}> should be the top key in configuration file"
     config = config[key]
 
-    sub_key = "slow"
-    if is_slow_test():
-        sub_key = "default"
+    sub_key = "slow" if is_slow_test() else "default"
 
     if sub_key not in config:
         return None
