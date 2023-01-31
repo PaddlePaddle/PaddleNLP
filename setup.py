@@ -16,7 +16,7 @@ import os
 
 import setuptools
 
-PADDLENLP_NIGHTLY_VERSION = "PADDLENLP_NIGHTLY_VERSION"
+PADDLENLP_STABLE_VERSION = "PADDLENLP_STABLE_VERSION"
 
 
 def read_requirements_file(filepath):
@@ -25,9 +25,9 @@ def read_requirements_file(filepath):
     return requirements
 
 
-__version__ = "2.5.0"
-if os.getenv(PADDLENLP_NIGHTLY_VERSION):
-    __version__ = f"{__version__}.dev"
+__version__ = "2.5.0.dev"
+if os.getenv(PADDLENLP_STABLE_VERSION):
+    __version__ = __version__.replace(".dev", "")
 
 
 extras = {}
