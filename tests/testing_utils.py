@@ -13,15 +13,19 @@
 # limitations under the License.
 from __future__ import annotations
 
+import copy
 import gc
 import inspect
 import os
+import sys
 import unittest
 from collections.abc import Mapping
+from contextlib import contextmanager
 from distutils.util import strtobool
 
 import numpy as np
 import paddle
+import yaml
 
 from paddlenlp.utils.import_utils import is_package_available
 
@@ -283,3 +287,63 @@ def require_package(*package_names):
         return func
 
     return decorator
+
+
+def load_test_config(config_file: str, key: str) -> dict:
+    """parse config file to argv
+
+    Args:
+        config_dir (str, optional): the path of config file. Defaults to None.
+        config_name (str, optional): the name key in config file. Defaults to None.
+    """
+    # 1. load the config with key and test env(default, test)
+    with open(config_file, "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f)
+
+    assert key in config, f"<{key}> should be the top key in configuration file"
+    config = config[key]
+
+    sub_key = "slow"
+    if os.getenv("RUN_SLOW_TEST", None):
+        sub_key = "default"
+
+    assert sub_key in config, f"<{sub_key}> not found in {key} configuration"
+    config = config[sub_key]
+    return config
+
+
+def construct_argv(config: dict) -> list[str]:
+    """construct argv by configs
+
+    Args:
+        config (dict): the config data
+
+    Returns:
+        list[str]: the argvs
+    """
+    # get current test
+    # refer to: https://docs.pytest.org/en/latest/example/simple.html#pytest-current-test-environment-variable
+    current_test = "tests/__init__.py"
+    if "PYTEST_CURRENT_TEST" in os.environ:
+        current_test = os.getenv("PYTEST_CURRENT_TEST").split("::")[0]
+
+    argv = [current_test]
+    for key, value in config.items():
+        argv.append(f"--{key}")
+        argv.append(str(value))
+
+    return argv
+
+
+@contextmanager
+def argv_context_guard(config: dict):
+    """construct argv by config
+
+    Args:
+        config (dict): the configuration to argv
+    """
+    old_argv = copy.deepcopy(sys.argv)
+    argv = construct_argv(config)
+    sys.argv = argv
+    yield
+    sys.argv = old_argv
