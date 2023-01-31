@@ -15,7 +15,7 @@ pretrain:
     do_train: true
     do_predict: true
   
-default:
+  default:
     model_type: gpt
     model_name_or_path: gpt2-en
     warmup_steps: 320000
@@ -92,8 +92,4 @@ generation:
 
   default:
     model_type: gpt2-cn
-    model_name_or_path: gpt-cpm-small-cn-distill
-
-eval:
-  default:
     model_name_or_path: gpt-cpm-small-cn-distill
